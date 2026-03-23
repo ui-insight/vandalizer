@@ -1,0 +1,21 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "knowledge_base",
+  "_seed_meta": {
+    "seed_id": "kb-dod-research",
+    "display_name": "DOD Research Funding & DFARS",
+    "description": "Department of Defense research funding policies, DFARS clauses, and DARPA/ONR/AFOSR-specific guidance.",
+    "quality_tier": "gold",
+    "collections": ["federal-agency", "reference-knowledge"]
+  },
+  "items": [{
+    "title": "DOD Research Funding & DFARS",
+    "description": "DFARS supplement, DOD grant and agreement regulations (DoDGARs), fundamental research determination, and controlled unclassified information requirements.",
+    "sources": [
+      {"source_type": "url", "url": "https://www.ecfr.gov/current/title-2/subtitle-B/chapter-XI/subchapter-D/part-1104"},
+      {"source_type": "url", "url": "https://www.acquisition.gov/dfars"},
+      {"source_type": "url", "url": "https://basicresearch.defense.gov/about/frequently-asked-questions/"}
+    ]
+  }]
+}

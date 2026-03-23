@@ -94,11 +94,13 @@ class MetadataUpdateRequest(BaseModel):
 class CreateCollectionRequest(BaseModel):
     title: str
     description: Optional[str] = None
+    featured: Optional[bool] = None
 
 
 class UpdateCollectionRequest(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
+    featured: Optional[bool] = None
 
 
 class AddToCollectionRequest(BaseModel):
@@ -176,13 +178,21 @@ async def my_requests(
 async def list_verified_items(
     kind: Optional[str] = Query(None),
     search: Optional[str] = Query(None),
+    quality_tier: Optional[str] = Query(None),
+    tag: Optional[str] = Query(None),
+    collection_id: Optional[str] = Query(None),
+    sort: Optional[str] = Query(None),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     user: User = Depends(get_current_user),
 ):
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
-    items = await svc.list_verified_items(
+    result = await svc.list_verified_items(
         kind_filter=kind, search=search, user_org_ancestry=user_org_ancestry,
+        quality_tier=quality_tier, tag=tag, collection_id=collection_id,
+        sort=sort, skip=skip, limit=limit,
     )
-    return {"items": items}
+    return result
 
 
 @router.get("/verified/{item_kind}/{item_id}/metadata")
@@ -315,6 +325,15 @@ async def list_featured_collections(user: User = Depends(get_current_user)):
     return {"collections": [svc._collection_to_dict(c) for c in collections]}
 
 
+@router.get("/collections/browse")
+async def browse_collections(user: User = Depends(get_current_user)):
+    """List all non-empty collections for catalog browsing (available to all users)."""
+    from app.models.verification import VerifiedCollection
+    collections = await VerifiedCollection.find_all().sort("-updated_at").to_list()
+    result = [svc._collection_to_dict(c) for c in collections if c.item_ids]
+    return {"collections": result}
+
+
 @router.get("/collections")
 async def list_collections(user: User = Depends(get_current_user)):
     _require_examiner_access(user)
@@ -327,7 +346,10 @@ async def create_collection(
     user: User = Depends(get_current_user),
 ):
     _require_examiner_access(user)
-    result = await svc.create_collection(title=req.title, user_id=user.user_id, description=req.description)
+    result = await svc.create_collection(
+        title=req.title, user_id=user.user_id,
+        description=req.description, featured=req.featured,
+    )
     return result
 
 
@@ -338,7 +360,9 @@ async def update_collection(
     user: User = Depends(get_current_user),
 ):
     _require_examiner_access(user)
-    result = await svc.update_collection(collection_id, title=req.title, description=req.description)
+    result = await svc.update_collection(
+        collection_id, title=req.title, description=req.description, featured=req.featured,
+    )
     if not result:
         raise HTTPException(status_code=404, detail="Collection not found")
     return result

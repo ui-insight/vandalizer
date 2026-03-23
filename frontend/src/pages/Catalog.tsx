@@ -1,11 +1,23 @@
-import { useCallback, useEffect, useState } from 'react'
-import { Search, ShieldCheck, Beaker, BookOpen, Workflow, Database, ChevronDown, ChevronUp } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  Search, ShieldCheck, Beaker, BookOpen, Workflow, Database,
+  ChevronDown, ChevronUp, FolderOpen, Star, X, Plus, ArrowUpDown,
+} from 'lucide-react'
 import { AppLayout } from '../components/layout/AppLayout'
 import { QualityBadge } from '../components/library/QualityBadge'
-import { listVerifiedItems, listFeaturedCollections, tryVerifiedItem } from '../api/library'
-import type { VerifiedCatalogItem, VerifiedCollection } from '../types/library'
+import { AddToLibraryDialog } from '../components/library/AddToLibraryDialog'
+import {
+  listVerifiedItems, browseCollections, listFeaturedCollections,
+  tryVerifiedItem, listLibraries,
+} from '../api/library'
+import type { VerifiedCatalogItem, VerifiedCollection, Library, LibraryItemKind } from '../types/library'
+import { useAuth } from '../hooks/useAuth'
 
 type KindFilter = '' | 'workflow' | 'search_set' | 'knowledge_base'
+type SortOption = '' | 'quality' | 'name' | 'validations'
+type QualityFilter = '' | 'gold' | 'silver' | 'bronze'
+
+const PAGE_SIZE = 30
 
 function KindIcon({ kind }: { kind: string }) {
   if (kind === 'workflow') return <Workflow className="h-4 w-4 text-purple-500" />
@@ -85,7 +97,15 @@ function TryItPanel({ item }: { item: VerifiedCatalogItem }) {
   )
 }
 
-function CatalogCard({ item }: { item: VerifiedCatalogItem }) {
+function CatalogCard({
+  item,
+  onTagClick,
+  onAddToLibrary,
+}: {
+  item: VerifiedCatalogItem
+  onTagClick: (tag: string) => void
+  onAddToLibrary: (item: VerifiedCatalogItem) => void
+}) {
   const [expanded, setExpanded] = useState(false)
   const [showTry, setShowTry] = useState(false)
   const canTry = item.kind === 'search_set' || item.kind === 'knowledge_base'
@@ -115,6 +135,14 @@ function CatalogCard({ item }: { item: VerifiedCatalogItem }) {
             )}
           </div>
           <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={() => onAddToLibrary(item)}
+              className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-gray-600 hover:bg-gray-100"
+              title="Add to my library"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Save
+            </button>
             {canTry && (
               <button
                 onClick={() => setShowTry(!showTry)}
@@ -137,9 +165,13 @@ function CatalogCard({ item }: { item: VerifiedCatalogItem }) {
         {item.tags.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-2">
             {item.tags.map((tag, i) => (
-              <span key={i} className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">
+              <button
+                key={i}
+                onClick={() => onTagClick(tag)}
+                className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors cursor-pointer"
+              >
                 {tag}
-              </span>
+              </button>
             ))}
           </div>
         )}
@@ -167,139 +199,416 @@ function CatalogCard({ item }: { item: VerifiedCatalogItem }) {
   )
 }
 
-function FeaturedCollectionCard({ collection, items }: { collection: VerifiedCollection; items: VerifiedCatalogItem[] }) {
-  const collectionItems = items.filter(i => collection.item_ids.includes(i.item_id))
-  if (collectionItems.length === 0) return null
+// ── Sidebar collection link ──────────────────────────────────────────────
 
+function CollectionLink({
+  collection,
+  active,
+  onClick,
+}: {
+  collection: VerifiedCollection
+  active: boolean
+  onClick: () => void
+}) {
   return (
-    <div className="border border-gray-200 rounded-lg bg-white p-4">
-      <h3 className="text-sm font-semibold text-gray-900 mb-1">{collection.title}</h3>
-      {collection.description && (
-        <p className="text-xs text-gray-500 mb-3">{collection.description}</p>
+    <button
+      onClick={onClick}
+      className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors flex items-center gap-2 ${
+        active
+          ? 'bg-gray-900 text-white'
+          : 'text-gray-700 hover:bg-gray-100'
+      }`}
+    >
+      <FolderOpen className={`h-3.5 w-3.5 shrink-0 ${active ? 'text-gray-300' : 'text-gray-400'}`} />
+      <span className="truncate flex-1">{collection.title}</span>
+      {collection.featured && (
+        <Star className={`h-3 w-3 shrink-0 fill-current ${active ? 'text-yellow-300' : 'text-yellow-400'}`} />
       )}
-      <div className="space-y-2">
-        {collectionItems.slice(0, 5).map(item => (
-          <div key={item.id} className="flex items-center gap-2 text-xs">
-            <KindIcon kind={item.kind} />
-            <span className="text-gray-700 truncate">{item.display_name || item.name}</span>
-            <QualityBadge tier={item.quality_tier} score={item.quality_score} />
-          </div>
-        ))}
-        {collectionItems.length > 5 && (
-          <p className="text-xs text-gray-400">+{collectionItems.length - 5} more</p>
-        )}
-      </div>
-    </div>
+      <span className={`text-xs shrink-0 ${active ? 'text-gray-300' : 'text-gray-500'}`}>
+        {collection.item_ids.length}
+      </span>
+    </button>
   )
 }
 
+// ── Main Catalog page ────────────────────────────────────────────────────
+
 export default function Catalog() {
+  const { user } = useAuth()
+
+  // Data
   const [items, setItems] = useState<VerifiedCatalogItem[]>([])
+  const [total, setTotal] = useState(0)
   const [collections, setCollections] = useState<VerifiedCollection[]>([])
+  const [featuredCollections, setFeaturedCollections] = useState<VerifiedCollection[]>([])
+  const [libraries, setLibraries] = useState<Library[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+
+  // Filters
   const [searchQuery, setSearchQuery] = useState('')
   const [kindFilter, setKindFilter] = useState<KindFilter>('')
+  const [qualityFilter, setQualityFilter] = useState<QualityFilter>('')
+  const [tagFilter, setTagFilter] = useState('')
+  const [sortOption, setSortOption] = useState<SortOption>('')
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null)
 
+  // Add to library dialog
+  const [addToLibraryItem, setAddToLibraryItem] = useState<VerifiedCatalogItem | null>(null)
+
+  // Debounced search
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current)
+    searchTimerRef.current = setTimeout(() => setDebouncedSearch(searchQuery), 300)
+    return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current) }
+  }, [searchQuery])
+
+  // Load collections once
+  useEffect(() => {
+    browseCollections().then(d => setCollections(d.collections)).catch(() => {})
+    listFeaturedCollections().then(d => setFeaturedCollections(d.collections)).catch(() => {})
+  }, [])
+
+  // Load user libraries for the "add to library" dialog
+  useEffect(() => {
+    const teamId = user?.current_team ?? undefined
+    listLibraries(teamId).then(setLibraries).catch(() => {})
+  }, [user?.current_team])
+
+  // Fetch items when filters change
   const refresh = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await listVerifiedItems(kindFilter || undefined, searchQuery || undefined)
+      const data = await listVerifiedItems({
+        kind: kindFilter || undefined,
+        search: debouncedSearch || undefined,
+        quality_tier: qualityFilter || undefined,
+        tag: tagFilter || undefined,
+        collection_id: selectedCollectionId || undefined,
+        sort: sortOption || undefined,
+        skip: 0,
+        limit: PAGE_SIZE,
+      })
       setItems(data.items)
+      setTotal(data.total)
     } catch {
       // silent
     } finally {
       setLoading(false)
     }
-  }, [kindFilter, searchQuery])
+  }, [kindFilter, debouncedSearch, qualityFilter, tagFilter, sortOption, selectedCollectionId])
 
   useEffect(() => {
     refresh()
   }, [refresh])
 
-  useEffect(() => {
-    listFeaturedCollections().then(d => setCollections(d.collections)).catch(() => {})
-  }, [])
+  // Load more (pagination)
+  const handleLoadMore = async () => {
+    setLoadingMore(true)
+    try {
+      const data = await listVerifiedItems({
+        kind: kindFilter || undefined,
+        search: debouncedSearch || undefined,
+        quality_tier: qualityFilter || undefined,
+        tag: tagFilter || undefined,
+        collection_id: selectedCollectionId || undefined,
+        sort: sortOption || undefined,
+        skip: items.length,
+        limit: PAGE_SIZE,
+      })
+      setItems(prev => [...prev, ...data.items])
+    } catch {
+      // silent
+    } finally {
+      setLoadingMore(false)
+    }
+  }
 
-  const filters: [KindFilter, string][] = [
+  const hasMore = items.length < total
+
+  // Active collection for header display
+  const activeCollection = selectedCollectionId
+    ? collections.find(c => c.id === selectedCollectionId) ?? null
+    : null
+
+  // Clear all filters
+  const clearFilters = () => {
+    setSearchQuery('')
+    setKindFilter('')
+    setQualityFilter('')
+    setTagFilter('')
+    setSortOption('')
+    setSelectedCollectionId(null)
+  }
+
+  const hasActiveFilters = !!(kindFilter || qualityFilter || tagFilter || sortOption || selectedCollectionId || debouncedSearch)
+
+  const kindFilters: [KindFilter, string][] = [
     ['', 'All'],
     ['workflow', 'Workflows'],
     ['search_set', 'Extractions'],
     ['knowledge_base', 'Knowledge Bases'],
   ]
 
+  const sortOptions: [SortOption, string][] = [
+    ['', 'Newest'],
+    ['quality', 'Quality'],
+    ['name', 'Name'],
+    ['validations', 'Most Validated'],
+  ]
+
   return (
     <AppLayout>
-      <div className="max-w-5xl mx-auto">
-        <div className="flex items-center gap-3 mb-6">
-          <ShieldCheck className="h-6 w-6 text-green-600" />
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">Verified Catalog</h1>
-            <p className="text-sm text-gray-500">
-              Browse validated and examiner-approved workflows, extractions, and knowledge bases
-            </p>
+      <div className="flex h-full -m-6">
+        {/* ── Sidebar: Collections ── */}
+        <div className="w-60 shrink-0 border-r border-gray-200 bg-gray-50/50 overflow-y-auto p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <ShieldCheck className="h-5 w-5 text-green-600" />
+            <h2 className="text-sm font-bold text-gray-900">Catalog</h2>
           </div>
-        </div>
 
-        {/* Featured collections */}
-        {collections.length > 0 && !searchQuery && !kindFilter && (
-          <div className="mb-6">
-            <h2 className="text-sm font-semibold text-gray-700 mb-3">Featured Collections</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {collections.map(col => (
-                <FeaturedCollectionCard key={col.id} collection={col} items={items} />
+          {/* "All Items" link */}
+          <button
+            onClick={() => setSelectedCollectionId(null)}
+            className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors mb-1 ${
+              !selectedCollectionId
+                ? 'bg-gray-900 text-white'
+                : 'text-gray-700 hover:bg-gray-100'
+            }`}
+          >
+            All Items
+            <span className={`ml-1 text-xs ${!selectedCollectionId ? 'text-gray-300' : 'text-gray-500'}`}>
+              {total}
+            </span>
+          </button>
+
+          {/* Featured collections */}
+          {featuredCollections.length > 0 && (
+            <div className="mt-4 mb-2">
+              <div className="flex items-center gap-1 px-3 mb-1">
+                <Star className="h-3 w-3 text-yellow-400 fill-current" />
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Featured</span>
+              </div>
+              {featuredCollections.map(col => (
+                <CollectionLink
+                  key={col.id}
+                  collection={col}
+                  active={selectedCollectionId === col.id}
+                  onClick={() => setSelectedCollectionId(selectedCollectionId === col.id ? null : col.id)}
+                />
               ))}
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Search + filter */}
-        <div className="flex items-center gap-3 mb-4 flex-wrap">
-          <div className="relative flex-1 min-w-[200px] max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search verified items..."
-              className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            {filters.map(([val, label]) => (
-              <button
-                key={val}
-                onClick={() => setKindFilter(val)}
-                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                  kindFilter === val
-                    ? 'bg-gray-900 text-white border-gray-900'
-                    : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          {/* All other collections */}
+          {collections.filter(c => !featuredCollections.some(f => f.id === c.id)).length > 0 && (
+            <div className="mt-4 mb-2">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide px-3">Collections</span>
+              <div className="mt-1">
+                {collections
+                  .filter(c => !featuredCollections.some(f => f.id === c.id))
+                  .map(col => (
+                    <CollectionLink
+                      key={col.id}
+                      collection={col}
+                      active={selectedCollectionId === col.id}
+                      onClick={() => setSelectedCollectionId(selectedCollectionId === col.id ? null : col.id)}
+                    />
+                  ))}
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Results */}
-        {loading ? (
-          <div className="text-sm text-gray-500 py-12 text-center">Loading...</div>
-        ) : items.length === 0 ? (
-          <div className="text-center py-16">
-            <ShieldCheck className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-            <h3 className="text-sm font-medium text-gray-700 mb-1">No verified items yet</h3>
-            <p className="text-xs text-gray-500">
-              Items submitted by your team and approved by examiners will appear here.
-            </p>
+        {/* ── Main content ── */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {/* Header */}
+          <div className="mb-4">
+            {activeCollection ? (
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <FolderOpen className="h-5 w-5 text-gray-400" />
+                  <h1 className="text-lg font-bold text-gray-900">{activeCollection.title}</h1>
+                  {activeCollection.featured && (
+                    <Star className="h-4 w-4 text-yellow-400 fill-current" />
+                  )}
+                </div>
+                {activeCollection.description && (
+                  <p className="text-sm text-gray-500 ml-7">{activeCollection.description}</p>
+                )}
+              </div>
+            ) : (
+              <div>
+                <h1 className="text-lg font-bold text-gray-900">Verified Catalog</h1>
+                <p className="text-sm text-gray-500">
+                  Browse validated and examiner-approved workflows, extractions, and knowledge bases
+                </p>
+              </div>
+            )}
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {items.map(item => (
-              <CatalogCard key={item.id} item={item} />
-            ))}
+
+          {/* Search + Filters toolbar */}
+          <div className="flex items-center gap-3 mb-4 flex-wrap">
+            {/* Search */}
+            <div className="relative flex-1 min-w-[200px] max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search items..."
+                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400"
+              />
+            </div>
+
+            {/* Kind filter pills */}
+            <div className="flex items-center gap-1.5">
+              {kindFilters.map(([val, label]) => (
+                <button
+                  key={val}
+                  onClick={() => setKindFilter(val)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                    kindFilter === val
+                      ? 'bg-gray-900 text-white border-gray-900'
+                      : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Quality tier dropdown */}
+            <select
+              value={qualityFilter}
+              onChange={(e) => setQualityFilter(e.target.value as QualityFilter)}
+              className="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-md bg-white text-gray-600 focus:outline-none focus:ring-1 focus:ring-gray-400"
+            >
+              <option value="">Any quality</option>
+              <option value="gold">Gold</option>
+              <option value="silver">Silver</option>
+              <option value="bronze">Bronze</option>
+            </select>
+
+            {/* Sort dropdown */}
+            <div className="flex items-center gap-1">
+              <ArrowUpDown className="h-3.5 w-3.5 text-gray-400" />
+              <select
+                value={sortOption}
+                onChange={(e) => setSortOption(e.target.value as SortOption)}
+                className="px-2 py-1.5 text-xs font-medium border border-gray-300 rounded-md bg-white text-gray-600 focus:outline-none focus:ring-1 focus:ring-gray-400"
+              >
+                {sortOptions.map(([val, label]) => (
+                  <option key={val} value={val}>{label}</option>
+                ))}
+              </select>
+            </div>
           </div>
-        )}
+
+          {/* Active filter chips */}
+          {hasActiveFilters && (
+            <div className="flex items-center gap-2 mb-4 flex-wrap">
+              {tagFilter && (
+                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-700">
+                  Tag: {tagFilter}
+                  <button onClick={() => setTagFilter('')} className="hover:text-gray-900">
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
+              {selectedCollectionId && activeCollection && (
+                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-700">
+                  Collection: {activeCollection.title}
+                  <button onClick={() => setSelectedCollectionId(null)} className="hover:text-gray-900">
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
+              <button
+                onClick={clearFilters}
+                className="text-xs text-gray-500 hover:text-gray-700 underline"
+              >
+                Clear all
+              </button>
+              <span className="text-xs text-gray-400 ml-auto">
+                {total} result{total !== 1 ? 's' : ''}
+              </span>
+            </div>
+          )}
+
+          {/* Results count (when no special filter chips shown) */}
+          {!hasActiveFilters && !loading && items.length > 0 && (
+            <div className="text-xs text-gray-400 mb-3">
+              {total} item{total !== 1 ? 's' : ''}
+            </div>
+          )}
+
+          {/* Results */}
+          {loading ? (
+            <div className="text-sm text-gray-500 py-12 text-center">Loading...</div>
+          ) : items.length === 0 ? (
+            <div className="text-center py-16">
+              <ShieldCheck className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+              <h3 className="text-sm font-medium text-gray-700 mb-1">
+                {hasActiveFilters ? 'No matching items' : 'No verified items yet'}
+              </h3>
+              <p className="text-xs text-gray-500">
+                {hasActiveFilters
+                  ? 'Try adjusting your filters or search query.'
+                  : 'Items submitted by your team and approved by examiners will appear here.'}
+              </p>
+              {hasActiveFilters && (
+                <button
+                  onClick={clearFilters}
+                  className="mt-3 px-4 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                >
+                  Clear filters
+                </button>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                {items.map(item => (
+                  <CatalogCard
+                    key={item.id}
+                    item={item}
+                    onTagClick={(tag) => setTagFilter(tag)}
+                    onAddToLibrary={(item) => setAddToLibraryItem(item)}
+                  />
+                ))}
+              </div>
+
+              {/* Load more */}
+              {hasMore && (
+                <div className="text-center mt-6">
+                  <button
+                    onClick={handleLoadMore}
+                    disabled={loadingMore}
+                    className="px-6 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    {loadingMore ? 'Loading...' : `Load more (${total - items.length} remaining)`}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
+
+      {/* Add to library dialog */}
+      {addToLibraryItem && libraries.length > 0 && (
+        <AddToLibraryDialog
+          libraries={libraries}
+          itemId={addToLibraryItem.item_id}
+          kind={addToLibraryItem.kind as LibraryItemKind}
+          onClose={() => setAddToLibraryItem(null)}
+          onAdded={() => setAddToLibraryItem(null)}
+        />
+      )}
     </AppLayout>
   )
 }

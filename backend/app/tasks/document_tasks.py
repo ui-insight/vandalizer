@@ -52,8 +52,10 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
         logger.warning("Document %s not found", document_uuid)
         return ""
 
-    upload_dir = os.environ.get("UPLOAD_DIR", "../app/static/uploads")
-    doc_path = os.path.join(upload_dir, doc.get("path", ""))
+    from app.config import Settings
+
+    settings = Settings()
+    doc_path = os.path.join(settings.upload_dir, doc.get("path", ""))
     absolute_path = Path(doc_path)
 
     extension = (extension or "").lower().lstrip(".")
@@ -391,8 +393,10 @@ def perform_semantic_ingestion(self, raw_text: str, document_uuid: str, user_id:
         {"$set": {"task_status": "readying"}},
     )
 
-    persist_dir = os.environ.get("CHROMADB_PERSIST_DIR", "../app/static/db")
-    dm = DocumentManager(persist_directory=persist_dir)
+    from app.config import Settings
+
+    settings = Settings()
+    dm = DocumentManager(persist_directory=settings.chromadb_persist_dir)
     dm.add_document(
         user_id=user_id,
         document_name=doc.get("title", ""),

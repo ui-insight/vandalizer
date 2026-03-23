@@ -208,7 +208,8 @@ def evaluate_conditions(documents: list[dict], conditions: list) -> bool:
         if field == "file_size":
             for doc in documents:
                 try:
-                    upload_dir = os.environ.get("UPLOAD_DIR", "../app/static/uploads")
+                    from app.config import Settings
+                    upload_dir = Settings().upload_dir
                     doc_path = os.path.join(upload_dir, doc.get("path", ""))
                     doc_size = os.path.getsize(doc_path)
                     if operator == "less_than" and doc_size >= value:

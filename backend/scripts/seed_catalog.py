@@ -321,7 +321,9 @@ async def seed_knowledge_base(
     )
     await kb.insert()
 
-    # Create source records (don't ingest - URLs may not be available at seed time)
+    # Create source records and ingest URL sources
+    from app.services.knowledge_service import _ingest_url_source
+
     source_count = 0
     for src_data in item.get("sources", []):
         src = KnowledgeBaseSource(
@@ -334,7 +336,22 @@ async def seed_knowledge_base(
         await src.insert()
         source_count += 1
 
-    kb.total_sources = source_count
+        # Ingest URL sources inline so KBs have chunks on first run
+        if src.source_type == "url" and src.url:
+            try:
+                await _ingest_url_source(src, kb)
+            except Exception as e:
+                logger.warning("Failed to ingest seed URL %s: %s", src.url, e)
+
+    # Recalculate stats from ingested sources
+    sources = await KnowledgeBaseSource.find(
+        KnowledgeBaseSource.knowledge_base_uuid == kb.uuid,
+    ).to_list()
+    kb.total_sources = len(sources)
+    kb.sources_ready = sum(1 for s in sources if s.status == "ready")
+    kb.sources_failed = sum(1 for s in sources if s.status == "error")
+    kb.total_chunks = sum(s.chunk_count for s in sources)
+    kb.status = "ready" if kb.sources_ready > 0 else ("error" if kb.sources_failed == kb.total_sources else "empty")
     await kb.save()
 
     # Library item + metadata

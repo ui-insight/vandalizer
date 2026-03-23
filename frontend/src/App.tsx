@@ -46,6 +46,19 @@ class ErrorBoundary extends Component<
   }
 }
 
+function useGlobalDropPrevention() {
+  useEffect(() => {
+    // Prevent the browser from opening/downloading files when dropped outside a drop zone
+    const prevent = (e: Event) => e.preventDefault()
+    document.addEventListener('dragover', prevent)
+    document.addEventListener('drop', prevent)
+    return () => {
+      document.removeEventListener('dragover', prevent)
+      document.removeEventListener('drop', prevent)
+    }
+  }, [])
+}
+
 function useThemeLoader() {
   useEffect(() => {
     getThemeConfig()
@@ -63,6 +76,7 @@ function useThemeLoader() {
 }
 
 export default function App() {
+  useGlobalDropPrevention()
   useThemeLoader()
 
   return (

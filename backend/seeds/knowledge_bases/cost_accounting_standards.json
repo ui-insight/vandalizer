@@ -1,0 +1,21 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "knowledge_base",
+  "_seed_meta": {
+    "seed_id": "kb-cas",
+    "display_name": "Cost Accounting Standards (CAS)",
+    "description": "Cost Accounting Standards applicable to educational institutions receiving federal contracts and grants.",
+    "quality_tier": "gold",
+    "collections": ["financial", "reference-knowledge"]
+  },
+  "items": [{
+    "title": "Cost Accounting Standards (CAS)",
+    "description": "CAS requirements for educational institutions, DS-2 disclosure statements, consistency in cost allocation, and F&A rate proposals.",
+    "sources": [
+      {"source_type": "url", "url": "https://www.ecfr.gov/current/title-48/chapter-99"},
+      {"source_type": "url", "url": "https://www.ecfr.gov/current/title-2/subtitle-A/chapter-II/part-200/subpart-E"},
+      {"source_type": "url", "url": "https://www.govinfo.gov/content/pkg/CFR-2023-title-48/xml/CFR-2023-title-48-chap99.xml"}
+    ]
+  }]
+}

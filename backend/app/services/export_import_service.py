@@ -352,7 +352,8 @@ async def import_knowledge_base(
 
 async def export_catalog(user_email: str) -> dict:
     """Export all verified catalog items with their full definitions."""
-    verified = await verification_service.list_verified_items()
+    result = await verification_service.list_verified_items(limit=10000)
+    verified = result["items"]
     catalog_items: list[dict] = []
 
     for vi in verified:

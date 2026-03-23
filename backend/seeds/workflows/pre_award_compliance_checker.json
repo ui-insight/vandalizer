@@ -8,19 +8,16 @@
     "display_name": "Sponsor Compliance Checker",
     "description": "Checks a proposal against solicitation requirements, identifying formatting violations, missing sections, and eligibility concerns.",
     "quality_tier": "gold",
-    "collections": ["pre-award", "compliance"]
+    "collections": [
+      "pre-award",
+      "compliance"
+    ]
   },
   "items": [
     {
       "name": "Sponsor Compliance Checker",
       "description": "Verifies that a proposal meets sponsor formatting, content, and eligibility requirements.",
       "steps": [
-        {
-          "name": "Document",
-          "data": {},
-          "is_output": false,
-          "tasks": []
-        },
         {
           "name": "Extract Requirements",
           "data": {},

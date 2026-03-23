@@ -1,0 +1,21 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "knowledge_base",
+  "_seed_meta": {
+    "seed_id": "kb-fcoi",
+    "display_name": "Financial Conflict of Interest (FCOI)",
+    "description": "PHS/NIH and NSF financial conflict of interest regulations for federally funded research.",
+    "quality_tier": "silver",
+    "collections": ["compliance", "reference-knowledge"]
+  },
+  "items": [{
+    "title": "Financial Conflict of Interest (FCOI)",
+    "description": "42 CFR 50 Subpart F requirements, significant financial interest thresholds, disclosure and management plans, and subrecipient FCOI obligations.",
+    "sources": [
+      {"source_type": "url", "url": "https://www.ecfr.gov/current/title-42/chapter-I/subchapter-D/part-50/subpart-F"},
+      {"source_type": "url", "url": "https://grants.nih.gov/grants/policy/coi/index.htm"},
+      {"source_type": "url", "url": "https://new.nsf.gov/policies/pappg/24-1/ch-9-grantee-standards#ch9D4"}
+    ]
+  }]
+}

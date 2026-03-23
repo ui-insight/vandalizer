@@ -49,7 +49,8 @@ def _save_attachment_as_document(
     ext = Path(filename).suffix.lstrip(".").lower() or "bin"
     doc_uuid = uuid4().hex
 
-    upload_dir = os.environ.get("UPLOAD_DIR", "../app/static/uploads")
+    from app.config import Settings
+    upload_dir = Settings().upload_dir
     user_dir = Path(upload_dir) / user_id
     user_dir.mkdir(parents=True, exist_ok=True)
     file_path = user_dir / f"{doc_uuid}.{ext}"

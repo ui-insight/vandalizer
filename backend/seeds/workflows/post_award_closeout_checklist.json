@@ -8,19 +8,15 @@
     "display_name": "Closeout Checklist Generator",
     "description": "Generates a comprehensive, timeline-ordered closeout checklist from award terms and conditions.",
     "quality_tier": "gold",
-    "collections": ["post-award"]
+    "collections": [
+      "post-award"
+    ]
   },
   "items": [
     {
       "name": "Closeout Checklist Generator",
       "description": "Extracts award terms and generates a timeline-ordered closeout checklist with deadlines and responsible parties.",
       "steps": [
-        {
-          "name": "Document",
-          "data": {},
-          "is_output": false,
-          "tasks": []
-        },
         {
           "name": "Extract Award Terms",
           "data": {},

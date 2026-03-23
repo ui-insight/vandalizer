@@ -281,10 +281,11 @@ export function VerifiedCatalog() {
   const refresh = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await listVerifiedItems(
-        kindFilter || undefined,
-        searchQuery || undefined,
-      )
+      const data = await listVerifiedItems({
+        kind: kindFilter || undefined,
+        search: searchQuery || undefined,
+        limit: 200,
+      })
       setItems(data.items)
     } catch {
       // silently fail

@@ -8,19 +8,15 @@
     "display_name": "IRB Protocol Pre-Review",
     "description": "Pre-screens a human subjects research protocol for completeness and appropriate review level before IRB submission.",
     "quality_tier": "gold",
-    "collections": ["compliance"]
+    "collections": [
+      "compliance"
+    ]
   },
   "items": [
     {
       "name": "IRB Protocol Pre-Review",
       "description": "Evaluates a human subjects protocol for completeness, appropriate review type, and adequate protections.",
       "steps": [
-        {
-          "name": "Document",
-          "data": {},
-          "is_output": false,
-          "tasks": []
-        },
         {
           "name": "Extract Protocol Fields",
           "data": {},

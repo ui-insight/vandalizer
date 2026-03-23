@@ -8,19 +8,15 @@
     "display_name": "Export Control Screening",
     "description": "Screens a project description or agreement for potential export control concerns under EAR, ITAR, and OFAC regulations.",
     "quality_tier": "gold",
-    "collections": ["compliance"]
+    "collections": [
+      "compliance"
+    ]
   },
   "items": [
     {
       "name": "Export Control Screening",
       "description": "Identifies potential export control issues in research projects involving foreign collaborators, restricted technology, or access limitations.",
       "steps": [
-        {
-          "name": "Document",
-          "data": {},
-          "is_output": false,
-          "tasks": []
-        },
         {
           "name": "Extract Project Details",
           "data": {},

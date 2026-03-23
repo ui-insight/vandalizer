@@ -8,19 +8,15 @@
     "display_name": "Conflict of Interest Review",
     "description": "Screens a proposal or disclosure for conflict of interest concerns, assessing financial relationships and recommending management plans.",
     "quality_tier": "gold",
-    "collections": ["compliance"]
+    "collections": [
+      "compliance"
+    ]
   },
   "items": [
     {
       "name": "Conflict of Interest Review",
       "description": "Analyzes investigator disclosures for potential conflicts of interest and recommends mitigation strategies.",
       "steps": [
-        {
-          "name": "Document",
-          "data": {},
-          "is_output": false,
-          "tasks": []
-        },
         {
           "name": "Extract COI Fields",
           "data": {},

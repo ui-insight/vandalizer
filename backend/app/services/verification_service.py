@@ -401,11 +401,31 @@ async def list_verified_items(
     kind_filter: str | None = None,
     search: str | None = None,
     user_org_ancestry: list[str] | None = None,
-) -> list[dict]:
-    """List all verified library items, optionally filtered by kind, search, and org visibility."""
+    quality_tier: str | None = None,
+    tag: str | None = None,
+    collection_id: str | None = None,
+    sort: str | None = None,
+    skip: int = 0,
+    limit: int = 50,
+) -> dict:
+    """List verified library items with filtering, sorting, and pagination.
+
+    Returns {"items": [...], "total": int} so the frontend can paginate.
+    """
+    # If filtering by collection, resolve the item_ids in that collection first
+    collection_item_ids: set[str] | None = None
+    if collection_id:
+        col = await VerifiedCollection.get(PydanticObjectId(collection_id))
+        if col:
+            collection_item_ids = set(col.item_ids)
+        else:
+            return {"items": [], "total": 0}
+
     query: dict = {"verified": True}
     if kind_filter:
         query["kind"] = kind_filter
+    if tag:
+        query["tags"] = tag
 
     items = await LibraryItem.find(query).sort("-created_at").to_list()
 
@@ -419,27 +439,75 @@ async def list_verified_items(
             deduped_items.append(item)
     items = deduped_items
 
+    # Collection filter: keep only items whose item_id is in the collection
+    if collection_item_ids is not None:
+        items = [i for i in items if str(i.item_id) in collection_item_ids]
+
+    # --- Batch-fetch names for all items to avoid N+1 queries ---
+    wf_ids = [i.item_id for i in items if i.kind == LibraryItemKind.WORKFLOW]
+    ss_ids = [i.item_id for i in items if i.kind == LibraryItemKind.SEARCH_SET]
+    kb_ids = [i.item_id for i in items if i.kind == LibraryItemKind.KNOWLEDGE_BASE]
+
+    name_map: dict[str, str] = {}
+    if wf_ids:
+        wfs = await Workflow.find({"_id": {"$in": wf_ids}}).to_list()
+        for wf in wfs:
+            name_map[str(wf.id)] = wf.name
+    if ss_ids:
+        ssets = await SearchSet.find({"_id": {"$in": ss_ids}}).to_list()
+        for ss in ssets:
+            name_map[str(ss.id)] = ss.title
+    if kb_ids:
+        kbs = await KnowledgeBase.find({"_id": {"$in": kb_ids}}).to_list()
+        for kb in kbs:
+            name_map[str(kb.id)] = kb.title
+
+    # --- Batch-fetch all metadata ---
+    all_meta = await VerifiedItemMetadata.find_all().to_list()
+    meta_map: dict[tuple[str, str], VerifiedItemMetadata] = {}
+    for m in all_meta:
+        meta_map[(m.item_kind, m.item_id)] = m
+
+    # --- Batch-fetch KB metrics ---
+    kb_map: dict[str, KnowledgeBase] = {}
+    if kb_ids:
+        kb_docs = await KnowledgeBase.find({"_id": {"$in": kb_ids}}).to_list()
+        for kb in kb_docs:
+            kb_map[str(kb.id)] = kb
+
+    # --- Build result entries (applying search and org filters) ---
+    search_lower = search.lower() if search else None
     results = []
     for item in items:
-        name = await _get_item_name(item.kind.value, item.item_id)
-        if search and search.lower() not in name.lower():
-            continue
+        item_id_str = str(item.item_id)
+        name = name_map.get(item_id_str, "Unknown")
+        meta = meta_map.get((item.kind.value, item_id_str))
 
-        # Fetch metadata overlay if it exists
-        meta = await VerifiedItemMetadata.find_one(
-            VerifiedItemMetadata.item_kind == item.kind.value,
-            VerifiedItemMetadata.item_id == str(item.item_id),
-        )
+        # Search: match against name, display_name, description, and tags
+        if search_lower:
+            searchable = " ".join(filter(None, [
+                name.lower(),
+                (meta.display_name or "").lower() if meta else "",
+                (meta.description or "").lower() if meta else "",
+                " ".join(t.lower() for t in item.tags),
+            ]))
+            if search_lower not in searchable:
+                continue
 
-        # Org visibility: if item is scoped to orgs and user's ancestry doesn't match, skip
+        # Org visibility
         item_org_ids = meta.organization_ids if meta else []
         if user_org_ancestry is not None and item_org_ids:
             if not set(item_org_ids) & set(user_org_ancestry):
                 continue
 
+        # Quality tier filter
+        item_tier = meta.quality_tier if meta else None
+        if quality_tier and item_tier != quality_tier:
+            continue
+
         entry = {
             "id": str(item.id),
-            "item_id": str(item.item_id),
+            "item_id": item_id_str,
             "kind": item.kind.value,
             "name": name,
             "tags": item.tags,
@@ -450,15 +518,15 @@ async def list_verified_items(
             "markdown": meta.markdown if meta else None,
             "organization_ids": item_org_ids,
             "quality_score": meta.quality_score if meta else None,
-            "quality_tier": meta.quality_tier if meta else None,
+            "quality_tier": item_tier,
             "quality_grade": meta.quality_grade if meta else None,
             "last_validated_at": meta.last_validated_at.isoformat() if meta and meta.last_validated_at else None,
             "validation_run_count": meta.validation_run_count if meta else 0,
         }
 
-        # Add KB-specific metrics
+        # KB-specific metrics (from batch)
         if item.kind == LibraryItemKind.KNOWLEDGE_BASE:
-            kb = await KnowledgeBase.get(item.item_id)
+            kb = kb_map.get(item_id_str)
             if kb:
                 entry["total_sources"] = kb.total_sources
                 entry["total_chunks"] = kb.total_chunks
@@ -466,7 +534,20 @@ async def list_verified_items(
                 entry["kb_status"] = kb.status
 
         results.append(entry)
-    return results
+
+    # --- Sort ---
+    if sort == "quality":
+        tier_order = {"gold": 0, "silver": 1, "bronze": 2}
+        results.sort(key=lambda e: (tier_order.get(e.get("quality_tier") or "", 99), -(e.get("quality_score") or 0)))
+    elif sort == "name":
+        results.sort(key=lambda e: (e.get("display_name") or e.get("name") or "").lower())
+    elif sort == "validations":
+        results.sort(key=lambda e: -(e.get("validation_run_count") or 0))
+    # default: already sorted by created_at desc from the DB query
+
+    total = len(results)
+    paginated = results[skip : skip + limit]
+    return {"items": paginated, "total": total}
 
 
 async def get_item_metadata(item_kind: str, item_id: str) -> dict | None:
@@ -609,12 +690,14 @@ async def create_collection(
     title: str,
     user_id: str,
     description: str | None = None,
+    featured: bool | None = None,
 ) -> dict:
     """Create a new verified collection."""
     now = datetime.datetime.now(datetime.timezone.utc)
     col = VerifiedCollection(
         title=title,
         description=description,
+        featured=featured or False,
         created_by_user_id=user_id,
         created_at=now,
         updated_at=now,
@@ -627,8 +710,9 @@ async def update_collection(
     collection_id: str,
     title: str | None = None,
     description: str | None = None,
+    featured: bool | None = None,
 ) -> dict | None:
-    """Update a collection's title/description."""
+    """Update a collection's title, description, and/or featured status."""
     col = await VerifiedCollection.get(PydanticObjectId(collection_id))
     if not col:
         return None
@@ -636,6 +720,8 @@ async def update_collection(
         col.title = title
     if description is not None:
         col.description = description
+    if featured is not None:
+        col.featured = featured
     col.updated_at = datetime.datetime.now(datetime.timezone.utc)
     await col.save()
     return _collection_to_dict(col)

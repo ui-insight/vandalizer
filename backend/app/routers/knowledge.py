@@ -1,6 +1,6 @@
 """Knowledge Base API routes."""
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app.dependencies import get_current_user
 from app.rate_limit import limiter
@@ -9,8 +9,11 @@ from app.services import organization_service
 from app.schemas.knowledge import (
     AddDocumentsRequest,
     AddUrlsRequest,
+    AdoptKBRequest,
     CreateKBRequest,
     KBDetailResponse,
+    KBListResponse,
+    KBReferenceResponse,
     KBResponse,
     KBSourceResponse,
     KBStatusResponse,
@@ -46,7 +49,7 @@ async def _get_kb_suggestion_or_404(kb_uuid: str, suggestion_uuid: str):
     return suggestion
 
 
-def _kb_response(kb) -> KBResponse:
+def _kb_response(kb, *, scope: str | None = None) -> KBResponse:
     return KBResponse(
         uuid=kb.uuid,
         title=kb.title,
@@ -61,6 +64,8 @@ def _kb_response(kb) -> KBResponse:
         total_chunks=kb.total_chunks,
         created_at=kb.created_at.isoformat() if kb.created_at else None,
         updated_at=kb.updated_at.isoformat() if kb.updated_at else None,
+        user_id=kb.user_id,
+        scope=scope,
     )
 
 
@@ -79,13 +84,79 @@ def _source_response(s) -> KBSourceResponse:
 
 
 @router.get("/list", response_model=list[KBResponse])
-async def list_knowledge_bases(user: User = Depends(get_current_user)):
+async def list_knowledge_bases_legacy(user: User = Depends(get_current_user)):
+    """Legacy flat list — returns all visible KBs without scope/pagination."""
     team_id = str(user.current_team) if user.current_team else None
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
-    kbs = await svc.list_knowledge_bases(
+    kbs = await svc.list_knowledge_bases_flat(
         user.user_id, team_id=team_id, user_org_ancestry=user_org_ancestry,
     )
     return [_kb_response(kb) for kb in kbs]
+
+
+def _classify_scope(kb, user_id: str, team_id: str | None) -> str:
+    """Determine the display scope for a KB relative to the requesting user."""
+    if kb.user_id == user_id:
+        return "mine"
+    if kb.verified:
+        return "verified"
+    if kb.shared_with_team and kb.team_id == team_id:
+        return "team"
+    return "mine"
+
+
+@router.get("/list/v2", response_model=KBListResponse)
+async def list_knowledge_bases_v2(
+    scope: str | None = Query(None, pattern="^(mine|team|verified)$"),
+    search: str | None = Query(None, max_length=200),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
+    user: User = Depends(get_current_user),
+):
+    """Scoped knowledge base listing with search and pagination."""
+    team_id = str(user.current_team) if user.current_team else None
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+
+    kbs, total = await svc.list_knowledge_bases(
+        user.user_id,
+        team_id=team_id,
+        user_org_ancestry=user_org_ancestry,
+        scope=scope,
+        search=search,
+        skip=skip,
+        limit=limit,
+    )
+
+    items: list[KBResponse] = []
+    for kb in kbs:
+        kb_scope = scope or _classify_scope(kb, user.user_id, team_id)
+        items.append(_kb_response(kb, scope=kb_scope))
+
+    # If scope is "mine", also include bookmarked references
+    if scope in (None, "mine"):
+        refs = await svc.list_references(user.user_id, team_id=team_id)
+        for ref in refs:
+            source_kb = await svc.resolve_reference(
+                ref.uuid, user, user_org_ancestry=user_org_ancestry,
+            )
+            if not source_kb:
+                continue  # stale reference — source KB deleted or access revoked
+            resp = _kb_response(source_kb, scope="reference")
+            resp.is_reference = True
+            resp.source_kb_uuid = ref.source_kb_uuid
+            resp.reference_uuid = ref.uuid
+            items.append(resp)
+
+    return KBListResponse(items=items, total=total + len([i for i in items if i.is_reference]))
+
+
+@router.delete("/reference/{ref_uuid}")
+async def remove_reference(ref_uuid: str, user: User = Depends(get_current_user)):
+    """Remove a KB bookmark."""
+    ok = await svc.remove_reference(ref_uuid, user)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Reference not found")
+    return {"ok": True}
 
 
 @router.post("/create", response_model=KBResponse)
@@ -434,6 +505,36 @@ async def review_suggestion(uuid: str, suggestion_uuid: str, request: Request, u
         "status": suggestion.status,
         "reviewed_at": suggestion.reviewed_at.isoformat() if suggestion.reviewed_at else None,
     }
+
+
+# ---------------------------------------------------------------------------
+# References (bookmarks)
+# ---------------------------------------------------------------------------
+
+
+@router.post("/{uuid}/adopt", response_model=KBReferenceResponse)
+async def adopt_knowledge_base(uuid: str, req: AdoptKBRequest, user: User = Depends(get_current_user)):
+    """Create a lightweight bookmark to a verified/shared KB."""
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    team_id = req.team_id or (str(user.current_team) if user.current_team else None)
+    try:
+        ref = await svc.adopt_knowledge_base(
+            uuid, user,
+            note=req.note,
+            team_id=team_id,
+            user_org_ancestry=user_org_ancestry,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return KBReferenceResponse(
+        uuid=ref.uuid,
+        source_kb_uuid=ref.source_kb_uuid,
+        user_id=ref.user_id,
+        team_id=ref.team_id,
+        note=ref.note,
+        pinned=ref.pinned,
+        created_at=ref.created_at.isoformat() if ref.created_at else None,
+    )
 
 
 # ---------------------------------------------------------------------------

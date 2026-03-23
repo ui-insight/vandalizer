@@ -8,19 +8,15 @@
     "display_name": "F&A Rate Validator",
     "description": "Validates that the correct facilities and administrative (indirect cost) rate is applied to an award, checking the MTDC base and sponsor caps.",
     "quality_tier": "gold",
-    "collections": ["financial"]
+    "collections": [
+      "financial"
+    ]
   },
   "items": [
     {
       "name": "F&A Rate Validator",
       "description": "Verifies correct application of indirect cost rates against the institution's negotiated rate agreement.",
       "steps": [
-        {
-          "name": "Document",
-          "data": {},
-          "is_output": false,
-          "tasks": []
-        },
         {
           "name": "Extract Rate Data",
           "data": {},

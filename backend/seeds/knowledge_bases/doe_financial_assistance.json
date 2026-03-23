@@ -1,0 +1,21 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "knowledge_base",
+  "_seed_meta": {
+    "seed_id": "kb-doe-fa",
+    "display_name": "DOE Financial Assistance Rules",
+    "description": "Department of Energy financial assistance regulations, merit review guidelines, and award management policies.",
+    "quality_tier": "gold",
+    "collections": ["federal-agency", "reference-knowledge"]
+  },
+  "items": [{
+    "title": "DOE Financial Assistance Rules",
+    "description": "DOE grant and cooperative agreement regulations under 2 CFR 910, merit review processes, and reporting requirements for DOE-funded research.",
+    "sources": [
+      {"source_type": "url", "url": "https://www.ecfr.gov/current/title-2/subtitle-B/chapter-IX/part-910"},
+      {"source_type": "url", "url": "https://science.osti.gov/grants/Policy-and-Guidance"},
+      {"source_type": "url", "url": "https://www.energy.gov/management/financial-assistance-guide"}
+    ]
+  }]
+}

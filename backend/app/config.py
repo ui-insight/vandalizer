@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -46,6 +48,12 @@ class Settings(BaseSettings):
     s3_access_key_id: str | None = None
     s3_secret_access_key: str | None = None
     s3_endpoint_url: str | None = None
+
+    @model_validator(mode="after")
+    def _resolve_paths(self) -> "Settings":
+        self.upload_dir = str(Path(self.upload_dir).resolve())
+        self.chromadb_persist_dir = str(Path(self.chromadb_persist_dir).resolve())
+        return self
 
     @model_validator(mode="after")
     def _check_jwt_secret(self) -> "Settings":

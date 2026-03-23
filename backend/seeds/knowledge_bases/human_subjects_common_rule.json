@@ -1,0 +1,21 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "knowledge_base",
+  "_seed_meta": {
+    "seed_id": "kb-common-rule",
+    "display_name": "Human Subjects Protection (Common Rule)",
+    "description": "Federal Policy for the Protection of Human Subjects (Common Rule, 45 CFR 46) and IRB review requirements.",
+    "quality_tier": "gold",
+    "collections": ["compliance", "reference-knowledge"]
+  },
+  "items": [{
+    "title": "Human Subjects Protection (Common Rule)",
+    "description": "Common Rule requirements, IRB review categories, informed consent elements, exempt research determinations, and single-IRB mandate for multi-site studies.",
+    "sources": [
+      {"source_type": "url", "url": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-A/part-46"},
+      {"source_type": "url", "url": "https://www.hhs.gov/ohrp/regulations-and-policy/regulations/common-rule/index.html"},
+      {"source_type": "url", "url": "https://www.hhs.gov/ohrp/regulations-and-policy/guidance/index.html"}
+    ]
+  }]
+}

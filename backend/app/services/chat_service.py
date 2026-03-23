@@ -151,10 +151,7 @@ async def chat_stream(
 
     # Fetch system config so agent creation can read per-model settings (api_key, endpoint, etc.)
     cfg = await SystemConfig.get_config()
-    sys_config_doc = {
-        "available_models": cfg.available_models,
-        "llm_endpoint": cfg.llm_endpoint,
-    }
+    sys_config_doc = cfg.model_dump() if cfg else {}
 
     # Load conversation
     conversation = await ChatConversation.find_one(

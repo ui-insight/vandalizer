@@ -10,7 +10,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from app.models.document import SmartDocument
-from app.models.knowledge import KnowledgeBase, KnowledgeBaseSource
+from app.models.knowledge import KnowledgeBase, KnowledgeBaseReference, KnowledgeBaseSource
 from app.models.user import User
 from app.services import access_control
 from app.services.document_manager import DocumentManager
@@ -31,25 +31,57 @@ async def list_knowledge_bases(
     user_id: str,
     team_id: str | None = None,
     user_org_ancestry: list[str] | None = None,
-) -> list[KnowledgeBase]:
-    if team_id:
-        kbs = await KnowledgeBase.find(
-            {"$or": [
-                {"user_id": user_id},
-                {"shared_with_team": True, "team_id": team_id},
-                {"verified": True},
-            ]},
-        ).sort(-KnowledgeBase.created_at).to_list()
-    else:
-        kbs = await KnowledgeBase.find(
-            {"$or": [
-                {"user_id": user_id},
-                {"verified": True},
-            ]},
-        ).sort(-KnowledgeBase.created_at).to_list()
+    *,
+    scope: str | None = None,
+    search: str | None = None,
+    skip: int = 0,
+    limit: int = 50,
+) -> tuple[list[KnowledgeBase], int]:
+    """List knowledge bases with optional scope filtering, search, and pagination.
 
-    # Org visibility: exclude KBs scoped to orgs the user doesn't belong to
-    # Never filter out user's own KBs
+    Returns ``(items, total)`` where *total* is the unscoped count before
+    skip/limit (for pagination metadata).
+    """
+    # Build the base query depending on scope
+    if scope == "mine":
+        query = {"user_id": user_id}
+    elif scope == "team":
+        if not team_id:
+            return [], 0
+        query = {"shared_with_team": True, "team_id": team_id}
+    elif scope == "verified":
+        query = {"verified": True}
+    else:
+        # No scope filter — return everything the user can see (original behaviour)
+        or_clauses: list[dict] = [
+            {"user_id": user_id},
+            {"verified": True},
+        ]
+        if team_id:
+            or_clauses.append({"shared_with_team": True, "team_id": team_id})
+        query = {"$or": or_clauses}
+
+    # Text search on title / description
+    if search:
+        pattern = re.escape(search)
+        search_filter = {"$or": [
+            {"title": {"$regex": pattern, "$options": "i"}},
+            {"description": {"$regex": pattern, "$options": "i"}},
+        ]}
+        # Merge with existing query
+        query = {"$and": [query, search_filter]}
+
+    total = await KnowledgeBase.find(query).count()
+    kbs = await (
+        KnowledgeBase.find(query)
+        .sort(-KnowledgeBase.created_at)
+        .skip(skip)
+        .limit(limit)
+        .to_list()
+    )
+
+    # Org visibility: exclude KBs scoped to orgs the user doesn't belong to.
+    # Never filter out user's own KBs.
     if user_org_ancestry is not None:
         kbs = [
             kb for kb in kbs
@@ -58,6 +90,22 @@ async def list_knowledge_bases(
             or bool(set(kb.organization_ids) & set(user_org_ancestry))
         ]
 
+    return kbs, total
+
+
+async def list_knowledge_bases_flat(
+    user_id: str,
+    team_id: str | None = None,
+    user_org_ancestry: list[str] | None = None,
+) -> list[KnowledgeBase]:
+    """Legacy flat list — returns all visible KBs without pagination.
+
+    Kept for backward-compatible callers (e.g. the old ``GET /list`` endpoint).
+    """
+    kbs, _ = await list_knowledge_bases(
+        user_id, team_id=team_id, user_org_ancestry=user_org_ancestry,
+        limit=10000,
+    )
     return kbs
 
 
@@ -174,6 +222,10 @@ async def delete_knowledge_base(
     # Delete sources
     await KnowledgeBaseSource.find(
         KnowledgeBaseSource.knowledge_base_uuid == kb.uuid,
+    ).delete()
+    # Clean up any references pointing to this KB
+    await KnowledgeBaseReference.find(
+        KnowledgeBaseReference.source_kb_uuid == kb.uuid,
     ).delete()
     await kb.delete()
     return True
@@ -438,6 +490,95 @@ async def review_suggestion(
             await add_documents(kb, [suggestion.document_uuid], user)
 
     return suggestion
+
+
+# --- References (bookmarks) ---
+
+
+async def adopt_knowledge_base(
+    source_kb_uuid: str,
+    user: User,
+    *,
+    note: str | None = None,
+    team_id: str | None = None,
+    user_org_ancestry: list[str] | None = None,
+) -> KnowledgeBaseReference:
+    """Create a lightweight reference/bookmark to an accessible KB.
+
+    The source KB must be verified or shared with the user's team.
+    """
+    source_kb = await access_control.get_authorized_knowledge_base(
+        source_kb_uuid,
+        user,
+        user_org_ancestry=user_org_ancestry,
+    )
+    if not source_kb:
+        raise ValueError("Knowledge base not found or not accessible")
+    # Only allow referencing verified or team-shared KBs (not your own private ones — those are already "yours")
+    if source_kb.user_id == user.user_id and not source_kb.verified and not source_kb.shared_with_team:
+        raise ValueError("Cannot bookmark your own private knowledge base")
+
+    # Check for existing reference
+    existing = await KnowledgeBaseReference.find_one(
+        KnowledgeBaseReference.source_kb_uuid == source_kb_uuid,
+        KnowledgeBaseReference.user_id == user.user_id,
+    )
+    if existing:
+        return existing
+
+    ref = KnowledgeBaseReference(
+        user_id=user.user_id,
+        team_id=team_id,
+        source_kb_uuid=source_kb_uuid,
+        note=(note or "")[:2000] or None,
+    )
+    await ref.insert()
+    return ref
+
+
+async def remove_reference(
+    reference_uuid: str,
+    user: User,
+) -> bool:
+    """Remove a KB bookmark. Only the reference owner can delete it."""
+    ref = await KnowledgeBaseReference.find_one(
+        KnowledgeBaseReference.uuid == reference_uuid,
+        KnowledgeBaseReference.user_id == user.user_id,
+    )
+    if not ref:
+        return False
+    await ref.delete()
+    return True
+
+
+async def list_references(
+    user_id: str,
+    team_id: str | None = None,
+) -> list[KnowledgeBaseReference]:
+    """List all KB references/bookmarks for a user."""
+    query: dict = {"user_id": user_id}
+    if team_id:
+        query = {"$or": [{"user_id": user_id}, {"team_id": team_id}]}
+    return await KnowledgeBaseReference.find(query).sort("-created_at").to_list()
+
+
+async def resolve_reference(
+    reference_uuid: str,
+    user: User,
+    *,
+    user_org_ancestry: list[str] | None = None,
+) -> KnowledgeBase | None:
+    """Resolve a reference to the actual source KB, verifying it's still accessible."""
+    ref = await KnowledgeBaseReference.find_one(
+        KnowledgeBaseReference.uuid == reference_uuid,
+    )
+    if not ref:
+        return None
+    return await access_control.get_authorized_knowledge_base(
+        ref.source_kb_uuid,
+        user,
+        user_org_ancestry=user_org_ancestry,
+    )
 
 
 # --- Crawling ---

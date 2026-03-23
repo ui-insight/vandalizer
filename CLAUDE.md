@@ -28,6 +28,10 @@ cd frontend
 npm install
 npm run dev
 
+# Reset database, uploads, and ChromaDB (development only)
+./scripts/reset_db.sh          # interactive
+./scripts/reset_db.sh --force  # skip confirmation
+
 # Production
 cd backend
 uvicorn app.main:app --host 0.0.0.0 --port 8001 --workers 4

@@ -8,19 +8,15 @@
     "display_name": "Progress Report Analyzer",
     "description": "Reviews a progress report for completeness, alignment with project objectives, and adequacy of explanations for any delays or problems.",
     "quality_tier": "gold",
-    "collections": ["post-award"]
+    "collections": [
+      "post-award"
+    ]
   },
   "items": [
     {
       "name": "Progress Report Analyzer",
       "description": "Evaluates a progress report for completeness and quality before submission to the sponsor.",
       "steps": [
-        {
-          "name": "Document",
-          "data": {},
-          "is_output": false,
-          "tasks": []
-        },
         {
           "name": "Extract Report Fields",
           "data": {},

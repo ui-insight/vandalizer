@@ -456,7 +456,8 @@ class BrowserAutomationService:
             return None
 
         filename = f"audit_{uuid.uuid4()}.png"
-        upload_dir = os.environ.get("UPLOAD_DIR", "../app/static/uploads")
+        from app.config import Settings
+        upload_dir = Settings().upload_dir
         filepath = Path(upload_dir) / filename
         filepath.parent.mkdir(parents=True, exist_ok=True)
 

@@ -1,0 +1,21 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "knowledge_base",
+  "_seed_meta": {
+    "seed_id": "kb-rcr",
+    "display_name": "Responsible Conduct of Research (RCR)",
+    "description": "Federal requirements for responsible conduct of research training, research misconduct policies, and data management mandates.",
+    "quality_tier": "silver",
+    "collections": ["compliance", "reference-knowledge"]
+  },
+  "items": [{
+    "title": "Responsible Conduct of Research (RCR)",
+    "description": "NSF and NIH RCR training requirements, federal research misconduct regulation (42 CFR 93), data management and sharing policies, and authorship standards.",
+    "sources": [
+      {"source_type": "url", "url": "https://ori.hhs.gov/federal-research-misconduct-policy"},
+      {"source_type": "url", "url": "https://www.ecfr.gov/current/title-42/chapter-I/subchapter-D/part-93"},
+      {"source_type": "url", "url": "https://sharing.nih.gov/data-management-and-sharing-policy"}
+    ]
+  }]
+}

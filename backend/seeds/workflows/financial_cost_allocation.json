@@ -8,19 +8,15 @@
     "display_name": "Cost Allocation Analyzer",
     "description": "Reviews cost allocations for compliance with 2 CFR 200 Uniform Guidance, checking allowability, allocability, and reasonableness.",
     "quality_tier": "gold",
-    "collections": ["financial"]
+    "collections": [
+      "financial"
+    ]
   },
   "items": [
     {
       "name": "Cost Allocation Analyzer",
       "description": "Evaluates cost allocations against federal uniform guidance requirements.",
       "steps": [
-        {
-          "name": "Document",
-          "data": {},
-          "is_output": false,
-          "tasks": []
-        },
         {
           "name": "Extract Cost Data",
           "data": {},
