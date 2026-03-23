@@ -40,6 +40,11 @@ class UpdateProfileRequest(BaseModel):
     email: Optional[str] = None
 
 
+class DeleteAccountRequest(BaseModel):
+    password: Optional[str] = None
+    confirmation: str
+
+
 class UserResponse(BaseModel):
     id: str
     user_id: str

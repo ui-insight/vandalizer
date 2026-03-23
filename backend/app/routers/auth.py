@@ -13,7 +13,7 @@ from app.rate_limit import limiter
 from app.models.system_config import SystemConfig
 from app.utils.encryption import decrypt_value
 from app.models.user import User
-from app.schemas.auth import LoginRequest, RegisterRequest, UpdateProfileRequest, UserResponse
+from app.schemas.auth import DeleteAccountRequest, LoginRequest, RegisterRequest, UpdateProfileRequest, UserResponse
 from app.services import auth_service, audit_service
 from app.utils.security import (
     create_access_token,
@@ -164,6 +164,56 @@ async def update_profile(
         user.email = body.email
     await user.save()
     return await _user_response(user)
+
+
+@router.post("/account/delete/preflight")
+async def delete_account_preflight(user: User = Depends(get_current_user)):
+    """Pre-flight check: returns data counts and blocking conditions."""
+    from app.services.account_deletion_service import get_deletion_summary
+
+    summary = await get_deletion_summary(user.user_id)
+    summary["has_password"] = bool(user.password_hash)
+    return summary
+
+
+@router.post("/account/delete")
+@limiter.limit("3/hour")
+async def delete_account(
+    request: Request,
+    body: DeleteAccountRequest,
+    response: Response,
+    user: User = Depends(get_current_user),
+):
+    """Permanently delete the current user's account and all data."""
+    if body.confirmation != "DELETE MY ACCOUNT":
+        raise HTTPException(status_code=400, detail="Confirmation text does not match.")
+
+    if user.password_hash:
+        if not body.password:
+            raise HTTPException(status_code=400, detail="Password is required.")
+        verified = await auth_service.authenticate(user.user_id, body.password)
+        if not verified:
+            raise HTTPException(status_code=401, detail="Incorrect password.")
+
+    from app.services.account_deletion_service import get_deletion_summary, delete_user_account
+
+    summary = await get_deletion_summary(user.user_id)
+    if not summary["can_delete"]:
+        raise HTTPException(status_code=409, detail=summary["blocking_reason"])
+
+    await audit_service.log_event(
+        action="user.account_deletion_initiated",
+        actor_user_id=user.user_id,
+        resource_type="user",
+        resource_id=user.user_id,
+        ip_address=request.client.host if request.client else None,
+    )
+
+    await delete_user_account(user.user_id)
+
+    response.delete_cookie("access_token", path="/")
+    response.delete_cookie("refresh_token", path="/")
+    return {"ok": True}
 
 
 _API_TOKEN_EXPIRY_DAYS = 365

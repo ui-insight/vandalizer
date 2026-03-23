@@ -322,11 +322,18 @@ async def get_user_org_ancestry(user: User) -> Optional[list[str]]:
     We check this by seeing if X is in the user's ancestry chain.
 
     Returns None for admins/examiners (bypass filtering).
-    Returns [] for users with no org assigned.
+    Returns None for users with no org when no orgs exist (bypass filtering).
+    Returns [] for users with no org assigned (when orgs are configured).
     """
     if user.is_admin or user.is_examiner:
         return None  # bypass filtering
     if not user.organization_id:
+        # If no organizations exist in the system, bypass filtering entirely
+        # so all users can see all verified items in dev / fresh installs.
+        from app.models.organization import Organization
+        org_count = await Organization.count()
+        if org_count == 0:
+            return None
         return []
     ancestors = await get_ancestor_ids(user.organization_id)
     return [user.organization_id] + ancestors

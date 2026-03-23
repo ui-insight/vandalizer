@@ -48,13 +48,26 @@ class ErrorBoundary extends Component<
 
 function useGlobalDropPrevention() {
   useEffect(() => {
-    // Prevent the browser from opening/downloading files when dropped outside a drop zone
-    const prevent = (e: Event) => e.preventDefault()
-    document.addEventListener('dragover', prevent)
-    document.addEventListener('drop', prevent)
+    // Prevent the browser from opening/downloading files when dropped outside a drop zone.
+    // Chrome requires both dragover and drop to be prevented, and dragover must set dropEffect.
+    const preventDragOver = (e: DragEvent) => {
+      e.preventDefault()
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'none'
+    }
+    const preventDrop = (e: DragEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    document.addEventListener('dragover', preventDragOver as EventListener, true)
+    document.addEventListener('drop', preventDrop as EventListener, true)
+    // Also prevent on window for extra safety (Chrome sometimes fires on window)
+    window.addEventListener('dragover', preventDragOver as EventListener)
+    window.addEventListener('drop', preventDrop as EventListener)
     return () => {
-      document.removeEventListener('dragover', prevent)
-      document.removeEventListener('drop', prevent)
+      document.removeEventListener('dragover', preventDragOver as EventListener, true)
+      document.removeEventListener('drop', preventDrop as EventListener, true)
+      window.removeEventListener('dragover', preventDragOver as EventListener)
+      window.removeEventListener('drop', preventDrop as EventListener)
     }
   }, [])
 }

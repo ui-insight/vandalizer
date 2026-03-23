@@ -364,8 +364,8 @@ build_image() {
 
   echo -e "  ${SYM_NEURAL}  ${BOLD}Building ${label}...${RESET}"
 
-  # Run build in background, tee to logfile
-  $COMPOSE_CMD build "$service" > "$logfile" 2>&1 &
+  # Run build in background, tee to logfile (--no-cache ensures code changes are picked up)
+  $COMPOSE_CMD build --no-cache "$service" > "$logfile" 2>&1 &
   local pid=$!
 
   # Show a tail of the build output so the user sees progress

@@ -401,7 +401,13 @@ VANDALIZER_CONTEXT = (
     "KNOWLEDGE BASES: Knowledge tab → + New → Add Documents or Add URLs → wait for 'ready' → Chat.\n"
     "SPACES: Logical project groupings within a team. Switch from the header.\n"
     "API: My Account (top-right dropdown) → generate API Token → use x-api-key header.\n"
-    "PIN vs FAVORITE: Pin = always visible in quick-access bar. Favorite = personal bookmark filter.\n\n"
+    "PIN vs FAVORITE: Pin = always visible in quick-access bar. Favorite = personal bookmark filter.\n"
+    "CERTIFICATION: Vandalizer offers the Vandal Workflow Architect certification program. "
+    "Go to the Certification page (left sidebar → Certification). The program has guided modules "
+    "that teach document upload, extraction, workflow building, automation, and more. "
+    "Complete all modules and earn enough XP to level up from Novice to Certified. "
+    "Each module has hands-on lessons with star ratings. "
+    "Once certified, you earn the Vandal Workflow Architect badge on your profile.\n\n"
     "Be concise. Give 2-3 specific Vandalizer UI steps, not generic advice.\n"
 )
 

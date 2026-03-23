@@ -42,6 +42,8 @@ function seededShuffle<T>(arr: T[], seed: number): T[] {
   return copy
 }
 
+const CERTIFICATION_PILL = 'How do I get certified as a Vandal Workflow Architect?'
+
 function applyStatus(s: OnboardingStatus) {
   const now = new Date()
   const seed = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate() + now.getHours()
@@ -50,16 +52,21 @@ function applyStatus(s: OnboardingStatus) {
   const shuffledFeature = seededShuffle(eligible, seed)
   const shuffledLearn = seededShuffle(LEARN_PILLS, seed + 1)
 
-  const combined = [...shuffledFeature, ...shuffledLearn].slice(0, 4)
-  return combined.map((p) => p.label)
+  // Always include certification pill for uncertified users
+  const pinned: string[] = []
+  if (!s.is_certified) pinned.push(CERTIFICATION_PILL)
+
+  const remaining = [...shuffledFeature, ...shuffledLearn]
+    .map((p) => p.label)
+    .slice(0, 4 - pinned.length)
+
+  return [...pinned, ...remaining]
 }
 
 export interface OnboardingResult {
   pills: string[]
-  /** True until user completes core getting-started steps (upload, extraction, workflow run) */
+  /** True until user has files or sidebar activities (workflows, extractions, knowledge bases) */
   isNewUser: boolean
-  /** True only when user has zero activity — used for first-ever welcome message */
-  isFirstVisit: boolean
   status: OnboardingStatus | null
   loading: boolean
   refetchStatus: () => void
@@ -67,8 +74,7 @@ export interface OnboardingResult {
 
 export function useOnboarding(): OnboardingResult {
   const [pills, setPills] = useState<string[]>([])
-  const [isNewUser, setIsNewUser] = useState(false)
-  const [isFirstVisit, setIsFirstVisit] = useState(false)
+  const [isNewUser, setIsNewUser] = useState(true)
   const [status, setStatus] = useState<OnboardingStatus | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -79,11 +85,11 @@ export function useOnboarding(): OnboardingResult {
         // User is "new" if they have no files and no sidebar activities
         const hasActivity = s.has_documents || s.has_workflows || s.has_extraction_sets || s.has_knowledge_base
         setIsNewUser(!hasActivity)
-        // First visit = absolutely zero activity (for welcome message injection)
-        setIsFirstVisit(Object.values(s).every((v) => v === false))
         setPills(applyStatus(s))
       })
       .catch(() => {
+        // Default to new-user experience on API failure
+        setIsNewUser(true)
         setPills([
           'What can I do here?',
           'How do I set up a workflow?',
@@ -95,5 +101,5 @@ export function useOnboarding(): OnboardingResult {
 
   useEffect(() => { fetchStatus() }, [fetchStatus])
 
-  return { pills, isNewUser, isFirstVisit, status, loading, refetchStatus: fetchStatus }
+  return { pills, isNewUser, status, loading, refetchStatus: fetchStatus }
 }

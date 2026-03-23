@@ -30,7 +30,8 @@
       "Bash(uv run:*)",
       "Bash(docker compose:*)",
       "Bash(brew services:*)",
-      "Bash(lsof -iTCP:27017 -sTCP:LISTEN)"
+      "Bash(lsof -iTCP:27017 -sTCP:LISTEN)",
+      "Bash(docker exec:*)"
     ]
   }
 }

@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.dependencies import get_current_user
 from app.models.automation import Automation
+from app.models.certification import CertificationProgress
 from app.models.chat import ChatConversation
 from app.models.document import SmartDocument
 from app.models.knowledge import KnowledgeBase
@@ -183,6 +184,7 @@ async def get_onboarding_status(user: User = Depends(get_current_user)):
         automations,
         knowledge_bases,
         doc_chat_count,
+        cert_progress,
     ) = await asyncio.gather(
         SmartDocument.find(SmartDocument.user_id == uid).count(),
         Workflow.find(Workflow.user_id == uid).to_list(),
@@ -192,14 +194,15 @@ async def get_onboarding_status(user: User = Depends(get_current_user)):
         Automation.find(Automation.user_id == uid).to_list(),
         KnowledgeBase.find(KnowledgeBase.user_id == uid).to_list(),
         # Conversations with at least one file or URL attachment + messages
-        ChatConversation.find(
-            ChatConversation.user_id == uid,
-            {"$or": [
+        ChatConversation.find({
+            "user_id": uid,
+            "messages": {"$ne": []},
+            "$or": [
                 {"file_attachments": {"$ne": []}},
                 {"url_attachments": {"$ne": []}},
-            ]},
-            ChatConversation.messages != [],
-        ).count(),
+            ],
+        }).count(),
+        CertificationProgress.find_one(CertificationProgress.user_id == uid),
     )
 
     return OnboardingStatusResponse(
@@ -216,6 +219,7 @@ async def get_onboarding_status(user: User = Depends(get_current_user)):
         has_knowledge_base=len(knowledge_bases) > 0,
         has_ready_knowledge_base=any(getattr(kb, "status", "") == "ready" for kb in knowledge_bases),
         has_chatted_with_docs=doc_chat_count > 0,
+        is_certified=bool(cert_progress and cert_progress.certified),
     )
 
 

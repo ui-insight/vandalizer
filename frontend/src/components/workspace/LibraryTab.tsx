@@ -4,6 +4,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useLibraries, useLibraryItems } from '../../hooks/useLibrary'
 import { LibraryItemRow } from '../library/LibraryItemRow'
+import { ExploreTab } from '../library/ExploreTab'
 import { cloneToPersonal, shareToTeam, addItem as addItemToLibrary, touchItem, listCollections } from '../../api/library'
 import { createWorkflow } from '../../api/workflows'
 import { createSearchSet, listItems as listSearchSetItems, updateSearchSet, updateItem as updateSearchSetItem } from '../../api/extractions'
@@ -505,8 +506,8 @@ export function LibraryTab() {
           })}
         </div>
 
-        {/* Row 3: Filter chips + sort */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingBottom: 2 }}>
+        {/* Row 3: Filter chips + sort (hidden when Explore is active — it has its own) */}
+        <div style={{ display: scope === 'explore' ? 'none' : 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingBottom: 2 }}>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             {([
               { value: 'all' as const, label: 'All Types' },
@@ -562,7 +563,12 @@ export function LibraryTab() {
         </div>
       </div>
 
-      {/* ── Body: sidebar + results ── */}
+      {/* ── Body: Explore tab gets its own view; mine/team keep sidebar + results ── */}
+      {scope === 'explore' ? (
+        <div style={{ flexGrow: 1, minHeight: 0, overflow: 'hidden' }}>
+          <ExploreTab />
+        </div>
+      ) : (
       <div style={{ display: 'flex', flexGrow: 1, minHeight: 0, overflow: 'hidden' }}>
         {/* Sidebar */}
         <div
@@ -1040,6 +1046,7 @@ export function LibraryTab() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Creation Modal (workflow / extraction / prompt / formatter) */}
       {createModalType && (

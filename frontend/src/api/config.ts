@@ -52,6 +52,7 @@ export interface OnboardingStatus {
   has_knowledge_base: boolean
   has_ready_knowledge_base: boolean
   has_chatted_with_docs: boolean
+  is_certified: boolean
 }
 
 export function getOnboardingStatus() {

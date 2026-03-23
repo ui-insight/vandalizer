@@ -72,3 +72,33 @@ export function revokeApiToken() {
 export function getApiTokenStatus() {
   return apiFetch<{ has_token: boolean; created_at: string | null }>('/api/auth/api-token/status')
 }
+
+// Account deletion
+
+export interface DeleteAccountPreflight {
+  can_delete: boolean
+  blocking_reason: string | null
+  has_password: boolean
+  data_summary: {
+    documents: number
+    folders: number
+    chat_conversations: number
+    workflows: number
+    search_sets: number
+    knowledge_bases: number
+    teams_owned: number
+    teams_member: number
+  }
+  owned_teams_with_members: Array<{ uuid: string; name: string; member_count: number }>
+}
+
+export function deleteAccountPreflight() {
+  return apiFetch<DeleteAccountPreflight>('/api/auth/account/delete/preflight', { method: 'POST' })
+}
+
+export function deleteAccount(data: { password?: string; confirmation: string }) {
+  return apiFetch<{ ok: boolean }>('/api/auth/account/delete', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}

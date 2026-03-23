@@ -3,7 +3,6 @@ import { Loader2, BookOpen, X, ArrowDown, ChevronRight } from 'lucide-react'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
 import { AttachmentList } from './AttachmentList'
-import { WelcomeActionCards, OnboardingStepper } from './WelcomeExperience'
 import { useChat } from '../../hooks/useChat'
 import { useOnboarding } from '../../hooks/useOnboarding'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
@@ -16,12 +15,6 @@ const LOADING_WORDS = [
   'Thinking', 'Vandalizing', 'Pondering', 'Analyzing',
   'Processing', 'Brewing', 'Crunching', 'Conjuring',
 ]
-
-const WELCOME_MESSAGE =
-  "**Welcome to Vandalizer!** I'm your AI research assistant. I can help you " +
-  "extract structured data from documents, build automated workflows, and manage " +
-  "your team's knowledge base.\n\n" +
-  "Pick a starting point below, or just type what you're working on:"
 
 function StreamingLabel() {
   const [index, setIndex] = useState(0)
@@ -59,7 +52,6 @@ interface ChatPanelProps {
 export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessageConsumed }: ChatPanelProps) {
   const {
     messages,
-    setMessages,
     streamingContent,
     thinkingContent,
     thinkingDuration,
@@ -72,9 +64,9 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     setActivity,
   } = useChat()
 
-  const { bumpActivitySignal, processingDoc, selectedDocUuids, selectedFolderUuids, activeKBUuid, activeKBTitle, deactivateKB, setWorkspaceMode, workspaceMode } = useWorkspace()
+  const { bumpActivitySignal, processingDoc, selectedDocUuids, selectedFolderUuids, activeKBUuid, activeKBTitle, deactivateKB } = useWorkspace()
   const { toast } = useToast()
-  const { pills: onboardingPills, isNewUser, isFirstVisit, status: onboardingStatus, loading: onboardingLoading, refetchStatus } = useOnboarding()
+  const { pills: onboardingPills, loading: onboardingLoading } = useOnboarding()
   const [fileAttachments, setFileAttachments] = useState<FileAttachment[]>([])
   const [urlAttachments, setUrlAttachments] = useState<UrlAttachment[]>([])
   const [attachLoading, setAttachLoading] = useState(false)
@@ -85,27 +77,6 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const [showScrollDown, setShowScrollDown] = useState(false)
   const prevScrollInfo = useRef({ scrollHeight: 0, scrollTop: 0, clientHeight: 0 })
 
-  // New-user onboarding state
-  const [hasSentFirstMessage, setHasSentFirstMessage] = useState(false)
-  const hasChatAboutDocs = onboardingStatus?.has_chatted_with_docs ?? false
-  const welcomeInjected = useRef(false)
-
-  // Inject synthetic welcome message only on first-ever visit (zero activity)
-  useEffect(() => {
-    if (isFirstVisit && !onboardingLoading && messages.length === 0 && !welcomeInjected.current) {
-      welcomeInjected.current = true
-      setMessages([{ role: 'assistant', content: WELCOME_MESSAGE }])
-    }
-  }, [isFirstVisit, onboardingLoading, messages.length, setMessages])
-
-  // Refetch onboarding status when user returns to chat mode (e.g. after uploading in files mode)
-  const prevMode = useRef(workspaceMode)
-  useEffect(() => {
-    if (prevMode.current !== 'chat' && workspaceMode === 'chat') {
-      refetchStatus()
-    }
-    prevMode.current = workspaceMode
-  }, [workspaceMode, refetchStatus])
 
   // Load saved model preference on mount
   useEffect(() => {
@@ -206,36 +177,9 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const hasDocContext = fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0 || selectedFolderUuids.length > 0
 
   const handleSend = (message: string, includeOnboardingContext?: boolean) => {
-    setHasSentFirstMessage(true)
-    // Refetch onboarding status after sending with doc context so stepper updates
-    if (hasDocContext && !hasChatAboutDocs) {
-      setTimeout(() => refetchStatus(), 2000)
-    }
     send(message, selectedDocUuids, selectedModel || undefined, activeKBUuid || undefined, includeOnboardingContext, selectedFolderUuids)
   }
 
-  // Onboarding: guide user to upload documents first, then come back
-  const handleSwitchToFiles = useCallback(() => {
-    setMessages(prev => [...prev, {
-      role: 'assistant',
-      content:
-        "Head to the **Files** panel on the left to upload your documents. " +
-        "I support PDFs, Word docs, spreadsheets, images, and HTML.\n\n" +
-        "Once they're processed, come back here and I'll help you analyze them.",
-    }])
-    setWorkspaceMode('files')
-  }, [setMessages, setWorkspaceMode])
-
-  const handleNeedDocumentsFirst = useCallback(() => {
-    setMessages(prev => [...prev, {
-      role: 'assistant',
-      content:
-        "You'll need to upload some documents first! Head to the **Files** panel " +
-        "on the left to add your PDFs, Word docs, or spreadsheets. " +
-        "Once they're processed, come back and we'll work with them.",
-    }])
-    setWorkspaceMode('files')
-  }, [setMessages, setWorkspaceMode])
 
   const handleAttachFile = async (files: File[]) => {
     setAttachLoading(true)
@@ -296,9 +240,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   }
 
   const handleExport = (format: string) => {
-    // Filter out the synthetic welcome message from exports
-    const exportMessages = messages.filter(m => m.content !== WELCOME_MESSAGE)
-    const text = exportMessages
+    const text = messages
       .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}:\n${m.content}`)
       .join('\n\n---\n\n')
     if (format === 'text') {
@@ -306,7 +248,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       downloadBlob(blob, 'conversation.txt')
     } else if (format === 'csv') {
       const rows = [['Role', 'Content']]
-      exportMessages.forEach(m => rows.push([m.role, m.content.replace(/"/g, '""')]))
+      messages.forEach(m => rows.push([m.role, m.content.replace(/"/g, '""')]))
       const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n')
       const blob = new Blob([csv], { type: 'text/csv' })
       downloadBlob(blob, 'conversation.csv')
@@ -314,19 +256,11 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       const html = `<html><head><title>Conversation</title><style>body{font-family:sans-serif;padding:40px;max-width:800px;margin:0 auto}
       .msg{margin-bottom:20px;padding:12px;border-radius:8px}.user{background:#f3f4f6;border-left:4px solid #eab308}
       .assistant{background:#fafafa}.role{font-weight:bold;margin-bottom:4px;font-size:12px;text-transform:uppercase;color:#666}</style></head>
-      <body>${exportMessages.map(m => `<div class="msg ${m.role}"><div class="role">${m.role}</div><div>${m.content.replace(/\n/g, '<br>')}</div></div>`).join('')}</body></html>`
+      <body>${messages.map(m => `<div class="msg ${m.role}"><div class="role">${m.role}</div><div>${m.content.replace(/\n/g, '<br>')}</div></div>`).join('')}</body></html>`
       const win = window.open('', '_blank')
       if (win) { win.document.write(html); win.document.close(); win.print() }
     }
   }
-
-  // Whether to show the new-user action cards below the messages
-  const showWelcomeCards = isNewUser && !hasSentFirstMessage && !processingDoc && !activeKBUuid && !hasDocContext
-  // Whether to show the onboarding stepper above the input
-  const showStepper = onboardingStatus && isNewUser && !(
-    onboardingStatus.has_documents && hasChatAboutDocs &&
-    (onboardingStatus.has_extraction_sets || onboardingStatus.has_run_workflow)
-  )
 
   return (
     <div className="flex h-full flex-col">
@@ -352,8 +286,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         className="flex-1 overflow-y-auto hide-scrollbar"
         style={{ padding: '20px 20px 180px 20px', position: 'relative' }}
       >
-        {/* Returning user empty state: banner + contextual pills */}
-        {messages.length === 0 && !isStreaming && !onboardingLoading && !isNewUser && (
+        {/* Empty state: banner + contextual pills */}
+        {messages.length === 0 && !isStreaming && !onboardingLoading && (
           <div style={{ maxWidth: 640, margin: '0 auto' }}>
             <div
               className="relative overflow-hidden text-white"
@@ -482,18 +416,6 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           />
         ))}
 
-        {/* New-user action cards — shown below the welcome message, hidden after first send */}
-        {showWelcomeCards && messages.length > 0 && (
-          <div style={{ marginTop: 12, paddingBottom: 8 }}>
-            <WelcomeActionCards
-              onboardingStatus={onboardingStatus}
-              onSwitchToFiles={handleSwitchToFiles}
-              onSendMessage={handleSend}
-              onNeedDocumentsFirst={handleNeedDocumentsFirst}
-            />
-          </div>
-        )}
-
         {/* Streaming: thinking-only phase */}
         {isStreaming && thinkingContent && !streamingContent && (
           <ChatMessage
@@ -566,10 +488,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         </div>
       )}
 
-      {/* Onboarding stepper — persists above input until all steps complete */}
-      {showStepper && (
-        <OnboardingStepper status={onboardingStatus} hasChatAboutDocs={hasChatAboutDocs} />
-      )}
+
 
       {/* KB active badge */}
       {activeKBUuid && (
