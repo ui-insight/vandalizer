@@ -53,6 +53,7 @@ export default function InviteAccept() {
                 workflow: undefined,
                 extraction: undefined,
                 automation: undefined,
+                kb: undefined,
               },
             })
           }
@@ -122,6 +123,7 @@ export default function InviteAccept() {
                     workflow: undefined,
                     extraction: undefined,
                     automation: undefined,
+                    kb: undefined,
                   },
                 })
               }

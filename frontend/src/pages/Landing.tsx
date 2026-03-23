@@ -283,6 +283,7 @@ export default function Landing() {
           workflow: undefined,
           extraction: undefined,
           automation: undefined,
+          kb: undefined,
         }}
       />
     )
