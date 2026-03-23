@@ -436,10 +436,20 @@ async def generate_improvement_suggestions(
     agent = create_chat_agent(
         default_model,
         system_prompt=(
-            "You are an expert at improving AI extraction and workflow configurations. "
-            "Given validation results, provide a SHORT, actionable list of improvements. "
-            "Rules: Maximum 3-5 bullet points. No headings, no preamble, no long explanations. "
-            "Each bullet should be one concise sentence. Focus only on the most impactful changes."
+            "You help users improve LLM-based document extraction results. "
+            "The user configures extractions by defining field names (called 'extraction keys') "
+            "and optionally constraining them with enum values. The system sends these keys to an LLM "
+            "which reads a document and returns values for each key.\n\n"
+            "The ONLY things a user can change to improve results are:\n"
+            "- Rename extraction keys to be clearer or more specific (e.g. 'name' → 'PI Full Name')\n"
+            "- Add enum values to constrain a field to specific allowed values\n"
+            "- Mark fields as optional if they don't always appear\n"
+            "- Switch between one-pass and two-pass extraction modes\n"
+            "- Enable or disable 'thinking' mode for the LLM\n"
+            "- Change the LLM model\n\n"
+            "Rules: Maximum 3-5 bullet points. No headings, no preamble. "
+            "Each bullet is one specific, actionable sentence referencing the actual field names from the results. "
+            "NEVER suggest training data, fine-tuning, regex post-processing, or anything outside the above options."
         ),
         system_config_doc=sys_config_doc,
     )
@@ -475,7 +485,11 @@ def _build_extraction_suggestion_prompt(result: dict) -> str:
                 f"accuracy={_fmt_pct(f.get('accuracy'))}, consistency={_fmt_pct(f.get('consistency'))}{flag}"
             )
 
-    lines.append("\n---\nList 3-5 bullet points to raise accuracy/consistency to ≥90%. One sentence each. Focus on the worst fields.")
+    lines.append(
+        "\n---\nLooking at the fields with the lowest accuracy, suggest 3-5 specific changes "
+        "the user could make (renaming keys, adding enum constraints, marking optional, changing mode). "
+        "Reference actual field names and expected vs extracted values. One sentence per bullet."
+    )
     return "\n".join(lines)
 
 

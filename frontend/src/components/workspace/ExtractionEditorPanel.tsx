@@ -26,8 +26,8 @@ import {
 import type { ValidationV2Result, QualityHistoryRun, ValidationSource, TuningResult } from '../../api/extractions'
 import { findBestSettings } from '../../api/extractions'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
+import { VerificationSubmitDialog } from '../shared/VerificationSubmitDialog'
 import { getModels } from '../../api/config'
-import { submitForVerification } from '../../api/library'
 import type { SearchSet, ModelInfo } from '../../types/workflow'
 import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from 'recharts'
 import { QualityBadge } from '../library/QualityBadge'
@@ -487,6 +487,7 @@ export function ExtractionEditorPanel() {
         <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: activeTab === 'validate' ? undefined : 'none' }}>
           <ValidateTab
             searchSetUuid={openExtractionId}
+            itemTitle={searchSet?.title}
             items={items}
             extractionConfig={config}
             onUpdateItem={update}
@@ -1816,12 +1817,14 @@ interface SourceLocal {
 
 function ValidateTab({
   searchSetUuid,
+  itemTitle,
   items,
   extractionConfig,
   onUpdateItem,
   onValidationComplete,
 }: {
   searchSetUuid: string
+  itemTitle?: string
   items: { id: string; searchphrase: string; is_optional: boolean; enum_values: string[] }[]
   extractionConfig: ExtractionConfig
   onUpdateItem: (id: string, data: { is_optional?: boolean; enum_values?: string[] }) => void
@@ -1849,7 +1852,7 @@ function ValidateTab({
   const [fillingSourceId, setFillingSourceId] = useState<string | null>(null)
   const [fillError, setFillError] = useState<string | null>(null)
   const fillAbortRef = useRef<AbortController | null>(null)
-  const [submittingToLibrary, setSubmittingToLibrary] = useState(false)
+  const [showSubmitDialog, setShowSubmitDialog] = useState(false)
   const [submitLibraryResult, setSubmitLibraryResult] = useState<'success' | 'error' | null>(null)
   const progress = useValidationProgress(validating, sources.length, numRuns, items.length, extractionConfig)
 
@@ -2679,37 +2682,30 @@ function ValidateTab({
             </div>
             {submitLibraryResult === 'success' ? (
               <span style={{ fontSize: 12, fontWeight: 600, color: '#059669', whiteSpace: 'nowrap' }}>Submitted!</span>
-            ) : submitLibraryResult === 'error' ? (
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#dc2626', whiteSpace: 'nowrap' }}>Submission failed. Please try again.</span>
             ) : (
               <button
-                disabled={submittingToLibrary}
-                onClick={async (e) => {
-                  e.stopPropagation()
-                  setSubmittingToLibrary(true)
-                  setSubmitLibraryResult(null)
-                  try {
-                    await submitForVerification({
-                      item_kind: 'search_set',
-                      item_id: searchSetUuid!,
-                    })
-                    setSubmitLibraryResult('success')
-                  } catch {
-                    setSubmitLibraryResult('error')
-                  } finally {
-                    setSubmittingToLibrary(false)
-                  }
-                }}
+                onClick={(e) => { e.stopPropagation(); setShowSubmitDialog(true) }}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6,
                   padding: '6px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
                   borderRadius: 6, border: '1px solid #a7f3d0', backgroundColor: '#fff',
-                  color: '#059669', cursor: submittingToLibrary ? 'not-allowed' : 'pointer',
-                  opacity: submittingToLibrary ? 0.6 : 1, whiteSpace: 'nowrap',
+                  color: '#059669', cursor: 'pointer', whiteSpace: 'nowrap',
                 }}
               >
-                {submittingToLibrary ? 'Submitting...' : 'Submit to Public Library'}
+                Submit to Public Library
               </button>
+            )}
+            {showSubmitDialog && (
+              <VerificationSubmitDialog
+                itemKind="search_set"
+                itemId={searchSetUuid!}
+                itemTitle={itemTitle}
+                onClose={() => setShowSubmitDialog(false)}
+                onSuccess={() => {
+                  setShowSubmitDialog(false)
+                  setSubmitLibraryResult('success')
+                }}
+              />
             )}
           </div>
         )

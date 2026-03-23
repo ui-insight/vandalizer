@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { UserPlus, Trash2, Pencil, Check, X, Copy, AlertTriangle, ArrowRightLeft } from 'lucide-react'
+import { UserPlus, Trash2, Pencil, Check, X, Copy, AlertTriangle, ArrowRightLeft, LogOut } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
 import { useTeams } from '../hooks/useTeams'
 import { useAuth } from '../hooks/useAuth'
@@ -125,6 +125,22 @@ export function TeamSettings() {
       refreshData()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to transfer ownership')
+    }
+  }
+
+  async function handleLeaveTeam() {
+    if (!currentTeam || !user) return
+    const confirmed = window.confirm(
+      `Are you sure you want to leave "${currentTeam.name}"?`,
+    )
+    if (!confirmed) return
+    setError('')
+    try {
+      await removeMember(currentTeam.uuid, user.user_id)
+      await refreshTeams()
+      navigate({ to: '/', search: { mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined } })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to leave team')
     }
   }
 
@@ -376,6 +392,26 @@ export function TeamSettings() {
                 Transfer
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Leave Team (non-owners only) */}
+        {currentTeam && !isOwner && (
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <h3 className="mb-1 font-medium text-gray-900 flex items-center gap-2">
+              <LogOut className="h-4 w-4" />
+              Leave Team
+            </h3>
+            <p className="mb-3 text-xs text-gray-500">
+              Leave this team. You will lose access to shared documents and folders.
+            </p>
+            <button
+              onClick={handleLeaveTeam}
+              className="flex items-center gap-1.5 rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm font-bold text-red-600 hover:bg-red-100"
+            >
+              <LogOut className="h-4 w-4" />
+              Leave Team
+            </button>
           </div>
         )}
 

@@ -36,7 +36,7 @@ import { QualityBadge } from '../library/QualityBadge'
 import { QualitySparkline } from '../library/QualitySparkline'
 import { useQualitySparkline } from '../../hooks/useQualitySparkline'
 import { relativeTime } from '../../utils/time'
-import { submitForVerification } from '../../api/library'
+import { VerificationSubmitDialog } from '../shared/VerificationSubmitDialog'
 
 // ---------------------------------------------------------------------------
 // Types & constants
@@ -576,6 +576,7 @@ export function WorkflowEditorPanel() {
         {activeTab === 'validate' && (
           <ValidateTab
             workflowId={openWorkflowId}
+            itemTitle={workflow?.name}
             selectedDocUuids={selectedDocUuids}
             bumpActivitySignal={bumpActivitySignal}
             onValidated={() => {
@@ -3297,11 +3298,13 @@ const CHECK_STATUS_STYLES: Record<string, { bg: string; text: string; label: str
 
 function ValidateTab({
   workflowId,
+  itemTitle,
   selectedDocUuids,
   bumpActivitySignal,
   onValidated,
 }: {
   workflowId: string | null
+  itemTitle?: string
   selectedDocUuids: string[]
   bumpActivitySignal: () => void
   onValidated?: () => void
@@ -3343,7 +3346,7 @@ function ValidateTab({
   const [historyExpanded, setHistoryExpanded] = useState(false)
   const [expandedRunId, setExpandedRunId] = useState<string | null>(null)
   const [submitLibraryResult, setSubmitLibraryResult] = useState<'success' | 'error' | null>(null)
-  const [submittingToLibrary, setSubmittingToLibrary] = useState(false)
+  const [showSubmitDialog, setShowSubmitDialog] = useState(false)
 
   // Progress tracking for Run & Validate
   const [runElapsedValidate, setRunElapsedValidate] = useState(0)
@@ -4355,33 +4358,28 @@ function ValidateTab({
                     <span style={{ fontSize: 12, fontWeight: 600, color: '#059669', whiteSpace: 'nowrap' }}>Submitted!</span>
                   ) : (
                     <button
-                      disabled={submittingToLibrary}
-                      onClick={async (e) => {
-                        e.stopPropagation()
-                        if (!workflowId) return
-                        setSubmittingToLibrary(true)
-                        try {
-                          await submitForVerification({
-                            item_kind: 'workflow',
-                            item_id: workflowId,
-                          })
-                          setSubmitLibraryResult('success')
-                        } catch {
-                          setSubmitLibraryResult('error')
-                        } finally {
-                          setSubmittingToLibrary(false)
-                        }
-                      }}
+                      onClick={(e) => { e.stopPropagation(); if (workflowId) setShowSubmitDialog(true) }}
                       style={{
                         display: 'inline-flex', alignItems: 'center', gap: 6,
                         padding: '6px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
                         borderRadius: 6, border: '1px solid #a7f3d0', backgroundColor: '#fff',
-                        color: '#059669', cursor: submittingToLibrary ? 'not-allowed' : 'pointer',
-                        opacity: submittingToLibrary ? 0.6 : 1, whiteSpace: 'nowrap',
+                        color: '#059669', cursor: 'pointer', whiteSpace: 'nowrap',
                       }}
                     >
-                      {submittingToLibrary ? 'Submitting...' : 'Submit to Public Library'}
+                      Submit to Public Library
                     </button>
+                  )}
+                  {showSubmitDialog && workflowId && (
+                    <VerificationSubmitDialog
+                      itemKind="workflow"
+                      itemId={workflowId}
+                      itemTitle={itemTitle}
+                      onClose={() => setShowSubmitDialog(false)}
+                      onSuccess={() => {
+                        setShowSubmitDialog(false)
+                        setSubmitLibraryResult('success')
+                      }}
+                    />
                   )}
                 </div>
               )

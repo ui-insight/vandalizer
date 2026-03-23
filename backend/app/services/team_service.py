@@ -19,12 +19,31 @@ async def get_user_teams(user_id: str) -> list[dict]:
     ).to_list()
     if not memberships:
         return []
+
+    # Deduplicate: keep only one membership per team (highest-ranked role)
+    best: dict[PydanticObjectId, TeamMembership] = {}
+    duplicates: list[TeamMembership] = []
+    for m in memberships:
+        existing = best.get(m.team)
+        if existing is None:
+            best[m.team] = m
+        else:
+            # Keep the one with the higher role (lower rank number)
+            if ROLE_RANK.get(m.role, 99) < ROLE_RANK.get(existing.role, 99):
+                duplicates.append(existing)
+                best[m.team] = m
+            else:
+                duplicates.append(m)
+    # Clean up duplicate memberships
+    for dup in duplicates:
+        await dup.delete()
+
     # Batch-fetch all teams in one query instead of N+1
-    team_ids = [m.team for m in memberships]
+    team_ids = list(best.keys())
     teams = await Team.find({"_id": {"$in": team_ids}}).to_list()
     team_map = {team.id: team for team in teams}
     result = []
-    for m in memberships:
+    for m in best.values():
         team = team_map.get(m.team)
         if team:
             result.append({
@@ -222,21 +241,34 @@ async def change_role(
 async def remove_member(
     team_uuid: str, target_user_id: str, actor_user_id: str
 ) -> None:
-    """Remove a member from a team."""
+    """Remove a member from a team.
+
+    Admins/owners can remove other non-owner members.
+    Any non-owner member can remove themselves (leave).
+    """
     team = await Team.find_one(Team.uuid == team_uuid)
     if not team:
         raise ValueError("Team not found")
 
-    actor_m = await _get_membership(team.id, actor_user_id)
-    _require_min_role(actor_m, "admin")
+    is_self = target_user_id == actor_user_id
 
-    target_m = await _get_membership(team.id, target_user_id)
-    if not target_m:
-        raise ValueError("Target user is not a member")
-
-    # Cannot remove an owner
-    if target_m.role == "owner":
-        raise ValueError("Cannot remove a team owner")
+    if is_self:
+        actor_m = await _get_membership(team.id, actor_user_id)
+        if not actor_m:
+            raise ValueError("You are not a member of this team")
+        if actor_m.role == "owner":
+            raise ValueError(
+                "Owners cannot leave. Transfer ownership first."
+            )
+        target_m = actor_m
+    else:
+        actor_m = await _get_membership(team.id, actor_user_id)
+        _require_min_role(actor_m, "admin")
+        target_m = await _get_membership(team.id, target_user_id)
+        if not target_m:
+            raise ValueError("Target user is not a member")
+        if target_m.role == "owner":
+            raise ValueError("Cannot remove a team owner")
 
     await target_m.delete()
 

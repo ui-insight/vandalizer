@@ -1,10 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
-import { Award, Headphones, User, Users, Settings, LogOut, IdCard, Shield, ClipboardCheck, ChevronDown } from 'lucide-react'
+import { Award, User, Users, Settings, LogOut, IdCard, Shield, ClipboardCheck, ChevronDown } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { useTeams } from '../../hooks/useTeams'
 import { useAuth } from '../../hooks/useAuth'
 import { useCertificationPanel } from '../../contexts/CertificationPanelContext'
-import { openSupportPanel } from '../../utils/supportPanel'
 
 export function TeamsDropdown() {
   const { teams, currentTeam, switchTeam } = useTeams()
@@ -133,20 +132,6 @@ export function TeamsDropdown() {
                 <span>Verification Management</span>
               </Link>
             </>
-          )}
-
-          {/* Support Center (admins only) */}
-          {user?.is_admin && (
-            <button
-              onClick={() => {
-                openSupportPanel()
-                setOpen(false)
-              }}
-              className="flex w-full items-center gap-2.5 rounded-md px-3.5 py-2.5 text-sm text-left text-[#111] hover:bg-black/[.04] transition-colors"
-            >
-              <Headphones className="h-4 w-4 shrink-0" style={{ width: 18 }} />
-              <span>Support Center</span>
-            </button>
           )}
 
           {/* Divider */}
