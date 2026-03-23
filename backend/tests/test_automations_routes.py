@@ -88,15 +88,13 @@ class TestAutomationTriggerAuth:
              patch("app.routers.automations.access_control.get_authorized_document", new_callable=AsyncMock) as mock_get_doc, \
              patch("app.routers.automations.get_authorized_search_set", new_callable=AsyncMock) as mock_get_search_set, \
              patch("app.services.activity_service.activity_start", new_callable=AsyncMock) as mock_activity_start, \
-             patch("app.services.activity_service.activity_finish", new_callable=AsyncMock) as mock_activity_finish, \
-             patch("app.services.search_set_service.run_extraction_sync", new_callable=AsyncMock) as mock_run_extraction:
+             patch("app.tasks.passive_tasks.process_extraction_outputs.delay") as mock_delay:
             MockUser.find_one = AsyncMock(return_value=user)
             mock_get_automation.return_value = auto
             mock_team_access.return_value = MagicMock()
             mock_get_doc.return_value = doc
             mock_get_search_set.return_value = MagicMock()
             mock_activity_start.return_value = activity
-            mock_run_extraction.return_value = [{"field": "value"}]
 
             resp = await client.post(
                 "/api/automations/automation-id/trigger",
@@ -105,11 +103,11 @@ class TestAutomationTriggerAuth:
             )
 
         assert resp.status_code == 200
-        assert resp.json()["status"] == "completed"
+        assert resp.json()["status"] == "queued"
         assert resp.json()["documents"] == ["doc-1"]
-        mock_run_extraction.assert_awaited_once_with(
+        mock_delay.assert_called_once_with(
+            automation_id="automation-id",
             search_set_uuid="search-set-1",
             document_uuids=["doc-1"],
             user_id="testuser",
         )
-        mock_activity_finish.assert_awaited_once()
