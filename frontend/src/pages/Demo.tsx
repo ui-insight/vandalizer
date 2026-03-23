@@ -26,8 +26,8 @@ const PRE_SURVEY_FIELDS: SurveyField[] = [
   // --- Demographics ---
   {
     key: 'ra_department',
-    label: 'Research Administration Department',
-    type: 'select',
+    label: 'Department you work in (select all that apply)',
+    type: 'multiselect',
     required: true,
     section: 'Demographics',
     options: [
@@ -45,52 +45,29 @@ const PRE_SURVEY_FIELDS: SurveyField[] = [
   },
   {
     key: 'carnegie_classification',
-    label: 'Carnegie Classification',
-    type: 'select',
+    label: 'Institution Carnegie Classification (select all that apply)',
+    type: 'multiselect',
     required: true,
     section: 'Demographics',
     options: [
-      'R1',
-      'R2',
-      'Primarily Undergraduate',
+      'Carnegie R1',
+      'Carnegie R2',
+      'Primarily Undergraduate Institution',
       'Community College',
-      'MSI',
+      'Minority Serving Institution',
       'Academic Medical Center',
       'Independent Research Institute',
-      'Emerging Research',
-      'HBCU',
+      'Emerging Research Institution',
+      'Historically Black College / University',
       'Other',
     ],
-  },
-  {
-    key: 'research_expenditures',
-    label: 'Approximate research expenditures FY2025',
-    type: 'text',
-    required: false,
-    section: 'Demographics',
-    placeholder: 'e.g., $50M',
-  },
-  {
-    key: 'active_federal_grants',
-    label: 'Approximate number of active federal grants',
-    type: 'text',
-    required: false,
-    section: 'Demographics',
-    placeholder: 'e.g., 200',
-  },
-  {
-    key: 'ra_staff_size',
-    label: 'Approximate research administration staff size',
-    type: 'text',
-    required: false,
-    section: 'Demographics',
-    placeholder: 'e.g., 25',
   },
 
   // --- Where did you come from? ---
   {
     key: 'process_obstacles',
-    label: 'What process obstacles or bottlenecks do you currently face?',
+    label:
+      'Please describe some of the process-based, technological obstacles or bottlenecks which you feel could be reduced or automated using AI.',
     type: 'textarea',
     required: true,
     section: 'Where did you come from?',
@@ -98,7 +75,7 @@ const PRE_SURVEY_FIELDS: SurveyField[] = [
   },
   {
     key: 'intended_use',
-    label: 'What do you intend to use Vandalizer for?',
+    label: 'How do you intend on using Vandalizer in your daily tasks?',
     type: 'textarea',
     required: true,
     section: 'Where did you come from?',
@@ -233,7 +210,30 @@ const PRE_SURVEY_FIELDS: SurveyField[] = [
         label:
           'I am worried that I am ethically complicit in environmental harms when using energy-intensive AI systems',
       },
+      {
+        key: 'comfortable_learning',
+        label:
+          'I am comfortable learning technical skills, even when there is a learning curve',
+      },
     ],
+  },
+
+  // --- Excitement & Discovery ---
+  {
+    key: 'excitement_level',
+    label: 'How excited are you to try Vandalizer?',
+    type: 'select',
+    required: true,
+    section: 'Pre-Experience Assessment',
+    options: ['1', '2', '3', '4', '5'],
+  },
+  {
+    key: 'how_heard',
+    label: 'How did you hear about Vandalizer?',
+    type: 'textarea',
+    required: false,
+    section: 'Pre-Experience Assessment',
+    placeholder: 'e.g., Conference, colleague, social media...',
   },
 ]
 

@@ -2364,6 +2364,33 @@ function ConfigTab() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Sticky save bar */}
+      <div style={{
+        position: 'sticky', top: 0, zIndex: 20,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        background: '#fff', borderBottom: '1px solid #e5e7eb',
+        padding: '12px 0', margin: '0 0 -4px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+      }}>
+        <span style={{ fontSize: 14, fontWeight: 600, color: '#374151', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Settings size={16} color="#6b7280" /> System Configuration
+        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {saved && <span style={{ fontSize: 13, color: '#16a34a' }}>Configuration saved!</span>}
+          <button
+            onClick={handleSaveConfig}
+            disabled={saving}
+            style={{
+              padding: '8px 20px', borderRadius: 'var(--ui-radius, 12px)', border: 'none',
+              backgroundColor: '#111827', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+              opacity: saving ? 0.6 : 1,
+            }}
+          >
+            {saving ? 'Saving...' : 'Save Configuration'}
+          </button>
+        </div>
+      </div>
+
       {error && (
         <div style={{ padding: '10px 16px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--ui-radius, 12px)', color: '#991b1b', fontSize: 13 }}>
           {error}

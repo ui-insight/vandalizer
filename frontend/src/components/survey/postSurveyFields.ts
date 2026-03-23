@@ -18,21 +18,22 @@ export const POST_SURVEY_FIELDS: SurveyField[] = [
   },
   {
     key: 'ease_of_use',
-    label: 'How easy was Vandalizer to use?',
+    label: 'How would you rate Vandalizer\'s ease of use?',
     type: 'select',
     required: true,
     section: 'Overall Experience',
     options: [
-      'Very hard to use',
-      'Somewhat hard to use',
-      'Neither easy nor hard to use',
-      'Somewhat easy to use',
       'Very easy to use',
+      'Somewhat easy to use',
+      'Neither easy nor difficult to use',
+      'Somewhat difficult to use',
+      'Very difficult to use',
     ],
   },
   {
     key: 'saved_time',
-    label: 'Did Vandalizer save you time?',
+    label:
+      'If given enough time to learn this tool, would Vandalizer workflows or tasks save you time?',
     type: 'select',
     required: true,
     section: 'Overall Experience',
@@ -40,7 +41,7 @@ export const POST_SURVEY_FIELDS: SurveyField[] = [
   },
   {
     key: 'time_saved_description',
-    label: 'How much time did it save you? Describe task and time savings.',
+    label: 'How much time did using Vandalizer save you? Describe task and time savings.',
     type: 'textarea',
     required: false,
     section: 'Overall Experience',
@@ -71,7 +72,7 @@ export const POST_SURVEY_FIELDS: SurveyField[] = [
       'Prior Approval Requirements',
       'Subaward Extraction',
       'Other',
-      'I did not use pre-vetted tasks',
+      'I did not use pre-vetted tasks or workflows',
     ],
   },
   {
@@ -91,11 +92,26 @@ export const POST_SURVEY_FIELDS: SurveyField[] = [
   // --- Feedback ---
   {
     key: 'constructive_criticism',
-    label: 'What constructive criticism do you have for us?',
+    label:
+      'Please provide any constructive criticism you have for the Vandalizer workflows or features you used.',
     type: 'textarea',
     required: false,
     section: 'Feedback',
     placeholder: 'We welcome all feedback — what could we improve?',
+  },
+  {
+    key: 'what_worked_well',
+    label: 'What worked well and what can be improved?',
+    type: 'textarea',
+    required: false,
+    section: 'Feedback',
+  },
+  {
+    key: 'additional_capabilities',
+    label: 'Which additional capabilities would you like to see incorporated?',
+    type: 'textarea',
+    required: false,
+    section: 'Feedback',
   },
   {
     key: 'estimated_usage_frequency',
@@ -136,24 +152,11 @@ export const POST_SURVEY_FIELDS: SurveyField[] = [
         label:
           'I am worried that I am ethically complicit in environmental harms when using energy-intensive AI systems',
       },
+      {
+        key: 'comfortable_learning',
+        label:
+          'I am comfortable learning technical skills, even when there is a learning curve',
+      },
     ],
-  },
-
-  // --- Looking Forward ---
-  {
-    key: 'new_features_desired',
-    label: 'What new features would you like to see in Vandalizer?',
-    type: 'textarea',
-    required: false,
-    section: 'Looking Forward',
-    placeholder: 'Describe features or capabilities you wish existed...',
-  },
-  {
-    key: 'training_types_desired',
-    label: 'What types of training would be helpful for using Vandalizer?',
-    type: 'textarea',
-    required: false,
-    section: 'Looking Forward',
-    placeholder: 'e.g., Video tutorials, live webinars, written guides...',
   },
 ]
