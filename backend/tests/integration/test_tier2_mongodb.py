@@ -17,6 +17,7 @@ pytestmark = [
         reason="Set INTEGRATION_MONGODB=1 to run MongoDB integration tests",
     ),
     pytest.mark.integration_tier2,
+    pytest.mark.asyncio(loop_scope="session"),
 ]
 
 
