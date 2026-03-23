@@ -5,17 +5,17 @@ import { QualityBadge } from './QualityBadge'
 describe('QualityBadge', () => {
   it('renders "excellent" tier with score', () => {
     render(<QualityBadge tier="excellent" score={95} />)
-    expect(screen.getByText('Excellent (95%)')).toBeTruthy()
+    expect(screen.getByText('Quality: Excellent (95%)')).toBeTruthy()
   })
 
   it('renders "good" tier with score', () => {
     render(<QualityBadge tier="good" score={78} />)
-    expect(screen.getByText('Good (78%)')).toBeTruthy()
+    expect(screen.getByText('Quality: Good (78%)')).toBeTruthy()
   })
 
   it('renders "fair" tier with score', () => {
     render(<QualityBadge tier="fair" score={55} />)
-    expect(screen.getByText('Fair (55%)')).toBeTruthy()
+    expect(screen.getByText('Quality: Fair (55%)')).toBeTruthy()
   })
 
   it('renders "Unvalidated" when tier is null', () => {
@@ -25,11 +25,11 @@ describe('QualityBadge', () => {
 
   it('renders tier name without percentage when score is null', () => {
     render(<QualityBadge tier="good" score={null} />)
-    expect(screen.getByText('Good')).toBeTruthy()
+    expect(screen.getByText('Quality: Good')).toBeTruthy()
   })
 
   it('rounds score to nearest integer', () => {
     render(<QualityBadge tier="excellent" score={92.7} />)
-    expect(screen.getByText('Excellent (93%)')).toBeTruthy()
+    expect(screen.getByText('Quality: Excellent (93%)')).toBeTruthy()
   })
 })
