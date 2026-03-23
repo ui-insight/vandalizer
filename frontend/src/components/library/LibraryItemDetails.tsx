@@ -42,6 +42,7 @@ export function LibraryItemDetails({ item, onClose, onRemove }: Props) {
           workflow: item.item_id,
           extraction: undefined,
           automation: undefined,
+          kb: undefined,
         },
       })
     } else {
@@ -53,6 +54,7 @@ export function LibraryItemDetails({ item, onClose, onRemove }: Props) {
           workflow: undefined,
           extraction: item.item_id,
           automation: undefined,
+          kb: undefined,
         },
       })
     }
