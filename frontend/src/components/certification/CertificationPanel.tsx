@@ -16,7 +16,6 @@ import {
   X,
 } from 'lucide-react'
 import { useCertificationPanel, type PanelMode } from '../../contexts/CertificationPanelContext'
-import { useCertification } from '../../hooks/useCertification'
 import { useToast } from '../../contexts/ToastContext'
 import { cn } from '../../lib/cn'
 import type { ValidationResult, CompletionResult, ValidationCheck, CertExercise } from '../../types/certification'
@@ -146,8 +145,7 @@ const MODE_ICONS: { mode: PanelMode; icon: typeof Maximize2; label: string }[] =
 // ---------------------------------------------------------------------------
 
 export function CertificationPanel() {
-  const { isOpen, mode, openPanel, closePanel, setMode } = useCertificationPanel()
-  const { progress, loading, validate, complete, provision, getExercise, submitAssessment } = useCertification()
+  const { isOpen, mode, closePanel, setMode, progress, loading, validate, complete, provision, getExercise, submitAssessment } = useCertificationPanel()
   const { toast } = useToast()
 
   // Module interaction state
@@ -295,41 +293,7 @@ export function CertificationPanel() {
 
   const activeModuleDef = MODULES.find(m => m.id === activeModule)
 
-  // --- Always-visible badge ---
-  const isCertified = !!progress?.certified
-  const hasStarted = totalXp > 0
-
-  const badge = createPortal(
-    <div
-      className="fixed bottom-4 right-4 z-[9000] flex items-center gap-2 px-4 py-2.5 cursor-pointer hover:shadow-xl transition-all cert-panel-collapse"
-      style={{
-        borderRadius: 'var(--ui-radius, 12px)',
-        ...(isCertified
-          ? { background: 'linear-gradient(135deg, #191919, #2d2d2d)', border: '1px solid #444', boxShadow: '0 4px 16px rgba(234,179,8,0.25)' }
-          : { background: '#fff', border: '1px solid #e5e7eb', boxShadow: '0 2px 8px rgba(0,0,0,0.08)' }),
-      }}
-      onClick={openPanel}
-    >
-      <Award
-        size={16}
-        style={{ color: isCertified ? '#eab308' : hasStarted ? levelConfig.color : 'var(--highlight-color)' }}
-      />
-      {isCertified ? (
-        <span className="text-sm font-semibold text-yellow-400 title-shimmer">Vandal Workflow Architect</span>
-      ) : hasStarted ? (
-        <>
-          <span className="text-sm font-semibold text-gray-900">{levelConfig.label}</span>
-          <span className="text-xs text-gray-400">{displayXp} XP</span>
-        </>
-      ) : (
-        <span className="text-sm font-semibold text-gray-700">Get Certified</span>
-      )}
-    </div>,
-    document.body,
-  )
-
-  // When panel is closed, only show badge
-  if (!isOpen) return badge
+  if (!isOpen) return null
 
   // --- Container styles by mode ---
   const containerClass = cn(
