@@ -8,7 +8,8 @@ const defaultColor = { bg: '#f9fafb', text: '#6b7280', border: '#e5e7eb' }
 
 export function QualityBadge({ tier, score }: { tier: string | null; score: number | null }) {
   const colors = tier ? tierColors[tier] || defaultColor : defaultColor
-  const label = tier ? `${tier.charAt(0).toUpperCase() + tier.slice(1)}${score != null ? ` (${Math.round(score)}%)` : ''}` : 'Unvalidated'
+  const tierLabel = tier ? tier.charAt(0).toUpperCase() + tier.slice(1) : null
+  const label = tierLabel ? `Quality: ${tierLabel}${score != null ? ` (${Math.round(score)}%)` : ''}` : 'Unvalidated'
 
   return (
     <span

@@ -437,8 +437,9 @@ async def generate_improvement_suggestions(
         default_model,
         system_prompt=(
             "You are an expert at improving AI extraction and workflow configurations. "
-            "Given validation results, provide concise, actionable suggestions to improve quality. "
-            "Use markdown formatting. Keep suggestions practical and specific."
+            "Given validation results, provide a SHORT, actionable list of improvements. "
+            "Rules: Maximum 3-5 bullet points. No headings, no preamble, no long explanations. "
+            "Each bullet should be one concise sentence. Focus only on the most impactful changes."
         ),
         system_config_doc=sys_config_doc,
     )
@@ -474,7 +475,7 @@ def _build_extraction_suggestion_prompt(result: dict) -> str:
                 f"accuracy={_fmt_pct(f.get('accuracy'))}, consistency={_fmt_pct(f.get('consistency'))}{flag}"
             )
 
-    lines.append("\n---\nBased on these results, suggest specific improvements to raise the extraction quality to an A grade (≥90% accuracy and consistency). Focus on:\n1. Fields with low accuracy — how to improve extraction prompts or field definitions\n2. Fields with low consistency — how to reduce variance across runs\n3. Any patterns you notice across test cases")
+    lines.append("\n---\nList 3-5 bullet points to raise accuracy/consistency to ≥90%. One sentence each. Focus on the worst fields.")
     return "\n".join(lines)
 
 
