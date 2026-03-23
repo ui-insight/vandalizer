@@ -5,7 +5,6 @@ export async function streamChat(
   message: string,
   documentUuids: string[],
   activityId?: string | null,
-  currentSpaceId?: string | null,
   onChunk?: (chunk: StreamChunk) => void,
   model?: string,
   knowledgeBaseUuid?: string,
@@ -20,7 +19,6 @@ export async function streamChat(
       message,
       document_uuids: documentUuids,
       activity_id: activityId || null,
-      current_space_id: currentSpaceId || null,
       knowledge_base_uuid: knowledgeBaseUuid || null,
       ...(model ? { model } : {}),
       ...(includeOnboardingContext ? { include_onboarding_context: true } : {}),
@@ -77,7 +75,6 @@ export async function streamChat(
 export function addLink(
   link: string,
   currentActivityId?: string | null,
-  currentSpaceId?: string | null,
 ) {
   return apiFetch<{
     success: boolean
@@ -92,7 +89,6 @@ export function addLink(
     body: JSON.stringify({
       link,
       current_activity_id: currentActivityId || null,
-      current_space_id: currentSpaceId || null,
     }),
   })
 }
@@ -100,12 +96,10 @@ export function addLink(
 export async function addDocument(
   files: File[],
   currentActivityId?: string | null,
-  currentSpaceId?: string | null,
 ) {
   const formData = new FormData()
   files.forEach((f) => formData.append('files', f))
   if (currentActivityId) formData.append('current_activity_id', currentActivityId)
-  if (currentSpaceId) formData.append('current_space_id', currentSpaceId)
 
   const res = await fetch('/api/chat/add-document', {
     method: 'POST',

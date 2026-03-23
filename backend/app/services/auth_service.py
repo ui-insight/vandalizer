@@ -47,6 +47,8 @@ async def authenticate(user_id: str, password: str) -> User | None:
         return None
     # Silently backfill default-team membership for pre-existing users
     await _auto_join_default_team(user, set_current=False)
+    from app.services.team_service import ensure_current_team
+    await ensure_current_team(user)
     return user
 
 
@@ -79,6 +81,8 @@ async def resolve_oauth_user(
             await user.save()
         # Silently backfill default-team membership for pre-existing users
         await _auto_join_default_team(user, set_current=False)
+        from app.services.team_service import ensure_current_team
+        await ensure_current_team(user)
         return user
 
     # Create new OAuth-only user
@@ -149,6 +153,10 @@ async def resolve_saml_user(
                 changed = True
         if changed:
             await user.save()
+        # Silently backfill default-team membership for pre-existing users
+        await _auto_join_default_team(user, set_current=False)
+        from app.services.team_service import ensure_current_team
+        await ensure_current_team(user)
         return user
 
     # Create new SAML user
@@ -191,6 +199,7 @@ async def resolve_saml_user(
         await user.delete()
         raise
 
+    await _auto_join_default_team(user, set_current=True)
     return user
 
 

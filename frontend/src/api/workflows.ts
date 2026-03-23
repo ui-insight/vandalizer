@@ -3,13 +3,12 @@ import type { Workflow, WorkflowStatus } from '../types/workflow'
 
 // Workflow CRUD
 
-export function createWorkflow(data: { name: string; space?: string; description?: string }) {
+export function createWorkflow(data: { name: string; description?: string }) {
   return apiFetch<Workflow>('/api/workflows', { method: 'POST', body: JSON.stringify(data) })
 }
 
-export function listWorkflows(space?: string) {
-  const params = space ? `?space=${encodeURIComponent(space)}` : ''
-  return apiFetch<Workflow[]>(`/api/workflows${params}`)
+export function listWorkflows() {
+  return apiFetch<Workflow[]>('/api/workflows')
 }
 
 export function getWorkflow(id: string) {

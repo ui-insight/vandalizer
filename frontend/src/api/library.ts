@@ -266,6 +266,25 @@ export function removeFromCollection(collectionId: string, itemId: string) {
   })
 }
 
+// Verification - Featured Collections (available to all users)
+
+export function listFeaturedCollections() {
+  return apiFetch<{ collections: VerifiedCollection[] }>('/api/verification/collections/featured')
+}
+
+// Verification - Try verified item
+
+export function tryVerifiedItem(
+  itemKind: string,
+  itemId: string,
+  data: { document_uuid?: string; source_text?: string; query?: string },
+) {
+  return apiFetch<Record<string, unknown>>(`/api/verification/try/${itemKind}/${itemId}`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
 // Verification - Examiners
 
 export function listExaminers() {

@@ -47,12 +47,6 @@ describe('SearchSet CRUD', () => {
     expect(mockFetch.mock.calls[0][0]).toBe('/api/extractions/search-sets')
   })
 
-  it('listSearchSets passes space param', async () => {
-    mockFetch.mockResolvedValueOnce(jsonResponse([]))
-    await listSearchSets('research')
-    expect(mockFetch.mock.calls[0][0]).toBe('/api/extractions/search-sets?space=research')
-  })
-
   it('getSearchSet sends GET with uuid', async () => {
     mockFetch.mockResolvedValueOnce(jsonResponse({ uuid: 'ss-1', title: 'Test' }))
     const result = await getSearchSet('ss-1')

@@ -1,16 +1,15 @@
 import { apiFetch } from './client'
 import type { Automation } from '../types/automation'
 
-export function listAutomations(space?: string) {
-  const params = space ? `?space=${encodeURIComponent(space)}` : ''
-  return apiFetch<Automation[]>(`/api/automations${params}`)
+export function listAutomations() {
+  return apiFetch<Automation[]>('/api/automations')
 }
 
 export function getAutomation(id: string) {
   return apiFetch<Automation>(`/api/automations/${id}`)
 }
 
-export function createAutomation(data: { name: string; space?: string; description?: string; trigger_type?: string; trigger_config?: Record<string, unknown>; action_type?: string; action_id?: string; shared_with_team?: boolean }) {
+export function createAutomation(data: { name: string; description?: string; trigger_type?: string; trigger_config?: Record<string, unknown>; action_type?: string; action_id?: string; shared_with_team?: boolean }) {
   return apiFetch<Automation>('/api/automations', { method: 'POST', body: JSON.stringify(data) })
 }
 

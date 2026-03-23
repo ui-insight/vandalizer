@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
-import { UserPlus, Trash2, Pencil, Check, X } from 'lucide-react'
+import { useNavigate } from '@tanstack/react-router'
+import { UserPlus, Trash2, Pencil, Check, X, Copy, AlertTriangle, ArrowRightLeft } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
 import { useTeams } from '../hooks/useTeams'
 import { useAuth } from '../hooks/useAuth'
@@ -12,11 +13,24 @@ import {
   removeMember,
   createTeam,
   updateTeamName,
+  transferOwnership,
+  deleteTeam,
 } from '../api/teams'
+
+function getInviteExpiry(invite: TeamInvite): { label: string; expired: boolean } {
+  if (!invite.created_at) return { label: '', expired: false }
+  const created = new Date(invite.created_at)
+  const expiresAt = new Date(created.getTime() + 30 * 24 * 60 * 60 * 1000)
+  const now = new Date()
+  if (now >= expiresAt) return { label: 'Expired', expired: true }
+  const daysLeft = Math.ceil((expiresAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000))
+  return { label: `Expires in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}`, expired: false }
+}
 
 export function TeamSettings() {
   const { user } = useAuth()
   const { teams, currentTeam, switchTeam, refreshTeams } = useTeams()
+  const navigate = useNavigate()
   const [members, setMembers] = useState<TeamMember[]>([])
   const [invites, setInvites] = useState<TeamInvite[]>([])
   const [inviteEmail, setInviteEmail] = useState('')
@@ -25,8 +39,11 @@ export function TeamSettings() {
   const [error, setError] = useState('')
   const [editingName, setEditingName] = useState(false)
   const [renameValue, setRenameValue] = useState('')
+  const [transferTarget, setTransferTarget] = useState('')
+  const [copiedToken, setCopiedToken] = useState<string | null>(null)
 
   const canEdit = currentTeam?.role === 'owner' || currentTeam?.role === 'admin'
+  const isOwner = currentTeam?.role === 'owner'
 
   const refreshData = useCallback(async () => {
     if (!currentTeam) return
@@ -93,6 +110,52 @@ export function TeamSettings() {
     setNewTeamName('')
     refreshTeams()
   }
+
+  async function handleTransferOwnership() {
+    if (!currentTeam || !transferTarget) return
+    const confirmed = window.confirm(
+      'Are you sure? You will be demoted to admin.',
+    )
+    if (!confirmed) return
+    setError('')
+    try {
+      await transferOwnership(currentTeam.uuid, transferTarget)
+      setTransferTarget('')
+      await refreshTeams()
+      refreshData()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to transfer ownership')
+    }
+  }
+
+  async function handleDeleteTeam() {
+    if (!currentTeam) return
+    const confirmed = window.confirm(
+      'Are you sure? This cannot be undone. All members will be removed.',
+    )
+    if (!confirmed) return
+    setError('')
+    try {
+      await deleteTeam(currentTeam.uuid)
+      await refreshTeams()
+      navigate({ to: '/' })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete team')
+    }
+  }
+
+  function handleCopyInviteLink(token: string) {
+    const link = `${window.location.origin}/invite?token=${token}`
+    navigator.clipboard.writeText(link).then(() => {
+      setCopiedToken(token)
+      setTimeout(() => setCopiedToken(null), 2000)
+    })
+  }
+
+  // Members eligible for ownership transfer (non-owner members)
+  const transferCandidates = members.filter(
+    (m) => m.user_id !== user?.user_id && m.role !== 'owner',
+  )
 
   return (
     <PageLayout>
@@ -244,18 +307,95 @@ export function TeamSettings() {
               <div className="mt-4">
                 <p className="text-xs font-medium text-gray-500">Pending Invites</p>
                 <div className="mt-2 space-y-1">
-                  {invites.map((inv) => (
-                    <div
-                      key={inv.id}
-                      className="flex items-center justify-between rounded-md bg-gray-50 px-3 py-2 text-sm"
-                    >
-                      <span className="text-gray-700">{inv.email}</span>
-                      <span className="text-xs text-gray-400">{inv.role}</span>
-                    </div>
-                  ))}
+                  {invites.map((inv) => {
+                    const expiry = getInviteExpiry(inv)
+                    return (
+                      <div
+                        key={inv.id}
+                        className="flex items-center justify-between rounded-md bg-gray-50 px-3 py-2 text-sm"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-gray-700">{inv.email}</span>
+                          <span className="text-xs text-gray-400">{inv.role}</span>
+                          {expiry.label && (
+                            <span
+                              className={`text-xs ${expiry.expired ? 'font-medium text-red-600' : 'text-gray-400'}`}
+                            >
+                              {expiry.label}
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleCopyInviteLink(inv.token)}
+                          className="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-200 hover:text-gray-700"
+                          title="Copy invite link"
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                          {copiedToken === inv.token ? 'Copied!' : 'Copy Link'}
+                        </button>
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Transfer Ownership */}
+        {isOwner && transferCandidates.length > 0 && (
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <h3 className="mb-1 font-medium text-gray-900 flex items-center gap-2">
+              <ArrowRightLeft className="h-4 w-4" />
+              Transfer Ownership
+            </h3>
+            <p className="mb-3 text-xs text-gray-500">
+              Transfer team ownership to another member. You will be demoted to admin.
+            </p>
+            <div className="flex items-end gap-3">
+              <div className="flex-1">
+                <label className="block text-xs font-medium text-gray-500">New Owner</label>
+                <select
+                  value={transferTarget}
+                  onChange={(e) => setTransferTarget(e.target.value)}
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                >
+                  <option value="">Select a member...</option>
+                  {transferCandidates.map((m) => (
+                    <option key={m.user_id} value={m.user_id}>
+                      {m.name || m.email || m.user_id} ({m.role})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                onClick={handleTransferOwnership}
+                disabled={!transferTarget}
+                className="rounded-md bg-highlight px-4 py-2 text-sm font-bold text-highlight-text hover:brightness-90 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Transfer
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Team */}
+        {isOwner && (
+          <div className="rounded-lg border border-red-200 bg-white p-4">
+            <h3 className="mb-1 font-medium text-gray-900 flex items-center gap-2">
+              <AlertTriangle className="h-4 w-4 text-red-500" />
+              Delete Team
+            </h3>
+            <p className="mb-3 text-xs text-gray-500">
+              Permanently delete this team and remove all members. This action cannot be undone.
+            </p>
+            <button
+              onClick={handleDeleteTeam}
+              className="flex items-center gap-1.5 rounded-md bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete Team
+            </button>
           </div>
         )}
 

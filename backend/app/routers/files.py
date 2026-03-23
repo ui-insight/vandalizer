@@ -33,7 +33,6 @@ async def upload(
             blob=body.contentAsBase64String,
             filename=body.fileName,
             raw_extension=body.extension,
-            space=body.space or user.user_id,
             user=user,
             settings=settings,
             folder=body.folder,

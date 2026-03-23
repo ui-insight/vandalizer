@@ -13,10 +13,10 @@ export interface SearchSet {
   id: string;
   title: string;
   uuid: string;
-  space: string;
   status: string;
   set_type: string;
   user_id: string | null;
+  team_id: string | null;
   is_global: boolean;
   verified: boolean;
   item_count: number;
@@ -47,7 +47,6 @@ export interface Workflow {
   name: string;
   description: string | null;
   user_id: string;
-  space: string | null;
   num_executions: number;
   steps: WorkflowStep[];
   input_config?: { trigger_type?: string };

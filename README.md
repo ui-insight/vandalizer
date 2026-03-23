@@ -21,9 +21,34 @@ The project was developed at the University of Idaho under the NSF GRANTED progr
 - **Team Collaboration** - Multi-tenant workspaces with role-based access and shared libraries
 - **Self-Hosted** - Run on your own infrastructure with full control over your data
 
+## Prerequisites
+
+| Tool | Version | Install |
+|------|---------|---------|
+| Docker & Docker Compose | Recent | [docs.docker.com/get-docker](https://docs.docker.com/get-docker/) |
+| Python | >= 3.11, < 3.13 | [python.org](https://www.python.org/downloads/) (local dev only) |
+| Node.js | >= 20 | [nodejs.org](https://nodejs.org/) (local dev only) |
+| `uv` | Latest | [docs.astral.sh/uv](https://docs.astral.sh/uv/) (local dev only) |
+
+Docker is required for both paths below. Python, Node.js, and `uv` are only needed for local development (Option B).
+
 ## Quickstart
 
-### Option A: Docker Compose (recommended)
+### Interactive setup (recommended)
+
+The setup wizard handles everything — environment configuration, secret generation, Docker builds, service startup, admin account creation, and database seeding — in a single interactive session:
+
+```bash
+git clone https://github.com/ui-insight/vandalizer.git
+cd vandalizer
+./setup.sh
+```
+
+The frontend is available at `http://localhost` and the API at `http://localhost:8001` when setup completes.
+
+### Manual setup: Docker Compose
+
+If you prefer to run each step yourself:
 
 ```bash
 git clone https://github.com/ui-insight/vandalizer.git
@@ -31,7 +56,9 @@ cd vandalizer
 
 # Configure environment
 cp backend/.env.example backend/.env
-# Edit backend/.env — set JWT_SECRET_KEY (LLM keys are configured in the admin UI)
+# Edit backend/.env — at minimum, set JWT_SECRET_KEY:
+#   python -c "import secrets; print(secrets.token_urlsafe(64))"
+# LLM API keys are configured later in the admin UI, not in .env.
 
 # Build and start everything
 docker compose up --build -d
@@ -50,11 +77,12 @@ docker compose exec \
 
 The status script checks Docker services, API health, environment config, admin accounts, the verified catalog, and storage volumes — and gives actionable recommendations for anything that's missing or misconfigured.
 
-The frontend is available at `http://localhost` and the API at `http://localhost:8001`.
+Log in at `http://localhost` with the admin credentials you provided to the bootstrap command.
 
 Bootstrap notes:
 
 - The bootstrap script also seeds the **verified catalog** — pre-built workflows and extraction templates for common grant types (NSF, NIH, DOD, DOE) — so they're available immediately in the Explore system.
+- If `CONFIG_ENCRYPTION_KEY` is not set in `.env`, the bootstrap script auto-generates one and prints it. Copy it into your `.env` to persist it across restarts — it is used to encrypt LLM API keys stored in MongoDB.
 - `DEFAULT_TEAM_NAME` is optional. If omitted, users will start in their personal team only.
 - New users always get a personal team. When a default team is configured, they also auto-join it on first registration or SSO login.
 - The bootstrap admin also keeps a personal team. After the first login, switch to the shared default team in the UI if that should be the primary workspace.
@@ -78,25 +106,35 @@ docker compose up -d redis mongo chromadb
 
 # Configure environment
 cp backend/.env.example backend/.env
-# Edit backend/.env — set JWT_SECRET_KEY (LLM keys are configured in the admin UI)
+# Edit backend/.env — at minimum, set JWT_SECRET_KEY:
+#   python -c "import secrets; print(secrets.token_urlsafe(64))"
 
-# Install and run the backend
+# Install and run the backend (terminal 1)
 make backend-install
 cd backend
 uv run uvicorn app.main:app --reload --port 8001
 
-# In another terminal — start the frontend
+# Start the frontend (terminal 2)
 make frontend-install
 cd frontend
 npm run dev
 
-# In another terminal — start Celery workers
+# Start Celery workers (terminal 3)
 cd backend
-./run_celery.sh
+./run_celery.sh start
 
-# Check that everything is running and seed data is in place
-./status.sh
+# Bootstrap the first admin account (terminal 4, from repo root)
+cd backend
+uv run python bootstrap_install.py
+# Requires ADMIN_EMAIL and ADMIN_PASSWORD env vars. Example:
+#   ADMIN_EMAIL=admin@example.edu ADMIN_PASSWORD=secret \
+#     ADMIN_NAME='Initial Admin' DEFAULT_TEAM_NAME='Research Administration' \
+#     uv run python bootstrap_install.py
 ```
+
+The frontend dev server runs at `http://localhost:5173` and proxies API requests to the backend on port 8001.
+
+> **Note:** MongoDB is mapped to host port **27018** (not the default 27017) to avoid conflicts with any local MongoDB instance. The `.env.example` defaults already account for this.
 
 ### Verification commands
 
@@ -115,16 +153,17 @@ Before tagging an operator-facing release, walk through [RELEASE_CHECKLIST.md](R
 
 ## Environment Variables
 
-Copy `.env.example` to `.env`. Key variables:
+Copy `backend/.env.example` to `backend/.env`. Key variables:
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `MONGO_HOST` | Yes | MongoDB connection host |
-| `MONGO_DB` | Yes | MongoDB database name (default: `osp`) |
-| `REDIS_HOST` | Yes | Redis connection host |
-| `JWT_SECRET_KEY` | Yes | Secret key for JWT authentication |
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `JWT_SECRET_KEY` | **Yes** | *(none — must set)* | Secret key for JWT authentication. Generate with `python -c "import secrets; print(secrets.token_urlsafe(64))"` |
+| `MONGO_HOST` | No | `mongodb://localhost:27018/` | MongoDB connection URI |
+| `MONGO_DB` | No | `osp` | MongoDB database name |
+| `REDIS_HOST` | No | `localhost` | Redis host |
+| `CONFIG_ENCRYPTION_KEY` | No | *(auto-generated by bootstrap)* | Fernet key for encrypting LLM API keys in MongoDB. Generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. If omitted, `bootstrap_install.py` generates one — copy it into `.env` to persist across restarts. |
 
-See `.env.example` for the full list.
+See `.env.example` for the full list including SMTP, ChromaDB, and upload directory settings.
 
 ## LLM Configuration
 
@@ -138,6 +177,29 @@ Navigate to **Admin → System Config → Models** to add LLM providers. Each mo
 - **Protocol** — `openai`, `ollama`, or `vllm`
 
 Vandalizer supports any OpenAI-compatible API including OpenAI, Azure OpenAI, Ollama (local models), vLLM, and OpenRouter.
+
+## PDF Processing & OCR
+
+Vandalizer offers two approaches for extracting text from PDF documents. Both are configured in the admin UI — no environment variables or restarts required.
+
+### Option 1: OCR endpoint (recommended for scanned documents)
+
+Navigate to **Admin → System Config → Endpoints** and set the **OCR Endpoint** URL. This should point to an HTTP service that accepts a multipart PDF file upload and returns extracted plain text. Any service that implements this interface will work — common choices include:
+
+- A self-hosted [Marker](https://github.com/VikParuchuri/marker) instance
+- A self-hosted [Surya](https://github.com/VikParuchuri/surya) instance
+- A wrapper around [Tesseract](https://github.com/tesseract-ocr/tesseract)
+- A wrapper around a cloud OCR API (Azure Document Intelligence, AWS Textract, Google Document AI)
+
+When the OCR endpoint is configured, Vandalizer sends PDFs to it first and falls back to basic text extraction (PyPDF2) if the endpoint is unreachable or returns insufficient text.
+
+When no OCR endpoint is configured, Vandalizer uses PyPDF2 for direct text extraction. This works well for digitally-created PDFs but will produce poor results on scanned documents.
+
+### Option 2: Multimodal LLM (vision-based extraction)
+
+For models that support vision (e.g., GPT-4o, Claude Sonnet), Vandalizer can bypass OCR entirely and send PDF pages as images directly to the LLM. Enable this under **Admin → System Config → Extraction** by toggling **Use Document Images (Multimodal)**.
+
+This approach works well for visually complex documents (tables, forms, mixed layouts) but uses more LLM tokens than text-based extraction.
 
 ## Architecture
 

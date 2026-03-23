@@ -18,7 +18,6 @@ class SmartDocument(Document):
     raw_text: str = ""
     extension: str = "pdf"
     uuid: str
-    space: str
     user_id: str
     team_id: Optional[str] = None
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
@@ -46,11 +45,8 @@ class SmartDocument(Document):
         indexes = [
             "uuid",
             "user_id",
-            "space",
             "team_id",
-            [("user_id", 1), ("space", 1)],
             [("user_id", 1), ("folder", 1)],
-            [("team_id", 1), ("space", 1)],
             [("team_id", 1), ("folder", 1)],
             "created_at",
         ]

@@ -2,7 +2,6 @@ from app.models.user import User
 from app.models.team import Team, TeamMembership, TeamInvite
 from app.models.document import SmartDocument
 from app.models.folder import SmartFolder
-from app.models.space import Space
 from app.models.search_set import SearchSet, SearchSetItem
 from app.models.workflow import (
     Workflow,
@@ -38,7 +37,6 @@ __all__ = [
     "TeamInvite",
     "SmartDocument",
     "SmartFolder",
-    "Space",
     "SearchSet",
     "SearchSetItem",
     "Workflow",

@@ -6,7 +6,6 @@ from app.models.user import User
 from app.models.team import Team, TeamMembership, TeamInvite
 from app.models.document import SmartDocument
 from app.models.folder import SmartFolder
-from app.models.space import Space
 from app.models.search_set import SearchSet, SearchSetItem
 from app.models.workflow import (
     Workflow,
@@ -37,6 +36,7 @@ from app.models.certification import CertificationProgress
 from app.models.organization import Organization
 from app.models.audit_log import AuditLog, AdminAuditLog
 from app.models.approval import ApprovalRequest
+from app.models.notification import Notification
 
 ALL_MODELS = [
     User,
@@ -45,7 +45,6 @@ ALL_MODELS = [
     TeamInvite,
     SmartDocument,
     SmartFolder,
-    Space,
     SearchSet,
     SearchSetItem,
     Workflow,
@@ -89,6 +88,7 @@ ALL_MODELS = [
     AuditLog,
     AdminAuditLog,
     ApprovalRequest,
+    Notification,
 ]
 
 

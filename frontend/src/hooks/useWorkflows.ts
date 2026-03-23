@@ -2,20 +2,20 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import * as api from '../api/workflows'
 import type { Workflow } from '../types/workflow'
 
-export function useWorkflows(space?: string) {
+export function useWorkflows() {
   const qc = useQueryClient()
-  const queryKey = ['workflows', space] as const
+  const queryKey = ['workflows'] as const
 
   const { data: workflows = [], isLoading: loading } = useQuery<Workflow[]>({
     queryKey,
-    queryFn: () => api.listWorkflows(space),
+    queryFn: () => api.listWorkflows(),
   })
 
   const refresh = () => qc.invalidateQueries({ queryKey })
 
   const createMutation = useMutation({
-    mutationFn: (args: { name: string; space?: string }) =>
-      api.createWorkflow({ name: args.name, space: args.space }),
+    mutationFn: (args: { name: string }) =>
+      api.createWorkflow({ name: args.name }),
     onSuccess: () => qc.invalidateQueries({ queryKey }),
   })
 
@@ -29,8 +29,8 @@ export function useWorkflows(space?: string) {
     onSuccess: () => qc.invalidateQueries({ queryKey }),
   })
 
-  const create = async (name: string, currentSpace?: string) => {
-    return createMutation.mutateAsync({ name, space: currentSpace })
+  const create = async (name: string) => {
+    return createMutation.mutateAsync({ name })
   }
 
   const remove = async (id: string) => {

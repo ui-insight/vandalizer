@@ -7,7 +7,12 @@ import { useLibraries } from '../hooks/useLibrary'
 import { useAuth } from '../hooks/useAuth'
 import type { Library as LibraryType } from '../types/library'
 
-type Tab = 'browse' | 'verification'
+type Tab = 'browse' | 'submissions'
+
+const TAB_LABELS: Record<Tab, string> = {
+  browse: 'Browse',
+  submissions: 'My Submissions',
+}
 
 export default function Library() {
   const { user } = useAuth()
@@ -24,17 +29,17 @@ export default function Library() {
       <div className="flex h-full flex-col -m-6">
         {/* Tab bar */}
         <div className="flex gap-0 border-b border-gray-200 px-6 shrink-0 bg-white">
-          {(['browse', 'verification'] as const).map((t) => (
+          {(Object.keys(TAB_LABELS) as Tab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`px-4 py-3 text-sm font-semibold capitalize transition-colors ${
+              className={`px-4 py-3 text-sm font-semibold transition-colors ${
                 tab === t
                   ? 'border-b-2 border-gray-900 text-gray-900'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              {t}
+              {TAB_LABELS[t]}
             </button>
           ))}
         </div>
@@ -68,7 +73,7 @@ export default function Library() {
             </>
           )}
 
-          {tab === 'verification' && (
+          {tab === 'submissions' && (
             <div className="flex-1 overflow-auto p-6">
               <VerificationQueue />
             </div>

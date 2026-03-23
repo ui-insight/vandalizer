@@ -10,7 +10,6 @@ from pydantic import BaseModel
 
 class CreateWorkflowRequest(BaseModel):
     name: str
-    space: Optional[str] = None
     description: Optional[str] = None
 
 
@@ -25,7 +24,6 @@ class WorkflowResponse(BaseModel):
     name: str
     description: Optional[str] = None
     user_id: str
-    space: Optional[str] = None
     num_executions: int = 0
     steps: list[dict] = []  # Dereferenced step objects
     input_config: dict = {}

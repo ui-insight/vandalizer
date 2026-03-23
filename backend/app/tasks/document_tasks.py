@@ -10,19 +10,9 @@ import re
 from pathlib import Path
 
 from app.celery_app import celery_app
-from app.tasks import TRANSIENT_EXCEPTIONS
+from app.tasks import TRANSIENT_EXCEPTIONS, get_sync_db
 
 logger = logging.getLogger(__name__)
-
-
-def _get_db():
-    """Get sync pymongo database handle."""
-    from pymongo import MongoClient
-
-    from app.config import Settings
-    settings = Settings()
-    client = MongoClient(settings.mongo_host)
-    return client[settings.mongo_db]
 
 
 def _remove_images_from_markdown(markdown_text: str) -> str:
@@ -56,7 +46,7 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
         remove_images_from_markdown,
     )
 
-    db = _get_db()
+    db = get_sync_db()
     doc = db.smart_document.find_one({"uuid": document_uuid})
     if not doc:
         logger.warning("Document %s not found", document_uuid)
@@ -126,7 +116,7 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
 )
 def update_document_fields(self, document_uuid: str) -> None:
     """Mark document extraction as complete, then check folder watch automations."""
-    db = _get_db()
+    db = get_sync_db()
     result = db.smart_document.update_one(
         {"uuid": document_uuid},
         {"$set": {"task_id": None, "task_status": "complete"}},
@@ -144,8 +134,6 @@ def update_document_fields(self, document_uuid: str) -> None:
 
 def _check_folder_watch_automations(db, document_uuid: str) -> None:
     """Check if any folder watch automations match this document's folder."""
-    from datetime import datetime, timezone
-    from uuid import uuid4
     from bson import ObjectId
 
     doc = db.smart_document.find_one({"uuid": document_uuid})
@@ -163,8 +151,6 @@ def _check_folder_watch_automations(db, document_uuid: str) -> None:
 
     if not automations:
         return
-
-    now = datetime.now(timezone.utc)
 
     for auto in automations:
         action_type = auto.get("action_type")
@@ -192,39 +178,25 @@ def _check_folder_watch_automations(db, document_uuid: str) -> None:
                 continue
 
         if action_type == "workflow":
-            # Create a WorkflowTriggerEvent and queue execution
-            event = {
-                "uuid": uuid4().hex,
-                "workflow": ObjectId(action_id),
-                "trigger_type": "folder_watch",
-                "status": "queued",
-                "documents": [doc["_id"]],
-                "document_count": 1,
-                "trigger_context": {
-                    "folder_id": folder_uuid,
-                    "automation_id": str(auto["_id"]),
-                    "automation_name": auto.get("name", ""),
-                },
-                "created_at": now,
-                "process_after": now,
-                "queued_at": now,
-                "attempt_number": 1,
-                "max_attempts": 3,
-                "output_delivery": {
-                    "storage_status": None,
-                    "notifications_sent": [],
-                    "webhooks_called": [],
-                    "chains_triggered": [],
-                },
-            }
-            result = db.workflow_trigger_event.insert_one(event)
+            # Create a pending WorkflowTriggerEvent — the beat task
+            # (process_pending_triggers) will apply budget/throttle checks
+            # and dispatch execution.
+            workflow_doc = db.workflow.find_one({"_id": ObjectId(action_id)})
+            if not workflow_doc:
+                logger.warning("Workflow %s not found for automation '%s'", action_id, auto.get("name"))
+                continue
+
+            from app.services.passive_triggers import create_folder_watch_trigger
+            event = create_folder_watch_trigger(
+                workflow_doc,
+                doc,
+                automation_id=str(auto["_id"]),
+                automation_name=auto.get("name", ""),
+            )
             logger.info(
                 "Created folder watch trigger %s for automation '%s' (workflow %s)",
-                result.inserted_id, auto.get("name"), action_id,
+                event["_id"], auto.get("name"), action_id,
             )
-
-            from app.tasks.passive_tasks import execute_workflow_passive
-            execute_workflow_passive.delay(str(result.inserted_id))
 
         elif action_type == "extraction":
             # Run extraction inline (sync) since we're in a Celery worker
@@ -380,7 +352,7 @@ def _process_extraction_outputs(db, automation: dict, results: dict) -> None:
 )
 def cleanup_document(self, document_uuid: str) -> None:
     """Error handler — mark document as errored with details."""
-    db = _get_db()
+    db = get_sync_db()
     result = db.smart_document.update_one(
         {"uuid": document_uuid},
         {"$set": {
@@ -408,7 +380,7 @@ def perform_semantic_ingestion(self, raw_text: str, document_uuid: str, user_id:
 
     from app.services.document_manager import DocumentManager
 
-    db = _get_db()
+    db = get_sync_db()
     doc = db.smart_document.find_one({"uuid": document_uuid})
     if not doc:
         logger.warning("Document %s not found for semantic ingestion", document_uuid)

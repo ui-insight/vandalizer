@@ -74,9 +74,9 @@ async def _ss_response(ss) -> SearchSetResponse:
     count = await ss.item_count()
     quality = await _attach_quality(ss)
     return SearchSetResponse(
-        id=str(ss.id), title=ss.title, uuid=ss.uuid, space=ss.space,
+        id=str(ss.id), title=ss.title, uuid=ss.uuid,
         status=ss.status, set_type=ss.set_type, user_id=ss.user_id,
-        is_global=ss.is_global, verified=ss.verified, item_count=count,
+        team_id=ss.team_id, is_global=ss.is_global, verified=ss.verified, item_count=count,
         extraction_config=ss.extraction_config,
         fillable_pdf_url=ss.fillable_pdf_url,
         **quality,
@@ -125,24 +125,24 @@ async def _authorize_documents(document_uuids: list[str], user: User) -> list[st
 
 @router.post("/search-sets", response_model=SearchSetResponse)
 async def create_search_set(req: CreateSearchSetRequest, user: User = Depends(get_current_user)):
+    team_id = str(user.current_team) if user.current_team else None
     ss = await svc.create_search_set(
         req.title,
         user.user_id,
-        req.space,
         req.set_type,
         extraction_config=req.extraction_config,
+        team_id=team_id,
     )
     return await _ss_response(ss)
 
 
 @router.get("/search-sets", response_model=list[SearchSetResponse])
 async def list_search_sets(
-    space: str | None = None,
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=500),
     user: User = Depends(get_current_user),
 ):
-    sets = await svc.list_search_sets(space=space, user=user, skip=skip, limit=limit)
+    sets = await svc.list_search_sets(user=user, skip=skip, limit=limit)
     return [await _ss_response(ss) for ss in sets]
 
 
@@ -158,6 +158,9 @@ async def update_search_set(uuid: str, req: UpdateSearchSetRequest, user: User =
     ss = await svc.update_search_set(uuid, title=req.title, extraction_config=req.extraction_config)
     if not ss:
         raise HTTPException(status_code=404, detail="SearchSet not found")
+    # Flag stale verification if this search set was verified
+    from app.services.verification_service import check_and_flag_stale_verification
+    await check_and_flag_stale_verification("search_set", str(ss.id))
     return await _ss_response(ss)
 
 
@@ -203,7 +206,6 @@ async def export_search_set(uuid: str, user: User = Depends(get_current_user)):
 @router.post("/search-sets/import", response_model=SearchSetResponse)
 async def import_search_set(
     file: UploadFile = File(...),
-    space: str | None = Form(None),
     user: User = Depends(get_current_user),
 ):
     """Import an extraction from an exported JSON file."""
@@ -215,8 +217,9 @@ async def import_search_set(
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON file")
 
+    team_id = str(user.current_team) if user.current_team else None
     try:
-        ss = await eis.import_search_set(data, user.user_id, space)
+        ss = await eis.import_search_set(data, user.user_id, team_id=team_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -468,6 +471,13 @@ async def update_item(item_id: str, req: UpdateSearchSetItemRequest, user: User 
     )
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
+    # Flag stale verification on parent search set
+    if item.searchset:
+        from app.models.search_set import SearchSet
+        from app.services.verification_service import check_and_flag_stale_verification
+        parent_ss = await SearchSet.find_one(SearchSet.uuid == item.searchset)
+        if parent_ss:
+            await check_and_flag_stale_verification("search_set", str(parent_ss.id))
     return SearchSetItemResponse(
         id=str(item.id), searchphrase=item.searchphrase, searchset=item.searchset,
         searchtype=item.searchtype, title=item.title,
@@ -609,7 +619,6 @@ async def run_extraction_integrated(
             extension=ext,
             uuid=uid,
             user_id=user.user_id,
-            space="default",
             folder="0",
         )
         await doc.insert()

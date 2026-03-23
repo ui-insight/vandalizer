@@ -1,6 +1,7 @@
 import { CircleHelp } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
 import { TeamsDropdown } from './TeamsDropdown'
+import { NotificationBell } from './NotificationBell'
 import { useOptionalWorkspace } from '../../contexts/WorkspaceContext'
 
 export function Header() {
@@ -49,8 +50,9 @@ export function Header() {
         </button>
       </div>
 
-      {/* Right: Support + Teams dropdown */}
+      {/* Right: Notifications + Support + Teams dropdown */}
       <div className="flex items-center gap-4">
+        <NotificationBell />
         <a
           href={import.meta.env.VITE_SUPPORT_URL || 'https://github.com/ui-insight/vandalizer/issues'}
           target="_blank"

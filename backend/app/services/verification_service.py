@@ -195,6 +195,9 @@ async def update_status(
         req.return_guidance = reviewer_notes
         await req.save()
 
+    # Notify the submitter of status changes
+    await _notify_submitter(req, new_status, reviewer_notes)
+
     # If approved, mark the library item as verified
     if new_status == VerificationStatus.APPROVED.value:
         if req.item_kind == "knowledge_base":
@@ -877,3 +880,106 @@ def _collection_to_dict(col: VerifiedCollection) -> dict:
         "created_at": col.created_at.isoformat() if col.created_at else None,
         "updated_at": col.updated_at.isoformat() if col.updated_at else None,
     }
+
+
+async def _notify_submitter(
+    req: VerificationRequest,
+    new_status: str,
+    reviewer_notes: str | None,
+) -> None:
+    """Send a notification to the submitter when their request status changes."""
+    from app.services import notification_service
+
+    item_name = await _get_item_name(req.item_kind, req.item_id)
+
+    status_config = {
+        VerificationStatus.APPROVED.value: {
+            "kind": "verification_approved",
+            "title": f'"{item_name}" has been approved',
+            "body": reviewer_notes or "Your submission has been verified and added to the catalog.",
+        },
+        VerificationStatus.REJECTED.value: {
+            "kind": "verification_rejected",
+            "title": f'"{item_name}" was not approved',
+            "body": reviewer_notes or "Your submission did not meet verification requirements.",
+        },
+        VerificationStatus.RETURNED.value: {
+            "kind": "verification_returned",
+            "title": f'"{item_name}" needs revision',
+            "body": reviewer_notes or "Your submission has been returned with feedback.",
+        },
+        VerificationStatus.IN_REVIEW.value: {
+            "kind": "verification_in_review",
+            "title": f'"{item_name}" is under review',
+            "body": "An examiner has started reviewing your submission.",
+        },
+    }
+
+    cfg = status_config.get(new_status)
+    if not cfg:
+        return
+
+    await notification_service.create_notification(
+        user_id=req.submitter_user_id,
+        kind=cfg["kind"],
+        title=cfg["title"],
+        body=cfg["body"],
+        link=f"/library?tab=verification",
+        item_kind=req.item_kind,
+        item_id=str(req.item_id),
+        item_name=item_name,
+        request_uuid=req.uuid,
+    )
+
+
+async def check_and_flag_stale_verification(item_kind: str, item_id: str) -> bool:
+    """Check if a verified item was modified and flag it as stale.
+
+    Called from workflow/extraction update endpoints. Returns True if the item
+    was verified and is now flagged stale.
+    """
+    from beanie import PydanticObjectId
+
+    obj_id = PydanticObjectId(item_id)
+
+    # Check if the underlying item is verified
+    if item_kind == "workflow":
+        obj = await Workflow.get(obj_id)
+        if not obj or not obj.verified:
+            return False
+    elif item_kind == "search_set":
+        obj = await SearchSet.get(obj_id)
+        if not obj or not obj.verified:
+            return False
+    elif item_kind == "knowledge_base":
+        obj = await KnowledgeBase.get(obj_id)
+        if not obj or not obj.verified:
+            return False
+    else:
+        return False
+
+    # Create a quality alert for the stale verification
+    from app.models.quality_alert import QualityAlert
+
+    item_name = await _get_item_name(item_kind, obj_id)
+
+    await QualityAlert(
+        alert_type="config_changed",
+        item_kind=item_kind,
+        item_id=str(obj_id),
+        item_name=item_name,
+        severity="warning",
+        message=f'Verified item "{item_name}" was modified. Re-validation recommended.',
+    ).insert()
+
+    # Mark verified item metadata as stale by clearing last_validated_at
+    meta = await VerifiedItemMetadata.find_one(
+        VerifiedItemMetadata.item_kind == item_kind,
+        VerifiedItemMetadata.item_id == str(obj_id),
+    )
+    if meta:
+        meta.last_validated_at = None
+        meta.updated_at = datetime.datetime.now(datetime.timezone.utc)
+        await meta.save()
+
+    return True

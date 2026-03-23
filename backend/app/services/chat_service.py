@@ -134,7 +134,6 @@ async def chat_stream(
     document_uuids: list[str],
     conversation_uuid: str,
     user_id: str,
-    space: Optional[str] = None,
     activity_id: Optional[str] = None,
     settings=None,
     model_override: Optional[str] = None,

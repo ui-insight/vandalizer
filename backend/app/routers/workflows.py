@@ -64,25 +64,24 @@ async def _authorize_documents(document_uuids: list[str], user: User) -> list[st
 @router.post("", response_model=WorkflowResponse)
 async def create_workflow(req: CreateWorkflowRequest, user: User = Depends(get_current_user)):
     team_id = str(user.current_team) if user.current_team else None
-    wf = await svc.create_workflow(req.name, user.user_id, req.space, req.description, team_id=team_id)
+    wf = await svc.create_workflow(req.name, user.user_id, req.description, team_id=team_id)
     return WorkflowResponse(
         id=str(wf.id), name=wf.name, description=wf.description,
-        user_id=wf.user_id, space=wf.space, num_executions=wf.num_executions,
+        user_id=wf.user_id, num_executions=wf.num_executions,
     )
 
 
 @router.get("", response_model=list[WorkflowResponse])
 async def list_workflows(
-    space: str | None = None,
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=500),
     user: User = Depends(get_current_user),
 ):
-    workflows = await svc.list_workflows(user=user, space=space, skip=skip, limit=limit)
+    workflows = await svc.list_workflows(user=user, skip=skip, limit=limit)
     return [
         WorkflowResponse(
             id=str(wf.id), name=wf.name, description=wf.description,
-            user_id=wf.user_id, space=wf.space, num_executions=wf.num_executions,
+            user_id=wf.user_id, num_executions=wf.num_executions,
         )
         for wf in workflows
     ]
@@ -327,7 +326,6 @@ async def export_workflow(workflow_id: str, user: User = Depends(get_current_use
 @router.post("/import")
 async def import_workflow(
     file: UploadFile = File(...),
-    space: str | None = Form(None),
     user: User = Depends(get_current_user),
 ):
     """Import a workflow from an exported JSON file."""
@@ -341,7 +339,7 @@ async def import_workflow(
 
     try:
         team_id = str(user.current_team) if user.current_team else None
-        wf = await eis.import_workflow(data, user.user_id, space, team_id=team_id)
+        wf = await eis.import_workflow(data, user.user_id, team_id=team_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -363,9 +361,12 @@ async def update_workflow(workflow_id: str, req: UpdateWorkflowRequest, user: Us
     )
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
+    # Flag stale verification if this workflow was verified
+    from app.services.verification_service import check_and_flag_stale_verification
+    await check_and_flag_stale_verification("workflow", str(wf.id))
     return WorkflowResponse(
         id=str(wf.id), name=wf.name, description=wf.description,
-        user_id=wf.user_id, space=wf.space, num_executions=wf.num_executions,
+        user_id=wf.user_id, num_executions=wf.num_executions,
         input_config=wf.input_config,
     )
 
@@ -404,6 +405,11 @@ async def update_step(step_id: str, req: UpdateStepRequest, user: User = Depends
     step = await svc.update_step(step_id, user=user, name=req.name, data=req.data, is_output=req.is_output)
     if not step:
         raise HTTPException(status_code=404, detail="Step not found")
+    # Flag stale verification on parent workflow
+    from app.services.verification_service import check_and_flag_stale_verification
+    wf = await svc._get_workflow_for_step(PydanticObjectId(step_id))
+    if wf:
+        await check_and_flag_stale_verification("workflow", str(wf.id))
     return step
 
 
@@ -432,6 +438,11 @@ async def update_task(task_id: str, req: UpdateTaskRequest, user: User = Depends
     task = await svc.update_task(task_id, user=user, name=req.name, data=req.data)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+    # Flag stale verification on parent workflow
+    from app.services.verification_service import check_and_flag_stale_verification
+    wf = await svc._get_workflow_for_task(PydanticObjectId(task_id))
+    if wf:
+        await check_and_flag_stale_verification("workflow", str(wf.id))
     return task
 
 
@@ -783,7 +794,6 @@ async def run_workflow_integrated(
             extension=ext,
             uuid=uid,
             user_id=user.user_id,
-            space="default",
             folder="0",
         )
         await doc.insert()

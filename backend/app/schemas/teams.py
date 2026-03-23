@@ -28,6 +28,11 @@ class RemoveMemberRequest(BaseModel):
     user_id: str
 
 
+class TransferOwnershipRequest(BaseModel):
+    team_uuid: str
+    new_owner_user_id: str
+
+
 class TeamResponse(BaseModel):
     id: str
     uuid: str

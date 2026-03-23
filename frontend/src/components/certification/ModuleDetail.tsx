@@ -66,7 +66,7 @@ function ProgressWidget({ moduleProgress, lessonsCount }: {
 
 export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, onProvision, onSubmitAssessment, exercise, validating, completing, provisioning, submittingAssessment }: {
   module: ModuleDefinition
-  moduleProgress: { completed: boolean; stars: number; attempts: number; provisioned_docs?: string[]; lab_space_id?: string; self_assessment?: Record<string, string> } | null
+  moduleProgress: { completed: boolean; stars: number; attempts: number; provisioned_docs?: string[]; self_assessment?: Record<string, string> } | null
   onValidate: () => void
   onComplete: () => void
   onProvision: () => void

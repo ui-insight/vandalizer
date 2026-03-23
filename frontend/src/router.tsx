@@ -22,14 +22,15 @@ const Account = lazy(() => import('./pages/Account'))
 const Automation = lazy(() => import('./pages/Automation'))
 const Office = lazy(() => import('./pages/Office'))
 const BrowserAutomation = lazy(() => import('./pages/BrowserAutomation'))
-const Spaces = lazy(() => import('./pages/Spaces'))
 const Verification = lazy(() => import('./pages/Verification'))
 const Docs = lazy(() => import('./pages/Docs'))
 const Demo = lazy(() => import('./pages/Demo'))
 const DemoFeedback = lazy(() => import('./pages/DemoFeedback'))
+const InviteAccept = lazy(() => import('./pages/InviteAccept'))
 const Organizations = lazy(() => import('./pages/Organizations'))
 const AuditLog = lazy(() => import('./pages/AuditLog'))
 const Approvals = lazy(() => import('./pages/Approvals'))
+const Catalog = lazy(() => import('./pages/Catalog'))
 // Certification is now a dockable panel — this redirect opens it from old bookmarks
 function CertificationRedirect() {
   const { openPanel } = useCertificationPanel()
@@ -67,6 +68,7 @@ const landingRoute = createRoute({
   path: '/landing',
   validateSearch: (search: Record<string, unknown>) => ({
     error: (search.error as string) || undefined,
+    invite_token: (search.invite_token as string) || undefined,
   }),
   component: Landing,
 })
@@ -81,6 +83,15 @@ const registerRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/register',
   component: () => <Navigate to="/landing" search={{ error: undefined }} />,
+})
+
+const inviteRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/invite',
+  validateSearch: (search: Record<string, unknown>) => ({
+    token: (search.token as string) || undefined,
+  }),
+  component: InviteAccept,
 })
 
 const indexRoute = createRoute({
@@ -207,22 +218,22 @@ const browserAutomationRoute = createRoute({
   ),
 })
 
-const spacesRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/spaces',
-  component: () => (
-    <ProtectedRoute>
-      <Spaces />
-    </ProtectedRoute>
-  ),
-})
-
 const verificationRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/verification',
   component: () => (
     <ProtectedRoute>
       <Verification />
+    </ProtectedRoute>
+  ),
+})
+
+const catalogRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/catalog',
+  component: () => (
+    <ProtectedRoute>
+      <Catalog />
     </ProtectedRoute>
   ),
 })
@@ -298,6 +309,7 @@ const routeTree = rootRoute.addChildren([
   landingRoute,
   loginRoute,
   registerRoute,
+  inviteRoute,
   indexRoute,
   teamsRoute,
   workflowsRoute,
@@ -309,8 +321,8 @@ const routeTree = rootRoute.addChildren([
   automationRoute,
   officeRoute,
   browserAutomationRoute,
-  spacesRoute,
   verificationRoute,
+  catalogRoute,
   docsRoute,
   certificationRoute,
   demoRoute,

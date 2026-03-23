@@ -50,7 +50,6 @@ class Workflow(Document):
     steps: list[PydanticObjectId] = []
     attachments: list[PydanticObjectId] = []
     num_executions: int = 0
-    space: Optional[str] = None
     verified: bool = False
     created_by_user_id: Optional[str] = None
     input_config: dict = {}
@@ -67,9 +66,6 @@ class Workflow(Document):
         indexes = [
             "user_id",
             "team_id",
-            "space",
-            [("user_id", 1), ("space", 1)],
-            [("team_id", 1), ("space", 1)],
         ]
 
 

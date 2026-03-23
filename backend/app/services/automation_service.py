@@ -13,7 +13,6 @@ from app.services.access_control import get_authorized_automation
 async def create_automation(
     name: str,
     user_id: str,
-    space: str | None = None,
     description: str | None = None,
     trigger_type: str | None = None,
     trigger_config: dict | None = None,
@@ -26,7 +25,6 @@ async def create_automation(
     auto = Automation(
         name=name,
         user_id=user_id,
-        space=space,
         description=description,
         trigger_type=trigger_type or "folder_watch",
         trigger_config=trigger_config or {},
@@ -43,17 +41,12 @@ async def create_automation(
 async def list_automations(
     user_id: str,
     team_id: str | None = None,
-    space: str | None = None,
 ) -> list[Automation]:
     # Return user's own automations OR team-shared ones
     user_query: dict = {"user_id": user_id}
-    if space:
-        user_query["space"] = space
 
     if team_id:
         team_query: dict = {"shared_with_team": True, "team_id": team_id}
-        if space:
-            team_query["space"] = space
         return await Automation.find({"$or": [user_query, team_query]}).to_list()
 
     return await Automation.find(user_query).to_list()

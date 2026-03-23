@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { X, ExternalLink, Trash2, Calendar, Tag, ShieldCheck, AlertTriangle } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
-import { submitForVerification } from '../../api/library'
 import { QualityBadge } from './QualityBadge'
+import { VerificationSubmitModal } from './VerificationSubmitModal'
 import type { LibraryItem } from '../../types/library'
 
 interface Props {
@@ -13,9 +13,8 @@ interface Props {
 
 export function LibraryItemDetails({ item, onClose, onRemove }: Props) {
   const navigate = useNavigate()
-  const [submitting, setSubmitting] = useState(false)
-  const [submitResult, setSubmitResult] = useState<'success' | 'error' | null>(null)
-  const [submitError, setSubmitError] = useState('')
+  const [showSubmitModal, setShowSubmitModal] = useState(false)
+  const [submitResult, setSubmitResult] = useState<'success' | null>(null)
   const kindLabel =
     item.kind === 'workflow'
       ? 'Workflow'
@@ -59,26 +58,15 @@ export function LibraryItemDetails({ item, onClose, onRemove }: Props) {
     }
   }
 
-  const handleSubmitForVerification = async () => {
-    setSubmitting(true)
-    setSubmitResult(null)
-    setSubmitError('')
-    try {
-      await submitForVerification({
-        item_kind: item.kind,
-        item_id: item.item_id,
-        summary: item.name,
-      })
-      setSubmitResult('success')
-    } catch (err: unknown) {
-      setSubmitResult('error')
-      setSubmitError(err instanceof Error ? err.message : 'Failed to submit')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
   return (
+    <>
+    {showSubmitModal && (
+      <VerificationSubmitModal
+        item={item}
+        onClose={() => setShowSubmitModal(false)}
+        onSubmitted={() => setSubmitResult('success')}
+      />
+    )}
     <div className="w-80 border-l border-gray-200 bg-white flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
@@ -174,21 +162,14 @@ export function LibraryItemDetails({ item, onClose, onRemove }: Props) {
               </div>
             )}
             <button
-              onClick={handleSubmitForVerification}
-              disabled={submitting || submitResult === 'success'}
+              onClick={() => setShowSubmitModal(true)}
+              disabled={submitResult === 'success'}
               className="flex w-full items-center justify-center gap-1.5 rounded-md border border-green-200 px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <ShieldCheck className="h-4 w-4" />
-              {submitting
-                ? 'Submitting...'
-                : submitResult === 'success'
-                  ? 'Submitted!'
-                  : 'Submit for Verification'}
+              {submitResult === 'success' ? 'Submitted!' : 'Submit for Verification'}
             </button>
           </>
-        )}
-        {submitResult === 'error' && (
-          <p className="text-xs text-red-500 text-center">{submitError}</p>
         )}
         <button
           onClick={() => onRemove(item.id)}
@@ -199,5 +180,6 @@ export function LibraryItemDetails({ item, onClose, onRemove }: Props) {
         </button>
       </div>
     </div>
+    </>
   )
 }

@@ -38,7 +38,6 @@ export function useChat() {
           message,
           documentUuids,
           activityId,
-          null,
           (chunk: StreamChunk) => {
             if (chunk.kind === 'text') {
               streamingRef.current += chunk.content
@@ -121,6 +120,7 @@ export function useChat() {
 
   return {
     messages,
+    setMessages,
     streamingContent,
     thinkingContent,
     thinkingDuration,

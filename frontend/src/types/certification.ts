@@ -5,7 +5,6 @@ export interface ModuleProgress {
   attempts: number
   xp_earned: number
   provisioned_docs?: string[]
-  lab_space_id?: string
   self_assessment?: Record<string, string>
 }
 

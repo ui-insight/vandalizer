@@ -30,4 +30,5 @@ export interface TeamInvite {
   role: string
   accepted: boolean
   token: string
+  created_at: string | null
 }

@@ -3,6 +3,7 @@ import { Loader2, BookOpen, X, ArrowDown, ChevronRight } from 'lucide-react'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
 import { AttachmentList } from './AttachmentList'
+import { WelcomeActionCards, OnboardingStepper } from './WelcomeExperience'
 import { useChat } from '../../hooks/useChat'
 import { useOnboarding } from '../../hooks/useOnboarding'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
@@ -14,6 +15,12 @@ const LOADING_WORDS = [
   'Thinking', 'Vandalizing', 'Pondering', 'Analyzing',
   'Processing', 'Brewing', 'Crunching', 'Conjuring',
 ]
+
+const WELCOME_MESSAGE =
+  "**Welcome to Vandalizer!** I'm your AI research assistant. I can help you " +
+  "extract structured data from documents, build automated workflows, and manage " +
+  "your team's knowledge base.\n\n" +
+  "Pick a starting point below, or just type what you're working on:"
 
 function StreamingLabel() {
   const [index, setIndex] = useState(0)
@@ -51,6 +58,7 @@ interface ChatPanelProps {
 export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessageConsumed }: ChatPanelProps) {
   const {
     messages,
+    setMessages,
     streamingContent,
     thinkingContent,
     thinkingDuration,
@@ -63,8 +71,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     setActivity,
   } = useChat()
 
-  const { bumpActivitySignal, processingDoc, selectedDocUuids, selectedFolderUuids, activeKBUuid, activeKBTitle, deactivateKB } = useWorkspace()
-  const onboardingPills = useOnboarding()
+  const { bumpActivitySignal, processingDoc, selectedDocUuids, selectedFolderUuids, activeKBUuid, activeKBTitle, deactivateKB, setWorkspaceMode, workspaceMode } = useWorkspace()
+  const { pills: onboardingPills, isNewUser, status: onboardingStatus, loading: onboardingLoading, refetchStatus } = useOnboarding()
   const [fileAttachments, setFileAttachments] = useState<FileAttachment[]>([])
   const [urlAttachments, setUrlAttachments] = useState<UrlAttachment[]>([])
   const [attachLoading, setAttachLoading] = useState(false)
@@ -73,11 +81,33 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const lastLoadedConvo = useRef<string | null>(null)
   const prevStreamingRef = useRef(false)
   const [showScrollDown, setShowScrollDown] = useState(false)
-  // Snapshot of scroll position, updated ONLY by handleScroll (user or programmatic scroll events).
-  // When we skip a programmatic scroll, no scroll event fires, so this stays frozen at "scrolled up".
   const prevScrollInfo = useRef({ scrollHeight: 0, scrollTop: 0, clientHeight: 0 })
 
-  // Load saved model preference on mount — auto-select first model if none is set
+  // New-user onboarding state
+  const [hasSentFirstMessage, setHasSentFirstMessage] = useState(false)
+  const [hasChatAboutDocs, setHasChatAboutDocs] = useState(
+    () => localStorage.getItem('onboarding:hasChatAboutDocs') === 'true',
+  )
+  const welcomeInjected = useRef(false)
+
+  // Inject synthetic welcome message for new users
+  useEffect(() => {
+    if (isNewUser && !onboardingLoading && messages.length === 0 && !welcomeInjected.current) {
+      welcomeInjected.current = true
+      setMessages([{ role: 'assistant', content: WELCOME_MESSAGE }])
+    }
+  }, [isNewUser, onboardingLoading, messages.length, setMessages])
+
+  // Refetch onboarding status when user returns to chat mode (e.g. after uploading in files mode)
+  const prevMode = useRef(workspaceMode)
+  useEffect(() => {
+    if (prevMode.current !== 'chat' && workspaceMode === 'chat') {
+      refetchStatus()
+    }
+    prevMode.current = workspaceMode
+  }, [workspaceMode, refetchStatus])
+
+  // Load saved model preference on mount
   useEffect(() => {
     getUserConfig().then(cfg => {
       if (cfg.model) {
@@ -95,8 +125,6 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     updateUserConfig({ model }).catch(() => {})
   }
 
-  // Save scroll info on every scroll event (user scrolls OR our programmatic scroll).
-  // This is NOT used to decide whether to auto-scroll — only to record position.
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current
     if (!el) return
@@ -109,7 +137,6 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     setShowScrollDown(distFromBottom > 80)
   }, [])
 
-  // When content grows, just show the down arrow if there's overflow — never auto-scroll.
   useEffect(() => {
     const el = scrollContainerRef.current
     if (!el) return
@@ -119,7 +146,6 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     }
   }, [messages, streamingContent])
 
-  // Reset scroll state when conversation UUID changes (new send or history load)
   const prevConvoRef = useRef(conversationUuid)
   useEffect(() => {
     if (conversationUuid !== prevConvoRef.current) {
@@ -129,7 +155,6 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     }
   }, [conversationUuid])
 
-  // Scroll to bottom when user sends a new message
   const prevMsgCount = useRef(messages.length)
   useEffect(() => {
     if (messages.length > prevMsgCount.current) {
@@ -150,7 +175,6 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
   }, [])
 
-  // Bump activity signal when streaming starts or ends so the rail picks up new/updated activities
   useEffect(() => {
     if (isStreaming !== prevStreamingRef.current) {
       prevStreamingRef.current = isStreaming
@@ -158,12 +182,10 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     }
   }, [isStreaming, bumpActivitySignal])
 
-  // Load conversation history when requested from workspace context
   useEffect(() => {
     if (conversationToLoad && conversationToLoad !== lastLoadedConvo.current) {
       lastLoadedConvo.current = conversationToLoad
       loadHistory(conversationToLoad).then(() => {
-        // Scroll to bottom after history renders
         setTimeout(() => {
           const el = scrollContainerRef.current
           if (el) el.scrollTop = el.scrollHeight
@@ -172,7 +194,6 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     }
   }, [conversationToLoad, loadHistory])
 
-  // Send a pending message injected from outside (e.g. library prompt click)
   const pendingHandled = useRef<string | null>(null)
   useEffect(() => {
     if (pendingMessage && pendingMessage !== pendingHandled.current && !isStreaming) {
@@ -185,8 +206,37 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const hasDocContext = fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0 || selectedFolderUuids.length > 0
 
   const handleSend = (message: string, includeOnboardingContext?: boolean) => {
+    setHasSentFirstMessage(true)
+    // Track when user chats with document context for onboarding stepper
+    if (hasDocContext && !hasChatAboutDocs) {
+      setHasChatAboutDocs(true)
+      localStorage.setItem('onboarding:hasChatAboutDocs', 'true')
+    }
     send(message, selectedDocUuids, selectedModel || undefined, activeKBUuid || undefined, includeOnboardingContext, selectedFolderUuids)
   }
+
+  // Onboarding: guide user to upload documents first, then come back
+  const handleSwitchToFiles = useCallback(() => {
+    setMessages(prev => [...prev, {
+      role: 'assistant',
+      content:
+        "Head to the **Files** panel on the left to upload your documents. " +
+        "I support PDFs, Word docs, spreadsheets, images, and HTML.\n\n" +
+        "Once they're processed, come back here and I'll help you analyze them.",
+    }])
+    setWorkspaceMode('files')
+  }, [setMessages, setWorkspaceMode])
+
+  const handleNeedDocumentsFirst = useCallback(() => {
+    setMessages(prev => [...prev, {
+      role: 'assistant',
+      content:
+        "You'll need to upload some documents first! Head to the **Files** panel " +
+        "on the left to add your PDFs, Word docs, or spreadsheets. " +
+        "Once they're processed, come back and we'll work with them.",
+    }])
+    setWorkspaceMode('files')
+  }, [setMessages, setWorkspaceMode])
 
   const handleAttachFile = async (files: File[]) => {
     setAttachLoading(true)
@@ -247,8 +297,9 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   }
 
   const handleExport = (format: string) => {
-    // Build conversation text
-    const text = messages
+    // Filter out the synthetic welcome message from exports
+    const exportMessages = messages.filter(m => m.content !== WELCOME_MESSAGE)
+    const text = exportMessages
       .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}:\n${m.content}`)
       .join('\n\n---\n\n')
     if (format === 'text') {
@@ -256,20 +307,27 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       downloadBlob(blob, 'conversation.txt')
     } else if (format === 'csv') {
       const rows = [['Role', 'Content']]
-      messages.forEach(m => rows.push([m.role, m.content.replace(/"/g, '""')]))
+      exportMessages.forEach(m => rows.push([m.role, m.content.replace(/"/g, '""')]))
       const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n')
       const blob = new Blob([csv], { type: 'text/csv' })
       downloadBlob(blob, 'conversation.csv')
     } else if (format === 'pdf') {
-      // For PDF, generate a simple HTML and open print dialog
       const html = `<html><head><title>Conversation</title><style>body{font-family:sans-serif;padding:40px;max-width:800px;margin:0 auto}
       .msg{margin-bottom:20px;padding:12px;border-radius:8px}.user{background:#f3f4f6;border-left:4px solid #eab308}
       .assistant{background:#fafafa}.role{font-weight:bold;margin-bottom:4px;font-size:12px;text-transform:uppercase;color:#666}</style></head>
-      <body>${messages.map(m => `<div class="msg ${m.role}"><div class="role">${m.role}</div><div>${m.content.replace(/\n/g, '<br>')}</div></div>`).join('')}</body></html>`
+      <body>${exportMessages.map(m => `<div class="msg ${m.role}"><div class="role">${m.role}</div><div>${m.content.replace(/\n/g, '<br>')}</div></div>`).join('')}</body></html>`
       const win = window.open('', '_blank')
       if (win) { win.document.write(html); win.document.close(); win.print() }
     }
   }
+
+  // Whether to show the new-user action cards below the messages
+  const showWelcomeCards = isNewUser && !hasSentFirstMessage && !processingDoc && !activeKBUuid && !hasDocContext
+  // Whether to show the onboarding stepper above the input
+  const showStepper = onboardingStatus && isNewUser && !(
+    onboardingStatus.has_documents && hasChatAboutDocs &&
+    (onboardingStatus.has_extraction_sets || onboardingStatus.has_run_workflow)
+  )
 
   return (
     <div className="flex h-full flex-col">
@@ -295,8 +353,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         className="flex-1 overflow-y-auto hide-scrollbar"
         style={{ padding: '20px 20px 180px 20px', position: 'relative' }}
       >
-        {/* Empty state: animated banner + suggestions */}
-        {messages.length === 0 && !isStreaming && (
+        {/* Returning user empty state: banner + contextual pills */}
+        {messages.length === 0 && !isStreaming && !onboardingLoading && !isNewUser && (
           <div style={{ maxWidth: 640, margin: '0 auto' }}>
             <div
               className="relative overflow-hidden text-white"
@@ -354,7 +412,6 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                   </div>
                 </div>
               </div>
-              {/* Processing progress bar */}
               {processingDoc && (
                 <div className="relative z-[1]" style={{ marginTop: 16, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)', overflow: 'hidden' }}>
                   <div
@@ -373,7 +430,6 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
               )}
             </div>
 
-            {/* Contextual suggestion chips */}
             {!processingDoc && (
               <div style={{ marginTop: 16, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {(activeKBUuid ? [
@@ -417,6 +473,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           </div>
         )}
 
+        {/* Chat messages */}
         {messages.map((msg, i) => (
           <ChatMessage
             key={i}
@@ -426,7 +483,19 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           />
         ))}
 
-        {/* Streaming: thinking-only phase (no text yet) */}
+        {/* New-user action cards — shown below the welcome message, hidden after first send */}
+        {showWelcomeCards && messages.length > 0 && (
+          <div style={{ marginTop: 12, paddingBottom: 8 }}>
+            <WelcomeActionCards
+              onboardingStatus={onboardingStatus}
+              onSwitchToFiles={handleSwitchToFiles}
+              onSendMessage={handleSend}
+              onNeedDocumentsFirst={handleNeedDocumentsFirst}
+            />
+          </div>
+        )}
+
+        {/* Streaming: thinking-only phase */}
         {isStreaming && thinkingContent && !streamingContent && (
           <ChatMessage
             message={{ role: 'assistant', content: '' }}
@@ -435,7 +504,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           />
         )}
 
-        {/* Streaming: text phase (with or without thinking) */}
+        {/* Streaming: text phase */}
         {isStreaming && streamingContent && (
           <ChatMessage
             message={{ role: 'assistant', content: streamingContent }}
@@ -445,7 +514,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           />
         )}
 
-        {/* Loading indicator — matches the compact thinking style */}
+        {/* Loading indicator */}
         {isStreaming && !streamingContent && !thinkingContent && (
           <div style={{ padding: 15, marginBottom: 15, backgroundColor: '#00000008', borderRadius: 'var(--ui-radius, 12px)' }}>
             <div className="thinking-shimmer" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#9ca3af' }}>
@@ -455,7 +524,6 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           </div>
         )}
 
-        {/* Error */}
         {error && (
           <div className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>
         )}
@@ -497,6 +565,11 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
             <ArrowDown size={18} />
           </button>
         </div>
+      )}
+
+      {/* Onboarding stepper — persists above input until all steps complete */}
+      {showStepper && (
+        <OnboardingStepper status={onboardingStatus} hasChatAboutDocs={hasChatAboutDocs} />
       )}
 
       {/* KB active badge */}

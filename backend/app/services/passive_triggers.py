@@ -10,37 +10,20 @@ import os
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
+from bson import ObjectId
+
+from app.tasks import get_sync_db
+
 logger = logging.getLogger(__name__)
 
-
-def _get_db():
-    from pymongo import MongoClient
-
-    from app.config import Settings
-    settings = Settings()
-    return MongoClient(settings.mongo_host)[settings.mongo_db]
+MAX_CHAIN_DEPTH = 5
 
 
-def create_folder_watch_trigger(workflow_doc: dict, document_doc: dict) -> dict:
-    """Create a pending trigger event for a folder-watched document.
-
-    Returns the inserted trigger event dict.
-    """
-    db = _get_db()
-    folder_watch_config = (workflow_doc.get("input_config") or {}).get("folder_watch", {})
-    delay_seconds = folder_watch_config.get("delay_seconds", 300)
-    now = datetime.now(timezone.utc)
-
-    event = {
+def _base_event(now: datetime) -> dict:
+    """Return common fields for all trigger events."""
+    return {
         "uuid": uuid4().hex,
-        "workflow": workflow_doc["_id"],
-        "trigger_type": "folder_watch",
-        "status": "pending",
-        "documents": [document_doc["_id"]],
-        "document_count": 1,
-        "trigger_context": {"folder_id": document_doc.get("folder", "")},
         "created_at": now,
-        "process_after": now + timedelta(seconds=delay_seconds),
         "attempt_number": 1,
         "max_attempts": 3,
         "output_delivery": {
@@ -49,6 +32,38 @@ def create_folder_watch_trigger(workflow_doc: dict, document_doc: dict) -> dict:
             "webhooks_called": [],
             "chains_triggered": [],
         },
+    }
+
+
+def create_folder_watch_trigger(
+    workflow_doc: dict,
+    document_doc: dict,
+    *,
+    automation_id: str | None = None,
+    automation_name: str | None = None,
+) -> dict:
+    """Create a pending trigger event for a folder-watched document.
+
+    Returns the inserted trigger event dict.
+    """
+    db = get_sync_db()
+    folder_watch_config = (workflow_doc.get("input_config") or {}).get("folder_watch", {})
+    delay_seconds = folder_watch_config.get("delay_seconds", 300)
+    now = datetime.now(timezone.utc)
+
+    event = {
+        **_base_event(now),
+        "workflow": workflow_doc["_id"],
+        "trigger_type": "folder_watch",
+        "status": "pending",
+        "documents": [document_doc["_id"]],
+        "document_count": 1,
+        "trigger_context": {
+            "folder_id": document_doc.get("folder", ""),
+            "automation_id": automation_id,
+            "automation_name": automation_name,
+        },
+        "process_after": now + timedelta(seconds=delay_seconds),
     }
     result = db.workflow_trigger_event.insert_one(event)
     event["_id"] = result.inserted_id
@@ -60,11 +75,11 @@ def create_m365_trigger(workflow_doc: dict, work_item_doc: dict) -> dict:
 
     Returns the inserted trigger event dict.
     """
-    db = _get_db()
+    db = get_sync_db()
     now = datetime.now(timezone.utc)
 
     event = {
-        "uuid": uuid4().hex,
+        **_base_event(now),
         "workflow": workflow_doc["_id"],
         "trigger_type": "m365_intake",
         "status": "pending",
@@ -76,16 +91,84 @@ def create_m365_trigger(workflow_doc: dict, work_item_doc: dict) -> dict:
             "source": work_item_doc.get("source", ""),
             "intake_config_id": str(work_item_doc.get("intake_config")) if work_item_doc.get("intake_config") else None,
         },
-        "created_at": now,
         "process_after": now,  # Process immediately (no delay for M365)
-        "attempt_number": 1,
-        "max_attempts": 3,
-        "output_delivery": {
-            "storage_status": None,
-            "notifications_sent": [],
-            "webhooks_called": [],
-            "chains_triggered": [],
+    }
+    result = db.workflow_trigger_event.insert_one(event)
+    event["_id"] = result.inserted_id
+    return event
+
+
+def create_api_trigger(
+    automation_doc: dict,
+    workflow_id: str,
+    document_oids: list,
+) -> dict:
+    """Create a trigger event for an API-initiated automation.
+
+    Bypasses the pending→queued beat cycle and goes straight to queued
+    so the caller can dispatch execution immediately.
+    """
+    db = get_sync_db()
+    now = datetime.now(timezone.utc)
+
+    event = {
+        **_base_event(now),
+        "workflow": ObjectId(workflow_id),
+        "trigger_type": "api",
+        "status": "queued",
+        "documents": document_oids,
+        "document_count": len(document_oids),
+        "trigger_context": {
+            "automation_id": str(automation_doc.get("_id", "")),
+            "automation_name": automation_doc.get("name", ""),
         },
+        "process_after": now,
+        "queued_at": now,
+    }
+    result = db.workflow_trigger_event.insert_one(event)
+    event["_id"] = result.inserted_id
+    return event
+
+
+def create_chain_trigger(
+    source_event: dict,
+    target_workflow_id,
+    document_oids: list,
+    *,
+    automation_id: str | None = None,
+    automation_name: str | None = None,
+) -> dict | None:
+    """Create a trigger event that chains from a completed trigger.
+
+    Returns None if max chain depth is reached.
+    """
+    source_context = source_event.get("trigger_context") or {}
+    depth = source_context.get("chain_depth", 0) + 1
+    if depth > MAX_CHAIN_DEPTH:
+        logger.warning(
+            "Chain depth %d exceeds max %d for source event %s",
+            depth, MAX_CHAIN_DEPTH, source_event.get("uuid"),
+        )
+        return None
+
+    db = get_sync_db()
+    now = datetime.now(timezone.utc)
+
+    event = {
+        **_base_event(now),
+        "workflow": ObjectId(target_workflow_id) if isinstance(target_workflow_id, str) else target_workflow_id,
+        "trigger_type": "chain",
+        "status": "pending",
+        "documents": document_oids,
+        "document_count": len(document_oids),
+        "trigger_context": {
+            "source_event_uuid": source_event.get("uuid"),
+            "source_workflow": str(source_event.get("workflow", "")),
+            "chain_depth": depth,
+            "automation_id": automation_id,
+            "automation_name": automation_name,
+        },
+        "process_after": now,
     }
     result = db.workflow_trigger_event.insert_one(event)
     event["_id"] = result.inserted_id
@@ -139,22 +222,44 @@ def evaluate_conditions(documents: list[dict], conditions: list) -> bool:
 
 
 def check_workflow_budget(workflow_doc: dict) -> tuple[bool, str | None]:
-    """Check if workflow has budget remaining."""
+    """Check if workflow has budget remaining for today."""
     budget_config = (workflow_doc.get("resource_config") or {}).get("budget", {})
-    stats = workflow_doc.get("stats") or {}
 
     daily_limit = budget_config.get("daily_token_limit")
-    if daily_limit:
-        tokens_used_today = stats.get("tokens_used", 0)
-        if tokens_used_today >= daily_limit:
-            return False, "Daily token limit reached"
+    if not daily_limit:
+        return True, None
+
+    # Aggregate actual token usage from today's completed trigger events
+    db = get_sync_db()
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+
+    pipeline = [
+        {
+            "$match": {
+                "workflow": workflow_doc["_id"],
+                "status": "completed",
+                "completed_at": {"$gte": today_start},
+            }
+        },
+        {
+            "$group": {
+                "_id": None,
+                "total_tokens": {"$sum": "$total_tokens"},
+            }
+        },
+    ]
+    results = list(db.workflow_trigger_event.aggregate(pipeline))
+    tokens_today = results[0]["total_tokens"] if results else 0
+
+    if tokens_today >= daily_limit:
+        return False, f"Daily token limit reached ({tokens_today}/{daily_limit})"
 
     return True, None
 
 
 def check_throttling(workflow_doc: dict) -> tuple[bool, str | None]:
     """Check if workflow can run based on throttling configuration."""
-    db = _get_db()
+    db = get_sync_db()
     throttle_config = (workflow_doc.get("resource_config") or {}).get("throttling", {})
     stats = workflow_doc.get("stats") or {}
 

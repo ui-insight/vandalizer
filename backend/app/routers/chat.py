@@ -140,7 +140,6 @@ async def chat(
             user_id=user_id,
             team_id=team_id,
             conversation_id=conversation.uuid,
-            space=body.current_space_id,
         )
 
         # Always set a placeholder title from the first message so the rail
@@ -187,7 +186,6 @@ async def chat(
             document_uuids=document_uuids,
             conversation_uuid=conversation.uuid,
             user_id=user_id,
-            space=body.current_space_id,
             activity_id=str(activity.id) if activity else None,
             settings=settings,
             model_override=body.model,
@@ -233,7 +231,6 @@ async def add_link(
             user_id=user_id,
             team_id=str(user.current_team) if user.current_team else None,
             conversation_id=conversation.uuid,
-            space=body.current_space_id,
         )
     else:
         activity = await _get_authorized_activity(body.current_activity_id, user)
@@ -298,7 +295,6 @@ async def add_link(
 async def add_document(
     request: Request,
     files: list[UploadFile] = File(...),
-    current_space_id: Optional[str] = Form(None),
     current_activity_id: Optional[str] = Form(None),
     user: User = Depends(get_current_user),
 ):
@@ -321,7 +317,6 @@ async def add_document(
             user_id=user_id,
             team_id=str(user.current_team) if user.current_team else None,
             conversation_id=conversation.uuid,
-            space=current_space_id,
         )
     else:
         activity = await _get_authorized_activity(current_activity_id, user)

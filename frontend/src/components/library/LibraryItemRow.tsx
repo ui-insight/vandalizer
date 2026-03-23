@@ -13,7 +13,7 @@ import {
   Check,
 } from 'lucide-react'
 import { QualityBadge } from './QualityBadge'
-import { submitForVerification } from '../../api/library'
+import { VerificationSubmitModal } from './VerificationSubmitModal'
 import { relativeTime } from '../../utils/time'
 import type { LibraryItem, LibraryFolder } from '../../types/library'
 
@@ -37,6 +37,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
   const [hovered, setHovered] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [folderSubmenuOpen, setFolderSubmenuOpen] = useState(false)
+  const [showVerifyModal, setShowVerifyModal] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 })
@@ -303,18 +304,9 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                     <MenuItem
                       icon={<ShieldCheck size={14} />}
                       label="Submit for Verification"
-                      onClick={async () => {
+                      onClick={() => {
                         setMenuOpen(false)
-                        try {
-                          await submitForVerification({
-                            item_kind: item.kind,
-                            item_id: item.item_id,
-                            summary: item.name,
-                          })
-                          alert('Submitted for verification!')
-                        } catch {
-                          alert('Failed to submit. Please try again.')
-                        }
+                        setShowVerifyModal(true)
                       }}
                     />
                   )}
@@ -452,6 +444,13 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
           </>
         )}
       </div>
+      {showVerifyModal && (
+        <VerificationSubmitModal
+          item={item}
+          onClose={() => setShowVerifyModal(false)}
+          onSubmitted={() => setShowVerifyModal(false)}
+        />
+      )}
     </div>
   )
 }

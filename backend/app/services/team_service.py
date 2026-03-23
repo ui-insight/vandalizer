@@ -1,3 +1,4 @@
+import datetime
 import secrets
 import uuid
 
@@ -8,6 +9,7 @@ from app.models.team import Team, TeamInvite, TeamMembership
 from app.models.user import User
 
 ROLE_RANK = {"owner": 0, "admin": 1, "member": 2}
+INVITE_EXPIRY_DAYS = 30
 
 
 async def get_user_teams(user_id: str) -> list[dict]:
@@ -71,6 +73,7 @@ async def get_team_invites(team_id: PydanticObjectId) -> list[dict]:
             "role": inv.role,
             "accepted": inv.accepted,
             "token": inv.token,
+            "created_at": inv.created_at.isoformat() if inv.created_at else None,
         }
         for inv in invites
     ]
@@ -142,6 +145,12 @@ async def accept_invite(token: str, user: User) -> Team:
     invite = await TeamInvite.find_one(TeamInvite.token == token)
     if not invite:
         raise ValueError("Invalid invite token")
+
+    # Check if invite has expired
+    if invite.created_at and (
+        datetime.datetime.now() - invite.created_at
+    ).days > INVITE_EXPIRY_DAYS:
+        raise ValueError("Invite has expired")
 
     team = await Team.get(invite.team)
     if not team:
@@ -271,28 +280,83 @@ async def ensure_current_team(user: User) -> Team:
     return team
 
 
-async def ensure_shared_folder(team: Team, space_id: str) -> SmartFolder:
-    """Ensure the team has a shared root folder for this space."""
+async def ensure_shared_folder(team: Team) -> SmartFolder:
+    """Ensure the team has a shared root folder."""
     folder = await SmartFolder.find_one(
         SmartFolder.team_id == team.uuid,
         SmartFolder.is_shared_team_root == True,
     )
     if folder:
-        if folder.space != space_id:
-            folder.space = space_id
-            await folder.save()
         return folder
 
     folder = SmartFolder(
         parent_id="0",
         title=f"{team.name} Shared",
         uuid=uuid.uuid4().hex,
-        space=space_id,
         team_id=team.uuid,
         is_shared_team_root=True,
     )
     await folder.insert()
     return folder
+
+
+async def transfer_ownership(
+    team_uuid: str, current_owner_id: str, new_owner_id: str
+) -> Team:
+    """Transfer team ownership to another member."""
+    team = await Team.find_one(Team.uuid == team_uuid)
+    if not team:
+        raise ValueError("Team not found")
+
+    current_m = await _get_membership(team.id, current_owner_id)
+    if not current_m or current_m.role != "owner":
+        raise ValueError("Only the team owner can transfer ownership")
+
+    new_m = await _get_membership(team.id, new_owner_id)
+    if not new_m:
+        raise ValueError("New owner must be a member of the team")
+
+    # Demote current owner to admin
+    current_m.role = "admin"
+    await current_m.save()
+
+    # Promote new owner
+    new_m.role = "owner"
+    await new_m.save()
+
+    # Update team record
+    team.owner_user_id = new_owner_id
+    await team.save()
+
+    return team
+
+
+async def delete_team(team_uuid: str, actor_id: str) -> bool:
+    """Delete a team and all associated records. Actor must be owner."""
+    team = await Team.find_one(Team.uuid == team_uuid)
+    if not team:
+        raise ValueError("Team not found")
+
+    actor_m = await _get_membership(team.id, actor_id)
+    if not actor_m or actor_m.role != "owner":
+        raise ValueError("Only the team owner can delete the team")
+
+    # Delete all memberships for this team
+    await TeamMembership.find(TeamMembership.team == team.id).delete()
+
+    # Delete all invites for this team
+    await TeamInvite.find(TeamInvite.team == team.id).delete()
+
+    # Clear current_team for any user pointing to this team
+    users_with_team = await User.find(User.current_team == team.id).to_list()
+    for u in users_with_team:
+        u.current_team = None
+        await u.save()
+
+    # Delete the team document
+    await team.delete()
+
+    return True
 
 
 # --- helpers ---

@@ -26,17 +26,17 @@ if TYPE_CHECKING:
 async def create_search_set(
     title: str,
     user_id: str,
-    space: str | None,
     set_type: str,
     extraction_config: dict | None = None,
+    team_id: str | None = None,
 ) -> SearchSet:
     ss = SearchSet(
         title=title,
         uuid=str(uuid_mod.uuid4()),
-        space=space or "default",
         status="active",
         set_type=set_type,
         user_id=user_id,
+        team_id=team_id,
         created_by_user_id=user_id,
         extraction_config=extraction_config or {},
     )
@@ -45,23 +45,34 @@ async def create_search_set(
 
 
 async def list_search_sets(
-    space: str | None = None,
     user: User | None = None,
     skip: int = 0,
     limit: int = 100,
 ) -> list[SearchSet]:
-    query = {}
-    if space:
-        query["space"] = space
-    search_sets = await SearchSet.find(query).skip(skip).limit(limit).to_list()
     if user is None:
-        return search_sets
+        return await SearchSet.find().skip(skip).limit(limit).to_list()
 
-    visible: list[SearchSet] = []
     team_access = await access_control.get_team_access_context(user)
+
+    # Build OR query: owned by user OR belongs to one of user's teams OR global
+    conditions: list[dict] = [{"user_id": user.user_id}, {"is_global": True}]
+    if team_access.team_uuids:
+        conditions.append({"team_id": {"$in": list(team_access.team_uuids)}})
+    if team_access.team_object_ids:
+        conditions.append({"team_id": {"$in": list(team_access.team_object_ids)}})
+
+    search_sets = await SearchSet.find({"$or": conditions}).skip(skip).limit(limit).to_list()
+
+    # Also check library-backed access for any we might have missed
+    visible: list[SearchSet] = []
     for search_set in search_sets:
-        if access_control.can_view_search_set(search_set, user):
-            visible.append(search_set)
+        visible.append(search_set)
+
+    # Check for library-backed access to additional search sets
+    all_sets = await SearchSet.find().skip(skip).limit(limit).to_list()
+    visible_ids = {str(ss.id) for ss in visible}
+    for search_set in all_sets:
+        if str(search_set.id) in visible_ids:
             continue
         if await access_control.has_library_backed_object_access(
             "search_set",
@@ -114,10 +125,10 @@ async def clone_search_set(search_set_uuid: str, user_id: str) -> SearchSet | No
     clone = SearchSet(
         title=f"{original.title} (Copy)",
         uuid=new_uuid,
-        space=original.space,
         status="active",
         set_type=original.set_type,
         user_id=user_id,
+        team_id=original.team_id,
         created_by_user_id=user_id,
         extraction_config=original.extraction_config,
     )
@@ -132,7 +143,6 @@ async def clone_search_set(search_set_uuid: str, user_id: str) -> SearchSet | No
             searchtype=item.searchtype,
             title=item.title,
             user_id=user_id,
-            space_id=item.space_id,
             is_optional=item.is_optional,
             enum_values=item.enum_values,
         )
@@ -173,7 +183,6 @@ async def add_item(
     searchtype: str = "extraction",
     title: str | None = None,
     user_id: str | None = None,
-    space_id: str | None = None,
     is_optional: bool = False,
     enum_values: list[str] | None = None,
 ) -> SearchSetItem:
@@ -183,7 +192,6 @@ async def add_item(
         searchtype=searchtype,
         title=title or searchphrase,
         user_id=user_id,
-        space_id=space_id,
         is_optional=is_optional,
         enum_values=enum_values or [],
     )

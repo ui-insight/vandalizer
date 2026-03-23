@@ -14,15 +14,9 @@ from uuid import uuid4
 
 import httpx
 
+from app.tasks import get_sync_db
+
 logger = logging.getLogger(__name__)
-
-
-def _get_db():
-    from pymongo import MongoClient
-
-    from app.config import Settings
-    settings = Settings()
-    return MongoClient(settings.mongo_host)[settings.mongo_db]
 
 
 def save_results_to_folder(result_doc: dict, storage_config: dict) -> str:
@@ -30,7 +24,7 @@ def save_results_to_folder(result_doc: dict, storage_config: dict) -> str:
 
     Returns the file path string.
     """
-    db = _get_db()
+    db = get_sync_db()
     folder_id = storage_config.get("destination_folder")
     if not folder_id:
         raise ValueError("No destination folder configured")
@@ -89,7 +83,6 @@ def save_results_to_folder(result_doc: dict, storage_config: dict) -> str:
         "extension": file_ext,
         "uuid": doc_uuid,
         "user_id": user_id,
-        "space": folder.get("space", ""),
         "folder": folder.get("uuid", ""),
         "raw_text": "",
         "processing": False,
@@ -281,7 +274,7 @@ def send_workflow_notification(
     if channel != "email":
         return
 
-    db = _get_db()
+    db = get_sync_db()
     recipients = list(notification.get("recipients", []))
 
     if notification.get("notify_owner"):
@@ -377,7 +370,7 @@ def _send_teams_notification(
 
     user_id = work_item_doc.get("owner_user_id") if work_item_doc else None
     if not user_id:
-        db = _get_db()
+        db = get_sync_db()
         workflow = db.workflow.find_one({"_id": result_doc.get("workflow")})
         user_id = workflow.get("user_id") if workflow else None
     if not user_id:
@@ -407,7 +400,7 @@ def save_results_to_onedrive_channel(
     if work_item_doc:
         user_id = work_item_doc.get("owner_user_id")
     if not user_id:
-        db = _get_db()
+        db = get_sync_db()
         workflow = db.workflow.find_one({"_id": result_doc.get("workflow")})
         user_id = workflow.get("user_id") if workflow else None
     if not user_id:
@@ -439,7 +432,7 @@ def save_extraction_results_to_folder(
 
     Returns the file path string.
     """
-    db = _get_db()
+    db = get_sync_db()
     folder_id = storage_config.get("destination_folder")
     if not folder_id:
         raise ValueError("No destination folder configured")
@@ -508,7 +501,6 @@ def save_extraction_results_to_folder(
         "extension": file_ext,
         "uuid": doc_uuid,
         "user_id": user_id,
-        "space": folder.get("space", ""),
         "folder": folder.get("uuid", ""),
         "raw_text": "",
         "processing": False,
@@ -527,7 +519,7 @@ def call_webhook(result_doc: dict, webhook_config: dict) -> None:
     validate_outbound_url(url)  # raises ValueError for internal/private URLs
     method = webhook_config.get("method", "POST").upper()
 
-    db = _get_db()
+    db = get_sync_db()
     workflow = db.workflow.find_one({"_id": result_doc.get("workflow")}) or {}
 
     payload = {

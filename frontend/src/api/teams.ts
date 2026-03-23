@@ -59,3 +59,16 @@ export function removeMember(team_id: string, user_id: string) {
     body: JSON.stringify({ team_id, user_id }),
   })
 }
+
+export function transferOwnership(teamUuid: string, newOwnerUserId: string) {
+  return apiFetch<{ ok: boolean }>('/api/teams/transfer-ownership', {
+    method: 'POST',
+    body: JSON.stringify({ team_uuid: teamUuid, new_owner_user_id: newOwnerUserId }),
+  })
+}
+
+export function deleteTeam(teamUuid: string) {
+  return apiFetch<{ ok: boolean }>(`/api/teams/${teamUuid}`, {
+    method: 'DELETE',
+  })
+}

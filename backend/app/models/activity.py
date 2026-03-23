@@ -30,7 +30,6 @@ class ActivityEvent(Document):
 
     user_id: str
     team_id: Optional[str] = None
-    space: Optional[str] = None
 
     started_at: datetime.datetime = Field(
         default_factory=lambda: datetime.datetime.now(datetime.timezone.utc)

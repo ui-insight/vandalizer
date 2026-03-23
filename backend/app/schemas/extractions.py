@@ -10,7 +10,6 @@ from pydantic import BaseModel
 
 class CreateSearchSetRequest(BaseModel):
     title: str
-    space: Optional[str] = None
     set_type: str = "extraction"
     extraction_config: Optional[dict] = None
 
@@ -48,10 +47,10 @@ class SearchSetResponse(BaseModel):
     id: str
     title: str
     uuid: str
-    space: str
     status: str
     set_type: str
     user_id: Optional[str] = None
+    team_id: Optional[str] = None
     is_global: bool = False
     verified: bool = False
     item_count: int = 0
