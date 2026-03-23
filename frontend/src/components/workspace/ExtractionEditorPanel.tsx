@@ -1,4 +1,4 @@
-import React, { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { ExtractionTutorial } from './ExtractionTutorial'
 import { X, Pencil, Loader2, Copy, Trash2, GripVertical, Plus, ChevronDown, ChevronRight, Play, TrendingUp, Sparkles, FileText, AlertTriangle, Eye, Shield, ShieldCheck, Download } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
