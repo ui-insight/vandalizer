@@ -77,10 +77,9 @@ async def activity_update(activity_id: PydanticObjectId, **kwargs) -> Optional[A
 async def get_activity(
     activity_id: PydanticObjectId, user_id: str, *, team_ids: list[str] | None = None,
 ) -> Optional[ActivityEvent]:
-    conditions: list[dict] = [{"_id": activity_id, "user_id": user_id}]
-    if team_ids:
-        conditions.append({"_id": activity_id, "team_id": {"$in": team_ids}})
-    return await ActivityEvent.find_one({"$or": conditions})
+    return await ActivityEvent.find_one(
+        ActivityEvent.id == activity_id, ActivityEvent.user_id == user_id,
+    )
 
 
 async def list_activities(
@@ -88,20 +87,22 @@ async def list_activities(
     limit: int = 50,
     team_ids: list[str] | None = None,
 ) -> list[ActivityEvent]:
-    conditions: list[dict] = [{"user_id": user_id}]
-    if team_ids:
-        conditions.append({"team_id": {"$in": team_ids}})
+    # Activity rail is personal — only show the current user's activities.
+    # Team-level activity sharing is handled separately.
     return (
-        await ActivityEvent.find({"$or": conditions})
+        await ActivityEvent.find({"user_id": user_id})
         .sort("-started_at")
         .limit(limit)
         .to_list()
     )
 
 
-async def delete_activity(activity_id: PydanticObjectId, user_id: str) -> bool:
+async def delete_activity(
+    activity_id: PydanticObjectId,
+    user_id: str,
+) -> bool:
     ev = await ActivityEvent.find_one(
-        ActivityEvent.id == activity_id, ActivityEvent.user_id == user_id
+        ActivityEvent.id == activity_id, ActivityEvent.user_id == user_id,
     )
     if not ev:
         return False
@@ -110,7 +111,6 @@ async def delete_activity(activity_id: PydanticObjectId, user_id: str) -> bool:
     if ev.conversation_id:
         conversation = await ChatConversation.find_one(
             ChatConversation.uuid == ev.conversation_id,
-            ChatConversation.user_id == user_id,
         )
         if conversation:
             if conversation.messages:

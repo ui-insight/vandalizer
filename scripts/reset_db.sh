@@ -30,12 +30,13 @@ MONGO_DB="${MONGO_DB:-vandalizer}"
 UPLOAD_DIR="${UPLOAD_DIR:-../app/static/uploads}"
 CHROMADB_PERSIST_DIR="${CHROMADB_PERSIST_DIR:-../app/static/db}"
 
-# Resolve relative paths from backend/
+# Resolve relative paths from backend/ (macOS-compatible, no GNU realpath needed)
+_resolve() { python3 -c "from pathlib import Path; print(Path('$1').resolve())" 2>/dev/null || echo "$1"; }
 if [[ "$UPLOAD_DIR" != /* ]]; then
-  UPLOAD_DIR="$(cd "$BACKEND_DIR" && realpath -m "$UPLOAD_DIR")"
+  UPLOAD_DIR="$(cd "$BACKEND_DIR" && _resolve "$UPLOAD_DIR")"
 fi
 if [[ "$CHROMADB_PERSIST_DIR" != /* ]]; then
-  CHROMADB_PERSIST_DIR="$(cd "$BACKEND_DIR" && realpath -m "$CHROMADB_PERSIST_DIR")"
+  CHROMADB_PERSIST_DIR="$(cd "$BACKEND_DIR" && _resolve "$CHROMADB_PERSIST_DIR")"
 fi
 
 echo "This will destroy:"

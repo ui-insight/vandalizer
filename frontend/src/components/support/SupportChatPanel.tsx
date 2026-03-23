@@ -2,6 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   ArrowLeft,
+  CheckCircle2,
+  Circle,
+  Clock,
   Loader2,
   MessageSquare,
   Paperclip,
@@ -29,6 +32,12 @@ const STATUS_DOT = {
   closed: 'bg-gray-300',
 } as const
 
+const PRIORITY_COLORS = {
+  low: 'text-gray-400',
+  normal: 'text-blue-500',
+  high: 'text-red-500',
+} as const
+
 // ---------------------------------------------------------------------------
 // Views
 // ---------------------------------------------------------------------------
@@ -38,16 +47,29 @@ type View = 'list' | 'new' | 'chat'
 function TicketListView({
   tickets,
   loading,
+  isSupportAgent,
   onSelect,
   onNew,
 }: {
   tickets: SupportTicketSummary[]
   loading: boolean
+  isSupportAgent: boolean
   onSelect: (uuid: string) => void
   onNew: () => void
 }) {
   const open = tickets.filter((t) => t.status !== 'closed')
   const closed = tickets.filter((t) => t.status === 'closed')
+
+  // A ticket "needs attention" if the last message is from the other party
+  const needsAttention = (t: SupportTicketSummary) => {
+    if (!t.last_message_user_id || t.status === 'closed') return false
+    if (isSupportAgent) {
+      // Support agent: needs attention if last message is NOT a support reply (user is waiting)
+      return t.last_message_is_support_reply === false
+    }
+    // Regular user: needs attention if last message IS a support reply (support responded)
+    return t.last_message_is_support_reply === true
+  }
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -59,37 +81,57 @@ function TicketListView({
         ) : tickets.length === 0 ? (
           <div className="flex flex-col items-center gap-3 px-4 py-12 text-center">
             <MessageSquare className="h-8 w-8 text-gray-300" />
-            <p className="text-sm text-gray-500">No support tickets yet</p>
-            <button
-              onClick={onNew}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-            >
-              Create your first ticket
-            </button>
+            <p className="text-sm text-gray-500">
+              {isSupportAgent ? 'No support tickets' : 'No support tickets yet'}
+            </p>
+            {!isSupportAgent && (
+              <button
+                onClick={onNew}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                Create your first ticket
+              </button>
+            )}
           </div>
         ) : (
           <>
-            {open.map((t) => (
-              <button
-                key={t.uuid}
-                onClick={() => onSelect(t.uuid)}
-                className="flex w-full items-start gap-3 border-b border-gray-100 px-4 py-3 text-left hover:bg-gray-50"
-              >
-                <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${STATUS_DOT[t.status]}`} />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-gray-900">{t.subject}</p>
-                  <p className="mt-0.5 truncate text-xs text-gray-500">
-                    {t.last_message_preview || 'No messages'}
-                  </p>
-                </div>
-                <div className="flex flex-col items-end gap-0.5 shrink-0">
-                  <span className="text-[10px] text-gray-400">{timeAgo(t.updated_at)}</span>
-                  {t.message_count > 1 && (
-                    <span className="text-[10px] text-gray-400">{t.message_count} msgs</span>
-                  )}
-                </div>
-              </button>
-            ))}
+            {open.map((t) => {
+              const attention = needsAttention(t)
+              return (
+                <button
+                  key={t.uuid}
+                  onClick={() => onSelect(t.uuid)}
+                  className={`flex w-full items-start gap-3 border-b border-gray-100 px-4 py-3 text-left hover:bg-gray-50 ${
+                    attention ? 'bg-blue-50/50' : ''
+                  }`}
+                >
+                  <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${STATUS_DOT[t.status]}`} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <p className={`truncate text-sm ${attention ? 'font-semibold text-gray-900' : 'font-medium text-gray-900'}`}>
+                        {t.subject}
+                      </p>
+                      {attention && (
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
+                      )}
+                    </div>
+                    <p className="mt-0.5 truncate text-xs text-gray-500">
+                      {isSupportAgent && t.user_name ? `${t.user_name}: ` : ''}
+                      {t.last_message_preview || 'No messages'}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-0.5 shrink-0">
+                    <span className="text-[10px] text-gray-400">{timeAgo(t.updated_at)}</span>
+                    {t.message_count > 1 && (
+                      <span className="text-[10px] text-gray-400">{t.message_count} msgs</span>
+                    )}
+                    {t.priority === 'high' && (
+                      <span className="text-[10px] font-medium text-red-500">High</span>
+                    )}
+                  </div>
+                </button>
+              )
+            })}
             {closed.length > 0 && (
               <details className="border-t border-gray-100">
                 <summary className="cursor-pointer px-4 py-2 text-xs font-medium text-gray-400 hover:text-gray-600">
@@ -114,7 +156,7 @@ function TicketListView({
         )}
       </div>
 
-      {tickets.length > 0 && (
+      {!isSupportAgent && tickets.length > 0 && (
         <div className="border-t p-3">
           <button
             onClick={onNew}
@@ -214,10 +256,14 @@ function NewTicketView({
 
 function ChatView({
   ticketUuid,
+  isSupportAgent,
   onBack,
+  onTicketUpdated,
 }: {
   ticketUuid: string
+  isSupportAgent: boolean
   onBack: () => void
+  onTicketUpdated: () => void
 }) {
   const { user } = useAuth()
   const { toast } = useToast()
@@ -225,6 +271,7 @@ function ChatView({
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
+  const [updatingStatus, setUpdatingStatus] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -256,6 +303,7 @@ function ChatView({
       const updated = await supportApi.addMessage(ticketUuid, message.trim())
       setTicket(updated)
       setMessage('')
+      onTicketUpdated()
     } catch {
       toast('Failed to send message', 'error')
     } finally {
@@ -292,6 +340,20 @@ function ChatView({
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
+  const handleStatusChange = async (newStatus: string) => {
+    setUpdatingStatus(true)
+    try {
+      const updated = await supportApi.updateTicket(ticketUuid, { status: newStatus })
+      setTicket(updated)
+      toast(`Ticket ${newStatus.replace('_', ' ')}`, 'success')
+      onTicketUpdated()
+    } catch {
+      toast('Failed to update ticket', 'error')
+    } finally {
+      setUpdatingStatus(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex flex-1 items-center justify-center">
@@ -309,22 +371,71 @@ function ChatView({
     )
   }
 
+  const StatusIcon = ticket.status === 'closed' ? CheckCircle2 : ticket.status === 'in_progress' ? Clock : Circle
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Chat header */}
-      <div className="flex items-center gap-2 border-b px-4 py-2">
-        <button onClick={onBack} className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
-          <ArrowLeft className="h-4 w-4" />
-        </button>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-gray-900">{ticket.subject}</p>
-          <div className="flex items-center gap-2">
-            <span className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT[ticket.status]}`} />
-            <span className="text-[10px] text-gray-400">
-              {ticket.status === 'closed' ? 'Closed' : ticket.status === 'in_progress' ? 'In progress' : 'Open'}
-            </span>
+      <div className="border-b px-4 py-2">
+        <div className="flex items-center gap-2">
+          <button onClick={onBack} className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+            <ArrowLeft className="h-4 w-4" />
+          </button>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-gray-900">{ticket.subject}</p>
+            <div className="flex items-center gap-2">
+              <StatusIcon className={`h-3 w-3 ${
+                ticket.status === 'closed' ? 'text-gray-400' : ticket.status === 'in_progress' ? 'text-blue-500' : 'text-yellow-500'
+              }`} />
+              <span className="text-[10px] text-gray-400">
+                {ticket.status === 'closed' ? 'Closed' : ticket.status === 'in_progress' ? 'In progress' : 'Open'}
+              </span>
+              {isSupportAgent && (
+                <>
+                  <span className="text-[10px] text-gray-300">|</span>
+                  <span className={`text-[10px] font-medium ${PRIORITY_COLORS[ticket.priority]}`}>
+                    {ticket.priority}
+                  </span>
+                  <span className="text-[10px] text-gray-300">|</span>
+                  <span className="text-[10px] text-gray-400">{ticket.user_name || ticket.user_id}</span>
+                </>
+              )}
+            </div>
           </div>
         </div>
+
+        {/* Support agent ticket controls */}
+        {isSupportAgent && (
+          <div className="flex items-center gap-1.5 mt-2 ml-7">
+            {ticket.status !== 'in_progress' && ticket.status !== 'closed' && (
+              <button
+                onClick={() => handleStatusChange('in_progress')}
+                disabled={updatingStatus}
+                className="rounded-md bg-blue-50 px-2.5 py-1 text-[11px] font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+              >
+                Start Working
+              </button>
+            )}
+            {ticket.status !== 'closed' && (
+              <button
+                onClick={() => handleStatusChange('closed')}
+                disabled={updatingStatus}
+                className="rounded-md bg-green-50 px-2.5 py-1 text-[11px] font-medium text-green-700 hover:bg-green-100 disabled:opacity-50"
+              >
+                Close Ticket
+              </button>
+            )}
+            {ticket.status === 'closed' && (
+              <button
+                onClick={() => handleStatusChange('open')}
+                disabled={updatingStatus}
+                className="rounded-md bg-yellow-50 px-2.5 py-1 text-[11px] font-medium text-yellow-700 hover:bg-yellow-100 disabled:opacity-50"
+              >
+                Reopen
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Messages */}
@@ -415,6 +526,9 @@ export function SupportChatPanel({
   onClose: () => void
   initialTicket?: string
 }) {
+  const { user } = useAuth()
+  const isSupportAgent = user?.is_support_agent ?? false
+
   const [view, setView] = useState<View>(initialTicket ? 'chat' : 'list')
   const [activeTicket, setActiveTicket] = useState<string | null>(initialTicket || null)
   const [tickets, setTickets] = useState<SupportTicketSummary[]>([])
@@ -459,6 +573,14 @@ export function SupportChatPanel({
 
   if (!open) return null
 
+  // Count tickets needing attention for the title bar badge
+  const attentionCount = tickets.filter(t => {
+    if (t.status === 'closed' || !t.last_message_user_id) return false
+    return isSupportAgent
+      ? t.last_message_is_support_reply === false
+      : t.last_message_is_support_reply === true
+  }).length
+
   return createPortal(
     <div
       ref={panelRef}
@@ -469,7 +591,14 @@ export function SupportChatPanel({
       <div className="flex items-center justify-between bg-blue-600 px-4 py-3 text-white">
         <div className="flex items-center gap-2">
           <MessageSquare className="h-4 w-4" />
-          <span className="text-sm font-semibold">Support</span>
+          <span className="text-sm font-semibold">
+            {isSupportAgent ? 'Support Center' : 'Support'}
+          </span>
+          {attentionCount > 0 && (
+            <span className="flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-white/20 text-[10px] font-bold">
+              {attentionCount}
+            </span>
+          )}
         </div>
         <button onClick={onClose} className="rounded p-0.5 hover:bg-blue-500">
           <X className="h-4 w-4" />
@@ -481,6 +610,7 @@ export function SupportChatPanel({
         <TicketListView
           tickets={tickets}
           loading={loading}
+          isSupportAgent={isSupportAgent}
           onSelect={(uuid) => {
             setActiveTicket(uuid)
             setView('chat')
@@ -504,11 +634,13 @@ export function SupportChatPanel({
         <ChatView
           key={activeTicket}
           ticketUuid={activeTicket}
+          isSupportAgent={isSupportAgent}
           onBack={() => {
             setView('list')
             setActiveTicket(null)
             loadTickets()
           }}
+          onTicketUpdated={loadTickets}
         />
       )}
     </div>,

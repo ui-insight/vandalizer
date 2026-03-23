@@ -78,6 +78,12 @@ def _ticket_summary(t: SupportTicket) -> dict:
         "last_message_at": (
             last_message.created_at.isoformat() if last_message and last_message.created_at else None
         ),
+        "last_message_is_support_reply": (
+            last_message.is_support_reply if last_message else None
+        ),
+        "last_message_user_id": (
+            last_message.user_id if last_message else None
+        ),
         "created_at": t.created_at.isoformat() if t.created_at else None,
         "updated_at": t.updated_at.isoformat() if t.updated_at else None,
         "closed_at": t.closed_at.isoformat() if t.closed_at else None,
@@ -293,16 +299,39 @@ async def get_support_contacts() -> list[dict]:
     return config.support_contacts or []
 
 
-async def _notify_support_contacts_new_ticket(ticket: SupportTicket) -> None:
-    """Email and notify all support contacts about a new ticket."""
+async def _get_all_support_user_ids() -> list[dict]:
+    """Return deduplicated list of support contacts + admins as {user_id, email, name}."""
     config = await SystemConfig.get_config()
-    contacts = config.support_contacts or []
+    contacts = list(config.support_contacts or [])
+    seen_ids = {c.get("user_id") for c in contacts if c.get("user_id")}
+
+    # Include admins who aren't already in the contacts list
+    admins = await User.find(User.is_admin == True).to_list()  # noqa: E712
+    for admin in admins:
+        if admin.user_id not in seen_ids:
+            contacts.append({
+                "user_id": admin.user_id,
+                "email": admin.email,
+                "name": admin.name or admin.user_id,
+            })
+            seen_ids.add(admin.user_id)
+
+    return contacts
+
+
+async def _notify_support_contacts_new_ticket(ticket: SupportTicket) -> None:
+    """Email and notify all support contacts and admins about a new ticket."""
+    contacts = await _get_all_support_user_ids()
     settings = Settings()
 
     for contact in contacts:
         email = contact.get("email")
         user_id = contact.get("user_id")
         name = contact.get("name", "Support")
+
+        # Don't notify the ticket creator
+        if user_id == ticket.user_id:
+            continue
 
         # In-app notification
         if user_id:
@@ -334,9 +363,8 @@ async def _notify_support_contacts_new_ticket(ticket: SupportTicket) -> None:
 async def _notify_support_contacts_new_message(
     ticket: SupportTicket, msg: SupportMessage
 ) -> None:
-    """Notify support contacts about a new message on an existing ticket."""
-    config = await SystemConfig.get_config()
-    contacts = config.support_contacts or []
+    """Notify support contacts and admins about a new message on an existing ticket."""
+    contacts = await _get_all_support_user_ids()
 
     for contact in contacts:
         user_id = contact.get("user_id")

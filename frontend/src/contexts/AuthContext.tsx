@@ -50,12 +50,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setDemoExpired(false)
     setDemoFeedbackToken(null)
+    localStorage.removeItem('workspace:mode')
     setUser(resp)
   }, [])
 
   const register = useCallback(
     async (userId: string, email: string, password: string, name?: string) => {
       const u = await authApi.register(userId, email, password, name)
+      localStorage.removeItem('workspace:mode')
       setUser(u)
     },
     [],

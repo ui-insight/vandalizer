@@ -56,3 +56,4 @@ class OnboardingStatusResponse(BaseModel):
     has_enabled_automation: bool = False
     has_knowledge_base: bool = False
     has_ready_knowledge_base: bool = False
+    has_chatted_with_docs: bool = False
