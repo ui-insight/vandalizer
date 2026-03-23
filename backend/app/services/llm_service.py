@@ -403,7 +403,7 @@ VANDALIZER_CONTEXT = (
     "API: My Account (top-right dropdown) → generate API Token → use x-api-key header.\n"
     "PIN vs FAVORITE: Pin = always visible in quick-access bar. Favorite = personal bookmark filter.\n"
     "CERTIFICATION: Vandalizer offers the Vandal Workflow Architect certification program. "
-    "Go to the Certification page (left sidebar → Certification). The program has guided modules "
+    "Go to the Certification page (top-right teams dropdown → Certification). The program has guided modules "
     "that teach document upload, extraction, workflow building, automation, and more. "
     "Complete all modules and earn enough XP to level up from Novice to Certified. "
     "Each module has hands-on lessons with star ratings. "
