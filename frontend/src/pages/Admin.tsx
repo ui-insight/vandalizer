@@ -2142,7 +2142,7 @@ function ConfigTab() {
       setThemeRadius(parseInt(c.ui_radius) || 12)
       setOcrEndpoint(c.ocr_endpoint || '')
       setAuthMethods(c.auth_methods || ['password'])
-      setSupportContacts((c as Record<string, unknown>).support_contacts as typeof supportContacts || [])
+      setSupportContacts((c as unknown as Record<string, unknown>).support_contacts as typeof supportContacts || [])
       // Extraction config
       const ec = c.extraction_config || {}
       setExtractionMode((ec as Record<string, unknown>).mode as string || 'one_pass')
