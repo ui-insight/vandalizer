@@ -37,6 +37,7 @@ from app.models.organization import Organization
 from app.models.audit_log import AuditLog, AdminAuditLog
 from app.models.approval import ApprovalRequest
 from app.models.notification import Notification
+from app.models.support import SupportTicket
 
 ALL_MODELS = [
     User,
@@ -90,6 +91,7 @@ ALL_MODELS = [
     AdminAuditLog,
     ApprovalRequest,
     Notification,
+    SupportTicket,
 ]
 
 

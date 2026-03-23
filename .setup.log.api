@@ -1,0 +1,79 @@
+ Service api  Building
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [api internal] load build definition from Dockerfile
+#1 transferring dockerfile: 1.11kB 0.0s done
+#1 DONE 0.0s
+
+#2 [api internal] load metadata for docker.io/library/python:3.12-slim
+#2 DONE 0.4s
+
+#3 [api internal] load .dockerignore
+#3 transferring context: 133B 0.0s done
+#3 DONE 0.0s
+
+#4 [api builder 1/5] FROM docker.io/library/python:3.12-slim@sha256:3d5ed973e45820f5ba5e46bd065bd88b3a504ff0724d85980dcd05eab361fcf4
+#4 DONE 0.0s
+
+#5 [api internal] load build context
+#5 transferring context: 197.85kB 0.1s done
+#5 DONE 0.1s
+
+#6 [api builder 3/5] WORKDIR /app
+#6 CACHED
+
+#7 [api builder 2/5] RUN pip install --no-cache-dir uv
+#7 CACHED
+
+#8 [api builder 4/5] COPY pyproject.toml uv.lock ./
+#8 CACHED
+
+#9 [api runtime  3/13] WORKDIR /app
+#9 CACHED
+
+#10 [api runtime  2/13] RUN groupadd --gid 1000 appuser &&     useradd --uid 1000 --gid appuser --create-home appuser
+#10 CACHED
+
+#11 [api builder 5/5] RUN uv sync --frozen --no-dev
+#11 CACHED
+
+#12 [api runtime  4/13] COPY --from=builder /app/.venv /app/.venv
+#12 CACHED
+
+#13 [api runtime  5/13] COPY app ./app
+#13 DONE 0.0s
+
+#14 [api runtime  6/13] COPY scripts ./scripts
+#14 DONE 0.0s
+
+#15 [api runtime  7/13] COPY seeds ./seeds
+#15 DONE 0.0s
+
+#16 [api runtime  8/13] COPY bootstrap_install.py ./
+#16 DONE 0.0s
+
+#17 [api runtime  9/13] COPY celery_worker.py ./
+#17 DONE 0.0s
+
+#18 [api runtime 10/13] COPY create_admin.py ./
+#18 DONE 0.0s
+
+#19 [api runtime 11/13] COPY run_celery.sh ./
+#19 DONE 0.0s
+
+#20 [api runtime 12/13] COPY setup_default_team.py ./
+#20 DONE 0.0s
+
+#21 [api runtime 13/13] RUN mkdir -p /app/static/uploads /app/static/db &&     chown -R appuser:appuser /app
+#21 DONE 12.8s
+
+#22 [api] exporting to image
+#22 exporting layers
+#22 exporting layers 2.8s done
+ Service api  Built
+#22 writing image sha256:5b1e2dc674883fd162e632a367c39f78a7213468c14f8e2a2a5c6a680a2d988d done
+#22 naming to docker.io/library/vandalizer-api done
+#22 DONE 2.8s
+
+#23 [api] resolving provenance for metadata file
+#23 DONE 0.0s

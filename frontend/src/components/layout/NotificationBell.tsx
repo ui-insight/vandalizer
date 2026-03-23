@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Bell, CheckCheck, ShieldCheck, ShieldX, RotateCcw, Eye } from 'lucide-react'
+import { Bell, CheckCheck, Headphones, MessageSquare, ShieldCheck, ShieldX, RotateCcw, Eye } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
 import { listNotifications, markRead, markAllRead, getUnreadCount } from '../../api/notifications'
 import type { Notification } from '../../api/notifications'
@@ -10,6 +10,10 @@ const kindIcons: Record<string, typeof ShieldCheck> = {
   verification_rejected: ShieldX,
   verification_returned: RotateCcw,
   verification_in_review: Eye,
+  support_new_ticket: Headphones,
+  support_new_message: MessageSquare,
+  support_reply: MessageSquare,
+  support_status: Headphones,
 }
 
 const kindColors: Record<string, string> = {
@@ -17,6 +21,10 @@ const kindColors: Record<string, string> = {
   verification_rejected: '#dc2626',
   verification_returned: '#d97706',
   verification_in_review: '#2563eb',
+  support_new_ticket: '#7c3aed',
+  support_new_message: '#7c3aed',
+  support_reply: '#2563eb',
+  support_status: '#059669',
 }
 
 export function NotificationBell() {

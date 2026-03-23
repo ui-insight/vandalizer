@@ -209,6 +209,7 @@ class ConfigUpdateRequest(BaseModel):
     ocr_endpoint: Optional[str] = None
     llm_endpoint: Optional[str] = None
     default_team_id: Optional[str] = None
+    support_contacts: Optional[list[dict]] = None
 
 
 class AdminTeamItem(BaseModel):
@@ -1169,6 +1170,8 @@ async def update_config(
         cfg.llm_endpoint = body.llm_endpoint
     if body.default_team_id is not None:
         cfg.default_team_id = body.default_team_id or None
+    if body.support_contacts is not None:
+        cfg.support_contacts = body.support_contacts
 
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
     cfg.updated_by = user.user_id

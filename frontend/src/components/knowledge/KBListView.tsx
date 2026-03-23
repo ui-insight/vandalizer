@@ -1,3 +1,4 @@
+import { type ReactNode } from 'react'
 import { Loader2 } from 'lucide-react'
 import { useScopedKnowledgeBases } from '../../hooks/useKnowledgeBases'
 import type { KBScope } from '../../types/knowledge'
@@ -16,12 +17,14 @@ interface KBListViewProps {
   onRemoveRef?: (refUuid: string) => void
   onClone?: (uuid: string) => void
   emptyMessage?: string
+  emptyComponent?: ReactNode
 }
 
 export function KBListView({
   scope, search, allOrgs,
   onSelect, onChat, onEdit, onDelete, onAdopt, onRemoveRef, onClone,
   emptyMessage = 'No knowledge bases found.',
+  emptyComponent,
 }: KBListViewProps) {
   const { knowledgeBases, loading } = useScopedKnowledgeBases({
     scope,
@@ -37,6 +40,7 @@ export function KBListView({
   }
 
   if (knowledgeBases.length === 0) {
+    if (emptyComponent) return <>{emptyComponent}</>
     return (
       <div style={{ fontSize: 13, color: '#888', textAlign: 'center', padding: '40px 20px' }}>
         {emptyMessage}

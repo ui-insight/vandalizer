@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Plus, Loader2, ArrowLeft, Trash2, X, FileText, Globe, MessageSquare, AlertCircle, CheckCircle2, Users, ShieldCheck, Send, Tag, Pencil, Check } from 'lucide-react'
+import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check } from 'lucide-react'
 import { useKnowledgeBases, useScopedKnowledgeBases } from '../../hooks/useKnowledgeBases'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useAuth } from '../../hooks/useAuth'
@@ -830,12 +830,13 @@ export function KnowledgePanel() {
           onClone={activeTab === 'explore'
             ? async (uuid) => { await api.cloneKnowledgeBase(uuid); refresh() }
             : undefined}
+          emptyComponent={activeTab === 'mine' && !search ? <KnowledgeTutorial /> : undefined}
           emptyMessage={
-            activeTab === 'mine'
-              ? undefined  // will show tutorial via the component
-              : activeTab === 'team'
-                ? 'No knowledge bases shared with your team yet.'
-                : 'No verified knowledge bases available yet.'
+            activeTab === 'team'
+              ? 'No knowledge bases shared with your team yet.'
+              : activeTab === 'explore'
+                ? 'No verified knowledge bases available yet.'
+                : 'No knowledge bases found.'
           }
         />
       </div>

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  Search, ShieldCheck, Beaker, BookOpen, Workflow, Database,
-  ChevronDown, ChevronUp, FolderOpen, Star, X, Plus, ArrowUpDown,
+  Search, ShieldCheck, Beaker,
+  ChevronDown, ChevronUp, FolderOpen, Star, X, Plus, ArrowUpDown, Bookmark,
 } from 'lucide-react'
 import { AppLayout } from '../components/layout/AppLayout'
 import { QualityBadge } from '../components/library/QualityBadge'
@@ -11,6 +11,7 @@ import {
   tryVerifiedItem, listLibraries,
 } from '../api/library'
 import type { VerifiedCatalogItem, VerifiedCollection, Library, LibraryItemKind } from '../types/library'
+import { adoptKnowledgeBase } from '../api/knowledge'
 import { useAuth } from '../hooks/useAuth'
 
 type KindFilter = '' | 'workflow' | 'search_set' | 'knowledge_base'
@@ -18,12 +19,6 @@ type SortOption = '' | 'quality' | 'name' | 'validations'
 type QualityFilter = '' | 'gold' | 'silver' | 'bronze'
 
 const PAGE_SIZE = 30
-
-function KindIcon({ kind }: { kind: string }) {
-  if (kind === 'workflow') return <Workflow className="h-4 w-4 text-purple-500" />
-  if (kind === 'knowledge_base') return <Database className="h-4 w-4 text-sky-500" />
-  return <BookOpen className="h-4 w-4 text-teal-500" />
-}
 
 function KindLabel({ kind }: { kind: string }) {
   if (kind === 'workflow') return <span className="text-xs px-2 py-0.5 rounded bg-purple-50 text-purple-700 border border-purple-200">Workflow</span>
@@ -101,10 +96,12 @@ function CatalogCard({
   item,
   onTagClick,
   onAddToLibrary,
+  onAdoptKB,
 }: {
   item: VerifiedCatalogItem
   onTagClick: (tag: string) => void
   onAddToLibrary: (item: VerifiedCatalogItem) => void
+  onAdoptKB?: (kbUuid: string) => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const [showTry, setShowTry] = useState(false)
@@ -135,6 +132,16 @@ function CatalogCard({
             )}
           </div>
           <div className="flex items-center gap-1 shrink-0">
+            {item.kind === 'knowledge_base' && onAdoptKB && (
+              <button
+                onClick={() => item.source_uuid && onAdoptKB(item.source_uuid)}
+                className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-blue-600 hover:bg-blue-50"
+                title="Add to my knowledge bases"
+              >
+                <Bookmark className="h-3.5 w-3.5" />
+                Add to My KBs
+              </button>
+            )}
             <button
               onClick={() => onAddToLibrary(item)}
               className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-gray-600 hover:bg-gray-100"
@@ -578,6 +585,11 @@ export default function Catalog() {
                     item={item}
                     onTagClick={(tag) => setTagFilter(tag)}
                     onAddToLibrary={(item) => setAddToLibraryItem(item)}
+                    onAdoptKB={async (kbUuid) => {
+                      try {
+                        await adoptKnowledgeBase(kbUuid)
+                      } catch { /* ignore duplicates */ }
+                    }}
                   />
                 ))}
               </div>

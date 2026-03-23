@@ -135,6 +135,9 @@ class SystemConfig(Document):
     auth_methods: list[str] = ["password"]
     oauth_providers: list[dict] = []
 
+    # Support contacts — list of {"user_id": ..., "email": ..., "name": ...}
+    support_contacts: list[dict] = []
+
     # Default team for new user auto-assignment
     default_team_id: Optional[str] = None
 

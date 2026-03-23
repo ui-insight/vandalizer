@@ -14,7 +14,7 @@ from app.database import init_db
 from app.exceptions import AppError
 from app.middleware.csrf import CSRFMiddleware
 from app.rate_limit import limiter
-from app.routers import activity, admin, approvals, audit, auth, automations, browser_automation, certification, chat, config, demo, documents, extractions, feedback, files, folders, graph_webhooks, knowledge, library, notifications, office, organizations, teams, verification, workflows
+from app.routers import activity, admin, approvals, audit, auth, automations, browser_automation, certification, chat, config, demo, documents, extractions, feedback, files, folders, graph_webhooks, knowledge, library, notifications, office, organizations, support, teams, verification, workflows
 
 
 @lru_cache
@@ -175,6 +175,7 @@ app.include_router(organizations.router, prefix="/api/organizations", tags=["org
 app.include_router(audit.router, prefix="/api/audit", tags=["audit"])
 app.include_router(approvals.router, prefix="/api/approvals", tags=["approvals"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
+app.include_router(support.router, prefix="/api/support", tags=["support"])
 
 
 # ---------------------------------------------------------------------------

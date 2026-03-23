@@ -2124,6 +2124,12 @@ function ConfigTab() {
   const [savingModel, setSavingModel] = useState(false)
   const [newModel, setNewModel] = useState({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '', speed: '', tier: '', privacy: '', supports_structured: true, multimodal: false, supports_pdf: false })
 
+  // Support contacts
+  const [supportContacts, setSupportContacts] = useState<{ user_id: string; email: string; name: string }[]>([])
+  const [showAddContact, setShowAddContact] = useState(false)
+  const [newContact, setNewContact] = useState({ user_id: '', email: '', name: '' })
+  const [supportSaving, setSupportSaving] = useState(false)
+
   // Add provider form
   const [showAddProvider, setShowAddProvider] = useState(false)
   const [newProvider, setNewProvider] = useState({ provider: 'oauth', display_name: '', client_id: '', client_secret: '', redirect_uri: '', tenant_id: '' })
@@ -2136,6 +2142,7 @@ function ConfigTab() {
       setThemeRadius(parseInt(c.ui_radius) || 12)
       setOcrEndpoint(c.ocr_endpoint || '')
       setAuthMethods(c.auth_methods || ['password'])
+      setSupportContacts((c as Record<string, unknown>).support_contacts as typeof supportContacts || [])
       // Extraction config
       const ec = c.extraction_config || {}
       setExtractionMode((ec as Record<string, unknown>).mode as string || 'one_pass')
@@ -2324,6 +2331,17 @@ function ConfigTab() {
       setCfg(c)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to delete provider')
+    }
+  }
+
+  const handleSaveSupportContacts = async () => {
+    setSupportSaving(true)
+    try {
+      await updateSystemConfig({ support_contacts: supportContacts } as Record<string, unknown>)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save support contacts')
+    } finally {
+      setSupportSaving(false)
     }
   }
 
@@ -2947,6 +2965,113 @@ function ConfigTab() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Support Contacts */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}>
+          <Users size={18} color="#6b7280" /> Support Contacts
+          <div style={{ flex: 1 }} />
+          <button
+            onClick={() => { setNewContact({ user_id: '', email: '', name: '' }); setShowAddContact(true) }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px',
+              borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db',
+              fontSize: 13, fontWeight: 500, cursor: 'pointer', background: '#fff',
+            }}
+          >
+            <Plus size={14} /> Add Contact
+          </button>
+        </div>
+        <div style={sectionBodyStyle}>
+          <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 12 }}>
+            People listed here will receive email alerts and in-app notifications when new support tickets are created. They will also have access to the Support Center to manage all tickets.
+          </p>
+          {supportContacts.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {supportContacts.map((c, i) => (
+                <div key={i} style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '10px 16px', background: '#f9fafb', borderRadius: 'var(--ui-radius, 12px)',
+                  border: '1px solid #e5e7eb',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: '#111' }}>{c.name}</span>
+                    <span style={{ fontSize: 13, color: '#6b7280' }}>{c.email}</span>
+                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#f3f4f6', color: '#6b7280', fontWeight: 600 }}>{c.user_id}</span>
+                  </div>
+                  <button
+                    onClick={() => {
+                      const updated = supportContacts.filter((_, idx) => idx !== i)
+                      setSupportContacts(updated)
+                    }}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 4 }}
+                    title="Remove contact"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ fontSize: 13, color: '#9ca3af' }}>No support contacts configured.</div>
+          )}
+          {showAddContact && (
+            <div style={{ marginTop: 16, padding: 16, background: '#f9fafb', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #e5e7eb' }}>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Add Support Contact</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={labelStyle}>Name</label>
+                  <input value={newContact.name} onChange={e => setNewContact({ ...newContact, name: e.target.value })} placeholder="Jane Doe" style={inputStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>User ID</label>
+                  <input value={newContact.user_id} onChange={e => setNewContact({ ...newContact, user_id: e.target.value })} placeholder="jdoe" style={inputStyle} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Email</label>
+                  <input value={newContact.email} onChange={e => setNewContact({ ...newContact, email: e.target.value })} placeholder="jdoe@example.com" style={inputStyle} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                <button
+                  onClick={() => {
+                    if (!newContact.name.trim() || !newContact.user_id.trim()) return
+                    setSupportContacts([...supportContacts, { ...newContact }])
+                    setShowAddContact(false)
+                  }}
+                  disabled={!newContact.name.trim() || !newContact.user_id.trim()}
+                  style={{
+                    padding: '6px 14px', borderRadius: 'var(--ui-radius, 12px)', border: 'none',
+                    background: '#111827', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                    opacity: (!newContact.name.trim() || !newContact.user_id.trim()) ? 0.5 : 1,
+                  }}
+                >
+                  Add
+                </button>
+                <button
+                  onClick={() => setShowAddContact(false)}
+                  style={{ padding: '6px 14px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db', background: '#fff', fontSize: 13, cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16 }}>
+            <button
+              onClick={handleSaveSupportContacts}
+              disabled={supportSaving}
+              style={{
+                padding: '8px 20px', borderRadius: 'var(--ui-radius, 12px)', border: 'none',
+                background: '#111827', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                opacity: supportSaving ? 0.6 : 1,
+              }}
+            >
+              {supportSaving ? 'Saving...' : 'Save Support Contacts'}
+            </button>
           </div>
         </div>
       </div>

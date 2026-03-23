@@ -532,6 +532,7 @@ async def list_verified_items(
                 entry["total_chunks"] = kb.total_chunks
                 entry["sources_ready"] = kb.sources_ready
                 entry["kb_status"] = kb.status
+                entry["source_uuid"] = kb.uuid
 
         results.append(entry)
 

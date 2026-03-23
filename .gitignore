@@ -49,5 +49,6 @@ node_modules/
 deploy_roadmap.md
 risk-plan.md
 
-# Setup wizard runtime log
+# Setup wizard runtime log and backups
 .setup.log
+backups/
