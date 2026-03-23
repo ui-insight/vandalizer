@@ -19,10 +19,11 @@ interface KBCardProps {
   onAdopt?: (uuid: string) => void
   onRemoveRef?: (refUuid: string) => void
   onClone?: (uuid: string) => void
+  onExplore?: (kb: KnowledgeBase) => void
 }
 
 export function KBCard({
-  kb, allOrgs, onSelect, onChat, onEdit, onDelete, onAdopt, onRemoveRef, onClone,
+  kb, allOrgs, onSelect, onChat, onEdit, onDelete, onAdopt, onRemoveRef, onClone, onExplore,
 }: KBCardProps) {
   const badge = STATUS_BADGE[kb.status] || STATUS_BADGE.empty
   const isReady = kb.status === 'ready'
@@ -30,7 +31,7 @@ export function KBCard({
 
   return (
     <button
-      onClick={() => isReady ? onChat(isReference ? kb.source_kb_uuid! : kb.uuid, kb.title) : onSelect(kb.uuid)}
+      onClick={() => onExplore ? onExplore(kb) : (isReady ? onChat(isReference ? kb.source_kb_uuid! : kb.uuid, kb.title) : onSelect(kb.uuid))}
       style={{
         display: 'block', width: '100%', textAlign: 'left',
         padding: '14px 16px', backgroundColor: '#2a2a2a',

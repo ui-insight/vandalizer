@@ -1,7 +1,7 @@
 import { type ReactNode } from 'react'
 import { Loader2 } from 'lucide-react'
 import { useScopedKnowledgeBases } from '../../hooks/useKnowledgeBases'
-import type { KBScope } from '../../types/knowledge'
+import type { KBScope, KnowledgeBase } from '../../types/knowledge'
 import type { Organization } from '../../api/organizations'
 import { KBCard } from './KBCard'
 
@@ -16,13 +16,14 @@ interface KBListViewProps {
   onAdopt?: (uuid: string) => void
   onRemoveRef?: (refUuid: string) => void
   onClone?: (uuid: string) => void
+  onExplore?: (kb: KnowledgeBase) => void
   emptyMessage?: string
   emptyComponent?: ReactNode
 }
 
 export function KBListView({
   scope, search, allOrgs,
-  onSelect, onChat, onEdit, onDelete, onAdopt, onRemoveRef, onClone,
+  onSelect, onChat, onEdit, onDelete, onAdopt, onRemoveRef, onClone, onExplore,
   emptyMessage = 'No knowledge bases found.',
   emptyComponent,
 }: KBListViewProps) {
@@ -62,6 +63,7 @@ export function KBListView({
           onAdopt={onAdopt}
           onRemoveRef={onRemoveRef}
           onClone={onClone}
+          onExplore={onExplore}
         />
       ))}
     </div>

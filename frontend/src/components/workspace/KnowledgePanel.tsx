@@ -5,8 +5,11 @@ import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useAuth } from '../../hooks/useAuth'
 import * as api from '../../api/knowledge'
 import { listOrganizationsFlat } from '../../api/organizations'
+import { getItemMetadata } from '../../api/library'
 import type { Organization } from '../../api/organizations'
-import type { KnowledgeBaseDetail, KnowledgeBaseSource, KBScope } from '../../types/knowledge'
+import type { KnowledgeBaseDetail, KnowledgeBaseSource, KBScope, KnowledgeBase } from '../../types/knowledge'
+import type { VerifiedCatalogItem } from '../../types/library'
+import { ItemDetailModal } from '../library/ExploreTab'
 import { AddUrlsModal } from '../knowledge/AddUrlsModal'
 import { DocumentPickerModal } from '../knowledge/DocumentPickerModal'
 import { KBSearchBar } from '../knowledge/KBSearchBar'
@@ -66,6 +69,51 @@ export function KnowledgePanel() {
   const [addingUrls, setAddingUrls] = useState(false)
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
+  const [exploreDetail, setExploreDetail] = useState<VerifiedCatalogItem | null>(null)
+
+  const handleExploreKBClick = useCallback(async (kb: KnowledgeBase) => {
+    // Build a base item immediately so the modal opens without waiting
+    const base: VerifiedCatalogItem = {
+      id: kb.uuid,
+      item_id: kb.uuid,
+      kind: 'knowledge_base',
+      name: kb.title,
+      tags: [],
+      verified: true,
+      created_at: kb.created_at,
+      display_name: null,
+      description: kb.description || null,
+      markdown: null,
+      organization_ids: kb.organization_ids || [],
+      quality_score: null,
+      quality_tier: null,
+      quality_grade: null,
+      last_validated_at: null,
+      validation_run_count: 0,
+      total_sources: kb.total_sources,
+      total_chunks: kb.total_chunks,
+      kb_status: kb.status,
+      source_uuid: kb.uuid,
+    }
+    setExploreDetail(base)
+    // Enrich with catalog metadata in the background
+    try {
+      const meta = await getItemMetadata('knowledge_base', kb.uuid)
+      setExploreDetail(prev => prev?.id === kb.uuid ? {
+        ...prev,
+        display_name: meta.display_name,
+        description: meta.description ?? prev.description,
+        markdown: meta.markdown,
+        quality_score: meta.quality_score ?? null,
+        quality_tier: meta.quality_tier ?? null,
+        quality_grade: meta.quality_grade ?? null,
+        last_validated_at: meta.last_validated_at ?? null,
+        validation_run_count: meta.validation_run_count ?? 0,
+      } : prev)
+    } catch {
+      // Keep the base item if metadata fetch fails
+    }
+  }, [])
 
   const handleCreate = async () => {
     setCreating(true)
@@ -830,6 +878,7 @@ export function KnowledgePanel() {
           onClone={activeTab === 'explore'
             ? async (uuid) => { await api.cloneKnowledgeBase(uuid); refresh() }
             : undefined}
+          onExplore={activeTab === 'explore' ? handleExploreKBClick : undefined}
           emptyComponent={activeTab === 'mine' && !search ? <KnowledgeTutorial /> : undefined}
           emptyMessage={
             activeTab === 'team'
@@ -841,5 +890,28 @@ export function KnowledgePanel() {
         />
       </div>
     </div>
+
+    {exploreDetail && (
+      <ItemDetailModal
+        item={exploreDetail}
+        onClose={() => setExploreDetail(null)}
+        onAddToLibrary={() => {}}
+        onAdoptKB={async (kbUuid) => {
+          try {
+            await scopedMine.adopt(kbUuid)
+            refresh()
+            setExploreDetail(null)
+          } catch {
+            // already adopted — still close the modal
+            setExploreDetail(null)
+          }
+        }}
+        onTryIt={(item) => {
+          if (!item.source_uuid) return
+          setExploreDetail(null)
+          activateKB(item.source_uuid, item.display_name || item.name)
+        }}
+      />
+    )}
   )
 }

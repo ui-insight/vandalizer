@@ -94,7 +94,7 @@ const TIER_STYLES = {
 // Item Detail Modal
 // ---------------------------------------------------------------------------
 
-function ItemDetailModal({
+export function ItemDetailModal({
   item,
   onClose,
   onAddToLibrary,
