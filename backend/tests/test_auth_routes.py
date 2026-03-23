@@ -10,9 +10,22 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from app.config import Settings
+from app.schemas.auth import UserResponse
 from app.utils.security import create_access_token, create_refresh_token, hash_password
 
 _TEST_SETTINGS = Settings(jwt_secret_key="test-secret-key", environment="development")
+
+_MOCK_USER_RESPONSE_DATA = {
+    "id": "fake-id",
+    "user_id": "testuser",
+    "email": "test@example.com",
+    "name": "Test User",
+    "is_admin": False,
+    "is_examiner": False,
+    "is_support_agent": False,
+    "current_team": None,
+    "current_team_uuid": None,
+}
 
 
 def _make_user(**overrides):
@@ -69,21 +82,9 @@ class TestAuthMe:
         user = _make_user()
         token = create_access_token("testuser", _TEST_SETTINGS)
 
-        mock_response = {
-            "id": "fake-id",
-            "user_id": "testuser",
-            "email": "test@example.com",
-            "name": "Test User",
-            "is_admin": False,
-            "is_examiner": False,
-            "is_support_agent": False,
-            "current_team": None,
-            "current_team_uuid": None,
-        }
-
         with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
              patch("app.dependencies.User") as MockUser, \
-             patch("app.routers.auth._user_response", new_callable=AsyncMock, return_value=mock_response):
+             patch("app.routers.auth._user_response", new_callable=AsyncMock, return_value=_MOCK_USER_RESPONSE_DATA):
             MockUser.find_one = AsyncMock(return_value=user)
             resp = await client.get(
                 "/api/auth/me",
@@ -141,9 +142,14 @@ class TestAuthLogin:
     async def test_login_success(self, client):
         user = _make_user()
 
+        mock_user_resp = UserResponse(**_MOCK_USER_RESPONSE_DATA)
+
         with patch("app.routers.auth.auth_service") as mock_svc, \
-             patch("app.routers.auth.get_settings", return_value=_TEST_SETTINGS):
+             patch("app.routers.auth.audit_service") as mock_audit, \
+             patch("app.routers.auth.get_settings", return_value=_TEST_SETTINGS), \
+             patch("app.routers.auth._user_response", new_callable=AsyncMock, return_value=mock_user_resp):
             mock_svc.authenticate = AsyncMock(return_value=user)
+            mock_audit.log_event = AsyncMock()
             resp = await client.post("/api/auth/login", json={
                 "user_id": "testuser",
                 "password": "correct-password",
@@ -201,7 +207,8 @@ class TestAuthRefresh:
 
         with patch("app.routers.auth.decode_token", return_value={"sub": "testuser", "type": "refresh"}), \
              patch("app.routers.auth.User") as MockUser, \
-             patch("app.routers.auth.get_settings", return_value=_TEST_SETTINGS):
+             patch("app.routers.auth.get_settings", return_value=_TEST_SETTINGS), \
+             patch("app.routers.auth._user_response", new_callable=AsyncMock, return_value=_MOCK_USER_RESPONSE_DATA):
             MockUser.find_one = AsyncMock(return_value=user)
             resp = await client.post(
                 "/api/auth/refresh",
@@ -239,7 +246,8 @@ class TestAuthRegister:
         user = _make_user()
 
         with patch("app.routers.auth.auth_service") as mock_svc, \
-             patch("app.routers.auth.get_settings", return_value=_TEST_SETTINGS):
+             patch("app.routers.auth.get_settings", return_value=_TEST_SETTINGS), \
+             patch("app.routers.auth._user_response", new_callable=AsyncMock, return_value=_MOCK_USER_RESPONSE_DATA):
             mock_svc.register = AsyncMock(return_value=user)
             resp = await client.post("/api/auth/register", json={
                 "email": "new@example.com",
@@ -302,7 +310,8 @@ class TestCSRFProtection:
         csrf_token = secrets.token_urlsafe(32)
 
         with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
-             patch("app.dependencies.User") as MockUser:
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.auth._user_response", new_callable=AsyncMock, return_value=_MOCK_USER_RESPONSE_DATA):
             MockUser.find_one = AsyncMock(return_value=user)
             resp = await client.put(
                 "/api/auth/profile",
