@@ -1,8 +1,0 @@
-# Use a minimal base image (can be python, node, etc., depending on your app)
-FROM alpine:latest
-
-# Copy files from the local demo-data/files into the image
-COPY demo-data/files/ /srv/files
-
-# Default command (replace with your app’s start command if needed)
-CMD ["/bin/sh", "-c", "cp -r /srv/files/* /app/app/static/uploads/"]

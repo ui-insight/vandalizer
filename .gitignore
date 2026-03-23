@@ -55,3 +55,9 @@ backups/
 
 # Claude Code local settings
 .claude/
+
+# Runtime data and build artifacts
+backend/data/
+backend/coverage.json
+demo-data/
+demo-containers/
