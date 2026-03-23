@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     )
 
     mongo_host: str = "mongodb://localhost:27017/"
-    mongo_db: str = "osp"
+    mongo_db: str = "vandalizer"
     redis_host: str = "localhost"
     jwt_secret_key: str = "change-me"
     jwt_algorithm: str = "HS256"

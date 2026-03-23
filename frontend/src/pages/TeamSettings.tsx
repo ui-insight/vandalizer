@@ -138,7 +138,7 @@ export function TeamSettings() {
     try {
       await deleteTeam(currentTeam.uuid)
       await refreshTeams()
-      navigate({ to: '/' })
+      navigate({ to: '/', search: { mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined } })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete team')
     }

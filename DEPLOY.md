@@ -209,16 +209,22 @@ server {
 
 ### Post-Deploy Verification
 
-After deployment, confirm these are working:
+Run the status script to check all services, health, and seed data:
 
-- [ ] `GET /api/health` returns `"status":"ok"` with populated health checks
+```bash
+./status.sh
+```
+
+Then confirm these manually:
+
 - [ ] Login works with the bootstrap admin credentials
 - [ ] At least one LLM provider is configured under Admin → System Config → Models
 - [ ] OCR endpoint is configured under Admin → System Config → Endpoints (if processing scanned PDFs)
-- [ ] Documents list loads in the UI
 - [ ] File upload completes successfully
 - [ ] Extraction workflow runs to completion (confirms Celery workers are connected)
 - [ ] Chat with a document works (confirms RAG pipeline end-to-end)
+
+If anything is broken, run `./setup.sh --repair` to diagnose and fix.
 
 ### Scaling
 

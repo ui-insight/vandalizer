@@ -27,20 +27,20 @@ Redis is not treated as durable state in this deployment. Losing Redis will drop
 
 ## Health Checks
 
-Use these before and after any maintenance window:
+Run the status script before and after any maintenance window:
 
 ```bash
-docker compose ps
-curl http://localhost:8001/api/health
+./status.sh
+```
+
+This checks Docker services, API health, database connectivity, admin accounts, seed data, and storage volumes. Expected baseline: all checks pass green.
+
+For targeted debugging:
+
+```bash
 docker compose logs --tail=100 api
 docker compose logs --tail=100 celery
 ```
-
-Expected baseline:
-
-- `mongo`, `redis`, and `chromadb` are `healthy`
-- `api`, `celery`, and `frontend` are `Up`
-- `/api/health` returns `{"status":"ok", ...}`
 
 ## Backup Procedure
 
@@ -166,6 +166,25 @@ Suggested smoke checks after restore:
 
 ## Upgrade Procedure
 
+The recommended way to upgrade is the interactive setup wizard:
+
+```bash
+./setup.sh --upgrade
+```
+
+This will:
+
+1. Show current branch/commit and fetch available updates
+2. Offer to pull latest, checkout a specific tag, or skip (rebuild only)
+3. Take a full backup (MongoDB, uploads, ChromaDB, .env, git revision)
+4. Check for `.env.example` config drift and warn if new variables were added
+5. Rebuild the backend and frontend Docker images
+6. Recreate application containers with new images (infrastructure stays untouched)
+7. Wait for health checks to pass
+8. Print rollback instructions with the exact commit to revert to
+
+### Manual upgrade (if you prefer raw commands)
+
 Use tagged releases when available. At minimum, record the exact commit SHA before changing anything.
 
 1. Take a fresh backup using the procedure above.
@@ -193,8 +212,7 @@ docker compose up -d
 6. Verify with:
 
 ```bash
-curl http://localhost:8001/api/health
-docker compose ps
+./status.sh
 ```
 
 If a release introduces a schema or data migration, treat the backup as mandatory and do not skip release-note review.
@@ -204,12 +222,32 @@ If a release introduces a schema or data migration, treat the backup as mandator
 If the new release is unhealthy and no irreversible migration has been applied:
 
 ```bash
-git checkout <previous-known-good-tag-or-commit>
-docker compose build api celery frontend
-docker compose up -d
+# The upgrade command prints the exact previous commit. Use it here:
+git checkout <previous-known-good-commit>
+./setup.sh --redeploy
 ```
 
 If an incompatible migration was already applied, do a full restore from the pre-upgrade backup instead of only switching code versions.
+
+## Redeploy (After Local Changes)
+
+To rebuild and restart after editing code locally (without pulling from git):
+
+```bash
+./setup.sh --redeploy
+```
+
+This rebuilds the Docker images from the current working tree and restarts all application containers. Infrastructure services (Redis, MongoDB, ChromaDB) are left untouched.
+
+## Repair
+
+If services are crashed, images are missing, or seed data is incomplete:
+
+```bash
+./setup.sh --repair
+```
+
+This scans the full deployment state and fixes what it finds — restarts crashed containers, rebuilds missing images, generates missing secrets, and re-runs bootstrap if the admin account or verified catalog is missing.
 
 ## Restore Drill Expectations
 

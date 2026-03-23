@@ -78,5 +78,5 @@ Copy `.env.example` to `.env`. Required: `MONGO_HOST`, `MONGO_DB`, `REDIS_HOST`,
 - `uv` is the Python package manager; `npm` for frontend
 - Beanie ODM for MongoDB (async, Pydantic v2 models)
 - Celery tasks use `bind=True` and `autoretry_for` patterns
-- MongoDB database name: `osp` — Office of Sponsored Programs, the original use case (configurable via `MONGO_DB`)
+- MongoDB database name: `vandalizer` (configurable via `MONGO_DB`)
 - The old Flask app is preserved in `deprecated/flask-app/` for reference

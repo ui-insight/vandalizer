@@ -33,27 +33,17 @@ make backend-static
 
 ## 3. Rehearse The Install And Bootstrap Path
 
-Use the same Docker Compose path documented for operators:
+Use the interactive setup wizard — the same path end users will follow:
 
 ```bash
-cp backend/.env.example backend/.env
-# Edit backend/.env and set at minimum:
-#   JWT_SECRET_KEY=<strong-random-secret>
-# LLM API keys are configured per-model via System Config in the admin UI.
-
-docker compose up --build -d
-
-docker compose exec \
-  -e ADMIN_EMAIL=admin@example.edu \
-  -e ADMIN_PASSWORD='change-me-now' \
-  -e ADMIN_NAME='Initial Admin' \
-  -e DEFAULT_TEAM_NAME='Research Administration' \
-  api python bootstrap_install.py
+./setup.sh
 ```
 
-Smoke checks:
+This handles `.env` creation, secret generation, Docker builds, service startup, admin account creation, and database seeding.
 
-- `curl http://localhost:8001/api/health` returns `{"status":"ok", ...}`
+Smoke checks after setup completes:
+
+- `./status.sh` passes all checks green
 - The bootstrap admin can log in
 - The shared default team appears and is selectable
 - A newly created user joins the default team automatically when that option is configured
@@ -62,9 +52,9 @@ The canonical `bootstrap_install.py` entrypoint is covered directly in the backe
 
 ## 4. Confirm Backup, Restore, And Rollback Readiness
 
-- Take a fresh backup using [OPERATIONS.md](OPERATIONS.md).
+- Take a fresh backup: `./setup.sh --upgrade` includes an automatic backup step, or use the manual procedure in [OPERATIONS.md](OPERATIONS.md).
 - If the release changes persistence, auth, migrations, or bootstrap behavior, run a restore drill on the candidate build.
-- Keep the previous known-good tag available for rollback.
+- Keep the previous known-good tag available for rollback (`./setup.sh --redeploy` after `git checkout <tag>`).
 
 ## 5. Tag And Publish
 

@@ -44,6 +44,7 @@ export interface WorkflowStep {
 
 export interface Workflow {
   id: string;
+  uuid: string;
   name: string;
   description: string | null;
   user_id: string;

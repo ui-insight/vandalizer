@@ -46,6 +46,16 @@ cd vandalizer
 
 The frontend is available at `http://localhost` and the API at `http://localhost:8001` when setup completes.
 
+After initial setup, `./setup.sh` is the single entry point for all deployment operations:
+
+| Command | What it does |
+|---------|-------------|
+| `./setup.sh` | First-time install, or re-run to choose repair/upgrade/redeploy |
+| `./setup.sh --repair` | Diagnose and fix a broken deployment (restart crashed services, rebuild missing images, re-run bootstrap) |
+| `./setup.sh --upgrade` | Pull latest code, take a backup, rebuild images, and redeploy |
+| `./setup.sh --redeploy` | Rebuild and restart from current code (after local edits, no git pull) |
+| `./status.sh` | Read-only health check and system status report |
+
 ### Manual setup: Docker Compose
 
 If you prefer to run each step yourself:

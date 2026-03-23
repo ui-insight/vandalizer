@@ -625,7 +625,7 @@ export default function Docs() {
       <nav className="fixed top-0 inset-x-0 z-50 bg-[#0a0a0a]/80 backdrop-blur-md border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
           <div className="flex items-center gap-6">
-            <Link to="/landing" search={{ error: undefined }} className="text-xl font-bold text-white hover:text-[#f1b300] transition-colors">
+            <Link to="/landing" search={{ error: undefined, invite_token: undefined }} className="text-xl font-bold text-white hover:text-[#f1b300] transition-colors">
               Vandalizer
             </Link>
             <span className="text-sm text-[#f1b300] font-medium">Docs</span>

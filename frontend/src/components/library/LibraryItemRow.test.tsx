@@ -41,7 +41,7 @@ const defaultProps = {
 }
 
 beforeEach(() => {
-  Object.values(defaultProps).forEach((fn) => fn.mockReset?.())
+  Object.values(defaultProps).forEach((fn) => { if (typeof fn === 'function' && 'mockReset' in fn) fn.mockReset() })
 })
 
 describe('LibraryItemRow', () => {

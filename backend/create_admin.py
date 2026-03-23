@@ -32,9 +32,11 @@ async def ensure_admin(email: str, password: str, name: str = "Admin") -> tuple[
 
     Returns ``(user, status)`` where status is one of:
     - ``created``: new admin account was created
-    - ``updated``: existing user was promoted to admin/examiner
+    - ``updated``: existing user was promoted to admin/examiner or password was reset
     - ``unchanged``: existing user already had the expected permissions
     """
+    from app.utils.security import hash_password
+
     normalized_email = email.strip().lower()
 
     existing = await User.find_one(User.email == normalized_email)
@@ -46,6 +48,9 @@ async def ensure_admin(email: str, password: str, name: str = "Admin") -> tuple[
         if not existing.is_examiner:
             existing.is_examiner = True
             changed = True
+        # Always reset password to what the operator provided
+        existing.password_hash = hash_password(password)
+        changed = True
         if changed:
             await existing.save()
             return existing, "updated"

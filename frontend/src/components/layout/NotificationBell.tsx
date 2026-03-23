@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Bell, Check, CheckCheck, ShieldCheck, ShieldX, RotateCcw, Eye } from 'lucide-react'
+import { Bell, CheckCheck, ShieldCheck, ShieldX, RotateCcw, Eye } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
 import { listNotifications, markRead, markAllRead, getUnreadCount } from '../../api/notifications'
 import type { Notification } from '../../api/notifications'

@@ -3,7 +3,11 @@
 #  Vandalizer — Interactive Setup Wizard
 #  AI-powered document intelligence for research administration
 #
-#  Run from the project root:  ./setup.sh
+#  Run from the project root:
+#    ./setup.sh             First-time setup (or re-run detects existing deployment)
+#    ./setup.sh --repair    Diagnose and fix a broken deployment
+#    ./setup.sh --upgrade   Pull latest code, backup, rebuild, and redeploy
+#    ./setup.sh --redeploy  Rebuild and restart from current code (no git pull)
 # ============================================================================
 
 set -uo pipefail
@@ -123,7 +127,7 @@ prompt() {
   fi
 
   value="${value:-$default}"
-  eval "$var_name=\$value"
+  printf -v "$var_name" '%s' "$value"
 }
 
 # Prompt yes/no
@@ -351,16 +355,83 @@ check_encryption_key() {
 # ---------------------------------------------------------------------------
 # Phase 2: Build & launch containers
 # ---------------------------------------------------------------------------
+
+# Stream a docker compose build with a live progress tail
+build_image() {
+  local service="$1"
+  local label="$2"
+  local logfile="${SETUP_LOG}.${service}"
+
+  echo -e "  ${SYM_NEURAL}  ${BOLD}Building ${label}...${RESET}"
+
+  # Run build in background, tee to logfile
+  $COMPOSE_CMD build "$service" > "$logfile" 2>&1 &
+  local pid=$!
+
+  # Show a tail of the build output so the user sees progress
+  local frames=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
+  local i=0
+  local last_line=""
+
+  while kill -0 "$pid" 2>/dev/null; do
+    local line
+    line=$(tail -1 "$logfile" 2>/dev/null | head -c 70 || true)
+    if [[ -n "$line" ]]; then
+      last_line="$line"
+    fi
+    printf "\r  ${CYAN}${frames[$i]}${RESET}  ${DIM}%-72s${RESET}" "$last_line"
+    i=$(( (i + 1) % ${#frames[@]} ))
+    sleep 0.15
+  done
+
+  if wait "$pid"; then
+    printf "\r  ${SYM_CHECK}  %-74s\n" "${label} built successfully"
+    cat "$logfile" >> "$SETUP_LOG"
+  else
+    printf "\r  ${SYM_CROSS}  %-74s\n" "${label} build failed"
+    echo ""
+    echo -e "  ${DIM}     Last 10 lines of build output:${RESET}"
+    tail -10 "$logfile" | while IFS= read -r errline; do
+      echo -e "  ${DIM}     ${errline}${RESET}"
+    done
+    cat "$logfile" >> "$SETUP_LOG"
+    ERRORS+=("${label} build failed — check ${SETUP_LOG}")
+    rm -f "$logfile"
+    return 1
+  fi
+  rm -f "$logfile"
+}
+
 launch_services() {
   section "2" "Launching Services"
 
-  echo -e "  ${SYM_NEURAL}  ${BOLD}Building container images...${RESET}"
-  echo -e "  ${DIM}     This may take a few minutes on first run.${RESET}"
+  # --- Build phase: show streaming progress ---
+  echo -e "  ${DIM}     First build may take several minutes (downloading dependencies).${RESET}"
+  echo -e "  ${DIM}     Subsequent builds use Docker layer cache and are much faster.${RESET}"
   echo ""
 
-  # Build
-  run_step "Building backend image" $COMPOSE_CMD build api || true
-  run_step "Building frontend image" $COMPOSE_CMD build frontend || true
+  local build_ok=true
+  build_image "api" "Backend image (API + Celery)" || build_ok=false
+
+  # Celery and Flower share the same Dockerfile — build their images too
+  echo -e "  ${DIM}     Building Celery/Flower from same backend image...${RESET}"
+  $COMPOSE_CMD build celery flower >> "$SETUP_LOG" 2>&1 || true
+
+  echo ""
+  build_image "frontend" "Frontend image (React + Nginx)" || build_ok=false
+
+  if [[ "$build_ok" == false ]]; then
+    echo ""
+    echo -e "  ${SYM_CROSS}  ${RED}${BOLD}One or more image builds failed. Cannot start services.${RESET}"
+    echo -e "  ${DIM}     Check the build log: ${SETUP_LOG}${RESET}"
+    echo ""
+    echo -e "  ${DIM}     Last 20 lines of build output:${RESET}"
+    tail -20 "$SETUP_LOG" | while IFS= read -r errline; do
+      echo -e "  ${DIM}     ${errline}${RESET}"
+    done
+    echo ""
+    return 1
+  fi
 
   echo ""
   echo -e "  ${SYM_NEURAL}  ${BOLD}Starting infrastructure layer...${RESET}"
@@ -376,9 +447,39 @@ launch_services() {
   echo -e "  ${SYM_PULSE}  ${DIM}Waiting for infrastructure health checks...${RESET}"
   echo ""
 
-  wait_healthy "redis" "Redis" 30
-  wait_healthy "mongo" "MongoDB" 30
-  wait_healthy "chromadb" "ChromaDB" 45
+  local infra_ok=true
+  wait_healthy "redis" "Redis" 30 || infra_ok=false
+  wait_healthy "mongo" "MongoDB" 90 || infra_ok=false
+  wait_healthy "chromadb" "ChromaDB" 60 || infra_ok=false
+
+  if [[ "$infra_ok" == false ]]; then
+    echo ""
+    echo -e "  ${SYM_WARN}  ${YELLOW}Infrastructure not fully healthy. Retrying unhealthy services...${RESET}"
+    echo ""
+
+    # Restart any unhealthy infra containers and wait again
+    for svc in redis mongo chromadb; do
+      local health
+      health=$($COMPOSE_CMD ps --format '{{.Service}} {{.Health}}' 2>/dev/null | grep "^${svc} " | awk '{print $2}' || true)
+      if [[ "$health" != "healthy" && "$health" != "(healthy)" ]]; then
+        $COMPOSE_CMD restart "$svc" >> "$SETUP_LOG" 2>&1
+      fi
+    done
+
+    infra_ok=true
+    wait_healthy "redis" "Redis" 30 || infra_ok=false
+    wait_healthy "mongo" "MongoDB" 90 || infra_ok=false
+    wait_healthy "chromadb" "ChromaDB" 60 || infra_ok=false
+  fi
+
+  if [[ "$infra_ok" == false ]]; then
+    echo ""
+    echo -e "  ${SYM_CROSS}  ${RED}${BOLD}Infrastructure services are not healthy. Cannot start application layer.${RESET}"
+    echo -e "  ${DIM}     Check logs: docker compose logs redis mongo chromadb${RESET}"
+    echo -e "  ${DIM}     Then re-run: ./setup.sh --repair${RESET}"
+    echo ""
+    return 1
+  fi
 
   echo ""
   echo -e "  ${SYM_NEURAL}  ${BOLD}Starting application layer...${RESET}"
@@ -393,7 +494,7 @@ launch_services() {
   echo -e "  ${SYM_PULSE}  ${DIM}Waiting for API to come online...${RESET}"
   echo ""
 
-  wait_healthy "api" "API server" 60
+  wait_healthy "api" "API server" 120
   wait_for_api 60
 
   echo ""
@@ -485,26 +586,50 @@ bootstrap() {
   fi
 
   echo ""
+  echo -e "  ${SYM_NEURAL}  ${BOLD}Verified catalog${RESET}"
+  echo -e "  ${DIM}     The bootstrap will also seed research administration content:${RESET}"
+  echo -e "  ${DIM}       •  Verified workflows (e.g. proposal review, compliance checks)${RESET}"
+  echo -e "  ${DIM}       •  Extraction templates (structured data extraction configs)${RESET}"
+  echo -e "  ${DIM}       •  Knowledge bases (source definitions — content is ingested separately)${RESET}"
+  echo -e "  ${DIM}       •  Curated collections to organize the above${RESET}"
+  echo ""
   echo -e "  ${SYM_PULSE}  ${DIM}Running bootstrap sequence...${RESET}"
   echo ""
 
-  # Build the docker exec command
-  local exec_cmd=("$COMPOSE_CMD" exec -T)
-  exec_cmd+=(-e "ADMIN_EMAIL=${ADMIN_EMAIL}")
-  exec_cmd+=(-e "ADMIN_PASSWORD=${ADMIN_PASSWORD}")
-  exec_cmd+=(-e "ADMIN_NAME=${ADMIN_NAME}")
-  if [[ -n "$DEFAULT_TEAM_NAME" ]]; then
-    exec_cmd+=(-e "DEFAULT_TEAM_NAME=${DEFAULT_TEAM_NAME}")
-  fi
-  exec_cmd+=(api python bootstrap_install.py)
+  # Pipe credentials into the container to avoid shell expansion issues with
+  # special characters in passwords (e.g. $, !, \, `)
+  local container_name
+  container_name=$($COMPOSE_CMD ps --format '{{.Service}} {{.Name}}' 2>/dev/null | awk '$1=="api"{print $2}')
 
-  # Capture output so we can show the encryption key if generated
-  local bootstrap_output
-  bootstrap_output=$("${exec_cmd[@]}" 2>&1) || true
-  local bootstrap_exit=$?
+  local bootstrap_output=""
+  local bootstrap_exit=1
+
+  if [[ -n "$container_name" ]]; then
+    # Pass credentials via stdin to Python — no shell expansion, no temp files
+    bootstrap_output=$(printf '%s\n' "$ADMIN_EMAIL" "$ADMIN_PASSWORD" "$ADMIN_NAME" "$DEFAULT_TEAM_NAME" | \
+      docker exec -i "$container_name" python -c "
+import sys, os, runpy
+lines = sys.stdin.read().split('\n')
+os.environ['ADMIN_EMAIL'] = lines[0] if len(lines) > 0 else ''
+os.environ['ADMIN_PASSWORD'] = lines[1] if len(lines) > 1 else ''
+os.environ['ADMIN_NAME'] = lines[2] if len(lines) > 2 else ''
+os.environ['DEFAULT_TEAM_NAME'] = lines[3] if len(lines) > 3 else ''
+runpy.run_path('bootstrap_install.py', run_name='__main__')
+" 2>&1)
+    bootstrap_exit=$?
+  else
+    echo -e "  ${SYM_CROSS}  ${RED}API container not found — cannot run bootstrap${RESET}"
+  fi
 
   log "Bootstrap output:"
   log "$bootstrap_output"
+
+  if [[ $bootstrap_exit -ne 0 ]]; then
+    echo -e "  ${SYM_WARN}  ${YELLOW}Bootstrap exited with errors:${RESET}"
+    echo "$bootstrap_output" | tail -5 | while IFS= read -r errline; do
+      echo -e "  ${DIM}     ${errline}${RESET}"
+    done
+  fi
 
   # Parse and display results
   if echo "$bootstrap_output" | grep -q "Admin user created"; then
@@ -514,7 +639,8 @@ bootstrap() {
   elif echo "$bootstrap_output" | grep -q "Admin user already ready"; then
     echo -e "  ${SYM_CHECK}  Admin account verified ${DIM}(${ADMIN_EMAIL})${RESET}"
   else
-    echo -e "  ${SYM_WARN}  Admin account ${DIM}— check logs for details${RESET}"
+    echo -e "  ${SYM_CROSS}  ${RED}Admin account was NOT created${RESET}"
+    ERRORS+=("Admin account creation failed — re-run ./setup.sh --repair")
   fi
 
   if [[ -n "$DEFAULT_TEAM_NAME" ]]; then
@@ -529,7 +655,19 @@ bootstrap() {
 
   # Check for catalog seeding
   if echo "$bootstrap_output" | grep -qi "seed\|catalog\|workflow\|verified"; then
-    echo -e "  ${SYM_CHECK}  Verified catalog seeded ${DIM}(workflows, templates, collections)${RESET}"
+    echo -e "  ${SYM_CHECK}  Verified catalog seeded"
+
+    # Extract counts from bootstrap output if available
+    local wf_created ss_created kb_created
+    wf_created=$(echo "$bootstrap_output" | grep -oi '[0-9]* workflow' | head -1 | grep -o '[0-9]*' || true)
+    ss_created=$(echo "$bootstrap_output" | grep -oi '[0-9]* search.set\|[0-9]* template' | head -1 | grep -o '[0-9]*' || true)
+    kb_created=$(echo "$bootstrap_output" | grep -oi '[0-9]* knowledge' | head -1 | grep -o '[0-9]*' || true)
+
+    [[ -n "$wf_created" ]] && echo -e "  ${DIM}     Workflows: ${wf_created} seeded${RESET}"
+    [[ -n "$ss_created" ]] && echo -e "  ${DIM}     Extraction templates: ${ss_created} seeded${RESET}"
+    [[ -n "$kb_created" ]] && echo -e "  ${DIM}     Knowledge bases: ${kb_created} seeded (content not yet ingested)${RESET}"
+
+    echo -e "  ${DIM}     Manage these in the Explore tab or Admin panel after login.${RESET}"
   fi
 
   # Check if bootstrap generated an encryption key we need to save
@@ -564,31 +702,33 @@ verify() {
   echo -e "  ${SYM_NEURAL}  ${BOLD}Running diagnostics...${RESET}"
   echo ""
 
-  # API health
-  local health_json
-  health_json=$(curl -sf "http://localhost:8001/api/health" 2>/dev/null || echo '{}')
+  # API health — give the API a moment to settle after bootstrap
+  local health_json=''
+  local attempt
+  for attempt in 1 2 3; do
+    health_json=$(curl -sf "http://localhost:8001/api/health" 2>/dev/null || true)
+    if [[ "$health_json" == *'"status":"ok"'* ]]; then
+      break
+    fi
+    sleep 5
+  done
 
-  local api_status
-  api_status=$(echo "$health_json" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('status','error'))" 2>/dev/null || echo "error")
-
-  if [[ "$api_status" == "ok" ]]; then
+  if [[ "$health_json" == *'"status":"ok"'* ]]; then
     echo -e "  ${SYM_CHECK}  API health              ${GREEN}operational${RESET}"
   else
-    echo -e "  ${SYM_CROSS}  API health              ${RED}${api_status}${RESET}"
+    echo -e "  ${SYM_CROSS}  API health              ${RED}not responding${RESET}"
     ERRORS+=("API health check failed")
   fi
 
   # Individual services from health endpoint
   for svc in mongodb redis chromadb; do
-    local svc_status
-    svc_status=$(echo "$health_json" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('checks',{}).get('${svc}','unknown'))" 2>/dev/null || echo "unknown")
     local label
     label=$(echo "$svc" | sed 's/mongodb/MongoDB/;s/redis/Redis/;s/chromadb/ChromaDB/')
 
-    if [[ "$svc_status" == "ok" ]]; then
-      echo -e "  ${SYM_CHECK}  %-22s ${GREEN}connected${RESET}" "$label"
+    if [[ "$health_json" == *"\"${svc}\":\"ok\""* ]]; then
+      printf "  ${SYM_CHECK}  %-22s ${GREEN}connected${RESET}\n" "$label"
     else
-      echo -e "  ${SYM_CROSS}  %-22s ${RED}${svc_status}${RESET}" "$label"
+      printf "  ${SYM_CROSS}  %-22s ${RED}unreachable${RESET}\n" "$label"
     fi
   done
 
@@ -618,7 +758,7 @@ verify() {
   local MONGO_CONTAINER
   MONGO_CONTAINER=$($COMPOSE_CMD ps --format '{{.Service}} {{.Name}}' 2>/dev/null | awk '$1=="mongo"{print $2}' || true)
 
-  local MONGO_DB="osp"
+  local MONGO_DB="vandalizer"
   if [[ -f "$ENV_FILE" ]]; then
     local env_db
     env_db=$(grep -E "^MONGO_DB=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d'=' -f2-)
@@ -707,11 +847,17 @@ finale() {
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${DIM}3.${RESET} Go to ${BOLD}Admin → System Config → Endpoints${RESET}            ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}      Set an OCR endpoint for scanned PDF extraction          ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}      ${DIM}(optional — basic PDF text extraction works without)${RESET}  ${MAGENTA}${BOLD}║${RESET}"
-  echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${DIM}4.${RESET} Upload a document and run your first extraction        ${MAGENTA}${BOLD}║${RESET}"
+  echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${DIM}4.${RESET} Go to ${BOLD}Explore → Knowledge Bases${RESET} and ingest          ${MAGENTA}${BOLD}║${RESET}"
+  echo -e "  ${MAGENTA}${BOLD}║${RESET}      content for the seeded knowledge bases                  ${MAGENTA}${BOLD}║${RESET}"
+  echo -e "  ${MAGENTA}${BOLD}║${RESET}      ${DIM}(sources are defined but not yet ingested)${RESET}             ${MAGENTA}${BOLD}║${RESET}"
+  echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${DIM}5.${RESET} Upload a document and run your first extraction        ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}                                                              ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}╠══════════════════════════════════════════════════════════════╣${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}                                                              ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${DIM}Useful commands:${RESET}                                           ${MAGENTA}${BOLD}║${RESET}"
+  echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}./setup.sh --repair${RESET}        ${DIM}Diagnose & fix issues${RESET}      ${MAGENTA}${BOLD}║${RESET}"
+  echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}./setup.sh --upgrade${RESET}       ${DIM}Pull, backup, rebuild${RESET}      ${MAGENTA}${BOLD}║${RESET}"
+  echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}./setup.sh --redeploy${RESET}      ${DIM}Rebuild current code${RESET}       ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}./status.sh${RESET}                ${DIM}Full system status${RESET}          ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}docker compose logs -f api${RESET} ${DIM}Stream API logs${RESET}            ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}docker compose down${RESET}        ${DIM}Stop everything${RESET}            ${MAGENTA}${BOLD}║${RESET}"
@@ -732,14 +878,617 @@ finale() {
 }
 
 # ---------------------------------------------------------------------------
+# Repair mode: diagnose and fix what's broken
+# ---------------------------------------------------------------------------
+repair() {
+  section "R" "Repair & Self-Heal"
+
+  echo -e "  ${SYM_NEURAL}  ${BOLD}Scanning deployment state...${RESET}"
+  echo ""
+
+  local actions_taken=0
+
+  # ── .env health ──────────────────────────────────────────────────────
+  if [[ ! -f "$ENV_FILE" ]]; then
+    echo -e "  ${SYM_CROSS}  backend/.env is missing"
+    echo -e "  ${SYM_ARROW}  ${DIM}Restoring from template...${RESET}"
+    cp "$ENV_EXAMPLE" "$ENV_FILE"
+    echo -e "  ${SYM_CHECK}  Created backend/.env from template"
+    actions_taken=$((actions_taken + 1))
+  else
+    echo -e "  ${SYM_CHECK}  backend/.env exists"
+  fi
+
+  local jwt_val
+  jwt_val=$(grep -E "^JWT_SECRET_KEY=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d'=' -f2-)
+  if [[ -z "$jwt_val" || "$jwt_val" == "change-me-to-a-random-secret" ]]; then
+    echo -e "  ${SYM_CROSS}  JWT_SECRET_KEY is not set"
+    local jwt_key
+    jwt_key=$(python3 -c "import secrets; print(secrets.token_urlsafe(64))" 2>/dev/null || openssl rand -base64 48 2>/dev/null)
+    sed -i.bak "s|^JWT_SECRET_KEY=.*|JWT_SECRET_KEY=${jwt_key}|" "$ENV_FILE" && rm -f "${ENV_FILE}.bak"
+    echo -e "  ${SYM_CHECK}  Generated and saved JWT_SECRET_KEY"
+    actions_taken=$((actions_taken + 1))
+  else
+    echo -e "  ${SYM_CHECK}  JWT_SECRET_KEY is configured"
+  fi
+
+  local enc_val
+  enc_val=$(grep -E "^CONFIG_ENCRYPTION_KEY=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d'=' -f2-)
+  if [[ -z "$enc_val" ]]; then
+    local enc_key
+    enc_key=$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())" 2>/dev/null || true)
+    if [[ -n "$enc_key" ]]; then
+      sed -i.bak "s|^CONFIG_ENCRYPTION_KEY=.*|CONFIG_ENCRYPTION_KEY=${enc_key}|" "$ENV_FILE" && rm -f "${ENV_FILE}.bak"
+      echo -e "  ${SYM_CHECK}  Generated and saved CONFIG_ENCRYPTION_KEY"
+      actions_taken=$((actions_taken + 1))
+    fi
+  else
+    echo -e "  ${SYM_CHECK}  CONFIG_ENCRYPTION_KEY is configured"
+  fi
+
+  # ── Docker images ────────────────────────────────────────────────────
+  echo ""
+  echo -e "  ${SYM_NEURAL}  ${BOLD}Checking container images...${RESET}"
+  echo ""
+
+  # Determine the compose project name to find images
+  local project_name
+  project_name=$($COMPOSE_CMD config --format json 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin).get('name',''))" 2>/dev/null || true)
+
+  local need_backend_build=false
+  local need_frontend_build=false
+
+  if [[ -n "$project_name" ]]; then
+    if docker image inspect "${project_name}-api" &>/dev/null 2>&1; then
+      echo -e "  ${SYM_CHECK}  Backend image exists"
+    else
+      echo -e "  ${SYM_CROSS}  Backend image not found"
+      need_backend_build=true
+    fi
+
+    if docker image inspect "${project_name}-frontend" &>/dev/null 2>&1; then
+      echo -e "  ${SYM_CHECK}  Frontend image exists"
+    else
+      echo -e "  ${SYM_CROSS}  Frontend image not found"
+      need_frontend_build=true
+    fi
+  else
+    # Can't determine project name — build both to be safe
+    need_backend_build=true
+    need_frontend_build=true
+  fi
+
+  local build_ok=true
+
+  if [[ "$need_backend_build" == true ]]; then
+    echo ""
+    build_image "api" "Backend image (API + Celery)" || build_ok=false
+    $COMPOSE_CMD build celery flower >> "$SETUP_LOG" 2>&1 || true
+    actions_taken=$((actions_taken + 1))
+  fi
+
+  if [[ "$need_frontend_build" == true ]]; then
+    echo ""
+    build_image "frontend" "Frontend image (React + Nginx)" || build_ok=false
+    actions_taken=$((actions_taken + 1))
+  fi
+
+  if [[ "$build_ok" == false ]]; then
+    echo ""
+    echo -e "  ${SYM_CROSS}  ${RED}${BOLD}Image build failed. Check the build log: ${SETUP_LOG}${RESET}"
+    echo ""
+    return 1
+  fi
+
+  # ── Service health ───────────────────────────────────────────────────
+  echo ""
+  echo -e "  ${SYM_NEURAL}  ${BOLD}Checking service health...${RESET}"
+  echo ""
+
+  # Infrastructure services — start if not running/healthy
+  for svc in redis mongo chromadb; do
+    local label
+    label=$(echo "$svc" | sed 's/redis/Redis/;s/mongo/MongoDB/;s/chromadb/ChromaDB/')
+    local state health
+    state=$($COMPOSE_CMD ps --format '{{.Service}} {{.State}}' 2>/dev/null | grep "^${svc} " | awk '{print $2}' || true)
+    health=$($COMPOSE_CMD ps --format '{{.Service}} {{.Health}}' 2>/dev/null | grep "^${svc} " | awk '{print $2}' || true)
+
+    if [[ "$state" == "running" && ("$health" == "healthy" || "$health" == "(healthy)") ]]; then
+      echo -e "  ${SYM_CHECK}  ${label} is healthy"
+    elif [[ "$state" == "running" ]]; then
+      echo -e "  ${SYM_WARN}  ${label} is running but ${YELLOW}${health:-unknown}${RESET}"
+      echo -e "  ${SYM_ARROW}  ${DIM}Restarting...${RESET}"
+      $COMPOSE_CMD restart "$svc" >> "$SETUP_LOG" 2>&1
+      actions_taken=$((actions_taken + 1))
+    else
+      echo -e "  ${SYM_CROSS}  ${label} is ${RED}${state:-not running}${RESET}"
+      echo -e "  ${SYM_ARROW}  ${DIM}Starting...${RESET}"
+      $COMPOSE_CMD up -d "$svc" >> "$SETUP_LOG" 2>&1
+      actions_taken=$((actions_taken + 1))
+    fi
+  done
+
+  # Wait for infra if we started anything
+  if [[ $actions_taken -gt 0 ]]; then
+    echo ""
+    echo -e "  ${SYM_PULSE}  ${DIM}Waiting for infrastructure...${RESET}"
+    echo ""
+    wait_healthy "redis" "Redis" 30
+    wait_healthy "mongo" "MongoDB" 90
+    wait_healthy "chromadb" "ChromaDB" 60
+  fi
+
+  # Application services
+  echo ""
+  for svc in api celery flower frontend; do
+    local label
+    case "$svc" in
+      api)      label="API server" ;;
+      celery)   label="Celery workers" ;;
+      flower)   label="Flower monitor" ;;
+      frontend) label="Frontend" ;;
+    esac
+
+    local state
+    state=$($COMPOSE_CMD ps --format '{{.Service}} {{.State}}' 2>/dev/null | grep "^${svc} " | awk '{print $2}' || true)
+
+    if [[ "$state" == "running" ]]; then
+      echo -e "  ${SYM_CHECK}  ${label} is running"
+    elif [[ "$state" == "restarting" ]]; then
+      echo -e "  ${SYM_CROSS}  ${label} is ${RED}restarting (crash loop)${RESET}"
+      echo -e "  ${SYM_ARROW}  ${DIM}Recreating...${RESET}"
+      $COMPOSE_CMD up -d --force-recreate "$svc" >> "$SETUP_LOG" 2>&1
+      actions_taken=$((actions_taken + 1))
+    else
+      echo -e "  ${SYM_CROSS}  ${label} is ${RED}${state:-not running}${RESET}"
+      echo -e "  ${SYM_ARROW}  ${DIM}Starting...${RESET}"
+      $COMPOSE_CMD up -d "$svc" >> "$SETUP_LOG" 2>&1
+      actions_taken=$((actions_taken + 1))
+    fi
+  done
+
+  # Wait for API
+  echo ""
+  echo -e "  ${SYM_PULSE}  ${DIM}Waiting for API...${RESET}"
+  echo ""
+  wait_for_api 60
+
+  # ── Seed data ────────────────────────────────────────────────────────
+  echo ""
+  echo -e "  ${SYM_NEURAL}  ${BOLD}Checking bootstrap state...${RESET}"
+  echo ""
+
+  local MONGO_CONTAINER
+  MONGO_CONTAINER=$($COMPOSE_CMD ps --format '{{.Service}} {{.Name}}' 2>/dev/null | awk '$1=="mongo"{print $2}' || true)
+
+  local MONGO_DB="vandalizer"
+  if [[ -f "$ENV_FILE" ]]; then
+    local env_db
+    env_db=$(grep -E "^MONGO_DB=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d'=' -f2-)
+    [[ -n "$env_db" ]] && MONGO_DB="$env_db"
+  fi
+
+  local need_bootstrap=false
+
+  if [[ -n "$MONGO_CONTAINER" ]]; then
+    local admin_count
+    admin_count=$(docker exec "$MONGO_CONTAINER" mongosh --quiet --eval \
+      "db.getSiblingDB('${MONGO_DB}').user.countDocuments({is_admin: true})" 2>/dev/null || echo "-1")
+
+    if [[ "$admin_count" == "-1" ]]; then
+      echo -e "  ${SYM_WARN}  Could not query MongoDB"
+    elif [[ "$admin_count" -ge 1 ]]; then
+      echo -e "  ${SYM_CHECK}  Admin account exists"
+    else
+      echo -e "  ${SYM_CROSS}  No admin account found"
+      need_bootstrap=true
+    fi
+
+    local wf_count
+    wf_count=$(docker exec "$MONGO_CONTAINER" mongosh --quiet --eval \
+      "db.getSiblingDB('${MONGO_DB}').workflow.countDocuments({verified: true})" 2>/dev/null || echo "-1")
+
+    if [[ "$wf_count" -ge 11 ]]; then
+      echo -e "  ${SYM_CHECK}  Verified catalog is seeded"
+    elif [[ "$wf_count" -ge 0 ]]; then
+      echo -e "  ${SYM_CROSS}  Verified catalog is incomplete or missing"
+      need_bootstrap=true
+    fi
+  fi
+
+  if [[ "$need_bootstrap" == true ]]; then
+    echo ""
+    echo -e "  ${SYM_NEURAL}  ${BOLD}Bootstrap needed${RESET}"
+    echo ""
+
+    # Check if API is actually reachable before trying bootstrap
+    if curl -sf "http://localhost:8001/api/health" -o /dev/null 2>/dev/null; then
+      prompt "Admin email" "" ADMIN_EMAIL
+      while [[ -z "$ADMIN_EMAIL" ]]; do
+        echo -e "  ${SYM_WARN}  ${YELLOW}Email is required.${RESET}"
+        prompt "Admin email" "" ADMIN_EMAIL
+      done
+      prompt "Admin password" "" ADMIN_PASSWORD true
+      while [[ -z "$ADMIN_PASSWORD" ]]; do
+        echo -e "  ${SYM_WARN}  ${YELLOW}Password is required.${RESET}"
+        prompt "Admin password" "" ADMIN_PASSWORD true
+      done
+      prompt "Admin display name" "Admin" ADMIN_NAME
+
+      local DEFAULT_TEAM_NAME=""
+      if confirm "Create a shared default team?" "y"; then
+        prompt "Team name" "Research Administration" DEFAULT_TEAM_NAME
+      fi
+
+      echo ""
+
+      local container_name
+      container_name=$($COMPOSE_CMD ps --format '{{.Service}} {{.Name}}' 2>/dev/null | awk '$1=="api"{print $2}')
+
+      local bootstrap_output=""
+      if [[ -n "$container_name" ]]; then
+        bootstrap_output=$(printf '%s\n' "$ADMIN_EMAIL" "$ADMIN_PASSWORD" "$ADMIN_NAME" "$DEFAULT_TEAM_NAME" | \
+          docker exec -i "$container_name" python -c "
+import sys, os, runpy
+lines = sys.stdin.read().split('\n')
+os.environ['ADMIN_EMAIL'] = lines[0] if len(lines) > 0 else ''
+os.environ['ADMIN_PASSWORD'] = lines[1] if len(lines) > 1 else ''
+os.environ['ADMIN_NAME'] = lines[2] if len(lines) > 2 else ''
+os.environ['DEFAULT_TEAM_NAME'] = lines[3] if len(lines) > 3 else ''
+runpy.run_path('bootstrap_install.py', run_name='__main__')
+" 2>&1)
+      fi
+
+      log "Repair bootstrap output:"
+      log "$bootstrap_output"
+
+      # Capture encryption key if generated
+      local gen_key
+      gen_key=$(echo "$bootstrap_output" | grep "Generated CONFIG_ENCRYPTION_KEY" | sed 's/.*): //' || true)
+      if [[ -n "$gen_key" ]]; then
+        local existing_enc
+        existing_enc=$(grep -E "^CONFIG_ENCRYPTION_KEY=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d'=' -f2-)
+        if [[ -z "$existing_enc" ]]; then
+          sed -i.bak "s|^CONFIG_ENCRYPTION_KEY=.*|CONFIG_ENCRYPTION_KEY=${gen_key}|" "$ENV_FILE" && rm -f "${ENV_FILE}.bak"
+        fi
+      fi
+
+      echo -e "  ${SYM_CHECK}  Bootstrap complete"
+      actions_taken=$((actions_taken + 1))
+    else
+      echo -e "  ${SYM_CROSS}  API is not reachable — cannot run bootstrap"
+      echo -e "  ${DIM}     Fix the API first, then re-run: ./setup.sh --repair${RESET}"
+    fi
+  fi
+
+  # ── Summary ──────────────────────────────────────────────────────────
+  echo ""
+  if [[ $actions_taken -eq 0 ]]; then
+    echo -e "  ${BRIGHT_GREEN}${BOLD}Everything looks healthy. No repairs needed.${RESET}"
+  else
+    echo -e "  ${BRIGHT_GREEN}${BOLD}Repair complete.${RESET} ${DIM}${actions_taken} action(s) taken.${RESET}"
+    echo -e "  ${DIM}Run ./status.sh for a full health report.${RESET}"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Backup helper (used by upgrade)
+# ---------------------------------------------------------------------------
+take_backup() {
+  local stamp
+  stamp=$(date +%Y%m%d_%H%M%S)
+  local backup_dir="backups/${stamp}"
+  mkdir -p "$backup_dir"
+
+  echo -e "  ${SYM_NEURAL}  ${BOLD}Backing up to ${backup_dir}/${RESET}"
+  echo ""
+
+  # Git revision
+  git rev-parse HEAD > "$backup_dir/git-revision.txt" 2>/dev/null || true
+  echo -e "  ${SYM_CHECK}  Recorded git revision"
+
+  # .env
+  if [[ -f "$ENV_FILE" ]]; then
+    cp "$ENV_FILE" "$backup_dir/backend.env"
+    echo -e "  ${SYM_CHECK}  Backed up backend/.env"
+  fi
+
+  # Compose config
+  $COMPOSE_CMD config > "$backup_dir/compose.resolved.yaml" 2>/dev/null || true
+
+  # MongoDB
+  local mongo_ok=false
+  if $COMPOSE_CMD exec -T mongo sh -lc 'mongodump --archive --gzip --db="${MONGO_DB:-vandalizer}"' > "$backup_dir/mongo.archive.gz" 2>/dev/null; then
+    local size
+    size=$(ls -lh "$backup_dir/mongo.archive.gz" 2>/dev/null | awk '{print $5}')
+    echo -e "  ${SYM_CHECK}  MongoDB dump ${DIM}(${size})${RESET}"
+    mongo_ok=true
+  else
+    echo -e "  ${SYM_WARN}  MongoDB dump skipped ${DIM}(container not reachable)${RESET}"
+  fi
+
+  # Uploads
+  if $COMPOSE_CMD exec -T api sh -lc 'tar czf - -C /app/static/uploads .' > "$backup_dir/uploads.tgz" 2>/dev/null; then
+    local size
+    size=$(ls -lh "$backup_dir/uploads.tgz" 2>/dev/null | awk '{print $5}')
+    echo -e "  ${SYM_CHECK}  Uploads archive ${DIM}(${size})${RESET}"
+  else
+    echo -e "  ${SYM_WARN}  Uploads backup skipped ${DIM}(container not reachable)${RESET}"
+  fi
+
+  # ChromaDB
+  if $COMPOSE_CMD exec -T api sh -lc 'tar czf - -C /app/static/db .' > "$backup_dir/chroma.tgz" 2>/dev/null; then
+    local size
+    size=$(ls -lh "$backup_dir/chroma.tgz" 2>/dev/null | awk '{print $5}')
+    echo -e "  ${SYM_CHECK}  ChromaDB archive ${DIM}(${size})${RESET}"
+  else
+    echo -e "  ${SYM_WARN}  ChromaDB backup skipped ${DIM}(container not reachable)${RESET}"
+  fi
+
+  echo ""
+  echo -e "  ${DIM}     Backup saved to ${BOLD}${backup_dir}/${RESET}"
+  LAST_BACKUP_DIR="$backup_dir"
+}
+
+# ---------------------------------------------------------------------------
+# Upgrade mode: pull new code, backup, rebuild, redeploy
+# ---------------------------------------------------------------------------
+upgrade() {
+  section "U" "Upgrade"
+
+  # Show current state
+  local current_rev
+  current_rev=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+  local current_branch
+  current_branch=$(git branch --show-current 2>/dev/null || echo "detached")
+  echo -e "  ${SYM_NEURAL}  ${BOLD}Current state${RESET}"
+  echo -e "  ${DIM}     Branch: ${current_branch}  Commit: ${current_rev}${RESET}"
+  echo ""
+
+  # Fetch and show what's available
+  echo -e "  ${SYM_PULSE}  ${DIM}Fetching latest changes...${RESET}"
+  git fetch --tags --quiet 2>/dev/null || true
+  echo ""
+
+  local behind
+  behind=$(git rev-list --count HEAD..@{upstream} 2>/dev/null || echo "0")
+  local latest_tag
+  latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "none")
+
+  if [[ "$behind" -gt 0 ]]; then
+    echo -e "  ${SYM_ARROW}  ${BOLD}${behind} new commit(s)${RESET} available on ${CYAN}${current_branch}${RESET}"
+  else
+    echo -e "  ${SYM_CHECK}  Already up to date on ${CYAN}${current_branch}${RESET}"
+  fi
+  echo -e "  ${DIM}     Latest tag: ${latest_tag}${RESET}"
+  echo ""
+
+  # Ask how to upgrade
+  echo -e "  ${DIM}  1)${RESET} ${CYAN}Pull latest${RESET}      ${DIM}— git pull on current branch${RESET}"
+  echo -e "  ${DIM}  2)${RESET} ${CYAN}Checkout tag${RESET}     ${DIM}— switch to a specific release tag${RESET}"
+  echo -e "  ${DIM}  3)${RESET} ${CYAN}Skip pull${RESET}        ${DIM}— just rebuild and redeploy current code${RESET}"
+  echo ""
+  echo -ne "  ${SYM_ARROW}  Select ${DIM}[1]${RESET}: "
+  local pull_choice
+  read -r pull_choice
+  pull_choice="${pull_choice:-1}"
+
+  # Backup before changing anything
+  echo ""
+  take_backup
+
+  local pull_ok=true
+
+  case "$pull_choice" in
+    1)
+      echo ""
+      echo -e "  ${SYM_NEURAL}  ${BOLD}Pulling latest changes...${RESET}"
+      echo ""
+      if git pull 2>&1 | tee -a "$SETUP_LOG" | head -5 | while IFS= read -r line; do
+        echo -e "  ${DIM}     ${line}${RESET}"
+      done; then
+        local new_rev
+        new_rev=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+        echo -e "  ${SYM_CHECK}  Updated to ${BOLD}${new_rev}${RESET}"
+      else
+        echo -e "  ${SYM_CROSS}  ${RED}Git pull failed${RESET}"
+        echo -e "  ${DIM}     Resolve conflicts or check ${SETUP_LOG}, then re-run.${RESET}"
+        pull_ok=false
+      fi
+      ;;
+    2)
+      echo ""
+      prompt "Tag to checkout (e.g. v1.2.0)" "$latest_tag" TARGET_TAG
+      echo ""
+      echo -e "  ${SYM_NEURAL}  ${BOLD}Checking out ${TARGET_TAG}...${RESET}"
+      if git checkout "$TARGET_TAG" >> "$SETUP_LOG" 2>&1; then
+        echo -e "  ${SYM_CHECK}  Switched to ${BOLD}${TARGET_TAG}${RESET}"
+      else
+        echo -e "  ${SYM_CROSS}  ${RED}Checkout failed${RESET}"
+        echo -e "  ${DIM}     Check ${SETUP_LOG} for details.${RESET}"
+        pull_ok=false
+      fi
+      ;;
+    3)
+      echo ""
+      echo -e "  ${DIM}     Skipping pull — rebuilding from current code.${RESET}"
+      ;;
+  esac
+
+  if [[ "$pull_ok" != true ]]; then
+    echo ""
+    echo -e "  ${YELLOW}${BOLD}Upgrade aborted.${RESET} ${DIM}Your backup is at ${LAST_BACKUP_DIR:-backups/}${RESET}"
+    return 1
+  fi
+
+  # Check for config drift
+  echo ""
+  echo -e "  ${SYM_NEURAL}  ${BOLD}Checking for configuration changes...${RESET}"
+  echo ""
+
+  local env_diff
+  env_diff=$(git diff "${current_rev}..HEAD" -- backend/.env.example 2>/dev/null || true)
+  if [[ -n "$env_diff" ]]; then
+    echo -e "  ${SYM_WARN}  ${YELLOW}backend/.env.example has changed${RESET}"
+    echo -e "  ${DIM}     Review new variables: git diff ${current_rev}..HEAD -- backend/.env.example${RESET}"
+    echo -e "  ${DIM}     Update your backend/.env accordingly.${RESET}"
+    echo ""
+    if ! confirm "Continue with rebuild?" "y"; then
+      echo -e "  ${DIM}     Update backend/.env first, then re-run: ./setup.sh --upgrade${RESET}"
+      return 0
+    fi
+  else
+    echo -e "  ${SYM_CHECK}  No config changes detected"
+  fi
+
+  # Rebuild and redeploy
+  do_redeploy
+
+  echo ""
+  echo -e "  ${BRIGHT_GREEN}${BOLD}Upgrade complete.${RESET}"
+  echo -e "  ${DIM}Previous code: ${current_rev}  Backup: ${LAST_BACKUP_DIR:-backups/}${RESET}"
+  echo ""
+  echo -e "  ${DIM}If something is wrong, rollback with:${RESET}"
+  echo -e "  ${GRAY}  git checkout ${current_rev} && ./setup.sh --redeploy${RESET}"
+}
+
+# ---------------------------------------------------------------------------
+# Redeploy: rebuild and restart from current code (no git operations)
+# ---------------------------------------------------------------------------
+redeploy() {
+  section "D" "Redeploy"
+
+  local current_rev
+  current_rev=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+  echo -e "  ${DIM}     Rebuilding from commit ${BOLD}${current_rev}${RESET}"
+  echo ""
+
+  do_redeploy
+
+  echo ""
+  echo -e "  ${BRIGHT_GREEN}${BOLD}Redeploy complete.${RESET}"
+}
+
+# Shared rebuild+restart logic used by upgrade and redeploy
+do_redeploy() {
+  echo ""
+  echo -e "  ${SYM_NEURAL}  ${BOLD}Rebuilding images...${RESET}"
+  echo ""
+
+  local build_ok=true
+  build_image "api" "Backend image (API + Celery)" || build_ok=false
+  $COMPOSE_CMD build celery flower >> "$SETUP_LOG" 2>&1 || true
+  echo ""
+  build_image "frontend" "Frontend image (React + Nginx)" || build_ok=false
+
+  if [[ "$build_ok" == false ]]; then
+    echo ""
+    echo -e "  ${SYM_CROSS}  ${RED}${BOLD}One or more image builds failed. Cannot restart services.${RESET}"
+    echo -e "  ${DIM}     Check the build log: ${SETUP_LOG}${RESET}"
+    echo ""
+    return 1
+  fi
+
+  echo ""
+  echo -e "  ${SYM_NEURAL}  ${BOLD}Restarting services...${RESET}"
+  echo ""
+
+  # Recreate application containers with new images (infra stays untouched)
+  run_step "Restarting API server" $COMPOSE_CMD up -d --force-recreate --no-deps api
+  run_step "Restarting Celery workers" $COMPOSE_CMD up -d --force-recreate --no-deps celery
+  run_step "Restarting Flower monitor" $COMPOSE_CMD up -d --force-recreate --no-deps flower
+  run_step "Restarting frontend" $COMPOSE_CMD up -d --force-recreate --no-deps frontend
+
+  echo ""
+  echo -e "  ${SYM_PULSE}  ${DIM}Waiting for services...${RESET}"
+  echo ""
+
+  wait_healthy "api" "API server" 90
+  wait_for_api 90
+  wait_healthy "frontend" "Frontend" 60
+}
+
+# ---------------------------------------------------------------------------
+# Detect existing deployment
+# ---------------------------------------------------------------------------
+detect_deployment() {
+  # Returns 0 if there's an existing deployment (any containers from this project)
+  local running
+  running=$($COMPOSE_CMD ps --format '{{.Service}}' 2>/dev/null | head -1 || true)
+  [[ -n "$running" ]]
+}
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 main() {
   # Reset log
   : > "$SETUP_LOG"
 
+  # Handle flags
+  case "${1:-}" in
+    --repair|-r|repair)
+      show_banner
+      preflight
+      repair
+      echo ""
+      exit 0
+      ;;
+    --upgrade|-u|upgrade)
+      show_banner
+      preflight
+      upgrade
+      echo ""
+      exit 0
+      ;;
+    --redeploy|-d|redeploy)
+      show_banner
+      preflight
+      redeploy
+      echo ""
+      exit 0
+      ;;
+    --help|-h|help)
+      echo ""
+      echo -e "  ${BOLD}Usage:${RESET} ./setup.sh [command]"
+      echo ""
+      echo -e "  ${BOLD}Commands:${RESET}"
+      echo -e "    ${CYAN}(none)${RESET}       Interactive setup — first-time install or repair existing"
+      echo -e "    ${CYAN}--repair${RESET}     Diagnose and fix a broken deployment"
+      echo -e "    ${CYAN}--upgrade${RESET}    Pull new code, backup, rebuild, and redeploy"
+      echo -e "    ${CYAN}--redeploy${RESET}   Rebuild and restart from current code (no git pull)"
+      echo -e "    ${CYAN}--help${RESET}       Show this help"
+      echo ""
+      exit 0
+      ;;
+  esac
+
   show_banner
   preflight
+
+  # If there's an existing deployment, offer mode selection
+  if detect_deployment; then
+    echo ""
+    echo -e "  ${SYM_NEURAL}  ${BOLD}Existing deployment detected.${RESET}"
+    echo ""
+    echo -e "  ${DIM}  1)${RESET} ${CYAN}Repair${RESET}       ${DIM}— diagnose and fix what's broken${RESET}"
+    echo -e "  ${DIM}  2)${RESET} ${CYAN}Upgrade${RESET}      ${DIM}— pull new code, backup, rebuild, redeploy${RESET}"
+    echo -e "  ${DIM}  3)${RESET} ${CYAN}Redeploy${RESET}     ${DIM}— rebuild and restart from current code${RESET}"
+    echo -e "  ${DIM}  4)${RESET} ${CYAN}Full setup${RESET}   ${DIM}— reconfigure everything from scratch${RESET}"
+    echo ""
+    echo -ne "  ${SYM_ARROW}  Select mode ${DIM}[1]${RESET}: "
+    local mode_choice
+    read -r mode_choice
+    mode_choice="${mode_choice:-1}"
+
+    case "$mode_choice" in
+      2) upgrade; echo ""; exit 0 ;;
+      3) redeploy; echo ""; exit 0 ;;
+      4) ;; # fall through to full setup
+      *) repair; echo ""; exit 0 ;;
+    esac
+  fi
+
   configure_env
   launch_services
   bootstrap

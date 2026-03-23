@@ -27,7 +27,10 @@
       "Bash(cd:*)",
       "Bash(wc:*)",
       "Bash(uv lock:*)",
-      "Bash(uv run:*)"
+      "Bash(uv run:*)",
+      "Bash(docker compose:*)",
+      "Bash(brew services:*)",
+      "Bash(lsof -iTCP:27017 -sTCP:LISTEN)"
     ]
   }
 }

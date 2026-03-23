@@ -435,7 +435,7 @@ export default function Demo() {
       {/* Nav */}
       <nav className="fixed top-0 inset-x-0 z-50 bg-[#0a0a0a]/80 backdrop-blur-md border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
-          <Link to="/landing" search={{ error: undefined }} className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors">
+          <Link to="/landing" search={{ error: undefined, invite_token: undefined }} className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors">
             <ArrowLeft className="w-4 h-4" />
             <span className="text-xl font-bold text-white">Vandalizer</span>
           </Link>
