@@ -4,6 +4,7 @@ import os
 from uuid import uuid4
 
 import pytest
+import pytest_asyncio
 
 
 # ---------------------------------------------------------------------------
@@ -27,22 +28,12 @@ def celery_eager():
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(scope="session")
-def event_loop():
-    """Session-scoped event loop for async fixtures."""
-    import asyncio
-
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
-
-
-@pytest.fixture(scope="session")
 def mongo_db_name():
     """Generate a unique test database name for the session."""
     return f"osp_test_{uuid4().hex[:8]}"
 
 
-@pytest.fixture(scope="session")
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def mongo_client(mongo_db_name):
     """Session-scoped: init Beanie with a disposable test database."""
     from motor.motor_asyncio import AsyncIOMotorClient
@@ -67,7 +58,7 @@ def sync_mongo(mongo_db_name, mongo_client):
     client.close()
 
 
-@pytest.fixture(autouse=True)
+@pytest_asyncio.fixture(autouse=True)
 async def clean_collections(request, mongo_db_name):
     """Drop all documents between tests (only for tier2 tests)."""
     # Only run for tests that use MongoDB (have mongo_client in their fixtures)
