@@ -1033,9 +1033,14 @@ class TestGetAuthorizedSearchSet:
         user = _make_user("owner1")
         ss = _make_search_set("owner1")
 
-        with patch(
-            "app.models.search_set.SearchSet"
-        ) as MockSS:
+        with (
+            patch("app.models.search_set.SearchSet") as MockSS,
+            patch(
+                "app.services.access_control.get_team_access_context",
+                new_callable=AsyncMock,
+            ) as mock_ctx,
+        ):
+            mock_ctx.return_value = _team_access()
             MockSS.find_one = AsyncMock(return_value=ss)
             MockSS.uuid = "uuid"
 
@@ -1047,9 +1052,14 @@ class TestGetAuthorizedSearchSet:
         user = _make_user("random-user")
         ss = _make_search_set("owner1", is_global=True)
 
-        with patch(
-            "app.models.search_set.SearchSet"
-        ) as MockSS:
+        with (
+            patch("app.models.search_set.SearchSet") as MockSS,
+            patch(
+                "app.services.access_control.get_team_access_context",
+                new_callable=AsyncMock,
+            ) as mock_ctx,
+        ):
+            mock_ctx.return_value = _team_access()
             MockSS.find_one = AsyncMock(return_value=ss)
             MockSS.uuid = "uuid"
 
