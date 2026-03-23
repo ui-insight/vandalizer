@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import {
+  Award,
   MessageSquare,
   Workflow,
   ListChecks,
@@ -18,6 +19,8 @@ import { useActivities } from '../../hooks/useActivities'
 import { deleteActivity } from '../../api/activity'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
+import { useCertificationPanel } from '../../contexts/CertificationPanelContext'
+import { LEVEL_CONFIG } from '../certification/constants'
 import { cn } from '../../lib/cn'
 import type { ActivityEvent } from '../../types/chat'
 
@@ -66,6 +69,13 @@ export function ActivityRail() {
   const { railDocked, toggleRailDocked, setActiveRightTab, setLoadConversationId, triggerNewChat, openWorkflow, openExtraction, closeWorkflow, closeExtraction, closeAutomation, activitySignal } = useWorkspace()
   const { activities, refresh, freshTitleIds, markTitleShimmered } = useActivities(activitySignal)
   const { toast } = useToast()
+  const { togglePanel, progress } = useCertificationPanel()
+
+  const certLevel = progress?.level || 'novice'
+  const certConfig = LEVEL_CONFIG[certLevel] || LEVEL_CONFIG.novice
+  const certXp = progress?.total_xp || 0
+  const certCertified = !!progress?.certified
+  const certStarted = certXp > 0
 
   const handleDelete = useCallback(
     async (e: React.MouseEvent, id: string) => {
@@ -129,7 +139,7 @@ export function ActivityRail() {
         </div>
       </div>
 
-      {/* Activity list */}
+      {/* Activity list — flex-1 so cert badge footer stays at bottom */}
       <div className="flex-1 overflow-y-auto hide-scrollbar p-2">
         <div className="flex flex-col gap-1">
           {/* New chat button - matches Flask _app_rail.html first item */}
@@ -234,6 +244,41 @@ export function ActivityRail() {
               </div>
             )
           })}
+        </div>
+      </div>
+
+      {/* Certification badge footer */}
+      <div className="border-t border-[#ddd] p-2 shrink-0 flex justify-center">
+        <div
+          onClick={togglePanel}
+          title={certCertified ? 'Vandal Workflow Architect' : certStarted ? `${certConfig.label} · ${certXp} XP` : 'Get Certified'}
+          className="flex items-center gap-2 cursor-pointer transition-all hover:shadow-md active:scale-95"
+          style={{
+            borderRadius: 'var(--ui-radius, 12px)',
+            padding: railDocked ? '6px 10px' : '6px 12px',
+            ...(certCertified
+              ? { background: 'linear-gradient(135deg, #191919, #2d2d2d)', border: '1px solid #444', boxShadow: '0 2px 8px rgba(234,179,8,0.2)' }
+              : { background: '#fff', border: '1px solid #e5e7eb', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }),
+          }}
+        >
+          <Award
+            className="h-3.5 w-3.5 shrink-0"
+            style={{ color: certCertified ? '#eab308' : certStarted ? certConfig.color : 'var(--highlight-color)' }}
+          />
+          {!railDocked && (
+            certCertified ? (
+              <span className="text-[11px] font-semibold text-yellow-400 title-shimmer">
+                Vandal Workflow Architect
+              </span>
+            ) : certStarted ? (
+              <>
+                <span className="text-[11px] font-semibold text-[#111]">{certConfig.label}</span>
+                <span className="text-[10px] text-[#999]">{certXp} XP</span>
+              </>
+            ) : (
+              <span className="text-[11px] font-semibold text-[#444]">Get Certified</span>
+            )
+          )}
         </div>
       </div>
     </aside>
