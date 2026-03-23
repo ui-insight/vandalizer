@@ -69,4 +69,4 @@ docker-build:
 	docker build -t vandalizer-backend ./backend
 	docker build -t vandalizer-frontend ./frontend
 
-release-check: ci docker-build
+release-check: backend-static ci docker-build

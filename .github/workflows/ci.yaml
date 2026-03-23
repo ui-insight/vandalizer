@@ -6,8 +6,42 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  backend:
+  backend-static:
+    name: Backend Lint & Security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install backend dependencies
+        run: make backend-install
+
+      - name: Lint (ruff)
+        run: make backend-lint
+
+      - name: Typecheck (mypy)
+        run: make backend-typecheck
+
+      - name: Security scan (bandit)
+        run: make backend-security
+
+      - name: Dependency audit (pip-audit)
+        run: make backend-audit
+
+  backend-test:
+    name: Backend Tests
     runs-on: ubuntu-latest
     services:
       mongo:
@@ -40,6 +74,7 @@ jobs:
         run: make backend-test-integration-t2
 
   frontend:
+    name: Frontend
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -58,7 +93,9 @@ jobs:
         run: make frontend-ci
 
   docker:
+    name: Docker Build
     runs-on: ubuntu-latest
+    needs: [backend-static, backend-test, frontend]
     steps:
       - uses: actions/checkout@v4
 
