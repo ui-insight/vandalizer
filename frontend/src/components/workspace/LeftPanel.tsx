@@ -30,11 +30,7 @@ export function LeftPanel() {
   // (the documents list refresh triggers onSelectionChange with empty selection, which
   // would clear selectedDocUuids and cause the chat pills to revert to generic ones)
   const handleSelectionChange = useCallback((uuids: string[]) => {
-    if (!viewingDocRef.current) {
-      setSelectedDocUuids(prev =>
-        prev.length === uuids.length && prev.every((u, i) => u === uuids[i]) ? prev : uuids,
-      )
-    }
+    if (!viewingDocRef.current) setSelectedDocUuids(uuids)
   }, [setSelectedDocUuids])
 
   const handleFolderSelectionChange = useCallback((uuids: string[]) => {
