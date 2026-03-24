@@ -25,18 +25,7 @@ backend-typecheck:
 	cd $(BACKEND_DIR) && uv run mypy app/ --ignore-missing-imports || echo "::warning::mypy found type errors (non-blocking)"
 
 backend-test:
-	cd $(BACKEND_DIR) && uv run pytest -q --cov=app --cov-report=term-missing --cov-fail-under=30 \
-		--ignore=tests/test_code_execution.py \
-		--ignore=tests/test_knowledge_routes.py \
-		--ignore=tests/test_spaces_routes.py \
-		--ignore=tests/test_upload_limits.py \
-		--ignore=tests/test_verification_routes.py \
-		--ignore=tests/test_workflow_authz.py \
-		--ignore=tests/test_workflow_engine_core.py \
-		--ignore=tests/test_workflow_nodes.py \
-		--ignore=tests/test_workflow_routes.py \
-		--ignore=tests/test_workflow_service.py \
-		--ignore=tests/test_bootstrap_scripts.py
+	cd $(BACKEND_DIR) && uv run pytest -q --cov=app --cov-report=term-missing --cov-fail-under=30
 
 backend-security:
 	cd $(BACKEND_DIR) && uv run bandit -r app/ -s B101 -q || echo "::warning::bandit found issues (non-blocking)"

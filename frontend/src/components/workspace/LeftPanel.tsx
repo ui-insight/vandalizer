@@ -23,6 +23,19 @@ export function LeftPanel() {
   const searchInputRef = useRef<HTMLInputElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const pollRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
+  const viewingDocRef = useRef(viewingDoc)
+  viewingDocRef.current = viewingDoc
+
+  // When a document is being viewed, ignore checkbox selection changes from FileBrowser
+  // (the documents list refresh triggers onSelectionChange with empty selection, which
+  // would clear selectedDocUuids and cause the chat pills to revert to generic ones)
+  const handleSelectionChange = useCallback((uuids: string[]) => {
+    if (!viewingDocRef.current) setSelectedDocUuids(uuids)
+  }, [setSelectedDocUuids])
+
+  const handleFolderSelectionChange = useCallback((uuids: string[]) => {
+    if (!viewingDocRef.current) setSelectedFolderUuids(uuids)
+  }, [setSelectedFolderUuids])
 
   // Open a document when requested from another panel (e.g. validation tab)
   useEffect(() => {
@@ -238,8 +251,8 @@ export function LeftPanel() {
               })
               setSelectedDocUuids([doc.uuid])
             }}
-            onSelectionChange={setSelectedDocUuids}
-            onFolderSelectionChange={setSelectedFolderUuids}
+            onSelectionChange={handleSelectionChange}
+            onFolderSelectionChange={handleFolderSelectionChange}
           />
         </div>
       )}
