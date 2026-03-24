@@ -148,6 +148,14 @@ async def clone_search_set(search_set_uuid: str, user_id: str) -> SearchSet | No
         )
         await new_item.insert()
 
+    # Add clone to user's personal library
+    from app.models.user import User as UserModel
+    user = await UserModel.find_one(UserModel.user_id == user_id)
+    if user:
+        from app.services.library_service import get_or_create_personal_library, add_item
+        lib = await get_or_create_personal_library(user_id)
+        await add_item(str(lib.id), user, str(clone.id), "search_set")
+
     return clone
 
 

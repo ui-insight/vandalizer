@@ -550,9 +550,20 @@ async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, u
             combined_context=req.combined_context,
         )
         await activity_service.activity_finish(activity.id, ActivityStatus.COMPLETED)
+        # Merge all result entities into a single normalized map so the
+        # activity rail can restore results when the user reopens the run.
+        normalized: dict = {}
+        for entity in results:
+            if isinstance(entity, dict):
+                normalized.update(entity)
         await activity_service.activity_update(
             activity.id,
             documents_touched=len(document_uuids),
+            result_snapshot={
+                "normalized": normalized,
+                "document_uuids": document_uuids,
+                "search_set_uuid": req.search_set_uuid,
+            },
         )
 
         # Fire-and-forget auto-validation if test cases exist
