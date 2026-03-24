@@ -139,6 +139,13 @@ export function SurveyFieldRenderer({ field, value, onChange }: Props) {
       )
     }
 
+    case 'info':
+      return (
+        <p className="text-sm text-gray-400 leading-relaxed">
+          {field.label}
+        </p>
+      )
+
     default:
       return null
   }

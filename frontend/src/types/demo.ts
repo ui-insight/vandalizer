@@ -1,7 +1,7 @@
 export interface SurveyField {
   key: string
   label: string
-  type: 'text' | 'textarea' | 'select' | 'number' | 'multiselect' | 'likert_group'
+  type: 'text' | 'textarea' | 'select' | 'number' | 'multiselect' | 'likert_group' | 'info'
   required: boolean
   placeholder?: string
   options?: string[]

@@ -73,10 +73,12 @@ export default function DemoFeedback() {
       <>
         {sec.fields.map((field) => (
           <div key={field.key}>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
-              {field.label}
-              {field.required ? ' *' : ''}
-            </label>
+            {field.type !== 'info' && (
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                {field.label}
+                {field.required ? ' *' : ''}
+              </label>
+            )}
             <SurveyFieldRenderer
               field={field}
               value={answers[field.key]}

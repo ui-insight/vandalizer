@@ -83,17 +83,19 @@ const PRE_SURVEY_FIELDS: SurveyField[] = [
   },
 
   // --- Task Time Estimates ---
+  // We collect baseline time estimates so we can measure how much time
+  // Vandalizer saves you. After the pilot we'll compare your "before"
+  // estimates here with your actual experience in the post-survey.
   {
-    key: 'time_rfa_checklist',
-    label: 'Build an RFA checklist (minutes)',
-    type: 'number',
+    key: 'task_time_intro',
+    label: 'For each task below, estimate how long it takes you today without AI assistance. This helps us measure time savings during the pilot so we can demonstrate the value of AI-assisted workflows to your institution.',
+    type: 'info',
     required: false,
     section: 'Task Time Estimates',
-    placeholder: 'Minutes',
   },
   {
     key: 'time_foa_checklist',
-    label: 'Build an FOA checklist (minutes)',
+    label: 'Review a funding opportunity (RFA/FOA/NOFO) and build a checklist of requirements for PIs',
     type: 'number',
     required: false,
     section: 'Task Time Estimates',
@@ -101,7 +103,7 @@ const PRE_SURVEY_FIELDS: SurveyField[] = [
   },
   {
     key: 'time_compliance_framework',
-    label: 'Build a compliance framework from an award notice (minutes)',
+    label: 'Read an award notice and compile the compliance obligations and reporting requirements',
     type: 'number',
     required: false,
     section: 'Task Time Estimates',
@@ -109,7 +111,7 @@ const PRE_SURVEY_FIELDS: SurveyField[] = [
   },
   {
     key: 'time_effort_compliance',
-    label: 'Create effort/time-and-effort compliance reports (minutes)',
+    label: 'Prepare effort certification or time-and-effort compliance documentation for a project',
     type: 'number',
     required: false,
     section: 'Task Time Estimates',
@@ -117,7 +119,7 @@ const PRE_SURVEY_FIELDS: SurveyField[] = [
   },
   {
     key: 'time_management_plan',
-    label: 'Build a management plan from an SF-425 (minutes)',
+    label: 'Review an SF-425 (Federal Financial Report) and build a financial management summary',
     type: 'number',
     required: false,
     section: 'Task Time Estimates',
@@ -125,7 +127,7 @@ const PRE_SURVEY_FIELDS: SurveyField[] = [
   },
   {
     key: 'time_prior_approval',
-    label: 'Create a prior approval requirements list (minutes)',
+    label: 'Read through award terms and extract the list of actions requiring prior sponsor approval',
     type: 'number',
     required: false,
     section: 'Task Time Estimates',
@@ -133,7 +135,7 @@ const PRE_SURVEY_FIELDS: SurveyField[] = [
   },
   {
     key: 'time_subaward_extraction',
-    label: 'Subaward extraction (minutes)',
+    label: 'Extract key data (parties, amounts, period of performance, terms) from a subaward agreement',
     type: 'number',
     required: false,
     section: 'Task Time Estimates',
@@ -414,10 +416,12 @@ export default function Demo() {
         <>
           {sec.fields.map((field) => (
             <div key={field.key}>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                {field.label}
-                {field.required ? ' *' : ''}
-              </label>
+              {field.type !== 'info' && (
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  {field.label}
+                  {field.required ? ' *' : ''}
+                </label>
+              )}
               <SurveyFieldRenderer
                 field={field}
                 value={answers[field.key]}
