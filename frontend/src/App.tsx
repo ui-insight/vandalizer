@@ -5,7 +5,6 @@ import { AuthProvider } from './contexts/AuthContext'
 import { TeamProvider } from './contexts/TeamContext'
 import { ToastProvider } from './contexts/ToastContext'
 import { CertificationPanelProvider } from './contexts/CertificationPanelContext'
-import { CertificationPanel } from './components/certification/CertificationPanel'
 import { queryClient } from './lib/queryClient'
 import { router } from './router'
 import { getThemeConfig } from './api/config'
@@ -95,7 +94,6 @@ export default function App() {
             <ToastProvider>
               <CertificationPanelProvider>
                 <RouterProvider router={router} />
-                <CertificationPanel />
               </CertificationPanelProvider>
             </ToastProvider>
           </TeamProvider>
