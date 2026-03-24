@@ -1,8 +1,10 @@
 """Support ticket API endpoints."""
 
+import base64
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel
 
 from app.dependencies import get_current_user
@@ -181,7 +183,16 @@ async def download_attachment(
     data = await support_service.get_attachment_data(ticket_uuid, attachment_uuid)
     if not data:
         raise HTTPException(status_code=404, detail="Attachment not found")
-    return data
+
+    file_bytes = base64.b64decode(data["file_data"])
+    content_type = data.get("file_type") or "application/octet-stream"
+    filename = data.get("filename", "attachment")
+
+    return Response(
+        content=file_bytes,
+        media_type=content_type,
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+    )
 
 
 @router.patch("/tickets/{ticket_uuid}")

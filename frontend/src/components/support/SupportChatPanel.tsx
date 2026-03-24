@@ -326,11 +326,17 @@ function ChatView({
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
+    if (fileInputRef.current) fileInputRef.current.value = ''
+    const sizeMB = (file.size / (1024 * 1024)).toFixed(1)
     if (file.size > 10 * 1024 * 1024) {
-      toast('File must be under 10MB', 'error')
+      toast(`File is ${sizeMB}MB — must be under 10MB`, 'error')
       return
     }
+    toast(`Uploading ${file.name} (${sizeMB}MB)...`, 'info')
     const reader = new FileReader()
+    reader.onerror = () => {
+      toast('Failed to read file', 'error')
+    }
     reader.onload = async () => {
       const base64 = (reader.result as string).split(',')[1]
       try {
@@ -338,11 +344,10 @@ function ChatView({
         setTicket(updated)
         toast('File attached', 'success')
       } catch {
-        toast('Failed to upload file', 'error')
+        toast('Failed to upload file — it may be too large', 'error')
       }
     }
     reader.readAsDataURL(file)
-    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   const handleStatusChange = async (newStatus: string) => {
