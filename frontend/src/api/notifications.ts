@@ -34,6 +34,13 @@ export function markRead(notificationUuid: string) {
   })
 }
 
+export function markReadForItem(itemKind: string, itemId: string) {
+  return apiFetch<{ ok: boolean; marked_count: number }>(
+    `/api/notifications/read-item/${itemKind}/${itemId}`,
+    { method: 'POST' },
+  )
+}
+
 export function markAllRead() {
   return apiFetch<{ ok: boolean; marked_count: number }>('/api/notifications/read-all', {
     method: 'POST',

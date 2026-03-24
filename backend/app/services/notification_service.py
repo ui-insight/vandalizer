@@ -1,6 +1,18 @@
-"""Notification service for verification events."""
+"""Notification service for verification and support events."""
+
+import datetime
 
 from app.models.notification import Notification
+
+# Notification kinds that should coalesce: if an unread notification already
+# exists for the same (user, item_kind, item_id), update it instead of
+# creating a duplicate.  This prevents the bell from filling up with one
+# entry per chat message in an active support conversation.
+_COALESCE_KINDS = frozenset({
+    "support_reply",
+    "support_new_message",
+    "support_new_ticket",
+})
 
 
 async def create_notification(
@@ -14,6 +26,23 @@ async def create_notification(
     item_name: str | None = None,
     request_uuid: str | None = None,
 ) -> dict:
+    # Coalesce: update existing unread notification for the same item
+    if kind in _COALESCE_KINDS and item_kind and item_id:
+        existing = await Notification.find_one(
+            Notification.user_id == user_id,
+            Notification.item_kind == item_kind,
+            Notification.item_id == item_id,
+            Notification.read == False,  # noqa: E712
+        )
+        if existing:
+            existing.title = title
+            existing.body = body
+            existing.kind = kind
+            existing.link = link
+            existing.created_at = datetime.datetime.now(datetime.timezone.utc)
+            await existing.save()
+            return _to_dict(existing)
+
     n = Notification(
         user_id=user_id,
         kind=kind,
@@ -59,6 +88,17 @@ async def mark_read(user_id: str, notification_uuid: str) -> bool:
     n.read = True
     await n.save()
     return True
+
+
+async def mark_read_for_item(user_id: str, item_kind: str, item_id: str) -> int:
+    """Mark all unread notifications for a specific item as read."""
+    result = await Notification.find(
+        Notification.user_id == user_id,
+        Notification.item_kind == item_kind,
+        Notification.item_id == item_id,
+        Notification.read == False,  # noqa: E712
+    ).update_many({"$set": {"read": True}})
+    return result.modified_count if result else 0
 
 
 async def mark_all_read(user_id: str) -> int:

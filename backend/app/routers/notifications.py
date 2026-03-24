@@ -35,6 +35,16 @@ async def mark_read(
     return {"ok": ok}
 
 
+@router.post("/read-item/{item_kind}/{item_id}")
+async def mark_read_for_item(
+    item_kind: str,
+    item_id: str,
+    user: User = Depends(get_current_user),
+):
+    count = await svc.mark_read_for_item(user.user_id, item_kind, item_id)
+    return {"ok": True, "marked_count": count}
+
+
 @router.post("/read-all")
 async def mark_all_read(user: User = Depends(get_current_user)):
     count = await svc.mark_all_read(user.user_id)
