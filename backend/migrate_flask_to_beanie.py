@@ -106,6 +106,8 @@ def extract_oid(value):
         if "$id" in value:
             return value["$id"]
         ref = value.get("_ref")
+        if isinstance(ref, DBRef):
+            return ref.id
         if ref and "$id" in ref:
             return ref["$id"]
     return None
@@ -442,12 +444,36 @@ def phase4_migrations(db, user_team_map, kb_id_uuid, default_team_id, dry_run):
         "soft_deleted_at": None,
         "token_count": 0,
         "num_pages": 0,
+        "user_id": "unknown",
+        "raw_text": "",
     }, dry_run, existing)
+
+    # Copy path → downloadpath for docs that lack it
+    if "smart_document" in existing:
+        coll = db["smart_document"]
+        need_dp = list(coll.find(
+            {"downloadpath": {"$exists": False}, "path": {"$exists": True}},
+            {"_id": 1, "path": 1},
+        ))
+        if need_dp:
+            if dry_run:
+                log.info("    DRY-RUN: smart_document.downloadpath: "
+                         "copy from path on %d docs", len(need_dp))
+            else:
+                ops = [
+                    UpdateOne({"_id": d["_id"]},
+                              {"$set": {"downloadpath": d["path"]}})
+                    for d in need_dp
+                ]
+                coll.bulk_write(ops)
+                log.info("    smart_document.downloadpath: copied from path "
+                         "on %d docs", len(ops))
 
     _set_defaults(db, "search_set", {
         "item_order": [],
         "domain": None,
         "cross_field_rules": [],
+        "set_type": "extraction",
     }, dry_run, existing)
 
     _set_defaults(db, "search_set_item", {
@@ -498,7 +524,7 @@ def phase4_migrations(db, user_team_map, kb_id_uuid, default_team_id, dry_run):
     _set_defaults(db, "extraction_quality_record", {
         "user_id": None,
         "search_set_uuid": None,
-        "created_at": datetime.datetime.utcnow(),
+        "created_at": datetime.datetime.now(datetime.UTC),
     }, dry_run, existing)
 
     # ------------------------------------------------------------------
@@ -534,6 +560,28 @@ def _migrate_library_items(db, dry_run, existing):
 
     coll = db["library_item"]
     log.info("  LibraryItem migration")
+
+    # 0. Remove items whose kind is unsupported in Beanie (e.g. SearchSetItem
+    #    prompts/formatters — the new UI only supports workflow/search_set/
+    #    knowledge_base).
+    UNSUPPORTED_KINDS = {"prompt", "formatter"}
+    unsupported_cls = {"SearchSetItem"}
+
+    unsup_query = {"$or": [
+        {"kind": {"$in": list(UNSUPPORTED_KINDS)}},
+        {"obj._cls": {"$in": list(unsupported_cls)}},
+    ]}
+    unsup_count = coll.count_documents(unsup_query)
+    if unsup_count:
+        if dry_run:
+            log.info("    DRY-RUN: would remove %d library items with "
+                     "unsupported kinds %s (SearchSetItem references)",
+                     unsup_count, UNSUPPORTED_KINDS)
+        else:
+            coll.delete_many(unsup_query)
+            log.info("    Removed %d library items with unsupported kinds %s "
+                     "(SearchSetItem references — not supported in new UI)",
+                     unsup_count, UNSUPPORTED_KINDS)
 
     # 1. Convert obj → item_id / kind
     docs = list(coll.find(
@@ -680,6 +728,18 @@ def _migrate_verification_requests(db, dry_run, existing):
 
     coll = db["verification_request"]
     log.info("  VerificationRequest migration")
+
+    # Remove verification requests for unsupported item kinds
+    unsup_kinds = {"prompt", "formatter"}
+    unsup_count = coll.count_documents({"item_kind": {"$in": list(unsup_kinds)}})
+    if unsup_count:
+        if dry_run:
+            log.info("    DRY-RUN: would remove %d verification requests with "
+                     "unsupported item_kind %s", unsup_count, unsup_kinds)
+        else:
+            coll.delete_many({"item_kind": {"$in": list(unsup_kinds)}})
+            log.info("    Removed %d verification requests with unsupported "
+                     "item_kind %s", unsup_count, unsup_kinds)
 
     docs = list(coll.find(
         {"item_identifier": {"$exists": True},
@@ -967,6 +1027,8 @@ def phase5_verify(db):
                           f"(should be renamed to '{new}')")
 
     # 9. Document counts match pre-migration baseline
+    #    library_item is expected to shrink (unsupported kinds removed).
+    EXPECTED_SHRINK = {"library_item", "verification_request"}
     meta = db["_migration_metadata"].find_one({"_id": "preflight"})
     if meta:
         pre = meta.get("pre_counts", {})
@@ -975,8 +1037,13 @@ def phase5_verify(db):
             if check in existing:
                 post_count = db[check].count_documents({})
                 if post_count != pre_count:
-                    issues.append(
-                        f"{check}: count changed {pre_count} -> {post_count}")
+                    if check in EXPECTED_SHRINK and post_count < pre_count:
+                        log.info("  OK  %s: count %d -> %d (expected — "
+                                 "unsupported items removed)", check,
+                                 pre_count, post_count)
+                    else:
+                        issues.append(
+                            f"{check}: count changed {pre_count} -> {post_count}")
 
     # -- report --
     if issues:

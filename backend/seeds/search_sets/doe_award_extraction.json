@@ -39,7 +39,92 @@
         {"searchphrase": "Total Project Costs", "searchtype": "extraction", "is_optional": false, "enum_values": []},
         {"searchphrase": "NEPA Status", "searchtype": "extraction", "is_optional": true, "enum_values": ["Categorical Exclusion", "Environmental Assessment", "Environmental Impact Statement", "Not Applicable"]}
       ],
-      "test_cases": []
+      "test_cases": [
+        {
+          "label": "BES University Grant - Perovskite Solar (UW-Madison)",
+          "source_type": "text",
+          "source_text": "U.S. DEPARTMENT OF ENERGY\nOFFICE OF SCIENCE\nFINANCIAL ASSISTANCE AWARD\n\nAward Instrument: Grant\nAward Number: DE-SC0024817\n\nRecipient: University of Wisconsin-Madison\n           21 North Park Street, Suite 6401\n           Madison, WI 53715-1218\n           DUNS: 161202122    EIN: 39-6006492\n\nFunding Opportunity Announcement:\n   FOA Number: DE-FOA-0003189\n   Title: Basic Energy Sciences: Materials Sciences and Engineering Division\n   Research Area: Solar Energy Conversion\n\nProgram Office: Office of Science (SC)\n   Division: Basic Energy Sciences (BES)\n   Program Manager: Dr. Helen W. Kershaw\n   Phone: (301) 555-2847\n\n---\n\nAWARD DETAILS\n\nProject Title: Compositional Engineering of Halide Perovskite Thin Films for\nThermally Stable High-Efficiency Photovoltaic Devices\n\nPrincipal Investigator: Dr. Margaret L. Thornton\n   Department of Materials Science and Engineering\n   University of Wisconsin-Madison\n   1509 University Avenue, Room 246\n   Madison, WI 53706\n   Phone: (608) 555-9374\n   Email: mthornton@wisc.edu\n\nProject Period:\n   Start Date: 09/01/2025\n   End Date: 08/31/2028\n   Duration: 36 months\n\n---\n\nBUDGET SUMMARY (SF-424A)\n\nBudget Period 1: 09/01/2025 - 08/31/2026\nBudget Period 2: 09/01/2026 - 08/31/2027\nBudget Period 3: 09/01/2027 - 08/31/2028\n\nCOST CATEGORY                        FEDERAL        COST SHARING     TOTAL\n----------------------------------------------------------------------\na. Personnel Costs                   $285,000       $42,000          $327,000\n   PI (15% effort x 3 years)          $67,500\n   Postdoc (100% x 3 years)          $174,000\n   Graduate Student (50% x 3 years)   $43,500\n\nb. Fringe Benefits                    $88,350       $13,020          $101,370\n   PI (31%)                            $20,925\n   Postdoc (28%)                       $48,720\n   Graduate (43%)                      $18,705\n\nc. Equipment                          $0             $0               $0\n\nd. Travel                             $18,600        $0               $18,600\n   ACS National Meetings (3 trips)     $10,800\n   MRS Fall Meeting (2 trips)           $7,800\n\ne. Supplies                           $142,000       $0               $142,000\n   Perovskite precursor chemicals       $48,000\n   Thin film deposition targets         $35,000\n   Characterization consumables         $32,000\n   Glassware and lab consumables        $27,000\n\nf. Contractual/Subawards              $0             $0               $0\n\ng. Other Costs                        $24,600        $0               $24,600\n   Publication and open access fees     $8,400\n   Synchrotron beamtime user fees      $12,000\n   Equipment maintenance                $4,200\n\nh. Total Direct Costs                 $558,550       $55,020          $613,570\n\ni. Indirect Charges                   $340,621       $49,980          $390,601\n   Rate: 54.5% MTDC\n   Base: $558,550 (federal) / $55,020 (cost share)\n\nj. Total Federal Funding:             $899,171\nk. Total Cost Sharing:                $105,000\nl. Total Project Costs:               $1,004,171\n\n---\n\nNATIONAL ENVIRONMENTAL POLICY ACT (NEPA)\n\nNEPA Determination: Categorical Exclusion\nCategorical Exclusion Applied: B3.6 - Small-scale research and development,\nprocess development, and small-scale pilot plant operations.\nDate of Determination: 07/15/2025\n\n---\n\nPROJECT NARRATIVE SUMMARY\n\nThis project addresses a critical barrier to commercialization of halide perovskite\nphotovoltaics: thermal instability of the absorber layer at operating temperatures\nabove 85°C. Through systematic compositional engineering of mixed-halide\nperovskite thin films (combining formamidinium, cesium, and methylammonium\ncations with iodide-bromide anion mixtures), the research aims to identify\ncompositions that maintain >22% power conversion efficiency while surviving\n1000+ hours at 85°C/85% relative humidity. Advanced characterization using\nsynchrotron X-ray diffraction at the Advanced Photon Source (APS) will provide\nreal-time insights into degradation mechanisms at the atomic scale.",
+          "expected_values": {
+            "Award Number": "DE-SC0024817",
+            "FOA Number": "DE-FOA-0003189",
+            "PI Name": "Margaret L. Thornton",
+            "Institution": "University of Wisconsin-Madison",
+            "DOE Program Office": "BES",
+            "Project Title": "Compositional Engineering of Halide Perovskite Thin Films for Thermally Stable High-Efficiency Photovoltaic Devices",
+            "Project Start Date": "09/01/2025",
+            "Project End Date": "08/31/2028",
+            "Total Federal Funding": "$899,171",
+            "Cost Sharing Amount": "$105,000",
+            "Personnel Costs": "$285,000",
+            "Fringe Benefits": "$88,350",
+            "Equipment": "$0",
+            "Travel": "$18,600",
+            "Supplies": "$142,000",
+            "Contractual/Subawards": "$0",
+            "Other Costs": "$24,600",
+            "Indirect Charges": "$340,621",
+            "Total Direct Costs": "$558,550",
+            "Total Project Costs": "$1,004,171",
+            "NEPA Status": "Categorical Exclusion"
+          }
+        },
+        {
+          "label": "ARPA-E Cooperative Agreement - Grid Storage (VoltGrid Energy)",
+          "source_type": "text",
+          "source_text": "U.S. DEPARTMENT OF ENERGY\nADVANCED RESEARCH PROJECTS AGENCY - ENERGY (ARPA-E)\nFINANCIAL ASSISTANCE AWARD\n\nAward Instrument: Cooperative Agreement\nAward Number: DE-AR0001578\n\nRecipient: VoltGrid Energy Solutions, Inc.\n           4800 Innovation Drive, Suite 300\n           Durham, NC 27703\n           DUNS: 089234567    EIN: 83-2456198\n           Small Business: Yes\n\nFunding Opportunity Announcement:\n   FOA Number: DE-FOA-0003042\n   Title: Duration Addition to Electricity Storage (DAYS)\n   Topic Area: Long-Duration Energy Storage Technologies\n\nProgram Office: ARPA-E\n   DOE Program Office: ARPA-E\n   Program Director: Dr. Susan F. Babinec\n   Technology-to-Market Advisor: Dr. Richard T. Simmons\n   Phone: (202) 555-5246\n\n---\n\nAWARD DETAILS\n\nProject Title: Iron-Air Redox Flow Battery System for 100-Hour Grid-Scale\nEnergy Storage\n\nPrincipal Investigator: Dr. Rajesh K. Subramanian\n   Chief Technology Officer\n   VoltGrid Energy Solutions, Inc.\n   Phone: (919) 555-8834\n   Email: rsubramanian@voltgrid.com\n\nProject Period:\n   Start Date: 03/01/2025\n   End Date: 02/28/2029\n   Duration: 48 months\n\n---\n\nBUDGET SUMMARY (SF-424A)\n\nPhase 1 (Concept Development):   03/01/2025 - 02/28/2027 (24 months)\nPhase 2 (Prototype & Test):      03/01/2027 - 02/28/2029 (24 months)\n\nCOST CATEGORY                        FEDERAL        COST SHARING     TOTAL\n----------------------------------------------------------------------\na. Personnel Costs                   $1,420,000     $580,000         $2,000,000\n   CTO/PI (40% effort x 4 yr)         $320,000\n   Battery Engineers (3 FTE)           $720,000\n   Materials Scientists (2 FTE)        $380,000\n\nb. Fringe Benefits                    $468,600       $191,400         $660,000\n   Rate: 33% of personnel\n\nc. Equipment                          $1,377,000     $423,000         $1,800,000\n   Iron-air cell fabrication line       $680,000\n   Electrolyte circulation system       $320,000\n   Battery test stations (8 units)      $245,000\n   Environmental chambers (2 units)     $132,000\n\nd. Travel                              $86,000        $0               $86,000\n   ARPA-E Annual Summit                  $18,000\n   DOE review meetings (quarterly)       $48,000\n   Utility partner site visits           $20,000\n\ne. Supplies                            $438,000       $112,000         $550,000\n   Iron powder and electrode materials   $195,000\n   Electrolyte chemicals                 $128,000\n   Membrane materials                     $75,000\n   General lab supplies                   $40,000\n\nf. Contractual/Subawards               $1,200,000     $300,000         $1,500,000\n   Georgia Institute of Technology       $750,000\n   (membrane characterization and\n   degradation modeling)\n   Pacific Northwest Natl. Lab (PNNL)   $450,000\n   (accelerated life testing)\n\ng. Other Costs                          $168,400       $68,380          $236,780\n   Patent filing and prosecution          $85,000\n   Testing and certification fees         $42,000\n   Insurance and facility costs           $28,400\n   Publications and outreach              $13,000\n\nh. Total Direct Costs                  $5,158,000     $1,674,780       $6,832,780\n\ni. Indirect Charges                     $392,000       $200,000         $592,000\n   Rate: 22% MTDC\n   Base: Personnel + Fringe (excl. subs and equip)\n\nj. Total Federal Funding:              $5,550,000\nk. Total Cost Sharing:                 $1,874,780\nl. Total Project Costs:                $7,424,780\n\nCost Share Percentage: 25.2% (exceeds minimum 20% requirement)\n\n---\n\nNATIONAL ENVIRONMENTAL POLICY ACT (NEPA)\n\nNEPA Determination: Environmental Assessment\nAn Environmental Assessment (EA) was prepared pursuant to 10 CFR 1021.315.\nThe EA concluded with a Finding of No Significant Impact (FONSI).\nDate of FONSI: 01/22/2025\nDOE/EA-2198\n\n---\n\nPROJECT NARRATIVE SUMMARY\n\nVoltGrid Energy Solutions proposes to develop a novel iron-air redox flow\nbattery system targeting 100-hour discharge duration at $5/kWh levelized\ncost of energy storage (LCOS). The technology uses earth-abundant iron as\nthe negative electrode active material and ambient air as the positive\nelectrode reactant, eliminating the need for expensive cathode materials.\nPhase 1 focuses on fundamental cell chemistry optimization, achieving\n>80% round-trip energy efficiency at 10 mA/cm² current density. Phase 2\nscales to a 10 kW prototype system integrated with a microgrid testbed\nat the National Renewable Energy Laboratory (NREL).",
+          "expected_values": {
+            "Award Number": "DE-AR0001578",
+            "FOA Number": "DE-FOA-0003042",
+            "PI Name": "Rajesh K. Subramanian",
+            "Institution": "VoltGrid Energy Solutions, Inc.",
+            "DOE Program Office": "ARPA-E",
+            "Project Title": "Iron-Air Redox Flow Battery System for 100-Hour Grid-Scale Energy Storage",
+            "Project Start Date": "03/01/2025",
+            "Project End Date": "02/28/2029",
+            "Total Federal Funding": "$5,550,000",
+            "Cost Sharing Amount": "$1,874,780",
+            "Personnel Costs": "$1,420,000",
+            "Fringe Benefits": "$468,600",
+            "Equipment": "$1,377,000",
+            "Travel": "$86,000",
+            "Supplies": "$438,000",
+            "Contractual/Subawards": "$1,200,000",
+            "Other Costs": "$168,400",
+            "Indirect Charges": "$392,000",
+            "Total Direct Costs": "$5,158,000",
+            "Total Project Costs": "$7,424,780",
+            "NEPA Status": "Environmental Assessment"
+          }
+        },
+        {
+          "label": "EERE Award - Cement Decarbonization (Georgia Tech)",
+          "source_type": "text",
+          "source_text": "U.S. DEPARTMENT OF ENERGY\nOFFICE OF ENERGY EFFICIENCY AND RENEWABLE ENERGY (EERE)\nFINANCIAL ASSISTANCE AWARD\n\nAward Instrument: Grant\nAward Number: DE-EE0010342\n\nRecipient: Georgia Institute of Technology\n           505 Tenth Street NW\n           Atlanta, GA 30332-0420\n           DUNS: 097394084    EIN: 58-0603146\n\nFunding Opportunity Announcement:\n   FOA Number: DE-FOA-0002978\n   Title: Industrial Efficiency and Decarbonization Office -\n          Low-Carbon Cement and Concrete Manufacturing\n   Topic Area: Advanced Process Heating Technologies\n\nProgram Office: EERE\n   DOE Program Office: EERE\n   Sub-Program: Industrial Efficiency and Decarbonization Office (IEDO)\n   Federal Project Officer: Ms. Patricia R. Gonzalez\n   Phone: (720) 555-4618\n   Contract Specialist: Mr. David L. Foster\n\n---\n\nAWARD DETAILS\n\nProject Title: Microwave-Plasma Hybrid Reactor for Low-Carbon Cement Clinker\nCalcination\n\nPrincipal Investigator: Dr. Samuel T. Okonkwo\n   Associate Professor, School of Mechanical Engineering\n   Georgia Institute of Technology\n   George W. Woodruff School of Mechanical Engineering\n   801 Ferst Drive NW\n   Atlanta, GA 30332-0405\n   Phone: (404) 555-7219\n   Email: sokonkwo@gatech.edu\n\nProject Period:\n   Start Date: 10/01/2025\n   End Date: 09/30/2028\n   Duration: 36 months\n\n---\n\nBUDGET SUMMARY (SF-424A)\n\nBudget Period 1: 10/01/2025 - 09/30/2026\nBudget Period 2: 10/01/2026 - 09/30/2027\nBudget Period 3: 10/01/2027 - 09/30/2028\n\nCOST CATEGORY                        FEDERAL        COST SHARING     TOTAL\n----------------------------------------------------------------------\na. Personnel Costs                   $412,000       $0               $412,000\n   PI (20% effort x 3 years)          $78,000\n   Research Scientists (2 FTE)        $216,000\n   Graduate Students (2 x 50%)        $118,000\n\nb. Fringe Benefits                    $132,640       $0               $132,640\n   PI (32.2%)                          $25,116\n   Research Scientists (32.2%)         $69,552\n   Graduate (32.2%)                    $37,996\n\nc. Equipment                          $385,000       $0               $385,000\n   Microwave generator (100kW, 915MHz) $165,000\n   Plasma torch assembly                $95,000\n   High-temp kiln reactor vessel        $78,000\n   Gas analysis system (FTIR+MS)        $47,000\n\nd. Travel                              $32,400       $0               $32,400\n   DOE AMO Peer Review (annual)         $10,800\n   Cement industry partner visits        $12,600\n   AIChE Annual Meeting (2 trips)        $9,000\n\ne. Supplies                            $186,000       $0               $186,000\n   Raw materials (limestone, clay)       $42,000\n   Microwave-transparent crucibles       $38,000\n   Gas handling components               $35,000\n   Refractory materials                  $32,000\n   Analytical consumables                $24,000\n   Safety equipment                      $15,000\n\nf. Contractual/Subawards               $975,000       $0               $975,000\n   Oak Ridge National Laboratory (ORNL) $975,000\n   (neutron scattering characterization\n   of clinker microstructure evolution\n   and process modeling support)\n\ng. Other Costs                          $48,460       $0               $48,460\n   Publication costs                      $7,200\n   Equipment maintenance contracts       $18,000\n   Intellectual property costs           $14,260\n   Outreach and workforce development     $9,000\n\nh. Total Direct Costs                  $2,171,500     $0               $2,171,500\n\ni. Indirect Charges                     $489,000       $0               $489,000\n   Rate: 56.5% MTDC\n   Base: $1,196,500 (excl. equipment, subs > $25K, participant support)\n   Note: Subaward first $25K included in base\n\nj. Total Federal Funding:              $2,660,500\nk. Total Cost Sharing:                 $0\n   (Cost sharing not required per FOA)\nl. Total Project Costs:                $2,660,500\n\n---\n\nNATIONAL ENVIRONMENTAL POLICY ACT (NEPA)\n\nNEPA Determination: Not Applicable\nJustification: All research activities are conducted within existing\nlaboratory facilities at Georgia Tech and ORNL. No new construction,\nmodification of facilities, or field activities are proposed. Research\nactivities fall within the scope of existing NEPA coverage for the\nrespective facilities.\n\n---\n\nPROJECT NARRATIVE SUMMARY\n\nCement production accounts for approximately 8% of global CO2 emissions,\nwith the calcination of limestone (CaCO3 -> CaO + CO2) representing 60%\nof process emissions. This project develops a microwave-plasma hybrid\nreactor that replaces conventional fossil-fuel-fired rotary kilns with\nelectrified process heating. The hybrid approach combines volumetric\nmicrowave heating (for uniform thermal activation) with atmospheric-pressure\nplasma (for rapid surface reactions), targeting a 40% reduction in energy\nconsumption and near-complete elimination of combustion-related CO2. The\nresearch team will characterize clinker quality through neutron scattering\nat ORNL's Spallation Neutron Source and validate scale-up models for\nindustrial deployment.",
+          "expected_values": {
+            "Award Number": "DE-EE0010342",
+            "FOA Number": "DE-FOA-0002978",
+            "PI Name": "Samuel T. Okonkwo",
+            "Institution": "Georgia Institute of Technology",
+            "DOE Program Office": "EERE",
+            "Project Title": "Microwave-Plasma Hybrid Reactor for Low-Carbon Cement Clinker Calcination",
+            "Project Start Date": "10/01/2025",
+            "Project End Date": "09/30/2028",
+            "Total Federal Funding": "$2,660,500",
+            "Cost Sharing Amount": "$0",
+            "Personnel Costs": "$412,000",
+            "Fringe Benefits": "$132,640",
+            "Equipment": "$385,000",
+            "Travel": "$32,400",
+            "Supplies": "$186,000",
+            "Contractual/Subawards": "$975,000",
+            "Other Costs": "$48,460",
+            "Indirect Charges": "$489,000",
+            "Total Direct Costs": "$2,171,500",
+            "Total Project Costs": "$2,660,500",
+            "NEPA Status": "Not Applicable"
+          }
+        }
+      ]
     }
   ]
 }
