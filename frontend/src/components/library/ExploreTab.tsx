@@ -237,7 +237,7 @@ function FeaturedCollectionCard({
         <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-yellow-50 text-yellow-600 shrink-0">
           <Star className="h-4 w-4 fill-current" />
         </div>
-        <h3 className="text-sm font-bold text-gray-900 group-hover:text-blue-700 transition-colors line-clamp-2 min-w-0">
+        <h3 className="text-sm font-bold text-gray-900 group-hover:text-blue-700 transition-colors line-clamp-2 flex-1 min-w-0">
           {collection.title}
         </h3>
       </div>
@@ -279,7 +279,7 @@ function CatalogCard({
             <ShieldCheck className={`h-3.5 w-3.5 shrink-0 mt-0.5 ${
               item.quality_tier === 'gold' ? 'text-amber-500' : item.quality_tier === 'silver' ? 'text-gray-400' : 'text-green-500'
             }`} />
-            <span className="text-sm font-semibold text-gray-900 line-clamp-2 min-w-0 group-hover:text-blue-700 transition-colors">
+            <span className="text-sm font-semibold text-gray-900 line-clamp-2 flex-1 min-w-0 group-hover:text-blue-700 transition-colors">
               {item.display_name || item.name}
             </span>
           </div>
@@ -342,14 +342,14 @@ function CollectionLink({
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center gap-2 ${
+      className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-start gap-2 ${
         active
           ? 'bg-gray-900 text-white'
           : 'text-gray-700 hover:bg-gray-100'
       }`}
     >
-      <FolderOpen className={`h-3.5 w-3.5 shrink-0 ${active ? 'text-gray-300' : 'text-gray-400'}`} />
-      <span className="truncate flex-1">{collection.title}</span>
+      <FolderOpen className={`h-3.5 w-3.5 shrink-0 mt-0.5 ${active ? 'text-gray-300' : 'text-gray-400'}`} />
+      <span className="line-clamp-2 flex-1 min-w-0 text-left leading-snug">{collection.title}</span>
       {collection.featured && (
         <Star className={`h-3 w-3 shrink-0 fill-current ${active ? 'text-yellow-300' : 'text-yellow-400'}`} />
       )}
