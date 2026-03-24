@@ -366,6 +366,7 @@ async def run_extraction_sync(
     user_id: str,
     model: str | None = None,
     extraction_config_override: dict | None = None,
+    combined_context: bool = False,
 ) -> list:
     """Run extraction synchronously via asyncio.to_thread."""
     keys = await get_extraction_keys(search_set_uuid)
@@ -393,6 +394,12 @@ async def run_extraction_sync(
 
     if not any(doc_texts) and not any(doc_file_paths):
         return []
+
+    # Combined context: merge all documents into a single text for extraction
+    if combined_context and len(doc_texts) > 1:
+        merged = "\n\n---\n\n".join(t for t in doc_texts if t)
+        doc_texts = [merged]
+        doc_file_paths = []  # image mode not supported for combined
 
     # Resolve model
     if not model:

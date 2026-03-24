@@ -547,6 +547,7 @@ async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, u
             user_id=user.user_id,
             model=req.model,
             extraction_config_override=req.extraction_config_override,
+            combined_context=req.combined_context,
         )
         await activity_service.activity_finish(activity.id, ActivityStatus.COMPLETED)
         await activity_service.activity_update(

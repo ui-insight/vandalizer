@@ -94,6 +94,7 @@ class RunExtractionSyncRequest(BaseModel):
     document_uuids: list[str]
     model: Optional[str] = None
     extraction_config_override: Optional[dict] = None
+    combined_context: bool = False
 
 
 class ExtractionStatusResponse(BaseModel):

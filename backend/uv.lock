@@ -3614,6 +3614,19 @@ wheels = [
 ]
 
 [[package]]
+name = "reportlab"
+version = "4.4.10"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "charset-normalizer" },
+    { name = "pillow" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/48/57/28bfbf0a775b618b6e4d854ef8dd3f5c8988e5d614d8898703502a35f61c/reportlab-4.4.10.tar.gz", hash = "sha256:5cbbb34ac3546039d0086deb2938cdec06b12da3cdb836e813258eb33cd28487", size = 3714962, upload-time = "2026-02-12T10:45:21.325Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8a/2e/e1798b8b248e1517e74c6cdf10dd6edd485044e7edf46b5f11ffcc5a0add/reportlab-4.4.10-py3-none-any.whl", hash = "sha256:5abc815746ae2bc44e7ff25db96814f921349ca814c992c7eac3c26029bf7c24", size = 1955400, upload-time = "2026-02-12T10:45:18.828Z" },
+]
+
+[[package]]
 name = "requests"
 version = "2.32.5"
 source = { registry = "https://pypi.org/simple" }
@@ -4255,6 +4268,7 @@ dependencies = [
     { name = "python-multipart" },
     { name = "python3-saml" },
     { name = "redis" },
+    { name = "reportlab" },
     { name = "sentry-sdk", extra = ["celery", "fastapi"] },
     { name = "slowapi" },
     { name = "uvicorn", extra = ["standard"] },
@@ -4314,6 +4328,7 @@ requires-dist = [
     { name = "python-multipart", specifier = ">=0.0.18,<1" },
     { name = "python3-saml", specifier = ">=1.16,<2" },
     { name = "redis", specifier = ">=5.0,<6" },
+    { name = "reportlab", specifier = ">=4.0,<5" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.11,<1" },
     { name = "sentry-sdk", extras = ["fastapi", "celery"], specifier = ">=2.0,<3" },
     { name = "slowapi", specifier = ">=0.1,<1" },
