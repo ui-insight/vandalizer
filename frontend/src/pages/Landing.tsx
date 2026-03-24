@@ -623,7 +623,7 @@ export default function Landing() {
           <div className="mb-20">
             <h2 className="text-4xl font-bold text-white mb-6">Tools to Augment your Team</h2>
             <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-              Collaborate, Verify, and Scale with confidence using our secure platform.
+              Collaborate, verify, and scale with confidence using our secure platform.
             </p>
           </div>
 
@@ -640,7 +640,7 @@ export default function Landing() {
                 Unified Team Workspace
               </h3>
               <p className="text-gray-400 text-xl leading-relaxed mb-6 relative z-10 max-w-lg">
-                All your team&apos;s files and workflows in one central hub. Share specific tasks or
+                All of your team&apos;s files and workflows in one central hub. Share specific tasks or
                 entire pipelines instantly. No more emailing refined prompts or Python scripts back
                 and forth.
               </p>
@@ -660,7 +660,7 @@ export default function Landing() {
               </h3>
               <p className="text-gray-400 text-xl leading-relaxed relative z-10">
                 Powerful AI models that are private and secure. Your data stays within your control
-                and is never used to train public models.
+                and is not used to train public models.
               </p>
             </div>
 
@@ -690,12 +690,12 @@ export default function Landing() {
                 <span className="text-sm font-mono text-gray-500">04</span>
               </div>
               <h3 className="text-2xl font-bold text-white mb-4 group-hover:text-[#f1b300] transition-colors relative z-10">
-                Evaluate Once, Run Everywhere
+                Verify Once, Deploy with Confidence
               </h3>
               <p className="text-gray-400 text-xl leading-relaxed mb-6 relative z-10 max-w-lg">
-                Create a &ldquo;Golden Set&rdquo; of documents to verify a workflow&apos;s accuracy. Once a
-                workflow passes evaluation, deploy it to your entire team with the confidence that it
-                performs correctly.
+                Create a &ldquo;Golden Set&rdquo; of documents to evaluate a workflow&apos;s accuracy using
+                TaMPER scoring. Once verified, publish it to your team knowing it has been tested
+                against real data.
               </p>
               <div className="absolute -bottom-6 -right-6 w-40 h-40 bg-[#f1b300]/5 rounded-full blur-2xl group-hover:bg-[#f1b300]/10 transition-colors" />
             </div>
@@ -840,7 +840,9 @@ export default function Landing() {
             <br />
             This project is made possible through the support of the{' '}
             <strong>NSF GRANTED</strong> program (Award #2427549), dedicated to reducing barriers to
-            research administration and building capacity at emerging research institutions.
+            research administration and building capacity for research administration operations of
+            all structures and sizes. Developed in collaboration with{' '}
+            <strong>Southern Utah University</strong>.
           </p>
 
           <div className="flex flex-wrap justify-center gap-8 opacity-70 hover:opacity-100 transition-opacity duration-300">
@@ -851,6 +853,11 @@ export default function Landing() {
             </div>
             <div className="h-20 px-8 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center hover:bg-white/10 transition-colors">
               <span className="text-2xl font-bold text-blue-400 tracking-wider">NSF GRANTED</span>
+            </div>
+            <div className="h-20 px-8 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center hover:bg-white/10 transition-colors">
+              <span className="text-2xl font-bold text-green-400 tracking-wider">
+                Southern Utah University
+              </span>
             </div>
           </div>
         </div>
@@ -863,8 +870,8 @@ export default function Landing() {
           <h2 className="text-4xl font-bold text-white mb-6">Help Shape the Future of RA</h2>
           <p className="text-gray-300 text-lg mb-10 max-w-2xl mx-auto">
             We are actively seeking collaborators, testers, and contributors. If you are a Research
-            Administrator interested in piloting Vandalizer, or a developer wanting to contribute to
-            the codebase, we want to hear from you.
+            Administrator interested in using Vandalizer at your institution, or a developer wanting
+            to contribute to the codebase, we want to hear from you.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a
