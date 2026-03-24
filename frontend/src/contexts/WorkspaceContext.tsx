@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 
 type RightTab = 'assistant' | 'library'
@@ -19,7 +19,6 @@ interface NavigationContextValue {
   openExtractionId: string | null
   openExtraction: (uuid: string, initialResults?: Record<string, string>) => void
   closeExtraction: () => void
-  pendingExtractionResults: Record<string, string> | null
   consumeExtractionResults: () => Record<string, string> | null
   openAutomationId: string | null
   openAutomation: (id: string) => void
@@ -162,7 +161,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [activeKBUuid, setActiveKBUuid] = useState<string | null>(null)
   const [activeKBTitle, setActiveKBTitle] = useState<string | null>(null)
   const [viewDocumentRequest, setViewDocumentRequest] = useState<{ uuid: string; title: string } | null>(null)
-  const [pendingExtractionResults, setPendingExtractionResults] = useState<Record<string, string> | null>(null)
+  const pendingExtractionResultsRef = useRef<Record<string, string> | null>(null)
 
   const updateSearch = useCallback(
     (updater: (prev: WorkspaceSearchState) => WorkspaceSearchState) => {
@@ -194,15 +193,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [updateSearch])
 
   const openExtraction = useCallback((uuid: string, initialResults?: Record<string, string>) => {
+    pendingExtractionResultsRef.current = initialResults ?? null
     updateSearch((prev) => ({ ...prev, extraction: uuid, workflow: undefined, automation: undefined }))
-    setPendingExtractionResults(initialResults ?? null)
   }, [updateSearch])
 
   const consumeExtractionResults = useCallback((): Record<string, string> | null => {
-    const r = pendingExtractionResults
-    setPendingExtractionResults(null)
+    const r = pendingExtractionResultsRef.current
+    pendingExtractionResultsRef.current = null
     return r
-  }, [pendingExtractionResults])
+  }, [])
 
   const closeExtraction = useCallback(() => {
     updateSearch((prev) => ({ ...prev, extraction: undefined }))
@@ -318,7 +317,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     activeRightTab, setActiveRightTab,
     openWorkflowId, openWorkflow, closeWorkflow,
     openExtractionId, openExtraction, closeExtraction,
-    pendingExtractionResults, consumeExtractionResults,
+    consumeExtractionResults,
     openAutomationId, openAutomation, closeAutomation,
     resetToHome,
   }), [
@@ -326,7 +325,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     activeRightTab, setActiveRightTab,
     openWorkflowId, openWorkflow, closeWorkflow,
     openExtractionId, openExtraction, closeExtraction,
-    pendingExtractionResults, consumeExtractionResults,
+    consumeExtractionResults,
     openAutomationId, openAutomation, closeAutomation,
     resetToHome,
   ])
