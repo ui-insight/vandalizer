@@ -346,12 +346,48 @@ export interface FindBestSettingsResult {
   search_set_uuid: string
 }
 
-export function findBestSettings(uuid: string, numRuns = 2, maxCandidates = 8) {
-  return apiFetch<FindBestSettingsResult>(`/api/extractions/search-sets/${uuid}/find-best-settings`, {
+export async function findBestSettingsStream(
+  uuid: string,
+  numRuns = 2,
+  maxCandidates = 8,
+  onEvent: (event: TuningStreamEvent) => void,
+) {
+  const res = await fetch(`/api/extractions/search-sets/${uuid}/find-best-settings`, {
     method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json', ...csrfHeaders() },
     body: JSON.stringify({ num_runs: numRuns, max_candidates: maxCandidates }),
   })
+  if (!res.ok) {
+    const text = await res.text()
+    throw new Error(text || `Request failed (${res.status})`)
+  }
+  const reader = res.body?.getReader()
+  if (!reader) throw new Error('No response body')
+  const decoder = new TextDecoder()
+  let buffer = ''
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split('\n')
+    buffer = lines.pop() || ''
+    for (const line of lines) {
+      if (line.startsWith('data: ')) {
+        try {
+          onEvent(JSON.parse(line.slice(6)))
+        } catch { /* skip malformed */ }
+      }
+    }
+  }
 }
+
+export type TuningStreamEvent =
+  | { kind: 'start'; total: number; candidates: string[] }
+  | { kind: 'testing'; index: number; label: string; total: number }
+  | { kind: 'result'; index: number; result: TuningResult; total: number }
+  | { kind: 'done'; best: TuningResult; results: TuningResult[]; recommendation: string }
+  | { kind: 'error'; detail: string }
 
 // Export / Import
 

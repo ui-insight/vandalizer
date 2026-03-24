@@ -232,35 +232,28 @@ async def _run_single_config(
     }
 
 
-async def find_best_settings(
+async def find_best_settings_stream(
     search_set_uuid: str,
     user_id: str,
     num_runs: int = 2,
     max_candidates: int = 8,
-) -> dict:
-    """Try multiple extraction configurations and return ranked results.
+):
+    """Async generator that yields SSE events as each config is tested.
 
-    Requires at least one test case with expected values.
-    Uses 2 runs per config by default (balance between speed and consistency measurement).
-
-    Returns:
-        {
-            "best": {...},           # Best configuration
-            "results": [...],        # All configs ranked by score
-            "recommendation": str,   # Human-readable recommendation
-            "search_set_uuid": str,
-        }
+    Events:
+        {kind: "start", total: N, candidates: [...labels]}
+        {kind: "testing", index: i, label: "...", total: N}
+        {kind: "result", index: i, result: {...}, total: N}
+        {kind: "done", best: {...}, results: [...], recommendation: "..."}
+        {kind: "error", detail: "..."}
     """
     keys = await get_extraction_keys(search_set_uuid)
     if not keys:
         raise ValueError("No extraction fields defined")
 
-    # Load test cases
     test_cases = await ExtractionTestCase.find(
         ExtractionTestCase.search_set_uuid == search_set_uuid
     ).to_list()
-
-    # Filter to test cases with at least some expected values
     test_cases = [tc for tc in test_cases if tc.expected_values and any(v for v in tc.expected_values.values())]
     if not test_cases:
         raise ValueError(
@@ -268,24 +261,26 @@ async def find_best_settings(
             "Create test cases first (you can use 'Create from extraction' to bootstrap them)."
         )
 
-    # Load system config
     sys_config = await SystemConfig.get_config()
     sys_config_doc = sys_config.model_dump() if sys_config else {}
-
-    # Load field metadata
     field_metadata = await get_extraction_field_metadata(search_set_uuid)
 
-    # Build candidate configs
     candidates = _build_candidate_configs(sys_config.available_models, len(keys))
     if not candidates:
         raise ValueError("No models available for tuning")
-
-    # Limit candidates
     candidates = candidates[:max_candidates]
 
-    # Run all candidates (sequentially to avoid overwhelming the LLM API)
+    total = len(candidates)
+    yield {
+        "kind": "start",
+        "total": total,
+        "candidates": [c["label"] for c in candidates],
+    }
+
     results = []
-    for candidate in candidates:
+    for i, candidate in enumerate(candidates):
+        yield {"kind": "testing", "index": i, "label": candidate["label"], "total": total}
+
         try:
             result = await _run_single_config(
                 candidate, keys, test_cases, sys_config_doc, field_metadata, num_runs,
@@ -293,7 +288,7 @@ async def find_best_settings(
             results.append(result)
         except Exception as e:
             logger.warning("Tuning candidate %s failed: %s", candidate["label"], e)
-            results.append({
+            result = {
                 "label": candidate["label"],
                 "model": candidate["model"],
                 "config_override": candidate["config_override"],
@@ -301,17 +296,15 @@ async def find_best_settings(
                 "consistency": 0.0,
                 "score": 0.0,
                 "elapsed_seconds": 0.0,
-                "fields_evaluated": 0,
-                "total_comparisons": 0,
                 "error": str(e),
-            })
+            }
+            results.append(result)
 
-    # Sort by score descending, then by elapsed_seconds ascending (tiebreak: faster is better)
+        yield {"kind": "result", "index": i, "result": result, "total": total}
+
     results.sort(key=lambda r: (-r["score"], r["elapsed_seconds"]))
-
     best = results[0] if results else None
 
-    # Build recommendation
     if best and best["score"] >= 90:
         recommendation = (
             f"Recommended: **{best['label']}** with score {best['score']} "
@@ -332,12 +325,9 @@ async def find_best_settings(
     else:
         recommendation = "No configurations could be evaluated. Check model availability."
 
-    return {
-        "search_set_uuid": search_set_uuid,
+    yield {
+        "kind": "done",
         "best": best,
         "results": results,
         "recommendation": recommendation,
-        "num_candidates_tested": len(results),
-        "num_test_cases": len(test_cases),
-        "num_runs_per_config": num_runs,
     }
