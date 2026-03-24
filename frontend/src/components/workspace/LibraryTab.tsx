@@ -565,7 +565,7 @@ export function LibraryTab() {
 
       {/* ── Body: Explore tab gets its own view; mine/team keep sidebar + results ── */}
       {scope === 'explore' ? (
-        <div style={{ flexGrow: 1, minHeight: 0, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0, overflow: 'hidden' }}>
           <ExploreTab />
         </div>
       ) : (
