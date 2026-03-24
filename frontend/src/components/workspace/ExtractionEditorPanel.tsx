@@ -2,6 +2,7 @@ import React, { Fragment, useCallback, useEffect, useRef, useState } from 'react
 import { ExtractionTutorial } from './ExtractionTutorial'
 import { X, Pencil, Loader2, Copy, Trash2, GripVertical, Plus, ChevronDown, ChevronRight, Play, TrendingUp, Sparkles, FileText, AlertTriangle, Eye, Shield, ShieldCheck, Download } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
+import { useToast } from '../../contexts/ToastContext'
 import { useSearchSetItems } from '../../hooks/useExtractions'
 import {
   getSearchSet,
@@ -56,6 +57,7 @@ interface ExtractionConfig {
 
 export function ExtractionEditorPanel() {
   const { openExtractionId, openExtraction, closeExtraction, selectedDocUuids, setHighlightTerms, bumpActivitySignal, consumeExtractionResults } = useWorkspace()
+  const { toast } = useToast()
   const [searchSet, setSearchSet] = useState<SearchSet | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('design')
@@ -162,6 +164,8 @@ export function ExtractionEditorPanel() {
   // --- Export ---
   const handleExport = () => {
     navigator.clipboard.writeText(JSON.stringify(results, null, 2))
+      .then(() => toast('Results copied to clipboard', 'success'))
+      .catch(() => toast('Failed to copy to clipboard', 'error'))
   }
 
   // --- Tools ---
@@ -219,6 +223,8 @@ export function ExtractionEditorPanel() {
     setExportingPdf(true)
     try {
       await exportExtractionPdf(openExtractionId, results, [])
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'PDF export failed', 'error')
     } finally {
       setExportingPdf(false)
     }

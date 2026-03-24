@@ -428,7 +428,7 @@ export async function exportExtractionPdf(
   const res = await fetch(`/api/extractions/search-sets/${uuid}/export-pdf`, {
     method: 'POST',
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...csrfHeaders() },
     body: JSON.stringify({ results, document_names: documentNames }),
   })
   if (!res.ok) {
