@@ -65,8 +65,11 @@ export function ExtractionEditorPanel() {
   const [titleDraft, setTitleDraft] = useState('')
   const [newTerm, setNewTerm] = useState('')
   const [running, setRunning] = useState(false)
-  const [results, setResults] = useState<Record<string, string>>({})
+  const [resultSets, setResultSets] = useState<Record<string, string>[]>([])
+  const [activeResultIdx, setActiveResultIdx] = useState(0)
   const [combinedContext, setCombinedContext] = useState(false)
+
+  const results = resultSets[activeResultIdx] ?? {}
   const [attachingTemplate, setAttachingTemplate] = useState(false)
   const [generatingTemplate, setGeneratingTemplate] = useState(false)
   const [exportingPdf, setExportingPdf] = useState(false)
@@ -164,10 +167,37 @@ export function ExtractionEditorPanel() {
   }
 
   // --- Export ---
-  const handleExport = () => {
+  const handleExportCopy = () => {
     navigator.clipboard.writeText(JSON.stringify(results, null, 2))
       .then(() => toast('Results copied to clipboard', 'success'))
       .catch(() => toast('Failed to copy to clipboard', 'error'))
+  }
+
+  const handleExportJSON = () => {
+    const blob = new Blob([JSON.stringify(results, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `extraction-${searchSet?.name || 'results'}-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast('JSON downloaded', 'success')
+  }
+
+  const handleExportCSV = () => {
+    const escape = (v: string) => `"${v.replace(/"/g, '""')}"`
+    const keys = Object.keys(results)
+    const header = keys.map(escape).join(',')
+    const row = keys.map(k => escape(String(results[k] ?? ''))).join(',')
+    const csv = header + '\n' + row + '\n'
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `extraction-${searchSet?.name || 'results'}-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast('CSV downloaded', 'success')
   }
 
   // --- Tools ---
@@ -440,7 +470,9 @@ export function ExtractionEditorPanel() {
           running={running}
           config={config}
           docCount={selectedDocUuids.length}
-          onExport={handleExport}
+          onExportCSV={handleExportCSV}
+          onExportJSON={handleExportJSON}
+          onExportCopy={handleExportCopy}
           onRemoveItem={remove}
           onUpdateItem={update}
           onReorder={reorder}
@@ -699,7 +731,9 @@ function DesignTab({
   running,
   config,
   docCount,
-  onExport,
+  onExportCSV,
+  onExportJSON,
+  onExportCopy,
   onRemoveItem,
   onUpdateItem,
   onReorder,
@@ -713,7 +747,9 @@ function DesignTab({
   running: boolean
   config: ExtractionConfig
   docCount: number
-  onExport: () => void
+  onExportCSV: () => void
+  onExportJSON: () => void
+  onExportCopy: () => void
   onRemoveItem: (id: string) => void
   onUpdateItem: (id: string, data: { searchphrase?: string; title?: string; is_optional?: boolean; enum_values?: string[] }) => void
   onReorder: (itemIds: string[]) => void
@@ -725,6 +761,19 @@ function DesignTab({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState('')
   const [expandedSettingsId, setExpandedSettingsId] = useState<string | null>(null)
+  const [exportMenuOpen, setExportMenuOpen] = useState(false)
+  const exportMenuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!exportMenuOpen) return
+    const handler = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setExportMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [exportMenuOpen])
   const [enumDraft, setEnumDraft] = useState('')
   const tip = useRotatingTip(running, config, docCount, items.length)
 
@@ -769,24 +818,74 @@ function DesignTab({
       >
         <div style={{ fontSize: 14, fontWeight: 600, color: '#202124' }}>Extractions</div>
         {hasResults && (
-          <button
-            onClick={onExport}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 4,
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: 12,
-              color: '#2563eb',
-              fontFamily: 'inherit',
-              padding: 0,
-            }}
-          >
-            <Copy style={{ width: 12, height: 12 }} />
-            Export
-          </button>
+          <div ref={exportMenuRef} style={{ position: 'relative' }}>
+            <button
+              onClick={() => setExportMenuOpen(v => !v)}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: 12,
+                color: '#2563eb',
+                fontFamily: 'inherit',
+                padding: 0,
+              }}
+            >
+              <Download style={{ width: 12, height: 12 }} />
+              Export
+              <ChevronDown style={{ width: 10, height: 10 }} />
+            </button>
+            {exportMenuOpen && (
+              <div
+                style={{
+                  position: 'absolute',
+                  right: 0,
+                  top: '100%',
+                  marginTop: 4,
+                  background: '#fff',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: 8,
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                  zIndex: 50,
+                  minWidth: 160,
+                  overflow: 'hidden',
+                }}
+              >
+                {[
+                  { label: 'Download CSV', icon: <Download style={{ width: 13, height: 13 }} />, action: onExportCSV },
+                  { label: 'Download JSON', icon: <Download style={{ width: 13, height: 13 }} />, action: onExportJSON },
+                  { label: 'Copy to Clipboard', icon: <Copy style={{ width: 13, height: 13 }} />, action: onExportCopy },
+                ].map(opt => (
+                  <button
+                    key={opt.label}
+                    onClick={() => { setExportMenuOpen(false); opt.action() }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      width: '100%',
+                      padding: '8px 12px',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      color: '#374151',
+                      fontFamily: 'inherit',
+                      textAlign: 'left',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#f3f4f6')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+                  >
+                    {opt.icon}
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </div>
 
