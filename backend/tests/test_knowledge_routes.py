@@ -206,6 +206,7 @@ class TestKnowledgeCloneAuth:
         cloned_kb.total_chunks = 0
         cloned_kb.created_at = None
         cloned_kb.updated_at = None
+        cloned_kb.user_id = "viewer"
 
         with (
             patch("app.dependencies.decode_token", return_value={"sub": "viewer", "type": "access"}),

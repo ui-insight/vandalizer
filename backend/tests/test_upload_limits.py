@@ -47,7 +47,6 @@ class TestUploadSizeLimits:
                 blob=oversized_blob,
                 filename="big_file.pdf",
                 raw_extension="pdf",
-                space="default",
                 user=_make_user(),
                 settings=settings,
             )
@@ -73,7 +72,6 @@ class TestUploadSizeLimits:
                     blob=blob,
                     filename="big_file.pdf",
                     raw_extension="pdf",
-                    space="default",
                     user=_make_user(),
                     settings=settings,
                 )
@@ -111,7 +109,6 @@ class TestUploadSizeLimits:
                 blob=blob,
                 filename="small_file.pdf",
                 raw_extension="pdf",
-                space="default",
                 user=user,
                 settings=settings,
             )
@@ -132,7 +129,6 @@ class TestUploadSizeLimits:
                 blob=blob,
                 filename="script.py",
                 raw_extension="py",
-                space="default",
                 user=_make_user(),
                 settings=settings,
             )

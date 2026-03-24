@@ -453,6 +453,7 @@ async def preview_catalog_import(
 async def import_catalog_items(
     file: UploadFile = File(...),
     selected_indices: str = Form(...),
+    space: Optional[str] = Form(None),
     user: User = Depends(get_current_user),
 ):
     _require_examiner_access(user)
@@ -478,6 +479,7 @@ async def import_catalog_items(
             data,
             parsed_indices,
             user.user_id,
+            space=space,
             team_id=str(user.current_team) if user.current_team else None,
         )
     except ValueError as e:

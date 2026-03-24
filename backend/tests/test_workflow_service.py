@@ -106,7 +106,6 @@ class TestCreateWorkflow:
         result = await create_workflow(
             name="My Workflow",
             user_id="user1",
-            space="research",
             description="A test workflow",
             team_id="team1",
         )

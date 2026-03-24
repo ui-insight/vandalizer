@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vandalizer Release Testing — Friday Launch</title>
+<style>
+  :root {
+    --gold: #f1b300;
+    --gold-dim: #f1b30030;
+    --gold-glow: #f1b30050;
+    --bg: #0a0a0a;
+    --surface: #141414;
+    --surface-hover: #1a1a1a;
+    --border: #ffffff12;
+    --text: #e5e5e5;
+    --text-dim: #888;
+    --green: #22c55e;
+    --green-dim: #22c55e30;
+    --blue: #3b82f6;
+    --blue-dim: #3b82f630;
+    --red: #ef4444;
+    --purple: #a855f7;
+    --purple-dim: #a855f730;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── Top bar ─────────────────────────────────────────────── */
+  .topbar {
+    position: sticky; top: 0; z-index: 100;
+    background: var(--bg); border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+    backdrop-filter: blur(12px);
+  }
+  .topbar-left { display: flex; align-items: center; gap: 16px; }
+  .topbar-logo { font-size: 18px; font-weight: 800; color: var(--gold); letter-spacing: 1px; }
+  .topbar-subtitle { font-size: 13px; color: var(--text-dim); }
+  .topbar-right { display: flex; align-items: center; gap: 20px; }
+
+  /* ── XP & Level ──────────────────────────────────────────── */
+  .level-badge {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--gold-dim); border: 1px solid var(--gold);
+    border-radius: 20px; padding: 4px 14px 4px 8px;
+    font-size: 13px; font-weight: 700; color: var(--gold);
+  }
+  .level-badge .icon { font-size: 18px; }
+  .xp-display {
+    font-size: 14px; font-weight: 700; color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  .xp-display span { color: var(--gold); }
+
+  /* ── Progress bar (global) ───────────────────────────────── */
+  .global-progress {
+    height: 4px; background: var(--border);
+    position: sticky; top: 53px; z-index: 99;
+  }
+  .global-progress-fill {
+    height: 100%; background: linear-gradient(90deg, var(--gold), #ffdd57);
+    transition: width 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow: 0 0 12px var(--gold-glow);
+  }
+
+  /* ── Stats row ───────────────────────────────────────────── */
+  .stats-row {
+    display: flex; gap: 12px; padding: 20px 24px;
+    overflow-x: auto; flex-wrap: wrap;
+  }
+  .stat-card {
+    flex: 1; min-width: 140px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px;
+    text-align: center; transition: border-color 0.3s, box-shadow 0.3s;
+  }
+  .stat-card.complete { border-color: var(--green); box-shadow: 0 0 20px var(--green-dim); }
+  .stat-card .stat-value { font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .stat-card .stat-label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; margin-top: 2px; }
+
+  /* ── Phase sections ──────────────────────────────────────── */
+  .content { max-width: 960px; margin: 0 auto; padding: 0 24px 80px; }
+
+  .phase {
+    margin-top: 32px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--surface);
+    overflow: hidden;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+  .phase.phase-done { border-color: var(--green); box-shadow: 0 0 24px var(--green-dim); }
+
+  .phase-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px;
+    cursor: pointer; user-select: none;
+    transition: background 0.2s;
+  }
+  .phase-header:hover { background: var(--surface-hover); }
+  .phase-header-left { display: flex; align-items: center; gap: 12px; }
+  .phase-icon { font-size: 22px; }
+  .phase-title { font-size: 16px; font-weight: 700; }
+  .phase-subtitle { font-size: 12px; color: var(--text-dim); }
+  .phase-counter {
+    font-size: 13px; font-weight: 600; color: var(--text-dim);
+    background: var(--border); border-radius: 8px; padding: 4px 10px;
+    font-variant-numeric: tabular-nums;
+    min-width: 52px; text-align: center;
+  }
+  .phase-counter.done { background: var(--green-dim); color: var(--green); }
+  .phase-chevron {
+    font-size: 14px; color: var(--text-dim);
+    transition: transform 0.3s;
+  }
+  .phase.collapsed .phase-chevron { transform: rotate(-90deg); }
+  .phase.collapsed .phase-body { display: none; }
+
+  /* ── Phase mini progress ─────────────────────────────────── */
+  .phase-progress {
+    height: 3px; background: var(--border);
+  }
+  .phase-progress-fill {
+    height: 100%; transition: width 0.5s ease;
+  }
+
+  /* ── Sections inside phase ───────────────────────────────── */
+  .phase-body { padding: 0 20px 16px; }
+
+  .section { margin-top: 16px; }
+  .section-header {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 8px;
+  }
+  .section-badge {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1px; padding: 2px 8px; border-radius: 6px;
+  }
+  .section-badge.critical { background: #ef444425; color: var(--red); }
+  .section-badge.important { background: var(--blue-dim); color: var(--blue); }
+  .section-badge.nice { background: var(--purple-dim); color: var(--purple); }
+  .section-badge.auto { background: var(--gold-dim); color: var(--gold); }
+  .section-title { font-size: 14px; font-weight: 700; }
+  .section-xp { font-size: 11px; color: var(--gold); font-weight: 600; margin-left: auto; }
+
+  /* ── Checklist items ─────────────────────────────────────── */
+  .checklist { list-style: none; }
+  .checklist li {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 8px 12px; border-radius: 8px;
+    transition: background 0.15s;
+    cursor: pointer;
+  }
+  .checklist li:hover { background: #ffffff06; }
+  .checklist li.checked { opacity: 0.5; }
+  .checklist li.checked .item-text { text-decoration: line-through; }
+
+  .checkbox {
+    width: 20px; height: 20px; flex-shrink: 0; margin-top: 1px;
+    border: 2px solid #555; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s; position: relative;
+    cursor: pointer;
+  }
+  .checkbox::after {
+    content: ''; display: block;
+    width: 10px; height: 10px; border-radius: 3px;
+    background: var(--green); transform: scale(0);
+    transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .checklist li.checked .checkbox {
+    border-color: var(--green); background: var(--green-dim);
+  }
+  .checklist li.checked .checkbox::after { transform: scale(1); }
+
+  .item-text { font-size: 13px; flex: 1; padding-top: 1px; }
+  .item-xp {
+    font-size: 11px; color: var(--gold); font-weight: 600;
+    white-space: nowrap; padding-top: 2px;
+    opacity: 1; transition: opacity 0.3s;
+  }
+  .checklist li.checked .item-xp { opacity: 0.3; }
+
+  /* ── Code blocks inside items ────────────────────────────── */
+  .cmd-block {
+    margin: 8px 0 4px 30px;
+    background: #0d0d0d; border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 14px;
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 12px; color: #ccc; line-height: 1.7;
+    overflow-x: auto; white-space: pre;
+    cursor: pointer; position: relative;
+  }
+  .cmd-block:hover::after {
+    content: 'click to copy'; position: absolute; top: 6px; right: 10px;
+    font-size: 10px; color: var(--text-dim); font-family: -apple-system, sans-serif;
+  }
+  .cmd-block.copied::after {
+    content: 'copied!'; color: var(--green);
+  }
+
+  /* ── Streak & combos ─────────────────────────────────────── */
+  .streak-bar {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--surface); border: 1px solid var(--gold);
+    border-radius: 14px; padding: 8px 20px;
+    font-size: 14px; font-weight: 700; color: var(--gold);
+    box-shadow: 0 4px 30px #00000080, 0 0 20px var(--gold-glow);
+    z-index: 200; display: flex; align-items: center; gap: 8px;
+    opacity: 0; transform: translateX(-50%) translateY(20px);
+    transition: opacity 0.3s, transform 0.3s;
+    pointer-events: none;
+  }
+  .streak-bar.visible {
+    opacity: 1; transform: translateX(-50%) translateY(0);
+  }
+
+  /* ── Completion overlay ──────────────────────────────────── */
+  .completion-overlay {
+    position: fixed; inset: 0; z-index: 500;
+    background: #000000cc; backdrop-filter: blur(8px);
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.5s;
+  }
+  .completion-overlay.visible { opacity: 1; pointer-events: auto; }
+  .completion-card {
+    text-align: center; padding: 48px;
+    background: var(--surface); border: 2px solid var(--gold);
+    border-radius: 24px; box-shadow: 0 0 60px var(--gold-glow);
+    max-width: 480px;
+    transform: scale(0.9); transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .completion-overlay.visible .completion-card { transform: scale(1); }
+  .completion-card .trophy { font-size: 72px; margin-bottom: 16px; }
+  .completion-card h2 { font-size: 28px; color: var(--gold); margin-bottom: 8px; }
+  .completion-card p { color: var(--text-dim); font-size: 15px; margin-bottom: 24px; }
+  .completion-card .final-xp { font-size: 36px; font-weight: 800; color: var(--gold); }
+  .completion-card button {
+    margin-top: 24px; background: var(--gold); color: #000;
+    border: none; border-radius: 10px; padding: 12px 32px;
+    font-size: 15px; font-weight: 700; cursor: pointer;
+    transition: transform 0.2s;
+  }
+  .completion-card button:hover { transform: scale(1.05); }
+
+  /* ── Float animation for XP popups ───────────────────────── */
+  .xp-popup {
+    position: fixed; z-index: 300;
+    font-size: 16px; font-weight: 800; color: var(--gold);
+    pointer-events: none;
+    animation: floatUp 1s ease-out forwards;
+    text-shadow: 0 0 10px var(--gold-glow);
+  }
+  @keyframes floatUp {
+    0% { opacity: 1; transform: translateY(0) scale(1); }
+    100% { opacity: 0; transform: translateY(-60px) scale(1.3); }
+  }
+
+  /* ── Confetti canvas ─────────────────────────────────────── */
+  #confetti {
+    position: fixed; inset: 0; z-index: 400;
+    pointer-events: none;
+  }
+
+  /* ── Responsive ──────────────────────────────────────────── */
+  @media (max-width: 640px) {
+    .stats-row { gap: 8px; }
+    .stat-card { min-width: 100px; padding: 12px; }
+    .stat-card .stat-value { font-size: 22px; }
+    .topbar { padding: 10px 16px; }
+    .content { padding: 0 12px 80px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="topbar-logo">VANDALIZER</div>
+    <div class="topbar-subtitle">Release Testing &mdash; Friday Launch</div>
+  </div>
+  <div class="topbar-right">
+    <div class="xp-display"><span id="totalXp">0</span> XP</div>
+    <div class="level-badge"><span class="icon" id="levelIcon">🥚</span> <span id="levelName">Hatchling</span></div>
+  </div>
+</div>
+
+<div class="global-progress"><div class="global-progress-fill" id="globalBar" style="width:0%"></div></div>
+
+<div class="stats-row" id="statsRow"></div>
+
+<div class="content" id="content"></div>
+
+<div class="streak-bar" id="streakBar">🔥 <span id="streakText"></span></div>
+<div class="completion-overlay" id="completionOverlay">
+  <div class="completion-card">
+    <div class="trophy">🏆</div>
+    <h2>RELEASE READY</h2>
+    <p>You've completed every test. Ship it.</p>
+    <div class="final-xp" id="finalXp">0 XP</div>
+    <button onclick="document.getElementById('completionOverlay').classList.remove('visible')">Let's Go</button>
+  </div>
+</div>
+<canvas id="confetti"></canvas>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════════════════════════
+const PHASES = [
+  {
+    id: 'auto', icon: '⚡', title: 'Phase 1 — Automated Testing',
+    subtitle: 'Run the machines first', color: '#f1b300',
+    sections: [
+      { id: 'ci', title: 'CI Suite', badge: 'auto', xpPer: 15, items: [
+        { text: 'Run <code>make backend-static</code> — lint + security passes', cmd: 'make backend-static' },
+        { text: 'Run <code>make backend-ci</code> — unit tests + tier 1 pass', cmd: 'make backend-ci' },
+        { text: 'Run <code>make frontend-ci</code> — typecheck + lint + tests + build', cmd: 'cd frontend && npm ci && cd .. && make frontend-ci' },
+        { text: 'Run <code>make docker-build</code> — both containers build', cmd: 'make docker-build' },
+      ]},
+      { id: 'ignored', title: 'Triage Ignored Tests', badge: 'auto', xpPer: 10, items: [
+        { text: 'Run the 11 ignored test files — triage each failure', cmd: 'cd backend && uv run pytest tests/test_code_execution.py tests/test_knowledge_routes.py tests/test_spaces_routes.py tests/test_upload_limits.py tests/test_verification_routes.py tests/test_workflow_authz.py tests/test_workflow_engine_core.py tests/test_workflow_nodes.py tests/test_workflow_routes.py tests/test_workflow_service.py tests/test_bootstrap_scripts.py -v --tb=short' },
+        { text: 'Document reason for each skipped file (fix or justify)' },
+      ]},
+      { id: 'integration', title: 'Integration Tests', badge: 'auto', xpPer: 20, items: [
+        { text: 'Tier 2 MongoDB — real DB round-trips pass', cmd: 'cd backend && INTEGRATION_MONGODB=1 uv run pytest tests/integration/test_tier2_mongodb.py -x -v' },
+        { text: 'Tier 3 LLM — structured extraction with real model works', cmd: 'cd backend && INTEGRATION_LLM=1 INTEGRATION_LLM_MODEL=gpt-4o-mini INTEGRATION_LLM_API_KEY=$LLM_KEY uv run pytest tests/integration/test_tier3_llm.py -x -v' },
+        { text: 'Playwright E2E — auth + upload flows pass', cmd: 'cd frontend && E2E_TEST_USER=test@example.com E2E_TEST_PASS=testpass npx playwright test' },
+      ]},
+      { id: 'docker', title: 'Docker Smoke Test', badge: 'auto', xpPer: 15, items: [
+        { text: 'Containers start and reach healthy state', cmd: 'docker compose up -d && docker compose ps' },
+        { text: 'Backend health endpoint responds', cmd: 'curl http://localhost:8001/api/health' },
+        { text: 'Frontend serves HTML', cmd: 'curl -s http://localhost:80 | head -5' },
+      ]},
+    ]
+  },
+  {
+    id: 'critical', icon: '🔴', title: 'Phase 2 — Critical Path',
+    subtitle: 'Block release if any of these fail', color: '#ef4444',
+    sections: [
+      { id: 'auth', title: 'Authentication', badge: 'critical', xpPer: 10, items: [
+        { text: 'Login with valid password credentials' },
+        { text: 'Login with SAML SSO (if configured)' },
+        { text: 'Login with Azure OAuth (if configured)' },
+        { text: 'Register a new account — logs in automatically' },
+        { text: 'Invalid credentials show error message' },
+        { text: 'Logout clears session — redirects to landing' },
+        { text: 'JWT refresh works — stay logged in >15 min without re-auth' },
+        { text: '<code>/landing</code> renders correctly for unauthenticated users' },
+      ]},
+      { id: 'docs', title: 'Document Upload & Processing', badge: 'critical', xpPer: 12, items: [
+        { text: 'Upload a PDF — appears in file list' },
+        { text: 'Upload a DOCX — appears in file list' },
+        { text: 'Upload an XLSX — appears in file list' },
+        { text: 'Processing completes (status: processing → ready)' },
+        { text: 'Document text renders in viewer' },
+        { text: 'Download document — matches original' },
+        { text: 'Delete a document — removed from list' },
+        { text: 'Batch download multiple docs as zip' },
+      ]},
+      { id: 'folders', title: 'Folder Management', badge: 'critical', xpPer: 8, items: [
+        { text: 'Create a folder' },
+        { text: 'Rename a folder' },
+        { text: 'Move a file into a folder' },
+        { text: 'Delete a folder' },
+      ]},
+      { id: 'extractions', title: 'Extractions', badge: 'critical', xpPer: 12, items: [
+        { text: 'Create extraction with 3+ fields' },
+        { text: 'Run on single document — results appear' },
+        { text: 'Run on multiple documents — results for each' },
+        { text: 'Download results as CSV' },
+        { text: 'Download results as JSON' },
+        { text: 'Download results as PDF' },
+        { text: 'Edit fields and re-run — results reflect changes' },
+        { text: 'Delete an extraction' },
+      ]},
+      { id: 'workflows', title: 'Workflows', badge: 'critical', xpPer: 12, items: [
+        { text: 'Create workflow with an Extraction step' },
+        { text: 'Add a Prompt step after extraction' },
+        { text: 'Run workflow — all steps complete' },
+        { text: 'View step-by-step output in results' },
+        { text: 'Download workflow results' },
+        { text: 'Duplicate workflow — copy appears' },
+        { text: 'Delete a workflow' },
+        { text: 'Export workflow as JSON' },
+        { text: 'Import workflow from JSON' },
+      ]},
+      { id: 'chat', title: 'Chat / RAG', badge: 'critical', xpPer: 12, items: [
+        { text: 'Start a new chat' },
+        { text: 'Ask about uploaded document — answer references doc content' },
+        { text: 'Multi-turn conversation maintains context' },
+        { text: 'Streaming works — tokens appear incrementally' },
+        { text: 'New chat clears previous conversation' },
+      ]},
+      { id: 'kb', title: 'Knowledge Bases', badge: 'critical', xpPer: 12, items: [
+        { text: 'Create a knowledge base' },
+        { text: 'Add documents — sources list updates' },
+        { text: 'Add a URL — source is scraped and indexed' },
+        { text: 'Chat with KB active — answers from KB content' },
+        { text: 'Remove a source from KB' },
+        { text: 'Delete a knowledge base' },
+        { text: 'Deep link <code>/?kb=&lt;uuid&gt;</code> activates KB in chat' },
+      ]},
+    ]
+  },
+  {
+    id: 'important', icon: '🔵', title: 'Phase 3 — Important Features',
+    subtitle: 'High user impact — should work', color: '#3b82f6',
+    sections: [
+      { id: 'teams', title: 'Teams & Multi-Tenancy', badge: 'important', xpPer: 8, items: [
+        { text: 'Create a team' },
+        { text: 'Invite a user by email' },
+        { text: 'Invited user accepts via <code>/invite?token=...</code>' },
+        { text: 'Team member sees shared documents' },
+        { text: 'Change member role (member → admin)' },
+        { text: 'Remove member from team' },
+        { text: 'Leave a team' },
+        { text: 'Switch teams — workspace updates correctly' },
+        { text: 'Team A docs NOT visible in Team B' },
+      ]},
+      { id: 'library', title: 'Library', badge: 'important', xpPer: 8, items: [
+        { text: 'Save a workflow to library' },
+        { text: 'Save an extraction to library' },
+        { text: 'Browse library items' },
+        { text: 'Clone item to personal library' },
+        { text: 'Share item with team' },
+        { text: 'Delete a library item' },
+      ]},
+      { id: 'automations', title: 'Automations', badge: 'important', xpPer: 10, items: [
+        { text: 'Create automation (on upload → run extraction)' },
+        { text: 'Upload document — automation triggers' },
+        { text: 'Verify automation results match expected output' },
+        { text: 'Disable / delete automation' },
+      ]},
+      { id: 'workspace', title: 'Workspace UI', badge: 'important', xpPer: 6, items: [
+        { text: 'Switch between modes: Chat, Files, Automations, Knowledge' },
+        { text: 'Activity rail shows recent activities' },
+        { text: 'Click activity — navigates to correct context' },
+        { text: 'Panel resize persists on reload' },
+        { text: 'Rail dock/undock toggle works' },
+      ]},
+      { id: 'admin', title: 'Admin Panel', badge: 'important', xpPer: 8, items: [
+        { text: 'View usage stats dashboard' },
+        { text: 'View user list' },
+        { text: 'Create a new user' },
+        { text: 'Toggle admin/examiner flags' },
+        { text: 'Update system configuration' },
+        { text: 'Add/update LLM model configuration' },
+        { text: 'View audit log — events for recent actions' },
+        { text: 'Clear LLM agent cache' },
+      ]},
+      { id: 'verification', title: 'Verification Queue', badge: 'important', xpPer: 10, items: [
+        { text: 'Submit workflow for verification' },
+        { text: 'Examiner sees submission in queue' },
+        { text: 'Examiner approves/rejects submission' },
+        { text: 'Approved items appear in verified lists' },
+      ]},
+    ]
+  },
+  {
+    id: 'nice', icon: '🟣', title: 'Phase 4 — Nice to Have',
+    subtitle: 'Test if time permits', color: '#a855f7',
+    sections: [
+      { id: 'quality', title: 'Quality & Validation', badge: 'nice', xpPer: 6, items: [
+        { text: 'Generate a validation plan for a workflow' },
+        { text: 'Run validation suite — pass/fail results display' },
+        { text: 'Save execution as expected output (golden standard)' },
+        { text: 'Quality sparkline renders on workflow card' },
+        { text: 'LLM improvement suggestions load' },
+      ]},
+      { id: 'exportimport', title: 'Export / Import', badge: 'nice', xpPer: 6, items: [
+        { text: 'Export workflow JSON, import on different account' },
+        { text: 'Export extraction results as XLSX' },
+      ]},
+      { id: 'account', title: 'Account Management', badge: 'nice', xpPer: 5, items: [
+        { text: 'Update display name' },
+        { text: 'Update email address' },
+        { text: 'Generate API token' },
+        { text: 'Revoke API token' },
+        { text: 'Delete account — confirmation required, data purged' },
+      ]},
+      { id: 'demo', title: 'Demo Mode', badge: 'nice', xpPer: 5, items: [
+        { text: '<code>/demo</code> page loads' },
+        { text: 'Submit demo application' },
+        { text: 'Check status via <code>/demo/status/&lt;uuid&gt;</code>' },
+      ]},
+      { id: 'edge', title: 'Edge Cases', badge: 'nice', xpPer: 5, items: [
+        { text: 'Upload 0-byte file — graceful error' },
+        { text: 'Upload very large file (>50MB) — limit error or processes' },
+        { text: 'Run workflow with no docs selected — graceful error' },
+        { text: 'Rapid-click "Run" — only one execution starts' },
+        { text: 'Two browser tabs — no state corruption' },
+        { text: 'Landing page readable on mobile' },
+      ]},
+      { id: 'browser', title: 'Browser Compatibility', badge: 'nice', xpPer: 5, items: [
+        { text: 'Chrome' },
+        { text: 'Firefox' },
+        { text: 'Safari' },
+        { text: 'Edge' },
+      ]},
+    ]
+  },
+  {
+    id: 'launch', icon: '🚀', title: 'Phase 5 — Launch Day',
+    subtitle: 'Thursday night / Friday morning', color: '#22c55e',
+    sections: [
+      { id: 'preflight', title: 'Pre-Flight Checks', badge: 'auto', xpPer: 15, items: [
+        { text: 'All CI checks green on <code>main</code>' },
+        { text: 'Container images published to GHCR' },
+        { text: 'Tag the release', cmd: 'git tag v1.0.0 && git push origin v1.0.0' },
+        { text: 'Release workflow creates GitHub Release' },
+        { text: 'Pull release images on production server' },
+        { text: 'Verify <code>.env</code> has all required vars' },
+        { text: 'LLM API keys configured in admin System Config' },
+      ]},
+      { id: 'smoke', title: 'Production Smoke Test', badge: 'critical', xpPer: 20, items: [
+        { text: 'Login on production' },
+        { text: 'Upload a document on production' },
+        { text: 'Run extraction on production' },
+        { text: 'Chat with document on production' },
+        { text: 'Verify HTTPS / SSL working' },
+      ]},
+    ]
+  },
+];
+
+// ═══════════════════════════════════════════════════════════════
+// LEVELS
+// ═══════════════════════════════════════════════════════════════
+const LEVELS = [
+  { name: 'Hatchling', icon: '🥚', minXp: 0 },
+  { name: 'Scout', icon: '🔍', minXp: 50 },
+  { name: 'Tester', icon: '🧪', minXp: 150 },
+  { name: 'Inspector', icon: '🔬', minXp: 300 },
+  { name: 'Guardian', icon: '🛡️', minXp: 500 },
+  { name: 'Sentinel', icon: '⚔️', minXp: 750 },
+  { name: 'Release Captain', icon: '🚀', minXp: 1000 },
+  { name: 'Vandal Legend', icon: '👑', minXp: 1300 },
+];
+
+// ═══════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════
+const STORAGE_KEY = 'vandalizer-testing-state';
+let state = loadState();
+let streak = 0;
+let streakTimer = null;
+
+function loadState() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    return s && s.checked ? s : { checked: {} };
+  } catch { return { checked: {} }; }
+}
+function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+
+function itemKey(phaseId, sectionId, idx) { return `${phaseId}:${sectionId}:${idx}`; }
+
+// ═══════════════════════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════════════════════
+function render() {
+  const statsRow = document.getElementById('statsRow');
+  const content = document.getElementById('content');
+  statsRow.innerHTML = '';
+  content.innerHTML = '';
+
+  let totalItems = 0, totalChecked = 0, totalXp = 0;
+
+  // Build phases
+  PHASES.forEach(phase => {
+    let phaseItems = 0, phaseChecked = 0;
+
+    phase.sections.forEach(sec => {
+      sec.items.forEach((item, idx) => {
+        totalItems++;
+        phaseItems++;
+        const key = itemKey(phase.id, sec.id, idx);
+        if (state.checked[key]) {
+          totalChecked++;
+          phaseChecked++;
+          totalXp += sec.xpPer;
+        }
+      });
+    });
+
+    const phaseDone = phaseItems > 0 && phaseChecked === phaseItems;
+
+    // Stat card
+    const card = document.createElement('div');
+    card.className = 'stat-card' + (phaseDone ? ' complete' : '');
+    card.innerHTML = `
+      <div class="stat-value" style="color:${phaseDone ? 'var(--green)' : phase.color}">${phaseChecked}/${phaseItems}</div>
+      <div class="stat-label">${phase.title.replace(/Phase \d+ — /, '')}</div>
+    `;
+    statsRow.appendChild(card);
+
+    // Phase card
+    const phaseEl = document.createElement('div');
+    phaseEl.className = 'phase' + (phaseDone ? ' phase-done' : '');
+    phaseEl.id = `phase-${phase.id}`;
+
+    const phasePct = phaseItems > 0 ? (phaseChecked / phaseItems * 100) : 0;
+    const progressColor = phaseDone ? 'var(--green)' : phase.color;
+
+    phaseEl.innerHTML = `
+      <div class="phase-header" onclick="togglePhase('${phase.id}')">
+        <div class="phase-header-left">
+          <span class="phase-icon">${phase.icon}</span>
+          <div>
+            <div class="phase-title">${phase.title}</div>
+            <div class="phase-subtitle">${phase.subtitle}</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="phase-counter ${phaseDone ? 'done' : ''}">${phaseChecked}/${phaseItems}</div>
+          <span class="phase-chevron">▼</span>
+        </div>
+      </div>
+      <div class="phase-progress"><div class="phase-progress-fill" style="width:${phasePct}%;background:${progressColor}"></div></div>
+      <div class="phase-body"></div>
+    `;
+
+    const body = phaseEl.querySelector('.phase-body');
+    phase.sections.forEach(sec => {
+      const sectionEl = document.createElement('div');
+      sectionEl.className = 'section';
+
+      const secChecked = sec.items.filter((_, i) => state.checked[itemKey(phase.id, sec.id, i)]).length;
+      const secTotal = sec.items.length;
+      const secDone = secChecked === secTotal;
+
+      sectionEl.innerHTML = `
+        <div class="section-header">
+          <span class="section-badge ${sec.badge}">${sec.badge}</span>
+          <span class="section-title">${sec.title}</span>
+          <span style="font-size:12px;color:${secDone ? 'var(--green)' : 'var(--text-dim)'};margin-left:8px">${secChecked}/${secTotal}</span>
+          <span class="section-xp">${sec.xpPer} XP each</span>
+        </div>
+      `;
+
+      const ul = document.createElement('ul');
+      ul.className = 'checklist';
+
+      sec.items.forEach((item, idx) => {
+        const key = itemKey(phase.id, sec.id, idx);
+        const checked = !!state.checked[key];
+        const li = document.createElement('li');
+        li.className = checked ? 'checked' : '';
+        li.innerHTML = `
+          <div class="checkbox"></div>
+          <div class="item-text">${item.text}</div>
+          <div class="item-xp">+${sec.xpPer}</div>
+        `;
+
+        li.addEventListener('click', (e) => {
+          if (e.target.closest('.cmd-block')) return;
+          toggleItem(key, sec.xpPer, li, e);
+        });
+
+        ul.appendChild(li);
+
+        if (item.cmd) {
+          const cmd = document.createElement('div');
+          cmd.className = 'cmd-block';
+          cmd.textContent = item.cmd;
+          cmd.addEventListener('click', (e) => {
+            e.stopPropagation();
+            navigator.clipboard.writeText(item.cmd);
+            cmd.classList.add('copied');
+            setTimeout(() => cmd.classList.remove('copied'), 1500);
+          });
+          ul.appendChild(document.createElement('li')).replaceWith(cmd);
+          // Attach after the li
+          li.after(cmd);
+        }
+      });
+
+      sectionEl.appendChild(ul);
+      body.appendChild(sectionEl);
+    });
+
+    content.appendChild(phaseEl);
+  });
+
+  // Update global
+  updateGlobal(totalXp, totalChecked, totalItems);
+}
+
+function updateGlobal(xp, checked, total) {
+  const pct = total > 0 ? (checked / total * 100) : 0;
+  document.getElementById('globalBar').style.width = pct + '%';
+  animateXp(xp);
+  updateLevel(xp);
+
+  if (checked === total && total > 0) {
+    setTimeout(() => {
+      document.getElementById('finalXp').textContent = xp + ' XP';
+      document.getElementById('completionOverlay').classList.add('visible');
+      fireConfetti();
+    }, 600);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INTERACTIONS
+// ═══════════════════════════════════════════════════════════════
+function toggleItem(key, xp, li, event) {
+  const wasChecked = !!state.checked[key];
+  if (wasChecked) {
+    delete state.checked[key];
+  } else {
+    state.checked[key] = true;
+    showXpPopup(event, xp);
+    bumpStreak(xp);
+  }
+  saveState();
+  render();
+}
+
+function togglePhase(id) {
+  const el = document.getElementById(`phase-${id}`);
+  el.classList.toggle('collapsed');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// XP ANIMATION
+// ═══════════════════════════════════════════════════════════════
+let displayedXp = 0;
+let xpAnimFrame = null;
+
+function animateXp(target) {
+  if (xpAnimFrame) cancelAnimationFrame(xpAnimFrame);
+  const start = displayedXp;
+  const diff = target - start;
+  if (diff === 0) return;
+  const steps = 20;
+  let step = 0;
+  function tick() {
+    step++;
+    displayedXp = Math.round(start + (diff * (step / steps)));
+    document.getElementById('totalXp').textContent = displayedXp;
+    if (step < steps) xpAnimFrame = requestAnimationFrame(tick);
+    else displayedXp = target;
+  }
+  tick();
+}
+
+function updateLevel(xp) {
+  let level = LEVELS[0];
+  for (const l of LEVELS) {
+    if (xp >= l.minXp) level = l;
+  }
+  document.getElementById('levelIcon').textContent = level.icon;
+  document.getElementById('levelName').textContent = level.name;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// XP POPUP
+// ═══════════════════════════════════════════════════════════════
+function showXpPopup(event, xp) {
+  const el = document.createElement('div');
+  el.className = 'xp-popup';
+  el.textContent = `+${xp} XP`;
+  el.style.left = event.clientX + 'px';
+  el.style.top = event.clientY + 'px';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1000);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// STREAK
+// ═══════════════════════════════════════════════════════════════
+function bumpStreak(xp) {
+  streak++;
+  if (streakTimer) clearTimeout(streakTimer);
+
+  const bar = document.getElementById('streakBar');
+  const text = document.getElementById('streakText');
+
+  if (streak >= 3) {
+    const multiplier = Math.min(streak, 10);
+    const labels = ['', '', '', 'On Fire!', 'Blazing!', 'UNSTOPPABLE!', 'GODLIKE!', 'LEGENDARY!', 'MYTHICAL!', 'TRANSCENDENT!', 'BEYOND!!'];
+    text.textContent = `${streak}x Streak — ${labels[Math.min(multiplier, labels.length - 1)]}`;
+    bar.classList.add('visible');
+  }
+
+  streakTimer = setTimeout(() => {
+    streak = 0;
+    bar.classList.remove('visible');
+  }, 8000);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONFETTI
+// ═══════════════════════════════════════════════════════════════
+function fireConfetti() {
+  const canvas = document.getElementById('confetti');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  const particles = [];
+  const colors = ['#f1b300', '#ffdd57', '#22c55e', '#3b82f6', '#ef4444', '#a855f7', '#ffffff'];
+
+  for (let i = 0; i < 200; i++) {
+    particles.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height - canvas.height,
+      w: Math.random() * 8 + 4,
+      h: Math.random() * 6 + 2,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      vy: Math.random() * 3 + 2,
+      vx: (Math.random() - 0.5) * 2,
+      rot: Math.random() * 360,
+      rotSpeed: (Math.random() - 0.5) * 10,
+      life: 1,
+    });
+  }
+
+  let frame = 0;
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    let alive = false;
+    particles.forEach(p => {
+      if (p.life <= 0) return;
+      alive = true;
+      p.y += p.vy;
+      p.x += p.vx;
+      p.rot += p.rotSpeed;
+      if (p.y > canvas.height) p.life -= 0.02;
+
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot * Math.PI / 180);
+      ctx.globalAlpha = Math.max(0, p.life);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      ctx.restore();
+    });
+    frame++;
+    if (alive && frame < 300) requestAnimationFrame(draw);
+    else ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+  draw();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+render();
+</script>
+</body>
+</html>

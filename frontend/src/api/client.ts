@@ -65,16 +65,21 @@ export async function apiFetch<T>(
   clearTimeout(timer)
 
   if (res.status === 401) {
-    const refreshed = await refreshToken()
-    if (refreshed) {
-      const retry = await fetch(url, {
-        ...options,
-        credentials: 'include',
-        headers: buildHeaders(options),
-      })
-      if (retry.ok) return retry.json()
+    const body401 = await res.json().catch(() => null)
+    const detail = body401?.detail
+    // Only attempt token refresh for authenticated endpoints (not login itself)
+    if (!detail || detail === 'Not authenticated') {
+      const refreshed = await refreshToken()
+      if (refreshed) {
+        const retry = await fetch(url, {
+          ...options,
+          credentials: 'include',
+          headers: buildHeaders(options),
+        })
+        if (retry.ok) return retry.json()
+      }
     }
-    throw new ApiError(401, 'Not authenticated')
+    throw new ApiError(401, typeof detail === 'string' ? detail : 'Not authenticated')
   }
 
   if (res.status === 403) {

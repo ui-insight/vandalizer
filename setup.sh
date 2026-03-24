@@ -1610,6 +1610,7 @@ main() {
     echo -e "  ${DIM}  2)${RESET} ${CYAN}Upgrade${RESET}      ${DIM}— pull new code, backup, rebuild, redeploy${RESET}"
     echo -e "  ${DIM}  3)${RESET} ${CYAN}Redeploy${RESET}     ${DIM}— rebuild and restart from current code${RESET}"
     echo -e "  ${DIM}  4)${RESET} ${CYAN}Full setup${RESET}   ${DIM}— reconfigure everything from scratch${RESET}"
+    echo -e "  ${DIM}  5)${RESET} ${CYAN}Seed catalog${RESET} ${DIM}— update verified catalog with new seed data${RESET}"
     echo ""
     echo -ne "  ${SYM_ARROW}  Select mode ${DIM}[1]${RESET}: "
     local mode_choice
@@ -1620,6 +1621,7 @@ main() {
       2) upgrade; echo ""; exit 0 ;;
       3) redeploy; echo ""; exit 0 ;;
       4) ;; # fall through to full setup
+      5) update_catalog; echo ""; exit 0 ;;
       *) repair; echo ""; exit 0 ;;
     esac
   fi

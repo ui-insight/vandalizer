@@ -233,7 +233,6 @@ class TestFullWorkflowWithRealEngine:
             mock_val.delay = MagicMock()
 
             execute_workflow_task(
-                None,
                 str(wr.id),
                 str(wf.id),
                 {"doc_uuids": ["full_test_uuid"]},
@@ -293,7 +292,7 @@ class TestFullWorkflowWithRealEngine:
              patch("app.tasks.quality_tasks.auto_validate_workflow") as mock_val:
             mock_val.delay = MagicMock()
             execute_workflow_task(
-                None, str(wr.id), str(wf.id),
+                str(wr.id), str(wf.id),
                 {"doc_uuids": ["multi_uuid_1", "multi_uuid_2"]},
                 "test-model",
             )
@@ -340,7 +339,7 @@ class TestWorkflowErrorPath:
              patch("app.services.workflow_engine.build_workflow_engine", return_value=mock_engine):
             with pytest.raises(RuntimeError, match="LLM provider timeout"):
                 execute_workflow_task(
-                    None, str(wr.id), str(wf.id),
+                    str(wr.id), str(wf.id),
                     {"doc_uuids": []}, "test-model",
                 )
 

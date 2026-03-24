@@ -110,7 +110,7 @@ class TestCreateWorkflow:
 
             resp = await client.post(
                 "/api/workflows",
-                json={"name": "New Workflow", "space": "default", "description": "A test workflow"},
+                json={"name": "New Workflow", "description": "A test workflow"},
                 cookies=cookies,
                 headers=headers,
             )
@@ -120,5 +120,5 @@ class TestCreateWorkflow:
         assert data["name"] == "New Workflow"
         assert data["description"] == "A test workflow"
         mock_svc.create_workflow.assert_called_once_with(
-            "New Workflow", "testuser", "default", "A test workflow", team_id=None,
+            "New Workflow", "testuser", "A test workflow", team_id=None,
         )

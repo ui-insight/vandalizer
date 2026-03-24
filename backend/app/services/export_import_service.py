@@ -452,6 +452,7 @@ async def import_catalog_items(
     data: dict,
     selected_indices: list[int],
     user_id: str,
+    space: str | None = None,
     team_id: str | None = None,
 ) -> list[dict]:
     """Import selected catalog items. Returns list of created item summaries."""

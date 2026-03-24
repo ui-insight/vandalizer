@@ -159,7 +159,8 @@ class TestWorkflowUpdateAuthz:
 
         with patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}), \
              patch("app.dependencies.User") as MockUser, \
-             patch("app.routers.workflows.svc") as mock_svc:
+             patch("app.routers.workflows.svc") as mock_svc, \
+             patch("app.services.verification_service.check_and_flag_stale_verification", new_callable=AsyncMock, return_value=False):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_svc.update_workflow = AsyncMock(return_value=updated_wf)
 

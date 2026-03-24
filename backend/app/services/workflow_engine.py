@@ -113,50 +113,6 @@ def _stringify_value(value):
     return str(value)
 
 
-def _run_sandboxed_code(code: str, input_data, result_queue) -> None:
-    """Execute sandboxed code in a child process so timeouts can be enforced."""
-    import datetime
-    import math
-
-    safe_builtins = {
-        "json": json,
-        "re": re,
-        "math": math,
-        "datetime": datetime,
-        "str": str,
-        "int": int,
-        "float": float,
-        "list": list,
-        "dict": dict,
-        "len": len,
-        "range": range,
-        "enumerate": enumerate,
-        "sorted": sorted,
-        "min": min,
-        "max": max,
-        "sum": sum,
-        "round": round,
-        "abs": abs,
-        "isinstance": isinstance,
-        "print": print,
-        "True": True,
-        "False": False,
-        "None": None,
-    }
-    local_vars = {"data": input_data, "result": None}
-
-    try:
-        exec(code, {"__builtins__": safe_builtins}, local_vars)  # noqa: S102
-    except Exception as exc:
-        result_queue.put({"error": str(exc)})
-        return
-
-    try:
-        result_queue.put({"result": local_vars.get("result", "")})
-    except Exception:
-        result_queue.put({"result": str(local_vars.get("result", ""))})
-
-
 # ---------------------------------------------------------------------------
 # LLM helper functions (sync, for nodes)
 # ---------------------------------------------------------------------------
@@ -511,7 +467,7 @@ class CodeExecutionNode(Node):
     """Execute user-provided Python code in a restricted sandbox.
 
     WARNING: The sandbox restricts builtins but does NOT provide full isolation.
-    Code runs in-process with a 10-second timeout. Do not rely on this for
+    Code runs in a daemon thread with a timeout. Do not rely on this for
     untrusted input in high-security contexts.
     """
 
@@ -537,50 +493,32 @@ class CodeExecutionNode(Node):
                 "input": inputs.get("output"),
                 "step_name": self.name,
             }
-        ctx = multiprocessing.get_context("spawn")
-        result_queue = ctx.Queue()
-        process = ctx.Process(
-            target=_run_sandboxed_code,
-            args=(code, inputs.get("output"), result_queue),
-            daemon=True,
+
+        from app.utils.code_sandbox_runner import execute_sandboxed_code
+
+        result = execute_sandboxed_code(
+            code, inputs.get("output"), timeout=self.CODE_TIMEOUT_SECONDS
         )
 
-        try:
-            process.start()
-            process.join(timeout=self.CODE_TIMEOUT_SECONDS)
-
-            if process.is_alive():
-                process.terminate()
-                process.join(timeout=1)
-                return {
-                    "output": f"Code execution timed out after {self.CODE_TIMEOUT_SECONDS} seconds",
-                    "input": inputs.get("output"),
-                    "step_name": self.name,
-                }
-
-            if result_queue.empty():
-                return {
-                    "output": None,
-                    "input": inputs.get("output"),
-                    "step_name": self.name,
-                }
-
-            result = result_queue.get()
-            if "error" in result:
-                return {
-                    "output": f"Code execution error: {result['error']}",
-                    "input": inputs.get("output"),
-                    "step_name": self.name,
-                }
-
+        if result.get("timed_out"):
             return {
-                "output": result.get("result", ""),
+                "output": f"Code execution timed out after {self.CODE_TIMEOUT_SECONDS} seconds",
                 "input": inputs.get("output"),
                 "step_name": self.name,
             }
-        finally:
-            result_queue.close()
-            result_queue.join_thread()
+
+        if "error" in result:
+            return {
+                "output": f"Code execution error: {result['error']}",
+                "input": inputs.get("output"),
+                "step_name": self.name,
+            }
+
+        return {
+            "output": result.get("result"),
+            "input": inputs.get("output"),
+            "step_name": self.name,
+        }
 
 
 class CrawlerNode(Node):

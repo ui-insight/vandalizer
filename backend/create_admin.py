@@ -48,10 +48,9 @@ async def ensure_admin(email: str, password: str, name: str = "Admin") -> tuple[
         if not existing.is_examiner:
             existing.is_examiner = True
             changed = True
-        # Always reset password to what the operator provided
-        existing.password_hash = hash_password(password)
-        changed = True
         if changed:
+            # Reset password when promoting permissions
+            existing.password_hash = hash_password(password)
             await existing.save()
             return existing, "updated"
         return existing, "unchanged"

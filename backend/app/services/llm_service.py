@@ -60,7 +60,7 @@ class InsightAIProvider(OpenRouterProvider):
     def base_url(self) -> str:
         if hasattr(self, "_endpoint") and self._endpoint:
             return self._endpoint
-        return ""
+        return "https://api.openai.com/v1"
 
     def model_profile(self, model_name: str) -> Optional[ModelProfile]:
         if "/" not in model_name:
