@@ -184,7 +184,7 @@ export function ExtractionEditorPanel() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `extraction-${searchSet?.name || 'results'}-${new Date().toISOString().slice(0, 10)}.json`
+    a.download = `extraction-${searchSet?.title || 'results'}-${new Date().toISOString().slice(0, 10)}.json`
     a.click()
     URL.revokeObjectURL(url)
     toast('JSON downloaded', 'success')
@@ -201,7 +201,7 @@ export function ExtractionEditorPanel() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `extraction-${searchSet?.name || 'results'}-${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = `extraction-${searchSet?.title || 'results'}-${new Date().toISOString().slice(0, 10)}.csv`
     a.click()
     URL.revokeObjectURL(url)
     toast('CSV downloaded', 'success')
@@ -485,6 +485,9 @@ export function ExtractionEditorPanel() {
           onReorder={reorder}
           searchSetUuid={openExtractionId ?? undefined}
           onHighlightValue={setHighlightTerms}
+          resultSets={resultSets}
+          activeResultIdx={activeResultIdx}
+          onSetActiveResultIdx={setActiveResultIdx}
         />
       </div>
       <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: activeTab === 'tools' ? undefined : 'none' }}>
@@ -746,6 +749,9 @@ function DesignTab({
   onReorder,
   searchSetUuid,
   onHighlightValue,
+  resultSets,
+  activeResultIdx,
+  onSetActiveResultIdx,
 }: {
   items: { id: string; searchphrase: string; is_optional: boolean; enum_values: string[] }[]
   itemsLoading: boolean
@@ -762,6 +768,9 @@ function DesignTab({
   onReorder: (itemIds: string[]) => void
   searchSetUuid?: string
   onHighlightValue: (terms: string[]) => void
+  resultSets: Record<string, string>[]
+  activeResultIdx: number
+  onSetActiveResultIdx: (idx: number) => void
 }) {
   const [dragIdx, setDragIdx] = useState<number | null>(null)
   const [overIdx, setOverIdx] = useState<number | null>(null)
@@ -952,7 +961,7 @@ function DesignTab({
           {resultSets.map((_, i) => (
             <button
               key={i}
-              onClick={() => setActiveResultIdx(i)}
+              onClick={() => onSetActiveResultIdx(i)}
               style={{
                 padding: '3px 10px', fontSize: 12, fontWeight: 600,
                 fontFamily: 'inherit', borderRadius: 12, border: 'none',
