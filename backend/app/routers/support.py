@@ -188,10 +188,14 @@ async def download_attachment(
     content_type = data.get("file_type") or "application/octet-stream"
     filename = data.get("filename", "attachment")
 
+    # Images and PDFs can display inline; everything else should download
+    inline_types = ("image/", "application/pdf")
+    disposition = "inline" if any(content_type.startswith(t) for t in inline_types) else "attachment"
+
     return Response(
         content=file_bytes,
         media_type=content_type,
-        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+        headers={"Content-Disposition": f'{disposition}; filename="{filename}"'},
     )
 
 

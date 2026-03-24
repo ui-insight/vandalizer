@@ -254,6 +254,48 @@ function NewTicketView({
   )
 }
 
+function AttachmentChip({
+  attachment: a,
+  ticketUuid,
+  onPreview,
+}: {
+  attachment: import('../../types/support').SupportAttachment
+  ticketUuid: string
+  onPreview: (a: import('../../types/support').SupportAttachment) => void
+}) {
+  const [imgBroken, setImgBroken] = useState(false)
+  const isImage = a.file_type?.startsWith('image/') && !imgBroken
+  const downloadUrl = `/api/support/tickets/${ticketUuid}/attachments/${a.uuid}`
+
+  if (isImage) {
+    return (
+      <button
+        onClick={() => onPreview(a)}
+        className="block rounded-lg overflow-hidden border border-gray-200 hover:border-blue-400 transition-colors cursor-pointer"
+        title={a.filename}
+      >
+        <img
+          src={downloadUrl}
+          alt={a.filename}
+          className="max-w-[220px] max-h-[160px] object-cover"
+          onError={() => setImgBroken(true)}
+        />
+      </button>
+    )
+  }
+
+  return (
+    <a
+      href={downloadUrl}
+      download={a.filename}
+      className="inline-flex items-center gap-1.5 rounded-lg bg-white px-2.5 py-1.5 text-xs text-blue-600 border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-colors"
+    >
+      <Paperclip className="h-3 w-3" />
+      {a.filename}
+    </a>
+  )
+}
+
 function ChatView({
   ticketUuid,
   isSupportAgent,
@@ -474,35 +516,9 @@ function ChatView({
               </div>
               {msgAttachments.length > 0 && (
                 <div className={`flex flex-col gap-1.5 mt-1.5 max-w-[85%] ${isMe ? 'items-end' : 'items-start'}`}>
-                  {msgAttachments.map((a) => {
-                    const isImage = a.file_type?.startsWith('image/')
-                    const downloadUrl = `/api/support/tickets/${ticketUuid}/attachments/${a.uuid}`
-                    return isImage ? (
-                      <button
-                        key={a.uuid}
-                        onClick={() => setPreviewAttachment(a)}
-                        className="block rounded-lg overflow-hidden border border-gray-200 hover:border-blue-400 transition-colors cursor-pointer"
-                        title={a.filename}
-                      >
-                        <img
-                          src={downloadUrl}
-                          alt={a.filename}
-                          className="max-w-[220px] max-h-[160px] object-cover"
-                        />
-                      </button>
-                    ) : (
-                      <a
-                        key={a.uuid}
-                        href={downloadUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-white px-2.5 py-1.5 text-xs text-blue-600 border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-colors"
-                      >
-                        <Paperclip className="h-3 w-3" />
-                        {a.filename}
-                      </a>
-                    )
-                  })}
+                  {msgAttachments.map((a) => (
+                    <AttachmentChip key={a.uuid} attachment={a} ticketUuid={ticketUuid} onPreview={setPreviewAttachment} />
+                  ))}
                 </div>
               )}
             </div>
@@ -511,35 +527,9 @@ function ChatView({
         {/* Orphan attachments (no message_uuid) */}
         {ticket.attachments.filter(a => !a.message_uuid).length > 0 && (
           <div className="flex flex-wrap gap-1.5 pt-2 border-t border-gray-100">
-            {ticket.attachments.filter(a => !a.message_uuid).map((a) => {
-              const isImage = a.file_type?.startsWith('image/')
-              const downloadUrl = `/api/support/tickets/${ticketUuid}/attachments/${a.uuid}`
-              return isImage ? (
-                <button
-                  key={a.uuid}
-                  onClick={() => setPreviewAttachment(a)}
-                  className="block rounded-lg overflow-hidden border border-gray-200 hover:border-blue-400 transition-colors cursor-pointer"
-                  title={a.filename}
-                >
-                  <img
-                    src={downloadUrl}
-                    alt={a.filename}
-                    className="max-w-[220px] max-h-[160px] object-cover"
-                  />
-                </button>
-              ) : (
-                <a
-                  key={a.uuid}
-                  href={downloadUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-white px-2.5 py-1.5 text-xs text-blue-600 border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-colors"
-                >
-                  <Paperclip className="h-3 w-3" />
-                  {a.filename}
-                </a>
-              )
-            })}
+            {ticket.attachments.filter(a => !a.message_uuid).map((a) => (
+              <AttachmentChip key={a.uuid} attachment={a} ticketUuid={ticketUuid} onPreview={setPreviewAttachment} />
+            ))}
           </div>
         )}
         <div ref={messagesEndRef} />
