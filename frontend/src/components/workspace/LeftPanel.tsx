@@ -206,6 +206,7 @@ export function LeftPanel() {
             <button
               onClick={() => setShowRawText(true)}
               className="bg-transparent border-0 p-0 cursor-pointer"
+              title="View extracted text"
             >
               <FileText className="h-5 w-5 text-white" />
             </button>

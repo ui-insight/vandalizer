@@ -83,7 +83,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
             borderBottom: '1px solid #eee',
           }}
         >
-          <span id="raw-text-modal-title" style={{ fontWeight: 600, fontSize: 16 }}>Raw Text</span>
+          <span id="raw-text-modal-title" style={{ fontWeight: 600, fontSize: 16 }}>Extracted Text</span>
           <button
             onClick={onClose}
             aria-label="Close"
