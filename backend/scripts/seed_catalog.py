@@ -19,6 +19,7 @@ from beanie import PydanticObjectId
 
 from app.config import Settings
 from app.database import init_db
+from app.models.extraction_test_case import ExtractionTestCase
 from app.models.knowledge import KnowledgeBase, KnowledgeBaseSource
 from app.models.library import Library, LibraryItem, LibraryItemKind, LibraryScope
 from app.models.search_set import SearchSet, SearchSetItem
@@ -82,9 +83,16 @@ async def add_to_collection(collection: VerifiedCollection, item_id: str):
 
 
 async def create_verified_metadata(
-    item_kind: str, item_id: str, display_name: str, description: str, quality_tier: str = "gold",
+    item_kind: str, item_id: str, display_name: str, description: str,
+    quality_tier: str | None = None, quality_score: float | None = None,
+    quality_grade: str | None = None,
 ):
-    """Create VerifiedItemMetadata if it doesn't already exist."""
+    """Create VerifiedItemMetadata if it doesn't already exist.
+
+    If quality_score/grade are provided (e.g. from a previous validation export),
+    they are used directly. Otherwise the item is created without quality data,
+    indicating it has not yet been validated.
+    """
     existing = await VerifiedItemMetadata.find_one(
         VerifiedItemMetadata.item_kind == item_kind,
         VerifiedItemMetadata.item_id == item_id,
@@ -98,8 +106,8 @@ async def create_verified_metadata(
         display_name=display_name,
         description=description,
         quality_tier=quality_tier,
-        quality_grade="A",
-        quality_score=95,
+        quality_grade=quality_grade,
+        quality_score=quality_score,
         organization_ids=[],  # empty = globally visible
         updated_at=now,
     )
@@ -186,7 +194,9 @@ async def seed_workflow(
         "workflow", str(wf.id),
         meta.get("display_name", item["name"]),
         meta.get("description", item.get("description", "")),
-        meta.get("quality_tier", "gold"),
+        quality_tier=meta.get("quality_tier"),
+        quality_score=meta.get("quality_score"),
+        quality_grade=meta.get("quality_grade"),
     )
 
     # Add to collections
@@ -196,6 +206,35 @@ async def seed_workflow(
             await add_to_collection(col, str(wf.id))
 
     return True
+
+
+# ---------------------------------------------------------------------------
+# Test case seeding
+# ---------------------------------------------------------------------------
+
+async def _seed_test_cases(search_set_uuid: str, test_cases: list[dict]) -> int:
+    """Create ExtractionTestCase records from seed data. Returns count created."""
+    created = 0
+    for tc_data in test_cases:
+        label = tc_data.get("label", "Seed test case")
+        # Idempotency: skip if a test case with this label already exists
+        existing = await ExtractionTestCase.find_one(
+            ExtractionTestCase.search_set_uuid == search_set_uuid,
+            ExtractionTestCase.label == label,
+        )
+        if existing:
+            continue
+        tc = ExtractionTestCase(
+            search_set_uuid=search_set_uuid,
+            label=label,
+            source_type="text",
+            source_text=tc_data.get("source_text", ""),
+            expected_values=tc_data.get("expected_values", {}),
+            user_id=SYSTEM_USER,
+        )
+        await tc.insert()
+        created += 1
+    return created
 
 
 # ---------------------------------------------------------------------------
@@ -225,13 +264,19 @@ async def seed_search_set(
             "search_set", str(old_template.id),
             meta.get("display_name", item["title"]),
             meta.get("description", ""),
-            meta.get("quality_tier", "gold"),
+            quality_tier=meta.get("quality_tier"),
+            quality_score=meta.get("quality_score"),
+            quality_grade=meta.get("quality_grade"),
         )
         await create_library_item(verified_lib, old_template.id, LibraryItemKind.SEARCH_SET)
         for slug in meta.get("collections", []):
             col = slug_to_collection.get(slug)
             if col:
                 await add_to_collection(col, str(old_template.id))
+        # Seed test cases for adopted template
+        tc_count = await _seed_test_cases(old_template.uuid, item.get("test_cases", []))
+        if tc_count:
+            print(f"    + {tc_count} test case(s)")
         # Mark as seeded for future runs
         old_template.extraction_config = {**old_template.extraction_config, "seed_id": seed_id}
         await old_template.save()
@@ -270,13 +315,20 @@ async def seed_search_set(
     ss.item_order = item_order
     await ss.save()
 
+    # Create test cases from seed data
+    tc_count = await _seed_test_cases(ss_uuid, item.get("test_cases", []))
+    if tc_count:
+        print(f"    + {tc_count} test case(s)")
+
     # Library item + metadata
     await create_library_item(verified_lib, ss.id, LibraryItemKind.SEARCH_SET)
     await create_verified_metadata(
         "search_set", str(ss.id),
         meta.get("display_name", item["title"]),
         meta.get("description", ""),
-        meta.get("quality_tier", "gold"),
+        quality_tier=meta.get("quality_tier"),
+        quality_score=meta.get("quality_score"),
+        quality_grade=meta.get("quality_grade"),
     )
 
     # Add to collections
@@ -360,7 +412,9 @@ async def seed_knowledge_base(
         "knowledge_base", str(kb.id),
         meta.get("display_name", item["title"]),
         meta.get("description", item.get("description", "")),
-        meta.get("quality_tier", "gold"),
+        quality_tier=meta.get("quality_tier"),
+        quality_score=meta.get("quality_score"),
+        quality_grade=meta.get("quality_grade"),
     )
 
     # Add to collections
