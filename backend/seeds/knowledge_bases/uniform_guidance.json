@@ -14,6 +14,12 @@
     "description": "Knowledge base covering cost principles, administrative requirements, audit requirements, and indirect cost rate agreements from 2 CFR 200.",
     "sources": [
       {"source_type": "url", "url": "https://www.ecfr.gov/current/title-2/subtitle-A/chapter-II/part-200"},
+      {"source_type": "url", "url": "https://www.ecfr.gov/current/title-2/subtitle-A/chapter-II/part-200/subpart-A"},
+      {"source_type": "url", "url": "https://www.ecfr.gov/current/title-2/subtitle-A/chapter-II/part-200/subpart-B"},
+      {"source_type": "url", "url": "https://www.ecfr.gov/current/title-2/subtitle-A/chapter-II/part-200/subpart-C"},
+      {"source_type": "url", "url": "https://www.ecfr.gov/current/title-2/subtitle-A/chapter-II/part-200/subpart-D"},
+      {"source_type": "url", "url": "https://www.ecfr.gov/current/title-2/subtitle-A/chapter-II/part-200/subpart-E"},
+      {"source_type": "url", "url": "https://www.ecfr.gov/current/title-2/subtitle-A/chapter-II/part-200/subpart-F"},
       {"source_type": "url", "url": "https://www.cfo.gov/resources/uniform-guidance/"},
       {"source_type": "url", "url": "https://www.grants.gov/web/grants/learn-grants/grant-policies.html"}
     ]

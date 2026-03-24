@@ -8,6 +8,7 @@
 #    ./setup.sh --repair    Diagnose and fix a broken deployment
 #    ./setup.sh --upgrade   Pull latest code, backup, rebuild, and redeploy
 #    ./setup.sh --redeploy  Rebuild and restart from current code (no git pull)
+#    ./setup.sh --seed      Update verified catalog (add new seed data)
 # ============================================================================
 
 set -uo pipefail
@@ -860,6 +861,7 @@ finale() {
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}./setup.sh --repair${RESET}        ${DIM}Diagnose & fix issues${RESET}      ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}./setup.sh --upgrade${RESET}       ${DIM}Pull, backup, rebuild${RESET}      ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}./setup.sh --redeploy${RESET}      ${DIM}Rebuild current code${RESET}       ${MAGENTA}${BOLD}║${RESET}"
+  echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}./setup.sh --seed${RESET}          ${DIM}Update verified catalog${RESET}    ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}./status.sh${RESET}                ${DIM}Full system status${RESET}          ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}docker compose logs -f api${RESET} ${DIM}Stream API logs${RESET}            ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}docker compose down${RESET}        ${DIM}Stop everything${RESET}            ${MAGENTA}${BOLD}║${RESET}"
@@ -1493,6 +1495,47 @@ do_redeploy() {
 }
 
 # ---------------------------------------------------------------------------
+# Update verified catalog: re-run seed script against running deployment
+# ---------------------------------------------------------------------------
+update_catalog() {
+  section "S" "Update Verified Catalog"
+
+  echo -e "  ${DIM}     Re-seeding verified workflows, extractions, and knowledge bases.${RESET}"
+  echo -e "  ${DIM}     Existing items are skipped — only new seed data is added.${RESET}"
+  echo ""
+
+  # Find the API container
+  local container_name
+  container_name=$($COMPOSE_CMD ps --format '{{.Names}}' 2>/dev/null | grep -E '(api|backend)' | grep -v celery | head -1 || true)
+
+  if [[ -z "$container_name" ]]; then
+    echo -e "  ${SYM_CROSS}  ${RED}API container is not running.${RESET}"
+    echo -e "  ${DIM}     Start services first: docker compose up -d${RESET}"
+    return 1
+  fi
+
+  echo -e "  ${SYM_ARROW}  Using container: ${BOLD}${container_name}${RESET}"
+  echo ""
+
+  local seed_output
+  if seed_output=$(docker exec "$container_name" python -m scripts.seed_catalog 2>&1); then
+    # Display the output with indentation
+    while IFS= read -r line; do
+      echo -e "  ${DIM}     ${line}${RESET}"
+    done <<< "$seed_output"
+    echo ""
+    echo -e "  ${SYM_CHECK}  ${BRIGHT_GREEN}${BOLD}Verified catalog updated.${RESET}"
+  else
+    while IFS= read -r line; do
+      echo -e "  ${DIM}     ${line}${RESET}"
+    done <<< "$seed_output"
+    echo ""
+    echo -e "  ${SYM_CROSS}  ${RED}Catalog seeding failed. Check output above.${RESET}"
+    return 1
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # Detect existing deployment
 # ---------------------------------------------------------------------------
 detect_deployment() {
@@ -1532,6 +1575,13 @@ main() {
       echo ""
       exit 0
       ;;
+    --seed|-s|seed)
+      show_banner
+      preflight
+      update_catalog
+      echo ""
+      exit 0
+      ;;
     --help|-h|help)
       echo ""
       echo -e "  ${BOLD}Usage:${RESET} ./setup.sh [command]"
@@ -1541,6 +1591,7 @@ main() {
       echo -e "    ${CYAN}--repair${RESET}     Diagnose and fix a broken deployment"
       echo -e "    ${CYAN}--upgrade${RESET}    Pull new code, backup, rebuild, and redeploy"
       echo -e "    ${CYAN}--redeploy${RESET}   Rebuild and restart from current code (no git pull)"
+      echo -e "    ${CYAN}--seed${RESET}       Update verified catalog with new seed data"
       echo -e "    ${CYAN}--help${RESET}       Show this help"
       echo ""
       exit 0

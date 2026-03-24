@@ -32,6 +32,11 @@
       "title": "Reference Knowledge Bases",
       "description": "Curated knowledge bases with federal agency guidelines, policies, and procedures for research administration.",
       "featured": true
+    },
+    {
+      "slug": "institutional",
+      "title": "Institutional Policies & Procedures",
+      "description": "University-specific research administration policies, procedures, and process guides."
     }
   ]
 }

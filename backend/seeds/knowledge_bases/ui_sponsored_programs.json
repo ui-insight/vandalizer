@@ -1,0 +1,44 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "knowledge_base",
+  "_seed_meta": {
+    "seed_id": "kb-ui-osp",
+    "display_name": "University of Idaho Office of Sponsored Programs",
+    "description": "University of Idaho research administration policies and procedures for sponsored funding - APM Chapter 45, OSP guidance, and related institutional resources for faculty, DGAs, and research administrators.",
+    "quality_tier": "gold",
+    "collections": ["institutional", "reference-knowledge", "pre-award", "post-award"]
+  },
+  "items": [{
+    "title": "University of Idaho Office of Sponsored Programs",
+    "description": "Knowledge base covering UI sponsored programs policies, procedures, and resources including APM Chapter 45 research administration policies, cost principles, effort reporting, subawards, and compliance guidance.",
+    "sources": [
+      {"source_type": "url", "url": "https://www.uidaho.edu/research"},
+      {"source_type": "url", "url": "https://www.uidaho.edu/policies/apm/45"},
+      {"source_type": "url", "url": "https://www.uidaho.edu/policies/apm/45/01"},
+      {"source_type": "url", "url": "https://www.uidaho.edu/policies/apm/45/02"},
+      {"source_type": "url", "url": "https://www.uidaho.edu/policies/apm/45/03"},
+      {"source_type": "url", "url": "https://www.uidaho.edu/policies/apm/45/04"},
+      {"source_type": "url", "url": "https://www.uidaho.edu/policies/apm/45/05"},
+      {"source_type": "url", "url": "https://www.uidaho.edu/policies/apm/45/06"},
+      {"source_type": "url", "url": "https://www.uidaho.edu/policies/apm/45/07"},
+      {"source_type": "url", "url": "https://www.uidaho.edu/policies/apm/45/08"},
+      {"source_type": "url", "url": "https://www.uidaho.edu/policies/apm/45/09"},
+      {"source_type": "url", "url": "https://www.uidaho.edu/policies/apm/45/10"},
+      {"source_type": "url", "url": "https://www.uidaho.edu/policies/apm/45/12"},
+      {"source_type": "url", "url": "https://www.uidaho.edu/policies/apm/45/13"},
+      {"source_type": "url", "url": "https://www.uidaho.edu/policies/apm/45/14"},
+      {"source_type": "url", "url": "https://www.uidaho.edu/policies/apm/45/15"},
+      {"source_type": "url", "url": "https://www.uidaho.edu/policies/apm/45/16"},
+      {"source_type": "url", "url": "https://www.uidaho.edu/policies/apm/45/17"},
+      {"source_type": "url", "url": "https://www.uidaho.edu/policies/apm/45/19"},
+      {"source_type": "url", "url": "https://www.uidaho.edu/policies/apm/45/20"},
+      {"source_type": "url", "url": "https://www.uidaho.edu/policies/apm/45/21"},
+      {"source_type": "url", "url": "https://www.uidaho.edu/policies/apm/45/22"},
+      {"source_type": "url", "url": "https://www.uidaho.edu/policies/apm/45/23"},
+      {"source_type": "url", "url": "https://www.uidaho.edu/policies/apm/45/24"},
+      {"source_type": "url", "url": "https://www.uidaho.edu/policies/apm/45/25"},
+      {"source_type": "url", "url": "https://www.uidaho.edu/policies/apm/45/35"}
+    ]
+  }]
+}
