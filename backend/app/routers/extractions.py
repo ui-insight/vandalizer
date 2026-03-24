@@ -938,27 +938,29 @@ async def find_best_settings(
     uuid: str,
     user: User = Depends(get_current_user),
 ):
-    """Try multiple extraction configurations and return which works best.
-
-    Requires test cases with expected values. Tests each available model
-    and strategy combination, then ranks by accuracy + consistency score.
-    """
+    """Try multiple extraction configurations via SSE, streaming results as each finishes."""
     await _get_search_set_or_404(uuid, user, manage=True)
     body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
     num_runs = body.get("num_runs", 2)
     max_candidates = body.get("max_candidates", 8)
 
-    from app.services.extraction_tuning_service import find_best_settings as _find_best
-    try:
-        result = await _find_best(
-            search_set_uuid=uuid,
-            user_id=user.user_id,
-            num_runs=min(num_runs, 5),
-            max_candidates=min(max_candidates, 12),
-        )
-        return result
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    from app.services.extraction_tuning_service import find_best_settings_stream
+
+    async def generate():
+        try:
+            async for event in find_best_settings_stream(
+                search_set_uuid=uuid,
+                user_id=user.user_id,
+                num_runs=min(num_runs, 5),
+                max_candidates=min(max_candidates, 12),
+            ):
+                yield f"data: {json.dumps(event)}\n\n"
+        except ValueError as e:
+            yield f"data: {json.dumps({'kind': 'error', 'detail': str(e)})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'kind': 'error', 'detail': str(e)})}\n\n"
+
+    return StreamingResponse(generate(), media_type="text/event-stream")
 
 
 @router.post("/validate")

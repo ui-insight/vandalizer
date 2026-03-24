@@ -24,8 +24,8 @@ import {
   exportSearchSetUrl,
   importSearchSet,
 } from '../../api/extractions'
-import type { ValidationV2Result, QualityHistoryRun, ValidationSource, TuningResult } from '../../api/extractions'
-import { findBestSettings } from '../../api/extractions'
+import type { ValidationV2Result, QualityHistoryRun, ValidationSource, TuningResult, TuningStreamEvent } from '../../api/extractions'
+import { findBestSettingsStream } from '../../api/extractions'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
 import { VerificationSubmitDialog } from '../shared/VerificationSubmitDialog'
 import { getModels } from '../../api/config'
@@ -2024,6 +2024,7 @@ function ValidateTab({
   const [tuning, setTuning] = useState(false)
   const [tuningResults, setTuningResults] = useState<TuningResult[] | null>(null)
   const [tuningRecommendation, setTuningRecommendation] = useState<string | null>(null)
+  const [tuningProgress, setTuningProgress] = useState<{ index: number; total: number; label: string } | null>(null)
   const [fillingSourceId, setFillingSourceId] = useState<string | null>(null)
   const [fillError, setFillError] = useState<string | null>(null)
   const fillAbortRef = useRef<AbortController | null>(null)
@@ -2604,15 +2605,28 @@ function ValidateTab({
               setTuning(true)
               setTuningResults(null)
               setTuningRecommendation(null)
+              setTuningProgress(null)
               try {
-                const res = await findBestSettings(searchSetUuid, numRuns)
-                setTuningResults(res.results)
-                setTuningRecommendation(res.recommendation)
+                await findBestSettingsStream(searchSetUuid, numRuns, 8, (event: TuningStreamEvent) => {
+                  if (event.kind === 'testing') {
+                    setTuningProgress({ index: event.index, total: event.total, label: event.label })
+                  } else if (event.kind === 'result') {
+                    setTuningResults(prev => [...(prev || []), event.result])
+                  } else if (event.kind === 'done') {
+                    setTuningResults(event.results)
+                    setTuningRecommendation(event.recommendation)
+                    setTuningProgress(null)
+                  } else if (event.kind === 'error') {
+                    setTuningRecommendation(event.detail)
+                    setTuningProgress(null)
+                  }
+                })
               } catch (e: unknown) {
                 const msg = e instanceof Error ? e.message : 'Failed to find best settings'
                 setTuningRecommendation(msg)
               } finally {
                 setTuning(false)
+                setTuningProgress(null)
               }
             }}
             disabled={tuning || validating || sources.length === 0}
@@ -2626,15 +2640,15 @@ function ValidateTab({
             }}
           >
             {tuning ? (
-              <><Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} /> Testing configs...</>
+              <><Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} /> {tuningProgress ? `Testing ${tuningProgress.index + 1}/${tuningProgress.total}` : 'Preparing...'}</>
             ) : (
               <><Sparkles style={{ width: 14, height: 14 }} /> Find Best Settings</>
             )}
           </button>
         </div>
 
-        {/* Tuning results */}
-        {(tuningResults || tuningRecommendation) && (
+        {/* Tuning results — live streaming */}
+        {(tuningResults || tuningRecommendation || tuningProgress) && (
           <div style={{
             marginTop: 12, padding: 16, borderRadius: 8,
             border: '1px solid #c4b5fd', backgroundColor: '#f5f3ff',
@@ -2642,13 +2656,38 @@ function ValidateTab({
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
               <Sparkles style={{ width: 14, height: 14, color: '#7c3aed' }} />
               <span style={{ fontSize: 13, fontWeight: 600, color: '#5b21b6' }}>Settings Comparison</span>
-              <button
-                onClick={() => { setTuningResults(null); setTuningRecommendation(null) }}
-                style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 2 }}
-              >
-                <X style={{ width: 12, height: 12 }} />
-              </button>
+              {!tuning && (
+                <button
+                  onClick={() => { setTuningResults(null); setTuningRecommendation(null); setTuningProgress(null) }}
+                  style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 2 }}
+                >
+                  <X style={{ width: 12, height: 12 }} />
+                </button>
+              )}
             </div>
+
+            {/* Progress bar while tuning */}
+            {tuningProgress && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                  <Loader2 style={{ width: 14, height: 14, color: '#7c3aed', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
+                  <span style={{ fontSize: 12, color: '#5b21b6', fontWeight: 500 }}>
+                    Testing: {tuningProgress.label}
+                  </span>
+                  <span style={{ fontSize: 11, color: '#8b5cf6', marginLeft: 'auto' }}>
+                    {tuningProgress.index + 1} of {tuningProgress.total}
+                  </span>
+                </div>
+                <div style={{ height: 4, borderRadius: 2, backgroundColor: '#ddd6fe', overflow: 'hidden' }}>
+                  <div style={{
+                    height: '100%', borderRadius: 2, backgroundColor: '#7c3aed',
+                    width: `${((tuningProgress.index + 0.5) / tuningProgress.total) * 100}%`,
+                    transition: 'width 0.3s ease',
+                  }} />
+                </div>
+              </div>
+            )}
+
             {tuningResults && tuningResults.length > 0 && (
               <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse', marginBottom: 10 }}>
                 <thead>
@@ -2664,13 +2703,14 @@ function ValidateTab({
                 <tbody>
                   {tuningResults.map((r, i) => {
                     const scoreColor = r.score >= 90 ? '#059669' : r.score >= 70 ? '#d97706' : '#dc2626'
+                    const isBest = !tuning && i === 0
                     return (
-                      <tr key={i} style={{
+                      <tr key={r.label} style={{
                         borderBottom: '1px solid #ede9fe',
-                        backgroundColor: i === 0 ? '#ede9fe' : 'transparent',
+                        backgroundColor: isBest ? '#ede9fe' : 'transparent',
                       }}>
-                        <td style={{ padding: '4px 6px', fontWeight: i === 0 ? 700 : 400 }}>
-                          {r.label}{i === 0 && ' *'}
+                        <td style={{ padding: '4px 6px', fontWeight: isBest ? 700 : 400 }}>
+                          {r.label}{isBest && ' *'}
                         </td>
                         <td style={{ padding: '4px 6px', color: '#6b7280', fontSize: 10 }}>{r.model}</td>
                         <td style={{ padding: '4px 6px', textAlign: 'right', fontWeight: 600, color: scoreColor }}>
