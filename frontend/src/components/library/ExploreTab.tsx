@@ -233,16 +233,16 @@ function FeaturedCollectionCard({
       onClick={onClick}
       className="group flex flex-col rounded-xl border border-gray-200 bg-white p-5 text-left hover:border-gray-300 hover:shadow-md transition-all"
     >
-      <div className="flex items-center gap-2 mb-2">
-        <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-yellow-50 text-yellow-600">
+      <div className="flex items-start gap-2 mb-2">
+        <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-yellow-50 text-yellow-600 shrink-0">
           <Star className="h-4 w-4 fill-current" />
         </div>
-        <h3 className="text-sm font-bold text-gray-900 group-hover:text-blue-700 transition-colors truncate">
+        <h3 className="text-sm font-bold text-gray-900 group-hover:text-blue-700 transition-colors line-clamp-2 min-w-0">
           {collection.title}
         </h3>
       </div>
       {collection.description && (
-        <p className="text-xs text-gray-500 line-clamp-2 mb-3">{collection.description}</p>
+        <p className="text-xs text-gray-500 line-clamp-3 mb-3">{collection.description}</p>
       )}
       <span className="mt-auto text-xs font-medium text-gray-400">
         {collection.item_ids.length} item{collection.item_ids.length !== 1 ? 's' : ''}
@@ -275,11 +275,11 @@ function CatalogCard({
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 mb-1">
-            <ShieldCheck className={`h-3.5 w-3.5 shrink-0 ${
+          <div className="flex items-start gap-1.5 mb-1">
+            <ShieldCheck className={`h-3.5 w-3.5 shrink-0 mt-0.5 ${
               item.quality_tier === 'gold' ? 'text-amber-500' : item.quality_tier === 'silver' ? 'text-gray-400' : 'text-green-500'
             }`} />
-            <span className="text-sm font-semibold text-gray-900 truncate group-hover:text-blue-700 transition-colors">
+            <span className="text-sm font-semibold text-gray-900 line-clamp-2 min-w-0 group-hover:text-blue-700 transition-colors">
               {item.display_name || item.name}
             </span>
           </div>
@@ -296,7 +296,7 @@ function CatalogCard({
       </div>
 
       {item.description && (
-        <p className="text-xs text-gray-600 line-clamp-2 mb-2">{item.description}</p>
+        <p className="text-xs text-gray-600 line-clamp-3 mb-2">{item.description}</p>
       )}
 
       {item.kind === 'knowledge_base' && (item.total_sources != null || item.total_chunks != null) && (

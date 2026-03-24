@@ -82,6 +82,7 @@ export function runExtractionSync(data: {
   document_uuids: string[]
   model?: string
   extraction_config_override?: Record<string, unknown>
+  combined_context?: boolean
 }, signal?: AbortSignal) {
   return apiFetch<{ results: unknown[] }>('/api/extractions/run-sync', {
     method: 'POST',

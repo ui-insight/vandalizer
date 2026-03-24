@@ -24,6 +24,7 @@ dependencies = [
     "PyPDF2>=3.0,<4",
     "pypandoc>=1.13,<2",
     "markitdown[docx,pptx,xlsx]>=0.1,<1",
+    "reportlab>=4.0,<5",
     "markdownify>=0.13,<1",
     "msal>=1.28,<2",
     "redis>=5.0,<6",

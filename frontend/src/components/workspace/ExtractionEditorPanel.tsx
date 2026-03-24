@@ -66,6 +66,7 @@ export function ExtractionEditorPanel() {
   const [newTerm, setNewTerm] = useState('')
   const [running, setRunning] = useState(false)
   const [results, setResults] = useState<Record<string, string>>({})
+  const [combinedContext, setCombinedContext] = useState(false)
   const [attachingTemplate, setAttachingTemplate] = useState(false)
   const [generatingTemplate, setGeneratingTemplate] = useState(false)
   const [exportingPdf, setExportingPdf] = useState(false)
@@ -143,6 +144,7 @@ export function ExtractionEditorPanel() {
       const resp = await runExtractionSync({
         search_set_uuid: openExtractionId,
         document_uuids: selectedDocUuids,
+        combined_context: combinedContext,
       })
       // Build key→value map from results
       const map: Record<string, string> = {}
@@ -171,7 +173,13 @@ export function ExtractionEditorPanel() {
   // --- Tools ---
   const handleClone = async () => {
     if (!openExtractionId) return
-    await cloneSearchSet(openExtractionId)
+    try {
+      const cloned = await cloneSearchSet(openExtractionId)
+      openExtraction(cloned.uuid)
+      toast('Extraction cloned', 'success')
+    } catch {
+      toast('Failed to clone extraction', 'error')
+    }
   }
 
   const handleDelete = async () => {
@@ -596,6 +604,21 @@ export function ExtractionEditorPanel() {
               Add
             </button>
           </div>
+          {selectedDocUuids.length > 1 && (
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              fontSize: 12, color: '#374151', cursor: 'pointer', userSelect: 'none',
+              whiteSpace: 'nowrap', flexShrink: 0,
+            }}>
+              <input
+                type="checkbox"
+                checked={combinedContext}
+                onChange={e => setCombinedContext(e.target.checked)}
+                style={{ accentColor: 'var(--highlight-color, #eab308)' }}
+              />
+              Combined
+            </label>
+          )}
           <button
             onClick={handleRun}
             disabled={running || selectedDocUuids.length === 0}
