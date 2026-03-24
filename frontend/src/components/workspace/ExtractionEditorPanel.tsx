@@ -101,7 +101,8 @@ export function ExtractionEditorPanel() {
     if (!openExtractionId) return
     setLoading(true)
     const pending = consumeExtractionResults()
-    setResults(pending ?? {})
+    setResultSets(pending ? [pending] : [])
+    setActiveResultIdx(0)
     setActiveTab('design')
     getSearchSet(openExtractionId)
       .then(setSearchSet)
@@ -149,17 +150,21 @@ export function ExtractionEditorPanel() {
         document_uuids: selectedDocUuids,
         combined_context: combinedContext,
       })
-      // Build key→value map from results
-      const map: Record<string, string> = {}
+      // Build result sets — one per entity object returned
+      const sets: Record<string, string>[] = []
       if (resp.results && resp.results.length > 0) {
-        const first = resp.results[0]
-        if (typeof first === 'object' && first !== null) {
-          for (const [k, v] of Object.entries(first as Record<string, unknown>)) {
-            map[k] = v === null ? 'N/A' : String(v)
+        for (const entity of resp.results) {
+          if (typeof entity === 'object' && entity !== null) {
+            const map: Record<string, string> = {}
+            for (const [k, v] of Object.entries(entity as Record<string, unknown>)) {
+              map[k] = v === null ? 'N/A' : String(v)
+            }
+            sets.push(map)
           }
         }
       }
-      setResults(map)
+      setResultSets(sets.length > 0 ? sets : [{}])
+      setActiveResultIdx(0)
     } finally {
       setRunning(false)
       bumpActivitySignal()
@@ -174,7 +179,8 @@ export function ExtractionEditorPanel() {
   }
 
   const handleExportJSON = () => {
-    const blob = new Blob([JSON.stringify(results, null, 2)], { type: 'application/json' })
+    const exportData = resultSets.length > 1 ? resultSets : results
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -186,10 +192,11 @@ export function ExtractionEditorPanel() {
 
   const handleExportCSV = () => {
     const escape = (v: string) => `"${v.replace(/"/g, '""')}"`
-    const keys = Object.keys(results)
+    const allSets = resultSets.length > 0 ? resultSets : [results]
+    const keys = Object.keys(allSets[0] ?? {})
     const header = keys.map(escape).join(',')
-    const row = keys.map(k => escape(String(results[k] ?? ''))).join(',')
-    const csv = header + '\n' + row + '\n'
+    const rows = allSets.map(set => keys.map(k => escape(String(set[k] ?? ''))).join(','))
+    const csv = header + '\n' + rows.join('\n') + '\n'
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -930,6 +937,36 @@ function DesignTab({
             </div>
           </div>
           <style>{`@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }`}</style>
+        </div>
+      )}
+
+      {/* Result set selector for multi-document extractions */}
+      {resultSets.length > 1 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '8px 0', borderBottom: '1px solid #e5e7eb',
+        }}>
+          <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 500 }}>
+            Document:
+          </span>
+          {resultSets.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setActiveResultIdx(i)}
+              style={{
+                padding: '3px 10px', fontSize: 12, fontWeight: 600,
+                fontFamily: 'inherit', borderRadius: 12, border: 'none',
+                cursor: 'pointer', transition: 'all 0.15s',
+                backgroundColor: i === activeResultIdx ? 'var(--highlight-color, #eab308)' : '#f3f4f6',
+                color: i === activeResultIdx ? 'var(--highlight-text-color, #000)' : '#374151',
+              }}
+            >
+              {i + 1}
+            </button>
+          ))}
+          <span style={{ fontSize: 11, color: '#9ca3af', marginLeft: 4 }}>
+            {resultSets.length} result{resultSets.length !== 1 ? 's' : ''}
+          </span>
         </div>
       )}
 
