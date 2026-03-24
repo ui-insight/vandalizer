@@ -277,7 +277,13 @@ async def upload_pdf_template(
     class FieldMapping(PydanticBase):
         mappings: dict[str, str]  # {pdf_field_name: human_readable_prompt}
 
+    from app.models.system_config import SystemConfig
+    sys_cfg = await SystemConfig.get_config()
+    sys_config_doc = sys_cfg.model_dump() if sys_cfg else {}
+
     model_name = await get_default_model_name()
+    if not model_name:
+        model_name = "gpt-4o-mini"
     agent = create_chat_agent(
         model_name,
         system_prompt=(
@@ -286,6 +292,7 @@ async def upload_pdf_template(
             "field name to a short, clear English extraction prompt (what to extract from a document "
             "to fill that field). Return only valid JSON."
         ),
+        system_config_doc=sys_config_doc,
     )
     prompt = (
         f"PDF form fields and their options:\n{field_info}\n\n"
