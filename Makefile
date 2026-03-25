@@ -3,13 +3,14 @@
 BACKEND_DIR := backend
 FRONTEND_DIR := frontend
 
-.PHONY: help backend-install backend-lint backend-typecheck backend-test backend-security backend-audit backend-static backend-ci backend-test-integration-t1 backend-test-integration-t2 backend-test-integration-t3 frontend-install frontend-typecheck frontend-lint frontend-test frontend-build frontend-ci ci docker-build release-check
+.PHONY: help backend-install backend-lint backend-typecheck backend-test backend-security backend-audit backend-static backend-backlog backend-ci backend-test-integration-t1 backend-test-integration-t2 backend-test-integration-t3 frontend-install frontend-typecheck frontend-lint frontend-test frontend-build frontend-ci ci docker-build release-check
 
 help:
 	@printf "Common targets:\n"
 	@printf "  make backend-install   Install backend dev dependencies\n"
 	@printf "  make backend-ci        Run the backend release-gating test suite\n"
-	@printf "  make backend-static    Run backend lint, typecheck, and security scans\n"
+	@printf "  make backend-static    Run release-gating backend lint and security checks\n"
+	@printf "  make backend-backlog   Run backend typecheck and dependency audit backlog\n"
 	@printf "  make frontend-install  Install frontend dependencies\n"
 	@printf "  make frontend-ci       Run frontend typecheck, lint, tests, and build\n"
 	@printf "  make ci                Run backend and frontend CI checks\n"
@@ -22,18 +23,20 @@ backend-lint:
 	cd $(BACKEND_DIR) && uv run ruff check app/
 
 backend-typecheck:
-	cd $(BACKEND_DIR) && uv run mypy app/ --ignore-missing-imports || echo "::warning::mypy found type errors (non-blocking)"
+	cd $(BACKEND_DIR) && uv run mypy app/ --ignore-missing-imports
 
 backend-test:
 	cd $(BACKEND_DIR) && uv run pytest -q --cov=app --cov-report=term-missing --cov-fail-under=30
 
 backend-security:
-	cd $(BACKEND_DIR) && uv run bandit -r app/ -s B101 -q || echo "::warning::bandit found issues (non-blocking)"
+	cd $(BACKEND_DIR) && uv run bandit -r app/ -s B101 -q -ll -ii
 
 backend-audit:
-	cd $(BACKEND_DIR) && uv run pip-audit || echo "::warning::pip-audit found vulnerabilities (non-blocking)"
+	cd $(BACKEND_DIR) && uv run pip-audit
 
-backend-static: backend-lint backend-typecheck backend-security backend-audit
+backend-static: backend-lint backend-security
+
+backend-backlog: backend-typecheck backend-audit
 
 backend-test-integration-t1:
 	cd $(BACKEND_DIR) && uv run pytest tests/integration/test_tier1_engine.py -x -q

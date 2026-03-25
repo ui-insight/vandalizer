@@ -25,10 +25,10 @@ make backend-install frontend-install
 make release-check
 ```
 
-Optional but recommended while the backend static-analysis backlog is still being cleaned up:
+Optional but recommended while the backend analysis backlog is still being cleaned up:
 
 ```bash
-make backend-static
+make backend-backlog
 ```
 
 ## 3. Rehearse The Install And Bootstrap Path

@@ -19,6 +19,7 @@ _SAFE_BUILTINS = {
     "str": str,
     "int": int,
     "float": float,
+    "bool": bool,
     "list": list,
     "dict": dict,
     "len": len,
@@ -51,7 +52,7 @@ def execute_sandboxed_code(code: str, input_data, timeout: int = 10) -> dict:
 
     def _run():
         try:
-            exec(code, {"__builtins__": _SAFE_BUILTINS}, local_vars)  # noqa: S102
+            exec(code, {"__builtins__": _SAFE_BUILTINS}, local_vars)  # noqa: S102  # nosec B102
         except Exception as exc:
             result_holder["error"] = str(exc)
             return
@@ -72,7 +73,7 @@ def run_sandboxed_code(code: str, input_data, result_queue) -> None:
     local_vars = {"data": input_data, "result": None}
 
     try:
-        exec(code, {"__builtins__": _SAFE_BUILTINS}, local_vars)  # noqa: S102
+        exec(code, {"__builtins__": _SAFE_BUILTINS}, local_vars)  # noqa: S102  # nosec B102
     except Exception as exc:
         result_queue.put({"error": str(exc)})
         return

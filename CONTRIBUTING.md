@@ -79,7 +79,7 @@ If `CONFIG_ENCRYPTION_KEY` is not set, the bootstrap script auto-generates one a
 - Use `uv` for package management (never `pip install` directly)
 - Celery tasks use `bind=True` and `autoretry_for` patterns
 - Beanie ODM for all MongoDB access (async, Pydantic v2 models)
-- MongoDB database name: `osp`
+- MongoDB database name: `vandalizer`
 
 ### TypeScript / Frontend
 
@@ -129,12 +129,15 @@ Use the repo-root `Makefile` so local commands, CI, and release validation stay 
 make backend-install
 make backend-ci
 make backend-static
+make backend-backlog
 make frontend-install
 make frontend-ci
 make release-check
 ```
 
-`make backend-static` runs the current backend lint, typecheck, and security backlog without gating releases.
+`make backend-static` runs the backend release-gating lint and security checks.
+
+`make backend-backlog` runs the current backend typecheck and dependency-audit backlog without gating releases.
 
 `make release-check` runs the current release-gating checks plus the backend/frontend Docker builds that ship in releases.
 

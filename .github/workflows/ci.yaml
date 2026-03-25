@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   backend-static:
-    name: Backend Lint & Security
+    name: Backend Release Checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,17 +28,29 @@ jobs:
       - name: Install backend dependencies
         run: make backend-install
 
-      - name: Lint (ruff)
-        run: make backend-lint
+      - name: Run backend release checks
+        run: make backend-static
 
-      - name: Typecheck (mypy)
-        run: make backend-typecheck
+  backend-backlog:
+    name: Backend Advisory Backlog
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
 
-      - name: Security scan (bandit)
-        run: make backend-security
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
-      - name: Dependency audit (pip-audit)
-        run: make backend-audit
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install backend dependencies
+        run: make backend-install
+
+      - name: Run backend backlog checks
+        run: make backend-backlog
 
   backend-test:
     name: Backend Tests

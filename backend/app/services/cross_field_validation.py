@@ -2,11 +2,11 @@
 
 import logging
 import re
-import signal
 from datetime import datetime
 from typing import Optional
 
-from asteval import Interpreter
+from app.utils.code_sandbox import validate_sandbox_code
+from app.utils.code_sandbox_runner import execute_sandboxed_code
 
 logger = logging.getLogger(__name__)
 
@@ -212,61 +212,37 @@ class CrossFieldValidator:
         }
 
     def _validate_custom_expression(self, data: dict, rule: dict) -> dict:
-        """Evaluate a simple Python expression safely using asteval sandbox."""
+        """Evaluate a simple Python expression using the workflow sandbox."""
         expression = rule.get("expression", "")
         if not expression:
             return {"rule": rule, "passed": False, "message": "No expression provided"}
 
-        aeval = Interpreter(minimal=True)
-
-        # Remove dangerous builtins that minimal mode still includes
-        for _unsafe in ("open", "type", "dir", "print", "input", "help"):
-            aeval.symtable.pop(_unsafe, None)
-
-        # Populate symtable with safe builtins
-        for name, obj in [
-            ("abs", abs), ("min", min), ("max", max), ("sum", sum),
-            ("len", len), ("round", round), ("float", float), ("int", int),
-            ("str", str), ("bool", bool), ("True", True), ("False", False),
-            ("None", None),
-        ]:
-            aeval.symtable[name] = obj
-
-        # Add data variables with sanitized keys
+        sandbox_data = {}
+        variable_names = []
         for key, value in data.items():
             safe_key = re.sub(r"[^a-zA-Z0-9_]", "_", key)
             num = _try_parse_number(value)
-            aeval.symtable[safe_key] = num if num is not None else value
+            sandbox_data[safe_key] = num if num is not None else value
+            variable_names.append(safe_key)
 
-        # Run with a 5-second timeout (Unix only; graceful no-op on Windows)
-        timed_out = False
-
-        def _timeout_handler(signum, frame):
-            raise TimeoutError("Expression evaluation timed out (5s limit)")
-
-        use_alarm = hasattr(signal, "SIGALRM")
-        if use_alarm:
-            old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
-            signal.alarm(5)
+        prelude = "\n".join(f"{name} = data[{name!r}]" for name in variable_names)
+        code = f"{prelude}\nresult = bool({expression})" if prelude else f"result = bool({expression})"
 
         try:
-            result = aeval(expression)
-            if aeval.error:
-                msgs = "; ".join(str(e.get_error()[1]) for e in aeval.error)
-                return {"rule": rule, "passed": False, "message": f"Expression error: {msgs}"}
-            passed = bool(result)
-        except TimeoutError:
-            timed_out = True
-            return {"rule": rule, "passed": False, "message": "Expression evaluation timed out (5s limit)"}
+            validate_sandbox_code(code)
         except Exception as e:
             return {"rule": rule, "passed": False, "message": f"Expression error: {e}"}
-        finally:
-            if use_alarm and not timed_out:
-                signal.alarm(0)
-                signal.signal(signal.SIGALRM, old_handler)
+
+        result = execute_sandboxed_code(code, sandbox_data, timeout=5)
+        if result.get("timed_out"):
+            return {"rule": rule, "passed": False, "message": "Expression evaluation timed out (5s limit)"}
+        if "error" in result:
+            return {"rule": rule, "passed": False, "message": f"Expression error: {result['error']}"}
+
+        passed = bool(result.get("result"))
 
         return {
             "rule": rule,
             "passed": passed,
-            "message": f"Expression '{expression}' evaluated to {result}",
+            "message": f"Expression '{expression}' evaluated to {result.get('result')}",
         }
