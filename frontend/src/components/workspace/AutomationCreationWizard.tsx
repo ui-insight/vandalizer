@@ -63,18 +63,6 @@ export function AutomationCreationWizard({ onClose, onCreate, workflows, searchS
     if (step === 1) nameRef.current?.focus()
   }, [step])
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-      if (e.key === 'Enter' && !creating) {
-        if (step < totalSteps && canAdvance()) setStep(s => s + 1)
-        else if (step === totalSteps && canAdvance()) handleCreate()
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose, step, totalSteps, creating, canAdvance, handleCreate])
-
   // Load folders when entering the folder config step
   useEffect(() => {
     if (hasFolderStep && step === folderStep && folders.length === 0) {
@@ -138,6 +126,19 @@ export function AutomationCreationWizard({ onClose, onCreate, workflows, searchS
       setCreating(false)
     }
   }, [name, description, triggerType, watchFolderId, fileTypes, excludePatterns, batchMode, actionType, actionId, onCreate])
+
+  // Keyboard: Escape closes, Enter advances/submits
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+      if (e.key === 'Enter' && !creating && !creatingFolder) {
+        if (step < totalSteps && canAdvance()) setStep(s => s + 1)
+        else if (step === totalSteps && canAdvance()) handleCreate()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose, step, totalSteps, creating, creatingFolder, canAdvance, handleCreate])
 
   const handleFileTypeToggle = (type: string) => {
     setFileTypes(prev =>
