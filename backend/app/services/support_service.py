@@ -2,6 +2,7 @@
 
 import datetime
 import logging
+from pathlib import Path
 
 from app.config import Settings
 from app.models.support import (
@@ -212,6 +213,14 @@ async def add_message(
     return _ticket_to_dict(ticket)
 
 
+def _support_attachments_dir() -> Path:
+    """Return (and create) the directory for support ticket attachments."""
+    from app.dependencies import get_settings
+    base = Path(get_settings().upload_dir) / "support_attachments"
+    base.mkdir(parents=True, exist_ok=True)
+    return base
+
+
 async def add_attachment(
     ticket_uuid: str,
     user: User,
@@ -224,14 +233,22 @@ async def add_attachment(
     if not ticket:
         return None
 
-    attachment = SupportAttachment(
+    # Save file to disk instead of storing base64 in MongoDB
+    import base64 as b64
+    att = SupportAttachment(
         filename=filename,
         file_type=file_type,
-        file_data=file_data,
+        file_data="",  # don't store in DB
         uploaded_by=user.user_id,
         message_uuid=message_uuid,
     )
-    ticket.attachments.append(attachment)
+    dest_dir = _support_attachments_dir() / ticket_uuid
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest_file = dest_dir / att.uuid
+    dest_file.write_bytes(b64.b64decode(file_data))
+    att.file_path = str(dest_file)
+
+    ticket.attachments.append(att)
     ticket.updated_at = datetime.datetime.now(datetime.timezone.utc)
     await ticket.save()
     return _ticket_to_dict(ticket)
@@ -243,12 +260,25 @@ async def get_attachment_data(ticket_uuid: str, attachment_uuid: str) -> dict | 
         return None
     for a in ticket.attachments:
         if a.uuid == attachment_uuid:
-            return {
-                "uuid": a.uuid,
-                "filename": a.filename,
-                "file_type": a.file_type,
-                "file_data": a.file_data,
-            }
+            # Read from disk if file_path exists, fall back to legacy base64
+            if a.file_path:
+                p = Path(a.file_path)
+                if p.exists():
+                    import base64 as b64
+                    return {
+                        "uuid": a.uuid,
+                        "filename": a.filename,
+                        "file_type": a.file_type,
+                        "file_data": b64.b64encode(p.read_bytes()).decode(),
+                    }
+            # Legacy: base64 stored in document
+            if a.file_data:
+                return {
+                    "uuid": a.uuid,
+                    "filename": a.filename,
+                    "file_type": a.file_type,
+                    "file_data": a.file_data,
+                }
     return None
 
 
