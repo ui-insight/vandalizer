@@ -746,7 +746,7 @@ export function ExploreTab() {
                 {showHero && !activeCollection && featuredCollections.length > 0 && (
                   <div className="mb-8">
                     <h3 className="text-sm font-bold text-gray-900 mb-3">Featured Collections</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
                       {featuredCollections.map(col => (
                         <FeaturedCollectionCard
                           key={col.id}
@@ -766,7 +766,7 @@ export function ExploreTab() {
                       <h3 className="text-sm font-bold text-gray-900">Top Rated</h3>
                       <span className="text-xs text-gray-400">{goldItems.length} gold-tier item{goldItems.length !== 1 ? 's' : ''}</span>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
                       {goldItems.slice(0, 6).map(item => (
                         <CatalogCard
                           key={item.id}
@@ -789,7 +789,7 @@ export function ExploreTab() {
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
                   {(showHero && !activeCollection ? otherItems : items).map(item => (
                     <CatalogCard
                       key={item.id}
