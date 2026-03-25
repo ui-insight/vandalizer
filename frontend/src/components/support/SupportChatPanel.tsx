@@ -57,7 +57,7 @@ function TicketListView({
   isSupportAgent: boolean
   onSelect: (uuid: string) => void
   onNew: () => void
-  seenTickets?: Record<string, string>
+  seenTickets?: Record<string, number>
 }) {
   const open = tickets.filter((t) => t.status !== 'closed')
   const closed = tickets.filter((t) => t.status === 'closed')
@@ -70,9 +70,9 @@ function TicketListView({
       ? t.last_message_is_support_reply === false
       : t.last_message_is_support_reply === true
     if (!isNew) return false
-    // If we've seen this ticket and the last message hasn't changed, suppress the dot
-    const seenMsgUser = seenTickets[t.uuid]
-    if (seenMsgUser && seenMsgUser === t.last_message_user_id) return false
+    // If we've seen this ticket and no new messages have arrived, suppress the dot
+    const seenCount = seenTickets[t.uuid]
+    if (seenCount !== undefined && t.message_count <= seenCount) return false
     return true
   }
 
@@ -310,7 +310,7 @@ function ChatView({
   ticketUuid: string
   isSupportAgent: boolean
   onBack: () => void
-  onTicketUpdated: () => void
+  onTicketUpdated: (messageCount?: number) => void
 }) {
   const { user } = useAuth()
   const { toast } = useToast()
@@ -355,7 +355,7 @@ function ChatView({
       const updated = await supportApi.addMessage(ticketUuid, message.trim())
       setTicket(updated)
       setMessage('')
-      onTicketUpdated()
+      onTicketUpdated(updated.message_count)
     } catch {
       toast('Failed to send message', 'error')
     } finally {
@@ -403,7 +403,7 @@ function ChatView({
       const updated = await supportApi.updateTicket(ticketUuid, { status: newStatus })
       setTicket(updated)
       toast(`Ticket ${newStatus.replace('_', ' ')}`, 'success')
-      onTicketUpdated()
+      onTicketUpdated(updated.message_count)
     } catch {
       toast('Failed to update ticket', 'error')
     } finally {
@@ -618,9 +618,9 @@ export function SupportChatPanel({
   const panelRef = useRef<HTMLDivElement>(null)
 
   // Track which tickets have been viewed so we can suppress the blue dot.
-  // Maps ticket uuid → last_message_user_id at the time it was viewed.
-  // If a new message arrives from someone else, the dot reappears.
-  const [seenTickets, setSeenTickets] = useState<Record<string, string>>({})
+  // Maps ticket uuid → message_count at the time it was viewed.
+  // If a new message arrives, the dot reappears.
+  const [seenTickets, setSeenTickets] = useState<Record<string, number>>({})
 
   const loadTickets = useCallback(async () => {
     try {
@@ -667,8 +667,8 @@ export function SupportChatPanel({
       ? t.last_message_is_support_reply === false
       : t.last_message_is_support_reply === true
     if (!isNew) return false
-    const seenMsgUser = seenTickets[t.uuid]
-    if (seenMsgUser && seenMsgUser === t.last_message_user_id) return false
+    const seenCount = seenTickets[t.uuid]
+    if (seenCount !== undefined && t.message_count <= seenCount) return false
     return true
   }).length
 
@@ -705,8 +705,8 @@ export function SupportChatPanel({
           seenTickets={seenTickets}
           onSelect={(uuid) => {
             const ticket = tickets.find(t => t.uuid === uuid)
-            if (ticket?.last_message_user_id) {
-              setSeenTickets(prev => ({ ...prev, [uuid]: ticket.last_message_user_id }))
+            if (ticket) {
+              setSeenTickets(prev => ({ ...prev, [uuid]: ticket.message_count }))
             }
             setActiveTicket(uuid)
             setView('chat')
@@ -732,11 +732,22 @@ export function SupportChatPanel({
           ticketUuid={activeTicket}
           isSupportAgent={isSupportAgent}
           onBack={() => {
+            // Mark the ticket as seen with the latest message count
+            const fresh = tickets.find(t => t.uuid === activeTicket)
+            if (fresh) {
+              setSeenTickets(prev => ({ ...prev, [activeTicket!]: fresh.message_count }))
+            }
             setView('list')
             setActiveTicket(null)
             loadTickets()
           }}
-          onTicketUpdated={loadTickets}
+          onTicketUpdated={(messageCount?: number) => {
+            // Update seen count so the agent's own actions don't re-trigger the dot
+            if (messageCount !== undefined && activeTicket) {
+              setSeenTickets(prev => ({ ...prev, [activeTicket]: messageCount }))
+            }
+            loadTickets()
+          }}
         />
       )}
     </div>,

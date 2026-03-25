@@ -245,6 +245,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const activateKB = useCallback((uuid: string, title: string) => {
     setActiveKBUuid(uuid)
     setActiveKBTitle(title)
+    setNewChatSignal(prev => prev + 1)
     localStorage.setItem('workspace:mode', 'chat')
     updateSearch((prev) => ({ ...prev, mode: undefined, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined }))
   }, [updateSearch])

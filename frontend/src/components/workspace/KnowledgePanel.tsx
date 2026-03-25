@@ -15,6 +15,7 @@ import { DocumentPickerModal } from '../knowledge/DocumentPickerModal'
 import { KBSearchBar } from '../knowledge/KBSearchBar'
 import { KBListView } from '../knowledge/KBListView'
 import { KnowledgeTutorial } from './KnowledgeTutorial'
+import { useToast } from '../../contexts/ToastContext'
 
 type TabKey = 'mine' | 'team' | 'explore'
 const TABS: { key: TabKey; label: string }[] = [
@@ -40,6 +41,7 @@ const SOURCE_STATUS: Record<string, { icon: typeof CheckCircle2; color: string }
 export function KnowledgePanel() {
   const { activateKB } = useWorkspace()
   const { user } = useAuth()
+  const { toast } = useToast()
   const { create, remove, refresh } = useKnowledgeBases()
   const [activeTab, setActiveTab] = useState<TabKey>('mine')
   const [search, setSearch] = useState('')
@@ -264,6 +266,7 @@ export function KnowledgePanel() {
       loadDetail(selectedKB.uuid)
     } catch (err) {
       console.error('Failed to submit for verification:', err)
+      toast(err instanceof Error ? err.message : 'Failed to submit for verification', 'error')
     } finally {
       setSubmittingVerify(false)
     }
