@@ -13,6 +13,7 @@ import { RenameDialog } from './RenameDialog'
 import { CreateFolderDialog } from './CreateFolderDialog'
 import { deleteFile, renameFile, downloadFile, downloadFilesAsZip, moveFile } from '../../api/files'
 import { createFolder, renameFolder, deleteFolder } from '../../api/folders'
+import { listAutomations } from '../../api/automations'
 import type { Document, Folder } from '../../types/document'
 
 export type SortColumn = 'name' | 'modified'
@@ -56,6 +57,23 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
   const { documents, folders, loading, refresh } = useDocuments(currentFolder, currentTeam?.uuid)
   const { breadcrumbs } = useBreadcrumbs(currentFolder)
   const { uploads, upload, lastUploadedUuid, clearLastUploaded } = useUpload(currentFolder, refresh)
+
+  // Load watched folder UUIDs from automations
+  const [watchedFolderUuids, setWatchedFolderUuids] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    listAutomations()
+      .then(automations => {
+        const uuids = new Set<string>()
+        for (const a of automations) {
+          if (a.trigger_type === 'folder_watch' && a.enabled) {
+            const folderId = (a.trigger_config as Record<string, unknown>)?.folder_id
+            if (typeof folderId === 'string') uuids.add(folderId)
+          }
+        }
+        setWatchedFolderUuids(uuids)
+      })
+      .catch(() => {})
+  }, [])
 
   // Auto-open the first document after upload
   useEffect(() => {
@@ -491,6 +509,7 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
           highlighted={panelDragOver}
           sort={sort}
           onSort={handleSort}
+          watchedFolderUuids={watchedFolderUuids}
         />
       </div>
 

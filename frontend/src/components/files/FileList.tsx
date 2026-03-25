@@ -20,6 +20,7 @@ interface FileListProps {
   highlighted?: boolean
   sort?: SortState
   onSort?: (column: SortColumn) => void
+  watchedFolderUuids?: Set<string>
 }
 
 function SortIndicator({ column, sort }: { column: SortColumn; sort?: SortState }) {
@@ -44,6 +45,7 @@ export function FileList({
   highlighted,
   sort,
   onSort,
+  watchedFolderUuids,
 }: FileListProps) {
   if (folders.length === 0 && documents.length === 0) {
     return <FileBrowserTutorial highlighted={highlighted} />
@@ -113,6 +115,7 @@ export function FileList({
             selected={selectedUuids?.has(folder.uuid)}
             onToggleSelect={onToggleSelect}
             onDropFile={onDropFile}
+            isWatched={watchedFolderUuids?.has(folder.uuid)}
           />
         ))}
         {documents.map((doc) => (

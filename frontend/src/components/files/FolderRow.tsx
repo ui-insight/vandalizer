@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { Folder as FolderIcon, Users, MoreVertical } from 'lucide-react'
+import { Folder as FolderIcon, Users, MoreVertical, Eye } from 'lucide-react'
 import type { Folder } from '../../types/document'
 
 interface FolderRowProps {
@@ -9,9 +9,10 @@ interface FolderRowProps {
   selected?: boolean
   onToggleSelect?: (uuid: string) => void
   onDropFile?: (fileUuid: string, folderUuid: string) => void
+  isWatched?: boolean
 }
 
-export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSelect, onDropFile }: FolderRowProps) {
+export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSelect, onDropFile, isWatched }: FolderRowProps) {
   const isTeam = !!folder.team_id || folder.is_shared_team_root
   const iconColor = isTeam ? 'rgb(0, 128, 128)' : 'rgb(162, 162, 162)'
   const [isDragOver, setIsDragOver] = useState(false)
@@ -114,6 +115,16 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
               marginLeft: 6, whiteSpace: 'nowrap',
             }}>
               Team
+            </span>
+          )}
+          {isWatched && (
+            <span className="shrink-0" style={{
+              fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
+              color: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.1)',
+              marginLeft: 6, whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 2,
+            }}>
+              <Eye style={{ width: 9, height: 9 }} />
+              Watched
             </span>
           )}
         </div>
