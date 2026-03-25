@@ -1,5 +1,6 @@
 {
   "ai_literacy": {
+    "overview": "Complete the self-assessment reflection questions after reading all lessons. There is no hands-on exercise for this module — just share your honest thoughts.",
     "documents": [],
     "instructions": [
       "Read through all 6 lessons in the **Learn** tab to build your understanding of AI for research administration.",
@@ -15,6 +16,7 @@
     }
   },
   "process_mapping": {
+    "overview": "Reflect on your team's document processes. There is no hands-on exercise — answer the 4 process reflection questions to complete.",
     "documents": [],
     "instructions": [
       "Read through all 6 lessons in the **Learn** tab to build your process thinking skills.",
@@ -30,6 +32,7 @@
     }
   },
   "workflow_design": {
+    "overview": "Reflect on how you would design workflows for your processes. There is no hands-on exercise — answer the 4 design reflection questions to complete.",
     "documents": [],
     "instructions": [
       "Read through all 6 lessons in the **Learn** tab to understand workflow design principles.",
@@ -45,6 +48,7 @@
     }
   },
   "foundations": {
+    "overview": "Build your first extraction workflow using a sample NSF proposal. Click **Set Up Lab** below to add the PDF to your workspace, then follow the steps to create a workflow, extract data from it, and verify the results. When you click **Check Progress**, the system validates that your workflow extracted the correct values from the document.",
     "documents": ["nsf-proposal-alpine-ecology.pdf"],
     "instructions": [
       "Click **Set Up Lab** to add the sample NSF proposal to your workspace.",
@@ -69,6 +73,7 @@
     }
   },
   "extraction_engine": {
+    "overview": "Create a comprehensive extraction with 15+ fields using a sample NIH R01 proposal. Click **Set Up Lab** to add the PDF, then build a detailed SearchSet and validate your results.",
     "documents": ["nih-r01-neuroscience.pdf"],
     "instructions": [
       "Click **Set Up Lab** to add the sample NIH R01 proposal to your workspace.",
@@ -100,6 +105,7 @@
     }
   },
   "multi_step": {
+    "overview": "Build a multi-step workflow pipeline using a sample subaward agreement. Click **Set Up Lab** to add the PDF, then create a 3+ step workflow that chains extraction, analysis, and formatting.",
     "documents": ["subaward-agreement.pdf"],
     "instructions": [
       "Click **Set Up Lab** to add the sample subaward agreement to your workspace.",
@@ -127,6 +133,7 @@
     }
   },
   "advanced_nodes": {
+    "overview": "Use advanced workflow nodes (Code Execution, parallel tasks) to process a sample budget justification. Click **Set Up Lab** to add the PDF, then build a workflow with advanced node types.",
     "documents": ["budget-justification.pdf"],
     "instructions": [
       "Click **Set Up Lab** to add the sample budget justification to your workspace.",
@@ -152,6 +159,7 @@
     }
   },
   "output_delivery": {
+    "overview": "Create a workflow that produces a downloadable deliverable from a sample progress report. Click **Set Up Lab** to add the PDF, then build a pipeline that extracts, summarizes, and exports the data.",
     "documents": ["progress-report-year2.pdf"],
     "instructions": [
       "Click **Set Up Lab** to add the sample progress report to your workspace.",
@@ -178,6 +186,7 @@
     }
   },
   "validation_qa": {
+    "overview": "Add quality checks to a workflow you've already built. This module reuses the NSF proposal from Module 1 — no new documents needed.",
     "documents": ["nsf-proposal-alpine-ecology.pdf"],
     "instructions": [
       "This module reuses the NSF proposal from Module 1 (already in your workspace if you completed that module).",
@@ -197,6 +206,7 @@
     }
   },
   "batch_processing": {
+    "overview": "Run a workflow across multiple documents at once. Click **Set Up Lab** to add three sample proposals, then process them all in batch mode and verify the results.",
     "documents": ["proposal-batch-1.pdf", "proposal-batch-2.pdf", "proposal-batch-3.pdf"],
     "instructions": [
       "Click **Set Up Lab** to add three sample NSF proposals to your workspace.",
@@ -217,6 +227,7 @@
     }
   },
   "governance": {
+    "overview": "Organize, verify, and share your workflows across spaces. This module uses workflows you've already built — no new documents needed.",
     "documents": [],
     "instructions": [
       "This module uses workflows you've already built — no new documents needed.",

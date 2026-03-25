@@ -176,6 +176,16 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
           </div>
         ) : (
           <div>
+            {/* Challenge overview */}
+            {exercise?.overview && (
+              <p className="text-sm text-gray-600 mb-5 leading-relaxed"
+                dangerouslySetInnerHTML={{
+                  __html: exercise.overview
+                    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>'),
+                }}
+              />
+            )}
+
             {/* Self-assessment (modules with reflection questions) */}
             {MODULE_ASSESSMENTS[module.id] && (
               <SelfAssessment

@@ -88,7 +88,7 @@ const PRE_SURVEY_FIELDS: SurveyField[] = [
   // estimates here with your actual experience in the post-survey.
   {
     key: 'task_time_intro',
-    label: 'For each task below, estimate how long it takes you today without AI assistance. This helps us measure time savings during the pilot so we can demonstrate the value of AI-assisted workflows to your institution.',
+    label: 'For each task below, estimate how long it takes you today without AI assistance. This helps us measure time savings during the pilot so we can demonstrate the value of AI-assisted workflows to your institution.\n\nIf you do not know how long this takes, leave it blank.',
     type: 'info',
     required: false,
     section: 'Task Time Estimates',

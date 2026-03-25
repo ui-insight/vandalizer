@@ -56,7 +56,7 @@ export function SurveyFieldRenderer({ field, value, onChange }: Props) {
           required={field.required}
           value={(value as string) || ''}
           onChange={(e) => onChange(field.key, e.target.value)}
-          className={INPUT_CLASS}
+          className={`${INPUT_CLASS} [&>option]:text-black`}
         >
           <option value="">Select...</option>
           {field.options?.map((opt) => (
@@ -141,7 +141,7 @@ export function SurveyFieldRenderer({ field, value, onChange }: Props) {
 
     case 'info':
       return (
-        <p className="text-sm text-gray-400 leading-relaxed">
+        <p className="text-sm text-gray-400 leading-relaxed whitespace-pre-line">
           {field.label}
         </p>
       )

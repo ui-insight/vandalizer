@@ -9,6 +9,7 @@ export interface ModuleProgress {
 }
 
 export interface CertExercise {
+  overview?: string
   documents: string[]
   instructions: string[]
   expected_fields: string[]

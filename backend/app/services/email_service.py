@@ -69,6 +69,7 @@ def waitlist_confirmation_email(name: str, position: int, frontend_url: str, sta
       <div class="logo">Vandalizer</div>
       <h1>Welcome to the waitlist, {name}!</h1>
       <p>Your demo application has been received. You are currently at position <span class="highlight">#{position}</span> on the waitlist.</p>
+      <p>Your application ID is: <span class="highlight">{status_uuid}</span></p>
       <p>We activate new accounts regularly. When a spot opens up, you'll receive an email with your login credentials and full access to the platform for 2 weeks.</p>
       <p style="margin-top:24px"><a class="btn" href="{frontend_url}/demo/status/{status_uuid}">Check Your Status</a></p>
       <div class="footer">Vandalizer</div>

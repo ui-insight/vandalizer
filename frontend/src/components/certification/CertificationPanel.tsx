@@ -455,11 +455,10 @@ export function CertificationPanel() {
 
   return createPortal(
     <>
-      {/* Subtle backdrop for floating mode */}
+      {/* Subtle backdrop for floating mode — pointer-events-none so the app stays interactive */}
       {mode === 'floating' && (
         <div
-          className="fixed inset-0 z-[8999] bg-black/10 cert-fade-in"
-          onClick={closePanel}
+          className="fixed inset-0 z-[8999] bg-black/5 cert-fade-in pointer-events-none"
         />
       )}
 
