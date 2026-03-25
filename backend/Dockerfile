@@ -22,6 +22,7 @@ ENV VIRTUAL_ENV=/app/.venv \
 COPY --from=builder /app/.venv /app/.venv
 
 COPY app ./app
+COPY certification-data ./certification-data
 COPY scripts ./scripts
 COPY seeds ./seeds
 COPY bootstrap_install.py ./
