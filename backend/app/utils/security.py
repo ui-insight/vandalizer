@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
-from jose import JWTError, jwt
+import jwt
+from jwt import InvalidTokenError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.config import Settings
@@ -41,5 +42,5 @@ def decode_token(token: str, settings: Settings) -> dict | None:
         return jwt.decode(
             token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm]
         )
-    except JWTError:
+    except InvalidTokenError:
         return None
