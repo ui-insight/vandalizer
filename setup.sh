@@ -416,9 +416,9 @@ launch_services() {
   local build_ok=true
   build_image "api" "Backend image (API + Celery)" || build_ok=false
 
-  # Celery and Flower share the same Dockerfile — build their images too
-  echo -e "  ${DIM}     Building Celery/Flower from same backend image...${RESET}"
-  $COMPOSE_CMD build celery flower >> "$SETUP_LOG" 2>&1 || true
+  # Celery shares the same Dockerfile — build its image too
+  echo -e "  ${DIM}     Building Celery from same backend image...${RESET}"
+  $COMPOSE_CMD build celery >> "$SETUP_LOG" 2>&1 || true
 
   echo ""
   build_image "frontend" "Frontend image (React + Nginx)" || build_ok=false
@@ -490,7 +490,6 @@ launch_services() {
 
   run_step "Starting API server" $COMPOSE_CMD up -d api
   run_step "Starting Celery workers" $COMPOSE_CMD up -d celery
-  run_step "Starting Flower monitor" $COMPOSE_CMD up -d flower
   run_step "Starting frontend" $COMPOSE_CMD up -d frontend
 
   echo ""
@@ -838,7 +837,6 @@ finale() {
   printf "  ${MAGENTA}${BOLD}║${RESET}   ${BOLD}${WHITE}Frontend${RESET}     ${CYAN}%-40s${RESET}${MAGENTA}${BOLD}║${RESET}\n" "http://localhost"
   printf "  ${MAGENTA}${BOLD}║${RESET}   ${BOLD}${WHITE}API${RESET}          ${CYAN}%-40s${RESET}${MAGENTA}${BOLD}║${RESET}\n" "http://localhost:8001"
   printf "  ${MAGENTA}${BOLD}║${RESET}   ${BOLD}${WHITE}API Health${RESET}   ${CYAN}%-40s${RESET}${MAGENTA}${BOLD}║${RESET}\n" "http://localhost:8001/api/health"
-  printf "  ${MAGENTA}${BOLD}║${RESET}   ${BOLD}${WHITE}Flower${RESET}       ${CYAN}%-40s${RESET}${MAGENTA}${BOLD}║${RESET}\n" "http://localhost:5555"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}                                                              ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}╠══════════════════════════════════════════════════════════════╣${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}                                                              ${MAGENTA}${BOLD}║${RESET}"
@@ -967,7 +965,7 @@ repair() {
   if [[ "$need_backend_build" == true ]]; then
     echo ""
     build_image "api" "Backend image (API + Celery)" || build_ok=false
-    $COMPOSE_CMD build celery flower >> "$SETUP_LOG" 2>&1 || true
+    $COMPOSE_CMD build celery >> "$SETUP_LOG" 2>&1 || true
     actions_taken=$((actions_taken + 1))
   fi
 
@@ -1024,12 +1022,11 @@ repair() {
 
   # Application services
   echo ""
-  for svc in api celery flower frontend; do
+  for svc in api celery frontend; do
     local label
     case "$svc" in
       api)      label="API server" ;;
       celery)   label="Celery workers" ;;
-      flower)   label="Flower monitor" ;;
       frontend) label="Frontend" ;;
     esac
 
@@ -1463,7 +1460,7 @@ do_redeploy() {
 
   local build_ok=true
   build_image "api" "Backend image (API + Celery)" || build_ok=false
-  $COMPOSE_CMD build celery flower >> "$SETUP_LOG" 2>&1 || true
+  $COMPOSE_CMD build celery >> "$SETUP_LOG" 2>&1 || true
   echo ""
   build_image "frontend" "Frontend image (React + Nginx)" || build_ok=false
 
@@ -1482,7 +1479,6 @@ do_redeploy() {
   # Recreate application containers with new images (infra stays untouched)
   run_step "Restarting API server" $COMPOSE_CMD up -d --force-recreate --no-deps api
   run_step "Restarting Celery workers" $COMPOSE_CMD up -d --force-recreate --no-deps celery
-  run_step "Restarting Flower monitor" $COMPOSE_CMD up -d --force-recreate --no-deps flower
   run_step "Restarting frontend" $COMPOSE_CMD up -d --force-recreate --no-deps frontend
 
   echo ""

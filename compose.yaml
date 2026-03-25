@@ -123,28 +123,6 @@ services:
           memory: 8G
           cpus: "4.0"
 
-  flower:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    depends_on:
-      redis:
-        condition: service_healthy
-    env_file: ./backend/.env
-    environment:
-      - REDIS_HOST=redis
-    ports:
-      - "5555:5555"
-    networks:
-      - vandalizer
-    entrypoint: ["celery", "-A", "app.celery_app:celery", "flower", "--port=5555", "--persistent=True", "--db=/tmp/flower.db"]
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: "0.5"
-
   frontend:
     build:
       context: ./frontend
