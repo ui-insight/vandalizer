@@ -1,6 +1,8 @@
 # Deprecated Flask app (contains legacy code, excluded from open-source release)
 deprecated/
 
+mongo-backup
+
 # Uploads directory
 app/static/uploads/
 
