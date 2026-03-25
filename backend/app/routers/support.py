@@ -113,6 +113,18 @@ async def get_ticket(
     return ticket
 
 
+@router.post("/tickets/{ticket_uuid}/read")
+async def mark_ticket_read(
+    ticket_uuid: str,
+    user: User = Depends(get_current_user),
+):
+    """Mark a ticket as read by the current user."""
+    ok = await support_service.mark_ticket_read(ticket_uuid, user.user_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    return {"ok": True}
+
+
 @router.post("/tickets/{ticket_uuid}/messages")
 async def add_message(
     ticket_uuid: str,
