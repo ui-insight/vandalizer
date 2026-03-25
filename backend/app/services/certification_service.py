@@ -19,7 +19,7 @@ log = logging.getLogger(__name__)
 # Exercises data (loaded once from certification-data/exercises.json)
 # ---------------------------------------------------------------------------
 
-_CERT_DATA_DIR = Path(__file__).resolve().parent.parent.parent.parent / "certification-data"
+_CERT_DATA_DIR = Path(__file__).resolve().parent.parent.parent / "certification-data"
 _EXERCISES: dict = {}
 
 

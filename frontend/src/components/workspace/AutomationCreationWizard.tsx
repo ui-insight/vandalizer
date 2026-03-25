@@ -49,38 +49,50 @@ export function AutomationCreationWizard({ onClose, onCreate, workflows, searchS
   const [creatingFolder, setCreatingFolder] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
 
-  // Dynamic step count: folder_watch adds a config step
+  // Final step: output, enable, share
+  const [enabled, setEnabled] = useState(true)
+  const [sharedWithTeam, setSharedWithTeam] = useState(false)
+  const [saveToFolder, setSaveToFolder] = useState(false)
+  const [outputFolder, setOutputFolder] = useState('')
+  const [outputFormat, setOutputFormat] = useState('csv')
+  const [emailNotify, setEmailNotify] = useState(false)
+  const [emailRecipients, setEmailRecipients] = useState('')
+
+  // Dynamic step count: folder_watch adds a config step, plus final config step
   const hasFolderStep = triggerType === 'folder_watch'
-  const totalSteps = hasFolderStep ? 4 : 3
+  const totalSteps = hasFolderStep ? 5 : 4
 
   // Map logical step to content:
-  // folder_watch: 1=name, 2=trigger, 3=folder config, 4=action
-  // api:          1=name, 2=trigger, 3=action
+  // folder_watch: 1=name, 2=trigger, 3=folder config, 4=action, 5=output & activate
+  // api:          1=name, 2=trigger, 3=action, 4=output & activate
   const actionStep = hasFolderStep ? 4 : 3
+  const finalStep = totalSteps
   const folderStep = 3 // only used when hasFolderStep
 
   useEffect(() => {
     if (step === 1) nameRef.current?.focus()
   }, [step])
 
-  // Load folders when entering the folder config step
+  // Load folders when entering the folder config step or the final step (for output folder)
   useEffect(() => {
-    if (hasFolderStep && step === folderStep && folders.length === 0) {
+    const needsFolders = (hasFolderStep && step === folderStep) || step === finalStep
+    if (needsFolders && folders.length === 0) {
       setFoldersLoading(true)
       apiFetch<{ uuid: string; path: string }[]>('/api/folders/all')
         .then(setFolders)
         .catch(() => {})
         .finally(() => setFoldersLoading(false))
     }
-  }, [step, hasFolderStep, folderStep, folders.length])
+  }, [step, hasFolderStep, folderStep, finalStep, folders.length])
 
   const canAdvance = useCallback((): boolean => {
     if (step === 1) return name.trim().length > 0
     if (step === 2) return true
     if (hasFolderStep && step === folderStep) return watchFolderId.length > 0
     if (step === actionStep) return actionId.length > 0
+    if (step === finalStep) return true
     return false
-  }, [step, name, hasFolderStep, folderStep, actionStep, watchFolderId, actionId])
+  }, [step, name, hasFolderStep, folderStep, actionStep, finalStep, watchFolderId, actionId])
 
   const handleActionTypeChange = (type: ActionType) => {
     setActionType(type)
@@ -112,6 +124,23 @@ export function AutomationCreationWizard({ onClose, onCreate, workflows, searchS
           }
         : undefined
 
+      // Build output config
+      const outputConfig: Record<string, unknown> = {}
+      if (saveToFolder && outputFolder) {
+        outputConfig.storage = {
+          enabled: true,
+          destination_folder: outputFolder,
+          format: outputFormat,
+        }
+      }
+      if (emailNotify && emailRecipients.trim()) {
+        outputConfig.notifications = [{
+          channel: 'email',
+          recipients: emailRecipients.split(',').map(s => s.trim()).filter(Boolean),
+          notify_owner: true,
+        }]
+      }
+
       const auto = await createAutomation({
         name: name.trim(),
         description: description.trim() || undefined,
@@ -119,13 +148,24 @@ export function AutomationCreationWizard({ onClose, onCreate, workflows, searchS
         trigger_config: triggerConfig,
         action_type: actionType,
         action_id: actionId || undefined,
+        shared_with_team: sharedWithTeam,
       })
+
+      // Enable and set output config via update (create doesn't accept all fields)
+      if (enabled || Object.keys(outputConfig).length > 0) {
+        const { updateAutomation } = await import('../../api/automations')
+        await updateAutomation(auto.id, {
+          enabled,
+          ...(Object.keys(outputConfig).length > 0 ? { output_config: outputConfig } : {}),
+        })
+      }
+
       onCreate(auto.id)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create automation')
       setCreating(false)
     }
-  }, [name, description, triggerType, watchFolderId, fileTypes, excludePatterns, batchMode, actionType, actionId, onCreate])
+  }, [name, description, triggerType, watchFolderId, fileTypes, excludePatterns, batchMode, actionType, actionId, enabled, sharedWithTeam, saveToFolder, outputFolder, outputFormat, emailNotify, emailRecipients, onCreate])
 
   // Keyboard: Escape closes, Enter advances/submits
   useEffect(() => {
@@ -517,6 +557,114 @@ export function AutomationCreationWizard({ onClose, onCreate, workflows, searchS
                   </select>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Final step: Output, Enable, Share */}
+          {step === finalStep && (
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: '#202124', marginBottom: 20 }}>
+                Output &amp; Activation
+              </div>
+
+              {/* Enable toggle */}
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 16, fontSize: 13, color: '#374151' }}>
+                <input
+                  type="checkbox"
+                  checked={enabled}
+                  onChange={e => setEnabled(e.target.checked)}
+                  style={{ width: 16, height: 16, accentColor: '#3b82f6' }}
+                />
+                <span style={{ fontWeight: 500 }}>Enable immediately</span>
+                <span style={{ color: '#9ca3af', fontSize: 12 }}>&mdash; start watching as soon as created</span>
+              </label>
+
+              {/* Share with team */}
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: 20, fontSize: 13, color: '#374151' }}>
+                <input
+                  type="checkbox"
+                  checked={sharedWithTeam}
+                  onChange={e => setSharedWithTeam(e.target.checked)}
+                  style={{ width: 16, height: 16, accentColor: '#3b82f6' }}
+                />
+                <span style={{ fontWeight: 500 }}>Share with team</span>
+                <span style={{ color: '#9ca3af', fontSize: 12 }}>&mdash; team members can view and manage</span>
+              </label>
+
+              <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16, marginBottom: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 12 }}>Output Options</div>
+
+                {/* Save to folder */}
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: saveToFolder ? 12 : 8, fontSize: 13, color: '#374151' }}>
+                  <input
+                    type="checkbox"
+                    checked={saveToFolder}
+                    onChange={e => setSaveToFolder(e.target.checked)}
+                    style={{ width: 16, height: 16, accentColor: '#3b82f6' }}
+                  />
+                  <span style={{ fontWeight: 500 }}>Save results to a folder</span>
+                </label>
+                {saveToFolder && (
+                  <div style={{ paddingLeft: 24, marginBottom: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <select
+                      value={outputFolder}
+                      onChange={e => setOutputFolder(e.target.value)}
+                      style={selectStyle}
+                    >
+                      <option value="">-- Select destination folder --</option>
+                      {folders.map(f => (
+                        <option key={f.uuid} value={f.uuid}>{f.path}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={outputFormat}
+                      onChange={e => setOutputFormat(e.target.value)}
+                      style={selectStyle}
+                    >
+                      {actionType === 'extraction' ? (
+                        <>
+                          <option value="csv">CSV</option>
+                          <option value="json">JSON</option>
+                          <option value="text">Plain Text</option>
+                          <option value="markdown">Markdown</option>
+                          <option value="pdf">PDF</option>
+                        </>
+                      ) : (
+                        <>
+                          <option value="text">Plain Text</option>
+                          <option value="markdown">Markdown</option>
+                          <option value="pdf">PDF</option>
+                          <option value="json">JSON</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
+                )}
+
+                {/* Email notification */}
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: emailNotify ? 12 : 0, fontSize: 13, color: '#374151' }}>
+                  <input
+                    type="checkbox"
+                    checked={emailNotify}
+                    onChange={e => setEmailNotify(e.target.checked)}
+                    style={{ width: 16, height: 16, accentColor: '#3b82f6' }}
+                  />
+                  <span style={{ fontWeight: 500 }}>Email results when complete</span>
+                </label>
+                {emailNotify && (
+                  <div style={{ paddingLeft: 24 }}>
+                    <input
+                      type="text"
+                      value={emailRecipients}
+                      onChange={e => setEmailRecipients(e.target.value)}
+                      placeholder="email@example.com, another@example.com"
+                      style={inputStyle}
+                      onFocus={e => (e.currentTarget.style.borderColor = '#3b82f6')}
+                      onBlur={e => (e.currentTarget.style.borderColor = '#d1d5db')}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
