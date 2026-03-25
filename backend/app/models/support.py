@@ -40,7 +40,8 @@ class SupportAttachment(BaseModel):
     uuid: str = Field(default_factory=lambda: uuid_mod.uuid4().hex)
     filename: str
     file_type: Optional[str] = None
-    file_data: str = ""  # base64 encoded
+    file_data: str = ""  # base64 encoded (legacy, prefer file_path)
+    file_path: Optional[str] = None  # on-disk path (preferred)
     uploaded_by: str
     message_uuid: Optional[str] = None  # linked to a specific message
     created_at: datetime.datetime = Field(
