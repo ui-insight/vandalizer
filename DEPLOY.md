@@ -102,7 +102,7 @@ Storage needs depend primarily on the volume and size of uploaded documents. Pla
 
 ### Database Name
 
-The MongoDB database is named `osp` by default — short for Office of Sponsored Programs, the original use case at the University of Idaho. The name is configurable via the `MONGO_DB` environment variable and has no effect on functionality.
+The MongoDB database is named `vandalizer` by default. The name is configurable via the `MONGO_DB` environment variable and has no effect on functionality.
 
 ### Production Configuration
 
@@ -110,7 +110,7 @@ Create `backend/.env` with the following variables:
 
 ```env
 MONGO_HOST=mongodb://mongo:27017/
-MONGO_DB=osp
+MONGO_DB=vandalizer
 REDIS_HOST=redis
 JWT_SECRET_KEY=<generate-a-strong-random-secret>
 CONFIG_ENCRYPTION_KEY=<generate-a-fernet-key>
@@ -272,7 +272,7 @@ BACKUP_DIR="/backups/mongodb"
 RETENTION_DAYS=30
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
-mongodump --uri="$MONGO_HOST" --db=osp --gzip --out="$BACKUP_DIR/$TIMESTAMP"
+mongodump --uri="$MONGO_HOST" --db=vandalizer --gzip --out="$BACKUP_DIR/$TIMESTAMP"
 
 # Prune old backups
 find "$BACKUP_DIR" -type d -mtime +$RETENTION_DAYS -exec rm -rf {} +
@@ -281,7 +281,7 @@ find "$BACKUP_DIR" -type d -mtime +$RETENTION_DAYS -exec rm -rf {} +
 Restore:
 
 ```bash
-mongorestore --uri="$MONGO_HOST" --db=osp --gzip "$BACKUP_DIR/$TIMESTAMP/osp"
+mongorestore --uri="$MONGO_HOST" --db=vandalizer --gzip "$BACKUP_DIR/$TIMESTAMP/vandalizer"
 ```
 
 ### ChromaDB

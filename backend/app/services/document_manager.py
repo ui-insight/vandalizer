@@ -7,10 +7,41 @@ from typing import Any, Optional
 
 import chromadb
 from chromadb.config import Settings as ChromaSettings
-from langchain_openai import OpenAIEmbeddings
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 logger = logging.getLogger(__name__)
+
+
+def _split_text(text: str, chunk_size: int, chunk_overlap: int) -> list[str]:
+    """Split text into overlapping chunks without external dependencies."""
+    normalized = text.strip()
+    if not normalized:
+        return []
+
+    chunks: list[str] = []
+    start = 0
+    step = max(1, chunk_size - chunk_overlap)
+    text_length = len(normalized)
+
+    while start < text_length:
+        end = min(text_length, start + chunk_size)
+        if end < text_length:
+            preferred_break = normalized.rfind("\n\n", start + chunk_size // 2, end)
+            if preferred_break == -1:
+                preferred_break = normalized.rfind(" ", start + chunk_size // 2, end)
+            if preferred_break > start:
+                end = preferred_break
+
+        chunk = normalized[start:end].strip()
+        if chunk:
+            chunks.append(chunk)
+
+        if end >= text_length:
+            break
+
+        next_start = max(start + step, end - chunk_overlap)
+        if next_start <= start:
+            next_start = end
+        start = next_start
 
 
 class DocumentManager:
@@ -18,12 +49,8 @@ class DocumentManager:
 
     def __init__(self, persist_directory: str = "data/chromadb") -> None:
         self.persist_directory = persist_directory
-        self._embeddings = None
-        self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,
-            chunk_overlap=200,
-            length_function=len,
-        )
+        self.chunk_size = 1000
+        self.chunk_overlap = 200
 
         Path(persist_directory).mkdir(parents=True, exist_ok=True)
 
@@ -31,12 +58,6 @@ class DocumentManager:
             path=persist_directory,
             settings=ChromaSettings(anonymized_telemetry=False, is_persistent=True),
         )
-
-    @property
-    def embeddings(self):
-        if self._embeddings is None:
-            self._embeddings = OpenAIEmbeddings()
-        return self._embeddings
 
     def get_user_collection(self, user_id: str) -> chromadb.Collection:
         collection_name = f"user_{user_id}_docs"
@@ -54,7 +75,7 @@ class DocumentManager:
         if not text:
             return
 
-        text_splits = self.text_splitter.split_text(text)
+        text_splits = _split_text(text, self.chunk_size, self.chunk_overlap)
         if not text_splits:
             return
 
@@ -135,7 +156,7 @@ class DocumentManager:
         raw_text: str,
     ) -> int:
         """Chunk text, embed, and add to a KB collection. Returns chunk count."""
-        text_splits = self.text_splitter.split_text(raw_text)
+        text_splits = _split_text(raw_text, self.chunk_size, self.chunk_overlap)
         if not text_splits:
             return 0
 

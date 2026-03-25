@@ -71,7 +71,7 @@ Back up MongoDB:
 
 ```bash
 docker compose exec -T mongo \
-  sh -lc 'mongodump --archive --gzip --db="${MONGO_DB:-osp}"' \
+  sh -lc 'mongodump --archive --gzip --db="${MONGO_DB:-vandalizer}"' \
   > "$BACKUP_DIR/mongo.archive.gz"
 ```
 
@@ -126,7 +126,7 @@ cp "$BACKUP_DIR/backend.env" backend/.env
 
 ```bash
 cat "$BACKUP_DIR/mongo.archive.gz" | docker compose exec -T mongo \
-  sh -lc 'mongorestore --drop --archive --gzip --db="${MONGO_DB:-osp}"'
+  sh -lc 'mongorestore --drop --archive --gzip --db="${MONGO_DB:-vandalizer}"'
 ```
 
 5. Restore uploaded files:

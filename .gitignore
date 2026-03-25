@@ -5,6 +5,7 @@ mongo-backup
 
 # Uploads directory
 app/static/uploads/
+app/static/db/
 
 # Development certificates
 certs/
