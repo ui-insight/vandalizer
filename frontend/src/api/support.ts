@@ -51,6 +51,12 @@ export function updateTicket(
   })
 }
 
+export function markTicketRead(ticketUuid: string) {
+  return apiFetch<{ ok: boolean }>(`/api/support/tickets/${ticketUuid}/read`, {
+    method: 'POST',
+  })
+}
+
 export function getSupportContacts() {
   return apiFetch<{ contacts: SupportContact[] }>('/api/support/contacts')
 }

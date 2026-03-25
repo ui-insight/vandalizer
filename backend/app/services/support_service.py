@@ -84,6 +84,7 @@ def _ticket_summary(t: SupportTicket) -> dict:
         "last_message_user_id": (
             last_message.user_id if last_message else None
         ),
+        "read_by": t.read_by,
         "created_at": t.created_at.isoformat() if t.created_at else None,
         "updated_at": t.updated_at.isoformat() if t.updated_at else None,
         "closed_at": t.closed_at.isoformat() if t.closed_at else None,
@@ -170,6 +171,17 @@ async def get_ticket(ticket_uuid: str) -> dict | None:
     return _ticket_to_dict(ticket)
 
 
+async def mark_ticket_read(ticket_uuid: str, user_id: str) -> bool:
+    """Record that a user has read this ticket. Returns True if ticket exists."""
+    ticket = await SupportTicket.find_one(SupportTicket.uuid == ticket_uuid)
+    if not ticket:
+        return False
+    if user_id not in ticket.read_by:
+        ticket.read_by.append(user_id)
+        await ticket.save()
+    return True
+
+
 async def add_message(
     ticket_uuid: str,
     user: User,
@@ -188,6 +200,8 @@ async def add_message(
     )
     ticket.messages.append(msg)
     ticket.updated_at = datetime.datetime.now(datetime.timezone.utc)
+    # Reset read tracking — only the sender has "read" this state
+    ticket.read_by = [user.user_id]
 
     # Re-open if closed and user replies
     if ticket.status == TicketStatus.CLOSED and not is_support_reply:

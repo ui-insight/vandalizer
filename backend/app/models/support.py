@@ -68,6 +68,9 @@ class SupportTicket(Document):
     # Assignment
     assigned_to: Optional[str] = None  # user_id of support person
 
+    # Read tracking — user_ids who have viewed the ticket since the last message
+    read_by: list[str] = []
+
     # Timestamps
     created_at: datetime.datetime = Field(
         default_factory=lambda: datetime.datetime.now(datetime.timezone.utc)
