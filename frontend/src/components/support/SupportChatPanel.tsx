@@ -50,25 +50,30 @@ function TicketListView({
   isSupportAgent,
   onSelect,
   onNew,
+  seenTickets = {},
 }: {
   tickets: SupportTicketSummary[]
   loading: boolean
   isSupportAgent: boolean
   onSelect: (uuid: string) => void
   onNew: () => void
+  seenTickets?: Record<string, string>
 }) {
   const open = tickets.filter((t) => t.status !== 'closed')
   const closed = tickets.filter((t) => t.status === 'closed')
 
   // A ticket "needs attention" if the last message is from the other party
+  // AND the user hasn't already viewed it since that message arrived.
   const needsAttention = (t: SupportTicketSummary) => {
     if (!t.last_message_user_id || t.status === 'closed') return false
-    if (isSupportAgent) {
-      // Support agent: needs attention if last message is NOT a support reply (user is waiting)
-      return t.last_message_is_support_reply === false
-    }
-    // Regular user: needs attention if last message IS a support reply (support responded)
-    return t.last_message_is_support_reply === true
+    const isNew = isSupportAgent
+      ? t.last_message_is_support_reply === false
+      : t.last_message_is_support_reply === true
+    if (!isNew) return false
+    // If we've seen this ticket and the last message hasn't changed, suppress the dot
+    const seenMsgUser = seenTickets[t.uuid]
+    if (seenMsgUser && seenMsgUser === t.last_message_user_id) return false
+    return true
   }
 
   return (
@@ -612,6 +617,11 @@ export function SupportChatPanel({
   const [loading, setLoading] = useState(true)
   const panelRef = useRef<HTMLDivElement>(null)
 
+  // Track which tickets have been viewed so we can suppress the blue dot.
+  // Maps ticket uuid → last_message_user_id at the time it was viewed.
+  // If a new message arrives from someone else, the dot reappears.
+  const [seenTickets, setSeenTickets] = useState<Record<string, string>>({})
+
   const loadTickets = useCallback(async () => {
     try {
       const data = await supportApi.listTickets(undefined, 50)
@@ -653,9 +663,13 @@ export function SupportChatPanel({
   // Count tickets needing attention for the title bar badge
   const attentionCount = tickets.filter(t => {
     if (t.status === 'closed' || !t.last_message_user_id) return false
-    return isSupportAgent
+    const isNew = isSupportAgent
       ? t.last_message_is_support_reply === false
       : t.last_message_is_support_reply === true
+    if (!isNew) return false
+    const seenMsgUser = seenTickets[t.uuid]
+    if (seenMsgUser && seenMsgUser === t.last_message_user_id) return false
+    return true
   }).length
 
   return createPortal(
@@ -688,7 +702,12 @@ export function SupportChatPanel({
           tickets={tickets}
           loading={loading}
           isSupportAgent={isSupportAgent}
+          seenTickets={seenTickets}
           onSelect={(uuid) => {
+            const ticket = tickets.find(t => t.uuid === uuid)
+            if (ticket?.last_message_user_id) {
+              setSeenTickets(prev => ({ ...prev, [uuid]: ticket.last_message_user_id }))
+            }
             setActiveTicket(uuid)
             setView('chat')
           }}
