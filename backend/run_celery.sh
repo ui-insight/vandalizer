@@ -2,7 +2,7 @@
 # Celery worker management for vandalizer-next.
 #
 # Usage:
-#   ./run_celery.sh start    — Start all workers, beat, and flower
+#   ./run_celery.sh start    — Start all workers and beat
 #   ./run_celery.sh stop     — Stop all workers
 #   ./run_celery.sh status   — Check status
 #   ./run_celery.sh logs     — Tail all logs
@@ -57,14 +57,6 @@ case "${1:-help}" in
             --logfile="$LOG_DIR/beat.log" \
             --pidfile="$PID_DIR/beat.pid" \
             --detach
-
-        echo "Starting Flower..."
-        celery -A "$CELERY_APP" flower \
-            --port=5555 \
-            --persistent=True \
-            --db="$LOG_DIR/flower.db" \
-            --logfile="$LOG_DIR/flower.log" \
-            --detach 2>/dev/null || echo "Flower not installed or failed to start"
 
         echo "All workers started."
 
