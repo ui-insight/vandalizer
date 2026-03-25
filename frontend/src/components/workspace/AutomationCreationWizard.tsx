@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
-import { X, FolderOpen, Globe, Loader2 } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { X, FolderOpen, Globe, Loader2, Plus } from 'lucide-react'
 import { createAutomation } from '../../api/automations'
+import { createFolder } from '../../api/folders'
 import { apiFetch } from '../../api/client'
 import type { ActionType, TriggerType } from '../../types/automation'
 import type { Workflow } from '../../types/workflow'
@@ -45,6 +46,8 @@ export function AutomationCreationWizard({ onClose, onCreate, workflows, searchS
   const [fileTypes, setFileTypes] = useState<string[]>(['pdf', 'docx', 'xlsx', 'html'])
   const [excludePatterns, setExcludePatterns] = useState('')
   const [batchMode, setBatchMode] = useState(false)
+  const [creatingFolder, setCreatingFolder] = useState(false)
+  const [newFolderName, setNewFolderName] = useState('')
 
   // Dynamic step count: folder_watch adds a config step
   const hasFolderStep = triggerType === 'folder_watch'
@@ -61,10 +64,16 @@ export function AutomationCreationWizard({ onClose, onCreate, workflows, searchS
   }, [step])
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+      if (e.key === 'Enter' && !creating) {
+        if (step < totalSteps && canAdvance()) setStep(s => s + 1)
+        else if (step === totalSteps && canAdvance()) handleCreate()
+      }
+    }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [onClose, step, totalSteps, creating, canAdvance, handleCreate])
 
   // Load folders when entering the folder config step
   useEffect(() => {
@@ -77,13 +86,13 @@ export function AutomationCreationWizard({ onClose, onCreate, workflows, searchS
     }
   }, [step, hasFolderStep, folderStep, folders.length])
 
-  const canAdvance = (): boolean => {
+  const canAdvance = useCallback((): boolean => {
     if (step === 1) return name.trim().length > 0
     if (step === 2) return true
     if (hasFolderStep && step === folderStep) return watchFolderId.length > 0
     if (step === actionStep) return actionId.length > 0
     return false
-  }
+  }, [step, name, hasFolderStep, folderStep, actionStep, watchFolderId, actionId])
 
   const handleActionTypeChange = (type: ActionType) => {
     setActionType(type)
@@ -102,7 +111,7 @@ export function AutomationCreationWizard({ onClose, onCreate, workflows, searchS
     }
   }
 
-  const handleCreate = async () => {
+  const handleCreate = useCallback(async () => {
     setCreating(true)
     setError(null)
     try {
@@ -128,7 +137,7 @@ export function AutomationCreationWizard({ onClose, onCreate, workflows, searchS
       setError(err instanceof Error ? err.message : 'Failed to create automation')
       setCreating(false)
     }
-  }
+  }, [name, description, triggerType, watchFolderId, fileTypes, excludePatterns, batchMode, actionType, actionId, onCreate])
 
   const handleFileTypeToggle = (type: string) => {
     setFileTypes(prev =>
@@ -229,7 +238,6 @@ export function AutomationCreationWizard({ onClose, onCreate, workflows, searchS
                   type="text"
                   value={name}
                   onChange={e => setName(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && canAdvance()) setStep(2) }}
                   placeholder="e.g. Process grant applications"
                   style={inputStyle}
                   onFocus={e => (e.currentTarget.style.borderColor = '#3b82f6')}
@@ -318,17 +326,64 @@ export function AutomationCreationWizard({ onClose, onCreate, workflows, searchS
                 ) : (
                   <select
                     value={watchFolderId}
-                    onChange={e => setWatchFolderId(e.target.value)}
+                    onChange={e => {
+                      if (e.target.value === '__create__') {
+                        setCreatingFolder(true)
+                        setNewFolderName('')
+                      } else {
+                        setWatchFolderId(e.target.value)
+                      }
+                    }}
                     style={selectStyle}
                   >
                     <option value="">-- Select a folder to watch --</option>
                     {folders.map(f => (
                       <option key={f.uuid} value={f.uuid}>{f.path}</option>
                     ))}
+                    <option value="__create__">+ Create new folder...</option>
                   </select>
                 )}
-                {!foldersLoading && folders.length === 0 && (
-                  <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 6 }}>No folders yet — create one in the workspace first.</div>
+                {creatingFolder && (
+                  <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                    <input
+                      autoFocus
+                      type="text"
+                      value={newFolderName}
+                      onChange={e => setNewFolderName(e.target.value)}
+                      onKeyDown={async e => {
+                        if (e.key === 'Enter' && newFolderName.trim()) {
+                          const folder = await createFolder({ name: newFolderName.trim(), parent_id: '0' })
+                          setFolders(prev => [...prev, { uuid: folder.uuid, path: `/${folder.title}` }])
+                          setWatchFolderId(folder.uuid)
+                          setCreatingFolder(false)
+                        }
+                        if (e.key === 'Escape') setCreatingFolder(false)
+                      }}
+                      placeholder="Folder name..."
+                      style={{ ...inputStyle, flex: 1 }}
+                      onFocus={e => (e.currentTarget.style.borderColor = '#3b82f6')}
+                      onBlur={e => (e.currentTarget.style.borderColor = '#d1d5db')}
+                    />
+                    <button
+                      onClick={async () => {
+                        if (!newFolderName.trim()) return
+                        const folder = await createFolder({ name: newFolderName.trim(), parent_id: '0' })
+                        setFolders(prev => [...prev, { uuid: folder.uuid, path: `/${folder.title}` }])
+                        setWatchFolderId(folder.uuid)
+                        setCreatingFolder(false)
+                      }}
+                      style={{
+                        padding: '8px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                        borderRadius: 6, border: 'none', backgroundColor: '#3b82f6', color: '#fff',
+                        cursor: newFolderName.trim() ? 'pointer' : 'not-allowed',
+                        opacity: newFolderName.trim() ? 1 : 0.5,
+                        display: 'flex', alignItems: 'center', gap: 4,
+                      }}
+                    >
+                      <Plus style={{ width: 12, height: 12 }} />
+                      Create
+                    </button>
+                  </div>
                 )}
               </div>
 
