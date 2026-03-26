@@ -1,11 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Search, X, Workflow, FileText, Users, Compass, Loader2 } from 'lucide-react'
 import { listWorkflows } from '../../api/workflows'
 import { listSearchSets } from '../../api/extractions'
 import { listVerifiedItems } from '../../api/library'
-import type { Workflow as WorkflowType } from '../../types/workflow'
-import type { SearchSet } from '../../types/workflow'
-import type { VerifiedCatalogItem } from '../../types/library'
 
 type ScopeTab = 'mine' | 'team' | 'explore'
 

@@ -180,8 +180,6 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
 
       {showWizard && (
         <AutomationCreationWizard
-          workflows={workflows}
-          searchSets={searchSets}
           onClose={() => setShowWizard(false)}
           onCreate={id => {
             setShowWizard(false)

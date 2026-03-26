@@ -5,15 +5,9 @@ import { createFolder } from '../../api/folders'
 import { apiFetch } from '../../api/client'
 import { ItemPickerModal } from './ItemPickerModal'
 import type { ActionType, TriggerType } from '../../types/automation'
-import type { Workflow } from '../../types/workflow'
-
-interface SearchSet { uuid: string; title: string }
-
 interface Props {
   onClose: () => void
   onCreate: (id: string) => void
-  workflows: Workflow[]
-  searchSets: SearchSet[]
 }
 
 const TRIGGER_OPTIONS: { value: TriggerType; label: string; icon: typeof FolderOpen; description: string }[] = [
@@ -29,7 +23,7 @@ const ACTION_OPTIONS: { value: ActionType; label: string; description: string }[
 
 const FILE_TYPE_OPTIONS = ['pdf', 'docx', 'xlsx', 'html', 'txt', 'csv']
 
-export function AutomationCreationWizard({ onClose, onCreate, workflows, searchSets }: Props) {
+export function AutomationCreationWizard({ onClose, onCreate }: Props) {
   const [step, setStep] = useState(1)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
