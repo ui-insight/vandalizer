@@ -5,6 +5,7 @@ import base64
 import csv
 import io
 import json
+import re
 
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
@@ -38,6 +39,22 @@ from app.rate_limit import limiter
 from app.services import workflow_service as svc
 
 router = APIRouter()
+
+
+def _csv_cell(value) -> str:
+    """Format a value for a CSV cell, serializing complex types as JSON."""
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, default=str)
+    return str(value)
+
+
+def _strip_markdown(text: str) -> str:
+    """Remove common markdown formatting for plain-text output."""
+    text = re.sub(r"^#{1,6}\s+", "", text, flags=re.MULTILINE)
+    text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
+    text = re.sub(r"\*(.+?)\*", r"\1", text)
+    text = re.sub(r"`(.+?)`", r"\1", text)
+    return text
 
 
 async def _authorize_documents(document_uuids: list[str], user: User) -> list[str]:
@@ -180,23 +197,30 @@ async def download_results(
     if format == "csv":
         buf = io.StringIO()
         writer = csv.writer(buf)
-        if isinstance(output_data, list):
-            if output_data and isinstance(output_data[0], dict):
-                headers = list(output_data[0].keys())
+        # Parse JSON strings so fields land in separate columns
+        data = output_data
+        if isinstance(data, str):
+            try:
+                data = json.loads(data)
+            except (json.JSONDecodeError, ValueError):
+                pass
+        if isinstance(data, list):
+            if data and isinstance(data[0], dict):
+                headers = list(data[0].keys())
                 writer.writerow(headers)
-                for row in output_data:
-                    writer.writerow([row.get(h, "") for h in headers])
+                for row in data:
+                    writer.writerow([_csv_cell(row.get(h, "")) for h in headers])
             else:
                 writer.writerow(["Value"])
-                for item in output_data:
+                for item in data:
                     writer.writerow([str(item)])
-        elif isinstance(output_data, dict):
-            writer.writerow(["Key", "Value"])
-            for k, v in output_data.items():
-                writer.writerow([k, str(v)])
+        elif isinstance(data, dict):
+            headers = list(data.keys())
+            writer.writerow(headers)
+            writer.writerow([_csv_cell(data[h]) for h in headers])
         else:
             writer.writerow(["Output"])
-            writer.writerow([str(output_data)])
+            writer.writerow([str(data)])
         return StreamingResponse(
             io.BytesIO(buf.getvalue().encode()),
             media_type="text/csv",
@@ -222,15 +246,30 @@ async def download_results(
         )
 
     if format == "pdf":
-        # Build a plain-text representation, then wrap in a simple PDF
-        if isinstance(output_data, str):
-            text = output_data
-        elif isinstance(output_data, dict):
-            text = json.dumps(output_data, indent=2, default=str)
-        elif isinstance(output_data, list):
-            text = json.dumps(output_data, indent=2, default=str)
+        # Build a human-readable text representation for the PDF
+        data = output_data
+        if isinstance(data, str):
+            try:
+                data = json.loads(data)
+            except (json.JSONDecodeError, ValueError):
+                pass
+        if isinstance(data, str):
+            text = _strip_markdown(data)
+        elif isinstance(data, dict):
+            text = "\n".join(f"{k}: {v}" for k, v in data.items())
+        elif isinstance(data, list):
+            if data and isinstance(data[0], dict):
+                parts: list[str] = []
+                for i, item in enumerate(data):
+                    if len(data) > 1:
+                        parts.append(f"--- Result {i + 1} ---")
+                    parts.extend(f"{k}: {v}" for k, v in item.items())
+                    parts.append("")
+                text = "\n".join(parts)
+            else:
+                text = "\n".join(str(item) for item in data)
         else:
-            text = str(output_data)
+            text = str(data)
 
         # Minimal PDF generation without external dependencies
         lines = text.split("\n")
