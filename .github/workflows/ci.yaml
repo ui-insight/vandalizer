@@ -108,7 +108,7 @@ jobs:
         run: make frontend-ci
 
   docker:
-    name: Docker Build & Scan
+    name: Docker Build
     runs-on: ubuntu-latest
     needs: [backend-static, backend-test, frontend]
     steps:
