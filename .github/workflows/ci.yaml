@@ -49,7 +49,7 @@ jobs:
       - name: Install backend dependencies
         run: make backend-install
 
-      - name: Run backend backlog checks
+      - name: Run backend backlog checks (typecheck + dependency audit)
         run: make backend-backlog
 
   backend-test:
@@ -101,11 +101,14 @@ jobs:
       - name: Install frontend dependencies
         run: make frontend-install
 
+      - name: Dependency audit (npm audit, fail on critical/high)
+        run: make frontend-audit
+
       - name: Run frontend CI checks
         run: make frontend-ci
 
   docker:
-    name: Docker Build
+    name: Docker Build & Scan
     runs-on: ubuntu-latest
     needs: [backend-static, backend-test, frontend]
     steps:
@@ -113,3 +116,21 @@ jobs:
 
       - name: Build release containers
         run: make docker-build
+
+      - name: Scan backend image with Trivy
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: vandalizer-backend
+          format: table
+          exit-code: 1
+          severity: CRITICAL
+          ignore-unfixed: true
+
+      - name: Scan frontend image with Trivy
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: vandalizer-frontend
+          format: table
+          exit-code: 1
+          severity: CRITICAL
+          ignore-unfixed: true

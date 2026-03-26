@@ -3,7 +3,7 @@
 BACKEND_DIR := backend
 FRONTEND_DIR := frontend
 
-.PHONY: help backend-install backend-lint backend-typecheck backend-test backend-security backend-audit backend-static backend-backlog backend-ci backend-test-integration-t1 backend-test-integration-t2 backend-test-integration-t3 frontend-install frontend-typecheck frontend-lint frontend-test frontend-build frontend-ci ci docker-build release-check
+.PHONY: help backend-install backend-lint backend-typecheck backend-test backend-security backend-audit backend-static backend-backlog backend-ci backend-test-integration-t1 backend-test-integration-t2 backend-test-integration-t3 frontend-install frontend-typecheck frontend-lint frontend-test frontend-build frontend-audit frontend-ci ci docker-build release-check
 
 help:
 	@printf "Common targets:\n"
@@ -64,7 +64,10 @@ frontend-test:
 frontend-build:
 	cd $(FRONTEND_DIR) && npm run build
 
-frontend-ci: frontend-typecheck frontend-lint frontend-test frontend-build
+frontend-audit:
+	cd $(FRONTEND_DIR) && npm audit --audit-level=high
+
+frontend-ci: frontend-typecheck frontend-lint frontend-audit frontend-test frontend-build
 
 ci: backend-ci frontend-ci
 
