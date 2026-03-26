@@ -112,6 +112,16 @@ export function ExtractionEditorPanel() {
     getQualityStatus(openExtractionId).then(setQualityStatus).catch(() => {})
   }, [openExtractionId, refreshSparkline])
 
+  // Clear stale results when document selection changes
+  const prevDocUuidsRef = useRef(selectedDocUuids)
+  useEffect(() => {
+    if (prevDocUuidsRef.current !== selectedDocUuids) {
+      prevDocUuidsRef.current = selectedDocUuids
+      setResultSets([])
+      setActiveResultIdx(0)
+    }
+  }, [selectedDocUuids])
+
   // Nudge dismissal state
   useEffect(() => {
     if (!openExtractionId) return
