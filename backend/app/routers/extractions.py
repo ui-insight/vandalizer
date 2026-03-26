@@ -928,7 +928,12 @@ async def get_extraction_suggestions(
     latest = await get_latest_validation("search_set", uuid)
     if not latest:
         raise HTTPException(status_code=404, detail="No validation runs found for this search set")
-    result_snapshot = latest.get("result_snapshot", latest)
+    result_snapshot = latest.get("result_snapshot") or {}
+    if not result_snapshot.get("test_cases"):
+        raise HTTPException(
+            status_code=400,
+            detail="The latest validation run has no per-field detail. Run validation again to generate improvement suggestions.",
+        )
     suggestions = await generate_improvement_suggestions("search_set", uuid, result_snapshot)
     return {"suggestions": suggestions}
 
