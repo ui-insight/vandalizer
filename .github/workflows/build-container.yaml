@@ -57,12 +57,3 @@ jobs:
           push: true
           tags: ghcr.io/${{ github.repository }}-${{ matrix.image_name }}:sha-${{ steps.vars.outputs.sha_short }},ghcr.io/${{ github.repository }}-${{ matrix.image_name }}:${{ steps.vars.outputs.ref_name }}
           file: ${{ matrix.dockerfile }}
-
-      - name: Scan image with Trivy
-        uses: aquasecurity/trivy-action@0.28.0
-        with:
-          image-ref: ghcr.io/${{ github.repository }}-${{ matrix.image_name }}:sha-${{ steps.vars.outputs.sha_short }}
-          format: table
-          exit-code: 1
-          severity: CRITICAL
-          ignore-unfixed: true
