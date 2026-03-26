@@ -1,4 +1,4 @@
-import { apiFetch } from './client'
+import { apiFetch, ApiError, csrfHeaders } from './client'
 import type { SupportTicket, SupportTicketSummary, SupportContact } from '../types/support'
 
 export function createTicket(subject: string, message: string, priority = 'normal') {
@@ -29,16 +29,24 @@ export function addMessage(ticketUuid: string, content: string) {
   })
 }
 
-export function addAttachment(
+export async function addAttachment(
   ticketUuid: string,
-  filename: string,
-  fileData: string,
-  fileType?: string,
+  file: File,
 ) {
-  return apiFetch<SupportTicket>(`/api/support/tickets/${ticketUuid}/attachments`, {
+  const form = new FormData()
+  form.append('file', file)
+
+  const res = await fetch(`/api/support/tickets/${ticketUuid}/attachments`, {
     method: 'POST',
-    body: JSON.stringify({ filename, file_data: fileData, file_type: fileType }),
+    credentials: 'include',
+    headers: csrfHeaders(),
+    body: form,
   })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ detail: 'Upload failed' }))
+    throw new ApiError(res.status, body.detail || 'Upload failed')
+  }
+  return res.json() as Promise<SupportTicket>
 }
 
 export function updateTicket(

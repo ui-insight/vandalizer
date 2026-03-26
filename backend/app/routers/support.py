@@ -3,7 +3,7 @@
 import base64
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from fastapi.responses import Response
 from pydantic import BaseModel
 
@@ -28,13 +28,6 @@ class CreateTicketRequest(BaseModel):
 
 class AddMessageRequest(BaseModel):
     content: str
-
-
-class AddAttachmentRequest(BaseModel):
-    filename: str
-    file_type: str | None = None
-    file_data: str  # base64
-    message_uuid: str | None = None
 
 
 class UpdateTicketRequest(BaseModel):
@@ -154,7 +147,7 @@ async def add_message(
 @router.post("/tickets/{ticket_uuid}/attachments")
 async def add_attachment(
     ticket_uuid: str,
-    body: AddAttachmentRequest,
+    file: UploadFile = File(...),
     user: User = Depends(get_current_user),
 ):
     ticket_data = await support_service.get_ticket(ticket_uuid)
@@ -165,13 +158,16 @@ async def add_attachment(
     if ticket_data["user_id"] != user.user_id and not is_support:
         raise HTTPException(status_code=403, detail="Not authorized")
 
+    file_bytes = await file.read()
+    if len(file_bytes) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="File must be under 10MB")
+
     result = await support_service.add_attachment(
         ticket_uuid=ticket_uuid,
         user=user,
-        filename=body.filename,
-        file_type=body.file_type,
-        file_data=body.file_data,
-        message_uuid=body.message_uuid,
+        filename=file.filename or "attachment",
+        file_type=file.content_type,
+        file_bytes=file_bytes,
     )
     if not result:
         raise HTTPException(status_code=404, detail="Ticket not found")

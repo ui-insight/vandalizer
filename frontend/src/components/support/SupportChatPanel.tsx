@@ -380,21 +380,13 @@ function ChatView({
       return
     }
     toast(`Uploading ${file.name} (${sizeMB}MB)...`, 'info')
-    const reader = new FileReader()
-    reader.onerror = () => {
-      toast('Failed to read file', 'error')
+    try {
+      const updated = await supportApi.addAttachment(ticketUuid, file)
+      setTicket(updated)
+      toast('File attached', 'success')
+    } catch {
+      toast('Failed to upload file — it may be too large', 'error')
     }
-    reader.onload = async () => {
-      const base64 = (reader.result as string).split(',')[1]
-      try {
-        const updated = await supportApi.addAttachment(ticketUuid, file.name, base64, file.type || undefined)
-        setTicket(updated)
-        toast('File attached', 'success')
-      } catch {
-        toast('Failed to upload file — it may be too large', 'error')
-      }
-    }
-    reader.readAsDataURL(file)
   }
 
   const handleStatusChange = async (newStatus: string) => {

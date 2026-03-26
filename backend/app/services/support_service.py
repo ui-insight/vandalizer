@@ -240,15 +240,13 @@ async def add_attachment(
     user: User,
     filename: str,
     file_type: str | None,
-    file_data: str,
+    file_bytes: bytes,
     message_uuid: str | None = None,
 ) -> dict | None:
     ticket = await SupportTicket.find_one(SupportTicket.uuid == ticket_uuid)
     if not ticket:
         return None
 
-    # Save file to disk instead of storing base64 in MongoDB
-    import base64 as b64
     att = SupportAttachment(
         filename=filename,
         file_type=file_type,
@@ -259,7 +257,7 @@ async def add_attachment(
     dest_dir = _support_attachments_dir() / ticket_uuid
     dest_dir.mkdir(parents=True, exist_ok=True)
     dest_file = dest_dir / att.uuid
-    dest_file.write_bytes(b64.b64decode(file_data))
+    dest_file.write_bytes(file_bytes)
     att.file_path = str(dest_file)
 
     ticket.attachments.append(att)
