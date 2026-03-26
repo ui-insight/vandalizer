@@ -25,6 +25,7 @@ from datetime import datetime
 
 import chromadb
 
+from app.config import Settings
 from app.database import init_db
 from app.models.knowledge import KnowledgeBase, KnowledgeBaseSource
 from app.services.document_manager import _split_text
@@ -97,7 +98,8 @@ async def recalculate_stats(kb: KnowledgeBase) -> None:
 
 
 async def main(chroma_host: str | None) -> None:
-    await init_db()
+    settings = Settings()
+    await init_db(settings)
     client = get_chroma_client(chroma_host)
 
     kbs = await KnowledgeBase.find_all().to_list()
