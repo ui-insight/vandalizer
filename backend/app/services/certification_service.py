@@ -358,7 +358,7 @@ async def _get_extraction_fields(workflows: list) -> tuple[int, list[str]]:
             for task_id in step.tasks:
                 task = await WorkflowStepTask.get(task_id)
                 if task and task.name == "Extraction":
-                    ss_id = (task.data or {}).get("search_set_id")
+                    ss_id = (task.data or {}).get("search_set_uuid")
                     if ss_id:
                         items = await SearchSetItem.find(SearchSetItem.searchset == ss_id).to_list()
                         field_names = [item.searchphrase for item in items if item.searchphrase]
@@ -454,7 +454,7 @@ async def _validate_foundations(user_id: str) -> dict:
                 task = await WorkflowStepTask.get(task_id)
                 if task and task.name == "Extraction":
                     has_extraction_workflow = True
-                    ss_id = (task.data or {}).get("search_set_id")
+                    ss_id = (task.data or {}).get("search_set_uuid")
                     if ss_id:
                         items = await SearchSetItem.find(SearchSetItem.searchset == ss_id).to_list()
                         field_names = [item.searchphrase for item in items if item.searchphrase]
