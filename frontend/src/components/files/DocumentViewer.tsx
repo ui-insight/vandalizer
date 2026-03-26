@@ -256,38 +256,66 @@ export function DocumentViewer({ docUuid, highlightTerms = [], processing, taskS
         if (!textStr) continue
 
         const textLower = textStr.toLowerCase()
-        const matched = terms.some(t => t && textLower.includes(t.toLowerCase()))
-        if (!matched) continue
 
-        const scale = viewport.scale
-        const [, , , , tx, ty] = textItem.transform
-        const x = tx * scale
-        const y = viewport.height - (ty * scale) - (textItem.height * scale)
+        for (const term of terms) {
+          if (!term) continue
+          const termLower = term.toLowerCase()
+          let searchFrom = 0
 
-        const hl = document.createElement('div')
-        hl.className = 'pdf-highlight'
-        hl.dataset.highlightIndex = String(count)
-        Object.assign(hl.style, {
-          position: 'absolute',
-          left: `${x}px`,
-          top: `${y}px`,
-          width: `${textItem.width * scale}px`,
-          height: `${textItem.height * scale}px`,
-          backgroundColor: HIGHLIGHT_COLOR,
-          opacity: '0.45',
-          pointerEvents: 'none',
-          borderRadius: '2px',
-        })
-        overlay.appendChild(hl)
-        count++
+          while (searchFrom < textLower.length) {
+            const matchIndex = textLower.indexOf(termLower, searchFrom)
+            if (matchIndex === -1) break
+            searchFrom = matchIndex + 1
+
+            // Derive font height from transform matrix (textItem.height is often 0)
+            const fontHeight = Math.sqrt(
+              textItem.transform[2] * textItem.transform[2] +
+              textItem.transform[3] * textItem.transform[3]
+            ) || textItem.height || 10
+
+            const tx = textItem.transform[4]
+            const ty = textItem.transform[5]
+
+            // Convert PDF coordinates to viewport (pixel) coordinates
+            const vt = viewport.transform
+            const vpX = vt[0] * tx + vt[2] * ty + vt[4]
+            const vpY = vt[1] * tx + vt[3] * ty + vt[5]
+            const fontHeightVp = fontHeight * viewport.scale
+
+            // Estimate position and width of just the matched substring
+            const fullWidth = textItem.width * viewport.scale
+            const charCount = textStr.length
+            const xOffset = charCount > 0 ? (matchIndex / charCount) * fullWidth : 0
+            const matchWidth = charCount > 0 ? (term.length / charCount) * fullWidth : fullWidth
+
+            const hl = document.createElement('div')
+            hl.className = 'pdf-highlight'
+            hl.dataset.highlightIndex = String(count)
+            Object.assign(hl.style, {
+              position: 'absolute',
+              left: `${vpX + xOffset}px`,
+              top: `${vpY - fontHeightVp}px`,
+              width: `${matchWidth}px`,
+              height: `${fontHeightVp}px`,
+              backgroundColor: HIGHLIGHT_COLOR,
+              opacity: '0.45',
+              pointerEvents: 'none',
+              borderRadius: '2px',
+            })
+            overlay.appendChild(hl)
+            count++
+          }
+        }
       }
     }
 
     setTotalHighlights(count)
     if (count > 0) {
       setCurrentHighlight(0)
-      // Scroll to first highlight
-      setTimeout(() => scrollToHighlightByIndex(0), 150)
+      // Double rAF ensures DOM layout is complete before scrolling
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => scrollToHighlightByIndex(0))
+      })
     }
   }, [zoomLevel])
 
@@ -326,7 +354,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], processing, taskS
       } else {
         next = prev - 1 < 0 ? totalHighlights - 1 : prev - 1
       }
-      setTimeout(() => scrollToHighlightByIndex(next), 50)
+      requestAnimationFrame(() => scrollToHighlightByIndex(next))
       return next
     })
   }, [totalHighlights])
