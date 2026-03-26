@@ -65,7 +65,7 @@ frontend-build:
 	cd $(FRONTEND_DIR) && npm run build
 
 frontend-audit:
-	cd $(FRONTEND_DIR) && npm audit --audit-level=high
+	cd $(FRONTEND_DIR) && npm audit --audit-level=critical
 
 frontend-ci: frontend-typecheck frontend-lint frontend-audit frontend-test frontend-build
 

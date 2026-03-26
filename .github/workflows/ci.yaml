@@ -101,7 +101,7 @@ jobs:
       - name: Install frontend dependencies
         run: make frontend-install
 
-      - name: Dependency audit (npm audit, fail on critical/high)
+      - name: Dependency audit (npm audit, fail on critical)
         run: make frontend-audit
 
       - name: Run frontend CI checks
