@@ -28,7 +28,7 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId }: Props) {
   const [items, setItems] = useState<PickerItem[]>([])
   const [loading, setLoading] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
-  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const backdropRef = useRef<HTMLDivElement>(null)
 
   // Debounce search input
