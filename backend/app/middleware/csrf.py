@@ -4,7 +4,7 @@ import secrets
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import Response
+from starlette.responses import JSONResponse, Response
 
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
@@ -59,7 +59,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         csrf_header = request.headers.get("x-csrf-token")
 
         if not csrf_cookie or not csrf_header or csrf_cookie != csrf_header:
-            return Response("CSRF validation failed", status_code=403)
+            return JSONResponse({"detail": "CSRF validation failed"}, status_code=403)
 
         response = await call_next(request)
         _ensure_csrf_cookie(response, request)

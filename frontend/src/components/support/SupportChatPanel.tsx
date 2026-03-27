@@ -384,8 +384,9 @@ function ChatView({
       const updated = await supportApi.addAttachment(ticketUuid, file)
       setTicket(updated)
       toast('File attached', 'success')
-    } catch {
-      toast('Failed to upload file — it may be too large', 'error')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Upload failed'
+      toast(`Failed to upload file: ${msg}`, 'error')
     }
   }
 

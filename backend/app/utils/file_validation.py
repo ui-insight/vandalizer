@@ -1,7 +1,7 @@
 import io
 import zipfile
 
-ALLOWED_EXTS = {"pdf", "docx", "xlsx", "xls", "csv"}
+ALLOWED_EXTS = {"pdf", "doc", "docx", "xlsx", "xls", "csv"}
 
 
 def is_allowed_file(filename: str) -> bool:
@@ -16,6 +16,10 @@ def is_valid_file_content(data: bytes, extension: str) -> bool:
 
     if ext == "pdf":
         return b"%PDF-" in header[:1024]
+
+    if ext in ("doc", "xls"):
+        # OLE2 Compound Document format (legacy Microsoft Office)
+        return header.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1")
 
     if ext in ("docx", "xlsx"):
         if not header.startswith(b"PK\x03\x04"):

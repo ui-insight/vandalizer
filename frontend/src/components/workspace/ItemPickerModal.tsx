@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Search, X, Workflow, FileText, Users, Compass, Loader2 } from 'lucide-react'
-import { listWorkflows } from '../../api/workflows'
-import { listSearchSets } from '../../api/extractions'
-import { listVerifiedItems } from '../../api/library'
+import { listLibraries, listItems, listVerifiedItems } from '../../api/library'
+import { useAuth } from '../../hooks/useAuth'
+import type { Library } from '../../types/library'
 
 type ScopeTab = 'mine' | 'team' | 'explore'
 
@@ -22,14 +22,22 @@ interface Props {
 }
 
 export function ItemPickerModal({ kind, onSelect, onClose, currentId }: Props) {
+  const { user } = useAuth()
+  const teamId = user?.current_team ?? undefined
   const [scope, setScope] = useState<ScopeTab>('mine')
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [items, setItems] = useState<PickerItem[]>([])
   const [loading, setLoading] = useState(false)
+  const [libraries, setLibraries] = useState<Library[]>([])
   const searchRef = useRef<HTMLInputElement>(null)
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const backdropRef = useRef<HTMLDivElement>(null)
+
+  // Fetch libraries on mount to get personal/team library IDs
+  useEffect(() => {
+    listLibraries(teamId).then(setLibraries).catch(() => {})
+  }, [teamId])
 
   // Debounce search input
   useEffect(() => {
@@ -77,29 +85,25 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId }: Props) {
             owner: 'explore' as const,
             qualityTier: item.quality_tier,
           }))
-        } else if (kind === 'workflow') {
-          const workflows = await listWorkflows({
-            scope,
-            search: debouncedSearch || undefined,
-          })
-          result = workflows.map(wf => ({
-            id: wf.id,
-            name: wf.name,
-            description: wf.description,
-            owner: scope as 'mine' | 'team',
-          }))
         } else {
-          const sets = await listSearchSets({
-            scope,
-            search: debouncedSearch || undefined,
-          })
-          result = sets.map(ss => ({
-            id: kind === 'extraction' ? ss.uuid : ss.id,
-            name: ss.title,
-            description: null,
-            owner: scope as 'mine' | 'team',
-            qualityTier: ss.quality_tier,
-          }))
+          // Use library items so mine/team tabs match the Library page
+          const targetScope = scope === 'mine' ? 'personal' : 'team'
+          const lib = libraries.find(l => l.scope === targetScope)
+          if (lib) {
+            const filterKind = kind === 'workflow' ? 'workflow' : 'search_set'
+            const libItems = await listItems(lib.id, {
+              kind: filterKind,
+              search: debouncedSearch || undefined,
+            })
+            result = libItems.map(item => ({
+              // item_id is the Workflow _id; item_uuid is the SearchSet uuid
+              id: kind === 'extraction' ? (item.item_uuid || item.item_id) : item.item_id,
+              name: item.name,
+              description: item.description,
+              owner: scope as 'mine' | 'team',
+              qualityTier: item.quality_tier,
+            }))
+          }
         }
 
         if (!cancelled) {
@@ -116,7 +120,7 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId }: Props) {
 
     fetchItems()
     return () => { cancelled = true }
-  }, [scope, debouncedSearch, kind])
+  }, [scope, debouncedSearch, kind, libraries])
 
   const kindLabel = kind === 'workflow' ? 'Workflow' : 'Extraction'
 
