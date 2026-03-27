@@ -49,7 +49,11 @@ export default function Account() {
   useEffect(() => {
     getApiTokenStatus()
       .then(s => { setHasToken(s.has_token); setTokenCreatedAt(s.created_at) })
-      .catch(err => { setTokenError(err instanceof Error ? err.message : 'Failed to load token status') })
+      .catch(err => { 
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load token status'
+        setTokenError(`Failed to load API token status: ${errorMessage}`)
+        console.error('Error loading API token status:', err)
+      })
       .finally(() => setTokenLoading(false))
   }, [])
 
@@ -64,7 +68,9 @@ export default function Account() {
       setTokenCreatedAt(res.created_at)
       setTokenVisible(true)
     } catch (err) {
-      setTokenError(err instanceof Error ? err.message : 'Failed to generate token')
+      const errorMessage = err instanceof Error ? err.message : 'Failed to generate token'
+      setTokenError(`Failed to generate API token: ${errorMessage}`)
+      console.error('Error generating API token:', err)
     } finally { setTokenGenerating(false) }
   }
 
@@ -78,7 +84,9 @@ export default function Account() {
       setTokenCreatedAt(null)
       setNewToken(null)
     } catch (err) {
-      setTokenError(err instanceof Error ? err.message : 'Failed to revoke token')
+      const errorMessage = err instanceof Error ? err.message : 'Failed to revoke token'
+      setTokenError(`Failed to revoke API token: ${errorMessage}`)
+      console.error('Error revoking API token:', err)
     } finally { setTokenRevoking(false) }
   }
 

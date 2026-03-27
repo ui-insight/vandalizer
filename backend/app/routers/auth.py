@@ -1,6 +1,7 @@
 import datetime
 import secrets
 import urllib.parse
+import logging
 
 import httpx
 import redis.asyncio as aioredis
@@ -20,6 +21,8 @@ from app.utils.security import (
     create_refresh_token,
     decode_token,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -222,43 +225,66 @@ _API_TOKEN_EXPIRY_DAYS = 365
 @router.post("/api-token/generate")
 async def generate_api_token(user: User = Depends(get_current_user)):
     """Generate a new API token for the current user (expires in 365 days)."""
-    token = secrets.token_urlsafe(32)
-    now = datetime.datetime.now(datetime.timezone.utc)
-    user.api_token = token
-    user.api_token_created_at = now
-    user.api_token_expires_at = now + datetime.timedelta(days=_API_TOKEN_EXPIRY_DAYS)
-    await user.save()
-    return {
-        "api_token": token,
-        "created_at": user.api_token_created_at.isoformat(),
-        "expires_at": user.api_token_expires_at.isoformat(),
-    }
+    try:
+        token = secrets.token_urlsafe(32)
+        now = datetime.datetime.now(datetime.timezone.utc)
+        user.api_token = token
+        user.api_token_created_at = now
+        user.api_token_expires_at = now + datetime.timedelta(days=_API_TOKEN_EXPIRY_DAYS)
+        await user.save()
+        logger.info(f"API token generated for user: {user.user_id}")
+        return {
+            "api_token": token,
+            "created_at": user.api_token_created_at.isoformat(),
+            "expires_at": user.api_token_expires_at.isoformat(),
+        }
+    except Exception as e:
+        logger.error(f"Error generating API token for user {user.user_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate API token: {str(e)}"
+        )
 
 
 @router.post("/api-token/revoke")
 async def revoke_api_token(user: User = Depends(get_current_user)):
     """Revoke the current user's API token."""
-    user.api_token = None
-    user.api_token_created_at = None
-    user.api_token_expires_at = None
-    await user.save()
-    return {"ok": True}
+    try:
+        user.api_token = None
+        user.api_token_created_at = None
+        user.api_token_expires_at = None
+        await user.save()
+        logger.info(f"API token revoked for user: {user.user_id}")
+        return {"ok": True}
+    except Exception as e:
+        logger.error(f"Error revoking API token for user {user.user_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to revoke API token: {str(e)}"
+        )
 
 
 @router.get("/api-token/status")
 async def api_token_status(user: User = Depends(get_current_user)):
     """Check if the current user has an active API token."""
-    now = datetime.datetime.now(datetime.timezone.utc)
-    expired = (
-        user.api_token_expires_at is not None
-        and user.api_token_expires_at < now
-    )
-    return {
-        "has_token": user.api_token is not None,
-        "created_at": user.api_token_created_at.isoformat() if user.api_token_created_at else None,
-        "expires_at": user.api_token_expires_at.isoformat() if user.api_token_expires_at else None,
-        "expired": expired,
-    }
+    try:
+        now = datetime.datetime.now(datetime.timezone.utc)
+        expired = (
+            user.api_token_expires_at is not None
+            and user.api_token_expires_at < now
+        )
+        return {
+            "has_token": user.api_token is not None,
+            "created_at": user.api_token_created_at.isoformat() if user.api_token_created_at else None,
+            "expires_at": user.api_token_expires_at.isoformat() if user.api_token_expires_at else None,
+            "expired": expired,
+        }
+    except Exception as e:
+        logger.error(f"Error checking API token status for user {user.user_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to check API token status: {str(e)}"
+        )
 
 
 @router.post("/refresh")
