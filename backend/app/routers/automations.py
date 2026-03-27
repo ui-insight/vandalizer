@@ -1,22 +1,27 @@
 """Automation API routes."""
 
+import asyncio
 import logging
 import uuid as _uuid
 from pathlib import Path
 from typing import Optional
 
 from beanie import PydanticObjectId
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from bson import ObjectId
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
+from starlette.responses import JSONResponse
 
 from app.dependencies import get_api_key_user, get_current_user
 from app.models.automation import Automation
 from app.models.document import SmartDocument
-from app.models.passive import WorkflowTriggerEvent
+from app.models.passive import ExtractionTriggerEvent, WorkflowTriggerEvent
 from app.models.user import User
+from app.models.workflow import WorkflowResult
 from app.rate_limit import limiter
 from app.schemas.automations import (
     AutomationResponse,
     CreateAutomationRequest,
+    TriggerEventStatusResponse,
     UpdateAutomationRequest,
 )
 from app.services import access_control
@@ -193,6 +198,93 @@ async def get_active_automations(user: User = Depends(get_current_user)):
     return {"active_automation_ids": active_ids, "recently_completed": recently_completed}
 
 
+# ---------------------------------------------------------------------------
+# API trigger: polling endpoint for run status / results
+# ---------------------------------------------------------------------------
+
+
+@router.get("/runs/{trigger_event_id}", response_model=TriggerEventStatusResponse)
+@limiter.limit("60/minute")
+async def get_trigger_event_status(
+    request: Request,
+    trigger_event_id: str,
+    user: User = Depends(get_api_key_user),
+):
+    """Poll the status and output of a triggered automation run.
+
+    Works for both workflow and extraction trigger events.
+    Returns output data once the run has completed.
+    """
+    # Try WorkflowTriggerEvent first
+    try:
+        oid = ObjectId(trigger_event_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid trigger_event_id")
+
+    wf_event = await WorkflowTriggerEvent.find_one({"_id": oid})
+    if wf_event:
+        # Verify ownership via automation
+        ctx = wf_event.trigger_context or {}
+        auto_id = ctx.get("automation_id")
+        if auto_id:
+            try:
+                auto = await Automation.get(PydanticObjectId(auto_id))
+            except Exception:
+                auto = None
+            if not auto or auto.user_id != user.user_id:
+                raise HTTPException(status_code=404, detail="Trigger event not found")
+        output = None
+        if wf_event.status == "completed" and wf_event.workflow_result:
+            result = await WorkflowResult.get(wf_event.workflow_result)
+            if result and result.final_output:
+                output = result.final_output.get("output")
+        resp = TriggerEventStatusResponse(
+            trigger_event_id=trigger_event_id,
+            status=wf_event.status,
+            action_type="workflow",
+            created_at=wf_event.created_at.isoformat() if wf_event.created_at else None,
+            started_at=wf_event.started_at.isoformat() if wf_event.started_at else None,
+            completed_at=wf_event.completed_at.isoformat() if wf_event.completed_at else None,
+            output=output,
+            error=wf_event.error,
+        )
+        if wf_event.status in ("pending", "queued", "running"):
+            return JSONResponse(
+                content=resp.model_dump(),
+                headers={"Retry-After": "5"},
+            )
+        return resp
+
+    # Try ExtractionTriggerEvent
+    ext_event = await ExtractionTriggerEvent.find_one({"_id": oid})
+    if ext_event:
+        if ext_event.user_id != user.user_id:
+            raise HTTPException(status_code=404, detail="Trigger event not found")
+        resp = TriggerEventStatusResponse(
+            trigger_event_id=trigger_event_id,
+            status=ext_event.status,
+            action_type="extraction",
+            created_at=ext_event.created_at.isoformat() if ext_event.created_at else None,
+            started_at=ext_event.started_at.isoformat() if ext_event.started_at else None,
+            completed_at=ext_event.completed_at.isoformat() if ext_event.completed_at else None,
+            output=ext_event.result,
+            error=ext_event.error,
+        )
+        if ext_event.status in ("pending", "queued", "running"):
+            return JSONResponse(
+                content=resp.model_dump(),
+                headers={"Retry-After": "5"},
+            )
+        return resp
+
+    raise HTTPException(status_code=404, detail="Trigger event not found")
+
+
+# ---------------------------------------------------------------------------
+# CRUD endpoints with path params (must come after /runs, /active etc.)
+# ---------------------------------------------------------------------------
+
+
 @router.get("/{automation_id}", response_model=AutomationResponse)
 async def get_automation(automation_id: str, user: User = Depends(get_current_user)):
     auto = await svc.get_automation(automation_id, user=user)
@@ -250,6 +342,9 @@ async def trigger_automation(
     files: list[UploadFile] = File(default=[]),
     document_uuids: Optional[str] = Form(None),
     text: Optional[str] = Form(None),
+    callback_url: Optional[str] = Form(None),
+    wait: bool = Query(False),
+    timeout: int = Query(30, ge=5, le=120),
     user: User = Depends(get_api_key_user),
 ):
     """Trigger an automation via API. Accepts file uploads, existing document UUIDs, and/or plain text.
@@ -272,6 +367,14 @@ async def trigger_automation(
         raise HTTPException(status_code=400, detail="Automation is disabled")
     if not auto.action_id:
         raise HTTPException(status_code=400, detail="Automation has no action configured")
+
+    # Validate callback_url if provided (SSRF protection)
+    if callback_url:
+        from app.utils.url_validation import validate_outbound_url
+        try:
+            validate_outbound_url(callback_url)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=f"Invalid callback_url: {e}")
 
     settings = Settings()
     existing_doc_uuids: list[str] = []
@@ -360,6 +463,7 @@ async def trigger_automation(
             automation_doc=auto_dict,
             workflow_id=auto.action_id,
             document_oids=doc_oids,
+            callback_url=callback_url,
         )
 
         # Also create an Activity for the UI activity feed
@@ -374,9 +478,36 @@ async def trigger_automation(
         from app.tasks.passive_tasks import execute_workflow_passive
         execute_workflow_passive.delay(str(trigger_event["_id"]))
 
+        trigger_event_id = str(trigger_event["_id"])
+
+        if wait:
+            output = await _wait_for_workflow_event(trigger_event_id, timeout)
+            if output is not None:
+                return {
+                    "status": "completed",
+                    "trigger_event_id": trigger_event_id,
+                    "activity_id": str(activity.id),
+                    "action_type": auto.action_type,
+                    "documents": all_doc_uuids,
+                    "output": output,
+                }
+            # Timed out — return 202
+            return JSONResponse(
+                status_code=202,
+                content={
+                    "status": "running",
+                    "trigger_event_id": trigger_event_id,
+                    "activity_id": str(activity.id),
+                    "action_type": auto.action_type,
+                    "documents": all_doc_uuids,
+                    "output": None,
+                    "message": f"Still running. Poll GET /api/automations/runs/{trigger_event_id} for results.",
+                },
+            )
+
         return {
             "status": "queued",
-            "trigger_event_id": str(trigger_event["_id"]),
+            "trigger_event_id": trigger_event_id,
             "activity_id": str(activity.id),
             "action_type": auto.action_type,
             "documents": all_doc_uuids,
@@ -386,6 +517,17 @@ async def trigger_automation(
         ss = await get_authorized_search_set(auto.action_id, user)
         if not ss:
             raise HTTPException(status_code=404, detail="Linked extraction not found")
+
+        # Create tracking event for extractions
+        ext_event = ExtractionTriggerEvent(
+            automation_id=str(auto.id),
+            search_set_uuid=auto.action_id,
+            user_id=user.user_id,
+            status="queued",
+            document_uuids=all_doc_uuids,
+            trigger_context={"callback_url": callback_url} if callback_url else {},
+        )
+        await ext_event.insert()
 
         activity = await activity_service.activity_start(
             type=ActivityType.SEARCH_SET_RUN,
@@ -401,10 +543,38 @@ async def trigger_automation(
             search_set_uuid=auto.action_id,
             document_uuids=all_doc_uuids,
             user_id=user.user_id,
+            extraction_event_id=str(ext_event.id),
         )
+
+        trigger_event_id = str(ext_event.id)
+
+        if wait:
+            output = await _wait_for_extraction_event(trigger_event_id, timeout)
+            if output is not None:
+                return {
+                    "status": "completed",
+                    "trigger_event_id": trigger_event_id,
+                    "activity_id": str(activity.id),
+                    "action_type": "extraction",
+                    "documents": all_doc_uuids,
+                    "output": output,
+                }
+            return JSONResponse(
+                status_code=202,
+                content={
+                    "status": "running",
+                    "trigger_event_id": trigger_event_id,
+                    "activity_id": str(activity.id),
+                    "action_type": "extraction",
+                    "documents": all_doc_uuids,
+                    "output": None,
+                    "message": f"Still running. Poll GET /api/automations/runs/{trigger_event_id} for results.",
+                },
+            )
 
         return {
             "status": "queued",
+            "trigger_event_id": trigger_event_id,
             "activity_id": str(activity.id),
             "action_type": "extraction",
             "documents": all_doc_uuids,
@@ -412,3 +582,45 @@ async def trigger_automation(
 
     else:
         raise HTTPException(status_code=400, detail=f"Unsupported action type: {auto.action_type}")
+
+
+# ---------------------------------------------------------------------------
+# Sync-wait helpers
+# ---------------------------------------------------------------------------
+
+
+async def _wait_for_workflow_event(trigger_event_id: str, timeout: int):
+    """Poll WorkflowTriggerEvent until completed/failed or timeout. Returns output or None."""
+    oid = ObjectId(trigger_event_id)
+    elapsed = 0
+    while elapsed < timeout:
+        await asyncio.sleep(2)
+        elapsed += 2
+        event = await WorkflowTriggerEvent.find_one({"_id": oid})
+        if not event:
+            return None
+        if event.status == "completed" and event.workflow_result:
+            result = await WorkflowResult.get(event.workflow_result)
+            if result and result.final_output:
+                return result.final_output.get("output")
+            return {}
+        if event.status == "failed":
+            return None
+    return None
+
+
+async def _wait_for_extraction_event(trigger_event_id: str, timeout: int):
+    """Poll ExtractionTriggerEvent until completed/failed or timeout. Returns output or None."""
+    oid = ObjectId(trigger_event_id)
+    elapsed = 0
+    while elapsed < timeout:
+        await asyncio.sleep(2)
+        elapsed += 2
+        event = await ExtractionTriggerEvent.find_one({"_id": oid})
+        if not event:
+            return None
+        if event.status == "completed":
+            return event.result
+        if event.status == "failed":
+            return None
+    return None

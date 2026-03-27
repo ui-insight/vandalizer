@@ -31,7 +31,7 @@ from app.models.extraction_test_case import ExtractionTestCase
 from app.models.validation_run import ValidationRun
 from app.models.quality_alert import QualityAlert
 from app.models.demo import DemoApplication, PostExperienceResponse
-from app.models.passive import WorkflowTriggerEvent, GraphSubscription, M365AuditEntry
+from app.models.passive import WorkflowTriggerEvent, ExtractionTriggerEvent, GraphSubscription, M365AuditEntry
 from app.models.certification import CertificationProgress
 from app.models.organization import Organization
 from app.models.audit_log import AuditLog, AdminAuditLog
@@ -83,6 +83,7 @@ ALL_MODELS = [
     DemoApplication,
     PostExperienceResponse,
     WorkflowTriggerEvent,
+    ExtractionTriggerEvent,
     GraphSubscription,
     M365AuditEntry,
     CertificationProgress,

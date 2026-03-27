@@ -513,6 +513,28 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
             )
             return {"status": "retry_scheduled", "attempt": attempt + 1}
 
+        # Retries exhausted — deliver failure callback if configured
+        ctx = event.get("trigger_context") or {}
+        cb_url = ctx.get("callback_url")
+        if cb_url:
+            fail_now = datetime.now(timezone.utc)
+            deliver_callback.delay(
+                trigger_event_id=str(event["_id"]),
+                callback_url=cb_url,
+                payload={
+                    "event": "automation.failed",
+                    "trigger_event_id": str(event["_id"]),
+                    "automation_id": ctx.get("automation_id", ""),
+                    "action_type": "workflow",
+                    "status": "failed",
+                    "output": None,
+                    "error": str(e),
+                    "completed_at": fail_now.isoformat(),
+                    "timestamp": fail_now.isoformat(),
+                },
+                user_id=workflow.get("user_id", ""),
+            )
+
         return {"status": "failed", "error": str(e)}
 
 
@@ -704,7 +726,30 @@ def process_outputs(self, workflow_result_id: str) -> dict:
                 "error": str(e),
             })
 
-    # 6. Update work item status
+    # 6. Per-request callback URL
+    if trigger_event:
+        cb_url = (trigger_event.get("trigger_context") or {}).get("callback_url")
+        if cb_url:
+            auto_ctx = trigger_event.get("trigger_context") or {}
+            now = datetime.now(timezone.utc)
+            deliver_callback.delay(
+                trigger_event_id=str(trigger_event["_id"]),
+                callback_url=cb_url,
+                payload={
+                    "event": "automation.completed" if result_doc.get("status") == "completed" else "automation.failed",
+                    "trigger_event_id": str(trigger_event["_id"]),
+                    "automation_id": auto_ctx.get("automation_id", ""),
+                    "action_type": "workflow",
+                    "status": result_doc.get("status", "completed"),
+                    "output": (result_doc.get("final_output") or {}).get("output"),
+                    "error": result_doc.get("error"),
+                    "completed_at": now.isoformat(),
+                    "timestamp": now.isoformat(),
+                },
+                user_id=workflow.get("user_id", ""),
+            )
+
+    # 7. Update work item status
     if work_item:
         new_status = "completed" if result_doc.get("status") == "completed" else "failed"
         db.work_items.update_one(
@@ -736,6 +781,7 @@ def process_extraction_outputs(
     user_id: str,
     *,
     results: dict | None = None,
+    extraction_event_id: str | None = None,
 ) -> dict:
     """Run extraction and/or process output_config for an automation.
 
@@ -752,7 +798,21 @@ def process_extraction_outputs(
     db = get_sync_db()
     auto = db.automation.find_one({"_id": ObjectId(automation_id)})
     if not auto:
+        if extraction_event_id:
+            db.extraction_trigger_event.update_one(
+                {"_id": ObjectId(extraction_event_id)},
+                {"$set": {"status": "failed", "error": "Automation not found",
+                          "completed_at": datetime.now(timezone.utc)}},
+            )
         return {"error": "Automation not found"}
+
+    # Mark extraction event as running
+    ext_started_at = datetime.now(timezone.utc)
+    if extraction_event_id:
+        db.extraction_trigger_event.update_one(
+            {"_id": ObjectId(extraction_event_id)},
+            {"$set": {"status": "running", "started_at": ext_started_at}},
+        )
 
     # Run extraction if results not provided
     if results is None:
@@ -768,6 +828,12 @@ def process_extraction_outputs(
         }))
         keys = [item["searchphrase"] for item in ss_items]
         if not keys:
+            if extraction_event_id:
+                db.extraction_trigger_event.update_one(
+                    {"_id": ObjectId(extraction_event_id)},
+                    {"$set": {"status": "failed", "error": "No extraction keys found",
+                              "completed_at": datetime.now(timezone.utc)}},
+                )
             return {"error": "No extraction keys found"}
 
         results = {}
@@ -840,7 +906,100 @@ def process_extraction_outputs(
                 "error": str(e),
             })
 
+    # Persist results and mark extraction event as completed
+    if extraction_event_id:
+        now = datetime.now(timezone.utc)
+        duration_ms = int((now - ext_started_at).total_seconds() * 1000) if ext_started_at else None
+        db.extraction_trigger_event.update_one(
+            {"_id": ObjectId(extraction_event_id)},
+            {"$set": {
+                "status": "completed",
+                "result": results,
+                "completed_at": now,
+                "duration_ms": duration_ms,
+            }},
+        )
+
+        # Deliver per-request callback if configured
+        ext_event = db.extraction_trigger_event.find_one({"_id": ObjectId(extraction_event_id)})
+        cb_url = (ext_event.get("trigger_context") or {}).get("callback_url") if ext_event else None
+        if cb_url:
+            deliver_callback.delay(
+                trigger_event_id=extraction_event_id,
+                callback_url=cb_url,
+                payload={
+                    "event": "automation.completed",
+                    "trigger_event_id": extraction_event_id,
+                    "automation_id": automation_id,
+                    "action_type": "extraction",
+                    "status": "completed",
+                    "output": results,
+                    "completed_at": now.isoformat(),
+                    "timestamp": now.isoformat(),
+                },
+                user_id=user_id,
+            )
+
     return {"status": "completed", "outputs": outputs}
+
+
+# ---------------------------------------------------------------------------
+# Deliver per-request callback with retries + HMAC signing
+# ---------------------------------------------------------------------------
+
+
+CALLBACK_RETRY_DELAYS = [10, 30, 90, 270, 810]
+
+
+@celery_app.task(
+    bind=True,
+    name="tasks.passive.deliver_callback",
+    max_retries=5,
+    default_retry_delay=10,
+)
+def deliver_callback(
+    self,
+    trigger_event_id: str,
+    callback_url: str,
+    payload: dict,
+    user_id: str,
+) -> dict:
+    """POST results to a caller-provided callback URL with HMAC signing and retries."""
+    import json
+
+    import httpx
+
+    from app.services.output_handlers import compute_webhook_signature
+    from app.utils.url_validation import validate_outbound_url
+
+    try:
+        validate_outbound_url(callback_url)
+    except ValueError as e:
+        logger.error("Invalid callback_url for event %s: %s", trigger_event_id, e)
+        return {"status": "rejected", "error": str(e)}
+
+    # Look up the user's API token to use as HMAC signing secret
+    db = get_sync_db()
+    user = db.user.find_one({"user_id": user_id})
+    signing_secret = (user.get("api_token") or "") if user else ""
+
+    payload_bytes = json.dumps(payload, default=str).encode("utf-8")
+
+    headers = {"Content-Type": "application/json", "X-Webhook-Id": trigger_event_id}
+    if signing_secret:
+        headers["X-Webhook-Signature"] = compute_webhook_signature(payload_bytes, signing_secret)
+
+    try:
+        resp = httpx.post(callback_url, content=payload_bytes, headers=headers, timeout=15.0)
+        resp.raise_for_status()
+        return {"status": "delivered", "http_status": resp.status_code}
+    except (httpx.HTTPStatusError, httpx.TimeoutException, httpx.ConnectError) as exc:
+        delay = CALLBACK_RETRY_DELAYS[min(self.request.retries, len(CALLBACK_RETRY_DELAYS) - 1)]
+        logger.warning(
+            "Callback delivery failed for %s (attempt %d): %s — retrying in %ds",
+            trigger_event_id, self.request.retries + 1, exc, delay,
+        )
+        raise self.retry(exc=exc, countdown=delay)
 
 
 # ---------------------------------------------------------------------------

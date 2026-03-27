@@ -1,6 +1,6 @@
 """Request/response models for automation endpoints."""
 
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, model_validator
 
@@ -73,3 +73,14 @@ class AutomationResponse(BaseModel):
     output_config: dict = {}
     created_at: str
     updated_at: str
+
+
+class TriggerEventStatusResponse(BaseModel):
+    trigger_event_id: str
+    status: str  # queued | running | completed | failed
+    action_type: str  # workflow | extraction
+    created_at: Optional[str] = None
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    output: Optional[Any] = None
+    error: Optional[str] = None

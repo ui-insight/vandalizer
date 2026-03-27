@@ -1,4 +1,4 @@
-"""Passive automation models — WorkflowTriggerEvent, GraphSubscription, M365AuditEntry."""
+"""Passive automation models — WorkflowTriggerEvent, ExtractionTriggerEvent, GraphSubscription, M365AuditEntry."""
 
 import datetime
 from typing import Optional
@@ -54,6 +54,41 @@ class WorkflowTriggerEvent(Document):
 
     class Settings:
         name = "workflow_trigger_event"
+
+
+class ExtractionTriggerEvent(Document):
+    """Tracks API-triggered extraction runs (analogous to WorkflowTriggerEvent)."""
+
+    uuid: str = Field(default_factory=lambda: uuid4().hex)
+    automation_id: str = ""
+    search_set_uuid: str = ""
+    user_id: str = ""
+    status: str = "pending"  # pending, queued, running, completed, failed
+
+    document_uuids: list[str] = Field(default_factory=list)
+
+    # Results
+    result: Optional[dict] = None  # {doc_uuid: {key: value, ...}, ...}
+    error: Optional[str] = None
+
+    # Timing
+    created_at: datetime.datetime = Field(
+        default_factory=lambda: datetime.datetime.now(datetime.timezone.utc)
+    )
+    started_at: Optional[datetime.datetime] = None
+    completed_at: Optional[datetime.datetime] = None
+    duration_ms: Optional[int] = None
+
+    # Callback / delivery
+    trigger_context: dict = Field(default_factory=dict)
+    output_delivery: dict = Field(default_factory=lambda: {
+        "storage_status": None,
+        "webhooks_called": [],
+        "callback_status": None,
+    })
+
+    class Settings:
+        name = "extraction_trigger_event"
 
 
 class GraphSubscription(Document):

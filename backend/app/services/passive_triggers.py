@@ -102,6 +102,7 @@ def create_api_trigger(
     automation_doc: dict,
     workflow_id: str,
     document_oids: list,
+    callback_url: str | None = None,
 ) -> dict:
     """Create a trigger event for an API-initiated automation.
 
@@ -111,6 +112,13 @@ def create_api_trigger(
     db = get_sync_db()
     now = datetime.now(timezone.utc)
 
+    trigger_context: dict = {
+        "automation_id": str(automation_doc.get("_id", "")),
+        "automation_name": automation_doc.get("name", ""),
+    }
+    if callback_url:
+        trigger_context["callback_url"] = callback_url
+
     event = {
         **_base_event(now),
         "workflow": ObjectId(workflow_id),
@@ -118,10 +126,7 @@ def create_api_trigger(
         "status": "queued",
         "documents": document_oids,
         "document_count": len(document_oids),
-        "trigger_context": {
-            "automation_id": str(automation_doc.get("_id", "")),
-            "automation_name": automation_doc.get("name", ""),
-        },
+        "trigger_context": trigger_context,
         "process_after": now,
         "queued_at": now,
     }

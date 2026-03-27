@@ -511,6 +511,27 @@ def save_extraction_results_to_folder(
     return str(file_path)
 
 
+def compute_webhook_signature(payload_bytes: bytes, secret: str) -> str:
+    """Compute HMAC-SHA256 signature for webhook payload.
+
+    Returns ``t={timestamp},v1={hex_digest}`` string.
+    The receiver can verify by reconstructing ``{t}.{raw_body}`` and
+    computing HMAC-SHA256 with the shared secret.
+    """
+    import hashlib
+    import hmac
+    import time
+
+    timestamp = str(int(time.time()))
+    message = f"{timestamp}.{payload_bytes.decode('utf-8')}"
+    signature = hmac.new(
+        secret.encode("utf-8"),
+        message.encode("utf-8"),
+        hashlib.sha256,
+    ).hexdigest()
+    return f"t={timestamp},v1={signature}"
+
+
 def call_webhook(result_doc: dict, webhook_config: dict) -> None:
     """Call a webhook with workflow result data."""
     from app.utils.url_validation import validate_outbound_url
