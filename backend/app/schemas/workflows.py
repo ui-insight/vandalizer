@@ -163,8 +163,12 @@ class ValidateWorkflowResponse(BaseModel):
     grade: str  # A-F
     summary: str
     checks: list[ValidationCheckResult]
-    score: Optional[float] = None  # Continuous 0-100
-    check_pass_rate: Optional[float] = None  # 0-1
-    consistency: Optional[float] = None  # 0-1
+    score: Optional[float] = None  # Combined 0-100 (quality + stability)
+    quality_score: Optional[float] = None  # 0-100: how good is the output
+    stability_score: Optional[float] = None  # 0-100: how consistent across runs
+    stability_detail: Optional[dict] = None  # Breakdown of stability measurement
+    check_pass_rate: Optional[float] = None  # 0-1, unweighted
+    weighted_pass_rate: Optional[float] = None  # 0-1, weighted by category importance
+    consistency: Optional[float] = None  # 0-1, evaluator agreement (diagnostic)
     num_runs: int = 1
     num_checks: int = 0

@@ -868,7 +868,7 @@ async def generate_validation_plan(workflow_id: str, user: User) -> list[dict]:
                     all_extracted_fields.append(field_info)
 
                 step_desc_parts.append(
-                    f"**Extraction task** — extracts the following fields from the input:\n"
+                    "**Extraction task** — extracts the following fields from the input:\n"
                     + "\n".join(
                         f"  - `{f['key']}`"
                         + (f": {f['description']}" if f.get('description') else "")
@@ -936,9 +936,8 @@ async def generate_validation_plan(workflow_id: str, user: User) -> list[dict]:
                 )
 
             elif task_name == "CodeExecution":
-                code = data.get("code", "")[:500]
                 step_desc_parts.append(
-                    f"**Code Execution task** — runs custom code on the data."
+                    "**Code Execution task** — runs custom code on the data."
                 )
 
             else:
@@ -1059,6 +1058,108 @@ async def generate_validation_plan(workflow_id: str, user: User) -> list[dict]:
 # Validation Execution
 # ---------------------------------------------------------------------------
 
+# Category weights — completeness and accuracy matter more than formatting.
+_CATEGORY_WEIGHTS = {
+    "completeness": 1.5,
+    "accuracy": 1.3,
+    "content": 1.0,
+    "formatting": 0.7,
+}
+
+
+def _text_similarity(a: str, b: str) -> float:
+    """Jaccard similarity over whitespace-split tokens (case-insensitive)."""
+    tokens_a = set(a.lower().split())
+    tokens_b = set(b.lower().split())
+    if not tokens_a and not tokens_b:
+        return 1.0
+    if not tokens_a or not tokens_b:
+        return 0.0
+    return len(tokens_a & tokens_b) / len(tokens_a | tokens_b)
+
+
+def _compute_output_stability(results: list) -> dict:
+    """Compare actual workflow outputs across multiple executions.
+
+    Returns a stability dict with a 0-1 score representing how similar the
+    outputs are to each other, plus diagnostic details.
+    """
+    if len(results) < 2:
+        return {"stability_score": None, "detail": "Need 2+ runs for stability measurement"}
+
+    # Serialize all outputs to text
+    text_outputs = []
+    for r in results:
+        text = _serialize_output(r.final_output)
+        if text is not None:
+            text_outputs.append(text)
+
+    if len(text_outputs) < 2:
+        return {"stability_score": None, "detail": "Not enough text outputs to compare"}
+
+    # Pairwise text similarity
+    similarities = []
+    for i in range(len(text_outputs)):
+        for j in range(i + 1, len(text_outputs)):
+            similarities.append(_text_similarity(text_outputs[i], text_outputs[j]))
+
+    text_stability = sum(similarities) / len(similarities)
+
+    # Structured field-level stability (if outputs are dicts)
+    structured_stability = _structured_field_stability(results)
+
+    # Use structured stability when available (more precise), blend with text
+    if structured_stability is not None:
+        stability_score = structured_stability * 0.6 + text_stability * 0.4
+    else:
+        stability_score = text_stability
+
+    return {
+        "stability_score": round(stability_score, 4),
+        "text_similarity": round(text_stability, 4),
+        "structured_field_stability": (
+            round(structured_stability, 4) if structured_stability is not None else None
+        ),
+        "num_outputs_compared": len(text_outputs),
+        "pairwise_similarities": [round(s, 4) for s in similarities],
+    }
+
+
+def _structured_field_stability(results: list) -> float | None:
+    """Compare structured (dict) outputs field-by-field across runs.
+
+    Returns fraction of fields that are consistent across all runs, or None
+    if outputs are not structured.
+    """
+    outputs = []
+    for r in results:
+        fo = r.final_output
+        if not isinstance(fo, dict):
+            continue
+        out = fo.get("output", fo)
+        if isinstance(out, dict):
+            outputs.append(out)
+
+    if len(outputs) < 2:
+        return None
+
+    # Union of all keys
+    all_keys = set()
+    for o in outputs:
+        all_keys.update(o.keys())
+
+    if not all_keys:
+        return None
+
+    consistent = 0
+    for key in all_keys:
+        values = [str(o.get(key, "")).strip().lower() for o in outputs]
+        if len(set(values)) == 1:
+            consistent += 1
+
+    return consistent / len(all_keys)
+
+
 async def validate_workflow(workflow_id: str, user: User | None = None) -> dict:
     """Evaluate the last N executions' output against the persisted validation plan."""
     if user is not None:
@@ -1100,7 +1201,13 @@ async def validate_workflow(workflow_id: str, user: User | None = None) -> dict:
             }
             for c in plan
         ]
-        return await _build_result(checks, workflow_id, wf_data, num_runs=0, output_comparison=None)
+        return await _build_result(
+            checks, workflow_id, wf_data, num_runs=0,
+            output_comparison=None, stability_data=None,
+        )
+
+    # Compute output-to-output stability (compares actual outputs across runs)
+    stability_data = _compute_output_stability(last_results)
 
     # Evaluate each execution independently
     all_run_checks = []
@@ -1126,7 +1233,12 @@ async def validate_workflow(workflow_id: str, user: User | None = None) -> dict:
     if expected_outputs and last_results:
         output_comparison = _compare_outputs(last_results, expected_outputs)
 
-    return await _build_result(checks, workflow_id, wf_data, num_runs=len(all_run_checks), output_comparison=output_comparison)
+    return await _build_result(
+        checks, workflow_id, wf_data,
+        num_runs=len(all_run_checks),
+        output_comparison=output_comparison,
+        stability_data=stability_data,
+    )
 
 
 def _serialize_output(final_output: dict | None) -> str | None:
@@ -1177,6 +1289,35 @@ async def _evaluate_checks_against_output(
         indent=2,
     )
 
+    # Extract source document text from steps_output so the evaluator can
+    # verify extracted values actually come from the source (not hallucinated).
+    source_text = ""
+    if steps_output:
+        for step_name, step_data in steps_output.items():
+            # Document / AddDocument steps carry the raw source text
+            if step_name.lower() in ("document", "adddocument") or (
+                isinstance(step_data, dict) and step_data.get("step_name") in ("Document", "AddDocument")
+            ):
+                raw = step_data.get("output", step_data) if isinstance(step_data, dict) else step_data
+                if isinstance(raw, str) and raw.strip():
+                    source_text = (
+                        "\n\n## Source Document Text (ground truth)\n"
+                        "Use this to verify that extracted values actually appear in the "
+                        "source document. Values not grounded in this text may be hallucinated.\n"
+                        + raw[:15_000]
+                    )
+                    break
+                if isinstance(raw, list):
+                    combined = "\n---\n".join(str(item) for item in raw[:5])
+                    if combined.strip():
+                        source_text = (
+                            "\n\n## Source Document Text (ground truth)\n"
+                            "Use this to verify that extracted values actually appear in the "
+                            "source document. Values not grounded in this text may be hallucinated.\n"
+                            + combined[:15_000]
+                        )
+                        break
+
     # Include intermediate step outputs so the evaluator can cross-reference
     # whether data was faithfully carried through the pipeline
     steps_text = ""
@@ -1192,22 +1333,25 @@ async def _evaluate_checks_against_output(
         "You are a strict quality evaluator for workflow outputs. You will be given:\n"
         "1. A list of quality checks to evaluate\n"
         "2. The final output of a workflow execution\n"
-        "3. Intermediate step outputs (to cross-reference data flow)\n\n"
+        "3. The source document text (when available) — this is ground truth\n"
+        "4. Intermediate step outputs (to cross-reference data flow)\n\n"
         "Your job is to determine whether the FINAL OUTPUT satisfies each check.\n\n"
         "Key evaluation principles:\n"
         "- For COMPLETENESS checks: verify that specific named data points actually appear "
         "in the output. Cross-reference with intermediate step outputs to confirm data "
         "was carried through. If an extraction step produced a value but it's missing from "
         "the final output, that's a FAIL.\n"
-        "- For ACCURACY checks: compare values in the final output against intermediate "
-        "step data. If the final output restates or reformats extracted data, verify it "
-        "matches. Flag any values that appear fabricated or inconsistent.\n"
+        "- For ACCURACY checks: compare values in the final output against BOTH the "
+        "intermediate step data AND the source document. If the output claims a value "
+        "that doesn't appear in the source document, that's likely a hallucination — FAIL. "
+        "If values were faithfully extracted and carried through, that's a PASS.\n"
         "- For CONTENT checks: assess whether the output fulfills its stated purpose "
         "(e.g., 'human readable summary' should be a coherent narrative, not raw data).\n"
         "- For FORMATTING checks: verify the output matches the requested format.\n\n"
         "For EACH check, determine: PASS, FAIL, or WARN.\n"
         "Cite specific evidence from the output (quote actual text/values) to justify "
-        "your assessment.\n\n"
+        "your assessment. When checking accuracy, quote both the output value and the "
+        "source document value for comparison.\n\n"
         "Return ONLY a JSON array of result objects. Each object must have:\n"
         '- "check_id": the check ID from the input (string)\n'
         '- "status": one of "PASS", "FAIL", "WARN" (string)\n'
@@ -1219,6 +1363,7 @@ async def _evaluate_checks_against_output(
     user_prompt = (
         f"## Quality Checks to Evaluate\n{checks_desc}\n\n"
         f"## Workflow Final Output\n{output_text}"
+        f"{source_text}"
         f"{steps_text}"
     )
 
@@ -1441,8 +1586,9 @@ async def _build_result(
     wf_data: dict | None,
     num_runs: int = 1,
     output_comparison: dict | None = None,
+    stability_data: dict | None = None,
 ) -> dict:
-    """Compute continuous score (0-100), grade, and persist the validation result."""
+    """Compute separate quality / stability scores, combined score, grade, and persist."""
     statuses = [c["status"] for c in checks]
     fail_count = statuses.count("FAIL")
     warn_count = statuses.count("WARN")
@@ -1451,32 +1597,57 @@ async def _build_result(
     total = len(checks)
     evaluated = total - skip_count
 
-    # Continuous check pass rate: PASS=1.0, WARN=0.5, FAIL=0.0, SKIP=excluded
-    if evaluated > 0:
-        check_score_sum = pass_count * 1.0 + warn_count * 0.5
-        check_pass_rate = check_score_sum / evaluated
-    else:
-        check_pass_rate = 0.0
+    # -- Weighted check pass rate (by category) --
+    # Build check_id → category lookup from the workflow's validation plan
+    plan = (wf_data or {}).get("validation_plan", [])
+    cat_lookup: dict[str, str] = {c["id"]: c.get("category", "content") for c in plan}
 
-    # Consistency across runs (average per-check consistency)
-    consistencies = [c.get("consistency", 1.0) for c in checks if c["status"] != "SKIP"]
-    avg_consistency = sum(consistencies) / len(consistencies) if consistencies else 0.0
+    weighted_sum = 0.0
+    weight_total = 0.0
+    unweighted_sum = 0.0
+    for c in checks:
+        if c["status"] == "SKIP":
+            continue
+        cat = cat_lookup.get(c.get("check_id", ""), "content")
+        w = _CATEGORY_WEIGHTS.get(cat, 1.0)
+        status_val = {"PASS": 1.0, "WARN": 0.5, "FAIL": 0.0}.get(c["status"], 0.0)
+        weighted_sum += status_val * w
+        weight_total += w
+        unweighted_sum += status_val
 
-    # Continuous score: 60% check pass rate + 40% consistency (mirrors extraction formula)
-    accuracy_component = check_pass_rate * 100
-    consistency_component = avg_consistency * 100
-    score = min(100.0, max(0.0, accuracy_component * 0.6 + consistency_component * 0.4))
+    weighted_pass_rate = weighted_sum / weight_total if weight_total > 0 else 0.0
+    check_pass_rate = unweighted_sum / evaluated if evaluated > 0 else 0.0
 
-    # If we have ground-truth output comparison, blend it in
+    # -- Quality score (how good is the output?) --
+    # Based on weighted check pass rate + expected-output comparison when available
+    quality_score_raw = weighted_pass_rate * 100
     output_accuracy = None
     if output_comparison and output_comparison.get("has_expected"):
         output_accuracy = output_comparison["output_accuracy"]
-        # Reweight: 40% check pass rate + 30% consistency + 30% output accuracy
-        score = min(100.0, max(0.0,
-            accuracy_component * 0.4 + consistency_component * 0.3 + output_accuracy * 100 * 0.3
-        ))
+        # Blend: 70% weighted checks + 30% ground-truth comparison
+        quality_score_raw = weighted_pass_rate * 100 * 0.7 + output_accuracy * 100 * 0.3
 
-    # Map continuous score to letter grade for backward compatibility
+    quality_score = min(100.0, max(0.0, quality_score_raw))
+
+    # -- Stability score (how consistent are the actual outputs?) --
+    # This measures output-to-output similarity, not evaluator consistency.
+    stability_score_val = None
+    if stability_data and stability_data.get("stability_score") is not None:
+        stability_score_val = stability_data["stability_score"] * 100  # convert 0-1 → 0-100
+
+    # Evaluator consistency is kept as a diagnostic signal
+    consistencies = [c.get("consistency", 1.0) for c in checks if c["status"] != "SKIP"]
+    avg_evaluator_consistency = sum(consistencies) / len(consistencies) if consistencies else 0.0
+
+    # -- Combined score --
+    if stability_score_val is not None:
+        # Both dimensions available: 60% quality + 40% stability
+        score = min(100.0, max(0.0, quality_score * 0.6 + stability_score_val * 0.4))
+    else:
+        # Single run — quality only, but note reduced confidence
+        score = quality_score
+
+    # -- Grade from combined score --
     if score >= 90:
         grade = "A"
     elif score >= 80:
@@ -1488,16 +1659,25 @@ async def _build_result(
     else:
         grade = "F"
 
-    consistency_note = f", {avg_consistency*100:.0f}% consistent" if num_runs > 1 else ""
-    summary = f"{pass_count}/{total} checks passed, {warn_count} warnings, {fail_count} failures{consistency_note}"
+    # -- Summary --
+    parts = [f"{pass_count}/{total} checks passed, {warn_count} warnings, {fail_count} failures"]
+    if stability_score_val is not None:
+        parts.append(f"{stability_score_val:.0f}% stable")
+    if num_runs > 1:
+        parts.append(f"{avg_evaluator_consistency*100:.0f}% evaluator agreement")
+    summary = ", ".join(parts)
 
     result_dict = {
         "grade": grade,
         "summary": summary,
         "checks": checks,
         "score": round(score, 1),
+        "quality_score": round(quality_score, 1),
+        "stability_score": round(stability_score_val, 1) if stability_score_val is not None else None,
+        "stability_detail": stability_data,
         "check_pass_rate": round(check_pass_rate, 4),
-        "consistency": round(avg_consistency, 4),
+        "weighted_pass_rate": round(weighted_pass_rate, 4),
+        "consistency": round(avg_evaluator_consistency, 4),
         "num_runs": num_runs,
         "num_checks": total,
         "output_comparison": output_comparison,

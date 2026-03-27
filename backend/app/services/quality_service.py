@@ -72,9 +72,18 @@ async def persist_validation_run(
 
     # Apply sample size factor - low sample sizes reduce effective score
     raw_score = score
-    num_tc = len(result.get("test_cases", result.get("sources", [])))
     num_runs_val = result.get("num_runs", 1)
-    ssf = _sample_size_factor(num_tc, num_runs_val)
+
+    if run_type == "workflow":
+        # For workflows, the "test cases" concept doesn't apply — workflows
+        # have checks, not test cases.  Use num_checks as the sample-size
+        # proxy (a plan with >=4 checks is considered adequate).
+        num_tc = len(result.get("checks", []))
+        ssf = _sample_size_factor(min(num_tc, 3), num_runs_val)
+    else:
+        num_tc = len(result.get("test_cases", result.get("sources", [])))
+        ssf = _sample_size_factor(num_tc, num_runs_val)
+
     if ssf < 1.0:
         # Blend toward 50 (neutral) based on how much confidence we lack
         score = score * ssf + 50.0 * (1.0 - ssf)
