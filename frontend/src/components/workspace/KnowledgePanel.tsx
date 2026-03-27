@@ -14,6 +14,7 @@ import { AddUrlsModal } from '../knowledge/AddUrlsModal'
 import { DocumentPickerModal } from '../knowledge/DocumentPickerModal'
 import { KBSearchBar } from '../knowledge/KBSearchBar'
 import { KBListView } from '../knowledge/KBListView'
+import { KBAutomationsBar } from '../knowledge/KBAutomationsBar'
 import { KnowledgeTutorial } from './KnowledgeTutorial'
 import { useToast } from '../../contexts/ToastContext'
 
@@ -829,6 +830,9 @@ export function KnowledgePanel() {
           </button>
         )}
       </div>
+
+      {/* Automations */}
+      <KBAutomationsBar />
 
       {/* Tabs */}
       <div style={{

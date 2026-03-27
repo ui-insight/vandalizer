@@ -51,7 +51,7 @@ SYM_SEND="${DEEP_CYAN}➤${RESET}"
 # ---------------------------------------------------------------------------
 BASE_URL="${VANDALIZER_URL:-http://localhost:8001}"
 API_KEY="${VANDALIZER_API_KEY:-}"
-SESSION_COOKIE=""
+COOKIE_JAR=""      # path to curl cookie jar file
 CSRF_TOKEN=""
 LAST_RESPONSE=""
 LAST_STATUS=""
@@ -173,11 +173,23 @@ json_field() {
   echo "$LAST_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('$1',''))" 2>/dev/null
 }
 
-# Build auth cookies header
-cookie_header() {
-  if [[ -n "$SESSION_COOKIE" ]]; then
-    echo "Cookie: ${SESSION_COOKIE}"
+# Check if we have a valid session
+has_session() {
+  [[ -n "$COOKIE_JAR" && -f "$COOKIE_JAR" ]]
+}
+
+# Authenticated api_call: wraps api_call with cookie jar + CSRF header
+auth_api_call() {
+  local label="$1"
+  shift
+  if ! has_session; then
+    echo -e "\n  ${SYM_WARN}  ${YELLOW}Login required.${RESET}\n"
+    return 1
   fi
+  local -a args=("$label" -b "$COOKIE_JAR")
+  [[ -n "$CSRF_TOKEN" ]] && args+=(-H "X-CSRF-Token: ${CSRF_TOKEN}")
+  args+=("$@")
+  api_call "${args[@]}"
 }
 
 # Mask a key for display
@@ -264,7 +276,7 @@ check_connection() {
   else
     echo -e "  ${DIM}API Key:${RESET} ${YELLOW}not set${RESET}  ${DIM}(use 'gen-key' or export VANDALIZER_API_KEY)${RESET}"
   fi
-  if [[ -n "$SESSION_COOKIE" ]]; then
+  if [[ -n "$COOKIE_JAR" ]]; then
     echo -e "  ${DIM}Session:${RESET} ${GREEN}authenticated${RESET}"
   else
     echo -e "  ${DIM}Session:${RESET} ${GRAY}not logged in${RESET}"
@@ -287,28 +299,27 @@ do_login() {
   fi
 
   echo ""
-  local cookies_file="${TMP_DIR}/cookies"
+  COOKIE_JAR="${TMP_DIR}/cookies"
 
   if curl -s -w "\n%{http_code}" \
        -X POST "${BASE_URL}/api/auth/login" \
        -H "Content-Type: application/json" \
        -d "{\"user_id\":\"${email}\",\"password\":\"${password}\"}" \
-       -c "$cookies_file" \
+       -c "$COOKIE_JAR" \
        > "${TMP_DIR}/response" 2>/dev/null; then
 
     LAST_STATUS=$(tail -1 "${TMP_DIR}/response")
     LAST_RESPONSE=$(sed '$d' "${TMP_DIR}/response")
 
     if [[ "$LAST_STATUS" -ge 200 && "$LAST_STATUS" -lt 300 ]]; then
-      # Build cookie header from jar
-      SESSION_COOKIE=$(awk '!/^#/ && NF {printf "%s=%s; ", $6, $7}' "$cookies_file" 2>/dev/null)
-      CSRF_TOKEN=$(awk '!/^#/ && $6 == "csrf_token" {print $7}' "$cookies_file" 2>/dev/null)
+      CSRF_TOKEN=$(awk '$6 == "csrf_token" {print $7}' "$COOKIE_JAR" 2>/dev/null)
       echo -e "  ${SYM_CHECK}  Logged in as ${BOLD}${email}${RESET}"
       local name
       name=$(json_field "name" 2>/dev/null)
       [[ -n "$name" ]] && echo -e "  ${DIM}     Welcome back, ${name}${RESET}"
     else
       echo -e "  ${SYM_CROSS}  Login failed: ${RED}${LAST_STATUS}${RESET}"
+      COOKIE_JAR=""
       local detail
       detail=$(json_field "detail" 2>/dev/null)
       [[ -n "$detail" ]] && echo -e "  ${DIM}     ${detail}${RESET}"
@@ -320,16 +331,9 @@ do_login() {
 }
 
 do_gen_key() {
-  if [[ -z "$SESSION_COOKIE" ]]; then
-    echo -e "\n  ${SYM_WARN}  ${YELLOW}Login required.${RESET} Run ${BOLD}login${RESET} first.\n"
-    return
-  fi
-
   echo ""
-  if api_call "Generating API key" \
-       -X POST "${BASE_URL}/api/auth/api-token/generate" \
-       -H "$(cookie_header)" \
-       -H "X-CSRF-Token: ${CSRF_TOKEN}"; then
+  if auth_api_call "Generating API key" \
+       -X POST "${BASE_URL}/api/auth/api-token/generate"; then
 
     local token expires
     token=$(json_field "api_token")
@@ -354,14 +358,9 @@ do_gen_key() {
 }
 
 do_key_status() {
-  if [[ -z "$SESSION_COOKIE" ]]; then
-    echo -e "\n  ${SYM_WARN}  ${YELLOW}Login required.${RESET}\n"
-    return
-  fi
   echo ""
-  if api_call "Checking API key status" \
-       -X GET "${BASE_URL}/api/auth/api-token/status" \
-       -H "$(cookie_header)"; then
+  if auth_api_call "Checking API key status" \
+       -X GET "${BASE_URL}/api/auth/api-token/status"; then
     local has_token expired
     has_token=$(json_field "has_token")
     expired=$(json_field "expired")
@@ -384,14 +383,9 @@ do_key_status() {
 }
 
 do_list() {
-  if [[ -z "$SESSION_COOKIE" ]]; then
-    echo -e "\n  ${SYM_WARN}  ${YELLOW}Login required.${RESET}\n"
-    return
-  fi
   echo ""
-  if api_call "Fetching automations" \
-       -X GET "${BASE_URL}/api/automations" \
-       -H "$(cookie_header)"; then
+  if auth_api_call "Fetching automations" \
+       -X GET "${BASE_URL}/api/automations"; then
     show_automations_table
   else
     show_json "Error"
@@ -403,14 +397,9 @@ do_get() {
   if [[ -z "$auto_id" ]]; then
     prompt_input "Automation ID" "" auto_id
   fi
-  if [[ -z "$SESSION_COOKIE" ]]; then
-    echo -e "\n  ${SYM_WARN}  ${YELLOW}Login required.${RESET}\n"
-    return
-  fi
   echo ""
-  if api_call "Fetching automation ${auto_id}" \
-       -X GET "${BASE_URL}/api/automations/${auto_id}" \
-       -H "$(cookie_header)"; then
+  if auth_api_call "Fetching automation ${auto_id}" \
+       -X GET "${BASE_URL}/api/automations/${auto_id}"; then
     show_json "Automation Details"
   else
     show_json "Error"
@@ -418,7 +407,7 @@ do_get() {
 }
 
 do_create() {
-  if [[ -z "$SESSION_COOKIE" ]]; then
+  if ! has_session; then
     echo -e "\n  ${SYM_WARN}  ${YELLOW}Login required.${RESET}\n"
     return
   fi
@@ -450,10 +439,8 @@ do_create() {
   body="${body}}"
 
   echo ""
-  if api_call "Creating automation" \
+  if auth_api_call "Creating automation" \
        -X POST "${BASE_URL}/api/automations" \
-       -H "$(cookie_header)" \
-       -H "X-CSRF-Token: ${CSRF_TOKEN}" \
        -H "Content-Type: application/json" \
        -d "$body"; then
     local new_id
@@ -471,19 +458,13 @@ do_enable() {
   if [[ -z "$auto_id" ]]; then
     prompt_input "Automation ID" "" auto_id
   fi
-  if [[ -z "$SESSION_COOKIE" ]]; then
-    echo -e "\n  ${SYM_WARN}  ${YELLOW}Login required.${RESET}\n"
-    return
-  fi
 
   local label="Enabling"
   [[ "$enabled" == "false" ]] && label="Disabling"
 
   echo ""
-  if api_call "${label} automation" \
+  if auth_api_call "${label} automation" \
        -X PATCH "${BASE_URL}/api/automations/${auto_id}" \
-       -H "$(cookie_header)" \
-       -H "X-CSRF-Token: ${CSRF_TOKEN}" \
        -H "Content-Type: application/json" \
        -d "{\"enabled\":${enabled}}"; then
     if [[ "$enabled" == "true" ]]; then
@@ -502,10 +483,6 @@ do_delete() {
   if [[ -z "$auto_id" ]]; then
     prompt_input "Automation ID" "" auto_id
   fi
-  if [[ -z "$SESSION_COOKIE" ]]; then
-    echo -e "\n  ${SYM_WARN}  ${YELLOW}Login required.${RESET}\n"
-    return
-  fi
 
   echo -ne "  ${SYM_ARROW}  Delete ${BOLD}${auto_id}${RESET}? ${DIM}[y/N]${RESET}: "
   local confirm
@@ -516,10 +493,8 @@ do_delete() {
   fi
 
   echo ""
-  if api_call "Deleting automation" \
-       -X DELETE "${BASE_URL}/api/automations/${auto_id}" \
-       -H "$(cookie_header)" \
-       -H "X-CSRF-Token: ${CSRF_TOKEN}"; then
+  if auth_api_call "Deleting automation" \
+       -X DELETE "${BASE_URL}/api/automations/${auto_id}"; then
     echo -e "  ${SYM_CHECK}  Deleted."
   else
     show_json "Error"
@@ -528,14 +503,9 @@ do_delete() {
 }
 
 do_active() {
-  if [[ -z "$SESSION_COOKIE" ]]; then
-    echo -e "\n  ${SYM_WARN}  ${YELLOW}Login required.${RESET}\n"
-    return
-  fi
   echo ""
-  if api_call "Checking active automations" \
-       -X GET "${BASE_URL}/api/automations/active" \
-       -H "$(cookie_header)"; then
+  if auth_api_call "Checking active automations" \
+       -X GET "${BASE_URL}/api/automations/active"; then
 
     local active_count recently_count
     active_count=$(echo "$LAST_RESPONSE" | python3 -c "import sys,json; print(len(json.load(sys.stdin).get('active_automation_ids',[])))" 2>/dev/null || echo "0")
@@ -799,13 +769,13 @@ startup_login() {
   fi
 
   echo ""
-  local cookies_file="${TMP_DIR}/cookies"
+  COOKIE_JAR="${TMP_DIR}/cookies"
 
   curl -s -w "\n%{http_code}" \
     -X POST "${BASE_URL}/api/auth/login" \
     -H "Content-Type: application/json" \
     -d "{\"user_id\":\"${email}\",\"password\":\"${password}\"}" \
-    -c "$cookies_file" \
+    -c "$COOKIE_JAR" \
     > "${TMP_DIR}/response" 2>/dev/null &
   local pid=$!
   spin "$pid" "Authenticating"
@@ -815,8 +785,7 @@ startup_login() {
   LAST_RESPONSE=$(sed '$d' "${TMP_DIR}/response")
 
   if [[ "$LAST_STATUS" -ge 200 && "$LAST_STATUS" -lt 300 ]]; then
-    SESSION_COOKIE=$(awk '!/^#/ && NF {printf "%s=%s; ", $6, $7}' "$cookies_file" 2>/dev/null)
-    CSRF_TOKEN=$(awk '!/^#/ && $6 == "csrf_token" {print $7}' "$cookies_file" 2>/dev/null)
+    CSRF_TOKEN=$(awk '$6 == "csrf_token" {print $7}' "$COOKIE_JAR" 2>/dev/null)
     local name
     name=$(json_field "name" 2>/dev/null)
     printf "\r  ${SYM_CHECK}  Logged in as ${BOLD}%s${RESET}" "$email"
@@ -825,7 +794,7 @@ startup_login() {
 
     # Check API key status while we're at it
     curl -s "${BASE_URL}/api/auth/api-token/status" \
-         -H "$(cookie_header)" \
+         $(cookie_args) \
          > "${TMP_DIR}/keystatus" 2>/dev/null
     local has_token
     has_token=$(python3 -c "import json; print(json.load(open('${TMP_DIR}/keystatus')).get('has_token',False))" 2>/dev/null || echo "")
