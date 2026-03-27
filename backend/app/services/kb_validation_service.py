@@ -17,8 +17,7 @@ _dm: DocumentManager | None = None
 def _get_dm() -> DocumentManager:
     global _dm
     if _dm is None:
-        from app.config import Settings
-        _dm = DocumentManager(persist_directory=Settings().chromadb_persist_dir)
+        _dm = DocumentManager()
     return _dm
 
 

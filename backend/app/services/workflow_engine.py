@@ -881,8 +881,7 @@ class KnowledgeBaseQueryNode(Node):
 
         self.report_progress("Querying knowledge base…")
 
-        from app.config import Settings
-        dm = DocumentManager(persist_directory=Settings().chromadb_persist_dir)
+        dm = DocumentManager()
         results = dm.query_kb(kb_uuid, query, k=k)
 
         if not results:
