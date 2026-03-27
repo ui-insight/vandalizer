@@ -20,13 +20,13 @@ import {
   exportWorkflowUrl, importWorkflow,
 } from '../../api/workflows'
 import type { ValidationCheck, ValidationCheckDefinition, ValidationInputDefinition, QualityHistoryRun, BatchStatus, WorkflowQualityStatus } from '../../api/workflows'
-import { listSearchSets } from '../../api/extractions'
+import { ItemPickerModal } from './ItemPickerModal'
 import { getModels } from '../../api/config'
 import { listContents, searchDocuments } from '../../api/documents'
 import { listKnowledgeBases } from '../../api/knowledge'
 import type { KnowledgeBase } from '../../types/knowledge'
 import { useWorkflowRunner } from '../../hooks/useWorkflowRunner'
-import type { Workflow, WorkflowStep, WorkflowTask, WorkflowStatus, SearchSet, ModelInfo } from '../../types/workflow'
+import type { Workflow, WorkflowStep, WorkflowTask, WorkflowStatus, ModelInfo } from '../../types/workflow'
 import type { Document as VDoc } from '../../types/document'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
 import DOMPurify from 'dompurify'
@@ -1539,9 +1539,8 @@ function TaskEditModal({ task, selectedDocUuids, onClose, onSave }: {
     (task.data.post_process_prompt as string) || ''
   )
 
-  // Saved extraction sets dropdown
-  const [savedSets, setSavedSets] = useState<SearchSet[]>([])
-  const [loadingSets, setLoadingSets] = useState(false)
+  // Extraction set picker
+  const [showSetPicker, setShowSetPicker] = useState(false)
 
   // Model override for LLM tasks
   const LLM_TASKS = ['Extraction', 'Prompt', 'Formatter', 'DescribeImage', 'ResearchNode', 'FormFiller', 'Browser']
@@ -1561,14 +1560,6 @@ function TaskEditModal({ task, selectedDocUuids, onClose, onSave }: {
 
   const color = getTaskColor(task.name)
   const Icon = getTaskIcon(task.name)
-
-  // Load saved extraction sets for Extraction tasks
-  useEffect(() => {
-    if (task.name === 'Extraction') {
-      setLoadingSets(true)
-      listSearchSets().then(sets => setSavedSets(sets)).catch(() => {}).finally(() => setLoadingSets(false))
-    }
-  }, [task.name])
 
   // Load models for LLM task types
   useEffect(() => {
@@ -1689,11 +1680,9 @@ function TaskEditModal({ task, selectedDocUuids, onClose, onSave }: {
     setTaskData(prev => ({ ...prev, [key]: value }))
   }
 
-  const handleSelectSavedSet = (uuid: string) => {
-    const set = savedSets.find(s => s.uuid === uuid)
-    if (set) {
-      setTaskData(prev => ({ ...prev, search_set_uuid: uuid, name: set.title || prev.name }))
-    }
+  const handleSelectSavedSet = (id: string, name: string) => {
+    setTaskData(prev => ({ ...prev, search_set_uuid: id, name: name || prev.name }))
+    setShowSetPicker(false)
   }
 
   const SUB_TABS: { key: TaskSubTab; label: string }[] = [
@@ -1778,37 +1767,33 @@ function TaskEditModal({ task, selectedDocUuids, onClose, onSave }: {
           <div>
             {task.name === 'Extraction' && (
               <div>
-                {/* Saved extraction sets dropdown */}
-                {savedSets.length > 0 && (
-                  <div style={{ marginBottom: 16 }}>
-                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
-                      Use Saved Extraction Set
-                    </label>
-                    <div style={{ position: 'relative' }}>
-                      <select
-                        value={getTextValue('search_set_uuid')}
-                        onChange={e => handleSelectSavedSet(e.target.value)}
-                        style={{
-                          width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
-                          border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#fff',
-                          color: '#374151', appearance: 'none', paddingRight: 32,
-                        }}
-                      >
-                        <option value="">Select an extraction set...</option>
-                        {savedSets.map(s => (
-                          <option key={s.uuid} value={s.uuid}>{s.title}</option>
-                        ))}
-                      </select>
-                      <ChevronDown style={{
-                        position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-                        width: 14, height: 14, color: '#9ca3af', pointerEvents: 'none',
-                      }} />
-                    </div>
-                    {loadingSets && (
-                      <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>Loading saved sets...</div>
-                    )}
-                  </div>
-                )}
+                {/* Extraction set picker */}
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                    Use Saved Extraction Set
+                  </label>
+                  <button
+                    onClick={() => setShowSetPicker(true)}
+                    style={{
+                      width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
+                      border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#fff',
+                      color: getTextValue('search_set_uuid') ? '#374151' : '#9ca3af',
+                      cursor: 'pointer', textAlign: 'left', display: 'flex',
+                      alignItems: 'center', justifyContent: 'space-between',
+                    }}
+                  >
+                    <span>{getTextValue('name') && getTextValue('search_set_uuid') ? getTextValue('name') : 'Browse extraction sets...'}</span>
+                    <ChevronDown style={{ width: 14, height: 14, color: '#9ca3af', flexShrink: 0 }} />
+                  </button>
+                  {showSetPicker && (
+                    <ItemPickerModal
+                      kind="extraction"
+                      currentId={getTextValue('search_set_uuid') || undefined}
+                      onSelect={handleSelectSavedSet}
+                      onClose={() => setShowSetPicker(false)}
+                    />
+                  )}
+                </div>
 
                 <div style={{ marginBottom: 16 }}>
                   <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
