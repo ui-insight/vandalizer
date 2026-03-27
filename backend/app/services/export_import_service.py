@@ -327,8 +327,9 @@ async def import_knowledge_base(
         # Ingest from cached content or re-fetch
         if src.content:
             from app.services.document_manager import DocumentManager
+            from app.config import Settings
             import asyncio
-            dm = DocumentManager()
+            dm = DocumentManager(persist_directory=Settings().chromadb_persist_dir)
             try:
                 chunk_count = await asyncio.to_thread(
                     dm.add_to_kb, kb.uuid, src.uuid,

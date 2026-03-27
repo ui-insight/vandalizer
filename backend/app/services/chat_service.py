@@ -218,7 +218,7 @@ async def chat_stream(
     if kb_uuid:
         import asyncio
         from app.services.document_manager import DocumentManager
-        dm = DocumentManager()
+        dm = DocumentManager(persist_directory=settings.chromadb_persist_dir)
         kb_results = await asyncio.to_thread(dm.query_kb, kb_uuid, message, 8)
         if kb_results:
             kb_text = "\n\n## Knowledge Base Context:\n"

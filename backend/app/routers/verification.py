@@ -566,7 +566,8 @@ async def try_verified_item(
             if not set(meta.organization_ids) & set(user_org_ancestry):
                 raise HTTPException(status_code=404, detail="Verified knowledge base not found")
 
-        dm = DocumentManager()
+        from app.config import Settings
+        dm = DocumentManager(persist_directory=Settings().chromadb_persist_dir)
         results = await asyncio.to_thread(dm.query_kb, kb.uuid, query, 8)
 
         return {
