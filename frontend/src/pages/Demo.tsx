@@ -10,9 +10,10 @@ import {
   FileText,
   Cpu,
   Github,
+  Mail,
 } from 'lucide-react'
 import { Footer } from '../components/layout/Footer'
-import { submitDemoApplication, getWaitlistStatus } from '../api/demo'
+import { submitDemoApplication, getWaitlistStatus, resendCredentials } from '../api/demo'
 import { SurveyFieldRenderer } from '../components/survey/SurveyFieldRenderer'
 import { SurveyWizard, type WizardStep } from '../components/survey/SurveyWizard'
 import { groupBySection } from '../lib/survey'
@@ -248,10 +249,13 @@ function StatusCheck() {
   const [status, setStatus] = useState<WaitlistStatusResponse | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [resending, setResending] = useState(false)
+  const [resendMessage, setResendMessage] = useState('')
 
   async function handleCheck(e: FormEvent) {
     e.preventDefault()
     setError('')
+    setResendMessage('')
     setLoading(true)
     try {
       const s = await getWaitlistStatus(uuid)
@@ -260,6 +264,20 @@ function StatusCheck() {
       setError('Application not found. Please check your ID.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleResend() {
+    setResending(true)
+    setResendMessage('')
+    setError('')
+    try {
+      const res = await resendCredentials(uuid)
+      setResendMessage(res.message)
+    } catch {
+      setError('Unable to resend credentials. Please try again.')
+    } finally {
+      setResending(false)
     }
   }
 
@@ -290,6 +308,7 @@ function StatusCheck() {
         </button>
       </form>
       {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
+      {resendMessage && <p className="mt-3 text-sm text-green-400">{resendMessage}</p>}
       {status && (
         <div className="mt-4 p-4 rounded-lg bg-white/5 border border-white/10">
           <div className="flex items-center justify-between mb-2">
@@ -306,6 +325,21 @@ function StatusCheck() {
           )}
           {status.estimated_wait && (
             <p className="mt-2 text-sm text-gray-500">{status.estimated_wait}</p>
+          )}
+          {status.status === 'active' && (
+            <div className="mt-4 pt-4 border-t border-white/10">
+              <p className="text-sm text-gray-400 mb-3">
+                Lost your login credentials? We'll send a new password to the email on file.
+              </p>
+              <button
+                onClick={handleResend}
+                disabled={resending}
+                className="inline-flex items-center gap-2 rounded-lg bg-[#f1b300]/10 border border-[#f1b300]/20 px-4 py-2 text-sm font-bold text-[#f1b300] hover:bg-[#f1b300]/20 disabled:opacity-50 transition-colors"
+              >
+                {resending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                Resend Login Credentials
+              </button>
+            </div>
           )}
         </div>
       )}

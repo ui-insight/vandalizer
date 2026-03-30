@@ -306,6 +306,35 @@ async def get_feedback_application(token: str) -> Optional[DemoApplication]:
     )
 
 
+async def resend_credentials(uuid: str, settings: Settings | None = None) -> bool:
+    """Reset password and resend activation email for an active demo user."""
+    if settings is None:
+        settings = Settings()
+
+    app = await DemoApplication.find_one(DemoApplication.uuid == uuid)
+    if not app or app.status != "active" or not app.user_id:
+        return False
+
+    user = await User.find_one(User.user_id == app.user_id)
+    if not user:
+        return False
+
+    # Generate new password and update
+    password = secrets.token_urlsafe(10)
+    user.password_hash = hash_password(password)
+    await user.save()
+
+    # Resend activation email with new credentials
+    expires_str = app.expires_at.strftime("%B %d, %Y") if app.expires_at else "N/A"
+    subject, html = activation_email(
+        app.name, user.user_id, password, expires_str, settings.frontend_url
+    )
+    await send_email(app.email, subject, html, settings)
+
+    logger.info("Resent credentials for demo user %s", app.email)
+    return True
+
+
 async def admin_release_user(demo_uuid: str) -> bool:
     """Admin: release an expired demo user so they can log in again."""
     app = await DemoApplication.find_one(DemoApplication.uuid == demo_uuid)

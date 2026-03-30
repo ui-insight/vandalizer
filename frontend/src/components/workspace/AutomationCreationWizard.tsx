@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { X, FolderOpen, Globe, Loader2, Plus, ChevronRight } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { X, FolderOpen, Globe, Loader2, Plus, ChevronRight, Mail } from 'lucide-react'
 import { createAutomation } from '../../api/automations'
 import { createFolder } from '../../api/folders'
 import { apiFetch } from '../../api/client'
+import { getFeatureFlags } from '../../api/config'
 import { ItemPickerModal } from './ItemPickerModal'
 import type { ActionType, TriggerType } from '../../types/automation'
 interface Props {
@@ -10,10 +11,12 @@ interface Props {
   onCreate: (id: string) => void
 }
 
-const TRIGGER_OPTIONS: { value: TriggerType; label: string; icon: typeof FolderOpen; description: string }[] = [
+const BASE_TRIGGER_OPTIONS: { value: TriggerType; label: string; icon: typeof FolderOpen; description: string }[] = [
   { value: 'folder_watch', label: 'Folder Watch', icon: FolderOpen, description: 'Trigger when files are added to a folder' },
   { value: 'api', label: 'API Endpoint', icon: Globe, description: 'Trigger via HTTP POST request' },
 ]
+
+const M365_TRIGGER_OPTION = { value: 'm365_intake' as TriggerType, label: 'M365 Intake', icon: Mail, description: 'Trigger when files arrive in a Microsoft 365 source' }
 
 const ACTION_OPTIONS: { value: ActionType; label: string; description: string }[] = [
   { value: 'workflow', label: 'Run Workflow', description: 'Execute a workflow on triggered documents' },
@@ -24,6 +27,17 @@ const ACTION_OPTIONS: { value: ActionType; label: string; description: string }[
 const FILE_TYPE_OPTIONS = ['pdf', 'docx', 'xlsx', 'html', 'txt', 'csv']
 
 export function AutomationCreationWizard({ onClose, onCreate }: Props) {
+  const [m365Enabled, setM365Enabled] = useState(false)
+
+  useEffect(() => {
+    getFeatureFlags().then(f => setM365Enabled(f.m365_enabled)).catch(() => {})
+  }, [])
+
+  const triggerOptions = useMemo(
+    () => m365Enabled ? [...BASE_TRIGGER_OPTIONS, M365_TRIGGER_OPTION] : BASE_TRIGGER_OPTIONS,
+    [m365Enabled],
+  )
+
   const [step, setStep] = useState(1)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -307,7 +321,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                 What will trigger this automation?
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {TRIGGER_OPTIONS.map(opt => {
+                {triggerOptions.map(opt => {
                   const Icon = opt.icon
                   const selected = triggerType === opt.value
                   return (

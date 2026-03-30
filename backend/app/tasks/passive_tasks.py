@@ -431,7 +431,7 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
                 "status": "completed",
                 "completed_at": completed_at,
                 "duration_ms": duration_ms,
-                "result": result_id,
+                "workflow_result": result_id,
                 "documents_succeeded": len(doc_ids),
                 "documents_failed": 0,
                 "tokens_input": engine.usage.tokens_in,
@@ -584,7 +584,7 @@ def process_outputs(self, workflow_result_id: str) -> dict:
 
     # Find associated trigger event and work item
     work_item = None
-    trigger_event = db.workflow_trigger_event.find_one({"result": result_doc["_id"]})
+    trigger_event = db.workflow_trigger_event.find_one({"workflow_result": result_doc["_id"]})
     if trigger_event:
         work_item = db.work_items.find_one({"trigger_event": trigger_event["_id"]})
 
@@ -819,8 +819,10 @@ def process_extraction_outputs(
         from app.services.extraction_engine import ExtractionEngine
 
         sys_config = db.system_config.find_one() or {}
-        models = sys_config.get("available_models", [])
-        model = models[0]["name"] if models else "gpt-4o-mini"
+
+        ss_doc = db.search_set.find_one({"uuid": search_set_uuid})
+        extraction_config = (ss_doc or {}).get("extraction_config") or {}
+        domain = (ss_doc or {}).get("domain")
 
         ss_items = list(db.search_set_item.find({
             "searchset": search_set_uuid,
@@ -836,14 +838,25 @@ def process_extraction_outputs(
                 )
             return {"error": "No extraction keys found"}
 
+        field_metadata = [
+            {"key": item["searchphrase"],
+             "is_optional": item.get("is_optional", False),
+             "enum_values": item.get("enum_values", [])}
+            for item in ss_items
+        ]
+
         results = {}
         for doc_uuid in document_uuids:
             doc = db.smart_document.find_one({"uuid": doc_uuid})
             if not doc or not doc.get("raw_text"):
                 continue
             try:
-                engine = ExtractionEngine(model=model, system_config=sys_config)
-                doc_results = engine.extract(doc["raw_text"], keys)
+                engine = ExtractionEngine(system_config_doc=sys_config, domain=domain)
+                doc_results = engine.extract(
+                    doc["raw_text"], keys,
+                    extraction_config_override=extraction_config,
+                    field_metadata=field_metadata,
+                )
                 results[doc_uuid] = doc_results
             except Exception as e:
                 logger.error("Extraction failed for doc %s: %s", doc_uuid, e)

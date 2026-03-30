@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FolderSearch, Globe, Loader2, Plus, Search, X } from 'lucide-react'
+import { FolderSearch, Globe, Loader2, Mail, Plus, Search, X } from 'lucide-react'
 import { AutomationsTutorial } from './AutomationsTutorial'
 import { AutomationCreationWizard } from './AutomationCreationWizard'
 import { useAutomations } from '../../hooks/useAutomations'
 import { useWorkflows } from '../../hooks/useWorkflows'
 import { useSearchSets } from '../../hooks/useExtractions'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
+import { getFeatureFlags } from '../../api/config'
 import type { Automation, TriggerType } from '../../types/automation'
 
 const TRIGGER_BADGES: Record<TriggerType, { label: string; color: string; bg: string }> = {
@@ -14,7 +15,7 @@ const TRIGGER_BADGES: Record<TriggerType, { label: string; color: string; bg: st
   m365_intake: { label: 'M365', color: '#15803d', bg: '#dcfce7' },
 }
 
-type FilterMode = 'all' | 'folder_watch' | 'api'
+type FilterMode = 'all' | 'folder_watch' | 'api' | 'm365_intake'
 
 export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?: Set<string> }) {
   const { openAutomation, openAutomationId } = useWorkspace()
@@ -25,6 +26,11 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
   const [filter, setFilter] = useState<FilterMode>('all')
   const [search, setSearch] = useState('')
   const [showWizard, setShowWizard] = useState(false)
+  const [m365Enabled, setM365Enabled] = useState(false)
+
+  useEffect(() => {
+    getFeatureFlags().then(f => setM365Enabled(f.m365_enabled)).catch(() => {})
+  }, [])
 
   // Refresh list when editor saves or closes
   useEffect(() => {
@@ -51,6 +57,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
     all: automations.length,
     folder_watch: automations.filter(a => a.trigger_type === 'folder_watch').length,
     api: automations.filter(a => a.trigger_type === 'api').length,
+    m365_intake: automations.filter(a => a.trigger_type === 'm365_intake').length,
   }), [automations])
 
   const getActionName = (auto: Automation): string => {
@@ -123,6 +130,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
           <FilterPill label="All" count={counts.all} active={filter === 'all'} onClick={() => setFilter('all')} />
           <FilterPill label="Folder Watch" count={counts.folder_watch} active={filter === 'folder_watch'} onClick={() => setFilter('folder_watch')} icon={<FolderSearch size={10} />} />
           <FilterPill label="API" count={counts.api} active={filter === 'api'} onClick={() => setFilter('api')} icon={<Globe size={10} />} />
+          {m365Enabled && <FilterPill label="M365" count={counts.m365_intake} active={filter === 'm365_intake'} onClick={() => setFilter('m365_intake')} icon={<Mail size={10} />} />}
           <div style={{ flex: 1 }} />
           <div style={{
             display: 'flex', alignItems: 'center', gap: 4,

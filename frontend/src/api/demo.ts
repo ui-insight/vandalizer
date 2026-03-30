@@ -24,6 +24,12 @@ export function getWaitlistStatus(uuid: string) {
   return apiFetch<WaitlistStatusResponse>(`/api/demo/status/${uuid}`)
 }
 
+export function resendCredentials(uuid: string) {
+  return apiFetch<{ ok: boolean; message: string }>(`/api/demo/resend-credentials/${uuid}`, {
+    method: 'POST',
+  })
+}
+
 export function getPostQuestionnaire(token: string) {
   return apiFetch<FeedbackInfo>(`/api/demo/feedback/${token}`)
 }

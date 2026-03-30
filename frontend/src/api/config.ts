@@ -84,3 +84,13 @@ export interface AutomationStats {
 export function getAutomationStats() {
   return apiFetch<AutomationStats>('/api/config/automation-stats')
 }
+
+// Feature flags
+
+export interface FeatureFlags {
+  m365_enabled: boolean
+}
+
+export function getFeatureFlags() {
+  return apiFetch<FeatureFlags>('/api/config/features')
+}

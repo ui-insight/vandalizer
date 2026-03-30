@@ -20,7 +20,7 @@ import type { ThemeConfig } from '../api/config'
 import {
   getUsageStats, getUsageTimeseries, getUserLeaderboard, getTeamLeaderboard,
   getTeamDetail, getUserDetail,
-  getWorkflowEvents, getSystemConfig, updateSystemConfig,
+  getWorkflowEvents, getSystemConfig, updateSystemConfig, updateM365Config,
   addModel, updateModel, deleteModel, addOAuthProvider,
   deleteOAuthProvider, updateAuthMethods,
   getQualitySummary, getQualityTimeline, runRegressionSuite,
@@ -2135,6 +2135,14 @@ function ConfigTab() {
   const [showAddContact, setShowAddContact] = useState(false)
   const [newContact, setNewContact] = useState({ user_id: '', email: '', name: '' })
 
+  // M365 integration
+  const [m365Enabled, setM365Enabled] = useState(false)
+  const [m365ClientId, setM365ClientId] = useState('')
+  const [m365ClientSecret, setM365ClientSecret] = useState('')
+  const [m365TenantId, setM365TenantId] = useState('')
+  const [m365Saving, setM365Saving] = useState(false)
+  const [m365Saved, setM365Saved] = useState(false)
+
   // Add provider form
   const [showAddProvider, setShowAddProvider] = useState(false)
   const [newProvider, setNewProvider] = useState({ provider: 'oauth', display_name: '', client_id: '', client_secret: '', redirect_uri: '', tenant_id: '' })
@@ -2180,6 +2188,12 @@ function ConfigTab() {
       setExcellentThreshold((tiers.excellent?.min_score as number) ?? 90)
       setGoodThreshold((tiers.good?.min_score as number) ?? 70)
       setFairThreshold((tiers.fair?.min_score as number) ?? 50)
+      // M365 config
+      const m365 = c.m365_config || {}
+      setM365Enabled(!!m365.enabled)
+      setM365ClientId(m365.client_id || '')
+      setM365ClientSecret(m365.client_secret || '')
+      setM365TenantId(m365.tenant_id || '')
     }).finally(() => setLoading(false))
 
     getThemeConfig().then(t => {
@@ -3092,6 +3106,70 @@ function ConfigTab() {
               </div>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* M365 Integration */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}>
+          <Globe size={18} color="#6b7280" /> Microsoft 365 Integration
+        </div>
+        <div style={{ padding: '0 20px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <input type="checkbox" checked={m365Enabled} onChange={e => setM365Enabled(e.target.checked)} />
+            <span style={{ fontSize: 14, fontWeight: 500 }}>Enable M365 Integration</span>
+          </label>
+          {m365Enabled && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '8px 0' }}>
+              <div>
+                <label style={labelStyle}>Azure Tenant ID</label>
+                <input value={m365TenantId} onChange={e => setM365TenantId(e.target.value)} placeholder="e.g. xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Application (Client) ID</label>
+                <input value={m365ClientId} onChange={e => setM365ClientId(e.target.value)} placeholder="Azure AD app registration client ID" style={inputStyle} />
+              </div>
+              <div>
+                <label style={labelStyle}>Client Secret</label>
+                <input type="password" value={m365ClientSecret} onChange={e => setM365ClientSecret(e.target.value)} placeholder={m365ClientSecret === '***' ? '(unchanged)' : 'Azure AD client secret'} style={inputStyle} />
+              </div>
+              <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
+                Requires an Azure AD app registration with Graph API permissions (Mail.Read, Files.Read).
+                Your IT department may need to grant admin consent.
+              </div>
+            </div>
+          )}
+          <div>
+            <button
+              onClick={async () => {
+                setM365Saving(true)
+                setM365Saved(false)
+                try {
+                  await updateM365Config({
+                    enabled: m365Enabled,
+                    client_id: m365ClientId,
+                    tenant_id: m365TenantId,
+                    ...(m365ClientSecret !== '***' ? { client_secret: m365ClientSecret } : {}),
+                  })
+                  setM365Saved(true)
+                  setTimeout(() => setM365Saved(false), 3000)
+                } catch {
+                  setError('Failed to save M365 configuration')
+                } finally {
+                  setM365Saving(false)
+                }
+              }}
+              disabled={m365Saving}
+              style={{
+                padding: '8px 20px', borderRadius: 'var(--ui-radius, 12px)', border: 'none',
+                background: '#111827', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                opacity: m365Saving ? 0.6 : 1,
+              }}
+            >
+              {m365Saving ? 'Saving...' : 'Save M365 Configuration'}
+            </button>
+            {m365Saved && <span style={{ marginLeft: 10, fontSize: 13, color: '#16a34a' }}>Saved!</span>}
+          </div>
         </div>
       </div>
 

@@ -166,6 +166,20 @@ async def update_theme(req: UpdateThemeConfigRequest, user: User = Depends(get_c
 
 
 # ---------------------------------------------------------------------------
+# Feature flags
+# ---------------------------------------------------------------------------
+
+
+@router.get("/features")
+async def get_features(user: User = Depends(get_current_user)):
+    """Return feature flags for the current deployment."""
+    config = await SystemConfig.get_config()
+    return {
+        "m365_enabled": config.is_m365_enabled(),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Onboarding status
 # ---------------------------------------------------------------------------
 

@@ -1143,6 +1143,7 @@ async def get_config(
         "ui_radius": cfg.ui_radius,
         "default_team_id": cfg.default_team_id or "",
         "support_contacts": cfg.support_contacts,
+        "m365_config": _sanitize_m365_config(cfg.get_m365_config()),
     }
 
 
@@ -1389,6 +1390,56 @@ async def update_auth_methods(
     await _audit(user, "update_auth_methods", f"Updated auth methods: {body.methods}")
 
     return {"status": "ok", "auth_methods": cfg.auth_methods}
+
+
+# ---------------------------------------------------------------------------
+# 12b. GET/PUT /config/m365  - M365 integration config
+# ---------------------------------------------------------------------------
+
+
+def _sanitize_m365_config(cfg: dict) -> dict:
+    """Mask the client_secret for safe display."""
+    out = {**cfg}
+    secret = out.get("client_secret", "")
+    if secret and secret != "***":
+        out["client_secret"] = "***"
+    return out
+
+
+@router.get("/config/m365")
+async def get_m365_config(
+    user: User = Depends(get_current_user),
+):
+    await _require_admin(user)
+    cfg = await SystemConfig.get_config()
+    return _sanitize_m365_config(cfg.get_m365_config())
+
+
+@router.put("/config/m365")
+async def update_m365_config(
+    body: dict,
+    user: User = Depends(get_current_user),
+):
+    await _require_admin(user)
+    cfg = await SystemConfig.get_config()
+    current = cfg.get_m365_config()
+
+    if "enabled" in body:
+        current["enabled"] = bool(body["enabled"])
+    if "client_id" in body:
+        current["client_id"] = body["client_id"]
+    if "tenant_id" in body:
+        current["tenant_id"] = body["tenant_id"]
+    if "client_secret" in body and body["client_secret"] != "***":
+        current["client_secret"] = encrypt_value(body["client_secret"])
+
+    cfg.m365_config = current
+    cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
+    cfg.updated_by = user.user_id
+    await cfg.save()
+    await _audit(user, "update_m365_config", "Updated M365 integration configuration")
+
+    return _sanitize_m365_config(cfg.get_m365_config())
 
 
 # ---------------------------------------------------------------------------

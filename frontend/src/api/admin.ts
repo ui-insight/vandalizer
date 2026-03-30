@@ -183,6 +183,13 @@ export function getWorkflowEvents(page: number = 1, status?: string, search?: st
 
 // Config
 
+export interface M365Config {
+  enabled: boolean
+  client_id: string
+  client_secret: string
+  tenant_id: string
+}
+
 export interface SystemConfigData {
   extraction_config: Record<string, unknown>
   quality_config: Record<string, unknown>
@@ -194,6 +201,7 @@ export interface SystemConfigData {
   highlight_color: string
   ui_radius: string
   default_team_id: string
+  m365_config: M365Config
 }
 
 export function getSystemConfig() {
@@ -202,6 +210,14 @@ export function getSystemConfig() {
 
 export function updateSystemConfig(data: { extraction_config?: Record<string, unknown>; quality_config?: Record<string, unknown>; ocr_endpoint?: string; llm_endpoint?: string; default_team_id?: string; support_contacts?: { user_id: string; email: string; name: string }[] }) {
   return apiFetch<{ status: string }>('/api/admin/config', { method: 'PUT', body: JSON.stringify(data) })
+}
+
+export function getM365Config() {
+  return apiFetch<M365Config>('/api/admin/config/m365')
+}
+
+export function updateM365Config(data: Partial<M365Config>) {
+  return apiFetch<M365Config>('/api/admin/config/m365', { method: 'PUT', body: JSON.stringify(data) })
 }
 
 // Admin Team Management

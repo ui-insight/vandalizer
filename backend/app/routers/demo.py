@@ -82,6 +82,18 @@ async def get_feedback(token: str):
     }
 
 
+@router.post("/resend-credentials/{uuid}")
+async def resend_credentials(uuid: str, settings: Settings = Depends(get_settings)):
+    """Resend login credentials to the email on file for an active demo user."""
+    success = await demo_service.resend_credentials(uuid, settings)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Application not found or not in active status",
+        )
+    return {"ok": True, "message": "New credentials sent to your email on file."}
+
+
 @router.post("/feedback/{token}", response_model=PostExperienceResponseSchema)
 async def submit_feedback(token: str, body: PostExperienceRequest):
     """Submit post-experience questionnaire."""
