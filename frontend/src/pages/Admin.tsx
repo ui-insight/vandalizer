@@ -2340,13 +2340,10 @@ function ConfigTab() {
   }
 
   const saveSupportContacts = async (contacts: typeof supportContacts) => {
-    setSupportSaving(true)
     try {
       await updateSystemConfig({ support_contacts: contacts } as Record<string, unknown>)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save support contacts')
-    } finally {
-      setSupportSaving(false)
     }
   }
 
