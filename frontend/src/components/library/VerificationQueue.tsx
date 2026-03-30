@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { ShieldCheck, Clock, CheckCircle, XCircle, Eye, Search, ChevronDown, ChevronRight, Tag, FileText, RotateCcw, ExternalLink } from 'lucide-react'
+import { ShieldCheck, Clock, Search, ChevronDown, ChevronRight, Tag, FileText, ExternalLink } from 'lucide-react'
 import { listVerificationQueue, myVerificationRequests, updateVerificationStatus, listCollections } from '../../api/library'
 import type { VerificationRequest, VerificationStatus, VerifiedCollection } from '../../types/library'
 import { listOrganizationsFlat } from '../../api/organizations'
@@ -287,38 +287,14 @@ export function VerificationQueue() {
                       (req.status === 'submitted' || req.status === 'in_review') && (
                         <div className="flex items-center gap-1 shrink-0">
                           {!isReviewing ? (
-                            <>
-                              <button
-                                onClick={() => { setReviewingId(req.uuid); setReviewOrgIds([]); setReviewCollectionIds([]) }}
-                                className="p-1.5 rounded hover:bg-gray-100 text-gray-500"
-                                title="Review"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={() => handleAction(req.uuid, 'approved')}
-                                className="p-1.5 rounded hover:bg-green-50 text-green-600"
-                                title="Approve"
-                              >
-                                <CheckCircle className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={() => handleAction(req.uuid, 'rejected')}
-                                className="p-1.5 rounded hover:bg-red-50 text-red-600"
-                                title="Reject"
-                              >
-                                <XCircle className="h-4 w-4" />
-                              </button>
-                              <button
-                                onClick={() => { setReviewingId(req.uuid); setReviewOrgIds([]); setReviewCollectionIds([]) }}
-                                className="p-1.5 rounded hover:bg-orange-50 text-orange-600"
-                                title="Return for Improvement"
-                              >
-                                <RotateCcw className="h-4 w-4" />
-                              </button>
-                            </>
+                            <button
+                              onClick={() => { setReviewingId(req.uuid); setReviewOrgIds([]); setReviewCollectionIds([]) }}
+                              className="px-3 py-1.5 text-xs font-medium rounded-md bg-gray-900 text-white hover:bg-gray-800"
+                            >
+                              Review
+                            </button>
                           ) : (
-                            <div className="flex flex-col gap-2 w-56">
+                            <div className="flex flex-col gap-2 w-64">
                               <textarea
                                 value={reviewNotes}
                                 onChange={(e) => setReviewNotes(e.target.value)}
