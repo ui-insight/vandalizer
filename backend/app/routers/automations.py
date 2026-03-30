@@ -382,8 +382,6 @@ async def trigger_automation(
     and output delivery).
     """
     from app.config import Settings
-    from app.models.activity import ActivityType
-    from app.services import activity_service
     from app.tasks.upload_tasks import dispatch_upload_tasks
 
     auto = await svc.get_automation(automation_id, user=user)
@@ -403,72 +401,93 @@ async def trigger_automation(
             raise HTTPException(status_code=400, detail=f"Invalid callback_url: {e}")
 
     settings = Settings()
+    team_id = str(user.current_team) if user.current_team else None
     existing_doc_uuids: list[str] = []
     all_doc_uuids: list[str] = []
 
-    # Parse existing document UUIDs
-    if document_uuids:
-        existing_doc_uuids.extend(u.strip() for u in document_uuids.split(",") if u.strip())
-        existing_doc_uuids = await _authorize_existing_documents(existing_doc_uuids, user)
-        all_doc_uuids.extend(existing_doc_uuids)
+    try:
+        # Parse existing document UUIDs
+        if document_uuids:
+            existing_doc_uuids.extend(u.strip() for u in document_uuids.split(",") if u.strip())
+            existing_doc_uuids = await _authorize_existing_documents(existing_doc_uuids, user)
+            all_doc_uuids.extend(existing_doc_uuids)
 
-    # Handle plain text input — create a temporary document
-    if text and text.strip():
-        uid = _uuid.uuid4().hex.upper()
-        doc = SmartDocument(
-            title=f"API Input {uid[:8]}",
-            processing=False,
-            valid=True,
-            raw_text=text.strip(),
-            downloadpath="",
-            path="",
-            extension="txt",
-            uuid=uid,
-            user_id=user.user_id,
-            folder="0",
-        )
-        await doc.insert()
-        all_doc_uuids.append(uid)
+        # Handle plain text input — create a temporary document
+        if text and text.strip():
+            uid = _uuid.uuid4().hex.upper()
+            doc = SmartDocument(
+                title=f"API Input {uid[:8]}",
+                processing=False,
+                valid=True,
+                raw_text=text.strip(),
+                downloadpath="",
+                path="",
+                extension="txt",
+                uuid=uid,
+                user_id=user.user_id,
+                team_id=team_id,
+                folder="0",
+            )
+            await doc.insert()
+            all_doc_uuids.append(uid)
 
-    # Handle file uploads
-    for upload in files:
-        if not upload.filename:
-            continue
-        uid = _uuid.uuid4().hex.upper()
-        ext = (upload.filename.rsplit(".", 1)[-1] if "." in upload.filename else "pdf").lower()
-        relative_path = Path(user.user_id) / f"{uid}.{ext}"
-        upload_dir = Path(settings.upload_dir) / user.user_id
-        upload_dir.mkdir(parents=True, exist_ok=True)
-        file_path = upload_dir / f"{uid}.{ext}"
-        file_data = await upload.read()
-        file_path.write_bytes(file_data)
+        # Handle file uploads
+        for upload in files:
+            if not upload.filename:
+                continue
+            uid = _uuid.uuid4().hex.upper()
+            ext = (upload.filename.rsplit(".", 1)[-1] if "." in upload.filename else "pdf").lower()
+            relative_path = Path(user.user_id) / f"{uid}.{ext}"
+            upload_dir = Path(settings.upload_dir) / user.user_id
+            upload_dir.mkdir(parents=True, exist_ok=True)
+            file_path = upload_dir / f"{uid}.{ext}"
+            file_data = await upload.read()
+            file_path.write_bytes(file_data)
 
-        doc = SmartDocument(
-            title=upload.filename,
-            processing=True,
-            valid=True,
-            raw_text="",
-            downloadpath=str(relative_path),
-            path=str(relative_path),
-            extension=ext,
-            uuid=uid,
-            user_id=user.user_id,
-            folder="0",
-        )
-        await doc.insert()
+            doc = SmartDocument(
+                title=upload.filename,
+                processing=True,
+                valid=True,
+                raw_text="",
+                downloadpath=str(relative_path),
+                path=str(relative_path),
+                extension=ext,
+                uuid=uid,
+                user_id=user.user_id,
+                team_id=team_id,
+                folder="0",
+            )
+            await doc.insert()
 
-        task_id = dispatch_upload_tasks(
-            document_uuid=uid, extension=ext, document_path=str(file_path),
-            user_id=user.user_id,
-        )
-        doc.task_id = task_id
-        await doc.save()
-        all_doc_uuids.append(uid)
+            task_id = dispatch_upload_tasks(
+                document_uuid=uid, extension=ext, document_path=str(file_path),
+                user_id=user.user_id,
+            )
+            doc.task_id = task_id
+            await doc.save()
+            all_doc_uuids.append(uid)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error preparing trigger inputs for automation %s: %s", automation_id, e)
+        raise HTTPException(status_code=500, detail=f"Error preparing inputs: {e}")
 
     if not all_doc_uuids:
         raise HTTPException(status_code=400, detail="No input provided. Send files, document_uuids, or text.")
 
     # Route to the appropriate action
+    try:
+        return await _dispatch_action(auto, user, all_doc_uuids, callback_url, wait, timeout)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error dispatching action for automation %s: %s", automation_id, e)
+        raise HTTPException(status_code=500, detail=f"Error dispatching action: {e}")
+
+
+async def _dispatch_action(auto, user, all_doc_uuids, callback_url, wait, timeout):
+    from app.models.activity import ActivityType
+    from app.services import activity_service
     if auto.action_type in ("workflow", "task"):
         # Resolve document UUIDs to ObjectIds for the trigger event
         doc_records = await SmartDocument.find(
