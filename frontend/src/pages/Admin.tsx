@@ -2134,7 +2134,6 @@ function ConfigTab() {
   const [supportContacts, setSupportContacts] = useState<{ user_id: string; email: string; name: string }[]>([])
   const [showAddContact, setShowAddContact] = useState(false)
   const [newContact, setNewContact] = useState({ user_id: '', email: '', name: '' })
-  const [supportSaving, setSupportSaving] = useState(false)
 
   // Add provider form
   const [showAddProvider, setShowAddProvider] = useState(false)
