@@ -851,6 +851,15 @@ def process_extraction_outputs(
 
     output_config = auto.get("output_config") or {}
     if not output_config:
+        if extraction_event_id:
+            db.extraction_trigger_event.update_one(
+                {"_id": ObjectId(extraction_event_id)},
+                {"$set": {
+                    "status": "completed",
+                    "result": results,
+                    "completed_at": datetime.now(timezone.utc),
+                }},
+            )
         return {"status": "completed", "results": results}
 
     automation_dict = {
