@@ -67,6 +67,7 @@ export interface LessonSection {
   title: string
   content: string
   variant: 'concept' | 'walkthrough' | 'key-terms' | 'insight'
+  objective?: string
   knowledgeCheck?: KnowledgeCheckData
   diagram?: string
 }

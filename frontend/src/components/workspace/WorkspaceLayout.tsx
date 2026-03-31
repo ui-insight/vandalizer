@@ -86,7 +86,7 @@ export function WorkspaceLayout() {
             />
           )}
 
-          <div className="overflow-hidden flex-1">
+          <div className="overflow-hidden flex-1 relative" style={{ zIndex: 11 }}>
             <RightPanel />
           </div>
         </div>

@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { ChevronLeft, ChevronRight, Clock } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, Clock, Target } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import { useToast } from '../../contexts/ToastContext'
-import type { LessonSection } from '../../types/certification'
+import type { CertExercise, LessonSection } from '../../types/certification'
 import { LessonContent } from './LessonContent'
 
 function estimateReadTime(content: string): number {
@@ -13,12 +13,14 @@ function estimateReadTime(content: string): number {
 export function LessonStepper({
   lessons,
   moduleId,
+  exercise,
   onAllLessonsRead,
   onGoToChallenge,
   onStepChange,
 }: {
   lessons: LessonSection[]
   moduleId: string
+  exercise?: CertExercise | null
   onAllLessonsRead?: () => void
   onGoToChallenge: () => void
   onStepChange?: () => void
@@ -73,13 +75,17 @@ export function LessonStepper({
   }, [safeIndex])
 
   const allRead = readLessons.size >= lessons.length
+  const [showChallengePreview, setShowChallengePreview] = useState(false)
 
   const goNext = useCallback(() => {
     if (safeIndex < lessons.length - 1) {
       const nextIdx = safeIndex + 1
       setCurrentIndex(nextIdx)
-      setReadLessons(prev => new Set([...prev, nextIdx]))
-      toast(`Lesson ${safeIndex + 1} of ${lessons.length} complete!`, 'success')
+      setReadLessons(prev => {
+        if (prev.has(nextIdx)) return new Set([...prev])
+        toast(`Lesson ${safeIndex + 1} of ${lessons.length} complete!`, 'success')
+        return new Set([...prev, nextIdx])
+      })
     }
   }, [safeIndex, lessons.length, toast])
 
@@ -139,6 +145,44 @@ export function LessonStepper({
       <div className="cert-slide-in" key={safeIndex}>
         <LessonContent section={lessons[safeIndex]} />
       </div>
+
+      {/* Challenge preview — shown on last lesson when exercise exists */}
+      {isLastLesson && exercise && (
+        <div
+          className="overflow-hidden border border-amber-200 bg-amber-50/50"
+          style={{ borderRadius: 'var(--ui-radius, 12px)' }}
+        >
+          <button
+            onClick={() => setShowChallengePreview(p => !p)}
+            className="flex w-full items-center justify-between px-3 py-2 text-left"
+          >
+            <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-amber-700">
+              <Target size={12} />
+              What you'll do next
+            </span>
+            <ChevronDown
+              size={14}
+              className={cn('text-amber-600 transition-transform duration-200', showChallengePreview && 'rotate-180')}
+            />
+          </button>
+          {showChallengePreview && (
+            <div className="px-3 pb-3 space-y-1.5">
+              {exercise.overview && (
+                <p className="text-xs text-amber-800 mb-2 leading-relaxed">{exercise.overview}</p>
+              )}
+              {exercise.instructions.slice(0, 3).map((step, i) => (
+                <div key={i} className="flex items-start gap-2 text-xs text-amber-900">
+                  <span className="shrink-0 font-bold">{i + 1}.</span>
+                  <span>{step.replace(/\*\*(.+?)\*\*/g, '$1')}</span>
+                </div>
+              ))}
+              {exercise.instructions.length > 3 && (
+                <p className="text-xs text-amber-600 italic pl-4">...and {exercise.instructions.length - 3} more steps</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Navigation buttons */}
       <div className="flex items-center justify-between pt-2">

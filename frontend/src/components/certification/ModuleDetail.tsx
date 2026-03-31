@@ -92,8 +92,10 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
   const hasDocuments = (exercise?.documents?.length ?? 0) > 0
 
   const handleAllLessonsRead = useCallback(() => {
-    toast('All lessons complete \u2014 ready for the challenge!', 'success')
-  }, [toast])
+    if (!completed) {
+      toast('All lessons complete \u2014 ready for the challenge!', 'success')
+    }
+  }, [toast, completed])
 
   return (
     <div
@@ -237,10 +239,32 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
           <div className="space-y-4">
             <p className="text-sm text-gray-700 mb-2">{module.description}</p>
 
+            {/* Lab-ready callout — shown when documents are provisioned */}
+            {isProvisioned && exercise && (
+              <div
+                className="flex items-center justify-between p-2.5 bg-green-50 border border-green-200"
+                style={{ borderRadius: 'var(--ui-radius, 12px)' }}
+              >
+                <span className="flex items-center gap-1.5 text-sm font-medium text-green-800">
+                  <CheckCircle2 size={14} className="text-green-600 shrink-0" />
+                  Lab ready \u2014 challenge has {exercise.instructions.length} steps
+                </span>
+                <button
+                  onClick={() => handleTabChange('challenge')}
+                  className="flex items-center gap-1 text-xs font-semibold hover:underline shrink-0"
+                  style={{ color: 'var(--highlight-color)' }}
+                >
+                  Go to challenge
+                  <ChevronRight size={12} />
+                </button>
+              </div>
+            )}
+
             {/* LessonStepper replaces scrollable lesson list */}
             <LessonStepper
               lessons={module.lessons}
               moduleId={module.id}
+              exercise={exercise}
               onAllLessonsRead={handleAllLessonsRead}
               onGoToChallenge={() => hasDocuments && !isProvisioned ? undefined : setTab('challenge')}
               onStepChange={onTabChange}

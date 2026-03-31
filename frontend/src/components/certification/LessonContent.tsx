@@ -10,6 +10,9 @@ import { AIHumanPatternDiagram } from './diagrams/AIHumanPattern'
 import { AISuitabilityDiagram } from './diagrams/AISuitability'
 import { ExtractReasonDeliverDiagram } from './diagrams/ExtractReasonDeliver'
 import { StepGranularityDiagram } from './diagrams/StepGranularity'
+import { ExtractionOutputExample } from './diagrams/ExtractionOutputExample'
+import { WorkflowResultExample } from './diagrams/WorkflowResultExample'
+import { ValidationPlanExample } from './diagrams/ValidationPlanExample'
 
 marked.setOptions({ breaks: true, gfm: true })
 
@@ -26,15 +29,20 @@ const DIAGRAM_MAP: Record<string, React.ComponentType> = {
   'ai-suitability': AISuitabilityDiagram,
   'extract-reason-deliver': ExtractReasonDeliverDiagram,
   'step-granularity': StepGranularityDiagram,
+  'extraction-output-example': ExtractionOutputExample,
+  'workflow-result-example': WorkflowResultExample,
+  'validation-plan-example': ValidationPlanExample,
 }
 
 function GlossaryTerm({ term, definition }: { term: string; definition: string }) {
   return (
-    <div className="flex gap-2 py-1.5" style={{ borderBottom: '1px solid #f3f4f6' }}>
-      <span className="font-semibold text-sm text-gray-900 shrink-0">{term}</span>
-      <span className="text-sm text-gray-500">&mdash;</span>
-      <span className="text-sm text-gray-600 leading-relaxed">{definition}</span>
-    </div>
+    <details className="group py-1.5" style={{ borderBottom: '1px solid #f3f4f6' }}>
+      <summary className="flex items-center gap-1.5 cursor-pointer list-none select-none">
+        <span className="text-[10px] text-gray-400 inline-block transition-transform group-open:rotate-90">▶</span>
+        <span className="font-semibold text-sm text-gray-900">{term}</span>
+      </summary>
+      <p className="text-sm text-gray-600 leading-relaxed mt-1.5 ml-4">{definition}</p>
+    </details>
   )
 }
 
@@ -75,7 +83,10 @@ export function LessonContent({ section }: { section: LessonSection }) {
             {style.label}
           </span>
         </div>
-        <h4 className="text-sm font-bold text-gray-900 mb-2">{section.title}</h4>
+        <h4 className="text-sm font-bold text-gray-900 mb-1">{section.title}</h4>
+        {section.objective && (
+          <p className="text-xs italic text-gray-400 mb-2">{section.objective}</p>
+        )}
 
         {keyTerms ? (
           <div>

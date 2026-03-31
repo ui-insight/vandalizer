@@ -69,13 +69,13 @@ export function PanelResizer({ containerRef, onDragStart, onDragEnd }: PanelResi
         zIndex: 10,
       }}
     >
-      {/* Visible line */}
+      {/* Visible line — grows leftward so it stays visible above the right panel */}
       <div
         style={{
           position: 'absolute',
           top: 0,
           bottom: 0,
-          left: 0,
+          right: 0,
           width: active ? 3 : 1,
           background: active ? 'var(--highlight-color, #eab308)' : '#d8d8d8',
           transition: 'width 0.15s ease, background 0.15s ease',
