@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { type ReactNode } from 'react'
-import { AuthContext } from '../contexts/AuthContext'
 
 // We test the AuthProvider (which provides useAuth) by rendering it with mocked API calls.
 // useAuth itself is a thin wrapper around useContext, so the real value is testing the provider.
