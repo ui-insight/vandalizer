@@ -26,6 +26,7 @@ def _make_user(
     user.email = f"{user_id}@example.com"
     user.name = "Test User"
     user.is_admin = is_admin
+    user.is_staff = False
     user.is_examiner = is_examiner
     user.current_team = current_team
     user.is_demo_user = False
@@ -60,8 +61,10 @@ class TestAdminAnalyticsScoping:
         with (
             patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
             patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.TeamMembership") as MockTM,
         ):
             MockUser.find_one = AsyncMock(return_value=user)
+            MockTM.find_one = AsyncMock(return_value=None)
             resp = await client.get("/api/admin/usage", cookies=cookies, headers=headers)
 
         assert resp.status_code == 403
@@ -94,8 +97,10 @@ class TestAdminAnalyticsScoping:
         with (
             patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
             patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.TeamMembership") as MockTM,
         ):
             MockUser.find_one = AsyncMock(return_value=user)
+            MockTM.find_one = AsyncMock(return_value=None)
             resp = await client.get("/api/admin/usage", cookies=cookies, headers=headers)
 
         assert resp.status_code == 403
@@ -113,8 +118,10 @@ class TestAdminAnalyticsScoping:
         with (
             patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
             patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.TeamMembership") as MockTM,
         ):
             MockUser.find_one = AsyncMock(return_value=user)
+            MockTM.find_one = AsyncMock(return_value=None)
             resp = await client.get("/api/admin/users", cookies=cookies, headers=headers)
 
         assert resp.status_code == 403
