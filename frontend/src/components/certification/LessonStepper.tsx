@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { ChevronLeft, ChevronRight, Clock } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import { useToast } from '../../contexts/ToastContext'
@@ -44,6 +44,21 @@ export function LessonStepper({
   // Clamp index if it ever goes out of bounds
   const safeIndex = currentIndex >= lessons.length ? 0 : currentIndex
 
+  // Keep a stable ref to onStepChange so the scroll effect doesn't re-fire
+  // every time the parent re-renders (inline arrow functions change every render)
+  const onStepChangeRef = useRef(onStepChange)
+  useEffect(() => { onStepChangeRef.current = onStepChange })
+
+  // Scroll parent to top AFTER the new lesson content has rendered.
+  // Using useEffect (post-render) instead of calling scroll synchronously in
+  // the click handler — synchronous calls fire before React paints the new
+  // content, so the browser can negate the scroll when it updates layout.
+  const isFirstRender = useRef(true)
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return }
+    onStepChangeRef.current?.()
+  }, [safeIndex]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // Persist current lesson to localStorage
   useEffect(() => {
     localStorage.setItem(storageKey, String(safeIndex))
@@ -65,16 +80,14 @@ export function LessonStepper({
       setCurrentIndex(nextIdx)
       setReadLessons(prev => new Set([...prev, nextIdx]))
       toast(`Lesson ${safeIndex + 1} of ${lessons.length} complete!`, 'success')
-      onStepChange?.()
     }
-  }, [safeIndex, lessons.length, toast, onStepChange])
+  }, [safeIndex, lessons.length, toast])
 
   const goPrev = useCallback(() => {
     if (safeIndex > 0) {
       setCurrentIndex(safeIndex - 1)
-      onStepChange?.()
     }
-  }, [safeIndex, onStepChange])
+  }, [safeIndex])
 
   // Notify when all lessons read
   useEffect(() => {
@@ -93,7 +106,7 @@ export function LessonStepper({
         {lessons.map((_, i) => (
           <button
             key={i}
-            onClick={() => { setCurrentIndex(i); onStepChange?.() }}
+            onClick={() => setCurrentIndex(i)}
             className={cn(
               'h-2 flex-1 transition-all duration-300',
               i === safeIndex

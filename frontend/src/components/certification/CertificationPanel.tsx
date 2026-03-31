@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   Award,
   ChevronLeft,
@@ -147,6 +148,7 @@ const MODE_ICONS: { mode: PanelMode; icon: typeof Maximize2; label: string }[] =
 export function CertificationPanel() {
   const { isOpen, mode, closePanel, setMode, progress, loading, validate, complete, provision, getExercise, submitAssessment } = useCertificationPanel()
   const { toast } = useToast()
+  const queryClient = useQueryClient()
 
   // Module interaction state — persist across reloads
   const [activeModule, setActiveModuleState] = useState<string | null>(() => {
@@ -165,6 +167,9 @@ export function CertificationPanel() {
   const [exercise, setExercise] = useState<CertExercise | null>(null)
   const [tierCelebration, setTierCelebration] = useState<{ tierName: string; message: string } | null>(null)
   const moduleScrollRef = useRef<HTMLDivElement>(null)
+  const handleStepChange = useCallback(() => {
+    moduleScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [])
 
   // Drag state for floating mode
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null)
@@ -234,7 +239,11 @@ export function CertificationPanel() {
 
   const handleProvision = async (moduleId: string) => {
     setProvisioning(true)
-    try { await provision(moduleId) } finally { setProvisioning(false) }
+    try {
+      await provision(moduleId)
+      // Invalidate document queries so the file browser shows the new files
+      queryClient.invalidateQueries({ queryKey: ['documents'] })
+    } finally { setProvisioning(false) }
   }
 
   const handleSubmitAssessment = async (moduleId: string, answers: Record<string, string>) => {
@@ -365,7 +374,7 @@ export function CertificationPanel() {
           onComplete={() => handleComplete(activeModuleDef.id)}
           onProvision={() => handleProvision(activeModuleDef.id)}
           onSubmitAssessment={(answers) => handleSubmitAssessment(activeModuleDef.id, answers)}
-          onTabChange={() => moduleScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })}
+          onTabChange={handleStepChange}
           exercise={exercise}
           validating={validating}
           completing={completing}
