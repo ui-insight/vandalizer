@@ -12,7 +12,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     )
   }
 
-  if (!user) return <Navigate to="/landing" search={{ error: undefined, invite_token: undefined }} />
+  if (!user) return <Navigate to="/landing" search={{ error: undefined, invite_token: undefined, admin: undefined }} />
 
   if (demoExpired && demoFeedbackToken) {
     return <Navigate to="/demo/feedback" search={{ token: demoFeedbackToken }} />
