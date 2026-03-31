@@ -159,7 +159,7 @@ async def forgot_password(
     if not user:
         user = await User.find_one(User.user_id == email)
     if not user or not user.password_hash:
-        # Don't reveal whether the email exists
+        logger.info("Password reset: no matching user with password for %s", email)
         return {"ok": True}
 
     # Generate token, store in Redis with 1-hour TTL
@@ -174,7 +174,8 @@ async def forgot_password(
 
     reset_url = f"{settings.frontend_url}/reset-password?token={token}"
     subject, html = password_reset_email(user.name or user.user_id, reset_url)
-    await send_email(user.email or email, subject, html, settings)
+    sent = await send_email(user.email or email, subject, html, settings)
+    logger.info("Password reset: user=%s, email=%s, sent=%s", user.user_id, user.email, sent)
 
     return {"ok": True}
 
