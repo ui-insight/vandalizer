@@ -53,7 +53,7 @@ export function LoginForm() {
         {loading ? 'Signing in...' : 'SIGN IN'}
       </button>
       <p className="text-center text-sm">
-        <Link to="/reset-password" className="text-gray-400 hover:text-[#f1b300] transition-colors">
+        <Link to="/reset-password" search={{ token: undefined }} className="text-gray-400 hover:text-[#f1b300] transition-colors">
           Forgot password?
         </Link>
       </p>
