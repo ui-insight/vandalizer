@@ -70,7 +70,7 @@ def gen_nsf_proposal():
     pdf.field("Program", "Ecosystem Science")
     pdf.field("Program Officer", "Dr. Katherine Wells")
     pdf.field("Submission Date", "October 15, 2024")
-    pdf.ln(4)
+    pdf.ln(2)
 
     pdf.section("Project Information")
     pdf.field("Project Title", "Alpine Ecosystem Response to Climate Change in the Northern Rockies")
@@ -81,20 +81,16 @@ def gen_nsf_proposal():
     pdf.field("Requested Amount", "$485,000")
     pdf.field("Project Period", "September 1, 2025 - August 31, 2028")
     pdf.field("Sponsoring Agency", "National Science Foundation")
-    pdf.ln(4)
+    pdf.ln(2)
 
     pdf.section("Project Abstract")
     pdf.body(
         "This project investigates the impacts of climate change on alpine ecosystems in the Northern Rocky "
-        "Mountains. Alpine environments are among the most sensitive indicators of climate change, yet remain "
-        "understudied compared to lower-elevation systems. Our research combines long-term field monitoring, "
-        "remote sensing, and ecological modeling to understand how rising temperatures, shifting precipitation "
-        "patterns, and changing snowpack dynamics affect plant community composition, soil microbial diversity, "
-        "and ecosystem carbon cycling.\n\n"
-        "The study will establish 24 permanent monitoring plots across an elevational gradient (2,200-3,100m) "
-        "in the Sawtooth and White Cloud mountain ranges. We will collect seasonal data on vegetation cover, "
-        "soil temperature, moisture, and microbial community composition over the three-year project period. "
-        "Satellite imagery and drone-based surveys will provide landscape-scale context for plot-level observations."
+        "Mountains. Our research combines long-term field monitoring, remote sensing, and ecological modeling to "
+        "understand how rising temperatures, shifting precipitation patterns, and changing snowpack dynamics affect "
+        "plant community composition, soil microbial diversity, and ecosystem carbon cycling. The study will "
+        "establish 24 permanent monitoring plots across an elevational gradient (2,200-3,100m) in the Sawtooth "
+        "and White Cloud mountain ranges."
     )
 
     pdf.section("Budget Overview")
@@ -105,7 +101,7 @@ def gen_nsf_proposal():
     pdf.table_row(["Supplies", "$10,000", "$8,000", "$8,000", "$26,000"])
     pdf.table_row(["Indirect Costs", "$25,000", "$27,000", "$28,000", "$80,000"])
     pdf.table_row(["Total", "$177,000", "$152,000", "$156,000", "$485,000"])
-    pdf.ln(4)
+    pdf.ln(2)
 
     pdf.section("Broader Impacts")
     pdf.body(
