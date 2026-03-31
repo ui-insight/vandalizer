@@ -294,6 +294,12 @@ class ExtractionNode(Node):
         keys = self.data.get("searchphrases", [])
         if not keys:
             keys = self.data.get("keys", [])
+        if not keys:
+            raw = self.data.get("extractions", [])
+            if isinstance(raw, list):
+                keys = [str(k).strip() for k in raw if str(k).strip()]
+            elif isinstance(raw, str) and raw.strip():
+                keys = [s.strip() for s in raw.split(",") if s.strip()]
 
         prev_step_name = inputs.get("step_name")
         doc_texts = None

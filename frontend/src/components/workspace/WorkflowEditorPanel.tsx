@@ -1507,6 +1507,94 @@ function TaskTypePicker({ category, setCategory, onSelect, onClose }: {
 }
 
 // ---------------------------------------------------------------------------
+// Tag/chip input for extraction fields
+// ---------------------------------------------------------------------------
+
+function ExtractionTagInput({ tags, onChange }: { tags: string[]; onChange: (tags: string[]) => void }) {
+  const [inputValue, setInputValue] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const addTag = (value: string) => {
+    const trimmed = value.trim()
+    if (trimmed && !tags.includes(trimmed)) {
+      onChange([...tags, trimmed])
+    }
+    setInputValue('')
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault()
+      addTag(inputValue)
+    } else if (e.key === 'Backspace' && !inputValue && tags.length > 0) {
+      onChange(tags.slice(0, -1))
+    }
+  }
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const pasted = e.clipboardData.getData('text')
+    if (pasted.includes(',')) {
+      e.preventDefault()
+      const newTags = pasted.split(',').map(s => s.trim()).filter(s => s && !tags.includes(s))
+      if (newTags.length) onChange([...tags, ...newTags])
+    }
+  }
+
+  const removeTag = (index: number) => {
+    onChange(tags.filter((_, i) => i !== index))
+  }
+
+  return (
+    <div
+      onClick={() => inputRef.current?.focus()}
+      style={{
+        display: 'flex', flexWrap: 'wrap', gap: 4, padding: '6px 8px',
+        border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#fff',
+        cursor: 'text', minHeight: 38, alignItems: 'center', boxSizing: 'border-box',
+      }}
+    >
+      {tags.map((tag, i) => (
+        <span
+          key={i}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            backgroundColor: '#f3f4f6', border: '1px solid #e5e7eb',
+            borderRadius: 4, padding: '2px 8px', fontSize: 13,
+            color: '#374151', lineHeight: '22px',
+          }}
+        >
+          {tag}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); removeTag(i) }}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+              color: '#9ca3af', display: 'flex', alignItems: 'center',
+            }}
+          >
+            <X style={{ width: 12, height: 12 }} />
+          </button>
+        </span>
+      ))}
+      <input
+        ref={inputRef}
+        type="text"
+        value={inputValue}
+        onChange={e => setInputValue(e.target.value)}
+        onKeyDown={handleKeyDown}
+        onPaste={handlePaste}
+        onBlur={() => { if (inputValue.trim()) addTag(inputValue) }}
+        placeholder={tags.length === 0 ? 'Type a field name and press Enter' : ''}
+        style={{
+          border: 'none', outline: 'none', fontSize: 13, fontFamily: 'inherit',
+          flex: 1, minWidth: 120, padding: '2px 4px', backgroundColor: 'transparent',
+        }}
+      />
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Task edit modal (with Design/Input/Output sub-tabs + test step)
 // ---------------------------------------------------------------------------
 
@@ -1798,18 +1886,11 @@ function TaskEditModal({ task, selectedDocUuids, onClose, onSave }: {
 
                 <div style={{ marginBottom: 16 }}>
                   <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
-                    Enter extractions (comma-separated)
+                    Extraction fields
                   </label>
-                  <input
-                    type="text"
-                    value={getTextValue('extractions')}
-                    onChange={e => setTextValue('extractions', e.target.value)}
-                    placeholder="e.g., Name, Age, Location"
-                    style={{
-                      width: '100%', padding: '8px 12px', fontSize: 13,
-                      fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
-                      outline: 'none', boxSizing: 'border-box',
-                    }}
+                  <ExtractionTagInput
+                    tags={Array.isArray(taskData.extractions) ? (taskData.extractions as string[]) : []}
+                    onChange={(tags) => setTaskData(prev => ({ ...prev, extractions: tags }))}
                   />
                 </div>
 

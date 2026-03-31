@@ -855,15 +855,18 @@ async def generate_validation_plan(workflow_id: str, user: User) -> list[dict]:
                 extractions = data.get("extractions", [])
                 fields_detail = []
                 for ext in extractions[:30]:
-                    key = ext.get("key", "")
-                    desc = ext.get("description", "")
-                    is_optional = ext.get("is_optional", False)
-                    enum_vals = ext.get("enum_values", [])
-                    field_info = {"key": key, "description": desc}
-                    if is_optional:
-                        field_info["optional"] = True
-                    if enum_vals:
-                        field_info["allowed_values"] = enum_vals
+                    if isinstance(ext, str):
+                        field_info = {"key": ext.strip()}
+                    else:
+                        key = ext.get("key", "")
+                        desc = ext.get("description", "")
+                        is_optional = ext.get("is_optional", False)
+                        enum_vals = ext.get("enum_values", [])
+                        field_info = {"key": key, "description": desc}
+                        if is_optional:
+                            field_info["optional"] = True
+                        if enum_vals:
+                            field_info["allowed_values"] = enum_vals
                     fields_detail.append(field_info)
                     all_extracted_fields.append(field_info)
 

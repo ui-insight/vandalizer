@@ -360,8 +360,8 @@ async def _resolve_extraction_field_names(task_data: dict) -> list[str]:
         if names:
             return names
 
-    # Fall back to inline searchphrases / keys
-    raw = task_data.get("searchphrases") or task_data.get("keys") or []
+    # Fall back to inline searchphrases / keys / extractions
+    raw = task_data.get("searchphrases") or task_data.get("keys") or task_data.get("extractions") or []
     if isinstance(raw, str):
         return [s.strip() for s in raw.split(",") if s.strip()]
     if isinstance(raw, list):
