@@ -137,6 +137,54 @@ async def create_library_item(
 # Workflow seeding
 # ---------------------------------------------------------------------------
 
+async def _patch_inline_extractions(wf: Workflow, seed_item: dict) -> int:
+    """Patch existing seeded workflows whose Extraction tasks have inline
+    searchphrases but no linked SearchSet. Returns count of tasks patched."""
+    now = datetime.datetime.now(datetime.timezone.utc)
+    patched = 0
+    for step_id in wf.steps:
+        step = await WorkflowStep.get(step_id)
+        if not step:
+            continue
+        for task_id in step.tasks:
+            task = await WorkflowStepTask.get(task_id)
+            if not task or task.name != "Extraction":
+                continue
+            if task.data.get("search_set_uuid"):
+                continue  # already linked
+            raw = task.data.get("searchphrases")
+            if not raw:
+                continue
+            keys = [k.strip() for k in raw.split(",") if k.strip()]
+            ss_uuid = str(uuid_mod.uuid4())
+            ss = SearchSet(
+                title=f"{wf.name} — Extraction",
+                uuid=ss_uuid,
+                space="global",
+                status="active",
+                set_type="extraction",
+                is_global=True,
+                verified=True,
+                created_at=now,
+            )
+            await ss.insert()
+            for key in keys:
+                ssi = SearchSetItem(
+                    searchphrase=key,
+                    searchset=ss_uuid,
+                    searchtype="extraction",
+                )
+                await ssi.insert()
+            task.data = {
+                k: v for k, v in task.data.items() if k != "searchphrases"
+            }
+            task.data["search_set_uuid"] = ss_uuid
+            task.data["name"] = ss.title
+            await task.save()
+            patched += 1
+    return patched
+
+
 async def seed_workflow(
     data: dict, meta: dict, verified_lib: Library, slug_to_collection: dict[str, VerifiedCollection],
 ) -> bool:
@@ -146,6 +194,10 @@ async def seed_workflow(
     # Idempotency: check if already seeded
     existing = await Workflow.find_one({"resource_config.seed_id": seed_id})
     if existing:
+        # Patch existing workflows whose Extraction tasks lack a SearchSet
+        patched = await _patch_inline_extractions(existing, data["items"][0])
+        if patched:
+            print(f"    (patched {patched} extraction task(s))")
         return False
 
     item = data["items"][0]
@@ -156,7 +208,35 @@ async def seed_workflow(
     for step_data in item.get("steps", []):
         task_ids: list[PydanticObjectId] = []
         for task_data in step_data.get("tasks", []):
-            task = WorkflowStepTask(name=task_data["name"], data=task_data.get("data", {}))
+            td = dict(task_data.get("data", {}))
+
+            # Materialise a SearchSet for Extraction tasks with inline searchphrases
+            if task_data["name"] == "Extraction" and "searchphrases" in td:
+                raw = td.pop("searchphrases")
+                keys = [k.strip() for k in raw.split(",") if k.strip()]
+                ss_uuid = str(uuid_mod.uuid4())
+                ss = SearchSet(
+                    title=f"{item['name']} — Extraction",
+                    uuid=ss_uuid,
+                    space="global",
+                    status="active",
+                    set_type="extraction",
+                    is_global=True,
+                    verified=True,
+                    created_at=now,
+                )
+                await ss.insert()
+                for key in keys:
+                    ssi = SearchSetItem(
+                        searchphrase=key,
+                        searchset=ss_uuid,
+                        searchtype="extraction",
+                    )
+                    await ssi.insert()
+                td["search_set_uuid"] = ss_uuid
+                td["name"] = ss.title
+
+            task = WorkflowStepTask(name=task_data["name"], data=td)
             await task.insert()
             task_ids.append(task.id)
 
