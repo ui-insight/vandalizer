@@ -243,6 +243,15 @@ function AuthBlock({ config }: { config: AuthConfig | null }) {
         </>
       )}
 
+      {!passwordEnabled && config.demo_login_enabled && (
+        <p className="mt-6 text-center text-sm text-gray-400">
+          Have a trial account?{' '}
+          <Link to="/login" className="font-bold text-white hover:text-[#f1b300]">
+            Log in here
+          </Link>
+        </p>
+      )}
+
     </div>
   )
 }

@@ -345,9 +345,18 @@ async def auth_config():
                 "configured": azure is not None,
             }
         )
+
+    # Check if any demo/trial accounts exist (active or released)
+    from app.models.demo import DemoApplication
+
+    demo_login_enabled = await DemoApplication.find(
+        {"status": {"$in": ["active", "completed"]}},
+    ).count() > 0
+
     return {
         "auth_methods": config.auth_methods,
         "oauth_providers": providers,
+        "demo_login_enabled": demo_login_enabled,
     }
 
 
