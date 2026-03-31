@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.dependencies import get_current_user
+from app.config import Settings
+from app.dependencies import get_current_user, get_settings
 from app.models.team import Team, TeamMembership
 from app.models.user import User
 from app.schemas.teams import (
@@ -81,10 +82,12 @@ async def update_name(
 async def invite(
     body: InviteRequest,
     user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
 ):
     try:
         inv = await team_service.invite_member(
-            body.team_id, body.email, body.role, user.user_id
+            body.team_id, body.email, body.role, user.user_id,
+            settings=settings,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

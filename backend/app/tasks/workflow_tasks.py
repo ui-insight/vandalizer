@@ -12,6 +12,53 @@ from app.tasks import TRANSIENT_EXCEPTIONS
 logger = logging.getLogger(__name__)
 
 
+def _notify_approval_reviewers_sync(
+    db, assigned_user_ids: list[str], workflow_name: str,
+    step_name: str, instructions: str, approval_uuid: str,
+) -> None:
+    """Create in-app notifications and send emails to assigned reviewers (sync context)."""
+    import secrets
+    from datetime import datetime, timezone
+    from app.config import Settings
+
+    settings = Settings()
+    now = datetime.now(timezone.utc)
+
+    for user_id in assigned_user_ids:
+        # In-app notification
+        db.notification.insert_one({
+            "uuid": secrets.token_urlsafe(12),
+            "user_id": user_id,
+            "kind": "approval_request",
+            "title": f"Approval needed: {workflow_name}",
+            "body": f"Step \"{step_name}\" is waiting for your review.",
+            "link": f"/approvals?id={approval_uuid}",
+            "read": False,
+            "created_at": now,
+        })
+
+        # Email
+        user_doc = db.user.find_one({"user_id": user_id})
+        if user_doc and user_doc.get("email"):
+            from app.services.email_service import approval_request_email, send_email
+            import asyncio
+
+            subject, html = approval_request_email(
+                reviewer_name=user_doc.get("name", user_id),
+                workflow_name=workflow_name,
+                step_name=step_name,
+                instructions=instructions,
+                approval_uuid=approval_uuid,
+                frontend_url=settings.frontend_url,
+            )
+            try:
+                loop = asyncio.new_event_loop()
+                loop.run_until_complete(send_email(user_doc["email"], subject, html, settings))
+                loop.close()
+            except Exception:
+                logger.exception("Failed to send approval email to %s", user_id)
+
+
 def _get_db():
     """Get sync pymongo database handle."""
     from pymongo import MongoClient
@@ -206,6 +253,17 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
                 "current_step_detail": "Waiting for human review",
             }},
         )
+
+        # Notify assigned reviewers
+        workflow_doc = db.workflow.find_one({"_id": ObjectId(workflow_id)})
+        workflow_name = workflow_doc.get("name", "Workflow") if workflow_doc else "Workflow"
+        assigned_ids = final_output.get("_assigned_to_user_ids", [])
+        review_instructions = final_output.get("_review_instructions", "")
+        _notify_approval_reviewers_sync(
+            db, assigned_ids, workflow_name, "Approval",
+            review_instructions, approval_uuid,
+        )
+
         return {
             "status": "pending_approval",
             "approval_uuid": approval_uuid,

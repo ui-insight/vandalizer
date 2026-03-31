@@ -6,10 +6,11 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.dependencies import get_current_user
+from app.config import Settings
+from app.dependencies import get_current_user, get_settings
 from app.models.approval import ApprovalRequest
 from app.models.user import User
-from app.models.workflow import WorkflowResult
+from app.models.workflow import Workflow, WorkflowResult
 from app.services import access_control
 from app.services import audit_service
 
@@ -94,6 +95,7 @@ async def approve_request(
     approval_uuid: str,
     body: ApprovalDecisionRequest,
     user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
 ):
     """Approve a pending request and resume the workflow."""
     approval = await ApprovalRequest.find_one(ApprovalRequest.uuid == approval_uuid)
@@ -127,6 +129,8 @@ async def approve_request(
         detail={"workflow_result_id": str(approval.workflow_result_id), "comments": body.comments},
     )
 
+    await _notify_approval_resolved(approval, "approved", user, settings)
+
     return {"detail": "Approved, workflow resuming"}
 
 
@@ -135,6 +139,7 @@ async def reject_request(
     approval_uuid: str,
     body: ApprovalDecisionRequest,
     user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
 ):
     """Reject a pending request and fail the workflow."""
     approval = await ApprovalRequest.find_one(ApprovalRequest.uuid == approval_uuid)
@@ -167,4 +172,43 @@ async def reject_request(
         detail={"workflow_result_id": str(approval.workflow_result_id), "comments": body.comments},
     )
 
+    await _notify_approval_resolved(approval, "rejected", user, settings)
+
     return {"detail": "Rejected, workflow failed"}
+
+
+async def _notify_approval_resolved(
+    approval: ApprovalRequest, decision: str, reviewer: User, settings: Settings,
+) -> None:
+    """Notify the workflow owner that an approval was resolved."""
+    from app.services.notification_service import create_notification
+    from app.services.email_service import send_email, approval_resolved_email
+
+    workflow = await Workflow.get(approval.workflow_id)
+    workflow_name = workflow.name if workflow else "Workflow"
+    owner_user_id = workflow.user_id if workflow else None
+    if not owner_user_id:
+        return
+
+    # In-app notification
+    await create_notification(
+        user_id=owner_user_id,
+        kind=f"approval_{decision}",
+        title=f"Workflow {decision}: {workflow_name}",
+        body=f"{reviewer.name or reviewer.user_id} {decision} the approval."
+             + (f" Comments: {approval.reviewer_comments}" if approval.reviewer_comments else ""),
+        link=f"/approvals?id={approval.uuid}",
+    )
+
+    # Email
+    owner = await User.find_one(User.user_id == owner_user_id)
+    if owner and owner.email:
+        subject, html = approval_resolved_email(
+            owner_name=owner.name or owner.user_id,
+            workflow_name=workflow_name,
+            decision=decision,
+            reviewer_name=reviewer.name or reviewer.user_id,
+            comments=approval.reviewer_comments,
+            frontend_url=settings.frontend_url,
+        )
+        await send_email(owner.email, subject, html, settings)

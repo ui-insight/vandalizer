@@ -992,7 +992,7 @@ async def _notify_submitter(
     new_status: str,
     reviewer_notes: str | None,
 ) -> None:
-    """Send a notification to the submitter when their request status changes."""
+    """Send a notification and email to the submitter when their request status changes."""
     from app.services import notification_service
 
     item_name = await _get_item_name(req.item_kind, req.item_id)
@@ -1036,6 +1036,22 @@ async def _notify_submitter(
         request_uuid=req.uuid,
     )
 
+    # Send email notification
+    submitter = await User.find_one(User.user_id == req.submitter_user_id)
+    if submitter and submitter.email:
+        from app.config import Settings
+        from app.services.email_service import send_email, verification_status_email
+
+        settings = Settings()
+        subject, html = verification_status_email(
+            submitter_name=submitter.name or submitter.user_id,
+            item_name=item_name,
+            new_status=new_status,
+            reviewer_notes=reviewer_notes,
+            frontend_url=settings.frontend_url,
+        )
+        await send_email(submitter.email, subject, html, settings)
+
 
 async def check_and_flag_stale_verification(item_kind: str, item_id: str) -> bool:
     """Check if a verified item was modified and flag it as stale.
@@ -1068,13 +1084,15 @@ async def check_and_flag_stale_verification(item_kind: str, item_id: str) -> boo
 
     item_name = await _get_item_name(item_kind, obj_id)
 
+    alert_message = f'Verified item "{item_name}" was modified. Re-validation recommended.'
+
     await QualityAlert(
         alert_type="config_changed",
         item_kind=item_kind,
         item_id=str(obj_id),
         item_name=item_name,
         severity="warning",
-        message=f'Verified item "{item_name}" was modified. Re-validation recommended.',
+        message=alert_message,
     ).insert()
 
     # Mark verified item metadata as stale by clearing last_validated_at
@@ -1087,4 +1105,57 @@ async def check_and_flag_stale_verification(item_kind: str, item_id: str) -> boo
         meta.updated_at = datetime.datetime.now(datetime.timezone.utc)
         await meta.save()
 
+    # Notify item owner
+    await _notify_quality_alert(item_kind, str(obj_id), item_name, alert_message)
+
     return True
+
+
+async def _notify_quality_alert(
+    item_kind: str, item_id: str, item_name: str, message: str,
+) -> None:
+    """Notify the item owner about a quality alert."""
+    from app.services import notification_service
+
+    # Find the owner
+    owner_user_id = None
+    if item_kind == "workflow":
+        obj = await Workflow.find_one({"_id": PydanticObjectId(item_id)})
+        owner_user_id = obj.user_id if obj else None
+    elif item_kind == "search_set":
+        obj = await SearchSet.find_one({"_id": PydanticObjectId(item_id)})
+        owner_user_id = obj.user_id if obj else None
+    elif item_kind == "knowledge_base":
+        obj = await KnowledgeBase.find_one({"_id": PydanticObjectId(item_id)})
+        owner_user_id = obj.user_id if obj else None
+
+    if not owner_user_id:
+        return
+
+    # In-app notification
+    await notification_service.create_notification(
+        user_id=owner_user_id,
+        kind="quality_alert",
+        title=f"Quality alert: {item_name}",
+        body=message,
+        link="/library?tab=verification",
+        item_kind=item_kind,
+        item_id=item_id,
+        item_name=item_name,
+    )
+
+    # Email
+    owner = await User.find_one(User.user_id == owner_user_id)
+    if owner and owner.email:
+        from app.config import Settings
+        from app.services.email_service import send_email, quality_alert_email
+
+        settings = Settings()
+        subject, html = quality_alert_email(
+            owner_name=owner.name or owner.user_id,
+            item_name=item_name,
+            item_kind=item_kind,
+            message=message,
+            frontend_url=settings.frontend_url,
+        )
+        await send_email(owner.email, subject, html, settings)

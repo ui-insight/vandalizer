@@ -4,6 +4,8 @@ import datetime
 import logging
 from pathlib import Path
 
+import redis.asyncio as aioredis
+
 from app.config import Settings
 from app.services.email_service import _BASE_STYLE
 from app.models.support import (
@@ -19,6 +21,29 @@ from app.services.email_service import send_email
 from app.services.notification_service import create_notification
 
 logger = logging.getLogger(__name__)
+
+# Cooldown in seconds — skip email if we already emailed this person about
+# this ticket within this window (avoids spam during live chat).
+_EMAIL_COOLDOWN_SECONDS = 600  # 10 minutes
+
+
+async def _check_email_cooldown(ticket_uuid: str, recipient: str) -> bool:
+    """Return True if we should send (cooldown expired), False if throttled."""
+    settings = Settings()
+    key = f"support_email_cd:{ticket_uuid}:{recipient}"
+    try:
+        r = aioredis.from_url(f"redis://{settings.redis_host}:6379")
+        try:
+            existing = await r.get(key)
+            if existing:
+                return False
+            await r.set(key, "1", ex=_EMAIL_COOLDOWN_SECONDS)
+            return True
+        finally:
+            await r.aclose()
+    except Exception:
+        # Redis down — allow the email rather than silently dropping it
+        return True
 
 
 def _ticket_to_dict(t: SupportTicket) -> dict:
@@ -230,6 +255,8 @@ async def add_message(
             item_id=ticket.uuid,
             item_name=ticket.subject,
         )
+        # Email the ticket owner (with cooldown to avoid spam during live chat)
+        await _email_ticket_owner_reply(ticket, msg)
     else:
         await _notify_support_contacts_new_message(ticket, msg)
 
@@ -339,6 +366,8 @@ async def update_ticket(
             item_id=ticket.uuid,
             item_name=ticket.subject,
         )
+        # Email the ticket owner about status change
+        await _email_ticket_owner_status(ticket, status)
 
     return _ticket_to_dict(ticket)
 
@@ -415,9 +444,12 @@ async def _notify_support_contacts_new_message(
 ) -> None:
     """Notify support contacts and admins about a new message on an existing ticket."""
     contacts = await _get_all_support_user_ids()
+    settings = Settings()
 
     for contact in contacts:
         user_id = contact.get("user_id")
+        email = contact.get("email")
+        name = contact.get("name", "Support")
         if user_id and user_id != msg.user_id:
             await create_notification(
                 user_id=user_id,
@@ -429,6 +461,58 @@ async def _notify_support_contacts_new_message(
                 item_id=ticket.uuid,
                 item_name=ticket.subject,
             )
+            # Email with cooldown
+            if email and await _check_email_cooldown(ticket.uuid, user_id):
+                from app.services.email_service import support_new_message_email
+                subject, html = support_new_message_email(
+                    support_name=name,
+                    ticket_subject=ticket.subject,
+                    ticket_user=msg.user_name or msg.user_id,
+                    message=msg.content,
+                    ticket_uuid=ticket.uuid,
+                    frontend_url=settings.frontend_url,
+                )
+                await send_email(email, subject, html, settings)
+
+
+async def _email_ticket_owner_reply(
+    ticket: SupportTicket, msg: SupportMessage
+) -> None:
+    """Email the ticket owner when support replies (with cooldown)."""
+    if not await _check_email_cooldown(ticket.uuid, ticket.user_id):
+        return
+    owner = await User.find_one(User.user_id == ticket.user_id)
+    if not owner or not owner.email:
+        return
+    settings = Settings()
+    from app.services.email_service import support_reply_email
+    subject, html = support_reply_email(
+        user_name=owner.name or owner.user_id,
+        ticket_subject=ticket.subject,
+        message=msg.content,
+        ticket_uuid=ticket.uuid,
+        frontend_url=settings.frontend_url,
+    )
+    await send_email(owner.email, subject, html, settings)
+
+
+async def _email_ticket_owner_status(
+    ticket: SupportTicket, new_status: str
+) -> None:
+    """Email the ticket owner when ticket status changes."""
+    owner = await User.find_one(User.user_id == ticket.user_id)
+    if not owner or not owner.email:
+        return
+    settings = Settings()
+    from app.services.email_service import support_status_email
+    subject, html = support_status_email(
+        user_name=owner.name or owner.user_id,
+        ticket_subject=ticket.subject,
+        new_status=new_status.replace("_", " "),
+        ticket_uuid=ticket.uuid,
+        frontend_url=settings.frontend_url,
+    )
+    await send_email(owner.email, subject, html, settings)
 
 
 # ---------------------------------------------------------------------------

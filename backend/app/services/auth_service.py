@@ -1,8 +1,25 @@
+import datetime
 import uuid
 
 from app.models.user import User
 from app.models.team import Team, TeamMembership
 from app.utils.security import hash_password, verify_password
+
+
+async def _stamp_login(user: User) -> None:
+    """Record login timestamp and initialize onboarding drip for new users."""
+    now = datetime.datetime.now(datetime.timezone.utc)
+    is_first_login = user.last_login_at is None
+    user.last_login_at = now
+
+    # Start onboarding drip for new non-demo users on first login
+    if is_first_login and not user.is_demo_user and user.onboarding_drip_step == 0:
+        user.onboarding_drip_next_at = now  # eligible immediately for step 1
+        user.email_preferences = user.email_preferences or {}
+        user.email_preferences.setdefault("onboarding", True)
+        user.email_preferences.setdefault("nudges", True)
+
+    await user.save()
 
 
 async def _auto_join_default_team(user: User, *, set_current: bool = True) -> None:
@@ -50,6 +67,7 @@ async def authenticate(user_id: str, password: str) -> User | None:
         await _auto_join_default_team(user, set_current=False)
     from app.services.team_service import ensure_current_team
     await ensure_current_team(user)
+    await _stamp_login(user)
     return user
 
 
@@ -84,6 +102,7 @@ async def resolve_oauth_user(
         await _auto_join_default_team(user, set_current=False)
         from app.services.team_service import ensure_current_team
         await ensure_current_team(user)
+        await _stamp_login(user)
         return user
 
     # Create new OAuth-only user
@@ -120,6 +139,7 @@ async def resolve_oauth_user(
         raise
 
     await _auto_join_default_team(user, set_current=True)
+    await _stamp_login(user)
     return user
 
 
@@ -158,6 +178,7 @@ async def resolve_saml_user(
         await _auto_join_default_team(user, set_current=False)
         from app.services.team_service import ensure_current_team
         await ensure_current_team(user)
+        await _stamp_login(user)
         return user
 
     # Create new SAML user
@@ -201,6 +222,7 @@ async def resolve_saml_user(
         raise
 
     await _auto_join_default_team(user, set_current=True)
+    await _stamp_login(user)
     return user
 
 

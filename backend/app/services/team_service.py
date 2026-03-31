@@ -127,9 +127,10 @@ async def update_team_name(
 
 
 async def invite_member(
-    team_uuid: str, email: str, role: str, actor_user_id: str
+    team_uuid: str, email: str, role: str, actor_user_id: str,
+    settings=None,
 ) -> TeamInvite:
-    """Invite a user to a team by email."""
+    """Invite a user to a team by email and send an invitation email."""
     team = await Team.find_one(Team.uuid == team_uuid)
     if not team:
         raise ValueError("Team not found")
@@ -146,17 +147,39 @@ async def invite_member(
         existing.token = secrets.token_urlsafe(32)
         existing.resend_count += 1
         await existing.save()
-        return existing
+        invite = existing
+    else:
+        invite = TeamInvite(
+            team=team.id,
+            email=email,
+            invited_by_user_id=actor_user_id,
+            role=role,
+            token=secrets.token_urlsafe(32),
+        )
+        await invite.insert()
 
-    invite = TeamInvite(
-        team=team.id,
-        email=email,
-        invited_by_user_id=actor_user_id,
-        role=role,
-        token=secrets.token_urlsafe(32),
-    )
-    await invite.insert()
+    # Send invitation email
+    await _send_invite_email(invite, team, actor_user_id, settings)
+
     return invite
+
+
+async def _send_invite_email(
+    invite: TeamInvite, team: Team, inviter_user_id: str, settings=None,
+) -> None:
+    """Send the invitation email."""
+    from app.config import Settings
+    from app.services.email_service import send_email, team_invite_email
+
+    if settings is None:
+        settings = Settings()
+
+    inviter = await User.find_one(User.user_id == inviter_user_id)
+    inviter_name = inviter.name if inviter else inviter_user_id
+
+    accept_url = f"{settings.frontend_url}/invite?token={invite.token}"
+    subject, html = team_invite_email(inviter_name, team.name, invite.role, accept_url)
+    await send_email(invite.email, subject, html, settings)
 
 
 async def accept_invite(token: str, user: User) -> Team:
@@ -195,7 +218,45 @@ async def accept_invite(token: str, user: User) -> Team:
     user.current_team = team.id
     await user.save()
 
+    # Notify the inviter that the invitation was accepted
+    await _notify_invite_accepted(invite, team, user)
+
     return team
+
+
+async def _notify_invite_accepted(
+    invite: TeamInvite, team: Team, member: User,
+) -> None:
+    """Notify the inviter when someone joins the team."""
+    from app.config import Settings
+    from app.services.notification_service import create_notification
+    from app.services.email_service import send_email, team_member_joined_email
+
+    if not invite.invited_by_user_id:
+        return
+
+    member_name = member.name or member.user_id
+
+    # In-app notification
+    await create_notification(
+        user_id=invite.invited_by_user_id,
+        kind="team_member_joined",
+        title=f"{member_name} joined {team.name}",
+        body=f"{member_name} accepted your invitation.",
+        link="/teams",
+    )
+
+    # Email
+    inviter = await User.find_one(User.user_id == invite.invited_by_user_id)
+    if inviter and inviter.email:
+        settings = Settings()
+        subject, html = team_member_joined_email(
+            inviter_name=inviter.name or inviter.user_id,
+            member_name=member_name,
+            team_name=team.name,
+            frontend_url=settings.frontend_url,
+        )
+        await send_email(inviter.email, subject, html, settings)
 
 
 async def switch_team(team_uuid: str, user: User) -> Team:

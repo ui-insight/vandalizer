@@ -84,6 +84,15 @@ celery.conf.beat_schedule = {
         "task": "tasks.retention.cleanup_ancillary",
         "schedule": crontab(hour=5, minute=0),  # daily at 5am
     },
+    # User engagement
+    "engagement-onboarding-drips": {
+        "task": "tasks.engagement.process_onboarding_drips",
+        "schedule": crontab(hour=10, minute=0),  # daily at 10am
+    },
+    "engagement-inactivity-nudges": {
+        "task": "tasks.engagement.process_inactivity_nudges",
+        "schedule": crontab(hour=10, minute=30),  # daily at 10:30am
+    },
 }
 
 # Alias for import convenience
