@@ -27,7 +27,14 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 
 async def _require_admin(user: User) -> User:
-    """Raise 403 if the user is not an admin."""
+    """Raise 403 if the user is not an admin or staff member."""
+    if not (user.is_admin or user.is_staff):
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return user
+
+
+async def _require_superadmin(user: User) -> User:
+    """Raise 403 if the user is not a full admin (staff cannot access)."""
     if not user.is_admin:
         raise HTTPException(status_code=403, detail="Admin access required")
     return user
@@ -71,7 +78,7 @@ async def _require_admin_or_team_admin(user: User) -> tuple[User, str | None]:
     Returns (user, team_id) where team_id is None for global admins or the
     stringified team ObjectId for team admins.
     """
-    if user.is_admin:
+    if user.is_admin or user.is_staff:
         return user, None
 
     if not user.current_team:
@@ -146,6 +153,7 @@ class UserLeaderboardItem(BaseModel):
     name: Optional[str] = None
     email: Optional[str] = None
     is_admin: bool = False
+    is_staff: bool = False
     is_examiner: bool = False
     tokens_total: int = 0
     workflows_run: int = 0
@@ -319,6 +327,7 @@ class UserDetailResponse(BaseModel):
     name: Optional[str] = None
     email: Optional[str] = None
     is_admin: bool = False
+    is_staff: bool = False
     is_examiner: bool = False
     tokens_in: int = 0
     tokens_out: int = 0
@@ -556,6 +565,11 @@ async def user_leaderboard(
                 name=u.name if u else None,
                 email=u.email if u else None,
                 is_admin=(u.is_admin if u and show_platform_role_flags else False),
+                is_staff=(
+                    getattr(u, "is_staff", False)
+                    if u and show_platform_role_flags
+                    else False
+                ),
                 is_examiner=(
                     getattr(u, "is_examiner", False)
                     if u and show_platform_role_flags
@@ -984,6 +998,11 @@ async def user_detail(
     return UserDetailResponse(
         user_id=user_id, name=target_user.name, email=target_user.email,
         is_admin=target_user.is_admin if show_platform_role_flags else False,
+        is_staff=(
+            getattr(target_user, "is_staff", False)
+            if show_platform_role_flags
+            else False
+        ),
         is_examiner=(
             getattr(target_user, "is_examiner", False)
             if show_platform_role_flags
@@ -1128,7 +1147,7 @@ async def workflow_events(
 async def get_config(
     user: User = Depends(get_current_user),
 ):
-    await _require_admin(user)
+    await _require_superadmin(user)
 
     cfg = await SystemConfig.get_config()
     return {
@@ -1156,7 +1175,7 @@ async def update_config(
     body: ConfigUpdateRequest,
     user: User = Depends(get_current_user),
 ):
-    await _require_admin(user)
+    await _require_superadmin(user)
 
     cfg = await SystemConfig.get_config()
 
@@ -1191,7 +1210,7 @@ async def add_model(
     body: ModelAddRequest,
     user: User = Depends(get_current_user),
 ):
-    await _require_admin(user)
+    await _require_superadmin(user)
 
     cfg = await SystemConfig.get_config()
     cfg.available_models.append(
@@ -1230,7 +1249,7 @@ async def update_model(
     body: ModelAddRequest,
     user: User = Depends(get_current_user),
 ):
-    await _require_admin(user)
+    await _require_superadmin(user)
 
     cfg = await SystemConfig.get_config()
     if index < 0 or index >= len(cfg.available_models):
@@ -1276,7 +1295,7 @@ async def delete_model(
     index: int,
     user: User = Depends(get_current_user),
 ):
-    await _require_admin(user)
+    await _require_superadmin(user)
 
     cfg = await SystemConfig.get_config()
     if index < 0 or index >= len(cfg.available_models):
@@ -1301,7 +1320,7 @@ async def add_oauth_provider(
     body: OAuthProviderRequest,
     user: User = Depends(get_current_user),
 ):
-    await _require_admin(user)
+    await _require_superadmin(user)
 
     cfg = await SystemConfig.get_config()
     provider_dict = body.model_dump(exclude_none=True)
@@ -1326,7 +1345,7 @@ async def update_oauth_provider(
     body: OAuthProviderRequest,
     user: User = Depends(get_current_user),
 ):
-    await _require_admin(user)
+    await _require_superadmin(user)
 
     cfg = await SystemConfig.get_config()
     if index < 0 or index >= len(cfg.oauth_providers):
@@ -1356,7 +1375,7 @@ async def delete_oauth_provider(
     index: int,
     user: User = Depends(get_current_user),
 ):
-    await _require_admin(user)
+    await _require_superadmin(user)
 
     cfg = await SystemConfig.get_config()
     if index < 0 or index >= len(cfg.oauth_providers):
@@ -1380,7 +1399,7 @@ async def update_auth_methods(
     body: AuthMethodsRequest,
     user: User = Depends(get_current_user),
 ):
-    await _require_admin(user)
+    await _require_superadmin(user)
 
     cfg = await SystemConfig.get_config()
     cfg.auth_methods = body.methods
@@ -1410,7 +1429,7 @@ def _sanitize_m365_config(cfg: dict) -> dict:
 async def get_m365_config(
     user: User = Depends(get_current_user),
 ):
-    await _require_admin(user)
+    await _require_superadmin(user)
     cfg = await SystemConfig.get_config()
     return _sanitize_m365_config(cfg.get_m365_config())
 
@@ -1420,7 +1439,7 @@ async def update_m365_config(
     body: dict,
     user: User = Depends(get_current_user),
 ):
-    await _require_admin(user)
+    await _require_superadmin(user)
     cfg = await SystemConfig.get_config()
     current = cfg.get_m365_config()
 

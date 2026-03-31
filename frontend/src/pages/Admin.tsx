@@ -150,6 +150,7 @@ function StatusBadge({ status }: { status: string }) {
 function RoleBadge({ role }: { role: string }) {
   const colors: Record<string, { bg: string; text: string }> = {
     admin: { bg: '#fef3c7', text: '#92400e' },
+    staff: { bg: '#dcfce7', text: '#166534' },
     examiner: { bg: '#dbeafe', text: '#1e40af' },
   }
   const c = colors[role] || { bg: '#f3f4f6', text: '#374151' }
@@ -489,6 +490,7 @@ function UserDrillDown({ userId, onBack }: { userId: string; onBack: () => void 
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 20, fontWeight: 700 }}>{data.name || 'Unknown'}</span>
             {data.is_admin && <RoleBadge role="admin" />}
+            {data.is_staff && <RoleBadge role="staff" />}
             {data.is_examiner && <RoleBadge role="examiner" />}
           </div>
           <div style={{ fontSize: 13, color: '#6b7280' }}>{data.email || data.user_id}</div>
@@ -620,7 +622,7 @@ function UsersTab() {
       ['#', 'Name', 'Email', 'Roles', 'Tokens', 'Workflows', 'Conversations', 'Last Active'],
       filtered.map((u, i) => [
         i + 1, u.name, u.email,
-        [u.is_admin ? 'admin' : '', u.is_examiner ? 'examiner' : ''].filter(Boolean).join(', '),
+        [u.is_admin ? 'admin' : '', u.is_staff ? 'staff' : '', u.is_examiner ? 'examiner' : ''].filter(Boolean).join(', '),
         u.tokens_total, u.workflows_run, u.conversations, u.last_active,
       ])
     )
@@ -669,6 +671,7 @@ function UsersTab() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <span style={{ fontSize: 14, fontWeight: 500 }}>{u.name || 'Unknown'}</span>
                           {u.is_admin && <RoleBadge role="admin" />}
+                          {u.is_staff && <RoleBadge role="staff" />}
                           {u.is_examiner && <RoleBadge role="examiner" />}
                         </div>
                         <div style={{ fontSize: 12, color: '#6b7280' }}>{u.email || u.user_id}</div>
@@ -4634,14 +4637,17 @@ export default function Admin() {
   const [activeTab, setActiveTab] = useState<Tab>('usage')
 
   const isGlobalAdmin = !!user?.is_admin
+  const isStaff = !!user?.is_staff
   const isExaminer = !!user?.is_examiner
   const isTeamAdmin = currentTeam?.role === 'owner' || currentTeam?.role === 'admin'
-  const hasAccess = isGlobalAdmin || isExaminer || isTeamAdmin
+  const hasAccess = isGlobalAdmin || isStaff || isExaminer || isTeamAdmin
 
-  // Examiners see analytics tabs but NOT config/quality/demo/debugging
+  // Staff see everything except config; examiners see analytics tabs only
   const visibleTabs = isGlobalAdmin
     ? TABS
-    : TABS.filter(t => !['config', 'quality', 'demo', 'debugging', 'organizations', 'approvals', 'audit'].includes(t.key))
+    : isStaff
+      ? TABS.filter(t => t.key !== 'config')
+      : TABS.filter(t => !['config', 'quality', 'demo', 'debugging', 'organizations', 'approvals', 'audit'].includes(t.key))
 
   if (!hasAccess) {
     return (
@@ -4671,7 +4677,7 @@ export default function Admin() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 20px', marginBottom: 20 }}>
             <Shield size={20} color="#6b7280" />
             <h1 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>
-              {isGlobalAdmin ? 'Admin' : isExaminer ? 'Analytics' : 'Team Admin'}
+              {isGlobalAdmin ? 'Admin' : isStaff ? 'Admin' : isExaminer ? 'Analytics' : 'Team Admin'}
             </h1>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '0 8px' }}>
@@ -4707,13 +4713,13 @@ export default function Admin() {
           {activeTab === 'usage' && <UsageTab />}
           {activeTab === 'users' && <UsersTab />}
           {activeTab === 'teams' && <TeamsTab />}
-          {activeTab === 'organizations' && isGlobalAdmin && <OrganizationsTab />}
+          {activeTab === 'organizations' && (isGlobalAdmin || isStaff) && <OrganizationsTab />}
           {activeTab === 'workflows' && <WorkflowsTab />}
           {activeTab === 'quality' && <QualityTab />}
-          {activeTab === 'approvals' && isGlobalAdmin && <ApprovalsTab />}
-          {activeTab === 'audit' && isGlobalAdmin && <AuditTab />}
-          {activeTab === 'demo' && isGlobalAdmin && <DemoTab />}
-          {activeTab === 'debugging' && isGlobalAdmin && <DebuggingTab />}
+          {activeTab === 'approvals' && (isGlobalAdmin || isStaff) && <ApprovalsTab />}
+          {activeTab === 'audit' && (isGlobalAdmin || isStaff) && <AuditTab />}
+          {activeTab === 'demo' && (isGlobalAdmin || isStaff) && <DemoTab />}
+          {activeTab === 'debugging' && (isGlobalAdmin || isStaff) && <DebuggingTab />}
           {activeTab === 'config' && isGlobalAdmin && <ConfigTab />}
         </div>
       </div>

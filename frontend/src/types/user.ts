@@ -4,6 +4,7 @@ export interface User {
   email: string | null
   name: string | null
   is_admin: boolean
+  is_staff: boolean
   is_examiner: boolean
   is_support_agent: boolean
   is_demo_user: boolean

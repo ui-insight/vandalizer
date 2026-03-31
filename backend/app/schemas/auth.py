@@ -51,6 +51,7 @@ class UserResponse(BaseModel):
     email: Optional[str] = None
     name: Optional[str] = None
     is_admin: bool = False
+    is_staff: bool = False
     is_examiner: bool = False
     is_support_agent: bool = False
     is_demo_user: bool = False

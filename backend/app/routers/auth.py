@@ -75,6 +75,7 @@ async def _user_response(user: User) -> UserResponse:
         email=user.email,
         name=user.name,
         is_admin=user.is_admin,
+        is_staff=user.is_staff,
         is_examiner=user.is_examiner,
         is_support_agent=is_support_agent,
         is_demo_user=user.is_demo_user,
@@ -168,6 +169,27 @@ async def update_profile(
         user.email = body.email
     await user.save()
     return await _user_response(user)
+
+
+@router.get("/email-preferences")
+async def get_email_preferences(user: User = Depends(get_current_user)):
+    """Get the current user's email notification preferences."""
+    return user.email_preferences or {"onboarding": True, "nudges": True}
+
+
+@router.put("/email-preferences")
+async def update_email_preferences(
+    body: dict,
+    user: User = Depends(get_current_user),
+):
+    """Update email notification preferences."""
+    prefs = user.email_preferences or {}
+    for key in ("onboarding", "nudges"):
+        if key in body:
+            prefs[key] = bool(body[key])
+    user.email_preferences = prefs
+    await user.save()
+    return prefs
 
 
 @router.post("/account/delete/preflight")
