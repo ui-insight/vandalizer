@@ -26,8 +26,8 @@ export function useFeedbackPrompt(): FeedbackPromptResult {
   const { user } = useAuth()
   const [pendingPrompt, setPendingPrompt] = useState<PendingPrompt | null>(null)
   const [loading, setLoading] = useState(false)
-  const intervalRef = useRef<ReturnType<typeof setInterval>>()
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>()
+  const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined)
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined)
 
   const isDemoUser = user?.is_demo_user ?? false
 
