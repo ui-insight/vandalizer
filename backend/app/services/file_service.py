@@ -5,8 +5,6 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
-
 from app.config import Settings
 from app.models.document import SmartDocument
 from app.models.folder import SmartFolder
@@ -14,6 +12,8 @@ from app.models.user import User
 from app.services import access_control
 from app.utils.file_validation import is_allowed_file, is_valid_file_content
 from werkzeug.utils import secure_filename
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass

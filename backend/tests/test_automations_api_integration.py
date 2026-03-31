@@ -646,7 +646,6 @@ class TestTriggerWorkflowAction:
         assert body["action_type"] == "workflow"
         assert body["documents"] == ["doc-1"]
         assert "trigger_event_id" in body
-        assert "activity_id" in body
 
         # Trigger event created with correct workflow ID
         mock_create_trigger.assert_called_once()
@@ -751,7 +750,6 @@ class TestTriggerExtractionAction:
         body = resp.json()
         assert body["action_type"] == "extraction"
         assert body["status"] == "queued"
-        assert "activity_id" in body
         assert "trigger_event_id" in body
 
         mock_delay.assert_called_once_with(

@@ -5,7 +5,7 @@ import logging
 from typing import Optional
 
 from app.models.feedback_prompt import FeedbackPrompt, FeedbackPromptResponse, TriggerRules
-from app.models.support import SupportMessage, SupportTicket, TicketStatus
+from app.models.support import SupportMessage, SupportTicket
 from app.models.user import User
 
 logger = logging.getLogger(__name__)
