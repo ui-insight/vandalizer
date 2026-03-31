@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { ChevronDown, ChevronLeft, ChevronRight, Clock, Target } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import { useToast } from '../../contexts/ToastContext'
+import { useAuth } from '../../hooks/useAuth'
 import type { CertExercise, LessonSection } from '../../types/certification'
 import { LessonContent } from './LessonContent'
 
@@ -25,8 +26,9 @@ export function LessonStepper({
   onGoToChallenge: () => void
   onStepChange?: () => void
 }) {
-  // Resume from localStorage
-  const storageKey = `cert-lesson-${moduleId}`
+  const { user } = useAuth()
+  // Resume from localStorage, scoped by user
+  const storageKey = `cert-lesson:${user?.user_id || ''}:${moduleId}`
   const [currentIndex, setCurrentIndex] = useState(() => {
     const saved = localStorage.getItem(storageKey)
     const idx = saved ? parseInt(saved, 10) : 0

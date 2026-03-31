@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
 import { useCertification } from '../hooks/useCertification'
+import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../contexts/ToastContext'
 import { cn } from '../lib/cn'
 import type { ModuleDefinition, ValidationResult, CompletionResult, ValidationCheck, CertExercise } from '../types/certification'
@@ -910,15 +911,17 @@ function ValidationResults({ result, onDismiss }: { result: ValidationResult; on
 
 export default function Certification() {
   const { progress, loading, validate, complete, provision, getExercise, submitAssessment } = useCertification()
+  const { user } = useAuth()
   const queryClient = useQueryClient()
   const { toast } = useToast()
+  const uid = user?.user_id || ''
   const [activeModule, setActiveModuleState] = useState<string | null>(() => {
-    try { return localStorage.getItem('cert-active-module') } catch { return null }
+    try { return localStorage.getItem(`cert-active-module:${uid}`) } catch { return null }
   })
   const setActiveModule = useCallback((id: string | null) => {
     setActiveModuleState(id)
-    try { if (id) localStorage.setItem('cert-active-module', id); else localStorage.removeItem('cert-active-module') } catch {}
-  }, [])
+    try { if (id) localStorage.setItem(`cert-active-module:${uid}`, id); else localStorage.removeItem(`cert-active-module:${uid}`) } catch {}
+  }, [uid])
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null)
   const [completionResult, setCompletionResult] = useState<CompletionResult | null>(null)
   const [validating, setValidating] = useState(false)
@@ -1073,7 +1076,7 @@ export default function Certification() {
     }
     // Clear lesson localStorage for completed module
     if (completedModuleId) {
-      localStorage.removeItem(`cert-lesson-${completedModuleId}`)
+      localStorage.removeItem(`cert-lesson:${uid}:${completedModuleId}`)
     }
   }, [completionResult, isModuleLocked, toast])
 

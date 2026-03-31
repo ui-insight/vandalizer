@@ -17,6 +17,7 @@ import {
   X,
 } from 'lucide-react'
 import { useCertificationPanel, type PanelMode } from '../../contexts/CertificationPanelContext'
+import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../contexts/ToastContext'
 import { cn } from '../../lib/cn'
 import type { ValidationResult, CompletionResult, ValidationCheck, CertExercise } from '../../types/certification'
@@ -147,17 +148,19 @@ const MODE_ICONS: { mode: PanelMode; icon: typeof Maximize2; label: string }[] =
 
 export function CertificationPanel() {
   const { isOpen, mode, closePanel, setMode, progress, loading, validate, complete, provision, getExercise, submitAssessment } = useCertificationPanel()
+  const { user } = useAuth()
   const { toast } = useToast()
   const queryClient = useQueryClient()
+  const uid = user?.user_id || ''
 
-  // Module interaction state — persist across reloads
+  // Module interaction state — persist across reloads, scoped by user
   const [activeModule, setActiveModuleState] = useState<string | null>(() => {
-    try { return localStorage.getItem('cert-active-module') } catch { return null }
+    try { return localStorage.getItem(`cert-active-module:${uid}`) } catch { return null }
   })
   const setActiveModule = useCallback((id: string | null) => {
     setActiveModuleState(id)
-    try { if (id) localStorage.setItem('cert-active-module', id); else localStorage.removeItem('cert-active-module') } catch {}
-  }, [])
+    try { if (id) localStorage.setItem(`cert-active-module:${uid}`, id); else localStorage.removeItem(`cert-active-module:${uid}`) } catch {}
+  }, [uid])
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null)
   const [completionResult, setCompletionResult] = useState<CompletionResult | null>(null)
   const [validating, setValidating] = useState(false)
@@ -281,7 +284,7 @@ export function CertificationPanel() {
           return
         }
       }
-      localStorage.removeItem(`cert-lesson-${completedModuleId}`)
+      localStorage.removeItem(`cert-lesson:${uid}:${completedModuleId}`)
     }
   }, [completionResult, isModuleLocked, toast])
 

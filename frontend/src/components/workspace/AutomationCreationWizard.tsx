@@ -389,7 +389,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                     }}
                     style={selectStyle}
                   >
-                    <option value="">-- Select a folder to watch --</option>
+                    <option value="">Select a folder to watch</option>
                     {folders.map(f => (
                       <option key={f.uuid} value={f.uuid}>{f.path}</option>
                     ))}
@@ -616,7 +616,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                       onChange={e => setOutputFolder(e.target.value)}
                       style={selectStyle}
                     >
-                      <option value="">-- Select destination folder --</option>
+                      <option value="">Select destination folder</option>
                       {folders.map(f => (
                         <option key={f.uuid} value={f.uuid}>{f.path}</option>
                       ))}

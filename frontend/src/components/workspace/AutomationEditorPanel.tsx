@@ -447,7 +447,7 @@ function FolderWatchConfig({ automation, onSave }: { automation: Automation; onS
           backgroundColor: '#fff', color: '#202124', outline: 'none', marginBottom: 16,
         }}
       >
-        <option value="">-- Select a folder to watch --</option>
+        <option value="">Select a folder to watch</option>
         {folders.map(f => (
           <option key={f.uuid} value={f.uuid}>{f.path}</option>
         ))}
@@ -757,7 +757,7 @@ function OutputStorageCard({ automation, onSave }: { automation: Automation; onS
                 backgroundColor: '#fff', color: '#202124', outline: 'none',
               }}
             >
-              <option value="">-- Select folder --</option>
+              <option value="">Select folder</option>
               {folders.map(f => (
                 <option key={f.uuid} value={f.uuid}>{f.path}</option>
               ))}
