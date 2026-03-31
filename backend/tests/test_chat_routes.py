@@ -174,3 +174,381 @@ class TestChatActivityAuthz:
 
         assert resp.status_code == 404
         assert resp.json()["detail"] == "Activity not found"
+
+
+# ---------------------------------------------------------------------------
+# Coverage expansion - conversations, history, delete, download, remove
+# ---------------------------------------------------------------------------
+
+
+class TestChatConversations:
+    """Cover GET /conversations and GET /history/{uuid}."""
+
+    @pytest.mark.asyncio
+    async def test_list_conversations_requires_auth(self, client):
+        resp = await client.get("/api/chat/conversations")
+        assert resp.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_list_conversations_empty(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+
+        chain = MagicMock()
+        chain.to_list = AsyncMock(return_value=[])
+        chain.limit = MagicMock(return_value=chain)
+        find_result = MagicMock()
+        find_result.sort = MagicMock(return_value=chain)
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.chat.ChatConversation") as MockConv,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            MockConv.find = MagicMock(return_value=find_result)
+            MockConv.user_id = "user_id"
+            MockConv.updated_at = MagicMock()
+
+            resp = await client.get("/api/chat/conversations", cookies=cookies, headers=headers)
+
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    @pytest.mark.asyncio
+    async def test_get_history_no_conversation_returns_empty(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.chat.ChatConversation") as MockConv,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            MockConv.find_one = AsyncMock(return_value=None)
+            MockConv.uuid = "uuid"
+            MockConv.user_id = "user_id"
+
+            resp = await client.get(
+                "/api/chat/history/conv-nonexistent",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["messages"] == []
+        assert data["url_attachments"] == []
+        assert data["file_attachments"] == []
+
+    @pytest.mark.asyncio
+    async def test_get_history_with_conversation(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+
+        conv = MagicMock()
+        conv.uuid = "conv-1"
+        conv.user_id = "testuser"
+        conv.get_messages = AsyncMock(return_value=[
+            {"role": "user", "content": "Hello"},
+            {"role": "assistant", "content": "Hi there!"},
+        ])
+        conv.get_url_attachments = AsyncMock(return_value=[])
+        conv.get_file_attachments = AsyncMock(return_value=[])
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.chat.ChatConversation") as MockConv,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            MockConv.find_one = AsyncMock(return_value=conv)
+            MockConv.uuid = "uuid"
+            MockConv.user_id = "user_id"
+
+            resp = await client.get(
+                "/api/chat/history/conv-1",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["messages"]) == 2
+
+
+class TestChatDelete:
+    """Cover DELETE /history/{uuid}."""
+
+    @pytest.mark.asyncio
+    async def test_delete_conversation_success(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+
+        conv = MagicMock()
+        conv.uuid = "conv-1"
+        conv.user_id = "testuser"
+        conv.messages = []
+        conv.file_attachments = []
+        conv.url_attachments = []
+        conv.delete = AsyncMock()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.chat.ChatConversation") as MockConv,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            MockConv.find_one = AsyncMock(return_value=conv)
+            MockConv.uuid = "uuid"
+            MockConv.user_id = "user_id"
+
+            resp = await client.delete(
+                "/api/chat/history/conv-1",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["success"] is True
+        conv.delete.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_delete_conversation_not_found(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.chat.ChatConversation") as MockConv,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            MockConv.find_one = AsyncMock(return_value=None)
+            MockConv.uuid = "uuid"
+            MockConv.user_id = "user_id"
+
+            resp = await client.delete(
+                "/api/chat/history/conv-nonexistent",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 404
+        assert resp.json()["detail"] == "Conversation not found"
+
+    @pytest.mark.asyncio
+    async def test_delete_conversation_with_messages(self, client):
+        """Delete conversation that has messages and attachments."""
+        user = _make_user()
+        cookies, headers = _auth()
+
+        conv = MagicMock()
+        conv.uuid = "conv-1"
+        conv.user_id = "testuser"
+        conv.messages = ["msg-id-1"]
+        conv.file_attachments = ["file-id-1"]
+        conv.url_attachments = ["url-id-1"]
+        conv.delete = AsyncMock()
+
+        mock_msg_query = MagicMock()
+        mock_msg_query.delete = AsyncMock()
+        mock_file_query = MagicMock()
+        mock_file_query.delete = AsyncMock()
+        mock_url_query = MagicMock()
+        mock_url_query.delete = AsyncMock()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.chat.ChatConversation") as MockConv,
+            patch("app.routers.chat.ChatMessage") as MockMsg,
+            patch("app.routers.chat.FileAttachment") as MockFile,
+            patch("app.routers.chat.UrlAttachment") as MockUrl,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            MockConv.find_one = AsyncMock(return_value=conv)
+            MockConv.uuid = "uuid"
+            MockConv.user_id = "user_id"
+            MockMsg.find = MagicMock(return_value=mock_msg_query)
+            MockFile.find = MagicMock(return_value=mock_file_query)
+            MockUrl.find = MagicMock(return_value=mock_url_query)
+
+            resp = await client.delete(
+                "/api/chat/history/conv-1",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        conv.delete.assert_awaited_once()
+        mock_msg_query.delete.assert_awaited_once()
+
+
+class TestChatDownload:
+    """Cover POST /download."""
+
+    @pytest.mark.asyncio
+    async def test_download_txt(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+
+            resp = await client.post(
+                "/api/chat/download",
+                json={"content": "Hello world chat content", "format": "txt"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.headers["content-type"] == "text/plain; charset=utf-8"
+        assert "chat_output.txt" in resp.headers.get("content-disposition", "")
+        assert resp.text == "Hello world chat content"
+
+    @pytest.mark.asyncio
+    async def test_download_csv(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+
+            resp = await client.post(
+                "/api/chat/download",
+                json={"content": "role,content\nuser,hello", "format": "csv"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.headers["content-type"] == "text/csv; charset=utf-8"
+        assert "chat_output.csv" in resp.headers.get("content-disposition", "")
+
+
+class TestChatRemoveAttachments:
+    """Cover DELETE /remove-document/{id} and DELETE /remove-link/{id}."""
+
+    @pytest.mark.asyncio
+    async def test_remove_document_not_found(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.chat.FileAttachment") as MockFile,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            MockFile.find_one = AsyncMock(return_value=None)
+            MockFile.id = MagicMock()
+            MockFile.user_id = "user_id"
+
+            resp = await client.delete(
+                "/api/chat/remove-document/507f1f77bcf86cd799439011",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 404
+        assert resp.json()["detail"] == "Attachment not found"
+
+    @pytest.mark.asyncio
+    async def test_remove_document_success(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+
+        attachment = MagicMock()
+        attachment.id = "att-id"
+        attachment.user_id = "testuser"
+        attachment.delete = AsyncMock()
+
+        conv = MagicMock()
+        conv.file_attachments = [attachment.id]
+        conv.save = AsyncMock()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.chat.FileAttachment") as MockFile,
+            patch("app.routers.chat.ChatConversation") as MockConv,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            MockFile.find_one = AsyncMock(return_value=attachment)
+            MockFile.id = MagicMock()
+            MockFile.user_id = "user_id"
+            MockConv.find_one = AsyncMock(return_value=conv)
+
+            resp = await client.delete(
+                "/api/chat/remove-document/507f1f77bcf86cd799439011",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["success"] is True
+        attachment.delete.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_remove_link_not_found(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.chat.UrlAttachment") as MockUrl,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            MockUrl.find_one = AsyncMock(return_value=None)
+            MockUrl.id = MagicMock()
+            MockUrl.user_id = "user_id"
+
+            resp = await client.delete(
+                "/api/chat/remove-link/507f1f77bcf86cd799439011",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 404
+        assert resp.json()["detail"] == "Attachment not found"
+
+    @pytest.mark.asyncio
+    async def test_remove_link_success(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+
+        attachment = MagicMock()
+        attachment.id = "att-id"
+        attachment.user_id = "testuser"
+        attachment.delete = AsyncMock()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.chat.UrlAttachment") as MockUrl,
+            patch("app.routers.chat.ChatConversation") as MockConv,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            MockUrl.find_one = AsyncMock(return_value=attachment)
+            MockUrl.id = MagicMock()
+            MockUrl.user_id = "user_id"
+            MockConv.find_one = AsyncMock(return_value=None)
+
+            resp = await client.delete(
+                "/api/chat/remove-link/507f1f77bcf86cd799439011",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["success"] is True

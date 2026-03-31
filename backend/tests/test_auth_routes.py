@@ -348,3 +348,328 @@ class TestCSRFProtection:
 
         # Should get past CSRF (may fail on other grounds but not 403 CSRF)
         assert "CSRF" not in resp.text
+
+
+# ---------------------------------------------------------------------------
+# Coverage expansion - profile, account delete, API tokens, auth config
+# ---------------------------------------------------------------------------
+
+
+class TestUpdateProfile:
+    @pytest.mark.asyncio
+    async def test_update_profile_name(self, client):
+        user = _make_user()
+        csrf_token = secrets.token_urlsafe(32)
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.auth._user_response", new_callable=AsyncMock, return_value=_MOCK_USER_RESPONSE_DATA),
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            resp = await client.put(
+                "/api/auth/profile",
+                json={"name": "New Name"},
+                cookies={"access_token": "valid-token", "csrf_token": csrf_token},
+                headers={"X-CSRF-Token": csrf_token},
+            )
+
+        assert resp.status_code == 200
+        assert user.name == "New Name"
+        user.save.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_update_profile_email(self, client):
+        user = _make_user()
+        csrf_token = secrets.token_urlsafe(32)
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.auth._user_response", new_callable=AsyncMock, return_value=_MOCK_USER_RESPONSE_DATA),
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            resp = await client.put(
+                "/api/auth/profile",
+                json={"email": "new@example.com"},
+                cookies={"access_token": "valid-token", "csrf_token": csrf_token},
+                headers={"X-CSRF-Token": csrf_token},
+            )
+
+        assert resp.status_code == 200
+        assert user.email == "new@example.com"
+
+    @pytest.mark.asyncio
+    async def test_update_profile_requires_auth(self, client):
+        csrf_token = secrets.token_urlsafe(32)
+        resp = await client.put(
+            "/api/auth/profile",
+            json={"name": "Test"},
+            cookies={"csrf_token": csrf_token},
+            headers={"X-CSRF-Token": csrf_token},
+        )
+        assert resp.status_code == 401
+
+
+class TestDeleteAccountPreflight:
+    @pytest.mark.asyncio
+    async def test_preflight_success(self, client):
+        user = _make_user()
+        csrf_token = secrets.token_urlsafe(32)
+
+        summary = {"can_delete": True, "blocking_reason": None, "document_count": 5}
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.services.account_deletion_service.get_deletion_summary", new_callable=AsyncMock, return_value=summary) as mock_summary,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            resp = await client.post(
+                "/api/auth/account/delete/preflight",
+                cookies={"access_token": "valid-token", "csrf_token": csrf_token},
+                headers={"X-CSRF-Token": csrf_token},
+            )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["can_delete"] is True
+        assert "has_password" in data
+
+
+class TestDeleteAccount:
+    @pytest.mark.asyncio
+    async def test_delete_account_wrong_confirmation(self, client):
+        user = _make_user()
+        csrf_token = secrets.token_urlsafe(32)
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            resp = await client.post(
+                "/api/auth/account/delete",
+                json={"confirmation": "wrong text", "password": "correct-password"},
+                cookies={"access_token": "valid-token", "csrf_token": csrf_token},
+                headers={"X-CSRF-Token": csrf_token},
+            )
+
+        assert resp.status_code == 400
+        assert "Confirmation text" in resp.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_delete_account_wrong_password(self, client):
+        user = _make_user()
+        csrf_token = secrets.token_urlsafe(32)
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.auth.auth_service") as mock_svc,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.authenticate = AsyncMock(return_value=None)
+
+            resp = await client.post(
+                "/api/auth/account/delete",
+                json={"confirmation": "DELETE MY ACCOUNT", "password": "wrong-password"},
+                cookies={"access_token": "valid-token", "csrf_token": csrf_token},
+                headers={"X-CSRF-Token": csrf_token},
+            )
+
+        assert resp.status_code == 401
+        assert "Incorrect password" in resp.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_delete_account_requires_password_when_set(self, client):
+        user = _make_user()
+        csrf_token = secrets.token_urlsafe(32)
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            resp = await client.post(
+                "/api/auth/account/delete",
+                json={"confirmation": "DELETE MY ACCOUNT"},
+                cookies={"access_token": "valid-token", "csrf_token": csrf_token},
+                headers={"X-CSRF-Token": csrf_token},
+            )
+
+        assert resp.status_code == 400
+        assert "Password is required" in resp.json()["detail"]
+
+
+class TestAPITokenEndpoints:
+    @pytest.mark.asyncio
+    async def test_generate_api_token(self, client):
+        user = _make_user()
+        csrf_token = secrets.token_urlsafe(32)
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            resp = await client.post(
+                "/api/auth/api-token/generate",
+                cookies={"access_token": "valid-token", "csrf_token": csrf_token},
+                headers={"X-CSRF-Token": csrf_token},
+            )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "api_token" in data
+        assert "created_at" in data
+        assert "expires_at" in data
+        user.save.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_revoke_api_token(self, client):
+        user = _make_user(api_token="some-token")
+        csrf_token = secrets.token_urlsafe(32)
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            resp = await client.post(
+                "/api/auth/api-token/revoke",
+                cookies={"access_token": "valid-token", "csrf_token": csrf_token},
+                headers={"X-CSRF-Token": csrf_token},
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["ok"] is True
+        assert user.api_token is None
+        user.save.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_api_token_status_no_token(self, client):
+        user = _make_user()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            resp = await client.get(
+                "/api/auth/api-token/status",
+                cookies={"access_token": "valid-token"},
+            )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["has_token"] is False
+        assert data["created_at"] is None
+
+    @pytest.mark.asyncio
+    async def test_api_token_status_with_token(self, client):
+        import datetime
+
+        now = datetime.datetime.now(datetime.timezone.utc)
+        expires = now + datetime.timedelta(days=365)
+        user = _make_user(
+            api_token="some-token",
+            api_token_created_at=now,
+            api_token_expires_at=expires,
+        )
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            resp = await client.get(
+                "/api/auth/api-token/status",
+                cookies={"access_token": "valid-token"},
+            )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["has_token"] is True
+        assert data["expired"] is False
+
+    @pytest.mark.asyncio
+    async def test_api_token_requires_auth(self, client):
+        resp = await client.get("/api/auth/api-token/status")
+        assert resp.status_code == 401
+
+
+class TestAuthConfig:
+    @pytest.mark.asyncio
+    async def test_auth_config_returns_methods(self, client):
+        mock_config = MagicMock()
+        mock_config.auth_methods = ["local"]
+        mock_config.oauth_providers = []
+
+        with patch("app.routers.auth.SystemConfig") as MockConfig:
+            MockConfig.get_config = AsyncMock(return_value=mock_config)
+            resp = await client.get("/api/auth/config")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "auth_methods" in data
+        assert data["auth_methods"] == ["local"]
+
+    @pytest.mark.asyncio
+    async def test_auth_config_with_oauth(self, client):
+        mock_config = MagicMock()
+        mock_config.auth_methods = ["local", "oauth"]
+        mock_config.oauth_providers = [
+            {
+                "provider": "azure",
+                "enabled": True,
+                "client_id": "id",
+                "client_secret": "secret",
+                "tenant_id": "tenant",
+                "label": "Sign in with Azure",
+            }
+        ]
+
+        with patch("app.routers.auth.SystemConfig") as MockConfig:
+            MockConfig.get_config = AsyncMock(return_value=mock_config)
+            resp = await client.get("/api/auth/config")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["oauth_providers"]) == 1
+        assert data["oauth_providers"][0]["configured"] is True
+        assert data["oauth_providers"][0]["display_name"] == "Sign in with Azure"
+
+    @pytest.mark.asyncio
+    async def test_auth_config_with_unconfigured_oauth(self, client):
+        mock_config = MagicMock()
+        mock_config.auth_methods = ["local", "oauth"]
+        mock_config.oauth_providers = []
+
+        with patch("app.routers.auth.SystemConfig") as MockConfig:
+            MockConfig.get_config = AsyncMock(return_value=mock_config)
+            resp = await client.get("/api/auth/config")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["oauth_providers"]) == 1
+        assert data["oauth_providers"][0]["configured"] is False
+
+
+class TestPasswordValidation:
+    @pytest.mark.asyncio
+    async def test_register_weak_password_rejected(self, client):
+        """Password missing uppercase/digit should be rejected by Pydantic."""
+        resp = await client.post("/api/auth/register", json={
+            "email": "new@example.com",
+            "password": "weakpass",
+        })
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_register_short_password_rejected(self, client):
+        resp = await client.post("/api/auth/register", json={
+            "email": "new@example.com",
+            "password": "Ab1",
+        })
+        assert resp.status_code == 422

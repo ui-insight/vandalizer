@@ -12,7 +12,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage --coverage.reporter=text",
     "test:e2e": "playwright test",
-    "ci": "npm run typecheck && npm run lint && npm run test:coverage -- --coverage.thresholds.lines=30 && npm run build"
+    "ci": "npm run typecheck && npm run lint && npm run test:coverage -- --coverage.thresholds.lines=35 && npm run build"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.2.0",

@@ -26,7 +26,7 @@ backend-typecheck:
 	cd $(BACKEND_DIR) && uv run mypy app/ --ignore-missing-imports
 
 backend-test:
-	cd $(BACKEND_DIR) && uv run pytest -q --cov=app --cov-report=term-missing --cov-fail-under=30
+	cd $(BACKEND_DIR) && uv run pytest -q --cov=app --cov-report=term-missing --cov-fail-under=50
 
 backend-security:
 	cd $(BACKEND_DIR) && uv run bandit -r app/ -s B101 -q -ll -ii
@@ -59,7 +59,7 @@ frontend-lint:
 	cd $(FRONTEND_DIR) && npm run lint
 
 frontend-test:
-	cd $(FRONTEND_DIR) && npm run test:coverage -- --coverage.thresholds.lines=30
+	cd $(FRONTEND_DIR) && npm run test:coverage -- --coverage.thresholds.lines=35
 
 frontend-build:
 	cd $(FRONTEND_DIR) && npm run build
