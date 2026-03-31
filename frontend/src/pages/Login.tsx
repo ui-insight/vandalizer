@@ -24,7 +24,7 @@ export default function Login() {
   }
 
   return (
-    <AuthLayout title="Sign in to Vandalizer">
+    <AuthLayout title="Sign in">
       <LoginForm />
     </AuthLayout>
   )

@@ -26,9 +26,9 @@ export function Register() {
   return (
     <AuthLayout title="Create your account">
       <RegisterForm />
-      <p className="mt-4 text-center text-sm text-gray-600">
+      <p className="mt-4 text-center text-sm text-gray-400">
         Already have an account?{' '}
-        <Link to="/login" className="font-medium text-highlight hover:brightness-75">
+        <Link to="/login" className="font-bold text-white hover:text-[#f1b300]">
           Sign in
         </Link>
       </p>

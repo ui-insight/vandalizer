@@ -13,18 +13,18 @@ beforeEach(() => {
 })
 
 describe('LoginForm', () => {
-  it('renders username and password fields', () => {
+  it('renders email and password fields', () => {
     render(<LoginForm />)
-    expect(screen.getByLabelText(/username/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/password/i)).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(/email/i)).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(/password/i)).toBeInTheDocument()
   })
 
   it('calls login with entered credentials on submit', async () => {
     mockLogin.mockResolvedValueOnce(undefined)
     render(<LoginForm />)
 
-    fireEvent.change(screen.getByLabelText(/username/i), { target: { value: 'alice' } })
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'secret' } })
+    fireEvent.change(screen.getByPlaceholderText(/email/i), { target: { value: 'alice' } })
+    fireEvent.change(screen.getByPlaceholderText(/password/i), { target: { value: 'secret' } })
     fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
 
     await waitFor(() => expect(mockLogin).toHaveBeenCalledWith('alice', 'secret'))
@@ -35,8 +35,8 @@ describe('LoginForm', () => {
     mockLogin.mockReturnValue(new Promise<void>((r) => { resolve = r }))
 
     render(<LoginForm />)
-    fireEvent.change(screen.getByLabelText(/username/i), { target: { value: 'alice' } })
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'pw' } })
+    fireEvent.change(screen.getByPlaceholderText(/email/i), { target: { value: 'alice' } })
+    fireEvent.change(screen.getByPlaceholderText(/password/i), { target: { value: 'pw' } })
     fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
 
     expect(screen.getByRole('button', { name: /signing in/i })).toBeDisabled()
@@ -49,8 +49,8 @@ describe('LoginForm', () => {
     mockLogin.mockRejectedValueOnce(new Error('Invalid credentials'))
     render(<LoginForm />)
 
-    fireEvent.change(screen.getByLabelText(/username/i), { target: { value: 'alice' } })
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'wrong' } })
+    fireEvent.change(screen.getByPlaceholderText(/email/i), { target: { value: 'alice' } })
+    fireEvent.change(screen.getByPlaceholderText(/password/i), { target: { value: 'wrong' } })
     fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
 
     await waitFor(() => expect(screen.getByText('Invalid credentials')).toBeInTheDocument())
@@ -61,8 +61,8 @@ describe('LoginForm', () => {
     mockLogin.mockResolvedValueOnce(undefined)
     render(<LoginForm />)
 
-    fireEvent.change(screen.getByLabelText(/username/i), { target: { value: 'alice' } })
-    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'wrong' } })
+    fireEvent.change(screen.getByPlaceholderText(/email/i), { target: { value: 'alice' } })
+    fireEvent.change(screen.getByPlaceholderText(/password/i), { target: { value: 'wrong' } })
     fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
     await waitFor(() => expect(screen.getByText('Bad credentials')).toBeInTheDocument())
 
