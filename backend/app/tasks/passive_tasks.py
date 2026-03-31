@@ -881,7 +881,8 @@ def process_extraction_outputs(
             try:
                 engine = ExtractionEngine(system_config_doc=sys_config, domain=domain)
                 doc_results = engine.extract(
-                    doc["raw_text"], keys,
+                    extract_keys=keys,
+                    full_text=doc["raw_text"],
                     extraction_config_override=extraction_config,
                     field_metadata=field_metadata,
                 )

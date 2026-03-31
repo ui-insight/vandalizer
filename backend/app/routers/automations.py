@@ -488,8 +488,6 @@ async def trigger_automation(
 
 
 async def _dispatch_action(auto, user, all_doc_uuids, callback_url, wait, timeout, temp_doc_uuids=None):
-    from app.models.activity import ActivityType
-    from app.services import activity_service
     if auto.action_type in ("workflow", "task"):
         # Resolve document UUIDs to ObjectIds for the trigger event
         doc_records = await SmartDocument.find(
@@ -514,14 +512,6 @@ async def _dispatch_action(auto, user, all_doc_uuids, callback_url, wait, timeou
             temp_doc_uuids=temp_doc_uuids or [],
         )
 
-        # Also create an Activity for the UI activity feed
-        activity = await activity_service.activity_start(
-            type=ActivityType.WORKFLOW_RUN,
-            title=f"API: {auto.name}",
-            user_id=user.user_id,
-            workflow=PydanticObjectId(auto.action_id),
-        )
-
         # Dispatch to the passive execution pipeline
         from app.tasks.passive_tasks import execute_workflow_passive
         execute_workflow_passive.delay(str(trigger_event["_id"]))
@@ -534,7 +524,6 @@ async def _dispatch_action(auto, user, all_doc_uuids, callback_url, wait, timeou
                 return {
                     "status": "completed",
                     "trigger_event_id": trigger_event_id,
-                    "activity_id": str(activity.id),
                     "action_type": auto.action_type,
                     "documents": all_doc_uuids,
                     "output": output,
@@ -545,7 +534,6 @@ async def _dispatch_action(auto, user, all_doc_uuids, callback_url, wait, timeou
                 content={
                     "status": "running",
                     "trigger_event_id": trigger_event_id,
-                    "activity_id": str(activity.id),
                     "action_type": auto.action_type,
                     "documents": all_doc_uuids,
                     "output": None,
@@ -556,7 +544,6 @@ async def _dispatch_action(auto, user, all_doc_uuids, callback_url, wait, timeou
         return {
             "status": "queued",
             "trigger_event_id": trigger_event_id,
-            "activity_id": str(activity.id),
             "action_type": auto.action_type,
             "documents": all_doc_uuids,
         }
@@ -582,13 +569,6 @@ async def _dispatch_action(auto, user, all_doc_uuids, callback_url, wait, timeou
         )
         await ext_event.insert()
 
-        activity = await activity_service.activity_start(
-            type=ActivityType.SEARCH_SET_RUN,
-            title=f"API: {auto.name}",
-            user_id=user.user_id,
-            search_set_uuid=auto.action_id,
-        )
-
         # Dispatch extraction + output processing asynchronously via Celery
         from app.tasks.passive_tasks import process_extraction_outputs
         process_extraction_outputs.delay(
@@ -607,7 +587,6 @@ async def _dispatch_action(auto, user, all_doc_uuids, callback_url, wait, timeou
                 return {
                     "status": "completed",
                     "trigger_event_id": trigger_event_id,
-                    "activity_id": str(activity.id),
                     "action_type": "extraction",
                     "documents": all_doc_uuids,
                     "output": output,
@@ -617,7 +596,6 @@ async def _dispatch_action(auto, user, all_doc_uuids, callback_url, wait, timeou
                 content={
                     "status": "running",
                     "trigger_event_id": trigger_event_id,
-                    "activity_id": str(activity.id),
                     "action_type": "extraction",
                     "documents": all_doc_uuids,
                     "output": None,
@@ -628,7 +606,6 @@ async def _dispatch_action(auto, user, all_doc_uuids, callback_url, wait, timeou
         return {
             "status": "queued",
             "trigger_event_id": trigger_event_id,
-            "activity_id": str(activity.id),
             "action_type": "extraction",
             "documents": all_doc_uuids,
         }
