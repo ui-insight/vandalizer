@@ -31,7 +31,7 @@ Estimated time: ~3-4 hours total across all modules. Users can stop and resume a
 - What a workflow is and when to use one vs. ad-hoc chat
 - The document pipeline: upload → text extraction → ChromaDB ingestion
 - Creating your first workflow with a single Extraction step
-- Understanding SearchSets and extract keys
+- Understanding Extractions and extract keys
 - **Exercise:** Build a one-step workflow that extracts 3 fields from a sample grant proposal
 
 ### Module 2: The Extraction Engine

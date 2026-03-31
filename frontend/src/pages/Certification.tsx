@@ -112,7 +112,7 @@ export const MODULES: ModuleDefinition[] = [
     ],
     tips: [
       'The sample NSF proposal contains clearly labeled fields like PI Name, Institution, and Total Budget',
-      'Use clear, descriptive field names in your SearchSet that match the document labels',
+      'Use clear, descriptive field names in your Extraction that match the document labels',
       'After running, check that PI Name = Sarah Chen and Total Budget = $485,000',
     ],
     lessons: [
@@ -123,17 +123,17 @@ export const MODULES: ModuleDefinition[] = [
       },
       {
         title: 'Key terms',
-        content: 'Workflow \u2014 A saved pipeline of processing steps that can be run against documents.\n\nStep \u2014 One stage in the pipeline. Each step contains one or more tasks.\n\nTask \u2014 A single operation within a step (e.g., "Extraction", "Prompt", "Format").\n\nSearchSet \u2014 A collection of fields you want to extract. Each field has a name and optional configuration like allowed values.\n\nExtract Key \u2014 A single field within a SearchSet (e.g., "PI Name", "Funding Amount", "Agency").',
+        content: 'Workflow \u2014 A saved pipeline of processing steps that can be run against documents.\n\nStep \u2014 One stage in the pipeline. Each step contains one or more tasks.\n\nTask \u2014 A single operation within a step (e.g., "Extraction", "Prompt", "Format").\n\nExtraction \u2014 A collection of fields you want to extract. Each field has a name and optional configuration like allowed values.\n\nExtract Key \u2014 A single field within an Extraction (e.g., "PI Name", "Funding Amount", "Agency").',
         variant: 'key-terms',
       },
       {
         title: 'The document pipeline',
-        content: 'When you upload a document, Vandalizer processes it through several stages:\n\n1. **Text extraction** \u2014 The raw text is pulled from PDFs, DOCX, XLSX, and HTML files using specialized readers.\n2. **Chunking** \u2014 The text is split into overlapping segments for semantic search.\n3. **Embedding** \u2014 Each chunk is embedded into ChromaDB, a vector database, so it can be searched semantically.\n\nWhen a workflow runs an Extraction step, the LLM receives the full document text and your SearchSet fields, and returns structured JSON with the extracted values.',
+        content: 'When you upload a document, Vandalizer processes it through several stages:\n\n1. **Text extraction** \u2014 The raw text is pulled from PDFs, DOCX, XLSX, and HTML files using specialized readers.\n2. **Chunking** \u2014 The text is split into overlapping segments for semantic search.\n3. **Embedding** \u2014 Each chunk is embedded into ChromaDB, a vector database, so it can be searched semantically.\n\nWhen a workflow runs an Extraction step, the LLM receives the full document text and your Extraction fields, and returns structured JSON with the extracted values.',
         variant: 'concept',
       },
       {
         title: 'Build your first workflow',
-        content: '1. Go to the Workspace and open the Workflow editor (or navigate to Workflows and create a new one).\n2. Give your workflow a clear name, like "Grant Proposal Extractor".\n3. Add a step, then add an Extraction task to that step.\n4. In the Extraction task settings, select an existing SearchSet or create a new one.\n5. Add at least 3 fields to your SearchSet \u2014 for example: "Principal Investigator", "Funding Amount", "Sponsoring Agency".\n6. Select a document in your workspace, then click Run to execute the workflow.\n7. Review the extracted results in the output panel.',
+        content: '1. Go to the **Library** tab and click **New** to create a new workflow.\n2. Give your workflow a clear name, like "Grant Proposal Extractor", and add a description such as "Extracts key details from grant proposals".\n3. Add a step and give it a name, like "Extract Grant Details". Then add an Extraction task to that step.\n4. In the Extraction task settings, select an existing Extraction or create a new one.\n5. Add at least 3 fields to your Extraction \u2014 for example: "Principal Investigator", "Funding Amount", "Sponsoring Agency".\n6. Select a document, then click Run to execute the workflow.\n7. Review the extracted results in the output panel.',
         variant: 'walkthrough',
       },
       {
@@ -227,7 +227,7 @@ export const MODULES: ModuleDefinition[] = [
     lessons: [
       {
         title: 'From process map to workflow architecture',
-        content: 'In the previous module, you decomposed a process into steps and identified which are AI-suitable. Now you need to translate each step into a specific task type in Vandalizer.\n\nThe mapping is straightforward:\n\u2022 "Find information in a document" \u2192 Extraction task with a SearchSet\n\u2022 "Analyze or summarize the extracted data" \u2192 Prompt task\n\u2022 "Compute, total, or apply rules" \u2192 Code Execution task\n\u2022 "Check a document for specific sections or elements" \u2192 Prompt task\n\u2022 "Produce a formatted report or export" \u2192 Document Renderer or Data Export\n\u2022 "Compare this document to another" \u2192 Add Document + Prompt task\n\nThe key insight: you\'re not starting from scratch asking "what can this tool do?" You\'re starting from your process and asking "which tool handles this step?"',
+        content: 'In the previous module, you decomposed a process into steps and identified which are AI-suitable. Now you need to translate each step into a specific task type in Vandalizer.\n\nThe mapping is straightforward:\n\u2022 "Find information in a document" \u2192 Extraction task with an Extraction\n\u2022 "Analyze or summarize the extracted data" \u2192 Prompt task\n\u2022 "Compute, total, or apply rules" \u2192 Code Execution task\n\u2022 "Check a document for specific sections or elements" \u2192 Prompt task\n\u2022 "Produce a formatted report or export" \u2192 Document Renderer or Data Export\n\u2022 "Compare this document to another" \u2192 Add Document + Prompt task\n\nThe key insight: you\'re not starting from scratch asking "what can this tool do?" You\'re starting from your process and asking "which tool handles this step?"',
         variant: 'concept',
       },
       {
@@ -237,7 +237,7 @@ export const MODULES: ModuleDefinition[] = [
       },
       {
         title: 'The extract-reason-deliver pattern',
-        content: 'The most common and most effective workflow pattern in research administration has three phases:\n\n1. **Extract** \u2014 Pull structured data from the document. This is your Extraction step with a well-designed SearchSet. The output is clean, consistent JSON.\n\n2. **Reason** \u2014 Analyze the extracted data. This might be a Prompt step that summarizes findings, a Code Execution step that computes totals, or both. The output is analysis or computed results.\n\n3. **Deliver** \u2014 Produce something useful. A formatted report, a CSV export, a compliance checklist, or structured data ready for your tracking system.\n\nThis pattern works because it separates concerns. If your final report is wrong, you can check: did the extraction get the right data? (Check step 1\'s output.) Did the analysis interpret it correctly? (Check step 2.) You can fix the broken step without rebuilding the whole workflow.',
+        content: 'The most common and most effective workflow pattern in research administration has three phases:\n\n1. **Extract** \u2014 Pull structured data from the document. This is your Extraction step with a well-designed Extraction. The output is clean, consistent JSON.\n\n2. **Reason** \u2014 Analyze the extracted data. This might be a Prompt step that summarizes findings, a Code Execution step that computes totals, or both. The output is analysis or computed results.\n\n3. **Deliver** \u2014 Produce something useful. A formatted report, a CSV export, a compliance checklist, or structured data ready for your tracking system.\n\nThis pattern works because it separates concerns. If your final report is wrong, you can check: did the extraction get the right data? (Check step 1\'s output.) Did the analysis interpret it correctly? (Check step 2.) You can fix the broken step without rebuilding the whole workflow.',
         variant: 'concept',
         diagram: 'extract-reason-deliver',
         knowledgeCheck: {
@@ -279,7 +279,7 @@ export const MODULES: ModuleDefinition[] = [
     description: 'Build a comprehensive 20+ field extraction using a sample NIH R01 proposal from Dr. James Park. The document has budget breakdowns, key personnel, and specific aims to extract.',
     objectives: [
       'Add the sample NIH R01 proposal to your workspace',
-      'Create a SearchSet with 15+ fields covering all document sections',
+      'Create an Extraction with 15+ fields covering all document sections',
       'Extract budget categories, personnel, aims, and compliance fields',
     ],
     tips: [
@@ -295,17 +295,17 @@ export const MODULES: ModuleDefinition[] = [
       },
       {
         title: 'Key terms',
-        content: 'Structured Output \u2014 The LLM is constrained to return data matching a specific schema (built from your SearchSet fields as a dynamic Pydantic model). This prevents formatting errors and hallucinated fields.\n\nThinking Mode \u2014 When enabled, the LLM reasons step-by-step before answering. Pass 1 uses thinking for accuracy; Pass 2 disables it for speed.\n\nConsensus Repetition \u2014 An optional mode that runs extraction 3 times in parallel and uses majority voting to resolve disagreements. 3x the cost, but highest accuracy for critical fields.\n\nChunking \u2014 When you have many fields (20+), the extraction can be split into smaller batches to avoid overwhelming the LLM\'s context window.',
+        content: 'Structured Output \u2014 The LLM is constrained to return data matching a specific schema (built from your Extraction fields as a dynamic Pydantic model). This prevents formatting errors and hallucinated fields.\n\nThinking Mode \u2014 When enabled, the LLM reasons step-by-step before answering. Pass 1 uses thinking for accuracy; Pass 2 disables it for speed.\n\nConsensus Repetition \u2014 An optional mode that runs extraction 3 times in parallel and uses majority voting to resolve disagreements. 3x the cost, but highest accuracy for critical fields.\n\nChunking \u2014 When you have many fields (20+), the extraction can be split into smaller batches to avoid overwhelming the LLM\'s context window.',
         variant: 'key-terms',
       },
       {
         title: 'Configuring fields for accuracy',
-        content: 'The way you configure your SearchSet fields directly impacts extraction quality:\n\n**Field names** should be specific and unambiguous. "PI Name" is better than "Name". "Total Budget (USD)" is better than "Budget".\n\n**Enum values** constrain a field to a set of allowed options. For a field like "Document Type", you might set enum values to ["Grant Proposal", "Progress Report", "Budget Justification"]. This prevents the LLM from inventing categories.\n\n**Optional fields** should be marked as such. If a field like "Co-PI" won\'t appear in every document, marking it optional tells the extraction engine not to hallucinate a value when one doesn\'t exist.\n\n**Field descriptions** (in the title/searchphrase) give the LLM additional context about what to look for.',
+        content: 'The way you configure your Extraction fields directly impacts extraction quality:\n\n**Field names** should be specific and unambiguous. "PI Name" is better than "Name". "Total Budget (USD)" is better than "Budget".\n\n**Enum values** constrain a field to a set of allowed options. For a field like "Document Type", you might set enum values to ["Grant Proposal", "Progress Report", "Budget Justification"]. This prevents the LLM from inventing categories.\n\n**Optional fields** should be marked as such. If a field like "Co-PI" won\'t appear in every document, marking it optional tells the extraction engine not to hallucinate a value when one doesn\'t exist.\n\n**Field descriptions** (in the title/searchphrase) give the LLM additional context about what to look for.',
         variant: 'concept',
       },
       {
         title: 'Build a comprehensive extraction',
-        content: '1. Create a new SearchSet or expand an existing one to 15+ fields.\n2. Group related fields logically \u2014 e.g., personnel fields together, budget fields together.\n3. Use enum_values for any categorical field (status, type, category).\n4. Mark fields that may not always be present as optional.\n5. Add descriptive titles to help the LLM understand ambiguous fields.\n6. Run the extraction on a test document and review the results.\n7. Iterate: adjust field names and add enum constraints for any fields that extracted poorly.',
+        content: '1. Create a new Extraction or expand an existing one to 15+ fields.\n2. Group related fields logically \u2014 e.g., personnel fields together, budget fields together.\n3. Use enum_values for any categorical field (status, type, category).\n4. Mark fields that may not always be present as optional.\n5. Add descriptive titles to help the LLM understand ambiguous fields.\n6. Run the extraction on a test document and review the results.\n7. Iterate: adjust field names and add enum constraints for any fields that extracted poorly.',
         variant: 'walkthrough',
       },
       {
@@ -352,7 +352,7 @@ export const MODULES: ModuleDefinition[] = [
       },
       {
         title: 'Build a 3-step analysis workflow',
-        content: '1. Create a new workflow and add 3 steps.\n2. Step 1 \u2014 Add an Extraction task. Select a SearchSet with fields relevant to your document.\n3. Step 2 \u2014 Add a Prompt task. Write a prompt that analyzes the extracted data.\n4. Step 3 \u2014 Add a Formatter task. Write a template that structures the final output.\n5. Select a document and run the workflow. Observe how data flows through each step.\n6. Review each step\'s output individually using the step-by-step output panel.',
+        content: '1. Create a new workflow and add 3 steps.\n2. Step 1 \u2014 Add an Extraction task. Select an Extraction with fields relevant to your document.\n3. Step 2 \u2014 Add a Prompt task. Write a prompt that analyzes the extracted data.\n4. Step 3 \u2014 Add a Formatter task. Write a template that structures the final output.\n5. Select a document and run the workflow. Observe how data flows through each step.\n6. Review each step\'s output individually using the step-by-step output panel.',
         variant: 'walkthrough',
       },
       {
@@ -399,7 +399,7 @@ export const MODULES: ModuleDefinition[] = [
       },
       {
         title: 'Running tasks in parallel',
-        content: 'Within a single step, you can add multiple tasks. These tasks run concurrently \u2014 the workflow engine uses a thread pool to execute them simultaneously.\n\nThis is useful when you need multiple independent operations:\n\u2022 Extract from two different SearchSets at the same time\n\u2022 Call multiple APIs in parallel\n\u2022 Run an extraction while simultaneously fetching enrichment data from a website\n\nTo add parallel tasks, open a step in the workflow editor and click "Add Task" multiple times.',
+        content: 'Within a single step, you can add multiple tasks. These tasks run concurrently \u2014 the workflow engine uses a thread pool to execute them simultaneously.\n\nThis is useful when you need multiple independent operations:\n\u2022 Extract from two different Extractions at the same time\n\u2022 Call multiple APIs in parallel\n\u2022 Run an extraction while simultaneously fetching enrichment data from a website\n\nTo add parallel tasks, open a step in the workflow editor and click "Add Task" multiple times.',
         variant: 'concept',
       },
       {
@@ -493,7 +493,7 @@ export const MODULES: ModuleDefinition[] = [
       },
       {
         title: 'Validation as a safety net',
-        content: 'The best time to set up validation is before you need it. When you change your SearchSet fields, update a prompt, or when the underlying LLM model is updated, your workflow\'s behavior might change. If you have a validation plan, you can re-run it immediately to check for regressions.',
+        content: 'The best time to set up validation is before you need it. When you change your Extraction fields, update a prompt, or when the underlying LLM model is updated, your workflow\'s behavior might change. If you have a validation plan, you can re-run it immediately to check for regressions.',
         variant: 'insight',
       },
     ],

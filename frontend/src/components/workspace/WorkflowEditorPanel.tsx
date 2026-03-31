@@ -1782,7 +1782,7 @@ function TaskEditModal({ task, selectedDocUuids, onClose, onSave }: {
                       alignItems: 'center', justifyContent: 'space-between',
                     }}
                   >
-                    <span>{getTextValue('name') && getTextValue('search_set_uuid') ? getTextValue('name') : 'Browse extraction sets...'}</span>
+                    <span>{getTextValue('name') && getTextValue('search_set_uuid') ? getTextValue('name') : 'Browse extractions...'}</span>
                     <ChevronDown style={{ width: 14, height: 14, color: '#9ca3af', flexShrink: 0 }} />
                   </button>
                   {showSetPicker && (
