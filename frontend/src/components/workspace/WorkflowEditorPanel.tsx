@@ -1252,9 +1252,9 @@ function EditStepOverlay({
                   <Icon style={{ width: 16, height: 16, color }} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#202124' }}>{task.name}</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#202124' }}>{(task.data as Record<string, unknown>)?.name as string || task.name}</div>
                   <div style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>
-                    {task.name === 'Extraction' ? 'Structured data extraction'
+                    {task.name === 'Extraction' ? 'Extraction'
                       : task.name === 'Prompt' ? 'LLM prompt task'
                       : task.name === 'Formatter' || task.name === 'Format' ? 'Format output'
                       : task.name === 'AddWebsite' ? 'Fetch URL text'

@@ -305,7 +305,8 @@ class ExtractionNode(Node):
         doc_texts = None
         full_text = None
 
-        self.report_progress("Extraction running")
+        task_label = self.data.get("name")
+        self.report_progress(f"Running {task_label}" if task_label else "Extraction running")
 
         input_source = self.data.get("input_source", "step_input")
 
@@ -335,6 +336,15 @@ class ExtractionNode(Node):
 
         raw_output = extraction_response.get("raw") if isinstance(extraction_response, dict) else extraction_response
         formatted_output = extraction_response.get("formatted") if isinstance(extraction_response, dict) else extraction_response
+
+        # Label output with the custom task name when set
+        if task_label:
+            if isinstance(raw_output, list):
+                for entity in raw_output:
+                    if isinstance(entity, dict):
+                        entity["task_name"] = task_label
+            if isinstance(formatted_output, str):
+                formatted_output = f"### {task_label}\n{formatted_output}"
 
         return {
             "output": raw_output,
