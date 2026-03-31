@@ -19,6 +19,7 @@ import type { ModuleDefinition, ValidationResult, CompletionResult, ValidationCh
 import { CertifiedBanner } from '../components/certification/CertifiedBanner'
 import { CelebrationOverlay } from '../components/certification/CelebrationOverlay'
 import { ModuleDetail } from '../components/certification/ModuleDetail'
+import { useQueryClient } from '@tanstack/react-query'
 import { JourneyMap } from '../components/certification/JourneyMap'
 import { LEVEL_CONFIG, LEVEL_THRESHOLDS, TOTAL_XP, TIERS } from '../components/certification/constants'
 
@@ -133,7 +134,7 @@ export const MODULES: ModuleDefinition[] = [
       },
       {
         title: 'Build your first workflow',
-        content: '1. Go to the **Library** tab and click **New** to create a new workflow.\n2. Give your workflow a clear name, like "Grant Proposal Extractor", and add a description such as "Extracts key details from grant proposals".\n3. Add a step and give it a name, like "Extract Grant Details". Then add an Extraction task to that step.\n4. In the Extraction task settings, select an existing Extraction or create a new one.\n5. Add at least 3 fields to your Extraction \u2014 for example: "Principal Investigator", "Funding Amount", "Sponsoring Agency".\n6. Select a document, then click Run to execute the workflow.\n7. Review the extracted results in the output panel.',
+        content: 'When you start the lab exercise, here\'s what you\'ll do:\n\n1. Click **Set Up Lab** below to load the sample NSF proposal into your workspace.\n2. Go to the **Library** tab and click **New** to create a new workflow.\n3. Give your workflow a clear name, like "Grant Proposal Extractor", and add a description such as "Extracts key details from grant proposals".\n4. Add a step and give it a name, like "Extract Grant Details". Then add an Extraction task to that step.\n5. In the Extraction task settings, select an existing Extraction or create a new one.\n6. Add at least 3 fields to your Extraction \u2014 for example: "Principal Investigator", "Funding Amount", "Sponsoring Agency".\n7. Select the sample NSF proposal, then click Run to execute the workflow.\n8. Review the extracted results in the output panel.',
         variant: 'walkthrough',
       },
       {
@@ -748,6 +749,7 @@ function ValidationResults({ result, onDismiss }: { result: ValidationResult; on
 
 export default function Certification() {
   const { progress, loading, validate, complete, provision, getExercise, submitAssessment } = useCertification()
+  const queryClient = useQueryClient()
   const { toast } = useToast()
   const [activeModule, setActiveModule] = useState<string | null>(null)
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null)
@@ -843,6 +845,8 @@ export default function Certification() {
     setProvisioning(true)
     try {
       await provision(moduleId)
+      // Invalidate document queries so workspace shows the new files without a hard refresh
+      queryClient.invalidateQueries({ queryKey: ['documents'] })
     } finally {
       setProvisioning(false)
     }

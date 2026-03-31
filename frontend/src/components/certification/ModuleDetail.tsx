@@ -144,13 +144,16 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
           </button>
           <button
             onClick={() => handleTabChange('challenge')}
+            disabled={hasDocuments && !isProvisioned}
             className={cn(
               'px-4 py-2.5 text-sm font-medium transition-all border-b-2 -mb-px',
               tab === 'challenge'
                 ? 'border-highlight text-gray-900'
                 : 'border-transparent text-gray-500 hover:text-gray-700',
+              hasDocuments && !isProvisioned && 'opacity-40 cursor-not-allowed',
             )}
             style={tab === 'challenge' ? { borderColor: 'var(--highlight-color)' } : undefined}
+            title={hasDocuments && !isProvisioned ? 'Set up your lab first to unlock the challenge' : undefined}
           >
             <span className="flex items-center gap-1.5">
               <Target size={14} />
@@ -159,6 +162,74 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
           </button>
         </div>
       </div>
+
+      {/* Set Up Lab — shown above tab content so it's always accessible */}
+      {hasDocuments && (
+        <div className="px-6 pt-4">
+          <div
+            className={cn(
+              'p-4 border-2',
+              isProvisioned ? 'border-green-200 bg-green-50/50' : 'border-blue-200 bg-blue-50/50',
+            )}
+            style={{ borderRadius: 'var(--ui-radius, 12px)' }}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                {isProvisioned ? (
+                  <CheckCircle2 size={18} className="text-green-600" />
+                ) : (
+                  <Upload size={18} className="text-blue-600" />
+                )}
+                <div>
+                  <span className={cn('text-sm font-semibold', isProvisioned ? 'text-green-800' : 'text-blue-800')}>
+                    {isProvisioned ? 'Documents ready in your workspace' : 'Set up your lab to load sample documents'}
+                  </span>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {exercise?.documents.map(d => d.replace('.pdf', '')).join(', ')}
+                  </p>
+                  {isProvisioned && (
+                    <a
+                      href="/"
+                      className="text-xs font-medium mt-1 inline-block hover:underline"
+                      style={{ color: 'var(--highlight-color)' }}
+                    >
+                      Open Workspace &rarr;
+                    </a>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={onProvision}
+                disabled={provisioning || isProvisioned}
+                className={cn(
+                  'flex items-center gap-2 px-4 py-2 text-sm font-semibold transition-all disabled:opacity-50',
+                  isProvisioned
+                    ? 'bg-green-100 text-green-700 cursor-default'
+                    : 'bg-blue-600 text-white hover:bg-blue-700',
+                )}
+                style={{ borderRadius: 'var(--ui-radius, 12px)' }}
+              >
+                {provisioning ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    Setting up...
+                  </>
+                ) : isProvisioned ? (
+                  <>
+                    <Check size={14} />
+                    Ready
+                  </>
+                ) : (
+                  <>
+                    <Upload size={14} />
+                    Set Up Lab
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tab content */}
       <div className="p-6">
@@ -171,7 +242,7 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
               lessons={module.lessons}
               moduleId={module.id}
               onAllLessonsRead={handleAllLessonsRead}
-              onGoToChallenge={() => setTab('challenge')}
+              onGoToChallenge={() => hasDocuments && !isProvisioned ? undefined : setTab('challenge')}
               onStepChange={onTabChange}
             />
           </div>
@@ -195,72 +266,6 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
                 onSubmit={onSubmitAssessment}
                 submitting={submittingAssessment}
               />
-            )}
-
-            {/* Set Up Lab button */}
-            {hasDocuments && (
-              <div
-                className={cn(
-                  'mb-5 p-4 border-2',
-                  isProvisioned ? 'border-green-200 bg-green-50/50' : 'border-blue-200 bg-blue-50/50',
-                )}
-                style={{ borderRadius: 'var(--ui-radius, 12px)' }}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    {isProvisioned ? (
-                      <CheckCircle2 size={18} className="text-green-600" />
-                    ) : (
-                      <Upload size={18} className="text-blue-600" />
-                    )}
-                    <div>
-                      <span className={cn('text-sm font-semibold', isProvisioned ? 'text-green-800' : 'text-blue-800')}>
-                        {isProvisioned ? 'Documents ready in your workspace' : 'Add sample documents to your workspace'}
-                      </span>
-                      <p className="text-xs text-gray-500 mt-0.5">
-                        {exercise?.documents.map(d => d.replace('.pdf', '')).join(', ')}
-                      </p>
-                      {isProvisioned && (
-                        <a
-                          href="/"
-                          className="text-xs font-medium mt-1 inline-block hover:underline"
-                          style={{ color: 'var(--highlight-color)' }}
-                        >
-                          Open Workspace &rarr;
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                  <button
-                    onClick={onProvision}
-                    disabled={provisioning || isProvisioned}
-                    className={cn(
-                      'flex items-center gap-2 px-4 py-2 text-sm font-semibold transition-all disabled:opacity-50',
-                      isProvisioned
-                        ? 'bg-green-100 text-green-700 cursor-default'
-                        : 'bg-blue-600 text-white hover:bg-blue-700',
-                    )}
-                    style={{ borderRadius: 'var(--ui-radius, 12px)' }}
-                  >
-                    {provisioning ? (
-                      <>
-                        <Loader2 size={14} className="animate-spin" />
-                        Setting up...
-                      </>
-                    ) : isProvisioned ? (
-                      <>
-                        <Check size={14} />
-                        Ready
-                      </>
-                    ) : (
-                      <>
-                        <Upload size={14} />
-                        Set Up Lab
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
             )}
 
             {/* Step-by-step instructions */}
@@ -303,7 +308,7 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
                 style={{ borderRadius: 'var(--ui-radius, 12px)' }}
               >
                 <h4 className="text-xs font-bold uppercase tracking-wider text-purple-600 mb-2">
-                  Your SearchSet should include:
+                  Your Extraction should include:
                 </h4>
                 <div className="flex flex-wrap gap-1.5">
                   {exercise.expected_fields.map((field) => (

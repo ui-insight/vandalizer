@@ -872,7 +872,7 @@ def process_extraction_outputs(
             time.sleep(_PROCESSING_POLL_INTERVAL)
             _waited += _PROCESSING_POLL_INTERVAL
 
-        results = {}
+        results = []
         for doc_uuid in document_uuids:
             doc = db.smart_document.find_one({"uuid": doc_uuid})
             if not doc or not doc.get("raw_text"):
@@ -886,10 +886,12 @@ def process_extraction_outputs(
                     extraction_config_override=extraction_config,
                     field_metadata=field_metadata,
                 )
-                results[doc_uuid] = doc_results
+                for entity in doc_results:
+                    entity["document_id"] = doc_uuid
+                    results.append(entity)
             except Exception as e:
                 logger.error("Extraction failed for doc %s: %s", doc_uuid, e)
-                results[doc_uuid] = {"error": str(e)}
+                results.append({"document_id": doc_uuid, "error": str(e)})
 
     output_config = auto.get("output_config") or {}
     if not output_config:

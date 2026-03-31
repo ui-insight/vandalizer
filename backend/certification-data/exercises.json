@@ -52,10 +52,10 @@
     "documents": ["nsf-proposal-alpine-ecology.pdf"],
     "instructions": [
       "Click **Set Up Lab** to add the sample NSF proposal to your workspace.",
-      "Go to your **Workspace** and open the **Workflows** page.",
+      "Go to your **Library** tab and click **New** to create a workflow.",
       "Create a workflow named **NSF Proposal Extractor**.",
       "Add a step with an **Extraction** task.",
-      "Create a SearchSet with fields: `PI Name`, `Institution`, `Total Budget`, `Project Period`, `Sponsoring Agency`.",
+      "Create a Extraction with fields: `PI Name`, `Institution`, `Total Budget`, `Project Period`, `Sponsoring Agency`.",
       "Run the workflow against **nsf-proposal-alpine-ecology.pdf**.",
       "Verify: PI Name = Sarah Chen, Total Budget = $485,000."
     ],
@@ -73,13 +73,13 @@
     }
   },
   "extraction_engine": {
-    "overview": "Create a comprehensive extraction with 15+ fields using a sample NIH R01 proposal. Click **Set Up Lab** to add the PDF, then build a detailed SearchSet and validate your results.",
+    "overview": "Create a comprehensive extraction with 15+ fields using a sample NIH R01 proposal. Click **Set Up Lab** to add the PDF, then build a detailed Extraction and validate your results.",
     "documents": ["nih-r01-neuroscience.pdf"],
     "instructions": [
       "Click **Set Up Lab** to add the sample NIH R01 proposal to your workspace.",
-      "Create a new SearchSet with 15+ fields covering all sections of the NIH proposal.",
+      "Create a new Extraction with 15+ fields covering all sections of the NIH proposal.",
       "Include fields for: PI, institution, grant number, budget categories (personnel, equipment, travel, indirect costs), specific aims, human subjects, vertebrate animals, and key personnel.",
-      "Create a workflow with an Extraction task using your comprehensive SearchSet.",
+      "Create a workflow with an Extraction task using your comprehensive Extraction.",
       "Run the workflow against **nih-r01-neuroscience.pdf**.",
       "Review the results — verify PI Name = James Park, Total Budget = $1,250,000."
     ],
@@ -110,7 +110,7 @@
     "instructions": [
       "Click **Set Up Lab** to add the sample subaward agreement to your workspace.",
       "Create a 3-step workflow:",
-      "  **Step 1** — Extraction: Create a SearchSet with fields for parties, amounts, period, PI, deliverables, and compliance terms.",
+      "  **Step 1** — Extraction: Create a Extraction with fields for parties, amounts, period, PI, deliverables, and compliance terms.",
       "  **Step 2** — Prompt: Write a prompt that analyzes the extracted subaward data and identifies key obligations and deadlines.",
       "  **Step 3** — Formatter: Format the analysis into a structured compliance summary report.",
       "Run the workflow against **subaward-agreement.pdf**.",
