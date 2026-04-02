@@ -91,14 +91,51 @@ This section covers what you need to know when deploying Vandalizer for real use
 
 ### Resource Requirements
 
-Vandalizer's server-side workload is document processing, API serving, and background task execution. LLM inference happens externally via API calls (OpenAI, Azure, etc.), so the server does not need a GPU.
+Vandalizer is designed to be lightweight. The application itself (all Docker services plus the OS) consumes roughly **8 GB of RAM** in production. A machine with **16 GB of RAM** comfortably handles a departmental deployment; smaller teams can run on as little as **10 GB**.
+
+These requirements cover the Vandalizer application only — they assume LLM inference and OCR happen via external API calls (OpenAI, Azure, Ollama on a separate host, etc.). The server does **not** need a GPU when using external LLM providers.
 
 | Deployment size | CPU | RAM | Storage | Users |
 |----------------|-----|-----|---------|-------|
-| Small team | 4 cores | 8 GB | 50 GB | < 50 |
+| Small team | 4 cores | 8–10 GB | 50 GB | < 50 |
 | Department / college | 8 cores | 16 GB | 100 GB+ | 50–500 |
 
 Storage needs depend primarily on the volume and size of uploaded documents. Plan for growth if users will upload large PDFs or office files regularly.
+
+### Local LLM & OCR Hosting (Optional)
+
+If you want a fully self-contained installation with no external API dependencies, you can host your own LLM and OCR services alongside Vandalizer. This is a separate infrastructure concern with significantly different hardware requirements.
+
+**What this gives you:** Complete data sovereignty — no document content or prompts leave your network. Required for institutions with strict data-handling policies or air-gapped environments.
+
+**Hardware requirements for local LLM hosting:**
+
+| Component | Minimum | Recommended |
+|-----------|---------|-------------|
+| GPU | NVIDIA GPU with 16+ GB VRAM | NVIDIA GPU with 24–80 GB VRAM |
+| System RAM | 32 GB | 64 GB+ |
+| Storage | 100 GB SSD (for model weights) | 500 GB+ NVMe SSD |
+
+The exact requirements depend on the model size and concurrency you need. A 7B-parameter model can run on a single consumer GPU; 70B+ models need high-VRAM GPUs or multi-GPU setups.
+
+**Supported hardware configurations:**
+
+- **Apple Mac Mini / Mac Studio** (M-series) — Good for small teams. Unified memory architecture makes these surprisingly capable for local inference. 64 GB+ unified memory recommended.
+- **Workstation with NVIDIA GPU** — A single RTX 4090 (24 GB VRAM) or A6000 (48 GB VRAM) handles most models.
+- **NVIDIA DGX / multi-GPU servers** — For high-concurrency deployments or very large models (70B+).
+- **Rack-mounted GPU servers** — Standard enterprise option. Any server with one or more NVIDIA datacenter GPUs (A100, H100, L40S).
+
+**Software stack for local inference:**
+
+Vandalizer connects to local LLMs through its standard model configuration (Admin → System Config → Models). Common local inference servers include:
+
+- [**Ollama**](https://ollama.ai) — Simplest setup. Install, pull a model, point Vandalizer at the Ollama endpoint. Protocol: `ollama`.
+- [**vLLM**](https://docs.vllm.ai) — Higher throughput for concurrent users. Exposes an OpenAI-compatible API. Protocol: `openai` or `vllm`.
+- [**llama.cpp server**](https://github.com/ggerganov/llama.cpp) — Lightweight, runs on CPU or GPU. OpenAI-compatible API.
+
+For OCR, self-hosted options include [Marker](https://github.com/VikParuchuri/marker), [Surya](https://github.com/VikParuchuri/surya), or a Tesseract wrapper. These can run on the same GPU server or on a separate machine. See the [PDF Processing & OCR](#pdf-processing--ocr) section for configuration details.
+
+**Deployment topology:** The local LLM/OCR server does **not** need to be the same machine as Vandalizer. A common setup is two servers — one lightweight machine for Vandalizer (16 GB RAM, no GPU) and one GPU-equipped machine for inference — connected over the local network.
 
 ### Database Name
 

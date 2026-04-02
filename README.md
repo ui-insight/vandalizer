@@ -19,7 +19,7 @@ The project was developed at the University of Idaho under the NSF GRANTED progr
 - **Workflow Engine** - Chain extraction tasks into repeatable pipelines with dependency resolution
 - **RAG Chat** - Ask questions against your document collection with citation-backed answers
 - **Team Collaboration** - Multi-tenant workspaces with role-based access and shared libraries
-- **Self-Hosted** - Run on your own infrastructure with full control over your data
+- **Self-Hosted** - Run on your own infrastructure with full control over your data. A single server with 16 GB of RAM is sufficient; see the [Deployment Guide](DEPLOY.md) for details on local LLM/OCR hosting options for fully air-gapped installations.
 
 ## Prerequisites
 
