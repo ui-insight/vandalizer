@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 _fernet = None
 
 
-def _get_fernet():
+def _get_fernet() -> Fernet | None:
     global _fernet
     if _fernet is not None:
         return _fernet
@@ -34,7 +34,7 @@ def encrypt_value(plaintext: str) -> str:
     f = _get_fernet()
     if f is None:
         return plaintext
-    return "enc:" + f.encrypt(plaintext.encode()).decode()
+    return "enc:" + f.encrypt(plaintext.encode()).decode("ascii")
 
 
 def decrypt_value(value: str) -> str:
@@ -47,7 +47,7 @@ def decrypt_value(value: str) -> str:
         logger.warning("Cannot decrypt value — CONFIG_ENCRYPTION_KEY not set")
         return value
     try:
-        return f.decrypt(value[4:].encode()).decode()
+        return f.decrypt(value[4:].encode()).decode("utf-8")
     except InvalidToken:
         logger.error("Failed to decrypt config value — key may have changed")
         return value

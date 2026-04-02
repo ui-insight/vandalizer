@@ -26,7 +26,7 @@ jobs:
       packages: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - name: Set outputs
@@ -44,14 +44,14 @@ jobs:
           echo "ref_name=${sanitized_ref}" >> "$GITHUB_OUTPUT"
           echo "sha_short=${sha_short}" >> "$GITHUB_OUTPUT"
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.context }}
           push: true

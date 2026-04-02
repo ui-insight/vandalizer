@@ -1,7 +1,12 @@
 """Extraction API routes  - SearchSet CRUD and extraction execution."""
 
+from __future__ import annotations
+
 import json
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from app.models.extraction_test_case import ExtractionTestCase
 
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile
@@ -534,7 +539,7 @@ async def build_from_document(request: Request, uuid: str, req: BuildFromDocumen
 
 @router.post("/run-sync")
 @limiter.limit("30/minute")
-async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, user: User = Depends(get_current_user)):
+async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, user: User = Depends(get_current_user)) -> dict:
     # Look up the search set for the activity title
     ss = await _get_search_set_or_404(req.search_set_uuid, user)
     document_uuids = await _authorize_documents(req.document_uuids, user)
@@ -548,6 +553,7 @@ async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, u
         team_id=str(user.current_team) if user.current_team else None,
         search_set_uuid=req.search_set_uuid,
     )
+    assert activity.id is not None
 
     try:
         results = await svc.run_extraction_sync(
@@ -600,7 +606,7 @@ async def run_extraction_integrated(
     document_uuids: Optional[str] = Form(None),
     files: list[UploadFile] = File(default=[]),
     user: User = Depends(get_api_key_user),
-):
+) -> dict:
     """Run extraction via external API. Accepts optional file uploads and/or existing document UUIDs."""
     import uuid as _uuid
     from pathlib import Path
@@ -666,6 +672,7 @@ async def run_extraction_integrated(
         user_id=user.user_id,
         search_set_uuid=search_set_uuid,
     )
+    assert activity.id is not None
 
     try:
         results = await svc.run_extraction_sync(
@@ -685,7 +692,7 @@ async def run_extraction_integrated(
 async def get_extraction_status(
     activity_id: str,
     user: User = Depends(get_api_key_user),
-):
+) -> dict:
     """Check extraction status by activity ID."""
     try:
         activity_oid = PydanticObjectId(activity_id)
@@ -710,7 +717,7 @@ async def get_extraction_status(
 # Extraction test cases & validation
 # ---------------------------------------------------------------------------
 
-def _tc_response(tc) -> TestCaseResponse:
+def _tc_response(tc: "ExtractionTestCase") -> TestCaseResponse:
     return TestCaseResponse(
         id=str(tc.id),
         uuid=tc.uuid,
@@ -726,7 +733,7 @@ def _tc_response(tc) -> TestCaseResponse:
 
 
 @router.post("/test-cases", response_model=TestCaseResponse)
-async def create_test_case(req: CreateTestCaseRequest, user: User = Depends(get_current_user)):
+async def create_test_case(req: CreateTestCaseRequest, user: User = Depends(get_current_user)) -> TestCaseResponse:
     await _get_search_set_or_404(req.search_set_uuid, user, manage=True)
     if req.document_uuid:
         await _authorize_documents([req.document_uuid], user)
@@ -743,14 +750,14 @@ async def create_test_case(req: CreateTestCaseRequest, user: User = Depends(get_
 
 
 @router.get("/test-cases", response_model=list[TestCaseResponse])
-async def list_test_cases(search_set_uuid: str, user: User = Depends(get_current_user)):
+async def list_test_cases(search_set_uuid: str, user: User = Depends(get_current_user)) -> list[TestCaseResponse]:
     await _get_search_set_or_404(search_set_uuid, user, manage=True)
     tcs = await val_svc.list_test_cases(search_set_uuid)
     return [_tc_response(tc) for tc in tcs]
 
 
 @router.patch("/test-cases/{uuid}", response_model=TestCaseResponse)
-async def update_test_case(uuid: str, req: UpdateTestCaseRequest, user: User = Depends(get_current_user)):
+async def update_test_case(uuid: str, req: UpdateTestCaseRequest, user: User = Depends(get_current_user)) -> TestCaseResponse:
     current = await val_svc.get_test_case(uuid)
     if not current:
         raise HTTPException(status_code=404, detail="Test case not found")
@@ -771,7 +778,7 @@ async def update_test_case(uuid: str, req: UpdateTestCaseRequest, user: User = D
 
 
 @router.delete("/test-cases/{uuid}")
-async def delete_test_case(uuid: str, user: User = Depends(get_current_user)):
+async def delete_test_case(uuid: str, user: User = Depends(get_current_user)) -> dict:
     current = await val_svc.get_test_case(uuid)
     if not current:
         raise HTTPException(status_code=404, detail="Test case not found")
@@ -784,7 +791,7 @@ async def delete_test_case(uuid: str, user: User = Depends(get_current_user)):
 
 @router.post("/test-cases/from-extraction")
 @limiter.limit("10/minute")
-async def create_test_cases_from_extraction(request: Request, user: User = Depends(get_current_user)):
+async def create_test_cases_from_extraction(request: Request, user: User = Depends(get_current_user)) -> dict:
     """Run extraction on documents and auto-create test cases from results.
 
     The 'extract once, review, save as test case' flow. Users can then
@@ -818,7 +825,7 @@ async def create_test_cases_from_extraction(request: Request, user: User = Depen
 @router.get("/search-sets/{uuid}/quality-history")
 async def get_extraction_quality_history(
     uuid: str, limit: int = 50, user: User = Depends(get_current_user),
-):
+) -> dict:
     await _get_search_set_or_404(uuid, user)
     from app.services.quality_service import get_quality_history
     return {"runs": await get_quality_history("search_set", uuid, limit)}
@@ -827,7 +834,7 @@ async def get_extraction_quality_history(
 @router.get("/search-sets/{uuid}/quality-sparkline")
 async def get_extraction_quality_sparkline(
     uuid: str, limit: int = 10, user: User = Depends(get_current_user),
-):
+) -> dict:
     """Return compact score history for sparkline visualization."""
     await _get_search_set_or_404(uuid, user)
     from app.services.quality_service import get_quality_history
@@ -839,7 +846,7 @@ async def get_extraction_quality_sparkline(
 @router.get("/search-sets/{uuid}/quality-status")
 async def get_extraction_quality_status(
     uuid: str, user: User = Depends(get_current_user),
-):
+) -> dict:
     """Return quality status for Quality Pulse card."""
     import hashlib
     import json
@@ -900,7 +907,7 @@ async def get_extraction_quality_status(
 @router.get("/search-sets/{uuid}/quality-contract")
 async def get_extraction_quality_contract(
     uuid: str, user: User = Depends(get_current_user),
-):
+) -> dict:
     """Return quality contract status for a search set."""
     await _get_search_set_or_404(uuid, user)
     from app.services.quality_service import get_quality_contract_status
@@ -908,7 +915,7 @@ async def get_extraction_quality_contract(
 
 
 @router.get("/search-sets/{uuid}/verification-readiness")
-async def check_verification_readiness(uuid: str, user: User = Depends(get_current_user)):
+async def check_verification_readiness(uuid: str, user: User = Depends(get_current_user)) -> dict:
     """Check if a search set meets minimum thresholds for verification submission."""
     await _get_search_set_or_404(uuid, user)
     from app.services.quality_service import check_verification_readiness as check_ready
@@ -920,7 +927,7 @@ async def check_verification_readiness(uuid: str, user: User = Depends(get_curre
 async def get_extraction_suggestions(
     request: Request,
     uuid: str, user: User = Depends(get_current_user),
-):
+) -> dict:
     """Use LLM to suggest improvements based on validation results or field config."""
     await _get_search_set_or_404(uuid, user)
     from app.services.quality_service import get_latest_validation, generate_improvement_suggestions
@@ -963,7 +970,7 @@ async def find_best_settings(
     request: Request,
     uuid: str,
     user: User = Depends(get_current_user),
-):
+) -> StreamingResponse:
     """Try multiple extraction configurations via SSE, streaming results as each finishes."""
     await _get_search_set_or_404(uuid, user, manage=True)
     body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
@@ -990,14 +997,14 @@ async def find_best_settings(
 
 
 @router.get("/search-sets/{uuid}/tuning-result")
-async def get_tuning_result(uuid: str, user: User = Depends(get_current_user)):
+async def get_tuning_result(uuid: str, user: User = Depends(get_current_user)) -> dict:
     """Return the persisted tuning result for a search set, or null."""
     ss = await _get_search_set_or_404(uuid, user)
     return {"tuning_result": ss.tuning_result}
 
 
 @router.delete("/search-sets/{uuid}/tuning-result")
-async def clear_tuning_result(uuid: str, user: User = Depends(get_current_user)):
+async def clear_tuning_result(uuid: str, user: User = Depends(get_current_user)) -> dict:
     """Clear the persisted tuning result."""
     ss = await _get_search_set_or_404(uuid, user, manage=True)
     ss.tuning_result = None
@@ -1007,7 +1014,7 @@ async def clear_tuning_result(uuid: str, user: User = Depends(get_current_user))
 
 @router.post("/validate")
 @limiter.limit("10/minute")
-async def run_validation(request: Request, req: RunValidationRequest, user: User = Depends(get_current_user)):
+async def run_validation(request: Request, req: RunValidationRequest, user: User = Depends(get_current_user)) -> dict:
     await _get_search_set_or_404(req.search_set_uuid, user, manage=True)
     try:
         result = await val_svc.run_validation(
@@ -1024,7 +1031,7 @@ async def run_validation(request: Request, req: RunValidationRequest, user: User
 
 @router.post("/validate-v2")
 @limiter.limit("10/minute")
-async def run_validation_v2(request: Request, req: RunValidationV2Request, user: User = Depends(get_current_user)):
+async def run_validation_v2(request: Request, req: RunValidationV2Request, user: User = Depends(get_current_user)) -> dict:
     await _get_search_set_or_404(req.search_set_uuid, user, manage=True)
     document_uuids = [source.document_uuid for source in req.sources if source.document_uuid]
     if document_uuids:
@@ -1047,14 +1054,14 @@ async def run_validation_v2(request: Request, req: RunValidationV2Request, user:
 # ---------------------------------------------------------------------------
 
 @router.get("/search-sets/{uuid}/cross-field-rules")
-async def get_cross_field_rules(uuid: str, user: User = Depends(get_current_user)):
+async def get_cross_field_rules(uuid: str, user: User = Depends(get_current_user)) -> dict:
     """Get cross-field validation rules for a search set."""
     ss = await _get_search_set_or_404(uuid, user)
     return {"rules": ss.cross_field_rules}
 
 
 @router.put("/search-sets/{uuid}/cross-field-rules")
-async def update_cross_field_rules(uuid: str, request: Request, user: User = Depends(get_current_user)):
+async def update_cross_field_rules(uuid: str, request: Request, user: User = Depends(get_current_user)) -> dict:
     """Update cross-field validation rules for a search set."""
     body = await request.json()
     rules = body.get("rules", [])
@@ -1067,7 +1074,7 @@ async def update_cross_field_rules(uuid: str, request: Request, user: User = Dep
 
 
 @router.post("/search-sets/{uuid}/validate-cross-field")
-async def validate_cross_field(uuid: str, request: Request, user: User = Depends(get_current_user)):
+async def validate_cross_field(uuid: str, request: Request, user: User = Depends(get_current_user)) -> dict:
     """Run cross-field validation rules against provided extraction data."""
     body = await request.json()
     data = body.get("data", {})

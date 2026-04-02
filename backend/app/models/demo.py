@@ -25,6 +25,10 @@ class DemoApplication(Document):
     created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc))
     last_notified_position: Optional[int] = None
 
+    # Recapture drip — emails sent to activated users who haven't logged in
+    recapture_step: int = 0  # 0=not started, 1-3=sent step N
+    recapture_next_at: Optional[datetime.datetime] = None  # when to send next recapture email
+
     class Settings:
         name = "demo_application"
 

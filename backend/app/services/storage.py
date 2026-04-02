@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 
 class StorageBackend(Protocol):
@@ -101,9 +101,9 @@ class S3Storage:
         self._secret_access_key = secret_access_key
         self._endpoint_url = endpoint_url
 
-    def _session(self):
+    def _session(self) -> Any:
         try:
-            import aioboto3  # type: ignore[import]
+            import aioboto3
         except ImportError as e:
             raise RuntimeError(
                 "aioboto3 is required for S3 storage. "
@@ -135,7 +135,7 @@ class S3Storage:
             await s3.delete_object(Bucket=self._bucket, Key=relative_path)
 
     async def exists(self, relative_path: str) -> bool:
-        from botocore.exceptions import ClientError  # type: ignore[import]
+        from botocore.exceptions import ClientError
         async with self._session() as s3:
             try:
                 await s3.head_object(Bucket=self._bucket, Key=relative_path)
@@ -154,7 +154,7 @@ class S3Storage:
 _storage: StorageBackend | None = None
 
 
-def get_storage(settings=None) -> StorageBackend:  # type: ignore[return]
+def get_storage(settings: Any = None) -> StorageBackend:
     """Return the configured storage backend (singleton)."""
     global _storage
     if _storage is not None:

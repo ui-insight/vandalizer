@@ -383,15 +383,17 @@ export default function Landing() {
           </p>
 
           {/* Demo CTA */}
-          <div className="mb-8">
-            <Link
-              to="/demo"
-              className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/20 px-6 py-3 font-bold text-white transition-all hover:bg-white/20 hover:border-[#f1b300]/30"
-            >
-              Try the Free Trial
-              <span className="text-[#f1b300]">&rarr;</span>
-            </Link>
-          </div>
+          {authConfig?.trial_system_enabled && (
+            <div className="mb-8">
+              <Link
+                to="/demo"
+                className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/20 px-6 py-3 font-bold text-white transition-all hover:bg-white/20 hover:border-[#f1b300]/30"
+              >
+                Try the Free Trial
+                <span className="text-[#f1b300]">&rarr;</span>
+              </Link>
+            </div>
+          )}
 
           {/* Auth Block */}
           <AuthBlock config={authConfig} />

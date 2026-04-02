@@ -439,17 +439,21 @@ async def auth_config():
             }
         )
 
-    # Check if any demo/trial accounts exist (active or released)
-    from app.models.demo import DemoApplication
+    # Trial system is off by default for self-hosters
+    settings = get_settings()
+    demo_login_enabled = False
+    if settings.enable_trial_system:
+        from app.models.demo import DemoApplication
 
-    demo_login_enabled = await DemoApplication.find(
-        {"status": {"$in": ["active", "completed"]}},
-    ).count() > 0
+        demo_login_enabled = await DemoApplication.find(
+            {"status": {"$in": ["active", "completed"]}},
+        ).count() > 0
 
     return {
         "auth_methods": config.auth_methods,
         "oauth_providers": providers,
         "demo_login_enabled": demo_login_enabled,
+        "trial_system_enabled": settings.enable_trial_system,
     }
 
 

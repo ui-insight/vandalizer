@@ -16,6 +16,7 @@ from app.services.email_service import (
     activation_email,
     expiry_warning_email,
     trial_expired_email,
+    recapture_email,
 )
 from app.utils.security import hash_password
 
@@ -184,6 +185,10 @@ async def _activate_application(app: DemoApplication, settings: Settings) -> Non
     app.activated_at = now
     app.expires_at = expires_at
     await app.save()
+
+    # Seed recapture drip — first email 24h after activation
+    app.recapture_step = 0
+    app.recapture_next_at = now + datetime.timedelta(days=_RECAPTURE_SCHEDULE_DAYS[0])
 
     # Send activation email
     expires_str = expires_at.strftime("%B %d, %Y")
@@ -456,3 +461,100 @@ async def admin_list_post_responses() -> list[dict]:
             "created_at": r.created_at.isoformat(),
         })
     return result
+
+
+# ---------------------------------------------------------------------------
+# Recapture drip — re-engage activated users who haven't logged in
+# ---------------------------------------------------------------------------
+
+_RECAPTURE_STEPS = 3
+# Days after activation to send each step
+_RECAPTURE_SCHEDULE_DAYS = [1, 4, 9]
+
+
+async def process_recapture_drips(settings: Settings | None = None) -> int:
+    """Send recapture emails to activated demo users who haven't logged in.
+
+    Returns count of emails sent.
+    """
+    if settings is None:
+        settings = Settings()
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    sent = 0
+
+    # Find active demo apps with a pending recapture email due
+    apps = await DemoApplication.find(
+        DemoApplication.status == "active",
+        DemoApplication.recapture_step < _RECAPTURE_STEPS,
+        DemoApplication.recapture_next_at <= now,
+    ).to_list()
+
+    for app in apps:
+        # Skip if the user has already logged in
+        if app.user_id:
+            user = await User.find_one(User.user_id == app.user_id)
+            if user and user.last_login_at:
+                # User logged in — stop the recapture sequence
+                app.recapture_next_at = None
+                await app.save()
+                continue
+
+        step = app.recapture_step + 1  # next step to send (1-indexed)
+        resend_url = f"{settings.frontend_url}/demo/resend/{app.uuid}"
+
+        subject, html = recapture_email(
+            name=app.name,
+            step=step,
+            frontend_url=settings.frontend_url,
+            resend_url=resend_url,
+        )
+        success = await send_email(app.email, subject, html, settings)
+        if success:
+            sent += 1
+
+        # Advance to next step
+        app.recapture_step = step
+        if step < _RECAPTURE_STEPS:
+            next_delay = _RECAPTURE_SCHEDULE_DAYS[step] - _RECAPTURE_SCHEDULE_DAYS[step - 1]
+            app.recapture_next_at = now + datetime.timedelta(days=next_delay)
+        else:
+            app.recapture_next_at = None  # sequence complete
+        await app.save()
+
+    if sent:
+        logger.info("Sent %d recapture emails", sent)
+    return sent
+
+
+async def enqueue_recapture_all(settings: Settings | None = None) -> int:
+    """Admin: reset and enqueue recapture drips for all active demo users
+    who have never logged in. Used to backfill after SMTP issues.
+
+    Returns count of users enqueued.
+    """
+    if settings is None:
+        settings = Settings()
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    enqueued = 0
+
+    apps = await DemoApplication.find(
+        DemoApplication.status == "active",
+        DemoApplication.user_id != None,  # noqa: E711
+    ).to_list()
+
+    for app in apps:
+        user = await User.find_one(User.user_id == app.user_id)
+        if user and user.last_login_at:
+            continue  # already logged in, skip
+
+        # Reset the recapture sequence so it starts fresh
+        app.recapture_step = 0
+        app.recapture_next_at = now  # send first email on next processing cycle
+        await app.save()
+        enqueued += 1
+
+    if enqueued:
+        logger.info("Enqueued recapture drips for %d demo users", enqueued)
+    return enqueued

@@ -4,6 +4,8 @@ Provides hardcoded knowledge for NSF, NIH, DOD, DOE grant types.
 Admin can override via SystemConfig.extraction_config.domain_templates.
 """
 
+from typing import Any
+
 DOMAIN_TEMPLATES = {
     "nsf": {
         "name": "National Science Foundation (NSF)",
@@ -130,10 +132,10 @@ DOMAIN_TEMPLATES = {
 }
 
 
-def get_domain_template(domain: str, admin_overrides: dict | None = None) -> dict | None:
+def get_domain_template(domain: str, admin_overrides: dict | None = None) -> dict[str, Any] | None:
     """Get domain template, with admin overrides taking precedence."""
     if admin_overrides and domain in admin_overrides:
-        return admin_overrides[domain]
+        return dict(admin_overrides[domain])
     return DOMAIN_TEMPLATES.get(domain)
 
 
@@ -145,9 +147,9 @@ def get_field_hint(domain: str, field_name: str, admin_overrides: dict | None = 
     hints = template.get("field_hints", {})
     # Try exact match, then fuzzy
     if field_name in hints:
-        return hints[field_name]
+        return str(hints[field_name])
     lower = field_name.lower().replace(" ", "_")
     for key, val in hints.items():
         if key.lower().replace(" ", "_") == lower:
-            return val
+            return str(val)
     return None

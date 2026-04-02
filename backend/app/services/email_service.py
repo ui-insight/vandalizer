@@ -376,6 +376,70 @@ def quality_alert_email(
 # ---------------------------------------------------------------------------
 
 
+# ---------------------------------------------------------------------------
+# Recapture emails (activated demo users who haven't logged in)
+# ---------------------------------------------------------------------------
+
+
+_RECAPTURE_SEQUENCE = [
+    {
+        "subject": "Your Vandalizer demo account is waiting for you",
+        "heading": "Ready when you are",
+        "body": (
+            "You were activated for a Vandalizer demo "
+            "but we noticed you haven't logged in yet. "
+            "Your credentials were included in your activation email &mdash; "
+            "check your inbox (and spam folder) for an email from us."
+        ),
+        "cta": "Sign In Now",
+    },
+    {
+        "subject": "Don't miss out — your Vandalizer trial is ticking",
+        "heading": "Your trial clock is running",
+        "body": (
+            "Your 2-week Vandalizer demo is already active, but you haven't "
+            "signed in yet. Every day you wait is a day less to explore the platform. "
+            "If you're having trouble logging in, just reply to this email and we'll help."
+        ),
+        "cta": "Log In Now",
+    },
+    {
+        "subject": "Last reminder — your Vandalizer demo expires soon",
+        "heading": "Running out of time",
+        "body": (
+            "This is our last reminder &mdash; your Vandalizer demo trial will expire "
+            "soon and you haven't logged in yet. "
+            "We'd hate for you to miss the chance to try out AI-powered document intelligence. "
+            "If something went wrong with your account, reply to this email and we'll sort it out."
+        ),
+        "cta": "Try Vandalizer Now",
+    },
+]
+
+
+def recapture_email(
+    name: str, step: int, frontend_url: str, resend_url: str,
+) -> tuple[str, str]:
+    """Returns (subject, html_body) for a recapture drip email. step is 1-indexed."""
+    seq = _RECAPTURE_SEQUENCE[step - 1]
+    subject = seq["subject"]
+    html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
+    <div class="container"><div class="card">
+      <div class="logo">Vandalizer</div>
+      <h1>{seq['heading']}</h1>
+      <p>Hi {name}, {seq['body']}</p>
+      <p style="margin-top:24px"><a class="btn" href="{frontend_url}/login">{seq['cta']}</a></p>
+      <p style="font-size:13px;color:#6b7280;margin-top:16px">Lost your credentials? <a href="{resend_url}" style="color:#f1b300">Resend them</a>.</p>
+      <div class="footer">Vandalizer</div>
+    </div></div></body></html>"""
+    return subject, html
+
+
+# ---------------------------------------------------------------------------
+# Engagement emails (onboarding drip + inactivity nudge)
+# ---------------------------------------------------------------------------
+
+
 def onboarding_drip_email(
     name: str, step: int, module_title: str, module_description: str, frontend_url: str,
 ) -> tuple[str, str]:

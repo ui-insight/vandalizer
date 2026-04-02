@@ -9,8 +9,8 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.post("")
-async def graph_webhook(request: Request):
+@router.post("", response_model=None)
+async def graph_webhook(request: Request) -> Response | dict:
     """Receive Graph change notifications.
 
     Graph sends a validation request with ?validationToken=... on subscription
@@ -81,8 +81,8 @@ async def graph_webhook(request: Request):
     return {"status": "ok", "dispatched": dispatched}
 
 
-@router.post("/lifecycle")
-async def graph_lifecycle(request: Request):
+@router.post("/lifecycle", response_model=None)
+async def graph_lifecycle(request: Request) -> Response | dict:
     """Handle Graph subscription lifecycle notifications.
 
     These include reauthorization and missed-notification events.

@@ -171,3 +171,17 @@ async def admin_activate(
             detail="Application not found or not in pending status",
         )
     return {"ok": True}
+
+
+@router.post("/admin/recapture")
+async def admin_trigger_recapture(
+    user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+):
+    """Enqueue recapture drips for all active demo users who haven't logged in.
+
+    Use this after fixing SMTP issues to re-engage users who missed emails.
+    """
+    _require_admin(user)
+    count = await demo_service.enqueue_recapture_all(settings)
+    return {"ok": True, "enqueued": count}

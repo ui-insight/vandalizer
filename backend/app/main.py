@@ -69,13 +69,14 @@ logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
     logger.info("Starting Vandalizer backend")
     await init_db(get_settings())
 
     # Seed default feedback prompts for trial check-ins
-    from app.services.feedback_prompt_service import seed_default_prompts
-    await seed_default_prompts()
+    if get_settings().enable_trial_system:
+        from app.services.feedback_prompt_service import seed_default_prompts
+        await seed_default_prompts()
 
     yield
     logger.info("Shutting down Vandalizer backend")
@@ -91,7 +92,7 @@ app = FastAPI(
 app.state.limiter = limiter
 
 
-def _rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
+def _rate_limit_exceeded_handler(request: Request, exc: Exception) -> JSONResponse:
     return JSONResponse(
         status_code=429,
         content={"detail": "Rate limit exceeded. Please try again later."},
@@ -101,10 +102,11 @@ def _rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
-def _app_error_handler(request: Request, exc: AppError):
+def _app_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    app_exc: AppError = exc  # type: ignore[assignment]
     return JSONResponse(
-        status_code=exc.status_code,
-        content={"detail": exc.message},
+        status_code=app_exc.status_code,
+        content={"detail": app_exc.message},
     )
 
 
@@ -116,7 +118,7 @@ app.add_exception_handler(AppError, _app_error_handler)
 if not _boot_settings.is_production:
     import traceback as _tb
 
-    async def _dev_unhandled_error(request: Request, exc: Exception):
+    async def _dev_unhandled_error(request: Request, exc: Exception) -> JSONResponse:
         tb = _tb.format_exception(type(exc), exc, exc.__traceback__)
         logger.error("Unhandled exception:\n%s", "".join(tb))
         return JSONResponse(
@@ -134,7 +136,7 @@ if not _boot_settings.is_production:
 # Security headers middleware
 # ---------------------------------------------------------------------------
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next):  # type: ignore[no-untyped-def]
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
@@ -191,7 +193,8 @@ app.include_router(verification.router, prefix="/api/verification", tags=["verif
 app.include_router(office.router, prefix="/api/office", tags=["office"])
 app.include_router(automations.router, prefix="/api/automations", tags=["automations"])
 app.include_router(knowledge.router, prefix="/api/knowledge", tags=["knowledge"])
-app.include_router(demo.router, prefix="/api/demo", tags=["demo"])
+if _boot_settings.enable_trial_system:
+    app.include_router(demo.router, prefix="/api/demo", tags=["demo"])
 app.include_router(graph_webhooks.router, prefix="/api/webhooks/graph", tags=["webhooks"])
 app.include_router(browser_automation.router, prefix="/api/browser-automation", tags=["browser-automation"])
 app.include_router(certification.router, prefix="/api/certification", tags=["certification"])
@@ -201,7 +204,8 @@ app.include_router(approvals.router, prefix="/api/approvals", tags=["approvals"]
 app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
 app.include_router(spaces.router, prefix="/api/spaces", tags=["spaces"])
 app.include_router(support.router, prefix="/api/support", tags=["support"])
-app.include_router(feedback_prompt.router, prefix="/api/feedback/prompts", tags=["feedback-prompts"])
+if _boot_settings.enable_trial_system:
+    app.include_router(feedback_prompt.router, prefix="/api/feedback/prompts", tags=["feedback-prompts"])
 
 
 # ---------------------------------------------------------------------------
@@ -213,7 +217,7 @@ Instrumentator().instrument(app).expose(app, endpoint="/api/metrics")
 
 
 @app.get("/api/health")
-async def health():
+async def health() -> JSONResponse:
     """Health check that verifies all critical dependencies."""
     checks: dict[str, str] = {}
     settings = get_settings()

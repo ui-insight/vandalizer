@@ -15,6 +15,7 @@ export interface AuthConfig {
   auth_methods: string[]
   oauth_providers: OAuthProvider[]
   demo_login_enabled?: boolean
+  trial_system_enabled?: boolean
 }
 
 export async function getAuthConfig(): Promise<AuthConfig> {

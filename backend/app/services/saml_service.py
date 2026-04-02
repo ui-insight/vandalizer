@@ -60,7 +60,7 @@ def build_authn_request(provider_config: dict, request: Request) -> str:
     saml_settings = _get_saml_settings(provider_config, request)
     req = _prepare_request(request)
     auth = OneLogin_Saml2_Auth(req, saml_settings)
-    return auth.login()
+    return str(auth.login())
 
 
 def process_saml_response(
@@ -134,10 +134,10 @@ def get_sp_metadata(provider_config: dict, request: Request) -> str:
     errors = settings.validate_metadata(metadata)
     if errors:
         raise ValueError(f"SP metadata validation failed: {errors}")
-    return metadata
+    return str(metadata)
 
 
-def _first(val) -> Optional[str]:
+def _first(val: object) -> Optional[str]:
     """Get first element from a list or return the value if it's a string."""
     if isinstance(val, list) and val:
         return str(val[0])

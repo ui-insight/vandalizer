@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     s3_secret_access_key: str | None = None
     s3_endpoint_url: str | None = None
 
+    # Trial / demo system (disabled by default for self-hosters)
+    enable_trial_system: bool = False
+
     @model_validator(mode="after")
     def _resolve_paths(self) -> "Settings":
         # Resolve relative paths against the backend directory (parent of app/)

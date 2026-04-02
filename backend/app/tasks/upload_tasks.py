@@ -68,4 +68,4 @@ def dispatch_upload_tasks(
         queue="uploads",
     )
 
-    return result.id
+    return str(result.id)

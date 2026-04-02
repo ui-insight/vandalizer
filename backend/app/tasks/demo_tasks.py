@@ -46,6 +46,24 @@ async def _init_and_send_warnings():
     return await demo_service.send_expiry_warnings(settings)
 
 
+async def _init_and_process_recapture():
+    from app.database import init_db
+    from app.services import demo_service
+
+    settings = Settings()
+    await init_db(settings)
+    return await demo_service.process_recapture_drips(settings)
+
+
+async def _init_and_enqueue_recapture_all():
+    from app.database import init_db
+    from app.services import demo_service
+
+    settings = Settings()
+    await init_db(settings)
+    return await demo_service.enqueue_recapture_all(settings)
+
+
 @celery_app.task(
     bind=True,
     name="tasks.demo.process_waitlist",
@@ -86,3 +104,31 @@ def send_demo_expiry_warnings(self):
     """Send warning emails to demos expiring within 2 days."""
     count = _run_async(_init_and_send_warnings())
     return {"warnings_sent": count}
+
+
+@celery_app.task(
+    bind=True,
+    name="tasks.demo.process_recapture",
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
+    max_retries=2,
+    default_retry_delay=30,
+)
+def process_demo_recapture(self):
+    """Send recapture drip emails to activated users who haven't logged in."""
+    count = _run_async(_init_and_process_recapture())
+    return {"recapture_sent": count}
+
+
+@celery_app.task(
+    bind=True,
+    name="tasks.demo.enqueue_recapture_all",
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
+    max_retries=2,
+    default_retry_delay=30,
+)
+def enqueue_recapture_all(self):
+    """Admin-triggered: enqueue recapture drips for all eligible active demo users."""
+    count = _run_async(_init_and_enqueue_recapture_all())
+    return {"enqueued": count}

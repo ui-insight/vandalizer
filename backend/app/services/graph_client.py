@@ -56,7 +56,7 @@ def _get_valid_token(user_id: str) -> str | None:
                 scopes=["https://graph.microsoft.com/.default"],
             )
             if result and result.get("access_token"):
-                return result["access_token"]
+                return str(result["access_token"])
     except ImportError:
         pass
 
@@ -83,26 +83,26 @@ class GraphClient:
             "Content-Type": "application/json",
         }
 
-    def _get(self, path: str, params: dict | None = None) -> dict:
+    def _get(self, path: str, params: dict | None = None) -> dict[str, Any]:
         url = f"{BASE_URL}{path}"
         resp = httpx.get(url, headers=self._headers(), params=params, timeout=self.timeout)
         if resp.status_code >= 400:
             raise GraphAPIError(resp.status_code, resp.json(), url)
-        return resp.json()
+        return resp.json()  # type: ignore[no-any-return]
 
-    def _post(self, path: str, json: dict | None = None) -> dict:
+    def _post(self, path: str, json: dict | None = None) -> dict[str, Any]:
         url = f"{BASE_URL}{path}"
         resp = httpx.post(url, headers=self._headers(), json=json, timeout=self.timeout)
         if resp.status_code >= 400:
             raise GraphAPIError(resp.status_code, resp.json(), url)
-        return resp.json()
+        return resp.json()  # type: ignore[no-any-return]
 
-    def _patch(self, path: str, json: dict | None = None) -> dict:
+    def _patch(self, path: str, json: dict | None = None) -> dict[str, Any]:
         url = f"{BASE_URL}{path}"
         resp = httpx.patch(url, headers=self._headers(), json=json, timeout=self.timeout)
         if resp.status_code >= 400:
             raise GraphAPIError(resp.status_code, resp.json(), url)
-        return resp.json()
+        return resp.json()  # type: ignore[no-any-return]
 
     def _delete(self, path: str) -> None:
         url = f"{BASE_URL}{path}"
@@ -117,13 +117,13 @@ class GraphClient:
             raise GraphAPIError(resp.status_code, str(resp.content[:200]), url)
         return resp.content
 
-    def _put_bytes(self, url: str, content: bytes, content_type: str = "application/octet-stream") -> dict:
+    def _put_bytes(self, url: str, content: bytes, content_type: str = "application/octet-stream") -> dict[str, Any]:
         headers = self._headers()
         headers["Content-Type"] = content_type
         resp = httpx.put(url, headers=headers, content=content, timeout=self.timeout)
         if resp.status_code >= 400:
             raise GraphAPIError(resp.status_code, resp.json(), url)
-        return resp.json()
+        return resp.json()  # type: ignore[no-any-return]
 
     # ------------------------------------------------------------------
     # Mail
@@ -137,34 +137,34 @@ class GraphClient:
         top: int = 25,
         select: str = "id,subject,from,receivedDateTime,hasAttachments,bodyPreview",
         filter_query: str | None = None,
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         base = f"/users/{mailbox}" if mailbox else "/me"
         path = f"{base}/mailFolders/{folder_id}/messages"
         params: dict[str, Any] = {"$top": top, "$select": select, "$orderby": "receivedDateTime desc"}
         if filter_query:
             params["$filter"] = filter_query
         data = self._get(path, params)
-        return data.get("value", [])
+        return data.get("value", [])  # type: ignore[no-any-return]
 
-    def get_message(self, message_id: str, *, mailbox: str | None = None) -> dict:
+    def get_message(self, message_id: str, *, mailbox: str | None = None) -> dict[str, Any]:
         base = f"/users/{mailbox}" if mailbox else "/me"
         return self._get(f"{base}/messages/{message_id}")
 
-    def get_message_attachments(self, message_id: str, *, mailbox: str | None = None) -> list[dict]:
+    def get_message_attachments(self, message_id: str, *, mailbox: str | None = None) -> list[dict[str, Any]]:
         base = f"/users/{mailbox}" if mailbox else "/me"
         data = self._get(f"{base}/messages/{message_id}/attachments")
-        return data.get("value", [])
+        return data.get("value", [])  # type: ignore[no-any-return]
 
-    def list_mail_folders(self, *, mailbox: str | None = None) -> list[dict]:
+    def list_mail_folders(self, *, mailbox: str | None = None) -> list[dict[str, Any]]:
         base = f"/users/{mailbox}" if mailbox else "/me"
         data = self._get(f"{base}/mailFolders", {"$top": 100})
-        return data.get("value", [])
+        return data.get("value", [])  # type: ignore[no-any-return]
 
     # ------------------------------------------------------------------
     # OneDrive / Files
     # ------------------------------------------------------------------
 
-    def list_drive_items(self, folder_path: str = "/", *, drive_id: str | None = None) -> list[dict]:
+    def list_drive_items(self, folder_path: str = "/", *, drive_id: str | None = None) -> list[dict[str, Any]]:
         drive = f"/drives/{drive_id}" if drive_id else "/me/drive"
         if folder_path == "/":
             path = f"{drive}/root/children"
@@ -172,9 +172,9 @@ class GraphClient:
             clean = folder_path.lstrip("/")
             path = f"{drive}/root:/{clean}:/children"
         data = self._get(path)
-        return data.get("value", [])
+        return data.get("value", [])  # type: ignore[no-any-return]
 
-    def get_drive_item(self, item_id: str, *, drive_id: str | None = None) -> dict:
+    def get_drive_item(self, item_id: str, *, drive_id: str | None = None) -> dict[str, Any]:
         drive = f"/drives/{drive_id}" if drive_id else "/me/drive"
         return self._get(f"{drive}/items/{item_id}")
 
@@ -190,13 +190,13 @@ class GraphClient:
         *,
         drive_id: str | None = None,
         content_type: str = "application/octet-stream",
-    ) -> dict:
+    ) -> dict[str, Any]:
         drive = f"/drives/{drive_id}" if drive_id else "/me/drive"
         clean = folder_path.strip("/")
         url = f"{BASE_URL}{drive}/root:/{clean}/{filename}:/content"
         return self._put_bytes(url, content, content_type)
 
-    def create_folder(self, parent_path: str, name: str, *, drive_id: str | None = None) -> dict:
+    def create_folder(self, parent_path: str, name: str, *, drive_id: str | None = None) -> dict[str, Any]:
         drive = f"/drives/{drive_id}" if drive_id else "/me/drive"
         if parent_path == "/" or not parent_path:
             path = f"{drive}/root/children"
@@ -232,7 +232,7 @@ class GraphClient:
         *,
         content: str | None = None,
         card_json: dict | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         body: dict[str, Any] = {}
         if card_json:
             body["body"] = {"contentType": "html", "content": ""}
@@ -260,7 +260,7 @@ class GraphClient:
         expiration: datetime.datetime,
         *,
         client_state: str | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "changeType": change_type,
             "notificationUrl": notification_url,
@@ -271,7 +271,7 @@ class GraphClient:
             payload["clientState"] = client_state
         return self._post("/subscriptions", payload)
 
-    def renew_subscription(self, subscription_id: str, expiration: datetime.datetime) -> dict:
+    def renew_subscription(self, subscription_id: str, expiration: datetime.datetime) -> dict[str, Any]:
         return self._patch(f"/subscriptions/{subscription_id}", {
             "expirationDateTime": expiration.isoformat() + "Z",
         })

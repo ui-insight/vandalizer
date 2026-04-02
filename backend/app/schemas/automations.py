@@ -22,7 +22,7 @@ class CreateAutomationRequest(BaseModel):
     output_config: Optional[dict] = None
 
     @model_validator(mode="after")
-    def validate_trigger_config(self):
+    def validate_trigger_config(self) -> "CreateAutomationRequest":
         if self.trigger_type == "schedule":
             cfg = self.trigger_config or {}
             if not cfg.get("cron_expression"):
@@ -46,7 +46,7 @@ class UpdateAutomationRequest(BaseModel):
     output_config: Optional[dict] = None
 
     @model_validator(mode="after")
-    def validate_trigger_config(self):
+    def validate_trigger_config(self) -> "UpdateAutomationRequest":
         if self.trigger_type == "schedule":
             cfg = self.trigger_config or {}
             if not cfg.get("cron_expression"):

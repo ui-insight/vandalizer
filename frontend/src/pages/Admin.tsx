@@ -55,6 +55,7 @@ import * as approvalsApi from '../api/approvals'
 import type { ApprovalRequest } from '../api/approvals'
 import * as auditApi from '../api/audit'
 import type { AuditLogEntry } from '../api/audit'
+import { getAuthConfig } from '../api/auth'
 
 function applyThemeToDOM(theme: ThemeConfig) {
   const root = document.documentElement
@@ -4686,6 +4687,11 @@ export default function Admin() {
   const { user } = useAuth()
   const { currentTeam } = useTeams()
   const [activeTab, setActiveTab] = useState<Tab>('usage')
+  const [trialEnabled, setTrialEnabled] = useState(false)
+
+  useEffect(() => {
+    getAuthConfig().then(c => setTrialEnabled(!!c.trial_system_enabled))
+  }, [])
 
   const isGlobalAdmin = !!user?.is_admin
   const isStaff = !!user?.is_staff
@@ -4694,11 +4700,16 @@ export default function Admin() {
   const hasAccess = isGlobalAdmin || isStaff || isExaminer || isTeamAdmin
 
   // Staff see everything except config; examiners see analytics tabs only
-  const visibleTabs = isGlobalAdmin
+  const hiddenForNonAdmin = ['config', 'quality', 'demo', 'debugging', 'organizations', 'approvals', 'audit']
+  let visibleTabs = isGlobalAdmin
     ? TABS
     : isStaff
       ? TABS.filter(t => t.key !== 'config')
-      : TABS.filter(t => !['config', 'quality', 'demo', 'debugging', 'organizations', 'approvals', 'audit'].includes(t.key))
+      : TABS.filter(t => !hiddenForNonAdmin.includes(t.key))
+
+  if (!trialEnabled) {
+    visibleTabs = visibleTabs.filter(t => t.key !== 'demo')
+  }
 
   if (!hasAccess) {
     return (

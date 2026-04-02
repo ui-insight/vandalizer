@@ -8,6 +8,7 @@ import datetime
 import json
 import math
 import re
+import multiprocessing
 import threading
 
 
@@ -39,7 +40,7 @@ _SAFE_BUILTINS = {
 }
 
 
-def execute_sandboxed_code(code: str, input_data, timeout: int = 10) -> dict:
+def execute_sandboxed_code(code: str, input_data: object, timeout: int = 10) -> dict:
     """Execute sandboxed code in a daemon thread with a timeout.
 
     Returns a dict with one of:
@@ -50,7 +51,7 @@ def execute_sandboxed_code(code: str, input_data, timeout: int = 10) -> dict:
     result_holder: dict = {}
     local_vars = {"data": input_data, "result": None}
 
-    def _run():
+    def _run() -> None:
         try:
             exec(code, {"__builtins__": _SAFE_BUILTINS}, local_vars)  # noqa: S102  # nosec B102
         except Exception as exc:
@@ -68,7 +69,7 @@ def execute_sandboxed_code(code: str, input_data, timeout: int = 10) -> dict:
     return result_holder if result_holder else {"result": local_vars.get("result")}
 
 
-def run_sandboxed_code(code: str, input_data, result_queue) -> None:
+def run_sandboxed_code(code: str, input_data: object, result_queue: "multiprocessing.Queue[dict]") -> None:
     """Legacy entry point for multiprocessing-based execution."""
     local_vars = {"data": input_data, "result": None}
 

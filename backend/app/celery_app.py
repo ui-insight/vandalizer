@@ -42,6 +42,10 @@ celery.conf.beat_schedule = {
         "task": "tasks.demo.send_expiry_warnings",
         "schedule": crontab(hour=9, minute=0),  # daily at 9am
     },
+    "demo-recapture-drips": {
+        "task": "tasks.demo.process_recapture",
+        "schedule": crontab(hour=11, minute=0),  # daily at 11am
+    },
     # Passive workflow triggers
     "passive-process-pending-triggers": {
         "task": "tasks.passive.process_pending_triggers",
@@ -94,6 +98,10 @@ celery.conf.beat_schedule = {
         "schedule": crontab(hour=10, minute=30),  # daily at 10:30am
     },
 }
+
+if not settings.enable_trial_system:
+    for _key in ("demo-process-waitlist", "demo-check-expirations", "demo-send-expiry-warnings"):
+        celery.conf.beat_schedule.pop(_key, None)
 
 # Alias for import convenience
 celery_app = celery
