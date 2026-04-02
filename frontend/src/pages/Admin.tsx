@@ -385,7 +385,7 @@ function UsageTab() {
                     <Pie data={tokenDonut} cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={3} dataKey="value">
                       {tokenDonut.map((_, i) => <Cell key={i} fill={CHART_COLORS[i]} />)}
                     </Pie>
-                    <Tooltip formatter={(v: number | undefined) => formatNumber(v ?? 0)} contentStyle={{ borderRadius: 8, fontSize: 12 }} />
+                    <Tooltip formatter={(v) => formatNumber(Number(v ?? 0))} contentStyle={{ borderRadius: 8, fontSize: 12 }} />
                     <Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} />
                   </PieChart>
                 </ResponsiveContainer>
@@ -1824,7 +1824,7 @@ function QualityTab() {
               <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} tickLine={false} axisLine={{ stroke: '#e5e7eb' }} />
               <Tooltip
                 contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 12 }}
-                formatter={(value: number | undefined) => [`${value ?? 0}%`, 'Avg Score']}
+                formatter={(value) => [`${Number(value ?? 0)}%`, 'Avg Score']}
               />
               <Line type="monotone" dataKey="avg_score" stroke="#22c55e" strokeWidth={2} dot={false} name="Avg Score" />
             </LineChart>
@@ -2040,7 +2040,7 @@ function QualityTab() {
                                           <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} tickLine={false} axisLine={{ stroke: '#e5e7eb' }} />
                                           <Tooltip
                                             contentStyle={{ borderRadius: 8, border: '1px solid #e5e7eb', fontSize: 12 }}
-                                            formatter={(value: number | undefined) => [`${value ?? 0}%`, 'Score']}
+                                            formatter={(value) => [`${Number(value ?? 0)}%`, 'Score']}
                                           />
                                           <Line type="monotone" dataKey="score" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} name="Score" />
                                         </LineChart>
