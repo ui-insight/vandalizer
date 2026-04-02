@@ -4441,8 +4441,8 @@ function ValidateTab({
                         <YAxis domain={[0, 100]} tick={{ fontSize: 9, fill: '#9ca3af' }} />
                         <Tooltip
                           contentStyle={{ fontSize: 11, borderRadius: 6, border: '1px solid #e5e7eb' }}
-                          formatter={(value: number | undefined, name?: string) => {
-                            if (name === 'score') return [`${value ?? 0}%`, 'Quality']
+                          formatter={(value, name) => {
+                            if (name === 'score') return [`${Number(value ?? 0)}%`, 'Quality']
                             return [value, name]
                           }}
                           labelFormatter={(label, payload) => {
