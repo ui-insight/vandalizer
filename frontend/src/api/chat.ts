@@ -10,6 +10,7 @@ export async function streamChat(
   knowledgeBaseUuid?: string,
   includeOnboardingContext?: boolean,
   folderUuids?: string[],
+  isFirstSession?: boolean,
 ): Promise<{ conversationUuid: string; activityId: string }> {
   const res = await fetch('/api/chat', {
     method: 'POST',
@@ -23,6 +24,7 @@ export async function streamChat(
       ...(model ? { model } : {}),
       ...(includeOnboardingContext ? { include_onboarding_context: true } : {}),
       ...(folderUuids?.length ? { folder_uuids: folderUuids } : {}),
+      ...(isFirstSession ? { is_first_session: true } : {}),
     }),
   })
 

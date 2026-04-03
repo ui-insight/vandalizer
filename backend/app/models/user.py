@@ -27,6 +27,7 @@ class User(Document):
 
     # Engagement tracking
     last_login_at: Optional[datetime.datetime] = None
+    first_session_completed: bool = False
     onboarding_drip_step: int = 0  # 0=not started, 1-4=sent step N
     onboarding_drip_next_at: Optional[datetime.datetime] = None  # when to send next drip
     last_nudge_sent_at: Optional[datetime.datetime] = None

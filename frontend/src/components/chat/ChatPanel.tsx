@@ -8,7 +8,7 @@ import { useOnboarding } from '../../hooks/useOnboarding'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
 import { addLink, addDocument, removeDocument, removeLink } from '../../api/chat'
-import { getUserConfig, updateUserConfig } from '../../api/config'
+import { getUserConfig, updateUserConfig, markFirstSessionComplete } from '../../api/config'
 import type { FileAttachment, UrlAttachment } from '../../types/chat'
 
 const LOADING_WORDS = [
@@ -52,6 +52,7 @@ interface ChatPanelProps {
 export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessageConsumed }: ChatPanelProps) {
   const {
     messages,
+    setMessages,
     streamingContent,
     thinkingContent,
     thinkingDuration,
@@ -66,7 +67,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
 
   const { bumpActivitySignal, processingDoc, selectedDocUuids, selectedFolderUuids, activeKBUuid, activeKBTitle, deactivateKB } = useWorkspace()
   const { toast } = useToast()
-  const { pills: onboardingPills, loading: onboardingLoading } = useOnboarding()
+  const { pills: onboardingPills, isFirstSession, loading: onboardingLoading } = useOnboarding()
+  const firstSessionSeeded = useRef(false)
   const [fileAttachments, setFileAttachments] = useState<FileAttachment[]>([])
   const [urlAttachments, setUrlAttachments] = useState<UrlAttachment[]>([])
   const [attachLoading, setAttachLoading] = useState(false)
@@ -90,6 +92,21 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       }
     }).catch(() => {})
   }, [])
+
+  // Seed the first-session conversation with an opening assistant message
+  useEffect(() => {
+    if (isFirstSession && !onboardingLoading && messages.length === 0 && !firstSessionSeeded.current && !conversationToLoad) {
+      firstSessionSeeded.current = true
+      setMessages([{
+        role: 'assistant',
+        content:
+          "Hi — I'm your Vandalizer assistant. Before I show you around, I'd love to " +
+          "know a bit about your work.\n\n" +
+          "What kind of documents do you spend the most time processing? " +
+          "Grant proposals, compliance reviews, progress reports — or something else entirely?",
+      }])
+    }
+  }, [isFirstSession, onboardingLoading, messages.length, setMessages, conversationToLoad])
 
   const handleModelChange = (model: string) => {
     setSelectedModel(model)
@@ -177,7 +194,12 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const hasDocContext = fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0 || selectedFolderUuids.length > 0
 
   const handleSend = (message: string, includeOnboardingContext?: boolean) => {
-    send(message, selectedDocUuids, selectedModel || undefined, activeKBUuid || undefined, includeOnboardingContext, selectedFolderUuids)
+    // In first-session mode, every message uses the first-session system prompt
+    const firstSession = isFirstSession && !hasDocContext && !activeKBUuid
+    send(message, selectedDocUuids, selectedModel || undefined, activeKBUuid || undefined, includeOnboardingContext, selectedFolderUuids, firstSession || undefined)
+    if (firstSession) {
+      markFirstSessionComplete().catch(() => {})
+    }
   }
 
 
@@ -286,8 +308,44 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         className="flex-1 overflow-y-auto hide-scrollbar"
         style={{ padding: '20px 20px 180px 20px', position: 'relative' }}
       >
-        {/* Empty state: banner + contextual pills */}
-        {messages.length === 0 && !isStreaming && !onboardingLoading && (
+        {/* First-session: persistent welcome banner */}
+        {isFirstSession && !onboardingLoading && (
+          <div style={{ maxWidth: 640, margin: '0 auto 20px' }}>
+            <div
+              className="relative overflow-hidden text-white"
+              style={{
+                padding: '28px 24px',
+                borderRadius: 'var(--ui-radius, 12px)',
+                background: 'linear-gradient(135deg, var(--highlight-complement, #6a11cb), color-mix(in srgb, var(--highlight-color, #f1b300) 70%, #ffffff 30%))',
+              }}
+            >
+              <div
+                style={{
+                  position: 'absolute', top: '-50%', left: '-50%',
+                  width: '200%', height: '200%',
+                  background: 'radial-gradient(circle at center, rgba(255,255,255,0.15), transparent 70%)',
+                  animation: 'rotateBG 32s linear infinite',
+                }}
+              />
+              <div className="relative z-[1] flex items-center gap-4">
+                <div style={{ animation: 'float 3s ease-in-out infinite' }} className="shrink-0">
+                  <img src="/images/joevandal.png" alt="Joe Vandal" style={{ width: 22, height: 35 }} className="opacity-90" />
+                </div>
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3 }}>
+                    Welcome to Vandalizer
+                  </div>
+                  <div style={{ fontSize: 13, opacity: 0.8, marginTop: 2, fontWeight: 400 }}>
+                    AI-powered document intelligence for research administration
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Empty state: banner + contextual pills (non-first-session users) */}
+        {!isFirstSession && messages.length === 0 && !isStreaming && !onboardingLoading && (
           <div style={{ maxWidth: 640, margin: '0 auto' }}>
             <div
               className="relative overflow-hidden text-white"
@@ -407,14 +465,15 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           </div>
         )}
 
-        {/* Chat messages */}
-        {messages.map((msg, i) => (
-          <ChatMessage
-            key={i}
-            message={msg}
-            messageIndex={i}
-            conversationUuid={conversationUuid || undefined}
-          />
+        {/* Chat messages — centered under banner for first-session */}
+        <div style={isFirstSession ? { maxWidth: 640, margin: '0 auto' } : undefined}>
+          {messages.map((msg, i) => (
+            <ChatMessage
+              key={i}
+              message={msg}
+              messageIndex={i}
+              conversationUuid={conversationUuid || undefined}
+            />
         ))}
 
         {/* Streaming: thinking-only phase */}
@@ -449,6 +508,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         {error && (
           <div className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>
         )}
+        </div>{/* end centering wrapper */}
 
       </div>
 

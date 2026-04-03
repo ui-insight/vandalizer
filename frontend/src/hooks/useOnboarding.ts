@@ -65,6 +65,8 @@ function applyStatus(s: OnboardingStatus) {
 
 export interface OnboardingResult {
   pills: string[]
+  /** True when user has never interacted with Vandalizer — first-session onboarding experience */
+  isFirstSession: boolean
   /** True until user has files or sidebar activities (workflows, extractions, knowledge bases) */
   isNewUser: boolean
   status: OnboardingStatus | null
@@ -74,6 +76,7 @@ export interface OnboardingResult {
 
 export function useOnboarding(): OnboardingResult {
   const [pills, setPills] = useState<string[]>([])
+  const [isFirstSession, setIsFirstSession] = useState(false)
   const [isNewUser, setIsNewUser] = useState(true)
   const [status, setStatus] = useState<OnboardingStatus | null>(null)
   const [loading, setLoading] = useState(true)
@@ -85,21 +88,24 @@ export function useOnboarding(): OnboardingResult {
         // User is "new" if they have no files and no sidebar activities
         const hasActivity = s.has_documents || s.has_workflows || s.has_extraction_sets || s.has_knowledge_base
         setIsNewUser(!hasActivity)
-        setPills(applyStatus(s))
+
+        // First session: never completed onboarding, no conversations, no activity
+        const firstSession = !s.first_session_completed && !s.has_conversations && !hasActivity
+        setIsFirstSession(firstSession)
+
+        // First-session users get a seeded chat message instead of pills
+        setPills(firstSession ? [] : applyStatus(s))
       })
       .catch(() => {
-        // Default to new-user experience on API failure
+        // Default to first-session experience on API failure
+        setIsFirstSession(true)
         setIsNewUser(true)
-        setPills([
-          'What can I do here?',
-          'How do I set up a workflow?',
-          'How do knowledge bases work?',
-        ])
+        setPills([])
       })
       .finally(() => setLoading(false))
   }, [])
 
   useEffect(() => { fetchStatus() }, [fetchStatus])
 
-  return { pills, isNewUser, status, loading, refetchStatus: fetchStatus }
+  return { pills, isFirstSession, isNewUser, status, loading, refetchStatus: fetchStatus }
 }

@@ -191,6 +191,7 @@ async def chat(
             model_override=body.model,
             kb_uuid=body.knowledge_base_uuid,
             include_onboarding_context=body.include_onboarding_context,
+            is_first_session=body.is_first_session,
         ):
             yield chunk
 
