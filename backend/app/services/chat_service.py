@@ -25,6 +25,7 @@ from app.services.config_service import get_user_model_name
 from app.services.llm_service import (
     create_chat_agent,
     DOCUMENT_CHAT_SYSTEM_PROMPT,
+    FIRST_SESSION_SYSTEM_PROMPT,
     HELP_CHAT_SYSTEM_PROMPT,
     VANDALIZER_CONTEXT,
 )
@@ -139,6 +140,7 @@ async def chat_stream(
     model_override: Optional[str] = None,
     kb_uuid: Optional[str] = None,
     include_onboarding_context: bool = False,
+    is_first_session: bool = False,
 ) -> AsyncGenerator[str, None]:
     """Async generator yielding newline-delimited JSON chunks for streaming chat."""
 
@@ -247,6 +249,15 @@ async def chat_stream(
             "--- END REFERENCE DOCUMENTS ---"
         )
         system_prompt = DOCUMENT_CHAT_SYSTEM_PROMPT
+    elif is_first_session:
+        # First-session onboarding: conversational value discovery
+        prompt = (
+            "--- BEGIN VANDALIZER CONTEXT ---\n"
+            f"{VANDALIZER_CONTEXT}\n"
+            "--- END VANDALIZER CONTEXT ---\n\n"
+            f"User message: {message}"
+        )
+        system_prompt = FIRST_SESSION_SYSTEM_PROMPT
     elif include_onboarding_context:
         # Inject Vandalizer help context only when explicitly requested
         # (triggered by the placeholder pills in the chat UI).

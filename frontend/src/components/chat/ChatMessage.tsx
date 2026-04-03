@@ -1,9 +1,13 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import DOMPurify from 'dompurify'
 import { ThumbsUp, ThumbsDown, Copy, Check, ChevronRight } from 'lucide-react'
 import { marked } from 'marked'
 import { submitChatFeedback } from '../../api/feedback'
+import { useCertificationPanel } from '../../contexts/CertificationPanelContext'
+import { useWorkspace } from '../../contexts/WorkspaceContext'
 import type { ChatMessage as ChatMessageType } from '../../types/chat'
+
+const ACTION_RE = /\[ACTION:([\w-]+)\](.*?)\[\/ACTION\]/g
 
 const THINKING_WORDS = [
   'Thinking', 'Vandalizing', 'Pondering', 'Analyzing',
@@ -59,6 +63,9 @@ export function ChatMessage({ message, messageIndex, conversationUuid, streaming
   const [comment, setComment] = useState('')
   const [commentSent, setCommentSent] = useState(false)
   const [thinkingExpanded, setThinkingExpanded] = useState(false)
+  const contentRef = useRef<HTMLDivElement>(null)
+  const certPanel = useCertificationPanel()
+  const { setWorkspaceMode } = useWorkspace()
 
   // Resolve thinking content: streaming thinking > persisted thinking
   const thinkingText = streamingThinking || message.thinking || ''
@@ -68,9 +75,34 @@ export function ChatMessage({ message, messageIndex, conversationUuid, streaming
   const renderedHtml = useMemo(() => {
     if (isUser) return null
     // Strip any residual <think>/<thinking> blocks the backend didn't catch
-    const cleaned = message.content.replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>\n?/g, '')
-    return DOMPurify.sanitize(marked.parse(cleaned) as string)
+    let cleaned = message.content.replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>\n?/g, '')
+    // Replace [ACTION:type]label[/ACTION] markers with styled button HTML
+    cleaned = cleaned.replace(ACTION_RE, (_match, type: string, label: string) =>
+      `<button data-action="${type}" class="chat-action-btn">${label}</button>`
+    )
+    return DOMPurify.sanitize(marked.parse(cleaned) as string, {
+      ADD_TAGS: ['button'],
+      ADD_ATTR: ['data-action'],
+    })
   }, [message.content, isUser])
+
+  // Attach click handlers to action buttons after render
+  useEffect(() => {
+    const el = contentRef.current
+    if (!el) return
+    const buttons = el.querySelectorAll<HTMLButtonElement>('[data-action]')
+    const handlers: Array<[HTMLButtonElement, () => void]> = []
+    buttons.forEach(btn => {
+      const action = btn.getAttribute('data-action')
+      const handler = () => {
+        if (action === 'start-cert') certPanel.openPanel()
+        else if (action === 'upload-docs') setWorkspaceMode('files')
+      }
+      btn.addEventListener('click', handler)
+      handlers.push([btn, handler])
+    })
+    return () => { handlers.forEach(([b, h]) => b.removeEventListener('click', h)) }
+  }, [renderedHtml, certPanel, setWorkspaceMode])
 
   const handleFeedback = async (rating: 'up' | 'down') => {
     setFeedback(rating)
@@ -185,6 +217,7 @@ export function ChatMessage({ message, messageIndex, conversationUuid, streaming
 
           {message.content && (
             <div
+              ref={contentRef}
               className="select-text chat-markdown"
               style={{ fontSize: 14, lineHeight: 1.6 }}
               dangerouslySetInnerHTML={{ __html: renderedHtml! }}

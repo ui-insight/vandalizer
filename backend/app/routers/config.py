@@ -197,6 +197,7 @@ async def get_onboarding_status(user: User = Depends(get_current_user)):
         automations,
         knowledge_bases,
         doc_chat_count,
+        conversation_count,
         cert_progress,
     ) = await asyncio.gather(
         SmartDocument.find(SmartDocument.user_id == uid).count(),
@@ -215,6 +216,8 @@ async def get_onboarding_status(user: User = Depends(get_current_user)):
                 {"url_attachments": {"$ne": []}},
             ],
         }).count(),
+        # Any conversations at all
+        ChatConversation.find(ChatConversation.user_id == uid).count(),
         CertificationProgress.find_one(CertificationProgress.user_id == uid),
     )
 
@@ -232,8 +235,18 @@ async def get_onboarding_status(user: User = Depends(get_current_user)):
         has_knowledge_base=len(knowledge_bases) > 0,
         has_ready_knowledge_base=any(getattr(kb, "status", "") == "ready" for kb in knowledge_bases),
         has_chatted_with_docs=doc_chat_count > 0,
+        has_conversations=conversation_count > 0,
+        first_session_completed=user.first_session_completed,
         is_certified=bool(cert_progress and cert_progress.certified),
     )
+
+
+@router.post("/first-session-complete", status_code=204)
+async def mark_first_session_complete(user: User = Depends(get_current_user)):
+    """Mark the first-session onboarding as completed so it won't show again."""
+    if not user.first_session_completed:
+        user.first_session_completed = True
+        await user.save()
 
 
 # ---------------------------------------------------------------------------

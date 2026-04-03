@@ -201,6 +201,29 @@ html {
 .chat-markdown th { background: #f9fafb; font-weight: 600; }
 .chat-markdown hr { border: none; border-top: 1px solid #e5e7eb; margin: 1em 0; }
 
+/* Action buttons rendered from [ACTION:...] markers in chat responses */
+.chat-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 6px 4px 0;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  border: 1px solid var(--highlight-color, #eab308);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--highlight-color, #eab308) 10%, white);
+  color: var(--highlight-complement, #154cf7);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.chat-action-btn:hover {
+  background: color-mix(in srgb, var(--highlight-color, #eab308) 20%, white);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  transform: translateY(-1px);
+}
+
 /* ===== Landing page styles ===== */
 
 .landing-page .glass-panel {

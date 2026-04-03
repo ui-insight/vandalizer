@@ -13,6 +13,7 @@ class ChatRequest(BaseModel):
     model: Optional[str] = None
     knowledge_base_uuid: Optional[str] = None
     include_onboarding_context: bool = False
+    is_first_session: bool = False
 
 
 class AddLinkRequest(BaseModel):
