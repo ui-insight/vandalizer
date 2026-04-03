@@ -366,8 +366,8 @@ build_image() {
 
   echo -e "  ${SYM_NEURAL}  ${BOLD}Building ${label}...${RESET}"
 
-  # Run build in background, tee to logfile (--no-cache ensures code changes are picked up)
-  $COMPOSE_CMD build --no-cache "$service" > "$logfile" 2>&1 &
+  # Run build in background, tee to logfile
+  $COMPOSE_CMD build "$service" > "$logfile" 2>&1 &
   local pid=$!
 
   # Show a tail of the build output so the user sees progress
@@ -492,6 +492,9 @@ launch_services() {
   run_step "Starting API server" $COMPOSE_CMD up -d api
   run_step "Starting Celery workers" $COMPOSE_CMD up -d celery
   run_step "Starting frontend" $COMPOSE_CMD up -d frontend
+
+  # Clean up dangling images from the build
+  docker image prune -f >> "$SETUP_LOG" 2>&1 || true
 
   echo ""
   echo -e "  ${SYM_PULSE}  ${DIM}Waiting for API to come online...${RESET}"
@@ -1489,6 +1492,11 @@ do_redeploy() {
   wait_healthy "api" "API server" 90
   wait_for_api 90
   wait_healthy "frontend" "Frontend" 60
+
+  # Clean up dangling images and build cache to reclaim disk space
+  echo ""
+  echo -e "  ${SYM_PULSE}  ${DIM}Cleaning up old Docker images...${RESET}"
+  docker image prune -f >> "$SETUP_LOG" 2>&1 || true
 }
 
 # ---------------------------------------------------------------------------
