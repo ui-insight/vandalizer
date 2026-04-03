@@ -62,6 +62,20 @@ _BASE_STYLE = """
 """
 
 
+def test_email(to: str) -> tuple[str, str]:
+    """Returns (subject, html_body) for a deliverability test email."""
+    subject = "Vandalizer — Email Deliverability Test"
+    html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
+    <div class="container"><div class="card">
+      <div class="logo">Vandalizer</div>
+      <h1>Email Test</h1>
+      <p>This is a test email sent to <span class="highlight">{to}</span>.</p>
+      <p>If you're reading this in your <strong style="color:#fff">inbox</strong> (not spam), deliverability is working correctly.</p>
+      <div class="footer">Vandalizer — Email Deliverability Test</div>
+    </div></div></body></html>"""
+    return subject, html
+
+
 def waitlist_confirmation_email(name: str, position: int, frontend_url: str, status_uuid: str) -> tuple[str, str]:
     """Returns (subject, html_body) for waitlist confirmation."""
     subject = "You're on the Vandalizer Demo Waitlist!"

@@ -65,3 +65,15 @@ export function activateDemoUser(demoUuid: string) {
 export function getPostExperienceResponses() {
   return apiFetch<PostExperienceResponseAdmin[]>('/api/demo/admin/responses')
 }
+
+export function sendTestEmail(to: string) {
+  return apiFetch<{ ok: boolean; message: string }>(`/api/demo/admin/test-email?to=${encodeURIComponent(to)}`, {
+    method: 'POST',
+  })
+}
+
+export function adminResendCredentials(demoUuid: string) {
+  return apiFetch<{ ok: boolean; message: string }>(`/api/demo/resend-credentials/${demoUuid}`, {
+    method: 'POST',
+  })
+}

@@ -6,6 +6,7 @@ import {
   CheckCircle2, XCircle, Clock, Download, TrendingUp, TrendingDown,
   ChevronDown, ChevronUp, ArrowUpDown, Play, Minus, AlertCircle,
   ArrowLeft, FileText, FolderTree, X, Eye, Check, CheckCircle,
+  Mail, Send,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -33,7 +34,7 @@ import * as orgApi from '../api/organizations'
 import type { Organization, OrgMember, OrgTeam } from '../api/organizations'
 import {
   getDemoStats, getDemoApplications, releaseDemoUser, activateDemoUser,
-  getPostExperienceResponses,
+  getPostExperienceResponses, sendTestEmail, adminResendCredentials,
 } from '../api/demo'
 import { getAdminPromptOverview, adminUpdatePrompt, type PromptOverview } from '../api/feedbackPrompt'
 import type { DemoAdminStats, DemoApplication as DemoApp, PostExperienceResponseAdmin } from '../types/demo'
@@ -3435,6 +3436,8 @@ function DemoTab() {
 
   useEffect(() => { loadData() }, [loadData])
 
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
+
   async function handleActivate(uuid: string) {
     await activateDemoUser(uuid)
     loadData()
@@ -3443,6 +3446,31 @@ function DemoTab() {
   async function handleRelease(uuid: string) {
     await releaseDemoUser(uuid)
     loadData()
+  }
+
+  async function handleTestEmail(email: string) {
+    setActionLoading(`test-${email}`)
+    try {
+      await sendTestEmail(email)
+      alert(`Test email sent to ${email}`)
+    } catch {
+      alert('Failed to send test email — check SMTP configuration')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  async function handleResendCredentials(uuid: string, email: string) {
+    if (!confirm(`Resend credentials to ${email}? This will reset their password.`)) return
+    setActionLoading(`resend-${uuid}`)
+    try {
+      await adminResendCredentials(uuid)
+      alert(`Credentials resent to ${email}`)
+    } catch {
+      alert('Failed to resend credentials')
+    } finally {
+      setActionLoading(null)
+    }
   }
 
   const statusColors: Record<string, { bg: string; text: string }> = {
@@ -3568,7 +3596,7 @@ function DemoTab() {
                         {formatDate(app.created_at)}
                       </td>
                       <td style={{ padding: '12px 16px' }}>
-                        <div style={{ display: 'flex', gap: 6 }} onClick={(e) => e.stopPropagation()}>
+                        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} onClick={(e) => e.stopPropagation()}>
                           {app.status === 'pending' && (
                             <button
                               onClick={() => handleActivate(app.uuid)}
@@ -3591,6 +3619,36 @@ function DemoTab() {
                               }}
                             >
                               Release
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleTestEmail(app.email)}
+                            disabled={actionLoading === `test-${app.email}`}
+                            title={`Send test email to ${app.email}`}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: 4,
+                              padding: '4px 12px', borderRadius: 6, border: '1px solid #6b7280',
+                              background: '#f9fafb', color: '#374151', fontSize: 12, fontWeight: 600,
+                              cursor: 'pointer', fontFamily: 'inherit',
+                              opacity: actionLoading === `test-${app.email}` ? 0.5 : 1,
+                            }}
+                          >
+                            <Mail size={12} /> Test Email
+                          </button>
+                          {app.status === 'active' && (
+                            <button
+                              onClick={() => handleResendCredentials(app.uuid, app.email)}
+                              disabled={actionLoading === `resend-${app.uuid}`}
+                              title={`Resend credentials to ${app.email}`}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 4,
+                                padding: '4px 12px', borderRadius: 6, border: '1px solid #d97706',
+                                background: '#fffbeb', color: '#92400e', fontSize: 12, fontWeight: 600,
+                                cursor: 'pointer', fontFamily: 'inherit',
+                                opacity: actionLoading === `resend-${app.uuid}` ? 0.5 : 1,
+                              }}
+                            >
+                              <Send size={12} /> Resend Creds
                             </button>
                           )}
                           {app.admin_released && (
