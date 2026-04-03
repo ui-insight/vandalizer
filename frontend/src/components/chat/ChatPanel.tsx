@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Loader2, BookOpen, X, ArrowDown, ChevronRight } from 'lucide-react'
+import { Loader2, BookOpen, X, ArrowDown, ChevronRight, Shield, CheckCircle2, Upload } from 'lucide-react'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
 import { AttachmentList } from './AttachmentList'
@@ -308,9 +308,10 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         className="flex-1 overflow-y-auto hide-scrollbar"
         style={{ padding: '20px 20px 180px 20px', position: 'relative' }}
       >
-        {/* First-session: persistent welcome banner */}
+        {/* First-session: value proposition welcome */}
         {isFirstSession && !onboardingLoading && (
           <div style={{ maxWidth: 640, margin: '0 auto 20px' }}>
+            {/* Header banner */}
             <div
               className="relative overflow-hidden text-white"
               style={{
@@ -337,6 +338,78 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                   </div>
                   <div style={{ fontSize: 13, opacity: 0.8, marginTop: 2, fontWeight: 400 }}>
                     AI-powered document intelligence for research administration
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Value proposition cards */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+              <div style={{
+                display: 'flex', gap: 12, padding: '14px 16px',
+                borderRadius: 'var(--ui-radius, 12px)',
+                backgroundColor: '#fff', border: '1px solid #e5e7eb',
+              }}>
+                <div style={{
+                  flexShrink: 0, width: 36, height: 36, borderRadius: 8,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 10%, white)',
+                  color: 'var(--highlight-color, #eab308)',
+                }}>
+                  <Shield size={18} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#111827', lineHeight: 1.3 }}>
+                    Your documents stay private
+                  </div>
+                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 3, lineHeight: 1.5 }}>
+                    Unlike ChatGPT and Claude, your files never leave your institution's control. You choose the model — if it's a private endpoint, your data never touches a third party.
+                  </div>
+                </div>
+              </div>
+
+              <div style={{
+                display: 'flex', gap: 12, padding: '14px 16px',
+                borderRadius: 'var(--ui-radius, 12px)',
+                backgroundColor: '#fff', border: '1px solid #e5e7eb',
+              }}>
+                <div style={{
+                  flexShrink: 0, width: 36, height: 36, borderRadius: 8,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 10%, white)',
+                  color: 'var(--highlight-color, #eab308)',
+                }}>
+                  <CheckCircle2 size={18} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#111827', lineHeight: 1.3 }}>
+                    Workflows you can trust
+                  </div>
+                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 3, lineHeight: 1.5 }}>
+                    Every extraction workflow has documented quality metrics. Accuracy, consistency, and edge cases are tested and maintained — you see exactly how well it performs before you trust it.
+                  </div>
+                </div>
+              </div>
+
+              <div style={{
+                display: 'flex', gap: 12, padding: '14px 16px',
+                borderRadius: 'var(--ui-radius, 12px)',
+                backgroundColor: '#fff', border: '1px solid #e5e7eb',
+              }}>
+                <div style={{
+                  flexShrink: 0, width: 36, height: 36, borderRadius: 8,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 10%, white)',
+                  color: 'var(--highlight-color, #eab308)',
+                }}>
+                  <Upload size={18} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#111827', lineHeight: 1.3 }}>
+                    Built for research administration
+                  </div>
+                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 3, lineHeight: 1.5 }}>
+                    Purpose-built for grants, compliance, and institutional documents. Multi-format support, automatic OCR, and team collaboration — not a generic chatbot with a file upload bolted on.
                   </div>
                 </div>
               </div>
