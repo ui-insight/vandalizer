@@ -1,8 +1,6 @@
 """Symmetric encryption for sensitive config values stored in MongoDB."""
 
 import logging
-from typing import cast
-
 from cryptography.fernet import Fernet, InvalidToken
 
 logger = logging.getLogger(__name__)
@@ -35,11 +33,7 @@ def encrypt_value(plaintext: str) -> str:
     f = _get_fernet()
     if f is None:
         return plaintext
-<<<<<<< Updated upstream
     return "enc:" + f.encrypt(plaintext.encode()).decode("ascii")
-=======
-    return cast(str, "enc:" + f.encrypt(plaintext.encode()).decode())
->>>>>>> Stashed changes
 
 
 def decrypt_value(value: str) -> str:
@@ -52,11 +46,7 @@ def decrypt_value(value: str) -> str:
         logger.warning("Cannot decrypt value — CONFIG_ENCRYPTION_KEY not set")
         return value
     try:
-<<<<<<< Updated upstream
         return f.decrypt(value[4:].encode()).decode("utf-8")
-=======
-        return cast(str, f.decrypt(value[4:].encode()).decode())
->>>>>>> Stashed changes
     except InvalidToken:
         logger.error("Failed to decrypt config value — key may have changed")
         return value

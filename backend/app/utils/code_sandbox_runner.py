@@ -42,11 +42,7 @@ _SAFE_BUILTINS = {
 }
 
 
-<<<<<<< Updated upstream
-def execute_sandboxed_code(code: str, input_data: object, timeout: int = 10) -> dict:
-=======
 def execute_sandboxed_code(code: str, input_data: Any, timeout: int = 10) -> dict[str, Any]:
->>>>>>> Stashed changes
     """Execute sandboxed code in a daemon thread with a timeout.
 
     Returns a dict with one of:
@@ -75,11 +71,7 @@ def execute_sandboxed_code(code: str, input_data: Any, timeout: int = 10) -> dic
     return result_holder if result_holder else {"result": local_vars.get("result")}
 
 
-<<<<<<< Updated upstream
-def run_sandboxed_code(code: str, input_data: object, result_queue: "multiprocessing.Queue[dict]") -> None:
-=======
 def run_sandboxed_code(code: str, input_data: Any, result_queue: queue.Queue[dict[str, Any]]) -> None:
->>>>>>> Stashed changes
     """Legacy entry point for multiprocessing-based execution."""
     local_vars = {"data": input_data, "result": None}
 

@@ -11,11 +11,7 @@ from app.utils.code_sandbox_runner import execute_sandboxed_code
 logger = logging.getLogger(__name__)
 
 
-<<<<<<< Updated upstream
-def _try_parse_number(value: object) -> Optional[float]:
-=======
 def _try_parse_number(value: Any) -> Optional[float]:
->>>>>>> Stashed changes
     """Try to parse a numeric value from various formats."""
     if isinstance(value, (int, float)):
         return float(value)
@@ -28,11 +24,7 @@ def _try_parse_number(value: Any) -> Optional[float]:
         return None
 
 
-<<<<<<< Updated upstream
-def _try_parse_date(value: object) -> Optional[datetime]:
-=======
 def _try_parse_date(value: Any) -> Optional[datetime]:
->>>>>>> Stashed changes
     """Try to parse a date from common formats."""
     if isinstance(value, datetime):
         return value
@@ -51,11 +43,7 @@ def _try_parse_date(value: Any) -> Optional[datetime]:
     return None
 
 
-<<<<<<< Updated upstream
-def _get_field_value(data: dict, field_name: str) -> object:
-=======
 def _get_field_value(data: dict, field_name: str) -> Any:
->>>>>>> Stashed changes
     """Get a field value from extraction results, checking nested structures."""
     if field_name in data:
         return data[field_name]

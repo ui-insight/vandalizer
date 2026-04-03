@@ -26,10 +26,4 @@ def inline_defs(schema: dict[str, Any]) -> dict[str, Any]:
             return [_resolve(item) for item in node]
         return node
 
-<<<<<<< Updated upstream
-    result = _resolve(schema)
-    assert isinstance(result, dict)
-    return result
-=======
     return cast(dict[str, Any], _resolve(schema))
->>>>>>> Stashed changes
