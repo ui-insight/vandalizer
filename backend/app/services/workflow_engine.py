@@ -375,7 +375,13 @@ class PromptNode(Node):
             )
         elif input_source == "workflow_documents" or prev_step_name == "Document":
             doc_texts = self.data.get("doc_texts", [])
-            full_text = "\n".join(doc_texts) if doc_texts else ""
+            if len(doc_texts) > 1:
+                sections = []
+                for i, dt in enumerate(doc_texts, 1):
+                    sections.append(f"=== Document {i} ===\n{dt}")
+                full_text = "\n\n".join(sections)
+            else:
+                full_text = doc_texts[0] if doc_texts else ""
             chat_response = llm_chat_model(
                 model=self.model, prompt=prompt, data=full_text,
                 include_next_step=False, system_config_doc=self._sys_cfg,
@@ -410,7 +416,13 @@ class FormatNode(Node):
             text = self.data["selected_doc_text"]
         elif input_source == "workflow_documents" or prev_step_name == "Document":
             doc_texts = self.data.get("doc_texts", [])
-            text = "\n".join(doc_texts)
+            if len(doc_texts) > 1:
+                sections = []
+                for i, dt in enumerate(doc_texts, 1):
+                    sections.append(f"=== Document {i} ===\n{dt}")
+                text = "\n\n".join(sections)
+            else:
+                text = doc_texts[0] if doc_texts else ""
         elif prev_step_name == "Prompt":
             text = data.get("formatted_answer", "") if isinstance(data, dict) else data
         else:

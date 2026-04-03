@@ -135,6 +135,16 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
                         doc = db.smart_document.find_one({"uuid": uuid})
                         if doc and doc.get("raw_text"):
                             doc_texts.append(doc["raw_text"])
+                        else:
+                            logger.warning(
+                                "Document %s has no raw_text — it may still be processing or text extraction failed",
+                                uuid,
+                            )
+                    if not doc_texts:
+                        logger.error(
+                            "None of the %d input documents have raw_text available — workflow will produce no output",
+                            len(doc_uuids),
+                        )
                     task_data["doc_texts"] = doc_texts
 
                 # Pre-load specific document text when input_source is "select_document"
@@ -495,6 +505,16 @@ def resume_workflow_after_approval(self, approval_uuid):
                         doc = db.smart_document.find_one({"uuid": uuid})
                         if doc and doc.get("raw_text"):
                             doc_texts.append(doc["raw_text"])
+                        else:
+                            logger.warning(
+                                "Document %s has no raw_text — it may still be processing or text extraction failed",
+                                uuid,
+                            )
+                    if not doc_texts:
+                        logger.error(
+                            "None of the %d input documents have raw_text available — workflow will produce no output",
+                            len(doc_uuids),
+                        )
                     task_data["doc_texts"] = doc_texts
                 if task_data.get("input_source") == "select_document" and task_data.get("selected_document_uuid"):
                     sel_doc = db.smart_document.find_one({"uuid": task_data["selected_document_uuid"]})

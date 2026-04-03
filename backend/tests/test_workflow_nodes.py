@@ -227,7 +227,7 @@ class TestFormatNode:
         })
         result = node.process({"output": "prev", "step_name": "X"})
         args = mock_format.call_args[0]
-        assert "a\nb" == args[2]
+        assert "=== Document 1 ===\na\n\n=== Document 2 ===\nb" == args[2]
 
     @patch("app.services.workflow_engine.format_model")
     def test_format_from_prompt_step(self, mock_format):

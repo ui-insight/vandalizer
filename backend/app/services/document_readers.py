@@ -60,16 +60,22 @@ def ocr_extract_text_from_pdf(pdf_path: str, retries: int = 3) -> str:
     # OCR endpoint is stored in the database via admin config (SystemConfig)
     from pymongo import MongoClient
     from app.config import Settings
+    from app.utils.encryption import decrypt_value
     settings = Settings()
     client = MongoClient(settings.mongo_host)
     db = client[settings.mongo_db]
     cfg = db.system_config.find_one({})
     ocr_endpoint = (cfg or {}).get("ocr_endpoint", "")
+    ocr_api_key = decrypt_value((cfg or {}).get("ocr_api_key", ""))
 
     if not ocr_endpoint:
         logger.warning("OCR_ENDPOINT not configured — skipping OCR for %s", pdf_path)
         return ""
     logger.info("Extracting text with OCR for %s", pdf_path)
+
+    headers = {}
+    if ocr_api_key:
+        headers["Authorization"] = f"Bearer {ocr_api_key}"
 
     for _attempt in range(retries):
         try:
@@ -79,6 +85,7 @@ def ocr_extract_text_from_pdf(pdf_path: str, retries: int = 3) -> str:
                 with open(pdf_path, "rb") as f:
                     resp = client.post(
                         ocr_endpoint,
+                        headers=headers,
                         files={"file": (os.path.basename(pdf_path), f, "application/pdf")},
                     )
                 if resp.status_code == 200:

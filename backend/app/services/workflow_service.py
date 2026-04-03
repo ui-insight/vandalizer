@@ -422,6 +422,7 @@ async def run_workflow(
         session_id=session_id,
         status="queued",
         num_steps_total=len(wf.steps),
+        input_context={"doc_uuids": document_uuids},
     )
     await result.insert()
 

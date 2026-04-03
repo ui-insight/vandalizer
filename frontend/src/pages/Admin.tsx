@@ -21,7 +21,7 @@ import {
   getUsageStats, getUsageTimeseries, getUserLeaderboard, getTeamLeaderboard,
   getTeamDetail, getUserDetail,
   getWorkflowEvents, getSystemConfig, updateSystemConfig, updateM365Config,
-  addModel, updateModel, deleteModel, addOAuthProvider,
+  addModel, updateModel, deleteModel, testOcr, testModel, addOAuthProvider,
   deleteOAuthProvider, updateAuthMethods,
   getQualitySummary, getQualityTimeline, runRegressionSuite,
   getQualityAlerts, acknowledgeAlert, getQualityItems, getQualityItemDetail,
@@ -2176,6 +2176,11 @@ function ConfigTab() {
 
   // Endpoints
   const [ocrEndpoint, setOcrEndpoint] = useState('')
+  const [ocrApiKey, setOcrApiKey] = useState('')
+  const [ocrTesting, setOcrTesting] = useState(false)
+  const [ocrTestResult, setOcrTestResult] = useState<{ ok: boolean; message: string } | null>(null)
+  const [modelTesting, setModelTesting] = useState<number | null>(null)
+  const [modelTestResults, setModelTestResults] = useState<Record<number, { ok: boolean; message: string }>>({})
 
   // Auth
   const [authMethods, setAuthMethods] = useState<string[]>(['password'])
@@ -2211,6 +2216,7 @@ function ConfigTab() {
       setThemeColor(c.highlight_color || '#eab308')
       setThemeRadius(parseInt(c.ui_radius) || 12)
       setOcrEndpoint(c.ocr_endpoint || '')
+      setOcrApiKey(c.ocr_api_key || '')
       setAuthMethods(c.auth_methods || ['password'])
       setSupportContacts((c as unknown as Record<string, unknown>).support_contacts as typeof supportContacts || [])
       // Extraction config
@@ -2290,6 +2296,7 @@ function ConfigTab() {
           },
         },
         ocr_endpoint: ocrEndpoint,
+        ocr_api_key: ocrApiKey,
       })
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
@@ -2374,6 +2381,32 @@ function ConfigTab() {
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to delete model')
+    }
+  }
+
+  const handleTestOcr = async () => {
+    setOcrTesting(true)
+    setOcrTestResult(null)
+    try {
+      const res = await testOcr()
+      setOcrTestResult({ ok: true, message: res.message })
+    } catch (e) {
+      setOcrTestResult({ ok: false, message: e instanceof Error ? e.message : 'Test failed' })
+    } finally {
+      setOcrTesting(false)
+    }
+  }
+
+  const handleTestModel = async (index: number) => {
+    setModelTesting(index)
+    setModelTestResults(prev => { const next = { ...prev }; delete next[index]; return next })
+    try {
+      const res = await testModel(index)
+      setModelTestResults(prev => ({ ...prev, [index]: { ok: true, message: res.message } }))
+    } catch (e) {
+      setModelTestResults(prev => ({ ...prev, [index]: { ok: false, message: e instanceof Error ? e.message : 'Test failed' } }))
+    } finally {
+      setModelTesting(null)
     }
   }
 
@@ -2529,7 +2562,20 @@ function ConfigTab() {
                     {/* Characteristic bars (replaces speed / tier / privacy pills) */}
                     <ModelCharacterBars model={m as ModelInfo} />
                   </div>
-                  <div style={{ display: 'flex', gap: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    {modelTestResults[i] && (
+                      <span style={{ fontSize: 12, color: modelTestResults[i].ok ? '#059669' : '#dc2626', marginRight: 4, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={modelTestResults[i].message}>
+                        {modelTestResults[i].ok ? <CheckCircle2 size={14} style={{ verticalAlign: -2 }} /> : <XCircle size={14} style={{ verticalAlign: -2 }} />}
+                      </span>
+                    )}
+                    <button
+                      onClick={() => handleTestModel(i)}
+                      disabled={modelTesting === i}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: modelTesting === i ? '#9ca3af' : '#6b7280', padding: 4 }}
+                      title={modelTesting === i ? 'Testing...' : 'Test model'}
+                    >
+                      {modelTesting === i ? <RefreshCw size={16} className="animate-spin" /> : <Play size={16} />}
+                    </button>
                     <button
                       onClick={() => handleEditModel(i)}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4 }}
@@ -2825,6 +2871,33 @@ function ConfigTab() {
               type="url" value={ocrEndpoint} onChange={e => setOcrEndpoint(e.target.value)}
               placeholder="https://..." style={{ ...inputStyle, maxWidth: 500 }}
             />
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <label style={labelStyle}>OCR API Key (optional)</label>
+            <input
+              type="password" value={ocrApiKey} onChange={e => setOcrApiKey(e.target.value)}
+              placeholder="Bearer token..." style={{ ...inputStyle, maxWidth: 500 }}
+            />
+          </div>
+          <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button
+              onClick={handleTestOcr}
+              disabled={ocrTesting || !ocrEndpoint}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px',
+                fontSize: 13, fontWeight: 500, borderRadius: 'var(--ui-radius, 12px)',
+                border: '1px solid #e5e7eb', background: '#fff', cursor: ocrEndpoint ? 'pointer' : 'not-allowed',
+                color: '#374151', opacity: ocrTesting ? 0.6 : 1,
+              }}
+            >
+              <Play size={14} /> {ocrTesting ? 'Testing...' : 'Test Connection'}
+            </button>
+            {ocrTestResult && (
+              <span style={{ fontSize: 13, color: ocrTestResult.ok ? '#059669' : '#dc2626', fontWeight: 500 }}>
+                {ocrTestResult.ok ? <CheckCircle2 size={14} style={{ verticalAlign: -2, marginRight: 4 }} /> : <XCircle size={14} style={{ verticalAlign: -2, marginRight: 4 }} />}
+                {ocrTestResult.message}
+              </span>
+            )}
           </div>
         </div>
       </div>

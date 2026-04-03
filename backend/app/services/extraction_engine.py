@@ -131,6 +131,7 @@ class ExtractionEngine:
         if full_text is not None:
             texts = [full_text]
         if not texts:
+            logger.warning("No document texts provided for extraction — returning empty results")
             return []
 
         all_results = []

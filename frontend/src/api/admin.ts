@@ -199,6 +199,7 @@ export interface SystemConfigData {
   oauth_providers: Record<string, unknown>[]
   available_models: { name: string; tag: string; external: boolean; thinking: boolean; endpoint?: string; api_protocol?: string; api_key?: string; speed?: string; tier?: string; privacy?: string; supports_structured?: boolean; multimodal?: boolean; supports_pdf?: boolean }[]
   ocr_endpoint: string
+  ocr_api_key: string
   llm_endpoint: string
   highlight_color: string
   ui_radius: string
@@ -210,7 +211,7 @@ export function getSystemConfig() {
   return apiFetch<SystemConfigData>('/api/admin/config')
 }
 
-export function updateSystemConfig(data: { extraction_config?: Record<string, unknown>; quality_config?: Record<string, unknown>; ocr_endpoint?: string; llm_endpoint?: string; default_team_id?: string; support_contacts?: { user_id: string; email: string; name: string }[] }) {
+export function updateSystemConfig(data: { extraction_config?: Record<string, unknown>; quality_config?: Record<string, unknown>; ocr_endpoint?: string; ocr_api_key?: string; llm_endpoint?: string; default_team_id?: string; support_contacts?: { user_id: string; email: string; name: string }[] }) {
   return apiFetch<{ status: string }>('/api/admin/config', { method: 'PUT', body: JSON.stringify(data) })
 }
 
@@ -287,6 +288,16 @@ export function updateModel(index: number, data: { name: string; tag: string; ex
 
 export function deleteModel(index: number) {
   return apiFetch<{ status: string }>(`/api/admin/config/models/${index}`, { method: 'DELETE' })
+}
+
+// Test connectivity
+
+export function testOcr() {
+  return apiFetch<{ status: string; status_code: number; message: string }>('/api/admin/config/test-ocr', { method: 'POST' })
+}
+
+export function testModel(index: number) {
+  return apiFetch<{ status: string; model: string; message: string }>(`/api/admin/config/test-model/${index}`, { method: 'POST' })
 }
 
 // Auth
