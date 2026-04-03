@@ -108,6 +108,7 @@ class SystemConfig(Document):
     """System-wide configuration singleton."""
 
     ocr_endpoint: str = ""
+    ocr_api_key: str = ""
     llm_endpoint: str = ""
     available_models: list[dict] = []
 

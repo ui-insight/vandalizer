@@ -13,7 +13,7 @@ from app.dependencies import get_current_user
 from app.models.activity import ActivityEvent
 from app.models.audit_log import AdminAuditLog
 from app.models.system_config import SystemConfig
-from app.services.llm_service import clear_agent_caches
+from app.services.llm_service import clear_agent_caches, get_agent_model
 from app.utils.encryption import decrypt_value, encrypt_value
 from app.models.team import Team, TeamMembership
 from app.models.user import User
@@ -213,6 +213,7 @@ class ConfigUpdateRequest(BaseModel):
     extraction_config: Optional[dict] = None
     quality_config: Optional[dict] = None
     ocr_endpoint: Optional[str] = None
+    ocr_api_key: Optional[str] = None
     llm_endpoint: Optional[str] = None
     default_team_id: Optional[str] = None
     support_contacts: Optional[list[dict]] = None
@@ -1220,6 +1221,7 @@ async def get_config(
         "oauth_providers": _sanitize_providers(cfg.oauth_providers),
         "available_models": _sanitize_models(cfg.available_models),
         "ocr_endpoint": cfg.ocr_endpoint,
+        "ocr_api_key": "***" if decrypt_value(cfg.ocr_api_key) else "",
         "llm_endpoint": cfg.llm_endpoint,
         "highlight_color": cfg.highlight_color,
         "ui_radius": cfg.ui_radius,
@@ -1248,6 +1250,8 @@ async def update_config(
         cfg.quality_config = body.quality_config
     if body.ocr_endpoint is not None:
         cfg.ocr_endpoint = body.ocr_endpoint
+    if body.ocr_api_key is not None and body.ocr_api_key != "***":
+        cfg.ocr_api_key = encrypt_value(body.ocr_api_key)
     if body.llm_endpoint is not None:
         cfg.llm_endpoint = body.llm_endpoint
     if body.default_team_id is not None:
@@ -1916,3 +1920,67 @@ async def classification_dashboard(user: User = Depends(get_current_user)):
         "counts": counts,
         "recent_classifications": recent_list,
     }
+
+
+# ---------------------------------------------------------------------------
+# Test connectivity endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.post("/config/test-ocr")
+async def test_ocr(user: User = Depends(get_current_user)):
+    """Test OCR endpoint connectivity by sending a small health-check request."""
+    await _require_superadmin(user)
+
+    cfg = await SystemConfig.get_config()
+    if not cfg.ocr_endpoint:
+        raise HTTPException(status_code=400, detail="OCR endpoint not configured")
+
+    import httpx
+
+    headers: dict[str, str] = {}
+    api_key = decrypt_value(cfg.ocr_api_key) if cfg.ocr_api_key else ""
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.get(cfg.ocr_endpoint, headers=headers)
+            return {
+                "status": "ok",
+                "status_code": resp.status_code,
+                "message": f"OCR endpoint responded with {resp.status_code}",
+            }
+    except httpx.ConnectError:
+        raise HTTPException(status_code=502, detail="Could not connect to OCR endpoint")
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="OCR endpoint timed out")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"OCR test failed: {e}")
+
+
+@router.post("/config/test-model/{index}")
+async def test_model(index: int, user: User = Depends(get_current_user)):
+    """Test an LLM model by sending a minimal completion request."""
+    await _require_superadmin(user)
+
+    cfg = await SystemConfig.get_config()
+    if index < 0 or index >= len(cfg.available_models):
+        raise HTTPException(status_code=404, detail="Model not found")
+
+    model_cfg = cfg.available_models[index]
+    model_name = model_cfg.get("name", "")
+
+    try:
+        from pydantic_ai import Agent
+
+        model = get_agent_model(model_name)
+        agent = Agent(model, system_prompt="Reply with exactly: ok")
+        result = await agent.run("Say ok")
+        return {
+            "status": "ok",
+            "model": model_name,
+            "message": f"Model responded: {result.output[:100]}",
+        }
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Model test failed: {e}")
