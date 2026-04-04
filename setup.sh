@@ -315,6 +315,18 @@ configure_env() {
     echo -e "  ${SYM_CHECK}  Environment set to ${BOLD}development${RESET}"
   fi
 
+  # --- Web server port ---
+  echo ""
+  prompt "Web server port" "80" WEB_PORT
+  # Write WEB_PORT to root .env so docker compose picks it up
+  local root_env=".env"
+  if [[ -f "$root_env" ]] && grep -q "^WEB_PORT=" "$root_env" 2>/dev/null; then
+    sed -i.bak "s|^WEB_PORT=.*|WEB_PORT=${WEB_PORT}|" "$root_env" && rm -f "${root_env}.bak"
+  else
+    echo "WEB_PORT=${WEB_PORT}" >> "$root_env"
+  fi
+  echo -e "  ${SYM_CHECK}  Web server will listen on port ${BOLD}${WEB_PORT}${RESET}"
+
   # --- SMTP (optional) ---
   echo ""
   if confirm "Configure email notifications (SMTP)?" "n"; then
