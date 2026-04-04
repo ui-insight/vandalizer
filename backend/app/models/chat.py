@@ -97,6 +97,7 @@ class ChatConversation(Document):
     title: str
     user_id: str
     team_id: Optional[str] = None
+    is_first_session: bool = False
     messages: list[PydanticObjectId] = []
     file_attachments: list[PydanticObjectId] = []
     url_attachments: list[PydanticObjectId] = []

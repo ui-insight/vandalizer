@@ -195,6 +195,11 @@ async def chat_stream(
                 f"\n\n## Document: {att.filename}\n\n{att.content[:10000]}\n"
             )
 
+    # If the conversation was created during first-session onboarding, honour
+    # that flag even when the frontend doesn't pass it (e.g. after a remount).
+    if not is_first_session and conversation.is_first_session:
+        is_first_session = True
+
     # Load message history, excluding the user message we just saved (chat.py
     # saves the bare message before calling chat_stream).  We re-send it as
     # the enriched prompt below so the model only sees the version that

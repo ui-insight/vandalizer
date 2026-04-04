@@ -130,6 +130,7 @@ async def chat(
             uuid=str(uuid.uuid4()),
             user_id=user_id,
             team_id=team_id,
+            is_first_session=body.is_first_session,
         )
         conversation.generate_title()
         await conversation.insert()

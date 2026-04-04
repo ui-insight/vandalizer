@@ -12,6 +12,7 @@ from app.models.team import Team, TeamMembership
 from app.models.user import User
 from app.services.email_service import (
     send_email,
+    test_email,
     waitlist_confirmation_email,
     activation_email,
     expiry_warning_email,
@@ -558,3 +559,54 @@ async def enqueue_recapture_all(settings: Settings | None = None) -> int:
     if enqueued:
         logger.info("Enqueued recapture drips for %d demo users", enqueued)
     return enqueued
+
+
+async def send_test_email(to: str, settings: Settings | None = None) -> bool:
+    """Send a deliverability test email to verify SMTP/spam-folder status."""
+    if settings is None:
+        settings = Settings()
+    subject, html = test_email(to)
+    return await send_email(to, subject, html, settings)
+
+
+async def bulk_resend_credentials(settings: Settings | None = None) -> dict:
+    """Reset passwords and resend activation emails for all active demo users
+    who have never logged in. Returns counts of successes and failures."""
+    if settings is None:
+        settings = Settings()
+
+    apps = await DemoApplication.find(
+        DemoApplication.status == "active",
+        DemoApplication.user_id != None,  # noqa: E711
+    ).to_list()
+
+    sent = 0
+    skipped = 0
+    failed = 0
+
+    for app in apps:
+        user = await User.find_one(User.user_id == app.user_id)
+        if not user:
+            failed += 1
+            continue
+        if user.last_login_at:
+            skipped += 1
+            continue
+
+        # Generate new password and update
+        password = secrets.token_urlsafe(10)
+        user.password_hash = hash_password(password)
+        await user.save()
+
+        expires_str = app.expires_at.strftime("%B %d, %Y") if app.expires_at else "N/A"
+        subject, html = activation_email(
+            app.name, user.user_id, password, expires_str, settings.frontend_url
+        )
+        success = await send_email(app.email, subject, html, settings)
+        if success:
+            sent += 1
+        else:
+            failed += 1
+
+    logger.info("Bulk resend: sent=%d skipped=%d failed=%d", sent, skipped, failed)
+    return {"sent": sent, "skipped": skipped, "failed": failed}

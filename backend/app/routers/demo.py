@@ -173,6 +173,35 @@ async def admin_activate(
     return {"ok": True}
 
 
+@router.post("/admin/test-email")
+async def admin_test_email(
+    to: str = Query(..., description="Recipient email address"),
+    user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+):
+    """Send a test email to verify SMTP deliverability."""
+    _require_admin(user)
+    success = await demo_service.send_test_email(to, settings)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send test email — check SMTP configuration",
+        )
+    return {"ok": True, "message": f"Test email sent to {to}"}
+
+
+@router.post("/admin/bulk-resend-credentials")
+async def admin_bulk_resend_credentials(
+    user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+):
+    """Reset passwords and resend activation emails for all active demo users
+    who have never logged in. Use after fixing deliverability issues."""
+    _require_admin(user)
+    result = await demo_service.bulk_resend_credentials(settings)
+    return {"ok": True, **result}
+
+
 @router.post("/admin/recapture")
 async def admin_trigger_recapture(
     user: User = Depends(get_current_user),

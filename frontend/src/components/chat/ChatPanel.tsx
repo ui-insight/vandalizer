@@ -68,7 +68,15 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const { bumpActivitySignal, processingDoc, selectedDocUuids, selectedFolderUuids, activeKBUuid, activeKBTitle, deactivateKB } = useWorkspace()
   const { toast } = useToast()
   const { pills: onboardingPills, isFirstSession, loading: onboardingLoading } = useOnboarding()
+  // Lock the first-session flag once it's set so remounts/refetches can't
+  // flip it mid-conversation (markFirstSessionComplete fires early).
+  const lockedFirstSession = useRef<boolean | null>(null)
+  if (lockedFirstSession.current === null && !onboardingLoading) {
+    lockedFirstSession.current = isFirstSession
+  }
+  const effectiveFirstSession = lockedFirstSession.current ?? isFirstSession
   const firstSessionSeeded = useRef(false)
+  const firstSessionMarked = useRef(false)
   const [fileAttachments, setFileAttachments] = useState<FileAttachment[]>([])
   const [urlAttachments, setUrlAttachments] = useState<UrlAttachment[]>([])
   const [attachLoading, setAttachLoading] = useState(false)
@@ -95,7 +103,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
 
   // Seed the first-session conversation with an opening assistant message
   useEffect(() => {
-    if (isFirstSession && !onboardingLoading && messages.length === 0 && !firstSessionSeeded.current && !conversationToLoad) {
+    if (effectiveFirstSession && !onboardingLoading && messages.length === 0 && !firstSessionSeeded.current && !conversationToLoad) {
       firstSessionSeeded.current = true
       setMessages([{
         role: 'assistant',
@@ -106,7 +114,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           "Grant proposals, compliance reviews, progress reports — or something else entirely?",
       }])
     }
-  }, [isFirstSession, onboardingLoading, messages.length, setMessages, conversationToLoad])
+  }, [effectiveFirstSession, onboardingLoading, messages.length, setMessages, conversationToLoad])
 
   const handleModelChange = (model: string) => {
     setSelectedModel(model)
@@ -194,10 +202,15 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const hasDocContext = fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0 || selectedFolderUuids.length > 0
 
   const handleSend = (message: string, includeOnboardingContext?: boolean) => {
-    // In first-session mode, every message uses the first-session system prompt
-    const firstSession = isFirstSession && !hasDocContext && !activeKBUuid
+    // In first-session mode, every message uses the first-session system prompt.
+    // Use the locked ref so remounts / refetches can't flip this mid-conversation.
+    const firstSession = effectiveFirstSession && !hasDocContext && !activeKBUuid
     send(message, selectedDocUuids, selectedModel || undefined, activeKBUuid || undefined, includeOnboardingContext, selectedFolderUuids, firstSession || undefined)
-    if (firstSession) {
+    // Defer markFirstSessionComplete until the user has had enough exchanges
+    // to experience the value discovery (at least 3 user messages).
+    // messages.length counts both user + assistant; 4 = 2 full exchanges done.
+    if (firstSession && !firstSessionMarked.current && messages.length >= 4) {
+      firstSessionMarked.current = true
       markFirstSessionComplete().catch(() => {})
     }
   }
@@ -309,7 +322,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         style={{ padding: '20px 20px 180px 20px', position: 'relative' }}
       >
         {/* First-session: value proposition welcome */}
-        {isFirstSession && !onboardingLoading && (
+        {effectiveFirstSession && !onboardingLoading && (
           <div style={{ maxWidth: 640, margin: '0 auto 20px' }}>
             {/* Header banner */}
             <div
@@ -418,7 +431,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         )}
 
         {/* Empty state: banner + contextual pills (non-first-session users) */}
-        {!isFirstSession && messages.length === 0 && !isStreaming && !onboardingLoading && (
+        {!effectiveFirstSession && messages.length === 0 && !isStreaming && !onboardingLoading && (
           <div style={{ maxWidth: 640, margin: '0 auto' }}>
             <div
               className="relative overflow-hidden text-white"
@@ -539,7 +552,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         )}
 
         {/* Chat messages — centered under banner for first-session */}
-        <div style={isFirstSession ? { maxWidth: 640, margin: '0 auto' } : undefined}>
+        <div style={effectiveFirstSession ? { maxWidth: 640, margin: '0 auto' } : undefined}>
           {messages.map((msg, i) => (
             <ChatMessage
               key={i}
