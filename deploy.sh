@@ -239,6 +239,8 @@ _check_prereqs() {
 }
 
 DOCKER_COMPOSE="docker compose"
+# Use only compose.yaml — skip compose.override.yaml (dev port overrides)
+export COMPOSE_FILE=compose.yaml
 
 # =============================================================================
 # STATE (filled by wizard)
@@ -734,7 +736,8 @@ except: print('unknown')
   # Final check: API health endpoint
   local api_ok=false
   for _ in $(seq 1 10); do
-    if curl -sf http://localhost:8001/api/health &>/dev/null; then
+    if $DOCKER_COMPOSE exec -T api python -c \
+      "import urllib.request; urllib.request.urlopen('http://localhost:8001/api/health')" &>/dev/null; then
       api_ok=true
       break
     fi

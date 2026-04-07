@@ -1,0 +1,19 @@
+# Development overrides — exposes service ports to the host for local
+# development (e.g. running the backend outside Docker with uvicorn).
+#
+# Docker Compose loads this automatically alongside compose.yaml.
+# Production deployments (setup.sh) set COMPOSE_FILE=compose.yaml to
+# skip this file, keeping all ports internal to the Docker network.
+services:
+  redis:
+    ports:
+      - "6379:6379"
+  mongo:
+    ports:
+      - "27018:27017"
+  chromadb:
+    ports:
+      - "8000:8000"
+  api:
+    ports:
+      - "8001:8001"

@@ -168,12 +168,12 @@ else
     fi
   }
 
-  check_container "redis"    "Redis"    "6379"
-  check_container "mongo"    "MongoDB"  "27018"
-  check_container "chromadb" "ChromaDB" "8000"
-  check_container "api"      "API"      "8001"
+  check_container "redis"    "Redis"
+  check_container "mongo"    "MongoDB"
+  check_container "chromadb" "ChromaDB"
+  check_container "api"      "API"
   check_container "celery"   "Celery"
-  check_container "frontend" "Frontend" "80"
+  check_container "frontend" "Frontend"
 fi
 
 # ---------------------------------------------------------------------------
@@ -181,15 +181,27 @@ fi
 # ---------------------------------------------------------------------------
 header "API Health"
 
-API_URL="http://localhost:8001"
-if curl -sf "${API_URL}/api/health" -o /tmp/vandalizer_health.json 2>/dev/null; then
+# Check API health via docker exec (port may not be exposed to the host)
+API_CONTAINER=$($COMPOSE_CMD ps --format '{{.Names}}' 2>/dev/null | grep -E '(api|backend)' | grep -v celery | head -1 || true)
+API_HEALTH_OK=false
+if [[ -n "$API_CONTAINER" ]]; then
+  HEALTH_JSON=$(docker exec "$API_CONTAINER" python -c \
+    "import urllib.request; print(urllib.request.urlopen('http://localhost:8001/api/health').read().decode())" \
+    2>/dev/null || true)
+  if [[ -n "$HEALTH_JSON" ]]; then
+    echo "$HEALTH_JSON" > /tmp/vandalizer_health.json
+    API_HEALTH_OK=true
+  fi
+fi
+
+if [[ "$API_HEALTH_OK" == true ]]; then
   API_STATUS=$(python3 -c "import json; d=json.load(open('/tmp/vandalizer_health.json')); print(d.get('status','unknown'))" 2>/dev/null || echo "unknown")
 
   if [[ "$API_STATUS" == "ok" ]]; then
     pass "Health endpoint returned ${GREEN}ok${RESET}"
   else
     warn "Health endpoint returned ${YELLOW}${API_STATUS}${RESET}" \
-      "Run: curl ${API_URL}/api/health | python3 -m json.tool — to see which dependency is failing"
+      "Run: docker compose exec api python -c \"import urllib.request; print(urllib.request.urlopen('http://localhost:8001/api/health').read().decode())\" — to see details"
   fi
 
   # Parse individual checks
@@ -206,7 +218,7 @@ if curl -sf "${API_URL}/api/health" -o /tmp/vandalizer_health.json 2>/dev/null; 
 
   rm -f /tmp/vandalizer_health.json
 else
-  fail "API is not responding at ${API_URL}" \
+  fail "API is not responding" \
     "Start the stack: docker compose up -d — then: docker compose logs api"
   skip "MongoDB connection (API unavailable)"
   skip "Redis connection (API unavailable)"
@@ -218,8 +230,19 @@ fi
 # ---------------------------------------------------------------------------
 header "Frontend"
 
-if curl -sf "http://localhost/health" -o /dev/null 2>/dev/null; then
-  pass "Frontend is serving at ${CYAN}http://localhost${RESET}"
+# Read WEB_PORT from root .env (defaults to 80)
+_WEB_PORT=80
+if [[ -f ".env" ]]; then
+  _wp=$(grep -E "^WEB_PORT=" .env 2>/dev/null | head -1 | cut -d'=' -f2-)
+  [[ -n "$_wp" ]] && _WEB_PORT="$_wp"
+fi
+
+if curl -sf "http://localhost:${_WEB_PORT}/health" -o /dev/null 2>/dev/null; then
+  if [[ "$_WEB_PORT" == "80" ]]; then
+    pass "Frontend is serving at ${CYAN}http://localhost${RESET}"
+  else
+    pass "Frontend is serving at ${CYAN}http://localhost:${_WEB_PORT}${RESET}"
+  fi
 elif curl -sf "http://localhost:5173" -o /dev/null 2>/dev/null; then
   pass "Frontend dev server at ${CYAN}http://localhost:5173${RESET}"
 else

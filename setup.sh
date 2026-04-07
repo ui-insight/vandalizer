@@ -51,6 +51,10 @@ ENV_EXAMPLE="backend/.env.example"
 COMPOSE_CMD="docker compose"
 SETUP_LOG=".setup.log"
 ERRORS=()
+# Use only compose.yaml — skip compose.override.yaml (dev port overrides).
+# This keeps infrastructure ports off the host so Vandalizer can co-exist
+# with other services (Mongo, Redis, etc.) on the same server.
+export COMPOSE_FILE=compose.yaml
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -555,7 +559,9 @@ wait_for_api() {
   local i=0
 
   while [[ $elapsed -lt $timeout ]]; do
-    if curl -sf "http://localhost:8001/api/health" -o /dev/null 2>/dev/null; then
+    if $COMPOSE_CMD exec -T api python -c \
+      "import urllib.request; urllib.request.urlopen('http://localhost:8001/api/health')" \
+      2>/dev/null; then
       printf "\r  ${SYM_CHECK}  %-20s ${GREEN}responding${RESET}          \n" "Health endpoint"
       return 0
     fi
@@ -724,7 +730,9 @@ verify() {
   local health_json=''
   local attempt
   for attempt in 1 2 3; do
-    health_json=$(curl -sf "http://localhost:8001/api/health" 2>/dev/null || true)
+    health_json=$($COMPOSE_CMD exec -T api python -c \
+      "import urllib.request; print(urllib.request.urlopen('http://localhost:8001/api/health').read().decode())" \
+      2>/dev/null || true)
     if [[ "$health_json" == *'"status":"ok"'* ]]; then
       break
     fi
@@ -850,9 +858,11 @@ finale() {
 
   echo -e "  ${MAGENTA}${BOLD}╠══════════════════════════════════════════════════════════════╣${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}                                                              ${MAGENTA}${BOLD}║${RESET}"
-  printf "  ${MAGENTA}${BOLD}║${RESET}   ${BOLD}${WHITE}Frontend${RESET}     ${CYAN}%-40s${RESET}${MAGENTA}${BOLD}║${RESET}\n" "http://localhost"
-  printf "  ${MAGENTA}${BOLD}║${RESET}   ${BOLD}${WHITE}API${RESET}          ${CYAN}%-40s${RESET}${MAGENTA}${BOLD}║${RESET}\n" "http://localhost:8001"
-  printf "  ${MAGENTA}${BOLD}║${RESET}   ${BOLD}${WHITE}API Health${RESET}   ${CYAN}%-40s${RESET}${MAGENTA}${BOLD}║${RESET}\n" "http://localhost:8001/api/health"
+  local _wp="${WEB_PORT:-80}"
+  local _base_url="http://localhost"
+  [[ "$_wp" != "80" ]] && _base_url="http://localhost:${_wp}"
+  printf "  ${MAGENTA}${BOLD}║${RESET}   ${BOLD}${WHITE}Frontend${RESET}     ${CYAN}%-40s${RESET}${MAGENTA}${BOLD}║${RESET}\n" "${_base_url}"
+  printf "  ${MAGENTA}${BOLD}║${RESET}   ${BOLD}${WHITE}API Health${RESET}   ${CYAN}%-40s${RESET}${MAGENTA}${BOLD}║${RESET}\n" "${_base_url}/api/health"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}                                                              ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}╠══════════════════════════════════════════════════════════════╣${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}                                                              ${MAGENTA}${BOLD}║${RESET}"
@@ -1119,7 +1129,9 @@ repair() {
     echo ""
 
     # Check if API is actually reachable before trying bootstrap
-    if curl -sf "http://localhost:8001/api/health" -o /dev/null 2>/dev/null; then
+    if $COMPOSE_CMD exec -T api python -c \
+      "import urllib.request; urllib.request.urlopen('http://localhost:8001/api/health')" \
+      2>/dev/null; then
       prompt "Admin email" "" ADMIN_EMAIL
       while [[ -z "$ADMIN_EMAIL" ]]; do
         echo -e "  ${SYM_WARN}  ${YELLOW}Email is required.${RESET}"

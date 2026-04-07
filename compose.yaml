@@ -1,8 +1,6 @@
 services:
   redis:
     image: redis/redis-stack:7.4.0-v3
-    ports:
-      - "6379:6379"
     networks:
       - vandalizer
     restart: unless-stopped
@@ -19,8 +17,6 @@ services:
 
   mongo:
     image: mongo:7.0.16
-    ports:
-      - "27018:27017"
     networks:
       - vandalizer
     volumes:
@@ -40,8 +36,6 @@ services:
 
   chromadb:
     image: chromadb/chroma:0.6.3
-    ports:
-      - "8000:8000"
     networks:
       - vandalizer
     volumes:
@@ -66,8 +60,6 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    ports:
-      - "8001:8001"
     depends_on:
       redis:
         condition: service_healthy
