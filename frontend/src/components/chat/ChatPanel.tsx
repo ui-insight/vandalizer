@@ -8,7 +8,7 @@ import { useChat } from '../../hooks/useChat'
 import { useOnboarding } from '../../hooks/useOnboarding'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
-import { addLink, addDocument, removeDocument, removeLink } from '../../api/chat'
+import { addLink, removeDocument, removeLink } from '../../api/chat'
 import { uploadFile } from '../../api/files'
 import { getUserConfig, updateUserConfig, markFirstSessionComplete } from '../../api/config'
 import type { FileAttachment, UrlAttachment } from '../../types/chat'
@@ -222,33 +222,28 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
 
   const queryClient = useQueryClient()
 
-  const uploadToFileBrowser = useCallback(async (files: File[]) => {
-    for (const file of files) {
-      try {
-        const ext = file.name.split('.').pop() || ''
-        const base64 = await fileToBase64(file)
-        await uploadFile({ contentAsBase64String: base64, fileName: file.name, extension: ext })
-      } catch {
-        // File browser upload is best-effort; chat attachment is the primary action
-      }
-    }
-    queryClient.invalidateQueries({ queryKey: ['documents'] })
-  }, [queryClient])
-
   const handleAttachFile = async (files: File[]) => {
     setAttachLoading(true)
     try {
-      const result = await addDocument(files, activityId)
-      if (result.attachments) {
-        setFileAttachments((prev) => [...prev, ...result.attachments])
+      // Upload to the file browser (single source of truth) and auto-select
+      const newNames: Record<string, string> = {}
+      const newUuids: string[] = []
+      for (const file of files) {
+        const ext = file.name.split('.').pop() || ''
+        const base64 = await fileToBase64(file)
+        const result = await uploadFile({ contentAsBase64String: base64, fileName: file.name, extension: ext })
+        if (result.uuid) {
+          newUuids.push(result.uuid)
+          newNames[result.uuid] = file.name
+        }
       }
-      if (result.activity_id && result.conversation_uuid) {
-        setActivity(result.activity_id, result.conversation_uuid)
+      if (newUuids.length > 0) {
+        setSelectedDocUuids([...selectedDocUuids, ...newUuids])
+        setSelectedDocNames({ ...selectedDocNames, ...newNames })
+        queryClient.invalidateQueries({ queryKey: ['documents'] })
       }
-      // Also upload to file browser so the file appears in the files panel
-      uploadToFileBrowser(files)
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Failed to attach file', 'error')
+      toast(err instanceof Error ? err.message : 'Failed to upload file', 'error')
     } finally {
       setAttachLoading(false)
     }

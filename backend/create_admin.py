@@ -48,12 +48,12 @@ async def ensure_admin(email: str, password: str, name: str = "Admin") -> tuple[
         if not existing.is_examiner:
             existing.is_examiner = True
             changed = True
-        if changed:
-            # Reset password when promoting permissions
-            existing.password_hash = hash_password(password)
-            await existing.save()
-            return existing, "updated"
-        return existing, "unchanged"
+        # Always reset password so re-running bootstrap with a new password works
+        existing.password_hash = hash_password(password)
+        if name:
+            existing.name = name
+        await existing.save()
+        return existing, "updated" if changed else "unchanged"
 
     from app.services.auth_service import register
 
