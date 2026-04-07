@@ -58,6 +58,8 @@ const ChatStateContext = createContext<ChatStateContextValue | null>(null)
 interface UIStateContextValue {
   selectedDocUuids: string[]
   setSelectedDocUuids: (uuids: string[]) => void
+  selectedDocNames: Record<string, string>
+  setSelectedDocNames: (names: Record<string, string>) => void
   selectedFolderUuids: string[]
   setSelectedFolderUuids: (uuids: string[]) => void
   railDocked: boolean
@@ -150,6 +152,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   // ── Ephemeral React state ───────────────────────────────────────────────
   const [selectedDocUuids, setSelectedDocUuids] = useState<string[]>([])
+  const [selectedDocNames, setSelectedDocNames] = useState<Record<string, string>>({})
   const [selectedFolderUuids, setSelectedFolderUuids] = useState<string[]>([])
   const [railDocked, setRailDocked] = useState(() => getStoredBool('workspace:railDocked', false))
   const [panelSplit, _setPanelSplit] = useState(() => getStoredNumber('workspace:panelSplit', 60))
@@ -356,6 +359,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const uiValue = useMemo<UIStateContextValue>(() => ({
     selectedDocUuids, setSelectedDocUuids,
+    selectedDocNames, setSelectedDocNames,
     selectedFolderUuids, setSelectedFolderUuids,
     railDocked, toggleRailDocked,
     panelSplit, setPanelSplit,
@@ -363,7 +367,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     activitySignal, bumpActivitySignal,
     viewDocumentRequest, viewDocument, clearViewDocumentRequest,
   }), [
-    selectedDocUuids, selectedFolderUuids,
+    selectedDocUuids, selectedDocNames, selectedFolderUuids,
     railDocked, toggleRailDocked,
     panelSplit, setPanelSplit,
     highlightTerms, activitySignal, bumpActivitySignal,

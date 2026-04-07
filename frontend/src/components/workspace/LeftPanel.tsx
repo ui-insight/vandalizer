@@ -8,7 +8,7 @@ import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { pollStatus, searchDocuments } from '../../api/documents'
 
 export function LeftPanel() {
-  const { setSelectedDocUuids, setSelectedFolderUuids, highlightTerms, setProcessingDoc, viewDocumentRequest, clearViewDocumentRequest } = useWorkspace()
+  const { setSelectedDocUuids, setSelectedDocNames, setSelectedFolderUuids, highlightTerms, setProcessingDoc, viewDocumentRequest, clearViewDocumentRequest } = useWorkspace()
   const [viewingDoc, setViewingDoc] = useState<{
     uuid: string
     title: string
@@ -33,6 +33,10 @@ export function LeftPanel() {
     if (!viewingDocRef.current) setSelectedDocUuids(uuids)
   }, [setSelectedDocUuids])
 
+  const handleDocNamesChange = useCallback((names: Record<string, string>) => {
+    if (!viewingDocRef.current) setSelectedDocNames(names)
+  }, [setSelectedDocNames])
+
   const handleFolderSelectionChange = useCallback((uuids: string[]) => {
     if (!viewingDocRef.current) setSelectedFolderUuids(uuids)
   }, [setSelectedFolderUuids])
@@ -42,9 +46,10 @@ export function LeftPanel() {
     if (viewDocumentRequest) {
       setViewingDoc({ uuid: viewDocumentRequest.uuid, title: viewDocumentRequest.title })
       setSelectedDocUuids([viewDocumentRequest.uuid])
+      setSelectedDocNames({ [viewDocumentRequest.uuid]: viewDocumentRequest.title })
       clearViewDocumentRequest()
     }
-  }, [viewDocumentRequest, clearViewDocumentRequest, setSelectedDocUuids])
+  }, [viewDocumentRequest, clearViewDocumentRequest, setSelectedDocUuids, setSelectedDocNames])
 
   // Sync processing state to workspace context so ChatPanel can show it
   useEffect(() => {
@@ -154,7 +159,7 @@ export function LeftPanel() {
         <div style={{ paddingLeft: 15, width: 50 }}>
           {viewingDoc && (
             <button
-              onClick={() => { setViewingDoc(null); setSelectedDocUuids([]) }}
+              onClick={() => { setViewingDoc(null); setSelectedDocUuids([]); setSelectedDocNames({}) }}
               className="bg-transparent border-0 p-0 cursor-pointer"
             >
               <ArrowLeft className="h-6 w-6 text-white" />
@@ -251,8 +256,10 @@ export function LeftPanel() {
                 taskStatus: doc.task_status,
               })
               setSelectedDocUuids([doc.uuid])
+              setSelectedDocNames({ [doc.uuid]: doc.title })
             }}
             onSelectionChange={handleSelectionChange}
+            onDocNamesChange={handleDocNamesChange}
             onFolderSelectionChange={handleFolderSelectionChange}
           />
         </div>

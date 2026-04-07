@@ -43,12 +43,13 @@ interface FileBrowserProps {
   searchQuery?: string
   contentMatches?: ContentMatch[]
   onSelectionChange?: (docUuids: string[]) => void
+  onDocNamesChange?: (names: Record<string, string>) => void
   onFolderSelectionChange?: (folderUuids: string[]) => void
   currentFolder?: string | null
   onFolderNavigate?: (folderId: string | null) => void
 }
 
-export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSelectionChange, onFolderSelectionChange, currentFolder: controlledFolder, onFolderNavigate }: FileBrowserProps) {
+export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSelectionChange, onDocNamesChange, onFolderSelectionChange, currentFolder: controlledFolder, onFolderNavigate }: FileBrowserProps) {
   const { currentTeam } = useTeams()
 
   const [internalFolder, setInternalFolder] = useState<string | null>(null)
@@ -102,9 +103,14 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
   // Sync selected document UUIDs (excluding folders) to parent
   useEffect(() => {
     if (!onSelectionChange) return
-    const docUuids = [...selectedUuids].filter(u => documents.some(d => d.uuid === u))
+    const selectedDocs = documents.filter(d => selectedUuids.has(d.uuid))
+    const docUuids = selectedDocs.map(d => d.uuid)
     onSelectionChange(docUuids)
-  }, [selectedUuids, documents, onSelectionChange])
+    // Also emit a names map so the chat can show pills with document titles
+    const names: Record<string, string> = {}
+    for (const d of selectedDocs) names[d.uuid] = d.title
+    onDocNamesChange?.(names)
+  }, [selectedUuids, documents, onSelectionChange, onDocNamesChange])
 
   // Sync selected folder UUIDs to parent
   useEffect(() => {
