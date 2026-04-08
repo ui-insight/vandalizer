@@ -30,6 +30,7 @@ from app.services.llm_service import (
     create_agentic_chat_agent,
     create_chat_agent,
     DOCUMENT_CHAT_SYSTEM_PROMPT,
+    FIRST_SESSION_AGENTIC_PROMPT_TEMPLATE,
     FIRST_SESSION_SYSTEM_PROMPT,
     HELP_CHAT_SYSTEM_PROMPT,
     VANDALIZER_CONTEXT,
@@ -148,6 +149,7 @@ async def chat_stream(
     is_first_session: bool = False,
     user: Optional[User] = None,
     team_access: Optional[TeamAccessContext] = None,
+    onboarding_context=None,
 ) -> AsyncGenerator[str, None]:
     """Async generator yielding newline-delimited JSON chunks for streaming chat."""
 
@@ -262,12 +264,21 @@ async def chat_stream(
         )
         system_prompt = DOCUMENT_CHAT_SYSTEM_PROMPT
     elif is_first_session:
-        # First-session onboarding: conversational value discovery.
-        # Do NOT inject VANDALIZER_CONTEXT here — it's a technical how-to dump
-        # that causes the LLM to skip the conversation and spit out directions.
-        # The FIRST_SESSION_SYSTEM_PROMPT already has everything it needs.
+        if onboarding_context and onboarding_context.extraction_set_uuid:
+            # Agentic onboarding: build a dynamic prompt with real UUIDs
+            # so the agent can run live tool calls during the demo.
+            system_prompt = FIRST_SESSION_AGENTIC_PROMPT_TEMPLATE.format(
+                sample_doc_uuid=onboarding_context.sample_doc_uuid,
+                sample_doc_title=onboarding_context.sample_doc_title,
+                extraction_set_uuid=onboarding_context.extraction_set_uuid,
+                extraction_set_title=onboarding_context.extraction_set_title,
+                kb_uuid=onboarding_context.kb_uuid or "NOT AVAILABLE",
+                kb_title=onboarding_context.kb_title or "N/A",
+            )
+        else:
+            # Fallback: text-only conversational onboarding
+            system_prompt = FIRST_SESSION_SYSTEM_PROMPT
         prompt = message
-        system_prompt = FIRST_SESSION_SYSTEM_PROMPT
     elif include_onboarding_context:
         # Inject Vandalizer help context only when explicitly requested
         # (triggered by the placeholder pills in the chat UI).
@@ -287,6 +298,12 @@ async def chat_stream(
     if user and team_access:
         from app.services.chat_deps import AgenticChatDeps
 
+        # Include onboarding sample doc UUID so agent tools can access it
+        effective_doc_uuids = list(document_uuids)
+        if onboarding_context and onboarding_context.sample_doc_uuid:
+            if onboarding_context.sample_doc_uuid not in effective_doc_uuids:
+                effective_doc_uuids.append(onboarding_context.sample_doc_uuid)
+
         deps = AgenticChatDeps(
             user=user,
             user_id=user_id,
@@ -295,7 +312,7 @@ async def chat_stream(
             organization_id=getattr(user, "organization_id", None),
             system_config_doc=sys_config_doc,
             model_name=model_name,
-            context_document_uuids=document_uuids,
+            context_document_uuids=effective_doc_uuids,
             active_kb_uuid=kb_uuid,
         )
         agent = create_agentic_chat_agent(
@@ -312,6 +329,8 @@ async def chat_stream(
     thinking_started_at: float | None = None
     thinking_duration: float | None = None
     thinking_done_emitted = False
+    streamed_tool_calls: list[dict] = []
+    streamed_tool_results: list[dict] = []
 
     try:
         think_parser = _ThinkTagParser()
@@ -376,27 +395,35 @@ async def chat_stream(
                                         args = event.part.args_as_dict()
                                     except Exception:
                                         args = {}
-                                    yield json.dumps({
-                                        "kind": "tool_call",
+                                    call_data = {
                                         "tool_name": event.part.tool_name,
                                         "tool_call_id": event.part.tool_call_id,
                                         "args": args,
-                                    }) + "\n"
+                                    }
+                                    streamed_tool_calls.append(call_data)
+                                    yield json.dumps({"kind": "tool_call", **call_data}) + "\n"
                                 elif isinstance(event, FunctionToolResultEvent):
-                                    # Pop quality sidecar if the tool wrote one
+                                    # Extract quality sidecar from tool result.
+                                    # Tools embed a "quality" key in their return dict;
+                                    # we strip it here so it goes to the frontend but
+                                    # NOT back into the LLM context.
                                     quality = None
-                                    if deps and event.tool_call_id in deps.quality_annotations:
-                                        quality = deps.quality_annotations.pop(event.tool_call_id)
                                     result_content = event.result.content
+                                    if isinstance(result_content, dict) and "quality" in result_content:
+                                        quality = result_content.pop("quality")
+                                    # Also check the deps annotations dict (future-proof)
+                                    if quality is None and deps and event.tool_call_id in deps.quality_annotations:
+                                        quality = deps.quality_annotations.pop(event.tool_call_id)
                                     if not isinstance(result_content, (str, dict, list)):
                                         result_content = str(result_content)
-                                    yield json.dumps({
-                                        "kind": "tool_result",
+                                    result_data = {
                                         "tool_name": event.result.tool_name,
                                         "tool_call_id": event.result.tool_call_id,
                                         "content": result_content,
                                         "quality": quality,
-                                    }) + "\n"
+                                    }
+                                    streamed_tool_results.append(result_data)
+                                    yield json.dumps({"kind": "tool_result", **result_data}) + "\n"
 
             if agent_run.result:
                 usage = agent_run.result.usage()
@@ -408,6 +435,8 @@ async def chat_stream(
                     usage, activity_id, user_id,
                     thinking=thinking_text,
                     thinking_duration=thinking_duration,
+                    tool_calls=streamed_tool_calls or None,
+                    tool_results=streamed_tool_results or None,
                 )
 
     except Exception as e:
@@ -441,6 +470,8 @@ async def _finalize(
     user_id: str,
     thinking: Optional[str] = None,
     thinking_duration: Optional[float] = None,
+    tool_calls: Optional[list[dict]] = None,
+    tool_results: Optional[list[dict]] = None,
 ) -> None:
     """Save assistant message and update activity metrics."""
     await conversation.add_message(
@@ -448,6 +479,8 @@ async def _finalize(
         assistant_message,
         thinking=thinking,
         thinking_duration=thinking_duration,
+        tool_calls=tool_calls,
+        tool_results=tool_results,
     )
 
     if activity_id:

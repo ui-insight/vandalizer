@@ -114,10 +114,11 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       setMessages([{
         role: 'assistant',
         content:
-          "Hi — I'm your Vandalizer assistant. Before I show you around, I'd love to " +
-          "know a bit about your work.\n\n" +
-          "What kind of documents do you spend the most time processing? " +
-          "Grant proposals, compliance reviews, progress reports — or something else entirely?",
+          "Hi! I'm your Vandalizer assistant.\n\n" +
+          "I've placed a sample NSF proposal in your workspace so I can show you " +
+          "what this platform does — live, with real tools.\n\n" +
+          "What kind of documents do you typically work with? " +
+          "(Or just say **\"show me\"** and I'll jump right in.)",
       }])
     }
   }, [effectiveFirstSession, onboardingLoading, messages.length, setMessages, conversationToLoad])
@@ -212,10 +213,10 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     // Use the locked ref so remounts / refetches can't flip this mid-conversation.
     const firstSession = effectiveFirstSession && !hasDocContext && !activeKBUuid
     send(message, selectedDocUuids, selectedModel || undefined, activeKBUuid || undefined, includeOnboardingContext, selectedFolderUuids, firstSession || undefined)
-    // Defer markFirstSessionComplete until the user has had enough exchanges
-    // to experience the value discovery (at least 3 user messages).
-    // messages.length counts both user + assistant; 4 = 2 full exchanges done.
-    if (firstSession && !firstSessionMarked.current && messages.length >= 4) {
+    // Defer markFirstSessionComplete until the user has experienced the demo.
+    // messages.length counts both user + assistant; 6 = 3 full exchanges
+    // (enough for the agentic demo with tool calls to complete).
+    if (firstSession && !firstSessionMarked.current && messages.length >= 6) {
       firstSessionMarked.current = true
       markFirstSessionComplete().catch(() => {})
     }
@@ -445,7 +446,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                     Welcome to Vandalizer
                   </div>
                   <div style={{ fontSize: 13, opacity: 0.8, marginTop: 2, fontWeight: 400 }}>
-                    AI-powered document intelligence for research administration
+                    AI-powered document intelligence — watch it in action below
                   </div>
                 </div>
               </div>

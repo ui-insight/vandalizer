@@ -28,6 +28,19 @@ logger = logging.getLogger(__name__)
 MAX_RESULTS = 20
 
 
+def _score_to_tier(score: float | None) -> str | None:
+    """Map a numeric quality score to a tier label."""
+    if score is None:
+        return None
+    if score >= 90:
+        return "excellent"
+    if score >= 75:
+        return "good"
+    if score >= 50:
+        return "fair"
+    return "poor"
+
+
 # ---------------------------------------------------------------------------
 # Phase 1 — Read-only tools
 # ---------------------------------------------------------------------------
@@ -314,18 +327,29 @@ async def get_quality_info(
         result["last_validated_at"] = None
         result["note"] = "No validation runs found for this item."
 
-    if alerts:
-        result["active_alerts"] = [
-            {
-                "type": a.alert_type,
-                "severity": a.severity,
-                "message": a.message,
-                "created_at": a.created_at.isoformat() if a.created_at else None,
-            }
-            for a in alerts
-        ]
-    else:
-        result["active_alerts"] = []
+    alert_list = [
+        {
+            "type": a.alert_type,
+            "severity": a.severity,
+            "message": a.message,
+            "created_at": a.created_at.isoformat() if a.created_at else None,
+        }
+        for a in alerts
+    ] if alerts else []
+
+    result["active_alerts"] = alert_list
+
+    # Emit quality sidecar — streaming layer strips this and sends to frontend
+    if latest_run and latest_run.score is not None:
+        result["quality"] = {
+            "score": latest_run.score,
+            "tier": _score_to_tier(latest_run.score),
+            "grade": latest_run.grade,
+            "last_validated_at": latest_run.created_at.isoformat() if latest_run.created_at else None,
+            "num_test_cases": latest_run.num_test_cases,
+            "num_runs": latest_run.num_runs,
+            "active_alerts": alert_list,
+        }
 
     return result
 
@@ -484,12 +508,6 @@ async def run_extraction(
         ValidationRun.item_id == extraction_set_uuid,
     ).sort("-created_at").first_or_none()
 
-    if latest_run and latest_run.score is not None:
-        # Write quality sidecar — the streaming layer will pop this
-        # We don't have tool_call_id here (pydantic-ai assigns it), so we
-        # include quality in the return value and let the frontend display it.
-        pass  # Quality info included in response below
-
     response: dict = {
         "extraction_set": ss.title,
         "fields": keys,
@@ -499,13 +517,28 @@ async def run_extraction(
         "token_usage": {"input": tokens_in, "output": tokens_out},
     }
 
+    # Quality sidecar — streaming layer strips "quality" key before LLM sees it
     if latest_run and latest_run.score is not None:
+        # Check for active alerts on this extraction set
+        alerts = await QualityAlert.find(
+            QualityAlert.item_kind == "search_set",
+            QualityAlert.item_id == extraction_set_uuid,
+            QualityAlert.acknowledged != True,
+        ).sort("-created_at").limit(3).to_list()
+
         response["quality"] = {
             "score": latest_run.score,
+            "tier": _score_to_tier(latest_run.score),
+            "grade": latest_run.grade,
             "accuracy": latest_run.accuracy,
             "consistency": latest_run.consistency,
-            "grade": latest_run.grade,
             "last_validated_at": latest_run.created_at.isoformat() if latest_run.created_at else None,
+            "num_test_cases": latest_run.num_test_cases,
+            "num_runs": latest_run.num_runs,
+            "active_alerts": [
+                {"type": a.alert_type, "severity": a.severity, "message": a.message}
+                for a in alerts
+            ],
         }
 
     return response
@@ -520,14 +553,25 @@ async def create_knowledge_base(
     context: RunContext[AgenticChatDeps],
     title: str,
     description: str = "",
+    confirmed: bool = False,
 ) -> dict:
     """Create a new knowledge base for the user.
+
+    Call first with confirmed=false to preview. Then call again with confirmed=true after the user approves.
 
     Args:
         context: The call context.
         title: Title for the new knowledge base.
         description: Optional description.
+        confirmed: Must be true to actually create. If false, returns a preview for user confirmation.
     """
+    if not confirmed:
+        return {
+            "action": "create_knowledge_base",
+            "preview": f"Create a new knowledge base titled \"{title}\"" + (f" — {description}" if description else ""),
+            "needs_confirmation": True,
+        }
+
     from app.services.knowledge_service import create_knowledge_base as kb_create
 
     kb = await kb_create(
@@ -549,16 +593,18 @@ async def add_documents_to_kb(
     context: RunContext[AgenticChatDeps],
     kb_uuid: str,
     document_uuids: list[str],
+    confirmed: bool = False,
 ) -> dict:
     """Add documents to an existing knowledge base. Documents are chunked and indexed for semantic search.
+
+    Call first with confirmed=false to preview. Then call again with confirmed=true after the user approves.
 
     Args:
         context: The call context.
         kb_uuid: UUID of the knowledge base.
         document_uuids: List of document UUIDs to add.
+        confirmed: Must be true to actually add. If false, returns a preview for user confirmation.
     """
-    from app.services.knowledge_service import add_documents as kb_add_docs
-
     kb = await KnowledgeBase.find_one(KnowledgeBase.uuid == kb_uuid)
     if not kb:
         return {"error": f"Knowledge base '{kb_uuid}' not found."}
@@ -568,6 +614,15 @@ async def add_documents_to_kb(
     if kb.user_id != user.user_id and not kb.shared_with_team:
         if not (context.deps.team_id and kb.team_id == context.deps.team_id):
             return {"error": "You do not have access to this knowledge base."}
+
+    if not confirmed:
+        return {
+            "action": "add_documents_to_kb",
+            "preview": f"Add {len(document_uuids)} document(s) to knowledge base \"{kb.title}\"",
+            "needs_confirmation": True,
+        }
+
+    from app.services.knowledge_service import add_documents as kb_add_docs
 
     added = await kb_add_docs(kb, document_uuids[:20], user)
     return {
@@ -584,17 +639,19 @@ async def add_url_to_kb(
     kb_uuid: str,
     url: str,
     crawl: bool = False,
+    confirmed: bool = False,
 ) -> dict:
     """Add a URL source to a knowledge base. Optionally crawl linked pages.
+
+    Call first with confirmed=false to preview. Then call again with confirmed=true after the user approves.
 
     Args:
         context: The call context.
         kb_uuid: UUID of the knowledge base.
         url: The URL to add.
         crawl: If true, follow links on the page and index them too (max 5 pages).
+        confirmed: Must be true to actually add. If false, returns a preview for user confirmation.
     """
-    from app.services.knowledge_service import add_urls as kb_add_urls
-
     kb = await KnowledgeBase.find_one(KnowledgeBase.uuid == kb_uuid)
     if not kb:
         return {"error": f"Knowledge base '{kb_uuid}' not found."}
@@ -603,6 +660,18 @@ async def add_url_to_kb(
     if kb.user_id != user.user_id and not kb.shared_with_team:
         if not (context.deps.team_id and kb.team_id == context.deps.team_id):
             return {"error": "You do not have access to this knowledge base."}
+
+    if not confirmed:
+        action = f"Add URL \"{url}\" to knowledge base \"{kb.title}\""
+        if crawl:
+            action += " (with link crawling, up to 5 pages)"
+        return {
+            "action": "add_url_to_kb",
+            "preview": action,
+            "needs_confirmation": True,
+        }
+
+    from app.services.knowledge_service import add_urls as kb_add_urls
 
     added = await kb_add_urls(
         kb, [url],
@@ -627,16 +696,29 @@ async def run_workflow(
     context: RunContext[AgenticChatDeps],
     workflow_id: str,
     document_uuids: list[str],
+    confirmed: bool = False,
 ) -> dict:
     """Start a workflow execution against documents. Returns a session ID for status polling.
 
+    Call first with confirmed=false to preview. Then call again with confirmed=true after the user approves.
     Workflows run asynchronously in the background. Use get_workflow_status to check progress.
 
     Args:
         context: The call context.
         workflow_id: The ID of the workflow to execute.
         document_uuids: List of document UUIDs to process.
+        confirmed: Must be true to actually run. If false, returns a preview for user confirmation.
     """
+    if not confirmed:
+        # Look up workflow name for the preview
+        wf = await Workflow.get(workflow_id)
+        wf_name = wf.name if wf else workflow_id
+        return {
+            "action": "run_workflow",
+            "preview": f"Run workflow \"{wf_name}\" on {len(document_uuids)} document(s)",
+            "needs_confirmation": True,
+        }
+
     from app.services import workflow_service
 
     try:

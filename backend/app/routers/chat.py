@@ -122,6 +122,12 @@ async def chat(
     activity: Optional[ActivityEvent] = None
     conversation: Optional[ChatConversation] = None
 
+    # Provision onboarding sample for first-session agentic demo
+    onboarding_ctx = None
+    if body.is_first_session:
+        from app.services.onboarding_service import provision_onboarding_sample
+        onboarding_ctx = await provision_onboarding_sample(user)
+
     team_id = str(user.current_team) if user.current_team else None
     if not activity_id or len(str(activity_id).strip()) < 10:
         # New conversation
@@ -195,6 +201,7 @@ async def chat(
             is_first_session=body.is_first_session,
             user=user,
             team_access=team_access,
+            onboarding_context=onboarding_ctx,
         ):
             yield chunk
 

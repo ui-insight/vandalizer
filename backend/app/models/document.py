@@ -33,6 +33,9 @@ class SmartDocument(Document):
     classified_at: Optional[datetime.datetime] = None
     classified_by: Optional[str] = None  # "auto" or user_id
 
+    # Onboarding
+    is_onboarding_sample: bool = False
+
     # Data retention
     retention_hold: bool = False
     retention_hold_reason: Optional[str] = None

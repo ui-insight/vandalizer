@@ -274,7 +274,17 @@ class TestRunExtraction:
 
 class TestCreateKnowledgeBase:
     @pytest.mark.asyncio
-    async def test_creates_kb(self):
+    async def test_preview_without_confirmation(self):
+        from app.services.chat_tools import create_knowledge_base
+
+        ctx = _make_context()
+        result = await create_knowledge_base(ctx, "My New KB", "Desc", confirmed=False)
+
+        assert result["needs_confirmation"] is True
+        assert "My New KB" in result["preview"]
+
+    @pytest.mark.asyncio
+    async def test_creates_kb_when_confirmed(self):
         from app.services.chat_tools import create_knowledge_base
 
         fake_kb = MagicMock()
@@ -284,9 +294,8 @@ class TestCreateKnowledgeBase:
         fake_kb.status = "empty"
 
         ctx = _make_context()
-        # Patch at the source — the tool does `from app.services.knowledge_service import create_knowledge_base as kb_create`
         with patch("app.services.knowledge_service.create_knowledge_base", new_callable=AsyncMock, return_value=fake_kb):
-            result = await create_knowledge_base(ctx, "My New KB", "Desc")
+            result = await create_knowledge_base(ctx, "My New KB", "Desc", confirmed=True)
 
         assert result["uuid"] == "new-kb"
         assert "created" in result["message"].lower()
@@ -299,23 +308,37 @@ class TestCreateKnowledgeBase:
 
 class TestRunWorkflow:
     @pytest.mark.asyncio
-    async def test_returns_session_id(self):
+    async def test_preview_without_confirmation(self):
+        from app.services.chat_tools import run_workflow
+
+        ctx = _make_context()
+        wf = MagicMock()
+        wf.name = "My Workflow"
+        with patch("app.services.chat_tools.Workflow") as MockWF:
+            MockWF.get = AsyncMock(return_value=wf)
+            result = await run_workflow(ctx, "wf-1", ["doc-1"], confirmed=False)
+
+        assert result["needs_confirmation"] is True
+        assert "My Workflow" in result["preview"]
+
+    @pytest.mark.asyncio
+    async def test_returns_session_id_when_confirmed(self):
         from app.services.chat_tools import run_workflow
 
         ctx = _make_context()
         with patch("app.services.workflow_service.run_workflow", new_callable=AsyncMock, return_value="session-123"):
-            result = await run_workflow(ctx, "wf-1", ["doc-1"])
+            result = await run_workflow(ctx, "wf-1", ["doc-1"], confirmed=True)
 
         assert result["session_id"] == "session-123"
         assert result["status"] == "running"
 
     @pytest.mark.asyncio
-    async def test_handles_error(self):
+    async def test_handles_error_when_confirmed(self):
         from app.services.chat_tools import run_workflow
 
         ctx = _make_context()
         with patch("app.services.workflow_service.run_workflow", new_callable=AsyncMock, side_effect=ValueError("Workflow not found")):
-            result = await run_workflow(ctx, "nonexistent", ["doc-1"])
+            result = await run_workflow(ctx, "nonexistent", ["doc-1"], confirmed=True)
 
         assert "error" in result
         assert "not found" in result["error"].lower()

@@ -17,7 +17,11 @@ export interface QualityMeta {
   score: number | null
   tier: string | null
   grade: string | null
+  accuracy?: number | null
+  consistency?: number | null
   last_validated_at: string | null
+  num_test_cases?: number | null
+  num_runs?: number | null
   active_alerts?: Array<{ type: string; severity: string; message: string }>
 }
 
