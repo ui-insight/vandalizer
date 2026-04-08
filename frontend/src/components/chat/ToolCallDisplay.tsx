@@ -1,7 +1,8 @@
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import {
-  ChevronRight, Loader2, CheckCircle2, AlertCircle, CircleDashed,
-  Search, Database, Zap, FolderPlus, Play,
+  ChevronRight, Loader2, CheckCircle2, CircleDashed,
+  Search, Zap, FolderPlus, Play,
 } from 'lucide-react'
 import { QualityBadge } from './QualityBadge'
 import type { ToolCallInfo, ToolResultInfo, QualityMeta } from '../../types/chat'
@@ -130,7 +131,7 @@ function summarizeResult(toolName: string, content: unknown): string {
 // Format tool args for display
 // ---------------------------------------------------------------------------
 
-function formatArgs(toolName: string, args: Record<string, unknown>): string {
+function formatArgs(_toolName: string, args: Record<string, unknown>): string {
   // Show the most relevant arg per tool
   const q = args.query || args.search || args.title || args.url
   if (typeof q === 'string') return q.length > 50 ? q.slice(0, 47) + '...' : q
@@ -155,7 +156,7 @@ function formatArgs(toolName: string, args: Record<string, unknown>): string {
 // Rich result renderers
 // ---------------------------------------------------------------------------
 
-function renderExtractionTable(content: Record<string, unknown>): JSX.Element | null {
+function renderExtractionTable(content: Record<string, unknown>): ReactNode {
   const entities = content.entities as Array<Record<string, unknown>> | undefined
   if (!entities || entities.length === 0) return null
 
@@ -214,7 +215,7 @@ function renderExtractionTable(content: Record<string, unknown>): JSX.Element | 
   )
 }
 
-function renderDocumentList(content: unknown): JSX.Element | null {
+function renderDocumentList(content: unknown): ReactNode {
   const items = Array.isArray(content) ? content : null
   if (!items || items.length === 0) return null
 
@@ -246,7 +247,7 @@ function renderDocumentList(content: unknown): JSX.Element | null {
   )
 }
 
-function renderExpandedContent(toolName: string, content: unknown): JSX.Element {
+function renderExpandedContent(toolName: string, content: unknown): ReactNode {
   const obj = content as Record<string, unknown>
 
   // Extraction: render as table
