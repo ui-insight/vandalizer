@@ -122,9 +122,9 @@ async def chat(
     activity: Optional[ActivityEvent] = None
     conversation: Optional[ChatConversation] = None
 
-    # Provision onboarding sample for first-session agentic demo
+    # Provision onboarding sample for agentic demo (first session or on-demand)
     onboarding_ctx = None
-    if body.is_first_session:
+    if body.is_first_session or body.run_demo:
         from app.services.onboarding_service import provision_onboarding_sample
         onboarding_ctx = await provision_onboarding_sample(user)
 
@@ -199,6 +199,7 @@ async def chat(
             kb_uuid=body.knowledge_base_uuid,
             include_onboarding_context=body.include_onboarding_context,
             is_first_session=body.is_first_session,
+            run_demo=body.run_demo,
             user=user,
             team_access=team_access,
             onboarding_context=onboarding_ctx,

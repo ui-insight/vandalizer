@@ -14,6 +14,7 @@ class ChatRequest(BaseModel):
     knowledge_base_uuid: Optional[str] = None
     include_onboarding_context: bool = False
     is_first_session: bool = False
+    run_demo: bool = False
 
 
 class AddLinkRequest(BaseModel):

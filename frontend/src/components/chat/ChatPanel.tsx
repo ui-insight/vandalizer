@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, type DragEvent } from 'react'
-import { Loader2, BookOpen, X, ArrowDown, ChevronRight, Shield, CheckCircle2, Upload } from 'lucide-react'
+import { Loader2, BookOpen, X, ArrowDown, ChevronRight, Shield, CheckCircle2, Upload, Zap } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
@@ -220,6 +220,19 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       firstSessionMarked.current = true
       markFirstSessionComplete().catch(() => {})
     }
+  }
+
+  const handleRunDemo = () => {
+    send(
+      "Show me what Vandalizer can do",
+      selectedDocUuids,
+      selectedModel || undefined,
+      undefined, // knowledgeBaseUuid
+      undefined, // includeOnboardingContext
+      undefined, // folderUuids
+      undefined, // isFirstSession
+      true, // runDemo
+    )
   }
 
 
@@ -767,6 +780,47 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
             }}
           >
             <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* Persistent demo button */}
+      {!isStreaming && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '6px 16px',
+          borderTop: '1px solid #f3f4f6',
+        }}>
+          <button
+            onClick={handleRunDemo}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '5px 12px',
+              fontSize: 12,
+              fontWeight: 500,
+              fontFamily: 'inherit',
+              border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 30%, #e5e7eb)',
+              borderRadius: 16,
+              backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 6%, white)',
+              color: '#374151',
+              cursor: 'pointer',
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.borderColor = 'var(--highlight-color, #eab308)'
+              e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--highlight-color, #eab308) 12%, white)'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--highlight-color, #eab308) 30%, #e5e7eb)'
+              e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--highlight-color, #eab308) 6%, white)'
+            }}
+          >
+            <Zap size={13} style={{ color: 'var(--highlight-color, #eab308)' }} />
+            Show me what you can do
           </button>
         </div>
       )}

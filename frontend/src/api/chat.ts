@@ -11,6 +11,7 @@ export async function streamChat(
   includeOnboardingContext?: boolean,
   folderUuids?: string[],
   isFirstSession?: boolean,
+  runDemo?: boolean,
 ): Promise<{ conversationUuid: string; activityId: string }> {
   const res = await fetch('/api/chat', {
     method: 'POST',
@@ -25,6 +26,7 @@ export async function streamChat(
       ...(includeOnboardingContext ? { include_onboarding_context: true } : {}),
       ...(folderUuids?.length ? { folder_uuids: folderUuids } : {}),
       ...(isFirstSession ? { is_first_session: true } : {}),
+      ...(runDemo ? { run_demo: true } : {}),
     }),
   })
 

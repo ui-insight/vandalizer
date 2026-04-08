@@ -147,6 +147,7 @@ async def chat_stream(
     kb_uuid: Optional[str] = None,
     include_onboarding_context: bool = False,
     is_first_session: bool = False,
+    run_demo: bool = False,
     user: Optional[User] = None,
     team_access: Optional[TeamAccessContext] = None,
     onboarding_context=None,
@@ -263,9 +264,9 @@ async def chat_stream(
             "--- END REFERENCE DOCUMENTS ---"
         )
         system_prompt = DOCUMENT_CHAT_SYSTEM_PROMPT
-    elif is_first_session:
+    elif is_first_session or run_demo:
         if onboarding_context and onboarding_context.extraction_set_uuid:
-            # Agentic onboarding: build a dynamic prompt with real UUIDs
+            # Agentic demo: build a dynamic prompt with real UUIDs
             # so the agent can run live tool calls during the demo.
             system_prompt = FIRST_SESSION_AGENTIC_PROMPT_TEMPLATE.format(
                 sample_doc_uuid=onboarding_context.sample_doc_uuid,
@@ -275,9 +276,11 @@ async def chat_stream(
                 kb_uuid=onboarding_context.kb_uuid or "NOT AVAILABLE",
                 kb_title=onboarding_context.kb_title or "N/A",
             )
-        else:
+        elif is_first_session:
             # Fallback: text-only conversational onboarding
             system_prompt = FIRST_SESSION_SYSTEM_PROMPT
+        else:
+            system_prompt = None  # run_demo but no seed content — use default
         prompt = message
     elif include_onboarding_context:
         # Inject Vandalizer help context only when explicitly requested

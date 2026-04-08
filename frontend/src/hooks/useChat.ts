@@ -24,7 +24,7 @@ export function useChat() {
   const toolResultsRef = useRef<ToolResultInfo[]>([])
 
   const send = useCallback(
-    async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuid?: string, includeOnboardingContext?: boolean, folderUuids?: string[], isFirstSession?: boolean) => {
+    async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuid?: string, includeOnboardingContext?: boolean, folderUuids?: string[], isFirstSession?: boolean, runDemo?: boolean) => {
       setError(null)
       setIsStreaming(true)
       setStreamingContent('')
@@ -91,6 +91,7 @@ export function useChat() {
           includeOnboardingContext,
           folderUuids,
           isFirstSession,
+          runDemo,
         )
 
         setConversationUuid(result.conversationUuid)
