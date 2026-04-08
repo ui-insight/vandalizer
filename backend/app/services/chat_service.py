@@ -8,6 +8,8 @@ from typing import AsyncGenerator, Optional
 
 from pydantic_ai.agent import Agent
 from pydantic_ai.messages import (
+    FunctionToolCallEvent,
+    FunctionToolResultEvent,
     ModelMessage,
     PartDeltaEvent,
     PartStartEvent,
@@ -21,8 +23,11 @@ from app.models.activity import ActivityEvent, ActivityStatus
 from app.models.chat import ChatConversation, ChatRole
 from app.models.document import SmartDocument
 from app.models.system_config import SystemConfig
+from app.models.user import User
+from app.services.access_control import TeamAccessContext
 from app.services.config_service import get_user_model_name
 from app.services.llm_service import (
+    create_agentic_chat_agent,
     create_chat_agent,
     DOCUMENT_CHAT_SYSTEM_PROMPT,
     FIRST_SESSION_SYSTEM_PROMPT,
@@ -141,6 +146,8 @@ async def chat_stream(
     kb_uuid: Optional[str] = None,
     include_onboarding_context: bool = False,
     is_first_session: bool = False,
+    user: Optional[User] = None,
+    team_access: Optional[TeamAccessContext] = None,
 ) -> AsyncGenerator[str, None]:
     """Async generator yielding newline-delimited JSON chunks for streaming chat."""
 
@@ -275,7 +282,29 @@ async def chat_stream(
         prompt = message
         system_prompt = None  # uses default
 
-    agent = create_chat_agent(model_name, system_prompt=system_prompt, system_config_doc=sys_config_doc)
+    # Select agent — agentic (with tools) when user context is available
+    deps = None
+    if user and team_access:
+        from app.services.chat_deps import AgenticChatDeps
+
+        deps = AgenticChatDeps(
+            user=user,
+            user_id=user_id,
+            team_id=str(user.current_team) if user.current_team else None,
+            team_access=team_access,
+            organization_id=getattr(user, "organization_id", None),
+            system_config_doc=sys_config_doc,
+            model_name=model_name,
+            context_document_uuids=document_uuids,
+            active_kb_uuid=kb_uuid,
+        )
+        agent = create_agentic_chat_agent(
+            model_name, system_prompt=system_prompt, system_config_doc=sys_config_doc,
+        )
+    else:
+        agent = create_chat_agent(
+            model_name, system_prompt=system_prompt, system_config_doc=sys_config_doc,
+        )
 
     # Stream the response
     full_response: list[str] = []
@@ -287,9 +316,11 @@ async def chat_stream(
     try:
         think_parser = _ThinkTagParser()
 
-        async with agent.iter(
-            prompt, message_history=previous_messages
-        ) as agent_run:
+        iter_kwargs: dict = {"message_history": previous_messages}
+        if deps is not None:
+            iter_kwargs["deps"] = deps
+
+        async with agent.iter(prompt, **iter_kwargs) as agent_run:
             async for node in agent_run:
                 if Agent.is_model_request_node(node):
                     async with node.stream(agent_run.ctx) as stream:
@@ -334,6 +365,38 @@ async def chat_stream(
                         else:
                             full_response.append(text)
                             yield json.dumps({"kind": "text", "content": text}) + "\n"
+
+                elif Agent.is_call_tools_node(node):
+                    # Stream tool call / result events to the frontend
+                    async with node.stream(agent_run.ctx) as tool_stream:
+                        async for event_iter in tool_stream:
+                            async for event in event_iter:
+                                if isinstance(event, FunctionToolCallEvent):
+                                    try:
+                                        args = event.part.args_as_dict()
+                                    except Exception:
+                                        args = {}
+                                    yield json.dumps({
+                                        "kind": "tool_call",
+                                        "tool_name": event.part.tool_name,
+                                        "tool_call_id": event.part.tool_call_id,
+                                        "args": args,
+                                    }) + "\n"
+                                elif isinstance(event, FunctionToolResultEvent):
+                                    # Pop quality sidecar if the tool wrote one
+                                    quality = None
+                                    if deps and event.tool_call_id in deps.quality_annotations:
+                                        quality = deps.quality_annotations.pop(event.tool_call_id)
+                                    result_content = event.result.content
+                                    if not isinstance(result_content, (str, dict, list)):
+                                        result_content = str(result_content)
+                                    yield json.dumps({
+                                        "kind": "tool_result",
+                                        "tool_name": event.result.tool_name,
+                                        "tool_call_id": event.result.tool_call_id,
+                                        "content": result_content,
+                                        "quality": quality,
+                                    }) + "\n"
 
             if agent_run.result:
                 usage = agent_run.result.usage()

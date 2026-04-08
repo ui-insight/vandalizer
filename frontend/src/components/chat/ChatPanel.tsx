@@ -62,6 +62,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     activityId,
     conversationUuid,
     error,
+    activeToolCalls,
+    toolResults,
     send,
     loadHistory,
     setActivity,
@@ -660,22 +662,26 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           <ChatMessage
             message={{ role: 'assistant', content: '' }}
             streamingThinking={thinkingContent}
+            activeToolCalls={activeToolCalls}
+            toolResults={toolResults}
             isStreaming
           />
         )}
 
-        {/* Streaming: text phase */}
-        {isStreaming && streamingContent && (
+        {/* Streaming: text phase (or tool-only phase with no text yet) */}
+        {isStreaming && (streamingContent || toolResults.length > 0) && (
           <ChatMessage
             message={{ role: 'assistant', content: streamingContent }}
             streamingThinking={thinkingContent || undefined}
             thinkingDuration={thinkingDuration}
+            activeToolCalls={activeToolCalls}
+            toolResults={toolResults}
             isStreaming
           />
         )}
 
         {/* Loading indicator */}
-        {isStreaming && !streamingContent && !thinkingContent && (
+        {isStreaming && !streamingContent && !thinkingContent && activeToolCalls.length === 0 && toolResults.length === 0 && (
           <div style={{ padding: 15, marginBottom: 15, backgroundColor: '#00000008', borderRadius: 'var(--ui-radius, 12px)' }}>
             <div className="thinking-shimmer" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#9ca3af' }}>
               <ChevronRight size={14} />

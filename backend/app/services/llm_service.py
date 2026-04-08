@@ -20,6 +20,7 @@ from app.utils.encryption import decrypt_value
 # Agent caches  - prevent context leaks across requests
 # ---------------------------------------------------------------------------
 _chat_agent_cache: dict[str, Agent] = {}
+_agentic_chat_agent_cache: dict[str, Agent] = {}
 _extraction_agent_cache: dict[str, Agent] = {}
 _rag_agent_cache: dict[str, Agent] = {}
 _prompt_agent_cache: dict[str, Agent] = {}
@@ -28,6 +29,7 @@ _prompt_agent_cache: dict[str, Agent] = {}
 def clear_agent_caches():
     """Clear all cached agents so config changes (API keys, endpoints) take effect."""
     _chat_agent_cache.clear()
+    _agentic_chat_agent_cache.clear()
     _extraction_agent_cache.clear()
     _rag_agent_cache.clear()
     _prompt_agent_cache.clear()
@@ -249,9 +251,90 @@ def create_chat_agent(
     return _chat_agent_cache[cache_key]
 
 
+def create_agentic_chat_agent(
+    agent_model: str,
+    system_prompt: str | None = None,
+    thinking_override: Optional[bool] = None,
+    system_config_doc: dict | None = None,
+) -> Agent:
+    """Create or retrieve a cached agentic chat agent with tools."""
+    from app.services.chat_deps import AgenticChatDeps
+    from app.services.chat_tools import TOOLS
+
+    prompt_to_use = system_prompt or AGENTIC_CHAT_SYSTEM_PROMPT
+    cache_key = f"agentic_{agent_model}_{hash(prompt_to_use)}_{thinking_override}"
+
+    if cache_key not in _agentic_chat_agent_cache:
+        model = get_agent_model(
+            agent_model,
+            thinking_override=thinking_override,
+            system_config_doc=system_config_doc,
+        )
+        agent = Agent(model, deps_type=AgenticChatDeps, system_prompt=prompt_to_use)
+        for tool_fn in TOOLS:
+            agent.tool(tool_fn)
+        _agentic_chat_agent_cache[cache_key] = agent
+
+    return _agentic_chat_agent_cache[cache_key]
+
+
 # ---------------------------------------------------------------------------
 # Default system prompts
 # ---------------------------------------------------------------------------
+
+AGENTIC_CHAT_SYSTEM_PROMPT = (
+    "You are Vandalizer, an AI document intelligence assistant with access to tools.\n\n"
+    "## Available capabilities\n"
+    "You can search documents, query knowledge bases, run extractions, execute workflows, "
+    "create knowledge bases, and check quality metrics — all by calling your tools.\n\n"
+    "## When to use tools\n"
+    "- User asks about their documents or files → search_documents or list_documents\n"
+    "- User asks about knowledge base content → search_knowledge_base\n"
+    "- User wants to know what extraction sets exist → list_extraction_sets\n"
+    "- User wants to know what workflows exist → list_workflows\n"
+    "- User asks about quality, accuracy, or validation → get_quality_info\n"
+    "- User asks what's available in their library → search_library\n"
+    "- User wants to read or preview a document → get_document_text\n"
+    "- User wants to extract data from documents → run_extraction\n"
+    "- User wants to create a KB or add content to one → create_knowledge_base, add_documents_to_kb, add_url_to_kb\n"
+    "- User wants to run a workflow → run_workflow, then get_workflow_status\n\n"
+    "## Extraction workflow\n"
+    "When a user wants to extract data:\n"
+    "1. If they haven't specified an extraction set, use list_extraction_sets to find relevant ones\n"
+    "2. If they haven't specified documents, use search_documents to find them\n"
+    "3. Call run_extraction with the extraction_set_uuid and document_uuids\n"
+    "4. Present the extracted entities in a clear table or bullet list\n"
+    "5. If quality metadata is returned, mention the quality score and any alerts\n\n"
+    "## Knowledge base workflow\n"
+    "When a user wants to build a knowledge base:\n"
+    "1. Create a KB with create_knowledge_base\n"
+    "2. Add documents with add_documents_to_kb or URLs with add_url_to_kb\n"
+    "3. Explain that indexing happens in the background and they can query it shortly\n\n"
+    "## Workflow execution\n"
+    "When a user wants to run a workflow:\n"
+    "1. If they haven't specified a workflow, use list_workflows to find options\n"
+    "2. Call run_workflow — this starts execution asynchronously and returns a session_id\n"
+    "3. Call get_workflow_status with the session_id to check progress\n"
+    "4. If the workflow is still running, tell the user and offer to check again\n"
+    "5. If completed, present the output clearly\n"
+    "6. If paused for approval, explain that it needs human review\n\n"
+    "## When NOT to use tools\n"
+    "- User asks a general question you can answer from conversation context\n"
+    "- Documents are already loaded in the conversation (answer from them directly)\n"
+    "- User is making small talk or asking about Vandalizer features\n\n"
+    "## Response rules\n"
+    "- Be concise. Use Markdown bullets and headings.\n"
+    "- Summarize tool results in natural language — never dump raw JSON.\n"
+    "- When quality metadata is available, mention the quality tier and score naturally "
+    '(e.g. "This extraction set is verified with a quality score of 87/100").\n'
+    "- If quality alerts exist, mention them as a heads-up.\n"
+    "- If a tool returns no results, say so clearly and suggest alternatives.\n"
+    "- Never fabricate data that tools did not return.\n"
+    "- Keep answers under 200 words unless showing detailed extraction or workflow results.\n"
+    "- For extraction results, format entities as a Markdown table when there are multiple fields.\n"
+)
+
+
 
 DEFAULT_CHAT_SYSTEM_PROMPT = (
     "You are a helpful, concise assistant.\n\n"

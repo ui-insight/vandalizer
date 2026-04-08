@@ -3,6 +3,29 @@ export interface ChatMessage {
   content: string
   thinking?: string
   thinking_duration?: number
+  tool_calls?: ToolCallInfo[]
+  tool_results?: ToolResultInfo[]
+}
+
+export interface ToolCallInfo {
+  tool_name: string
+  tool_call_id: string
+  args: Record<string, unknown>
+}
+
+export interface QualityMeta {
+  score: number | null
+  tier: string | null
+  grade: string | null
+  last_validated_at: string | null
+  active_alerts?: Array<{ type: string; severity: string; message: string }>
+}
+
+export interface ToolResultInfo {
+  tool_name: string
+  tool_call_id: string
+  content: unknown
+  quality: QualityMeta | null
 }
 
 export interface FileAttachment {
@@ -48,7 +71,11 @@ export interface ActivityEvent {
 }
 
 export interface StreamChunk {
-  kind: 'text' | 'thinking' | 'thinking_done' | 'error'
+  kind: 'text' | 'thinking' | 'thinking_done' | 'error' | 'tool_call' | 'tool_result'
   content: string
   duration?: number
+  tool_name?: string
+  tool_call_id?: string
+  args?: Record<string, unknown>
+  quality?: QualityMeta | null
 }

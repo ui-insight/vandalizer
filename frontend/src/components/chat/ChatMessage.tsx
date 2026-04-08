@@ -5,7 +5,8 @@ import { marked } from 'marked'
 import { submitChatFeedback } from '../../api/feedback'
 import { useCertificationPanel } from '../../contexts/CertificationPanelContext'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
-import type { ChatMessage as ChatMessageType } from '../../types/chat'
+import { ToolCallDisplay } from './ToolCallDisplay'
+import type { ChatMessage as ChatMessageType, ToolCallInfo, ToolResultInfo } from '../../types/chat'
 
 const ACTION_RE = /\[ACTION:([\w-]+)\](.*?)\[\/ACTION\]/g
 
@@ -53,9 +54,13 @@ interface Props {
   thinkingDuration?: number | null
   /** Whether this message is currently streaming */
   isStreaming?: boolean
+  /** Active tool calls during streaming */
+  activeToolCalls?: ToolCallInfo[]
+  /** Completed tool results during streaming */
+  toolResults?: ToolResultInfo[]
 }
 
-export function ChatMessage({ message, messageIndex, conversationUuid, streamingThinking, thinkingDuration, isStreaming: isStreamingProp }: Props) {
+export function ChatMessage({ message, messageIndex, conversationUuid, streamingThinking, thinkingDuration, isStreaming: isStreamingProp, activeToolCalls, toolResults }: Props) {
   const isUser = message.role === 'user'
   const [feedback, setFeedback] = useState<'up' | 'down' | null>(null)
   const [copied, setCopied] = useState(false)
@@ -214,6 +219,20 @@ export function ChatMessage({ message, messageIndex, conversationUuid, streaming
               </div>
             </div>
           )}
+
+          {/* Tool calls / results — shown during streaming and persisted */}
+          {(() => {
+            const calls = activeToolCalls || message.tool_calls || []
+            const results = toolResults || message.tool_results || []
+            if (calls.length === 0 && results.length === 0) return null
+            return (
+              <ToolCallDisplay
+                toolCalls={calls}
+                toolResults={results}
+                isStreaming={isStreamingProp}
+              />
+            )
+          })()}
 
           {message.content && (
             <div

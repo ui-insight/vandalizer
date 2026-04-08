@@ -193,6 +193,8 @@ async def chat(
             kb_uuid=body.knowledge_base_uuid,
             include_onboarding_context=body.include_onboarding_context,
             is_first_session=body.is_first_session,
+            user=user,
+            team_access=team_access,
         ):
             yield chunk
 
