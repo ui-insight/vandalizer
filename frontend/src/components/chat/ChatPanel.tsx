@@ -64,6 +64,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     error,
     activeToolCalls,
     toolResults,
+    segments,
     send,
     loadHistory,
     setActivity,
@@ -705,31 +706,33 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
             />
         ))}
 
-        {/* Streaming: thinking-only phase */}
-        {isStreaming && thinkingContent && !streamingContent && (
+        {/* Streaming: thinking-only phase (no text or tools yet) */}
+        {isStreaming && thinkingContent && !streamingContent && segments.length === 0 && (
           <ChatMessage
             message={{ role: 'assistant', content: '' }}
             streamingThinking={thinkingContent}
             activeToolCalls={activeToolCalls}
             toolResults={toolResults}
+            streamSegments={segments}
             isStreaming
           />
         )}
 
-        {/* Streaming: text phase (or tool-only phase with no text yet) */}
-        {isStreaming && (streamingContent || toolResults.length > 0) && (
+        {/* Streaming: segments have started (text and/or tools) */}
+        {isStreaming && segments.length > 0 && (
           <ChatMessage
             message={{ role: 'assistant', content: streamingContent }}
             streamingThinking={thinkingContent || undefined}
             thinkingDuration={thinkingDuration}
             activeToolCalls={activeToolCalls}
             toolResults={toolResults}
+            streamSegments={segments}
             isStreaming
           />
         )}
 
         {/* Loading indicator */}
-        {isStreaming && !streamingContent && !thinkingContent && activeToolCalls.length === 0 && toolResults.length === 0 && (
+        {isStreaming && !streamingContent && !thinkingContent && activeToolCalls.length === 0 && toolResults.length === 0 && segments.length === 0 && (
           <div style={{ padding: 15, marginBottom: 15, backgroundColor: '#00000008', borderRadius: 'var(--ui-radius, 12px)' }}>
             <div className="thinking-shimmer" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#9ca3af' }}>
               <ChevronRight size={14} />

@@ -18,18 +18,13 @@ from app.models.document import SmartDocument
 from app.models.knowledge import KnowledgeBase, KnowledgeBaseReference, KnowledgeBaseSource
 from app.models.user import User
 from app.services import access_control
-from app.services.document_manager import DocumentManager
+from app.services.document_manager import get_document_manager
 
 logger = logging.getLogger(__name__)
 
-_dm: DocumentManager | None = None
 
-
-def _get_dm() -> DocumentManager:
-    global _dm
-    if _dm is None:
-        _dm = DocumentManager()
-    return _dm
+def _get_dm():
+    return get_document_manager()
 
 
 async def list_knowledge_bases(

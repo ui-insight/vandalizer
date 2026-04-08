@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react'
 import { streamChat, getHistory } from '../api/chat'
-import type { ChatMessage, StreamChunk, ToolCallInfo, ToolResultInfo } from '../types/chat'
+import type { ChatMessage, StreamChunk, StreamSegment, ToolCallInfo, ToolResultInfo } from '../types/chat'
 
 const THINK_BLOCK_RE = /<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>\n?/g
 const THINK_TRAILING_RE = /<think(?:ing)?>[\s\S]*$/
@@ -16,12 +16,14 @@ export function useChat() {
   const [error, setError] = useState<string | null>(null)
   const [activeToolCalls, setActiveToolCalls] = useState<ToolCallInfo[]>([])
   const [toolResults, setToolResults] = useState<ToolResultInfo[]>([])
+  const [segments, setSegments] = useState<StreamSegment[]>([])
 
   const streamingRef = useRef('')
   const thinkingRef = useRef('')
   const thinkingDurationRef = useRef<number | null>(null)
   const toolCallsRef = useRef<ToolCallInfo[]>([])
   const toolResultsRef = useRef<ToolResultInfo[]>([])
+  const segmentsRef = useRef<StreamSegment[]>([])
 
   const send = useCallback(
     async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuid?: string, includeOnboardingContext?: boolean, folderUuids?: string[], isFirstSession?: boolean, runDemo?: boolean) => {
@@ -32,11 +34,13 @@ export function useChat() {
       setThinkingDuration(null)
       setActiveToolCalls([])
       setToolResults([])
+      setSegments([])
       streamingRef.current = ''
       thinkingRef.current = ''
       thinkingDurationRef.current = null
       toolCallsRef.current = []
       toolResultsRef.current = []
+      segmentsRef.current = []
 
       // Add user message immediately
       setMessages((prev) => [...prev, { role: 'user', content: message }])
@@ -54,6 +58,16 @@ export function useChat() {
                 .replace(THINK_BLOCK_RE, '')
                 .replace(THINK_TRAILING_RE, '')
               setStreamingContent(display)
+
+              // Build ordered segments
+              const segs = segmentsRef.current
+              const last = segs[segs.length - 1]
+              if (last && last.kind === 'text') {
+                last.content += chunk.content
+              } else {
+                segs.push({ kind: 'text', content: chunk.content })
+              }
+              setSegments([...segs])
             } else if (chunk.kind === 'thinking') {
               thinkingRef.current += chunk.content
               setThinkingContent(thinkingRef.current)
@@ -68,6 +82,8 @@ export function useChat() {
               }
               toolCallsRef.current = [...toolCallsRef.current, call]
               setActiveToolCalls([...toolCallsRef.current])
+              segmentsRef.current.push({ kind: 'tool_call', call })
+              setSegments([...segmentsRef.current])
             } else if (chunk.kind === 'tool_result') {
               const res: ToolResultInfo = {
                 tool_name: chunk.tool_name!,
@@ -82,6 +98,8 @@ export function useChat() {
                 (c) => c.tool_call_id !== chunk.tool_call_id,
               )
               setActiveToolCalls([...toolCallsRef.current])
+              segmentsRef.current.push({ kind: 'tool_result', result: res })
+              setSegments([...segmentsRef.current])
             } else if (chunk.kind === 'error') {
               setError(chunk.content)
             }
@@ -118,6 +136,16 @@ export function useChat() {
             }))]
             assistantMsg.tool_results = [...toolResultsRef.current]
           }
+          // Persist ordered segments so the message renders interleaved
+          if (segmentsRef.current.length > 0) {
+            // Clean think tags from text segments
+            assistantMsg.segments = segmentsRef.current.map((seg) => {
+              if (seg.kind === 'text') {
+                return { ...seg, content: seg.content.replace(THINK_BLOCK_RE, '').replace(THINK_TRAILING_RE, '') }
+              }
+              return seg
+            }).filter((seg) => seg.kind !== 'text' || seg.content.trim().length > 0)
+          }
           setMessages((prev) => [...prev, assistantMsg])
         }
       } catch (e) {
@@ -129,6 +157,7 @@ export function useChat() {
         setThinkingDuration(null)
         setActiveToolCalls([])
         setToolResults([])
+        setSegments([])
       }
     },
     [activityId],
@@ -155,6 +184,7 @@ export function useChat() {
     setError(null)
     setActiveToolCalls([])
     setToolResults([])
+    setSegments([])
   }, [])
 
   const setActivity = useCallback((newActivityId: string, newConversationUuid: string) => {
@@ -174,6 +204,7 @@ export function useChat() {
     error,
     activeToolCalls,
     toolResults,
+    segments,
     send,
     loadHistory,
     reset,

@@ -895,7 +895,7 @@ class KnowledgeBaseQueryNode(Node):
         self.data = data
 
     def process(self, inputs):
-        from app.services.document_manager import DocumentManager
+        from app.services.document_manager import get_document_manager
 
         kb_uuid = self.data.get("kb_uuid", "").strip()
         query = self.data.get("query", "").strip()
@@ -909,7 +909,7 @@ class KnowledgeBaseQueryNode(Node):
 
         self.report_progress("Querying knowledge base…")
 
-        dm = DocumentManager()
+        dm = get_document_manager()
         results = dm.query_kb(kb_uuid, query, k=k)
 
         if not results:

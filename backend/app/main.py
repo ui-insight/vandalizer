@@ -249,9 +249,9 @@ async def health() -> JSONResponse:
 
     # ChromaDB
     try:
-        import chromadb
+        from app.services.document_manager import get_document_manager
 
-        chroma = chromadb.PersistentClient(path=settings.chromadb_persist_dir)
+        chroma = get_document_manager().client
         chroma.heartbeat()
         checks["chromadb"] = "ok"
     except Exception as e:

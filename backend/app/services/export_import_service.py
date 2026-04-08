@@ -481,9 +481,9 @@ async def import_knowledge_base(
 
         # Ingest from cached content or re-fetch
         if src.content:
-            from app.services.document_manager import DocumentManager
+            from app.services.document_manager import get_document_manager
             import asyncio
-            dm = DocumentManager()
+            dm = get_document_manager()
             try:
                 chunk_count = await asyncio.to_thread(
                     dm.add_to_kb, kb.uuid, src.uuid,

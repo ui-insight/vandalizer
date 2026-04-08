@@ -136,6 +136,247 @@ def _extract_event_content(event) -> tuple[str | None, bool]:
     return None, False
 
 
+async def _run_scripted_demo(
+    onboarding_context,
+    conversation: ChatConversation,
+    user,
+    user_id: str,
+    activity_id: Optional[str],
+    sys_config_doc: dict,
+) -> AsyncGenerator[str, None]:
+    """Deterministic onboarding demo — scripted tool calls, template narration.
+
+    Runs the same tools the LLM agent would, but in a fixed sequence so the
+    demo is identical every time.  Yields the same chunk format as the agent
+    streaming path so the frontend renders tool status lines, extraction
+    tables, quality badges, and interleaved text identically.
+    """
+    import asyncio
+    import uuid
+
+    from app.models.activity import ActivityEvent, ActivityStatus
+    from app.models.search_set import SearchSet
+    from app.models.validation_run import ValidationRun
+
+    ctx = onboarding_context
+    team_id = str(user.current_team) if user.current_team else None
+    full_text_parts: list[str] = []
+    all_tool_calls: list[dict] = []
+    all_tool_results: list[dict] = []
+
+    def _text(content: str):
+        full_text_parts.append(content)
+        return json.dumps({"kind": "text", "content": content}) + "\n"
+
+    def _tool_call(name: str, call_id: str, args: dict):
+        data = {"tool_name": name, "tool_call_id": call_id, "args": args}
+        all_tool_calls.append(data)
+        return json.dumps({"kind": "tool_call", **data}) + "\n"
+
+    def _tool_result(name: str, call_id: str, content, quality=None):
+        data = {"tool_name": name, "tool_call_id": call_id, "content": content, "quality": quality}
+        all_tool_results.append(data)
+        return json.dumps({"kind": "tool_result", **data}) + "\n"
+
+    try:
+        # -- Step 1: Introduction ------------------------------------------------
+        yield _text(
+            "I placed a sample NSF proposal in your workspace. Let me show you "
+            "what Vandalizer does with it.\n\n"
+            "Most tools just throw your document at an LLM and hope for the best. "
+            "Vandalizer uses **validated extraction templates** — tested against "
+            "real documents with known answers, so you know the accuracy *before* "
+            "you trust the results.\n\n"
+            "Let me find the right template…\n\n"
+        )
+
+        # -- Step 2: Search library ----------------------------------------------
+        call_id_1 = str(uuid.uuid4())[:12]
+        yield _tool_call("search_library", call_id_1, {"query": "NSF", "kind": "search_set"})
+        await asyncio.sleep(0)  # flush chunk so spinner appears
+
+        from app.services.library_service import search_libraries
+        lib_results = await search_libraries(user, query="NSF", team_id=team_id, kind="search_set")
+
+        yield _tool_result("search_library", call_id_1, lib_results[:20])
+
+        # Find the specific template info for narration
+        template_name = ctx.extraction_set_title or "NSF Grant Proposal"
+        # Look up validation data for narration
+        ss = await SearchSet.find_one(SearchSet.uuid == ctx.extraction_set_uuid)
+        latest_run = await ValidationRun.find(
+            ValidationRun.item_kind == "search_set",
+            ValidationRun.item_id == ctx.extraction_set_uuid,
+        ).sort("-created_at").first_or_none()
+
+        if latest_run and latest_run.accuracy is not None:
+            acc_pct = round(latest_run.accuracy * 100)
+            yield _text(
+                f'Found **"{template_name}"** — a verified template that\'s been '
+                f"validated at **{acc_pct}% accuracy** across "
+                f"{latest_run.num_test_cases} test cases "
+                f"and {latest_run.num_runs} validation runs. "
+                "That means you know how reliable the results are before you even start.\n\n"
+                "Now watch — I'll run it against the sample proposal…\n\n"
+            )
+        else:
+            yield _text(
+                f'Found **"{template_name}"** — a verified extraction template. '
+                "Let me run it against the sample proposal…\n\n"
+            )
+
+        # -- Step 3: Run extraction -----------------------------------------------
+        call_id_2 = str(uuid.uuid4())[:12]
+        yield _tool_call("run_extraction", call_id_2, {
+            "extraction_set_uuid": ctx.extraction_set_uuid,
+            "document_uuids": [ctx.sample_doc_uuid],
+        })
+        await asyncio.sleep(0)  # flush chunk so spinner appears before LLM extraction runs
+
+        # Execute the actual extraction
+        from app.services.extraction_engine import ExtractionEngine
+
+        items = await ss.get_extraction_items() if ss else []
+        keys = [item.searchphrase for item in items if item.searchphrase]
+        field_metadata = [
+            {"key": item.searchphrase, "is_optional": item.is_optional, "enum_values": item.enum_values}
+            for item in items if item.searchphrase
+        ]
+
+        doc = await SmartDocument.find_one(SmartDocument.uuid == ctx.sample_doc_uuid)
+        doc_text = doc.raw_text if doc else ""
+        doc_title = doc.title if doc else "Sample Document"
+
+        extraction_result: dict = {"error": "Extraction failed"}
+        quality_sidecar = None
+
+        if doc_text and keys:
+            def _extract():
+                engine = ExtractionEngine(system_config_doc=sys_config_doc, domain=ss.domain if ss else None)
+                results = engine.extract(
+                    extract_keys=keys,
+                    doc_texts=[doc_text],
+                    extraction_config_override=ss.extraction_config if ss else None,
+                    field_metadata=field_metadata,
+                )
+                return results
+
+            entities = await asyncio.to_thread(_extract)
+
+            extraction_result = {
+                "extraction_set": template_name,
+                "fields": keys,
+                "documents": [doc_title],
+                "entities": entities[:50],
+                "entity_count": len(entities),
+            }
+
+            if latest_run and latest_run.score is not None:
+                score = latest_run.score
+                tier = "excellent" if score >= 90 else "good" if score >= 75 else "fair" if score >= 50 else "poor"
+                quality_sidecar = {
+                    "score": score,
+                    "tier": tier,
+                    "grade": latest_run.grade,
+                    "accuracy": latest_run.accuracy,
+                    "consistency": latest_run.consistency,
+                    "last_validated_at": latest_run.created_at.isoformat() if latest_run.created_at else None,
+                    "num_test_cases": latest_run.num_test_cases,
+                    "num_runs": latest_run.num_runs,
+                    "active_alerts": [],
+                }
+
+        yield _tool_result("run_extraction", call_id_2, extraction_result, quality=quality_sidecar)
+
+        entity_count = extraction_result.get("entity_count", 0)
+        field_count = len(keys) if keys else 0
+
+        if latest_run and latest_run.accuracy is not None:
+            acc_pct = round(latest_run.accuracy * 100)
+            yield _text(
+                f"That pulled out **{field_count} structured fields** in seconds. "
+                f"Because this template was validated at **{acc_pct}% accuracy**, "
+                "you can trust these results for reporting, budgeting, and compliance — "
+                "not just hope the LLM got it right.\n\n"
+            )
+        else:
+            yield _text(
+                f"Extracted **{entity_count} entities** with **{field_count} fields** each. "
+            )
+
+        # -- Step 4: Knowledge base (if available) --------------------------------
+        if ctx.kb_uuid:
+            call_id_3 = str(uuid.uuid4())[:12]
+            yield _text(
+                "Let me cross-reference the budget against the NSF PAPPG policy guide…\n\n"
+            )
+            yield _tool_call("search_knowledge_base", call_id_3, {
+                "query": "NSF budget indirect costs MTDC equipment exclusion",
+                "kb_uuid": ctx.kb_uuid,
+            })
+            await asyncio.sleep(0)  # flush chunk so spinner appears
+
+            from app.services.document_manager import get_document_manager
+            dm = get_document_manager()
+            kb_results = await asyncio.to_thread(
+                dm.query_kb, ctx.kb_uuid, "NSF budget indirect costs MTDC equipment exclusion", 8,
+            )
+            kb_content = [
+                {"content": r.get("content", ""), "source_name": r.get("metadata", {}).get("source_name", "unknown")}
+                for r in kb_results
+            ]
+            yield _tool_result("search_knowledge_base", call_id_3, kb_content)
+
+            if kb_results:
+                yield _text(
+                    "The PAPPG confirms that **equipment over $5,000 is excluded from the "
+                    "MTDC base** for indirect cost calculations — which lines up with the "
+                    "$61,100 equipment line in the extracted budget. "
+                    "This kind of automated cross-reference catches policy issues before they "
+                    "become audit findings.\n\n"
+                )
+            else:
+                yield _text(
+                    "The knowledge base query didn't return strong matches this time, "
+                    "but with more reference content loaded, Vandalizer can cross-reference "
+                    "any extracted data against policy documents automatically.\n\n"
+                )
+
+        # -- Step 5: Hand off ------------------------------------------------------
+        yield _text(
+            "That's Vandalizer: **validated extraction** that you can measure and trust"
+        )
+        if ctx.kb_uuid:
+            yield _text(
+                ", plus **policy cross-reference** to catch compliance issues automatically"
+            )
+        yield _text(
+            " — not just a prompt and a prayer.\n\n"
+            "What would you like to do next?\n\n"
+            "[ACTION:upload-docs]Upload your documents[/ACTION]  "
+            "[ACTION:start-cert]Start the Certification Program[/ACTION]\n"
+        )
+
+        # -- Finalize: save to conversation & activity ----------------------------
+        assistant_message = "".join(full_text_parts)
+        await _finalize(
+            conversation, assistant_message, [doc] if doc else [],
+            None, activity_id, user_id,
+            tool_calls=all_tool_calls or None,
+            tool_results=all_tool_results or None,
+        )
+
+    except Exception as e:
+        logger.error("Scripted demo error: %s", e, exc_info=True)
+        yield json.dumps({"kind": "error", "content": f"Demo error: {e}"}) + "\n"
+        if activity_id:
+            ev = await ActivityEvent.get(activity_id)
+            if ev:
+                ev.status = ActivityStatus.FAILED.value
+                ev.error = str(e)[:2000]
+                await ev.save()
+
+
 async def chat_stream(
     message: str,
     document_uuids: list[str],
@@ -172,6 +413,22 @@ async def chat_stream(
     )
     if not conversation:
         yield json.dumps({"kind": "error", "content": "Conversation not found"}) + "\n"
+        return
+
+    # ---------------------------------------------------------------------------
+    # Scripted demo: deterministic tool calls + template narration.
+    # Bypasses the LLM agent entirely so the demo is 100% reliable.
+    # ---------------------------------------------------------------------------
+    if run_demo and onboarding_context and onboarding_context.extraction_set_uuid:
+        async for chunk in _run_scripted_demo(
+            onboarding_context=onboarding_context,
+            conversation=conversation,
+            user=user,
+            user_id=user_id,
+            activity_id=activity_id,
+            sys_config_doc=sys_config_doc,
+        ):
+            yield chunk
         return
 
     # Load documents
@@ -235,8 +492,8 @@ async def chat_stream(
     if kb_uuid:
         try:
             import asyncio
-            from app.services.document_manager import DocumentManager
-            dm = DocumentManager()
+            from app.services.document_manager import get_document_manager
+            dm = get_document_manager()
             kb_results = await asyncio.to_thread(dm.query_kb, kb_uuid, message, 8)
             if kb_results:
                 kb_text = "\n\n## Knowledge Base Context:\n"
@@ -391,42 +648,41 @@ async def chat_stream(
                 elif Agent.is_call_tools_node(node):
                     # Stream tool call / result events to the frontend
                     async with node.stream(agent_run.ctx) as tool_stream:
-                        async for event_iter in tool_stream:
-                            async for event in event_iter:
-                                if isinstance(event, FunctionToolCallEvent):
-                                    try:
-                                        args = event.part.args_as_dict()
-                                    except Exception:
-                                        args = {}
-                                    call_data = {
-                                        "tool_name": event.part.tool_name,
-                                        "tool_call_id": event.part.tool_call_id,
-                                        "args": args,
-                                    }
-                                    streamed_tool_calls.append(call_data)
-                                    yield json.dumps({"kind": "tool_call", **call_data}) + "\n"
-                                elif isinstance(event, FunctionToolResultEvent):
-                                    # Extract quality sidecar from tool result.
-                                    # Tools embed a "quality" key in their return dict;
-                                    # we strip it here so it goes to the frontend but
-                                    # NOT back into the LLM context.
-                                    quality = None
-                                    result_content = event.result.content
-                                    if isinstance(result_content, dict) and "quality" in result_content:
-                                        quality = result_content.pop("quality")
-                                    # Also check the deps annotations dict (future-proof)
-                                    if quality is None and deps and event.tool_call_id in deps.quality_annotations:
-                                        quality = deps.quality_annotations.pop(event.tool_call_id)
-                                    if not isinstance(result_content, (str, dict, list)):
-                                        result_content = str(result_content)
-                                    result_data = {
-                                        "tool_name": event.result.tool_name,
-                                        "tool_call_id": event.result.tool_call_id,
-                                        "content": result_content,
-                                        "quality": quality,
-                                    }
-                                    streamed_tool_results.append(result_data)
-                                    yield json.dumps({"kind": "tool_result", **result_data}) + "\n"
+                        async for event in tool_stream:
+                            if isinstance(event, FunctionToolCallEvent):
+                                try:
+                                    args = event.part.args_as_dict()
+                                except Exception:
+                                    args = {}
+                                call_data = {
+                                    "tool_name": event.part.tool_name,
+                                    "tool_call_id": event.part.tool_call_id,
+                                    "args": args,
+                                }
+                                streamed_tool_calls.append(call_data)
+                                yield json.dumps({"kind": "tool_call", **call_data}) + "\n"
+                            elif isinstance(event, FunctionToolResultEvent):
+                                # Extract quality sidecar from tool result.
+                                # Tools embed a "quality" key in their return dict;
+                                # we strip it here so it goes to the frontend but
+                                # NOT back into the LLM context.
+                                quality = None
+                                result_content = event.result.content
+                                if isinstance(result_content, dict) and "quality" in result_content:
+                                    quality = result_content.pop("quality")
+                                # Also check the deps annotations dict (future-proof)
+                                if quality is None and deps and event.tool_call_id in deps.quality_annotations:
+                                    quality = deps.quality_annotations.pop(event.tool_call_id)
+                                if not isinstance(result_content, (str, dict, list)):
+                                    result_content = str(result_content)
+                                result_data = {
+                                    "tool_name": event.result.tool_name,
+                                    "tool_call_id": event.result.tool_call_id,
+                                    "content": result_content,
+                                    "quality": quality,
+                                }
+                                streamed_tool_results.append(result_data)
+                                yield json.dumps({"kind": "tool_result", **result_data}) + "\n"
 
             if agent_run.result:
                 usage = agent_run.result.usage()

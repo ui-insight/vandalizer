@@ -5,6 +5,7 @@ export interface ChatMessage {
   thinking_duration?: number
   tool_calls?: ToolCallInfo[]
   tool_results?: ToolResultInfo[]
+  segments?: StreamSegment[]
 }
 
 export interface ToolCallInfo {
@@ -73,6 +74,11 @@ export interface ActivityEvent {
   message_count: number
   result_snapshot: Record<string, unknown>
 }
+
+export type StreamSegment =
+  | { kind: 'text'; content: string }
+  | { kind: 'tool_call'; call: ToolCallInfo }
+  | { kind: 'tool_result'; result: ToolResultInfo }
 
 export interface StreamChunk {
   kind: 'text' | 'thinking' | 'thinking_done' | 'error' | 'tool_call' | 'tool_result'

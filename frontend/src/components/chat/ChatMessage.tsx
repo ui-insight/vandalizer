@@ -5,10 +5,16 @@ import { marked } from 'marked'
 import { submitChatFeedback } from '../../api/feedback'
 import { useCertificationPanel } from '../../contexts/CertificationPanelContext'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
-import { ToolCallDisplay } from './ToolCallDisplay'
-import type { ChatMessage as ChatMessageType, ToolCallInfo, ToolResultInfo } from '../../types/chat'
+import { ToolCallDisplay, ToolStatusLine } from './ToolCallDisplay'
+import type { ChatMessage as ChatMessageType, StreamSegment, ToolCallInfo, ToolResultInfo } from '../../types/chat'
 
+// Matches [ACTION:type]Label[/ACTION] (correct) and also
+// [Label][ACTION:type] or [Label](ACTION:type) (common LLM mistakes)
 const ACTION_RE = /\[ACTION:([\w-]+)\](.*?)\[\/ACTION\]/g
+const ACTION_RE_ALT = /\[([^\]]+)\]\[ACTION:([\w-]+)\]/g
+const ACTION_RE_ALT2 = /\[([^\]]+)\]\(ACTION:([\w-]+)\)/g
+const THINK_BLOCK_RE = /<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>\n?/g
+const THINK_TRAILING_RE = /<think(?:ing)?>[\s\S]*$/
 
 const THINKING_WORDS = [
   'Thinking', 'Vandalizing', 'Pondering', 'Analyzing',
@@ -44,23 +50,45 @@ function ThinkingLabel() {
 
 marked.setOptions({ breaks: true, gfm: true })
 
+/** Render a markdown string to sanitized HTML. */
+function renderMarkdown(text: string): string {
+  let cleaned = text.replace(THINK_BLOCK_RE, '').replace(THINK_TRAILING_RE, '')
+  // Canonical: [ACTION:type]Label[/ACTION]
+  cleaned = cleaned.replace(ACTION_RE, (_match, type: string, label: string) =>
+    `<button data-action="${type}" class="chat-action-btn">${label}</button>`
+  )
+  // LLM mistake: [Label][ACTION:type]
+  cleaned = cleaned.replace(ACTION_RE_ALT, (_match, label: string, type: string) =>
+    `<button data-action="${type}" class="chat-action-btn">${label}</button>`
+  )
+  // LLM mistake: [Label](ACTION:type)
+  cleaned = cleaned.replace(ACTION_RE_ALT2, (_match, label: string, type: string) =>
+    `<button data-action="${type}" class="chat-action-btn">${label}</button>`
+  )
+  return DOMPurify.sanitize(marked.parse(cleaned) as string, {
+    ADD_TAGS: ['button'],
+    ADD_ATTR: ['data-action'],
+  })
+}
+
 interface Props {
   message: ChatMessageType
   messageIndex?: number
   conversationUuid?: string
-  /** Live thinking content during streaming (before thinking is finalized) */
   streamingThinking?: string
-  /** Duration in seconds (from thinking_done event or persisted) */
   thinkingDuration?: number | null
-  /** Whether this message is currently streaming */
   isStreaming?: boolean
-  /** Active tool calls during streaming */
   activeToolCalls?: ToolCallInfo[]
-  /** Completed tool results during streaming */
   toolResults?: ToolResultInfo[]
+  /** Ordered stream segments for interleaved rendering */
+  streamSegments?: StreamSegment[]
 }
 
-export function ChatMessage({ message, messageIndex, conversationUuid, streamingThinking, thinkingDuration, isStreaming: isStreamingProp, activeToolCalls, toolResults }: Props) {
+export function ChatMessage({
+  message, messageIndex, conversationUuid, streamingThinking,
+  thinkingDuration, isStreaming: isStreamingProp, activeToolCalls,
+  toolResults, streamSegments,
+}: Props) {
   const isUser = message.role === 'user'
   const [feedback, setFeedback] = useState<'up' | 'down' | null>(null)
   const [copied, setCopied] = useState(false)
@@ -72,24 +100,18 @@ export function ChatMessage({ message, messageIndex, conversationUuid, streaming
   const certPanel = useCertificationPanel()
   const { setWorkspaceMode } = useWorkspace()
 
-  // Resolve thinking content: streaming thinking > persisted thinking
   const thinkingText = streamingThinking || message.thinking || ''
   const duration = thinkingDuration ?? message.thinking_duration ?? null
   const hasThinking = thinkingText.length > 0
 
+  // Determine which segments to use: streaming > persisted > none
+  const segments = streamSegments || message.segments || null
+
+  // For non-segment fallback: full rendered HTML
   const renderedHtml = useMemo(() => {
-    if (isUser) return null
-    // Strip any residual <think>/<thinking> blocks the backend didn't catch
-    let cleaned = message.content.replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>\n?/g, '')
-    // Replace [ACTION:type]label[/ACTION] markers with styled button HTML
-    cleaned = cleaned.replace(ACTION_RE, (_match, type: string, label: string) =>
-      `<button data-action="${type}" class="chat-action-btn">${label}</button>`
-    )
-    return DOMPurify.sanitize(marked.parse(cleaned) as string, {
-      ADD_TAGS: ['button'],
-      ADD_ATTR: ['data-action'],
-    })
-  }, [message.content, isUser])
+    if (isUser || segments) return null
+    return renderMarkdown(message.content)
+  }, [message.content, isUser, segments])
 
   // Attach click handlers to action buttons after render
   useEffect(() => {
@@ -107,7 +129,7 @@ export function ChatMessage({ message, messageIndex, conversationUuid, streaming
       handlers.push([btn, handler])
     })
     return () => { handlers.forEach(([b, h]) => b.removeEventListener('click', h)) }
-  }, [renderedHtml, certPanel, setWorkspaceMode])
+  }, [renderedHtml, segments, certPanel, setWorkspaceMode])
 
   const handleFeedback = async (rating: 'up' | 'down') => {
     setFeedback(rating)
@@ -141,6 +163,28 @@ export function ChatMessage({ message, messageIndex, conversationUuid, streaming
     setTimeout(() => setCopied(false), 2000)
   }
 
+  // Build a result lookup from both streaming and persisted sources
+  const resultMap = useMemo(() => {
+    const map = new Map<string, ToolResultInfo>()
+    for (const r of (toolResults || message.tool_results || [])) {
+      map.set(r.tool_call_id, r)
+    }
+    // Also gather from segments
+    if (segments) {
+      for (const seg of segments) {
+        if (seg.kind === 'tool_result') map.set(seg.result.tool_call_id, seg.result)
+      }
+    }
+    return map
+  }, [toolResults, message.tool_results, segments])
+
+  // Active call IDs (no result yet)
+  const activeCallIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const c of (activeToolCalls || [])) ids.add(c.tool_call_id)
+    return ids
+  }, [activeToolCalls])
+
   return (
     <div
       style={{
@@ -167,17 +211,10 @@ export function ChatMessage({ message, messageIndex, conversationUuid, streaming
                 aria-label={thinkingExpanded ? 'Collapse thinking' : 'Expand thinking'}
                 className={duration == null ? 'thinking-shimmer' : undefined}
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4,
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  padding: '2px 0',
-                  fontSize: 12,
-                  color: '#9ca3af',
-                  fontFamily: 'inherit',
-                  transition: 'color 0.15s',
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  padding: '2px 0', fontSize: 12, color: '#9ca3af',
+                  fontFamily: 'inherit', transition: 'color 0.15s',
                 }}
                 onMouseEnter={e => { e.currentTarget.style.color = '#6b7280' }}
                 onMouseLeave={e => { e.currentTarget.style.color = '#9ca3af' }}
@@ -197,19 +234,13 @@ export function ChatMessage({ message, messageIndex, conversationUuid, streaming
                 <div>
                   <div
                     style={{
-                      marginTop: 6,
-                      padding: '10px 12px',
+                      marginTop: 6, padding: '10px 12px',
                       backgroundColor: '#f9fafb',
                       borderLeft: '3px solid var(--highlight-color, #eab308)',
-                      borderRadius: 4,
-                      fontSize: 13,
-                      lineHeight: 1.6,
-                      color: '#6b7280',
-                      fontStyle: 'italic',
-                      maxHeight: 400,
-                      overflowY: 'auto',
-                      whiteSpace: 'pre-wrap',
-                      wordBreak: 'break-word',
+                      borderRadius: 4, fontSize: 13, lineHeight: 1.6,
+                      color: '#6b7280', fontStyle: 'italic',
+                      maxHeight: 400, overflowY: 'auto',
+                      whiteSpace: 'pre-wrap', wordBreak: 'break-word',
                     }}
                     className="hide-scrollbar"
                   >
@@ -220,27 +251,69 @@ export function ChatMessage({ message, messageIndex, conversationUuid, streaming
             </div>
           )}
 
-          {/* Tool calls / results — shown during streaming and persisted */}
-          {(() => {
-            const calls = activeToolCalls || message.tool_calls || []
-            const results = toolResults || message.tool_results || []
-            if (calls.length === 0 && results.length === 0) return null
-            return (
-              <ToolCallDisplay
-                toolCalls={calls}
-                toolResults={results}
-                isStreaming={isStreamingProp}
-              />
-            )
-          })()}
+          {/* Interleaved segment rendering (streaming + persisted) */}
+          {segments && segments.length > 0 ? (
+            <div ref={contentRef}>
+              {segments.map((seg, i) => {
+                if (seg.kind === 'text') {
+                  const cleaned = seg.content.replace(THINK_BLOCK_RE, '').replace(THINK_TRAILING_RE, '')
+                  if (!cleaned.trim()) return null
+                  const html = renderMarkdown(cleaned)
+                  return (
+                    <div
+                      key={i}
+                      className="select-text chat-markdown"
+                      style={{ fontSize: 14, lineHeight: 1.6 }}
+                      dangerouslySetInnerHTML={{ __html: html }}
+                    />
+                  )
+                }
+                if (seg.kind === 'tool_call') {
+                  const result = resultMap.get(seg.call.tool_call_id)
+                  const isActive = !result && (isStreamingProp || activeCallIds.has(seg.call.tool_call_id))
+                  return (
+                    <div key={i} style={{ margin: '4px 0' }}>
+                      <ToolStatusLine call={seg.call} result={result} isActive={isActive} />
+                    </div>
+                  )
+                }
+                // tool_result segments: skip — rendered inline with their tool_call above
+                return null
+              })}
+              {/* Show any active tool calls that haven't appeared in segments yet */}
+              {activeToolCalls && activeToolCalls.filter(
+                (c) => !segments.some((s) => s.kind === 'tool_call' && s.call.tool_call_id === c.tool_call_id),
+              ).map((c) => (
+                <div key={c.tool_call_id} style={{ margin: '4px 0' }}>
+                  <ToolStatusLine call={c} isActive />
+                </div>
+              ))}
+            </div>
+          ) : (
+            /* Fallback: no segments (e.g. history loaded from backend) */
+            <>
+              {message.content && (
+                <div
+                  ref={contentRef}
+                  className="select-text chat-markdown"
+                  style={{ fontSize: 14, lineHeight: 1.6 }}
+                  dangerouslySetInnerHTML={{ __html: renderedHtml! }}
+                />
+              )}
 
-          {message.content && (
-            <div
-              ref={contentRef}
-              className="select-text chat-markdown"
-              style={{ fontSize: 14, lineHeight: 1.6 }}
-              dangerouslySetInnerHTML={{ __html: renderedHtml! }}
-            />
+              {(() => {
+                const calls = activeToolCalls || message.tool_calls || []
+                const results = toolResults || message.tool_results || []
+                if (calls.length === 0 && results.length === 0) return null
+                return (
+                  <ToolCallDisplay
+                    toolCalls={calls}
+                    toolResults={results}
+                    isStreaming={isStreamingProp}
+                  />
+                )
+              })()}
+            </>
           )}
 
           {/* Feedback bar - hidden during streaming */}

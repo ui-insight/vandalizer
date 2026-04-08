@@ -21,7 +21,7 @@ from app.models.search_set import SearchSet, SearchSetItem
 from app.models.validation_run import ValidationRun
 from app.models.workflow import Workflow, WorkflowStep
 from app.services.chat_deps import AgenticChatDeps
-from app.services.document_manager import DocumentManager
+from app.services.document_manager import get_document_manager
 
 logger = logging.getLogger(__name__)
 
@@ -158,7 +158,7 @@ async def search_knowledge_base(
         if kb.team_id != team_id:
             return [{"error": "You do not have access to this knowledge base."}]
 
-    dm = DocumentManager()
+    dm = get_document_manager()
     results = await asyncio.to_thread(dm.query_kb, uuid, query, 8)
     return [
         {

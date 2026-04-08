@@ -156,8 +156,8 @@ async def _execute_hard_deletes():
 
         # Delete from ChromaDB
         try:
-            import chromadb
-            chroma = chromadb.PersistentClient(path=settings.chromadb_persist_dir)
+            from app.services.document_manager import get_document_manager
+            chroma = get_document_manager().client
             collection = chroma.get_or_create_collection("documents")
             collection.delete(where={"document_uuid": doc.uuid})
         except Exception:

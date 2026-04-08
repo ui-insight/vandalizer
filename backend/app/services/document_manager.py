@@ -46,6 +46,17 @@ def _split_text(text: str, chunk_size: int, chunk_overlap: int) -> list[str]:
     return chunks
 
 
+_instance: "DocumentManager | None" = None
+
+
+def get_document_manager() -> "DocumentManager":
+    """Return a process-wide singleton DocumentManager."""
+    global _instance
+    if _instance is None:
+        _instance = DocumentManager()
+    return _instance
+
+
 class DocumentManager:
     """Synchronous document manager  - safe to call from asyncio.to_thread()."""
 
@@ -112,7 +123,11 @@ class DocumentManager:
         filter_docs: Optional[list[str]] = None,
         k: int = 4,
     ) -> list[dict[str, Any]]:
-        collection = self.get_user_collection(user_id)
+        collection_name = f"user_{user_id}_docs"
+        try:
+            collection = self.client.get_collection(name=collection_name)
+        except ValueError:
+            return []
 
         where_filter = None
         if filter_docs:
@@ -136,7 +151,11 @@ class DocumentManager:
         return output
 
     def document_exists(self, user_id: str, document_id: str) -> bool:
-        collection = self.get_user_collection(user_id)
+        collection_name = f"user_{user_id}_docs"
+        try:
+            collection = self.client.get_collection(name=collection_name)
+        except ValueError:
+            return False
         results = collection.get(where={"document_id": document_id})
         return bool(results and results.get("ids"))
 
@@ -191,7 +210,11 @@ class DocumentManager:
         k: int = 8,
     ) -> list[dict[str, Any]]:
         """Similarity search on a KB collection."""
-        collection = self.get_kb_collection(kb_uuid)
+        collection_name = f"kb_{kb_uuid}"
+        try:
+            collection = self.client.get_collection(name=collection_name)
+        except ValueError:
+            return []
         results = collection.query(query_texts=[query], n_results=k)
 
         output = []

@@ -1,24 +1,16 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import {
-  ChevronRight, Loader2, CheckCircle2, CircleDashed,
-  Search, Zap, FolderPlus, Play,
-} from 'lucide-react'
+import { ChevronRight, Loader2 } from 'lucide-react'
 import { QualityBadge } from './QualityBadge'
 import type { ToolCallInfo, ToolResultInfo, QualityMeta } from '../../types/chat'
 
 // ---------------------------------------------------------------------------
-// Tool metadata: labels, categories, icons
+// Tool metadata
 // ---------------------------------------------------------------------------
 
 type ToolCategory = 'read' | 'extract' | 'write' | 'workflow'
 
-interface ToolMeta {
-  label: string
-  category: ToolCategory
-}
-
-const TOOL_META: Record<string, ToolMeta> = {
+const TOOL_META: Record<string, { label: string; category: ToolCategory }> = {
   search_documents:      { label: 'Searching documents',      category: 'read' },
   list_documents:        { label: 'Listing documents',        category: 'read' },
   search_knowledge_base: { label: 'Querying knowledge base',  category: 'read' },
@@ -36,151 +28,235 @@ const TOOL_META: Record<string, ToolMeta> = {
   get_workflow_status:   { label: 'Checking workflow status',  category: 'workflow' },
 }
 
-const CATEGORY_STYLE: Record<ToolCategory, { accent: string; bg: string; border: string; Icon: typeof Search }> = {
-  read:     { accent: '#3b82f6', bg: 'rgba(59,130,246,0.04)',  border: 'rgba(59,130,246,0.15)',  Icon: Search },
-  extract:  { accent: '#f59e0b', bg: 'rgba(245,158,11,0.04)', border: 'rgba(245,158,11,0.15)', Icon: Zap },
-  write:    { accent: '#22c55e', bg: 'rgba(34,197,94,0.04)',   border: 'rgba(34,197,94,0.15)',  Icon: FolderPlus },
-  workflow: { accent: '#8b5cf6', bg: 'rgba(139,92,246,0.04)',  border: 'rgba(139,92,246,0.15)', Icon: Play },
+const CATEGORY_ACCENT: Record<ToolCategory, string> = {
+  read: '#3b82f6',
+  extract: '#f59e0b',
+  write: '#22c55e',
+  workflow: '#8b5cf6',
 }
 
-function getMeta(name: string): ToolMeta {
+function getMeta(name: string) {
   return TOOL_META[name] || { label: name.replace(/_/g, ' '), category: 'read' as ToolCategory }
 }
 
 // ---------------------------------------------------------------------------
-// Tool-specific result summaries
+// Context hints for ACTIVE (in-progress) tools
 // ---------------------------------------------------------------------------
 
-function summarizeResult(toolName: string, content: unknown): string {
-  if (content == null) return 'No results'
-  const obj = content as Record<string, unknown>
-
-  if (obj.error) return `Error: ${obj.error}`
-  if (obj.needs_confirmation) return obj.preview ? String(obj.preview) : 'Awaiting confirmation'
-  if (obj.message && typeof obj.message === 'string') return obj.message
+function getActiveHint(toolName: string, args: Record<string, unknown>): string {
+  const q = args.query || args.search || args.title || args.url
+  const queryStr = typeof q === 'string' ? (q.length > 50 ? q.slice(0, 47) + '...' : q) : ''
 
   switch (toolName) {
+    case 'search_library':
     case 'search_documents':
     case 'list_extraction_sets':
     case 'list_workflows':
     case 'list_knowledge_bases':
-    case 'search_library': {
-      if (Array.isArray(content)) {
-        const n = content.length
-        if (n === 0) return 'No results found'
-        const type = toolName === 'search_documents' ? 'document' :
-          toolName === 'list_extraction_sets' ? 'extraction set' :
-          toolName === 'list_workflows' ? 'workflow' :
-          toolName === 'list_knowledge_bases' ? 'knowledge base' : 'item'
-        return `${n} ${type}${n !== 1 ? 's' : ''} found`
-      }
-      break
+      return queryStr ? `for "${queryStr}"` : ''
+    case 'search_knowledge_base':
+      return queryStr ? `about "${queryStr}"` : ''
+    case 'run_extraction': {
+      const docs = Array.isArray(args.document_uuids) ? args.document_uuids.length : 0
+      return docs > 0 ? `on ${docs} document${docs !== 1 ? 's' : ''}` : ''
     }
+    case 'get_document_text':
+      return ''
+    default:
+      return queryStr
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Rich result summaries — pulls names, counts, and quality naturally
+// ---------------------------------------------------------------------------
+
+interface ResultSummary {
+  /** Main description — e.g. 'Found "NSF Grant Proposal" template' */
+  text: string
+  /** Quality/accuracy annotation — e.g. '92% accuracy · 847 validations' */
+  qualityHint: string
+}
+
+function summarizeResult(toolName: string, content: unknown, quality: QualityMeta | null): ResultSummary {
+  const empty: ResultSummary = { text: '', qualityHint: '' }
+  if (content == null) return empty
+  const obj = content as Record<string, unknown>
+
+  if (obj.error) return { text: String(obj.error), qualityHint: '' }
+  if (obj.needs_confirmation) return { text: obj.preview ? String(obj.preview) : 'Awaiting confirmation', qualityHint: '' }
+
+  // Build quality hint from sidecar
+  const qualityHint = formatQualityHint(quality)
+
+  switch (toolName) {
+    case 'search_library': {
+      if (!Array.isArray(content)) break
+      if (content.length === 0) return { text: 'No matching templates found', qualityHint: '' }
+      const first = content[0] as Record<string, unknown>
+      const name = first.name ? `"${first.name}"` : ''
+      const verified = first.verified ? ' (verified)' : ''
+      if (content.length === 1) {
+        return { text: `Found ${name}${verified}`, qualityHint }
+      }
+      return { text: `Found ${content.length} items — ${name}${verified}`, qualityHint }
+    }
+
+    case 'search_documents': {
+      if (!Array.isArray(content)) break
+      if (content.length === 0) return { text: 'No documents found', qualityHint: '' }
+      const first = content[0] as Record<string, unknown>
+      const title = first.title ? `"${String(first.title).slice(0, 40)}"` : ''
+      if (content.length === 1) return { text: `Found ${title}`, qualityHint }
+      return { text: `Found ${content.length} documents — ${title}`, qualityHint }
+    }
+
+    case 'list_extraction_sets':
+    case 'list_workflows':
+    case 'list_knowledge_bases': {
+      if (!Array.isArray(content)) break
+      const type = toolName === 'list_extraction_sets' ? 'template' :
+        toolName === 'list_workflows' ? 'workflow' : 'knowledge base'
+      if (content.length === 0) return { text: `No ${type}s found`, qualityHint: '' }
+      return { text: `Found ${content.length} ${type}${content.length !== 1 ? 's' : ''}`, qualityHint }
+    }
+
     case 'list_documents': {
       const docs = Array.isArray(obj.documents) ? obj.documents.length : 0
       const folders = Array.isArray(obj.folders) ? obj.folders.length : 0
       const parts: string[] = []
       if (docs > 0) parts.push(`${docs} document${docs !== 1 ? 's' : ''}`)
       if (folders > 0) parts.push(`${folders} folder${folders !== 1 ? 's' : ''}`)
-      return parts.length > 0 ? parts.join(', ') : 'Empty folder'
+      return { text: parts.length > 0 ? parts.join(', ') : 'Empty folder', qualityHint }
     }
+
     case 'search_knowledge_base': {
-      if (Array.isArray(content)) {
-        const n = content.length
-        return n > 0 ? `${n} relevant passage${n !== 1 ? 's' : ''} found` : 'No matching content'
-      }
-      break
+      if (!Array.isArray(content)) break
+      if (content.length === 0) return { text: 'No matching passages', qualityHint: '' }
+      return { text: `Found ${content.length} relevant passage${content.length !== 1 ? 's' : ''}`, qualityHint }
     }
-    case 'get_document_text':
-      return obj.truncated
-        ? `${((obj.total_chars as number) / 1000).toFixed(0)}K chars (truncated)`
-        : `${((obj.total_chars as number) / 1000).toFixed(0)}K chars`
+
+    case 'get_document_text': {
+      const title = obj.title ? `"${String(obj.title).slice(0, 40)}"` : ''
+      const chars = obj.total_chars ? `${((obj.total_chars as number) / 1000).toFixed(0)}K chars` : ''
+      return { text: [title, chars].filter(Boolean).join(' — '), qualityHint }
+    }
+
     case 'run_extraction': {
       const count = (obj.entity_count as number) || 0
-      const docs = Array.isArray(obj.documents) ? obj.documents.length : 0
-      return `${count} entit${count !== 1 ? 'ies' : 'y'} from ${docs} doc${docs !== 1 ? 's' : ''}`
+      const fields = Array.isArray(obj.fields) ? obj.fields.length : 0
+      const setName = obj.extraction_set ? `"${obj.extraction_set}"` : ''
+      const fieldHint = fields > 0 ? `${fields} fields` : ''
+      const entityHint = `${count} entit${count !== 1 ? 'ies' : 'y'}`
+      const parts = [entityHint, fieldHint].filter(Boolean).join(', ')
+      return {
+        text: setName ? `${setName} — ${parts}` : parts,
+        qualityHint,
+      }
     }
+
     case 'get_quality_info':
-      if (obj.score != null) return `Score: ${Math.round(obj.score as number)}/100`
-      return obj.note ? String(obj.note) : 'No validation data'
+      if (obj.score != null) return { text: `Score: ${Math.round(obj.score as number)}/100`, qualityHint }
+      return { text: obj.note ? String(obj.note) : 'No validation data', qualityHint: '' }
+
     case 'create_knowledge_base':
     case 'add_documents_to_kb':
     case 'add_url_to_kb':
-      return obj.message ? String(obj.message) : 'Done'
+      return { text: obj.message ? String(obj.message) : 'Done', qualityHint }
+
     case 'run_workflow':
-      return obj.session_id ? `Started (session: ${(obj.session_id as string).slice(0, 8)}...)` : 'Started'
+      return { text: 'Started', qualityHint }
+
     case 'get_workflow_status': {
       const status = obj.status as string
-      if (status === 'completed') return 'Completed'
-      if (status === 'paused') return 'Paused — awaiting approval'
-      if (status === 'failed') return 'Failed'
+      if (status === 'completed') return { text: 'Completed', qualityHint }
+      if (status === 'paused') return { text: 'Paused — awaiting approval', qualityHint: '' }
+      if (status === 'failed') return { text: 'Failed', qualityHint: '' }
       const done = (obj.steps_completed as number) || 0
       const total = (obj.steps_total as number) || 0
-      return `Running (${done}/${total} steps)`
+      return { text: `${done}/${total} steps`, qualityHint }
     }
   }
 
   // Generic fallback
-  if (Array.isArray(content)) {
-    return content.length > 0 ? `${content.length} results` : 'No results'
-  }
-  return 'Done'
+  if (Array.isArray(content))
+    return { text: content.length > 0 ? `${content.length} results` : 'No results', qualityHint }
+  if (obj.message && typeof obj.message === 'string') return { text: String(obj.message), qualityHint }
+  return { text: '', qualityHint }
 }
 
-// ---------------------------------------------------------------------------
-// Format tool args for display
-// ---------------------------------------------------------------------------
-
-function formatArgs(_toolName: string, args: Record<string, unknown>): string {
-  // Show the most relevant arg per tool
-  const q = args.query || args.search || args.title || args.url
-  if (typeof q === 'string') return q.length > 50 ? q.slice(0, 47) + '...' : q
-
-  if (args.document_uuid && typeof args.document_uuid === 'string')
-    return args.document_uuid.slice(0, 12) + '...'
-  if (args.kb_uuid && typeof args.kb_uuid === 'string')
-    return `KB: ${(args.kb_uuid as string).slice(0, 8)}...`
-
+function formatQualityHint(quality: QualityMeta | null): string {
+  if (!quality) return ''
   const parts: string[] = []
-  for (const [key, value] of Object.entries(args)) {
-    if (value == null || key === 'context') continue
-    const v = typeof value === 'string' ? value : JSON.stringify(value)
-    if (v.length > 50) continue
-    parts.push(v)
-    if (parts.length >= 2) break
+  if (quality.accuracy != null) {
+    parts.push(`${Math.round(quality.accuracy * 100)}% accuracy`)
+  } else if (quality.score != null) {
+    parts.push(`${Math.round(quality.score)}/100 quality`)
   }
-  return parts.join(', ')
+  if (quality.num_runs != null && quality.num_runs > 0) {
+    parts.push(`${quality.num_runs} validation${quality.num_runs !== 1 ? 's' : ''}`)
+  } else if (quality.num_test_cases != null && quality.num_test_cases > 0) {
+    parts.push(`${quality.num_test_cases} test case${quality.num_test_cases !== 1 ? 's' : ''}`)
+  }
+  return parts.join(' · ')
 }
 
 // ---------------------------------------------------------------------------
-// Rich result renderers
+// Auto-shown rich content
 // ---------------------------------------------------------------------------
 
-function renderExtractionTable(content: Record<string, unknown>): ReactNode {
+/** Key-value pairs for single-entity extractions, compact table for multi. */
+function renderExtractionContent(content: Record<string, unknown>): ReactNode {
   const entities = content.entities as Array<Record<string, unknown>> | undefined
   if (!entities || entities.length === 0) return null
-
   const fields = (content.fields as string[]) || Object.keys(entities[0])
   if (fields.length === 0) return null
 
+  // Single entity: key-value pairs
+  if (entities.length === 1) {
+    const entity = entities[0]
+    const entries = fields
+      .filter((f) => entity[f] != null && String(entity[f]).trim() !== '' && String(entity[f]) !== '--')
+    const shown = entries.slice(0, 8)
+    const remaining = entries.length - shown.length
+
+    return (
+      <div style={{ marginTop: 4, marginLeft: 20, fontSize: 12, lineHeight: 1.7 }}>
+        {shown.map((f) => (
+          <div key={f} style={{ display: 'flex', gap: 8 }}>
+            <span style={{ color: '#9ca3af', minWidth: 140, flexShrink: 0 }}>{f}</span>
+            <span style={{ color: '#374151' }}>
+              {String(entity[f]).length > 80
+                ? String(entity[f]).slice(0, 77) + '...'
+                : String(entity[f])}
+            </span>
+          </div>
+        ))}
+        {remaining > 0 && (
+          <div style={{ color: '#c4c9d1', fontSize: 11, marginTop: 2 }}>
+            +{remaining} more fields
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Multiple entities: compact table with limited columns
+  const maxCols = 6
+  const visibleFields = fields.slice(0, maxCols)
+  const hiddenCols = fields.length - visibleFields.length
+
   return (
-    <div style={{ overflowX: 'auto', marginTop: 6 }}>
+    <div style={{ overflowX: 'auto', marginTop: 4, marginLeft: 20 }}>
       <table style={{
-        width: '100%',
-        borderCollapse: 'collapse',
-        fontSize: 11,
-        lineHeight: 1.4,
+        width: '100%', borderCollapse: 'collapse', fontSize: 11, lineHeight: 1.4,
       }}>
         <thead>
           <tr>
-            {fields.map((f) => (
+            {visibleFields.map((f) => (
               <th key={f} style={{
-                textAlign: 'left',
-                padding: '4px 8px',
-                borderBottom: '2px solid #e5e7eb',
-                fontWeight: 600,
-                color: '#374151',
-                whiteSpace: 'nowrap',
+                textAlign: 'left', padding: '4px 8px', borderBottom: '2px solid #e5e7eb',
+                fontWeight: 600, color: '#374151', whiteSpace: 'nowrap',
               }}>
                 {f}
               </th>
@@ -188,16 +264,12 @@ function renderExtractionTable(content: Record<string, unknown>): ReactNode {
           </tr>
         </thead>
         <tbody>
-          {entities.slice(0, 20).map((entity, i) => (
+          {entities.slice(0, 12).map((entity, i) => (
             <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
-              {fields.map((f) => (
+              {visibleFields.map((f) => (
                 <td key={f} style={{
-                  padding: '3px 8px',
-                  color: '#4b5563',
-                  maxWidth: 200,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
+                  padding: '3px 8px', color: '#4b5563', maxWidth: 200,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                 }}>
                   {entity[f] != null ? String(entity[f]) : <span style={{ color: '#d1d5db' }}>--</span>}
                 </td>
@@ -206,108 +278,132 @@ function renderExtractionTable(content: Record<string, unknown>): ReactNode {
           ))}
         </tbody>
       </table>
-      {entities.length > 20 && (
-        <div style={{ color: '#9ca3af', fontSize: 10, marginTop: 4 }}>
-          Showing 20 of {entities.length} entities
-        </div>
-      )}
+      <div style={{ color: '#c4c9d1', fontSize: 10, marginTop: 2, display: 'flex', gap: 12 }}>
+        {entities.length > 12 && <span>+{entities.length - 12} more rows</span>}
+        {hiddenCols > 0 && <span>+{hiddenCols} more columns</span>}
+      </div>
     </div>
   )
 }
 
-function renderDocumentList(content: unknown): ReactNode {
-  const items = Array.isArray(content) ? content : null
-  if (!items || items.length === 0) return null
+function renderKBPassages(content: unknown): ReactNode {
+  if (!Array.isArray(content) || content.length === 0) return null
+  const passages = content as Array<Record<string, unknown>>
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginTop: 6 }}>
-      {items.slice(0, 15).map((item: Record<string, unknown>, i: number) => (
-        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#4b5563' }}>
-          <span style={{
-            display: 'inline-block',
-            padding: '0 4px',
-            borderRadius: 3,
-            background: '#f3f4f6',
-            fontSize: 10,
-            fontWeight: 500,
-            color: '#6b7280',
-            textTransform: 'uppercase',
-          }}>
-            {String(item.extension || item.kind || '').replace('.', '')}
+    <div style={{ marginTop: 4, marginLeft: 20, display: 'flex', flexDirection: 'column', gap: 4 }}>
+      {passages.slice(0, 3).map((chunk, i) => (
+        <div key={i} style={{
+          fontSize: 11, lineHeight: 1.5, color: '#6b7280',
+          padding: '4px 8px', borderLeft: '2px solid #e5e7eb',
+          background: '#fafafa', borderRadius: '0 4px 4px 0',
+        }}>
+          <span style={{ fontWeight: 500, color: '#9ca3af', fontSize: 10 }}>
+            {String(chunk.source_name || 'Source')}
           </span>
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {String(item.title || item.name || item.uuid || 'Untitled')}
-          </span>
+          <span style={{ margin: '0 6px', color: '#d1d5db' }}>&middot;</span>
+          <span>{String(chunk.content || '').slice(0, 200)}{String(chunk.content || '').length > 200 ? '...' : ''}</span>
         </div>
       ))}
-      {items.length > 15 && (
-        <div style={{ color: '#9ca3af', fontSize: 10 }}>+{items.length - 15} more</div>
-      )}
     </div>
-  )
-}
-
-function renderExpandedContent(toolName: string, content: unknown): ReactNode {
-  const obj = content as Record<string, unknown>
-
-  // Extraction: render as table
-  if (toolName === 'run_extraction' && obj?.entities) {
-    const table = renderExtractionTable(obj)
-    if (table) return table
-  }
-
-  // Search results: render as compact list
-  if (
-    ['search_documents', 'list_extraction_sets', 'list_workflows', 'list_knowledge_bases', 'search_library'].includes(toolName) &&
-    Array.isArray(content)
-  ) {
-    const list = renderDocumentList(content)
-    if (list) return list
-  }
-
-  // KB search: show passages
-  if (toolName === 'search_knowledge_base' && Array.isArray(content)) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
-        {(content as Array<Record<string, unknown>>).slice(0, 5).map((chunk, i) => (
-          <div key={i} style={{ fontSize: 11, lineHeight: 1.5, color: '#4b5563' }}>
-            <div style={{ fontWeight: 500, color: '#6b7280', fontSize: 10, marginBottom: 2 }}>
-              {String(chunk.source_name || 'Source')}
-            </div>
-            <div style={{
-              padding: '4px 8px',
-              background: '#fafafa',
-              borderRadius: 4,
-              borderLeft: '2px solid #e5e7eb',
-            }}>
-              {String(chunk.content || '').slice(0, 300)}
-              {String(chunk.content || '').length > 300 ? '...' : ''}
-            </div>
-          </div>
-        ))}
-      </div>
-    )
-  }
-
-  // Default: JSON with better formatting
-  return (
-    <pre style={{
-      marginTop: 6,
-      fontSize: 11,
-      lineHeight: 1.5,
-      color: '#6b7280',
-      whiteSpace: 'pre-wrap',
-      wordBreak: 'break-word',
-      maxHeight: 200,
-      overflow: 'auto',
-    }}>
-      {typeof content === 'string' ? content : JSON.stringify(content, null, 2)}
-    </pre>
   )
 }
 
 // ---------------------------------------------------------------------------
-// Main component
+// Exported single-tool status line — used for interleaved segment rendering
+// ---------------------------------------------------------------------------
+
+export function ToolStatusLine({
+  call,
+  result,
+  isActive,
+}: {
+  call?: ToolCallInfo
+  result?: ToolResultInfo
+  isActive?: boolean
+}) {
+  const name = result?.tool_name || call?.tool_name || 'unknown'
+  const meta = getMeta(name)
+  const accent = CATEGORY_ACCENT[meta.category]
+  const args = call?.args || {}
+  const obj = result?.content as Record<string, unknown> | undefined
+  const isError = Boolean(obj?.error)
+
+  const activeHint = isActive ? getActiveHint(name, args) : ''
+  const { text: summaryText, qualityHint } = result
+    ? summarizeResult(name, result.content, result.quality ?? null)
+    : { text: '', qualityHint: '' }
+
+  return (
+    <div>
+      {/* Status line */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        fontSize: 13, lineHeight: '20px', minHeight: 22,
+      }}>
+        {/* Activity indicator */}
+        {isActive ? (
+          <Loader2
+            size={12}
+            style={{ animation: 'spin 1s linear infinite', color: accent, flexShrink: 0 }}
+          />
+        ) : (
+          <span style={{
+            width: 5, height: 5, borderRadius: '50%',
+            background: isError ? '#ef4444' : accent,
+            flexShrink: 0, opacity: 0.5,
+          }} />
+        )}
+
+        {/* Label — active shows present tense + context hint, done shows result summary */}
+        {isActive ? (
+          <>
+            <span style={{ color: '#374151', fontWeight: 500 }}>
+              {meta.label}
+            </span>
+            {activeHint && (
+              <span style={{ color: '#6b7280', fontStyle: 'italic' }}>
+                {activeHint}
+              </span>
+            )}
+          </>
+        ) : (
+          <>
+            <span style={{ color: '#6b7280' }}>
+              {summaryText || meta.label}
+            </span>
+            {qualityHint && (
+              <>
+                <span style={{ color: '#d1d5db' }}>&middot;</span>
+                <span style={{ color: '#9ca3af', fontSize: 12 }}>
+                  {qualityHint}
+                </span>
+              </>
+            )}
+          </>
+        )}
+
+        <span style={{ flex: 1 }} />
+
+        {/* Quality badge — compact, with tooltip for details */}
+        {result?.quality && (
+          <QualityBadge quality={result.quality as QualityMeta} />
+        )}
+      </div>
+
+      {/* Auto-shown rich content */}
+      {result && name === 'run_extraction' && obj?.entities != null && (
+        renderExtractionContent(obj)
+      )}
+      {result && name === 'search_knowledge_base' && (
+        renderKBPassages(result.content)
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Grouped display — fallback for persisted messages without segments
 // ---------------------------------------------------------------------------
 
 interface Props {
@@ -338,118 +434,119 @@ export function ToolCallDisplay({ toolCalls, toolResults, isStreaming }: Props) 
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, margin: '8px 0' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, margin: '6px 0' }}>
       {[...allCallIds].map((callId) => {
         const result = resultMap.get(callId)
         const call = toolCalls.find((c) => c.tool_call_id === callId)
         const name = result?.tool_name || call?.tool_name || 'unknown'
-        const meta = getMeta(name)
-        const catStyle = CATEGORY_STYLE[meta.category]
-        const CatIcon = catStyle.Icon
         const isActive = !result && isStreaming
         const expanded = expandedIds.has(callId)
-        const args = call?.args || {}
-        const argsStr = formatArgs(name, args)
-        const isConfirmation = result && typeof result.content === 'object' &&
-          result.content !== null && (result.content as Record<string, unknown>).needs_confirmation === true
+        const expandable = result && hasExpandableContent(name, result.content)
 
         return (
-          <div
-            key={callId}
-            style={{
-              background: isConfirmation ? 'rgba(245,158,11,0.06)' : catStyle.bg,
-              border: `1px solid ${isConfirmation ? 'rgba(245,158,11,0.3)' : catStyle.border}`,
-              borderLeft: isConfirmation ? '3px solid #f59e0b' : undefined,
-              borderRadius: 'var(--ui-radius, 8px)',
-              padding: '6px 10px',
-              fontSize: 12,
-              transition: 'border-color 0.15s',
-            }}
-          >
-            {/* Header row */}
-            <button
-              onClick={() => result && toggle(callId)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                width: '100%',
-                background: 'none',
-                border: 'none',
-                padding: 0,
-                cursor: result ? 'pointer' : 'default',
-                color: 'inherit',
-                fontSize: 12,
-                textAlign: 'left',
-                fontFamily: 'inherit',
-              }}
-            >
-              {isActive ? (
-                <Loader2 size={14} style={{ animation: 'spin 1s linear infinite', flexShrink: 0, color: catStyle.accent, opacity: 0.7 }} />
-              ) : isConfirmation ? (
-                <CircleDashed size={14} style={{ color: '#f59e0b', flexShrink: 0 }} />
-              ) : result ? (
-                <CheckCircle2 size={14} style={{ color: catStyle.accent, flexShrink: 0 }} />
-              ) : (
-                <CatIcon size={14} style={{ color: '#94a3b8', flexShrink: 0 }} />
-              )}
-
-              <span style={{ fontWeight: 500, color: '#374151' }}>
-                {meta.label}
-              </span>
-
-              {argsStr && (
-                <span style={{
-                  color: '#94a3b8',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                  flex: 1,
-                  fontStyle: 'italic',
-                }}>
-                  {argsStr}
-                </span>
-              )}
-
-              {result && (
-                <span style={{ color: '#6b7280', marginLeft: 'auto', whiteSpace: 'nowrap', fontSize: 11 }}>
-                  {summarizeResult(name, result.content)}
-                </span>
-              )}
-
-              {result?.quality && (
-                <QualityBadge quality={result.quality as QualityMeta} />
-              )}
-
-              {result && (
-                <ChevronRight
-                  size={14}
-                  style={{
-                    flexShrink: 0,
-                    transition: 'transform 0.15s',
-                    transform: expanded ? 'rotate(90deg)' : 'none',
-                    opacity: 0.4,
-                    color: catStyle.accent,
-                  }}
-                />
-              )}
-            </button>
-
-            {/* Expanded details — rich rendering */}
-            {expanded && result && (
-              <div style={{
-                marginTop: 6,
-                paddingTop: 6,
-                borderTop: `1px solid ${catStyle.border}`,
-                maxHeight: 300,
-                overflow: 'auto',
-              }}>
-                {renderExpandedContent(name, result.content)}
+          <div key={callId}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <div style={{ flex: 1 }}>
+                <ToolStatusLine call={call} result={result} isActive={isActive} />
               </div>
+              {expandable && (
+                <button
+                  onClick={() => toggle(callId)}
+                  style={{
+                    display: 'flex', alignItems: 'center',
+                    background: 'none', border: 'none', padding: 0,
+                    cursor: 'pointer', color: '#c4c9d1', flexShrink: 0,
+                  }}
+                >
+                  <ChevronRight
+                    size={12}
+                    style={{
+                      transition: 'transform 0.15s',
+                      transform: expanded ? 'rotate(90deg)' : 'none',
+                    }}
+                  />
+                </button>
+              )}
+            </div>
+            {expanded && result && expandable && (
+              renderExpandedDetails(name, result.content)
             )}
           </div>
         )
       })}
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Expandable details for list-type results
+// ---------------------------------------------------------------------------
+
+function hasExpandableContent(toolName: string, content: unknown): boolean {
+  if (toolName === 'run_extraction') return false
+  if (toolName === 'search_knowledge_base') return false
+  if (Array.isArray(content) && content.length > 0) return true
+  if (toolName === 'list_documents') {
+    const obj = content as Record<string, unknown>
+    return Array.isArray(obj?.documents) && obj.documents.length > 0
+  }
+  return false
+}
+
+function renderExpandedDetails(toolName: string, content: unknown): ReactNode {
+  const obj = content as Record<string, unknown>
+
+  if (
+    ['search_documents', 'list_extraction_sets', 'list_workflows', 'list_knowledge_bases', 'search_library'].includes(toolName) &&
+    Array.isArray(content)
+  ) {
+    if (content.length === 0) return null
+    return (
+      <div style={{ marginTop: 2, marginLeft: 20, display: 'flex', flexDirection: 'column', gap: 1 }}>
+        {(content as Array<Record<string, unknown>>).slice(0, 10).map((item, i) => (
+          <div key={i} style={{ fontSize: 11, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ color: '#d1d5db' }}>&middot;</span>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {String(item.title || item.name || item.uuid || 'Untitled')}
+            </span>
+            {typeof item.extension === 'string' && (
+              <span style={{ fontSize: 9, color: '#9ca3af', textTransform: 'uppercase' }}>
+                {item.extension.replace('.', '')}
+              </span>
+            )}
+          </div>
+        ))}
+        {content.length > 10 && (
+          <div style={{ fontSize: 10, color: '#9ca3af', marginLeft: 10 }}>+{content.length - 10} more</div>
+        )}
+      </div>
+    )
+  }
+
+  if (toolName === 'list_documents') {
+    const docs = Array.isArray(obj.documents) ? obj.documents : []
+    if (docs.length === 0) return null
+    return (
+      <div style={{ marginTop: 2, marginLeft: 20, display: 'flex', flexDirection: 'column', gap: 1 }}>
+        {(docs as Array<Record<string, unknown>>).slice(0, 10).map((item, i) => (
+          <div key={i} style={{ fontSize: 11, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ color: '#d1d5db' }}>&middot;</span>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {String(item.title || item.name || 'Untitled')}
+            </span>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  return (
+    <pre style={{
+      marginTop: 2, marginLeft: 20, fontSize: 10, lineHeight: 1.4,
+      color: '#9ca3af', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+      maxHeight: 150, overflow: 'auto',
+    }}>
+      {typeof content === 'string' ? content : JSON.stringify(content, null, 2)}
+    </pre>
   )
 }
