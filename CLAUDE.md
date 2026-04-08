@@ -11,9 +11,6 @@ Vandalizer is an AI-powered document intelligence platform for research administ
 ## Development Commands
 
 ```bash
-# Start infrastructure (Redis, MongoDB, ChromaDB)
-docker compose up redis mongo chromadb
-
 # Backend
 cd backend
 uv sync
@@ -37,6 +34,22 @@ cd backend
 uvicorn app.main:app --host 0.0.0.0 --port 8001 --workers 4
 ```
 
+## CI / Testing (Makefile)
+
+```bash
+make backend-ci        # Unit tests (50% coverage gate) + tier-1 integration tests
+make backend-static    # Ruff lint + Bandit security scan
+make backend-backlog   # Mypy typecheck + pip-audit (non-blocking)
+make frontend-ci       # Typecheck, lint, audit, Vitest (35% line coverage gate), build
+make ci                # backend-ci + frontend-ci
+make release-check     # ci + backend-static + Docker builds
+
+# Integration test tiers (run individually)
+make backend-test-integration-t1   # Engine tests (no external deps)
+make backend-test-integration-t2   # MongoDB integration (needs INTEGRATION_MONGODB=1)
+make backend-test-integration-t3   # LLM integration (needs INTEGRATION_LLM=1)
+```
+
 ## Architecture
 
 ### Backend (`backend/`)
@@ -49,7 +62,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8001 --workers 4
 - **`app/dependencies.py`** — FastAPI dependency injection (current user, DB sessions)
 
 ### Routers (`backend/app/routers/`)
-`auth`, `documents`, `files`, `folders`, `workflows`, `extractions`, `chat`, `spaces`, `library`, `knowledge`, `teams`, `admin`, `config`, `feedback`, `activity`, `office`, `automations`, `verification`, `demo`, `browser_automation`, `graph_webhooks`
+`activity`, `admin`, `approvals`, `audit`, `auth`, `automations`, `browser_automation`, `certification`, `chat`, `config`, `demo`, `documents`, `extractions`, `feedback`, `feedback_prompt`, `files`, `folders`, `graph_webhooks`, `knowledge`, `library`, `notifications`, `office`, `organizations`, `spaces`, `support`, `teams`, `verification`, `workflows`
 
 ### Data Models (`backend/app/models/`)
 Beanie `Document` classes: `User`, `Team`/`TeamMembership`, `SmartDocument`, `SmartFolder`, `Space`, `Workflow`/`WorkflowStep`/`WorkflowResult`, `ChatConversation`, `Library`/`LibraryItem`, `SystemConfig`, `SearchSet`, `Group`, `QualityAlert`, `ValidationRun`, and more.
@@ -64,7 +77,7 @@ Business logic layer. Key services:
 - **`document_readers.py`** — Multi-format text extraction (PDF, DOCX, XLSX, HTML)
 
 ### Celery Tasks (`backend/app/tasks/`)
-Task modules: `upload_tasks`, `document_tasks`, `workflow_tasks`, `extraction_tasks`, `evaluation_tasks`, `quality_tasks`, `knowledge_base_tasks`, `activity_tasks`, `passive_tasks`, `m365_tasks`, `demo_tasks`, `upload_validation_tasks`
+Task modules: `activity_tasks`, `classification_tasks`, `demo_tasks`, `document_tasks`, `engagement_tasks`, `evaluation_tasks`, `extraction_tasks`, `knowledge_base_tasks`, `m365_tasks`, `passive_tasks`, `quality_tasks`, `retention_tasks`, `upload_tasks`, `upload_validation_tasks`, `workflow_tasks`
 
 ### Frontend (`frontend/`)
 React 19, Vite, TypeScript, Tailwind CSS v4, TanStack Router. Source in `frontend/src/`.
@@ -74,7 +87,7 @@ Documents, workflows, and folders are scoped by `space` and `team_id`. Users hav
 
 ## Key Environment Variables
 
-Copy `.env.example` to `.env`. Required: `MONGO_HOST`, `MONGO_DB`, `REDIS_HOST`, `JWT_SECRET_KEY`. LLM API keys and endpoints are configured per-model via System Config in the admin UI.
+Copy `.env.example` to `.env`. Key variables: `redis_host`, `ENVIRONMENT` (development/staging/production), `CONFIG_ENCRYPTION_KEY` (Fernet, for encrypting LLM API keys in MongoDB), `GRAPH_TOKEN_KEY` / `GRAPH_NOTIFICATION_URL` / `GRAPH_CLIENT_STATE_SECRET` (M365 integration), `VANDALIZER_BASE_URL`. LLM API keys and endpoints are configured per-model via System Config in the admin UI.
 
 ## Conventions
 
@@ -83,4 +96,4 @@ Copy `.env.example` to `.env`. Required: `MONGO_HOST`, `MONGO_DB`, `REDIS_HOST`,
 - Beanie ODM for MongoDB (async, Pydantic v2 models)
 - Celery tasks use `bind=True` and `autoretry_for` patterns
 - MongoDB database name: `vandalizer` (configurable via `MONGO_DB`)
-- The old Flask app is preserved in `deprecated/flask-app/` for reference
+- Docker builds via `docker build -t vandalizer-backend ./backend` and `docker build -t vandalizer-frontend ./frontend` (or `make docker-build`)
