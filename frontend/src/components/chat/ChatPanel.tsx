@@ -617,6 +617,40 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
             </div>
 
             <div style={{ marginTop: 16, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {/* Demo pill — always first */}
+              <button
+                disabled={!!processingDoc}
+                onClick={handleRunDemo}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  padding: '8px 14px',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  fontFamily: 'inherit',
+                  border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 40%, #e5e7eb)',
+                  borderRadius: 20,
+                  backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 6%, white)',
+                  color: '#374151',
+                  cursor: processingDoc ? 'default' : 'pointer',
+                  transition: 'all 0.15s',
+                  opacity: processingDoc ? 0.5 : 1,
+                }}
+                onMouseEnter={e => {
+                  if (processingDoc) return
+                  e.currentTarget.style.borderColor = 'var(--highlight-color, #eab308)'
+                  e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--highlight-color, #eab308) 12%, white)'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--highlight-color, #eab308) 40%, #e5e7eb)'
+                  e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--highlight-color, #eab308) 6%, white)'
+                }}
+              >
+                <Zap size={13} style={{ color: 'var(--highlight-color, #eab308)' }} />
+                Show me what you can do
+              </button>
+              {/* Contextual suggestion pills */}
               {(activeKBUuid ? [
                 'Summarize the key points across all sources',
                 'What are the most important facts and figures?',
@@ -780,47 +814,6 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
             }}
           >
             <X size={14} />
-          </button>
-        </div>
-      )}
-
-      {/* Persistent demo button */}
-      {!isStreaming && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          padding: '6px 16px',
-          borderTop: '1px solid #f3f4f6',
-        }}>
-          <button
-            onClick={handleRunDemo}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '5px 12px',
-              fontSize: 12,
-              fontWeight: 500,
-              fontFamily: 'inherit',
-              border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 30%, #e5e7eb)',
-              borderRadius: 16,
-              backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 6%, white)',
-              color: '#374151',
-              cursor: 'pointer',
-              transition: 'all 0.15s',
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.borderColor = 'var(--highlight-color, #eab308)'
-              e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--highlight-color, #eab308) 12%, white)'
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--highlight-color, #eab308) 30%, #e5e7eb)'
-              e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--highlight-color, #eab308) 6%, white)'
-            }}
-          >
-            <Zap size={13} style={{ color: 'var(--highlight-color, #eab308)' }} />
-            Show me what you can do
           </button>
         </div>
       )}
