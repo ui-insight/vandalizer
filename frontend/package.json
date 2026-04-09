@@ -30,7 +30,7 @@
     "react-dom": "^19.2.0",
     "recharts": "^3.8.1",
     "tailwind-merge": "^3.5.0",
-    "tailwindcss": "^4.2.0",
+    "tailwindcss": "^4.2.2",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
