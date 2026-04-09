@@ -2824,8 +2824,8 @@ function ConfigTab() {
                     <input type="password" value={newProvider.client_secret} onChange={e => setNewProvider({ ...newProvider, client_secret: e.target.value })} style={inputStyle} />
                   </div>
                   <div style={{ gridColumn: '1 / -1' }}>
-                    <label style={labelStyle}>Redirect URI</label>
-                    <input value={newProvider.redirect_uri} onChange={e => setNewProvider({ ...newProvider, redirect_uri: e.target.value })} style={inputStyle} />
+                    <label style={labelStyle}>Redirect URI (set automatically — register this in your identity provider)</label>
+                    <input value={`${window.location.origin}/api/auth/oauth/azure/callback`} readOnly style={{ ...inputStyle, opacity: 0.7, cursor: 'default' }} />
                   </div>
                   {newProvider.provider === 'azure' && (
                     <div style={{ gridColumn: '1 / -1' }}>

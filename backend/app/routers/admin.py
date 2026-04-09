@@ -264,7 +264,7 @@ class OAuthProviderRequest(BaseModel):
     display_name: str
     client_id: str
     client_secret: str
-    redirect_uri: str
+    redirect_uri: Optional[str] = None
     tenant_id: Optional[str] = None
     metadata_url: Optional[str] = None
     entity_id: Optional[str] = None
@@ -1391,6 +1391,7 @@ async def add_oauth_provider(
 
     cfg = await SystemConfig.get_config()
     provider_dict = body.model_dump(exclude_none=True)
+    provider_dict["enabled"] = True
     if provider_dict.get("client_secret"):
         provider_dict["client_secret"] = encrypt_value(provider_dict["client_secret"])
     cfg.oauth_providers.append(provider_dict)
