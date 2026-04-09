@@ -45,6 +45,16 @@ function seededShuffle<T>(arr: T[], seed: number): T[] {
 const CERTIFICATION_PILL = 'How do I get certified as a Vandal Workflow Architect?'
 
 function applyStatus(s: OnboardingStatus) {
+  // Prefer server-generated action pills when available
+  if (s.suggestion_pills?.length) {
+    // Still pin certification pill for uncertified users
+    const pinned: string[] = []
+    if (!s.is_certified) pinned.push(CERTIFICATION_PILL)
+    const serverPills = s.suggestion_pills.slice(0, 4 - pinned.length)
+    return [...pinned, ...serverPills]
+  }
+
+  // Fallback: client-side pill generation
   const now = new Date()
   const seed = now.getFullYear() * 10000 + (now.getMonth() + 1) * 100 + now.getDate() + now.getHours()
 

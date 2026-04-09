@@ -1,5 +1,7 @@
 """Chat service  - streaming chat with full document context."""
 
+import asyncio
+import datetime
 import json
 import logging
 import re
@@ -27,6 +29,7 @@ from app.models.user import User
 from app.services.access_control import TeamAccessContext
 from app.services.config_service import get_user_model_name
 from app.services.llm_service import (
+    AGENTIC_CHAT_SYSTEM_PROMPT,
     create_agentic_chat_agent,
     create_chat_agent,
     DOCUMENT_CHAT_SYSTEM_PROMPT,
@@ -163,19 +166,23 @@ async def _run_scripted_demo(
     full_text_parts: list[str] = []
     all_tool_calls: list[dict] = []
     all_tool_results: list[dict] = []
+    demo_segments: list[dict] = []
 
     def _text(content: str):
         full_text_parts.append(content)
+        demo_segments.append({"kind": "text", "content": content})
         return json.dumps({"kind": "text", "content": content}) + "\n"
 
     def _tool_call(name: str, call_id: str, args: dict):
         data = {"tool_name": name, "tool_call_id": call_id, "args": args}
         all_tool_calls.append(data)
+        demo_segments.append({"kind": "tool_call", "call": data})
         return json.dumps({"kind": "tool_call", **data}) + "\n"
 
     def _tool_result(name: str, call_id: str, content, quality=None):
         data = {"tool_name": name, "tool_call_id": call_id, "content": content, "quality": quality}
         all_tool_results.append(data)
+        demo_segments.append({"kind": "tool_result", "result": data})
         return json.dumps({"kind": "tool_result", **data}) + "\n"
 
     try:
@@ -364,6 +371,7 @@ async def _run_scripted_demo(
             None, activity_id, user_id,
             tool_calls=all_tool_calls or None,
             tool_results=all_tool_results or None,
+            segments=demo_segments or None,
         )
 
     except Exception as e:
@@ -511,6 +519,16 @@ async def chat_stream(
     if attachment_context:
         parts.append(attachment_context)
 
+    # Build workspace inventory for organic and document-chat modes.
+    # First-session / demo / help paths don't need it.
+    team_id = str(user.current_team) if user and user.current_team else None
+    inventory = ""
+    if user and not is_first_session and not run_demo and not include_onboarding_context:
+        try:
+            inventory = await _build_workspace_inventory(user_id, team_id)
+        except Exception as e:
+            logger.warning("Workspace inventory failed: %s", e)
+
     # Select system prompt based on whether we have document context
     if parts:
         context_block = "\n\n".join(parts)
@@ -521,6 +539,8 @@ async def chat_stream(
             "--- END REFERENCE DOCUMENTS ---"
         )
         system_prompt = DOCUMENT_CHAT_SYSTEM_PROMPT
+        if inventory:
+            system_prompt = system_prompt + "\n\n" + inventory
     elif is_first_session or run_demo:
         if onboarding_context and onboarding_context.extraction_set_uuid:
             # Agentic demo: build a dynamic prompt with real UUIDs
@@ -551,7 +571,10 @@ async def chat_stream(
         system_prompt = HELP_CHAT_SYSTEM_PROMPT
     else:
         prompt = message
-        system_prompt = None  # uses default
+        if inventory:
+            system_prompt = AGENTIC_CHAT_SYSTEM_PROMPT + "\n\n" + inventory
+        else:
+            system_prompt = None  # uses default
 
     # Select agent — agentic (with tools) when user context is available
     deps = None
@@ -591,6 +614,7 @@ async def chat_stream(
     thinking_done_emitted = False
     streamed_tool_calls: list[dict] = []
     streamed_tool_results: list[dict] = []
+    streamed_segments: list[dict] = []
 
     try:
         think_parser = _ThinkTagParser()
@@ -634,6 +658,11 @@ async def chat_stream(
                                                 "duration": thinking_duration,
                                             }) + "\n"
                                         full_response.append(text)
+                                        # Build segment — merge consecutive text
+                                        if streamed_segments and streamed_segments[-1].get("kind") == "text":
+                                            streamed_segments[-1]["content"] += text
+                                        else:
+                                            streamed_segments.append({"kind": "text", "content": text})
                                         yield json.dumps({"kind": "text", "content": text}) + "\n"
 
                     # Flush any remaining buffered content from the parser
@@ -643,6 +672,10 @@ async def chat_stream(
                             yield json.dumps({"kind": "thinking", "content": text}) + "\n"
                         else:
                             full_response.append(text)
+                            if streamed_segments and streamed_segments[-1].get("kind") == "text":
+                                streamed_segments[-1]["content"] += text
+                            else:
+                                streamed_segments.append({"kind": "text", "content": text})
                             yield json.dumps({"kind": "text", "content": text}) + "\n"
 
                 elif Agent.is_call_tools_node(node):
@@ -660,6 +693,7 @@ async def chat_stream(
                                     "args": args,
                                 }
                                 streamed_tool_calls.append(call_data)
+                                streamed_segments.append({"kind": "tool_call", "call": call_data})
                                 yield json.dumps({"kind": "tool_call", **call_data}) + "\n"
                             elif isinstance(event, FunctionToolResultEvent):
                                 # Extract quality sidecar from tool result.
@@ -682,6 +716,7 @@ async def chat_stream(
                                     "quality": quality,
                                 }
                                 streamed_tool_results.append(result_data)
+                                streamed_segments.append({"kind": "tool_result", "result": result_data})
                                 yield json.dumps({"kind": "tool_result", **result_data}) + "\n"
 
             if agent_run.result:
@@ -689,6 +724,17 @@ async def chat_stream(
                 # Safety-net: strip any residual think tags the parser missed
                 assistant_message = _THINK_BLOCK_RE.sub("", "".join(full_response)).strip()
                 thinking_text = "".join(full_thinking) or None
+
+                # Clean think tags from text segments before persisting
+                cleaned_segments: list[dict] = []
+                for seg in streamed_segments:
+                    if seg.get("kind") == "text":
+                        cleaned = _THINK_BLOCK_RE.sub("", seg["content"]).strip()
+                        if cleaned:
+                            cleaned_segments.append({"kind": "text", "content": cleaned})
+                    else:
+                        cleaned_segments.append(seg)
+
                 await _finalize(
                     conversation, assistant_message, documents,
                     usage, activity_id, user_id,
@@ -696,6 +742,7 @@ async def chat_stream(
                     thinking_duration=thinking_duration,
                     tool_calls=streamed_tool_calls or None,
                     tool_results=streamed_tool_results or None,
+                    segments=cleaned_segments or None,
                 )
 
     except Exception as e:
@@ -720,6 +767,228 @@ def _get_full_text(documents: list[SmartDocument]) -> str:
     return "".join(parts)
 
 
+# ---------------------------------------------------------------------------
+# Workspace inventory — gives the LLM awareness of the user's assets
+# ---------------------------------------------------------------------------
+
+_inventory_cache: dict[tuple[str, str | None], tuple[float, str]] = {}
+_INVENTORY_TTL = 60.0  # seconds
+
+
+def _relative_time(dt: datetime.datetime) -> str:
+    """Format a datetime as a human-friendly relative string."""
+    now = datetime.datetime.now(datetime.timezone.utc)
+    delta = now - dt
+    seconds = delta.total_seconds()
+    if seconds < 60:
+        return "just now"
+    if seconds < 3600:
+        mins = int(seconds // 60)
+        return f"{mins}m ago"
+    if seconds < 86400:
+        hours = int(seconds // 3600)
+        return f"{hours}h ago"
+    days = int(seconds // 86400)
+    if days == 1:
+        return "yesterday"
+    if days < 30:
+        return f"{days}d ago"
+    return f"{days // 30}mo ago"
+
+
+async def _build_workspace_inventory(
+    user_id: str, team_id: str | None
+) -> str:
+    """Build a compact workspace summary for injection into the system prompt.
+
+    Returns an empty string for brand-new users with zero assets.
+    Results are cached in-memory for 60 seconds per (user_id, team_id).
+    """
+    cache_key = (user_id, team_id)
+    now = time.monotonic()
+    cached = _inventory_cache.get(cache_key)
+    if cached and (now - cached[0]) < _INVENTORY_TTL:
+        return cached[1]
+
+    from app.models.knowledge import KnowledgeBase
+    from app.models.search_set import SearchSet
+    from app.models.validation_run import ValidationRun
+    from app.models.workflow import Workflow
+
+    # Build query filters — match team scope or personal
+    if team_id:
+        doc_filter = {
+            "soft_deleted": {"$ne": True},
+            "$or": [{"team_id": team_id}, {"user_id": user_id}],
+        }
+        ss_filter = {"$or": [{"team_id": team_id}, {"user_id": user_id}]}
+        wf_filter = {"$or": [{"team_id": team_id}, {"user_id": user_id}]}
+        kb_filter = {"$or": [{"team_id": team_id}, {"user_id": user_id}]}
+    else:
+        doc_filter = {"user_id": user_id, "soft_deleted": {"$ne": True}}
+        ss_filter = {"user_id": user_id}
+        wf_filter = {"user_id": user_id}
+        kb_filter = {"user_id": user_id}
+
+    # Parallel queries — lightweight counts + limited name lists
+    (
+        doc_count,
+        recent_docs,
+        search_sets,
+        workflows,
+        knowledge_bases,
+        recent_activity,
+    ) = await asyncio.gather(
+        SmartDocument.find(doc_filter).count(),
+        SmartDocument.find(doc_filter)
+        .sort("-created_at")
+        .limit(3)
+        .to_list(),
+        SearchSet.find(ss_filter).sort("-created_at").limit(5).to_list(),
+        Workflow.find(wf_filter).sort("-created_at").limit(5).to_list(),
+        KnowledgeBase.find(kb_filter).sort("-created_at").limit(5).to_list(),
+        ActivityEvent.find(
+            {"user_id": user_id, "status": "completed"}
+        )
+        .sort("-last_updated_at")
+        .limit(3)
+        .to_list(),
+    )
+
+    # Quick check: if the user has nothing, return empty
+    total_items = (
+        doc_count + len(search_sets) + len(workflows) + len(knowledge_bases)
+    )
+    if total_items == 0:
+        _inventory_cache[cache_key] = (now, "")
+        return ""
+
+    # Detect post-demo state: only onboarding sample docs, no real content
+    all_onboarding = doc_count > 0 and all(
+        getattr(d, "is_onboarding_sample", False) for d in recent_docs
+    ) and not search_sets and not workflows
+
+    # Fetch validation scores for extraction sets (if any)
+    quality_map: dict[str, float] = {}  # ss_uuid → score
+    if search_sets:
+        ss_uuids = [ss.uuid for ss in search_sets]
+        validation_runs = await ValidationRun.find(
+            {"item_kind": "search_set", "item_id": {"$in": ss_uuids}}
+        ).sort("-created_at").to_list()
+        # Keep only the latest run per item
+        for vr in validation_runs:
+            if vr.item_id not in quality_map:
+                quality_map[vr.item_id] = vr.score
+
+    # Build the inventory string
+    lines: list[str] = ["## Your workspace"]
+
+    # Documents
+    if doc_count > 0:
+        doc_names = ", ".join(
+            f'"{d.title}"' for d in recent_docs[:3]
+        )
+        lines.append(
+            f"- {doc_count} document{'s' if doc_count != 1 else ''}"
+            f" (latest: {doc_names})"
+        )
+
+    # Extraction sets
+    if search_sets:
+        ss_parts: list[str] = []
+        for ss in search_sets[:3]:
+            label = f'"{ss.title}"'
+            hints: list[str] = []
+            if ss.verified:
+                hints.append("verified")
+            score = quality_map.get(ss.uuid)
+            if score is not None:
+                hints.append(f"{round(score)}/100")
+            if hints:
+                label += f" ({', '.join(hints)})"
+            ss_parts.append(label)
+        lines.append(
+            f"- {len(search_sets)} extraction set"
+            f"{'s' if len(search_sets) != 1 else ''}: "
+            + ", ".join(ss_parts)
+        )
+
+    # Workflows
+    if workflows:
+        wf_parts: list[str] = []
+        for wf in workflows[:3]:
+            label = f'"{wf.name}"'
+            if wf.num_executions:
+                label += f" ({wf.num_executions} run{'s' if wf.num_executions != 1 else ''})"
+            wf_parts.append(label)
+        lines.append(
+            f"- {len(workflows)} workflow"
+            f"{'s' if len(workflows) != 1 else ''}: "
+            + ", ".join(wf_parts)
+        )
+
+    # Knowledge bases
+    if knowledge_bases:
+        kb_parts: list[str] = []
+        for kb in knowledge_bases[:3]:
+            label = f'"{kb.title}"'
+            if kb.status:
+                label += f" ({kb.status})"
+            kb_parts.append(label)
+        lines.append(
+            f"- {len(knowledge_bases)} knowledge base"
+            f"{'s' if len(knowledge_bases) != 1 else ''}: "
+            + ", ".join(kb_parts)
+        )
+
+    # Recent activity
+    if recent_activity:
+        lines.append("")
+        lines.append("## Recent activity")
+        for ev in recent_activity:
+            ts = _relative_time(ev.last_updated_at) if ev.last_updated_at else ""
+            title = ev.title or "Untitled"
+            if ev.type == "conversation":
+                lines.append(f'- "{title}" conversation ({ts})')
+            elif ev.type == "search_set_run":
+                touched = (
+                    f" on {ev.documents_touched} doc{'s' if ev.documents_touched != 1 else ''}"
+                    if ev.documents_touched
+                    else ""
+                )
+                lines.append(f'- Ran "{title}" extraction{touched} ({ts})')
+            elif ev.type == "workflow_run":
+                lines.append(
+                    f'- "{title}" workflow — {ev.status} ({ts})'
+                )
+            else:
+                lines.append(f"- {title} ({ts})")
+
+    # Post-demo bridge: guide users who only have the onboarding sample
+    if all_onboarding:
+        lines.append("")
+        lines.append(
+            "Note: This user just completed the onboarding demo. They have a "
+            "sample NSF proposal but haven't uploaded their own documents yet. "
+            "If they ask what to do, suggest trying the sample doc or uploading "
+            "their own files. Be encouraging, not pushy."
+        )
+
+    result = "\n".join(lines)
+
+    # Cache with TTL and enforce max size
+    if len(_inventory_cache) > 100:
+        # Evict oldest entries
+        sorted_keys = sorted(
+            _inventory_cache, key=lambda k: _inventory_cache[k][0]
+        )
+        for k in sorted_keys[:50]:
+            del _inventory_cache[k]
+    _inventory_cache[cache_key] = (now, result)
+
+    return result
+
+
 async def _finalize(
     conversation: ChatConversation,
     assistant_message: str,
@@ -731,6 +1000,7 @@ async def _finalize(
     thinking_duration: Optional[float] = None,
     tool_calls: Optional[list[dict]] = None,
     tool_results: Optional[list[dict]] = None,
+    segments: Optional[list[dict]] = None,
 ) -> None:
     """Save assistant message and update activity metrics."""
     await conversation.add_message(
@@ -740,6 +1010,7 @@ async def _finalize(
         thinking_duration=thinking_duration,
         tool_calls=tool_calls,
         tool_results=tool_results,
+        segments=segments,
     )
 
     if activity_id:

@@ -60,3 +60,7 @@ class OnboardingStatusResponse(BaseModel):
     has_conversations: bool = False
     first_session_completed: bool = False
     is_certified: bool = False
+    suggestion_pills: list[str] = []
+    has_only_onboarding_docs: bool = False
+    top_extraction_set_name: Optional[str] = None
+    top_workflow_name: Optional[str] = None

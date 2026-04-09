@@ -72,7 +72,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
 
   const { bumpActivitySignal, processingDoc, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, activeKBUuid, activeKBTitle, deactivateKB } = useWorkspace()
   const { toast } = useToast()
-  const { pills: onboardingPills, isFirstSession, loading: onboardingLoading } = useOnboarding()
+  const { pills: onboardingPills, isFirstSession, loading: onboardingLoading, status: onboardingStatus } = useOnboarding()
   // Lock the first-session flag once it's set so remounts/refetches can't
   // flip it mid-conversation (markFirstSessionComplete fires early).
   const lockedFirstSession = useRef<boolean | null>(null)
@@ -618,7 +618,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
             </div>
 
             <div style={{ marginTop: 16, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {/* Demo pill — always first */}
+              {/* Demo pill — hidden once user has deeply engaged */}
+              {!(onboardingStatus?.has_run_workflow || onboardingStatus?.is_certified || (onboardingStatus?.has_extraction_sets && onboardingStatus?.has_workflows)) && (
               <button
                 disabled={!!processingDoc}
                 onClick={handleRunDemo}
@@ -651,6 +652,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                 <Zap size={13} style={{ color: 'var(--highlight-color, #eab308)' }} />
                 Show me what you can do
               </button>
+              )}
               {/* Contextual suggestion pills */}
               {(activeKBUuid ? [
                 'Summarize the key points across all sources',
@@ -658,13 +660,23 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                 'List every topic covered',
               ] : hasDocContext ? [
                 'Summarize this in 5 bullet points',
-                'Extract all names, dates, and numbers',
-                'List every action item and deadline',
+                ...(onboardingStatus?.top_extraction_set_name
+                  ? [`Run ${onboardingStatus.top_extraction_set_name} on selected documents`]
+                  : ['Extract all names, dates, and numbers']),
+                ...(onboardingStatus?.top_workflow_name
+                  ? [`Run ${onboardingStatus.top_workflow_name} on selected documents`]
+                  : ['List every action item and deadline']),
               ] : onboardingPills).map(suggestion => (
                 <button
                   key={suggestion}
                   disabled={!!processingDoc}
-                  onClick={() => handleSend(suggestion, !activeKBUuid && !hasDocContext)}
+                  onClick={() => {
+                    // Server-generated action pills don't need onboarding context injection —
+                    // the workspace inventory in the system prompt provides the context.
+                    const hasServerPills = (onboardingStatus?.suggestion_pills?.length ?? 0) > 0
+                    const needsOnboardingContext = !activeKBUuid && !hasDocContext && !hasServerPills
+                    handleSend(suggestion, needsOnboardingContext)
+                  }}
                   style={{
                     padding: '8px 14px',
                     fontSize: 13,

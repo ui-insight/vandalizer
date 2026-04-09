@@ -55,6 +55,10 @@ export interface OnboardingStatus {
   has_conversations: boolean
   first_session_completed: boolean
   is_certified: boolean
+  suggestion_pills: string[]
+  has_only_onboarding_docs: boolean
+  top_extraction_set_name: string | null
+  top_workflow_name: string | null
 }
 
 export function getOnboardingStatus() {

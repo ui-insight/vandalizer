@@ -184,14 +184,73 @@ async def get_features(user: User = Depends(get_current_user)):
 # ---------------------------------------------------------------------------
 
 
+def _generate_action_pills(
+    *,
+    doc_count: int,
+    onboarding_doc_count: int,
+    search_sets: list,
+    workflows: list,
+    knowledge_bases: list,
+    has_chatted_with_docs: bool,
+    quality_map: dict[str, float],
+) -> list[str]:
+    """Generate up to 4 personalised, action-oriented suggestion pills."""
+    pills: list[str] = []
+
+    # 0. Post-demo: user has only the onboarding sample, no user-uploaded docs
+    has_only_sample = doc_count > 0 and doc_count == onboarding_doc_count
+    if has_only_sample:
+        pills.append("Ask me anything about the sample NSF proposal")
+        pills.append("Upload your own documents to get started")
+        return pills[:4]
+
+    ready_kbs = [kb for kb in knowledge_bases if getattr(kb, "status", "") == "ready"]
+
+    # 1. Run extraction on latest docs
+    if doc_count > 0 and search_sets:
+        top_ss = search_sets[0]
+        label = top_ss.title
+        score = quality_map.get(top_ss.uuid)
+        if score is not None:
+            label += f" ({round(score)}% validated)"
+        pills.append(f"Run {label} on your latest documents")
+
+    # 2. Query a ready knowledge base
+    if ready_kbs:
+        pills.append(f"Ask your {ready_kbs[0].title} knowledge base a question")
+
+    # 3. Run a workflow
+    if workflows and doc_count > 0:
+        pills.append(f"Run {workflows[0].name} on your documents")
+
+    # 4. Build extraction template from docs
+    if doc_count > 0 and not search_sets:
+        pills.append("Build an extraction template from your documents")
+
+    # 5. Turn extraction set into workflow
+    if search_sets and not workflows:
+        pills.append(f"Turn {search_sets[0].title} into a repeatable workflow")
+
+    # 6. Chat with docs
+    if doc_count > 0 and not has_chatted_with_docs:
+        pills.append("Select a document and ask me about it")
+
+    # 7. Empty workspace
+    if doc_count == 0:
+        pills.append("Upload your first document to get started")
+
+    return pills[:4]
+
+
 @router.get("/onboarding-status", response_model=OnboardingStatusResponse)
 async def get_onboarding_status(user: User = Depends(get_current_user)):
     uid = user.user_id
 
     (
         doc_count,
+        onboarding_doc_count,
         workflows,
-        ss_count,
+        search_sets,
         library_items,
         membership_count,
         automations,
@@ -201,8 +260,12 @@ async def get_onboarding_status(user: User = Depends(get_current_user)):
         cert_progress,
     ) = await asyncio.gather(
         SmartDocument.find(SmartDocument.user_id == uid).count(),
+        SmartDocument.find(
+            SmartDocument.user_id == uid,
+            SmartDocument.is_onboarding_sample == True,  # noqa: E712
+        ).count(),
         Workflow.find(Workflow.user_id == uid).to_list(),
-        SearchSet.find(SearchSet.user_id == uid).count(),
+        SearchSet.find(SearchSet.user_id == uid).to_list(),
         LibraryItem.find(LibraryItem.added_by_user_id == uid).to_list(),
         TeamMembership.find(TeamMembership.user_id == uid).count(),
         Automation.find(Automation.user_id == uid).to_list(),
@@ -221,11 +284,34 @@ async def get_onboarding_status(user: User = Depends(get_current_user)):
         CertificationProgress.find_one(CertificationProgress.user_id == uid),
     )
 
+    # Fetch quality scores for extraction sets to enrich action pills
+    quality_map: dict[str, float] = {}
+    if search_sets:
+        from app.models.validation_run import ValidationRun
+
+        ss_uuids = [ss.uuid for ss in search_sets]
+        vr_list = await ValidationRun.find(
+            {"item_kind": "search_set", "item_id": {"$in": ss_uuids}}
+        ).sort("-created_at").to_list()
+        for vr in vr_list:
+            if vr.item_id not in quality_map and vr.accuracy is not None:
+                quality_map[vr.item_id] = round(vr.accuracy * 100)
+
+    pills = _generate_action_pills(
+        doc_count=doc_count,
+        onboarding_doc_count=onboarding_doc_count,
+        search_sets=search_sets,
+        workflows=workflows,
+        knowledge_bases=knowledge_bases,
+        has_chatted_with_docs=doc_chat_count > 0,
+        quality_map=quality_map,
+    )
+
     return OnboardingStatusResponse(
         has_documents=doc_count > 0,
         has_workflows=len(workflows) > 0,
         has_run_workflow=any(getattr(w, "num_executions", 0) > 0 for w in workflows),
-        has_extraction_sets=ss_count > 0,
+        has_extraction_sets=len(search_sets) > 0,
         has_library_items=len(library_items) > 0,
         has_pinned_item=any(getattr(i, "pinned", False) for i in library_items),
         has_favorited_item=any(getattr(i, "favorited", False) for i in library_items),
@@ -238,6 +324,10 @@ async def get_onboarding_status(user: User = Depends(get_current_user)):
         has_conversations=conversation_count > 0,
         first_session_completed=user.first_session_completed,
         is_certified=bool(cert_progress and cert_progress.certified),
+        suggestion_pills=pills,
+        has_only_onboarding_docs=(doc_count > 0 and doc_count == onboarding_doc_count),
+        top_extraction_set_name=search_sets[0].title if search_sets else None,
+        top_workflow_name=workflows[0].name if workflows else None,
     )
 
 
