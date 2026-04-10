@@ -63,6 +63,50 @@ def _make_doc(**kwargs):
 # ---------------------------------------------------------------------------
 
 
+class TestWordsToRegex:
+    def test_single_word(self):
+        from app.services.chat_tools import _words_to_regex
+
+        assert _words_to_regex("composer") == "composer"
+
+    def test_multi_word(self):
+        from app.services.chat_tools import _words_to_regex
+        import re
+
+        pattern = _words_to_regex("composer agreement")
+        # Should match a title where both words appear (any order, any separator)
+        assert re.search(pattern, "Composer-Performer_Agreement_copy_4.pdf", re.IGNORECASE)
+        assert re.search(pattern, "Agreement for Composer", re.IGNORECASE)
+        # Should NOT match if one word is missing
+        assert not re.search(pattern, "Composer-Performer_copy_4.pdf", re.IGNORECASE)
+
+    def test_multi_word_across_newlines(self):
+        from app.services.chat_tools import _words_to_regex
+        import re
+
+        pattern = _words_to_regex("composer performance agreement")
+        raw_text = (
+            "Composer-Performer Agreement\n"
+            "Performance Date & Time: 4.29.26 at 7:30pm\n"
+            "Performance Venue: Haddock"
+        )
+        assert re.search(pattern, raw_text, re.IGNORECASE)
+
+    def test_empty_query(self):
+        from app.services.chat_tools import _words_to_regex
+
+        assert _words_to_regex("") == ""
+
+    def test_special_characters_escaped(self):
+        from app.services.chat_tools import _words_to_regex
+        import re
+
+        pattern = _words_to_regex("file.pdf copy")
+        assert re.search(pattern, "file.pdf copy_2", re.IGNORECASE)
+        # The dot should be escaped, not match any character
+        assert not re.search(pattern, "filexpdf copy_2", re.IGNORECASE)
+
+
 class TestSearchDocuments:
     @pytest.mark.asyncio
     async def test_returns_matching_docs(self):
@@ -80,6 +124,24 @@ class TestSearchDocuments:
         assert len(result) == 1
         assert result[0]["uuid"] == "doc-1"
         assert result[0]["title"] == "Test Doc"
+
+    @pytest.mark.asyncio
+    async def test_multi_word_query_builds_or_filter(self):
+        """Multi-word queries should search both title and raw_text."""
+        from app.services.chat_tools import search_documents
+
+        ctx = _make_context()
+        with patch("app.services.chat_tools.SmartDocument") as MockDoc:
+            MockDoc.find.return_value.sort.return_value.limit.return_value.to_list = AsyncMock(return_value=[])
+            await search_documents(ctx, "composer agreement")
+
+        # Verify the filter includes $or with title and raw_text
+        call_args = MockDoc.find.call_args[0][0]
+        assert "$and" in call_args
+        text_filter = call_args["$and"][1]
+        assert "$or" in text_filter
+        fields = {list(c.keys())[0] for c in text_filter["$or"]}
+        assert fields == {"title", "raw_text"}
 
     @pytest.mark.asyncio
     async def test_empty_query_returns_results(self):

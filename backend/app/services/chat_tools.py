@@ -46,24 +46,53 @@ def _score_to_tier(score: float | None) -> str | None:
 # ---------------------------------------------------------------------------
 
 
+def _words_to_regex(query: str) -> str:
+    r"""Build a regex that requires every word in *query* to appear (any order).
+
+    "composer agreement" → ``(?=[\s\S]*composer)(?=[\s\S]*agreement)`` which
+    matches titles like ``Composer-Performer_Agreement_copy_4.pdf`` and also
+    multi-line raw_text where words appear on different lines.
+
+    Uses ``[\s\S]`` instead of ``.`` so the lookahead crosses newline
+    boundaries (MongoDB regex does not enable dotall by default).
+    """
+    words = query.split()
+    if not words:
+        return ""
+    if len(words) == 1:
+        return re.escape(words[0])
+    return "".join(rf"(?=[\s\S]*{re.escape(w)})" for w in words)
+
+
 async def search_documents(
     context: RunContext[AgenticChatDeps],
     query: str,
 ) -> list[dict]:
-    """Search the user's documents by title. Returns matching documents with metadata.
+    """Search the user's documents by title or content. Returns matching documents with metadata.
 
     Args:
         context: The call context.
-        query: A text query to match against document titles.
+        query: A text query to match against document titles or content.
+               Multi-word queries match each word independently (any order).
     """
     team_id = context.deps.team_id
-    filters: dict = {"soft_deleted": {"$ne": True}}
+    base_filters: dict = {"soft_deleted": {"$ne": True}}
     if team_id:
-        filters["team_id"] = team_id
+        base_filters["team_id"] = team_id
     else:
-        filters["user_id"] = context.deps.user_id
+        base_filters["user_id"] = context.deps.user_id
+
     if query:
-        filters["title"] = {"$regex": re.escape(query), "$options": "i"}
+        pattern = _words_to_regex(query)
+        text_filter = {
+            "$or": [
+                {"title": {"$regex": pattern, "$options": "i"}},
+                {"raw_text": {"$regex": pattern, "$options": "i"}},
+            ],
+        }
+        filters = {"$and": [base_filters, text_filter]}
+    else:
+        filters = base_filters
 
     docs = await SmartDocument.find(filters).sort("-created_at").limit(MAX_RESULTS).to_list()
     return [
