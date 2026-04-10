@@ -15,7 +15,7 @@ from pydantic_ai.tools import RunContext
 
 from app.models.document import SmartDocument
 from app.models.folder import SmartFolder
-from app.models.knowledge import KnowledgeBase
+from app.models.knowledge import KnowledgeBase, KnowledgeBaseSource
 from app.models.quality_alert import QualityAlert
 from app.models.search_set import SearchSet, SearchSetItem
 from app.models.validation_run import ValidationRun
@@ -160,13 +160,39 @@ async def search_knowledge_base(
 
     dm = get_document_manager()
     results = await asyncio.to_thread(dm.query_kb, uuid, query, 8)
-    return [
-        {
+
+    # Batch-lookup KnowledgeBaseSource records to enrich results with
+    # source_type, document_uuid, and url so the frontend can link back
+    # to the original document or website.
+    source_ids = list(
+        {r.get("metadata", {}).get("source_id") for r in results}
+        - {None, ""}
+    )
+    source_map: dict[str, KnowledgeBaseSource] = {}
+    if source_ids:
+        sources = await KnowledgeBaseSource.find(
+            {"uuid": {"$in": source_ids}}
+        ).to_list()
+        source_map = {s.uuid: s for s in sources}
+
+    enriched: list[dict] = []
+    for r in results:
+        meta = r.get("metadata", {})
+        sid = meta.get("source_id", "")
+        entry: dict = {
             "content": r.get("content", ""),
-            "source_name": r.get("metadata", {}).get("source_name", "unknown"),
+            "source_name": meta.get("source_name", "unknown"),
         }
-        for r in results
-    ]
+        src = source_map.get(sid)
+        if src:
+            entry["source_type"] = src.source_type
+            if src.source_type == "document" and src.document_uuid:
+                entry["document_uuid"] = src.document_uuid
+            elif src.source_type == "url" and src.url:
+                entry["url"] = src.url
+        enriched.append(entry)
+
+    return enriched
 
 
 async def list_knowledge_bases(

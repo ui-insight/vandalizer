@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { ChevronRight, Loader2 } from 'lucide-react'
+import { ChevronRight, ExternalLink, FileText, Loader2 } from 'lucide-react'
 import { QualityBadge } from './QualityBadge'
+import { useWorkspace } from '../../contexts/WorkspaceContext'
+import type { WorkspaceMode } from '../../contexts/WorkspaceContext'
 import type { ToolCallInfo, ToolResultInfo, QualityMeta } from '../../types/chat'
 
 // ---------------------------------------------------------------------------
@@ -286,25 +288,76 @@ function renderExtractionContent(content: Record<string, unknown>): ReactNode {
   )
 }
 
-function renderKBPassages(content: unknown): ReactNode {
+/** Pick a short phrase from chunk content for PDF text-search highlighting. */
+function pickHighlightPhrase(content: string): string {
+  const cleaned = content.replace(/\s+/g, ' ').trim()
+  if (cleaned.length <= 60) return cleaned
+  const cut = cleaned.slice(0, 60)
+  const lastSpace = cut.lastIndexOf(' ')
+  return lastSpace > 20 ? cut.slice(0, lastSpace) : cut
+}
+
+interface KBSourceActions {
+  viewDocument: (uuid: string, title: string) => void
+  setHighlightTerms: (terms: string[]) => void
+  setWorkspaceMode: (mode: WorkspaceMode) => void
+}
+
+function renderKBPassages(content: unknown, actions?: KBSourceActions): ReactNode {
   if (!Array.isArray(content) || content.length === 0) return null
   const passages = content as Array<Record<string, unknown>>
 
   return (
     <div style={{ marginTop: 4, marginLeft: 20, display: 'flex', flexDirection: 'column', gap: 4 }}>
-      {passages.slice(0, 3).map((chunk, i) => (
-        <div key={i} style={{
-          fontSize: 11, lineHeight: 1.5, color: '#6b7280',
-          padding: '4px 8px', borderLeft: '2px solid #e5e7eb',
-          background: '#fafafa', borderRadius: '0 4px 4px 0',
-        }}>
-          <span style={{ fontWeight: 500, color: '#9ca3af', fontSize: 10 }}>
-            {String(chunk.source_name || 'Source')}
-          </span>
-          <span style={{ margin: '0 6px', color: '#d1d5db' }}>&middot;</span>
-          <span>{String(chunk.content || '').slice(0, 200)}{String(chunk.content || '').length > 200 ? '...' : ''}</span>
-        </div>
-      ))}
+      {passages.slice(0, 3).map((chunk, i) => {
+        const sourceType = chunk.source_type as string | undefined
+        const docUuid = chunk.document_uuid as string | undefined
+        const url = chunk.url as string | undefined
+        const sourceName = String(chunk.source_name || 'Source')
+        const chunkContent = String(chunk.content || '')
+
+        const isDoc = sourceType === 'document' && docUuid
+        const isUrl = sourceType === 'url' && url
+        const isClickable = actions && (isDoc || isUrl)
+
+        const handleClick = () => {
+          if (!actions) return
+          if (isDoc) {
+            actions.setWorkspaceMode('files')
+            actions.viewDocument(docUuid, sourceName)
+            actions.setHighlightTerms([pickHighlightPhrase(chunkContent)])
+          } else if (isUrl) {
+            window.open(url, '_blank', 'noopener,noreferrer')
+          }
+        }
+
+        return (
+          <div key={i} style={{
+            fontSize: 11, lineHeight: 1.5, color: '#6b7280',
+            padding: '4px 8px', borderLeft: '2px solid #e5e7eb',
+            background: '#fafafa', borderRadius: '0 4px 4px 0',
+          }}>
+            <span
+              role={isClickable ? 'button' : undefined}
+              tabIndex={isClickable ? 0 : undefined}
+              onClick={isClickable ? handleClick : undefined}
+              onKeyDown={isClickable ? (e) => { if (e.key === 'Enter') handleClick() } : undefined}
+              style={{
+                fontWeight: 500, fontSize: 10,
+                color: isClickable ? '#3b82f6' : '#9ca3af',
+                cursor: isClickable ? 'pointer' : 'default',
+                display: 'inline-flex', alignItems: 'center', gap: 3,
+              }}
+            >
+              {isDoc && <FileText size={10} style={{ flexShrink: 0 }} />}
+              {isUrl && <ExternalLink size={9} style={{ flexShrink: 0 }} />}
+              {sourceName}
+            </span>
+            <span style={{ margin: '0 6px', color: '#d1d5db' }}>&middot;</span>
+            <span>{chunkContent.slice(0, 200)}{chunkContent.length > 200 ? '...' : ''}</span>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -322,6 +375,7 @@ export function ToolStatusLine({
   result?: ToolResultInfo
   isActive?: boolean
 }) {
+  const { viewDocument, setHighlightTerms, setWorkspaceMode } = useWorkspace()
   const name = result?.tool_name || call?.tool_name || 'unknown'
   const meta = getMeta(name)
   const accent = CATEGORY_ACCENT[meta.category]
@@ -333,6 +387,8 @@ export function ToolStatusLine({
   const { text: summaryText, qualityHint } = result
     ? summarizeResult(name, result.content, result.quality ?? null)
     : { text: '', qualityHint: '' }
+
+  const kbActions: KBSourceActions = { viewDocument, setHighlightTerms, setWorkspaceMode }
 
   return (
     <div>
@@ -396,7 +452,7 @@ export function ToolStatusLine({
         renderExtractionContent(obj)
       )}
       {result && name === 'search_knowledge_base' && (
-        renderKBPassages(result.content)
+        renderKBPassages(result.content, kbActions)
       )}
     </div>
   )
