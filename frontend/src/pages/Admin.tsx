@@ -23,7 +23,7 @@ import {
   getTeamDetail, getUserDetail,
   getWorkflowEvents, getSystemConfig, updateSystemConfig, updateM365Config,
   addModel, updateModel, deleteModel, testOcr, testModel, addOAuthProvider,
-  deleteOAuthProvider, updateAuthMethods,
+  updateOAuthProvider, deleteOAuthProvider, updateAuthMethods,
   getQualitySummary, getQualityTimeline, runRegressionSuite,
   getQualityAlerts, acknowledgeAlert, getQualityItems, getQualityItemDetail,
   adminListAllTeams, adminCreateTeam, adminAddUserToTeam, adminRemoveUserFromTeam, getIsolatedUsers,
@@ -2206,9 +2206,11 @@ function ConfigTab() {
   const [m365Saving, setM365Saving] = useState(false)
   const [m365Saved, setM365Saved] = useState(false)
 
-  // Add provider form
+  // Add/edit provider form
   const [showAddProvider, setShowAddProvider] = useState(false)
   const [newProvider, setNewProvider] = useState({ provider: 'oauth', display_name: '', client_id: '', client_secret: '', redirect_uri: '', tenant_id: '' })
+  const [editingProviderIndex, setEditingProviderIndex] = useState<number | null>(null)
+  const [editingProvider, setEditingProvider] = useState({ provider: 'oauth', display_name: '', client_id: '', client_secret: '', redirect_uri: '', tenant_id: '' })
 
   useEffect(() => {
     setLoading(true)
@@ -2441,6 +2443,34 @@ function ConfigTab() {
       setCfg(c)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to delete provider')
+    }
+  }
+
+  const handleEditProvider = (index: number) => {
+    const p = cfg?.oauth_providers?.[index] as Record<string, unknown> | undefined
+    if (!p) return
+    setEditingProviderIndex(index)
+    setEditingProvider({
+      provider: (p.provider as string) || 'oauth',
+      display_name: (p.display_name as string) || '',
+      client_id: (p.client_id as string) || '',
+      client_secret: '***',
+      redirect_uri: (p.redirect_uri as string) || '',
+      tenant_id: (p.tenant_id as string) || '',
+    })
+    setShowAddProvider(false)
+  }
+
+  const handleUpdateProvider = async () => {
+    if (editingProviderIndex === null) return
+    if (!editingProvider.display_name || !editingProvider.client_id) return
+    try {
+      await updateOAuthProvider(editingProviderIndex, editingProvider as unknown as Record<string, string>)
+      const c = await getSystemConfig()
+      setCfg(c)
+      setEditingProviderIndex(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to update provider')
     }
   }
 
@@ -2768,26 +2798,97 @@ function ConfigTab() {
             {cfg?.oauth_providers && cfg.oauth_providers.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {cfg.oauth_providers.map((p, i) => (
-                  <div key={i} style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    padding: '10px 16px', background: '#f9fafb', borderRadius: 'var(--ui-radius, 12px)',
-                    border: '1px solid #e5e7eb',
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <Globe size={16} color="#6b7280" />
-                      <span style={{ fontSize: 14, fontWeight: 500 }}>{(p as Record<string, unknown>).display_name as string || (p as Record<string, unknown>).provider as string}</span>
-                      <span style={{
-                        fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#dbeafe', color: '#1e40af', fontWeight: 600,
-                      }}>
-                        {((p as Record<string, unknown>).provider as string || 'oauth').toUpperCase()}
-                      </span>
+                  <div key={i}>
+                    <div style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      padding: '10px 16px', background: '#f9fafb', borderRadius: 'var(--ui-radius, 12px)',
+                      border: '1px solid #e5e7eb',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <Globe size={16} color="#6b7280" />
+                        <span style={{ fontSize: 14, fontWeight: 500 }}>{(p as Record<string, unknown>).display_name as string || (p as Record<string, unknown>).provider as string}</span>
+                        <span style={{
+                          fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#dbeafe', color: '#1e40af', fontWeight: 600,
+                        }}>
+                          {((p as Record<string, unknown>).provider as string || 'oauth').toUpperCase()}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <button
+                          onClick={() => editingProviderIndex === i ? setEditingProviderIndex(null) : handleEditProvider(i)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4 }}
+                        >
+                          <Pencil size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteProvider(i)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 4 }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </div>
-                    <button
-                      onClick={() => handleDeleteProvider(i)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 4 }}
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    {editingProviderIndex === i && (
+                      <div style={{ marginTop: 8, padding: 16, background: '#f9fafb', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #e5e7eb' }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Edit Provider</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                          <div>
+                            <label style={labelStyle}>Type</label>
+                            <select
+                              value={editingProvider.provider}
+                              onChange={e => setEditingProvider({ ...editingProvider, provider: e.target.value })}
+                              style={inputStyle}
+                            >
+                              <option value="oauth">OAuth 2.0</option>
+                              <option value="azure">Azure AD</option>
+                              <option value="saml">SAML</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Display Name</label>
+                            <input value={editingProvider.display_name} onChange={e => setEditingProvider({ ...editingProvider, display_name: e.target.value })} style={inputStyle} />
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Client ID</label>
+                            <input value={editingProvider.client_id} onChange={e => setEditingProvider({ ...editingProvider, client_id: e.target.value })} style={inputStyle} />
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Client Secret</label>
+                            <input type="password" value={editingProvider.client_secret} onChange={e => setEditingProvider({ ...editingProvider, client_secret: e.target.value })} style={inputStyle} placeholder="Leave as *** to keep existing" />
+                          </div>
+                          <div style={{ gridColumn: '1 / -1' }}>
+                            <label style={labelStyle}>Redirect URI</label>
+                            <input value={editingProvider.redirect_uri} onChange={e => setEditingProvider({ ...editingProvider, redirect_uri: e.target.value })} style={inputStyle} />
+                          </div>
+                          {editingProvider.provider === 'azure' && (
+                            <div style={{ gridColumn: '1 / -1' }}>
+                              <label style={labelStyle}>Tenant ID</label>
+                              <input value={editingProvider.tenant_id} onChange={e => setEditingProvider({ ...editingProvider, tenant_id: e.target.value })} style={inputStyle} />
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                          <button
+                            onClick={handleUpdateProvider}
+                            style={{
+                              padding: '8px 16px', borderRadius: 'var(--ui-radius, 12px)', border: 'none',
+                              background: 'var(--highlight-color, #eab308)', color: 'var(--highlight-text-color, #000)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                            }}
+                          >
+                            Save Changes
+                          </button>
+                          <button
+                            onClick={() => setEditingProviderIndex(null)}
+                            style={{
+                              padding: '8px 16px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db',
+                              background: '#fff', fontSize: 13, cursor: 'pointer',
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

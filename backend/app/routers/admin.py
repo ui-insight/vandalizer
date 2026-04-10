@@ -265,6 +265,7 @@ class OAuthProviderRequest(BaseModel):
     client_id: str
     client_secret: str
     redirect_uri: str
+    enabled: bool = True
     tenant_id: Optional[str] = None
     metadata_url: Optional[str] = None
     entity_id: Optional[str] = None
