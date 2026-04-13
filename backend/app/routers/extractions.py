@@ -822,6 +822,42 @@ async def create_test_cases_from_extraction(request: Request, user: User = Depen
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.get("/search-sets/{uuid}/history")
+async def get_extraction_history(
+    uuid: str, limit: int = 50, user: User = Depends(get_current_user),
+) -> dict:
+    """List the current user's past runs of this extraction."""
+    await _get_search_set_or_404(uuid, user)
+    from app.models.activity import ActivityEvent
+    events = (
+        await ActivityEvent.find(
+            ActivityEvent.search_set_uuid == uuid,
+            ActivityEvent.user_id == user.user_id,
+            ActivityEvent.type == "search_set_run",
+        )
+        .sort("-started_at")
+        .limit(limit)
+        .to_list()
+    )
+    return {
+        "runs": [
+            {
+                "id": str(ev.id),
+                "status": ev.status,
+                "started_at": ev.started_at.isoformat() if ev.started_at else None,
+                "finished_at": ev.finished_at.isoformat() if ev.finished_at else None,
+                "duration_ms": ev.duration_ms,
+                "error": ev.error or "",
+                "tokens_input": ev.tokens_input,
+                "tokens_output": ev.tokens_output,
+                "documents_touched": ev.documents_touched,
+                "result_snapshot": ev.result_snapshot or {},
+            }
+            for ev in events
+        ],
+    }
+
+
 @router.get("/search-sets/{uuid}/quality-history")
 async def get_extraction_quality_history(
     uuid: str, limit: int = 50, user: User = Depends(get_current_user),

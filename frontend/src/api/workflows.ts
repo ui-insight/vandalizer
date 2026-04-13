@@ -300,6 +300,26 @@ export interface QualityHistoryRun {
   checks_failed: number
 }
 
+export interface RunHistoryEntry {
+  id: string
+  status: string
+  started_at: string | null
+  finished_at: string | null
+  duration_ms: number | null
+  error: string
+  tokens_input: number
+  tokens_output: number
+  documents_touched: number
+  steps_completed?: number
+  steps_total?: number
+  session_id?: string
+  result_snapshot: Record<string, unknown>
+}
+
+export function getWorkflowHistory(workflowId: string, limit = 50) {
+  return apiFetch<{ runs: RunHistoryEntry[] }>(`/api/workflows/${workflowId}/history?limit=${limit}`)
+}
+
 export function getWorkflowQualityHistory(workflowId: string) {
   return apiFetch<{ runs: QualityHistoryRun[] }>(`/api/workflows/${workflowId}/quality-history`)
 }

@@ -7,7 +7,7 @@ import {
   AlertTriangle, ChevronDown, ChevronRight, ArrowUp, ArrowDown,
   Circle, Hand, Keyboard, Sparkles, ShieldCheck, Type,
   ArrowRight, Pause, TrendingUp, RefreshCw,
-  Upload,
+  Upload, Clock,
 } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import {
@@ -17,8 +17,9 @@ import {
   getWorkflowQualityHistory, getWorkflowImprovementSuggestions, getWorkflowQualityStatus,
   getValidationPlan, updateValidationPlan, generateValidationPlan,
   getValidationInputs, updateValidationInputs,
-  exportWorkflowUrl, importWorkflow,
+  exportWorkflowUrl, importWorkflow, getWorkflowHistory,
 } from '../../api/workflows'
+import { RunHistoryTab } from './RunHistoryTab'
 import type { ValidationCheck, ValidationCheckDefinition, ValidationInputDefinition, QualityHistoryRun, BatchStatus, WorkflowQualityStatus } from '../../api/workflows'
 import { ItemPickerModal } from './ItemPickerModal'
 import { getModels } from '../../api/config'
@@ -44,7 +45,7 @@ import type { ApprovalRequest } from '../../api/approvals'
 // Types & constants
 // ---------------------------------------------------------------------------
 
-type Tab = 'design' | 'input' | 'validate'
+type Tab = 'design' | 'input' | 'validate' | 'history'
 type TaskCategory = 'all' | 'text' | 'files' | 'web' | 'output'
 type TaskSubTab = 'design' | 'input' | 'output'
 type TaskInputSource = 'step_input' | 'select_document' | 'workflow_documents'
@@ -89,6 +90,7 @@ const TABS: { key: Tab; label: string; icon: typeof PenTool }[] = [
   { key: 'design', label: 'Design', icon: PenTool },
   { key: 'input', label: 'Input', icon: Zap },
   { key: 'validate', label: 'Validate', icon: ClipboardCheck },
+  { key: 'history', label: 'History', icon: Clock },
 ]
 
 // ---------------------------------------------------------------------------
@@ -593,6 +595,12 @@ export function WorkflowEditorPanel() {
               refreshSparkline()
               if (openWorkflowId) getWorkflowQualityStatus(openWorkflowId).then(setQualityStatus).catch(() => {})
             }}
+          />
+        )}
+        {activeTab === 'history' && openWorkflowId && (
+          <RunHistoryTab
+            fetchHistory={() => getWorkflowHistory(openWorkflowId)}
+            type="workflow"
           />
         )}
       </div>

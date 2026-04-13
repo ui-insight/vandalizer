@@ -286,6 +286,23 @@ export interface QualityHistoryRun {
   extraction_config?: Record<string, unknown> | null
 }
 
+export interface ExtractionRunHistoryEntry {
+  id: string
+  status: string
+  started_at: string | null
+  finished_at: string | null
+  duration_ms: number | null
+  error: string
+  tokens_input: number
+  tokens_output: number
+  documents_touched: number
+  result_snapshot: Record<string, unknown>
+}
+
+export function getExtractionHistory(uuid: string, limit = 50) {
+  return apiFetch<{ runs: ExtractionRunHistoryEntry[] }>(`/api/extractions/search-sets/${uuid}/history?limit=${limit}`)
+}
+
 export function getExtractionQualityHistory(uuid: string) {
   return apiFetch<{ runs: QualityHistoryRun[] }>(`/api/extractions/search-sets/${uuid}/quality-history`)
 }

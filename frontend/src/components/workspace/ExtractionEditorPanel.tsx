@@ -25,7 +25,9 @@ import {
   importSearchSet,
   getTuningResult,
   clearTuningResult,
+  getExtractionHistory,
 } from '../../api/extractions'
+import { RunHistoryTab } from './RunHistoryTab'
 import type { ValidationV2Result, QualityHistoryRun, ValidationSource, TuningResult, TuningStreamEvent } from '../../api/extractions'
 import { findBestSettingsStream } from '../../api/extractions'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
@@ -44,7 +46,7 @@ import DOMPurify from 'dompurify'
 
 marked.setOptions({ breaks: true, gfm: true })
 
-type Tab = 'design' | 'tools' | 'validate' | 'advanced'
+type Tab = 'design' | 'tools' | 'validate' | 'advanced' | 'history'
 
 interface ExtractionConfig {
   mode?: 'one_pass' | 'two_pass'
@@ -443,7 +445,7 @@ export function ExtractionEditorPanel() {
           flexShrink: 0,
         }}
       >
-        {(['design', 'tools', 'validate', 'advanced'] as const).map((tab) => {
+        {(['design', 'tools', 'validate', 'advanced', 'history'] as const).map((tab) => {
           const isActive = activeTab === tab
           // Colored dot for validate tab
           let tabDot: string | null = null
@@ -578,6 +580,14 @@ export function ExtractionEditorPanel() {
           onSetUseDefaults={setUseDefaults}
           onSaveConfig={saveConfig}
         />
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: activeTab === 'history' ? undefined : 'none' }}>
+        {openExtractionId && (
+          <RunHistoryTab
+            fetchHistory={() => getExtractionHistory(openExtractionId)}
+            type="extraction"
+          />
+        )}
       </div>
 
       {/* Nudge banner for unvalidated items */}

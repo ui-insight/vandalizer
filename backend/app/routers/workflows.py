@@ -570,6 +570,47 @@ async def reorder_steps(workflow_id: str, req: ReorderStepsRequest, user: User =
     return {"ok": True}
 
 
+@router.get("/{workflow_id}/history")
+async def get_workflow_history(
+    workflow_id: str, limit: int = 50, user: User = Depends(get_current_user),
+):
+    """List the current user's past runs of this workflow."""
+    wf = await get_authorized_workflow(workflow_id, user)
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    from app.models.activity import ActivityEvent
+    events = (
+        await ActivityEvent.find(
+            ActivityEvent.workflow == wf.id,
+            ActivityEvent.user_id == user.user_id,
+            ActivityEvent.type == "workflow_run",
+        )
+        .sort("-started_at")
+        .limit(limit)
+        .to_list()
+    )
+    return {
+        "runs": [
+            {
+                "id": str(ev.id),
+                "status": ev.status,
+                "started_at": ev.started_at.isoformat() if ev.started_at else None,
+                "finished_at": ev.finished_at.isoformat() if ev.finished_at else None,
+                "duration_ms": ev.duration_ms,
+                "error": ev.error or "",
+                "tokens_input": ev.tokens_input,
+                "tokens_output": ev.tokens_output,
+                "documents_touched": ev.documents_touched,
+                "steps_completed": ev.steps_completed,
+                "steps_total": ev.steps_total,
+                "session_id": ev.workflow_session_id,
+                "result_snapshot": ev.result_snapshot or {},
+            }
+            for ev in events
+        ],
+    }
+
+
 @router.get("/{workflow_id}/quality-history")
 async def get_workflow_quality_history(
     workflow_id: str, limit: int = 50, user: User = Depends(get_current_user),
