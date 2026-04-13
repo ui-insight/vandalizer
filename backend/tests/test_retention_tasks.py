@@ -139,17 +139,13 @@ class TestExecuteHardDeletes:
         mock_chroma = MagicMock()
         mock_chroma.get_or_create_collection.return_value = mock_collection
 
-        import sys
-        mock_chromadb_mod = MagicMock()
-        mock_chromadb_mod.PersistentClient.return_value = mock_chroma
-
         with patch("app.database.init_db", new_callable=AsyncMock), \
              patch("app.config.Settings") as MockSettings, \
              patch("app.models.system_config.SystemConfig") as MockConfig, \
              patch("app.models.document.SmartDocument") as MockDoc, \
              patch("os.path.exists", return_value=True), \
              patch("os.remove") as mock_remove, \
-             patch.dict(sys.modules, {"chromadb": mock_chromadb_mod}):
+             patch("app.services.document_manager.get_chroma_client", return_value=mock_chroma):
             MockSettings.return_value.chromadb_persist_dir = "/tmp/chroma"
             MockConfig.get_config = AsyncMock(return_value=mock_config)
             MockDoc.find = MagicMock(return_value=mock_find_query)

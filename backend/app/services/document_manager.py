@@ -11,6 +11,23 @@ from chromadb.config import Settings as ChromaSettings
 logger = logging.getLogger(__name__)
 
 
+def get_chroma_client(persist_directory: str | None = None) -> chromadb.ClientAPI:
+    """Create a ChromaDB PersistentClient with consistent settings.
+
+    All code that needs a ChromaDB client should use this function to avoid
+    the 'instance already exists with different settings' error.
+    """
+    if persist_directory is None:
+        from app.config import Settings
+
+        persist_directory = Settings().chromadb_persist_dir
+    Path(persist_directory).mkdir(parents=True, exist_ok=True)
+    return chromadb.PersistentClient(
+        path=persist_directory,
+        settings=ChromaSettings(anonymized_telemetry=False, is_persistent=True),
+    )
+
+
 def _split_text(text: str, chunk_size: int, chunk_overlap: int) -> list[str]:
     """Split text into overlapping chunks without external dependencies."""
     normalized = text.strip()
@@ -57,12 +74,7 @@ class DocumentManager:
         self.chunk_size = 1000
         self.chunk_overlap = 200
 
-        Path(persist_directory).mkdir(parents=True, exist_ok=True)
-
-        self.client = chromadb.PersistentClient(
-            path=persist_directory,
-            settings=ChromaSettings(anonymized_telemetry=False, is_persistent=True),
-        )
+        self.client = get_chroma_client(persist_directory)
 
     def get_user_collection(self, user_id: str) -> chromadb.Collection:
         collection_name = f"user_{user_id}_docs"
