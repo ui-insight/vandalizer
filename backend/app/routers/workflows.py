@@ -273,7 +273,6 @@ async def download_results(
         if isinstance(data, list) and data and isinstance(data[0], dict):
             headers = list(dict.fromkeys(k for row in data for k in row.keys()))
             usable = pdf.w - pdf.l_margin - pdf.r_margin
-            n_cols = len(headers)
             # Smart column widths: allocate proportionally to max content length
             max_lens = []
             for h in headers:
