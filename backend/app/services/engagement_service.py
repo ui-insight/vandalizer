@@ -53,11 +53,10 @@ async def process_onboarding_drips(settings: Settings | None = None) -> int:
     now = datetime.datetime.now(datetime.timezone.utc)
     sent = 0
 
-    # Find users with a pending drip
+    # Find users with a pending drip (includes demo/trial users)
     users = await User.find(
         User.onboarding_drip_step < len(_DRIP_MODULES),
         User.onboarding_drip_next_at <= now,
-        User.is_demo_user != True,  # noqa: E712
     ).to_list()
 
     for user in users:

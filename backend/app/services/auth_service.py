@@ -12,8 +12,8 @@ async def _stamp_login(user: User) -> None:
     is_first_login = user.last_login_at is None
     user.last_login_at = now
 
-    # Start onboarding drip for new non-demo users on first login
-    if is_first_login and not user.is_demo_user and user.onboarding_drip_step == 0:
+    # Start onboarding drip for new users on first login
+    if is_first_login and user.onboarding_drip_step == 0:
         user.onboarding_drip_next_at = now  # eligible immediately for step 1
         user.email_preferences = user.email_preferences or {}
         user.email_preferences.setdefault("onboarding", True)

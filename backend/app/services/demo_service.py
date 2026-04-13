@@ -191,6 +191,7 @@ async def _activate_application(app: DemoApplication, settings: Settings) -> Non
     # Seed recapture drip — first email 24h after activation
     app.recapture_step = 0
     app.recapture_next_at = now + datetime.timedelta(days=_RECAPTURE_SCHEDULE_DAYS[0])
+    await app.save()
 
     # Send activation email
     expires_str = expires_at.strftime("%B %d, %Y")
@@ -615,12 +616,22 @@ async def bulk_resend_credentials(settings: Settings | None = None) -> dict:
             skipped += 1
             continue
 
-        # Generate new password and update
+        # Reset trial expiration to 14 days from now
+        now = datetime.datetime.now(datetime.timezone.utc)
+        new_expires = now + datetime.timedelta(days=TRIAL_DAYS)
+        app.expires_at = new_expires
+        # Restart recapture drip so they get reminder emails
+        app.recapture_step = 0
+        app.recapture_next_at = now + datetime.timedelta(days=_RECAPTURE_SCHEDULE_DAYS[0])
+        await app.save()
+
+        # Generate new password and update user
         password = secrets.token_urlsafe(10)
         user.password_hash = hash_password(password)
+        user.demo_expires_at = new_expires
         await user.save()
 
-        expires_str = app.expires_at.strftime("%B %d, %Y") if app.expires_at else "N/A"
+        expires_str = new_expires.strftime("%B %d, %Y")
         subject, html = activation_email(
             app.name, user.user_id, password, expires_str, settings.frontend_url
         )
