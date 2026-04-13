@@ -1,6 +1,6 @@
 import React, { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { ExtractionTutorial } from './ExtractionTutorial'
-import { X, Pencil, Loader2, Copy, Trash2, GripVertical, Plus, ChevronDown, ChevronRight, Play, TrendingUp, Sparkles, FileText, AlertTriangle, Eye, Shield, ShieldCheck, Download, Clock } from 'lucide-react'
+import { X, Pencil, Loader2, Copy, Trash2, GripVertical, Plus, ChevronDown, ChevronRight, Play, TrendingUp, Sparkles, FileText, AlertTriangle, Eye, Shield, ShieldCheck, Download } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
 import { useSearchSetItems } from '../../hooks/useExtractions'
