@@ -26,7 +26,14 @@ from app.models.chat import (
     UrlAttachment,
 )
 from app.models.user import User
-from app.schemas.chat import AddLinkRequest, ChatDownloadRequest, ChatRequest
+from app.schemas.chat import (
+    AddLinkRequest,
+    ChatDownloadRequest,
+    ChatRequest,
+    ClearContextRequest,
+    CompactContextRequest,
+    TruncateContextRequest,
+)
 from app.services import access_control, organization_service
 from app.services import activity_service
 from app.services.chat_service import chat_stream
@@ -525,6 +532,8 @@ async def get_chat_history(
             }
             for a in file_attachments
         ],
+        "context_mode": conversation.context_mode,
+        "context_cutoff_index": conversation.context_cutoff_index,
     }
 
 
@@ -583,3 +592,117 @@ async def download_chat(
         media_type="text/plain",
         headers={"Content-Disposition": "attachment; filename=chat_output.txt"},
     )
+
+
+# ---------------------------------------------------------------------------
+# Context management
+# ---------------------------------------------------------------------------
+
+
+@router.post("/truncate")
+async def truncate_context(
+    body: TruncateContextRequest,
+    user: User = Depends(get_current_user),
+):
+    """Truncate conversation context — older messages remain visible but are excluded from LLM context."""
+    conversation = await ChatConversation.find_one(
+        ChatConversation.uuid == body.conversation_uuid,
+        ChatConversation.user_id == user.user_id,
+    )
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    cutoff = body.cutoff_index
+    if cutoff <= 0:
+        # Default: keep only the last 4 messages (2 exchanges) in context
+        cutoff = max(0, len(conversation.messages) - 4)
+
+    conversation.context_mode = "truncated"
+    conversation.context_cutoff_index = cutoff
+    await conversation.save()
+
+    return {
+        "success": True,
+        "context_mode": "truncated",
+        "context_cutoff_index": cutoff,
+    }
+
+
+@router.post("/compact")
+async def compact_context(
+    body: CompactContextRequest,
+    user: User = Depends(get_current_user),
+):
+    """Compact conversation context — summarize history with an LLM, keeping old messages visible."""
+    conversation = await ChatConversation.find_one(
+        ChatConversation.uuid == body.conversation_uuid,
+        ChatConversation.user_id == user.user_id,
+    )
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    messages = await conversation.get_messages()
+    if not messages:
+        raise HTTPException(status_code=400, detail="No messages to compact")
+
+    # Build conversation text for summarization
+    conversation_text = "\n".join(
+        f"{m['role']}: {m['content']}" for m in messages
+    )
+
+    from app.models.system_config import SystemConfig
+    from app.services.config_service import get_user_model_name
+    from app.services.llm_service import create_chat_agent, COMPACT_SYSTEM_PROMPT
+
+    model_name = await get_user_model_name(user.user_id)
+    cfg = await SystemConfig.get_config()
+    sys_config_doc = cfg.model_dump() if cfg else {}
+
+    agent = create_chat_agent(
+        model_name,
+        system_prompt=COMPACT_SYSTEM_PROMPT,
+        system_config_doc=sys_config_doc,
+    )
+    result = await agent.run(
+        f"Summarize this conversation:\n\n{conversation_text}"
+    )
+
+    summary = result.output if hasattr(result, "output") else str(result.data)
+    cutoff = len(conversation.messages)
+
+    conversation.context_mode = "compacted"
+    conversation.compact_summary = summary
+    conversation.context_cutoff_index = cutoff
+    await conversation.save()
+
+    return {
+        "success": True,
+        "context_mode": "compacted",
+        "context_cutoff_index": cutoff,
+        "summary": summary,
+    }
+
+
+@router.post("/clear-context")
+async def clear_context(
+    body: ClearContextRequest,
+    user: User = Depends(get_current_user),
+):
+    """Clear conversation context — all existing messages become display-only."""
+    conversation = await ChatConversation.find_one(
+        ChatConversation.uuid == body.conversation_uuid,
+        ChatConversation.user_id == user.user_id,
+    )
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    conversation.context_mode = "truncated"
+    conversation.context_cutoff_index = len(conversation.messages)
+    conversation.compact_summary = None
+    await conversation.save()
+
+    return {
+        "success": True,
+        "context_mode": "truncated",
+        "context_cutoff_index": len(conversation.messages),
+    }

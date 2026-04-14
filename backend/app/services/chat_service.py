@@ -347,6 +347,16 @@ async def chat_stream(
                     thinking_duration=thinking_duration,
                 )
 
+                # Stream token usage so the frontend can display context utilization
+                if usage:
+                    yield json.dumps({
+                        "kind": "usage",
+                        "content": "",
+                        "request_tokens": usage.request_tokens or 0,
+                        "response_tokens": usage.response_tokens or 0,
+                        "total_tokens": (usage.request_tokens or 0) + (usage.response_tokens or 0),
+                    }) + "\n"
+
     except Exception as e:
         logger.error(f"Chat stream error: {e}")
         yield json.dumps({"kind": "error", "content": str(e)}) + "\n"

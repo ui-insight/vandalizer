@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type KeyboardEvent } from 'react'
+import { useState, useRef, useEffect, type KeyboardEvent, type ReactNode } from 'react'
 import { Send, Plus, FileUp, Globe, Download, ChevronDown, Cpu } from 'lucide-react'
 import { getModels } from '../../api/config'
 import type { ModelInfo } from '../../types/workflow'
@@ -14,11 +14,13 @@ interface Props {
   onExport?: (format: string) => void
   hasMessages?: boolean
   hasDocuments?: boolean
+  contextMeter?: ReactNode
 }
 
 export function ChatInput({
   onSend, onAttachFile, onAttachLink, disabled,
   selectedModel, onModelChange, onExport, hasMessages, hasDocuments,
+  contextMeter,
 }: Props) {
   const [message, setMessage] = useState('')
   const [showAddMenu, setShowAddMenu] = useState(false)
@@ -226,6 +228,9 @@ export function ChatInput({
               )}
             </div>
           )}
+
+          {/* Context meter */}
+          {contextMeter}
 
           {/* Spacer */}
           <div className="flex-1" />

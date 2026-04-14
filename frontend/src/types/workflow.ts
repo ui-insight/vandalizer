@@ -76,6 +76,7 @@ export interface ModelInfo {
   supports_structured: boolean;
   multimodal: boolean;
   supports_pdf: boolean;
+  context_window: number;
 }
 
 export interface UserConfig {
