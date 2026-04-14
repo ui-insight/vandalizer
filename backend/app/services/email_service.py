@@ -1,21 +1,21 @@
-"""Async SMTP email service."""
+"""Async email service — supports SMTP and Resend providers."""
 
 import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 import aiosmtplib
+import httpx
 
 from app.config import Settings
 
 logger = logging.getLogger(__name__)
 
+RESEND_API_URL = "https://api.resend.com/emails"
 
-async def send_email(to: str, subject: str, html_body: str, settings: Settings | None = None) -> bool:
-    """Send an HTML email via SMTP. Returns True on success."""
-    if settings is None:
-        settings = Settings()
 
+async def _send_via_smtp(to: str, subject: str, html_body: str, settings: Settings) -> bool:
+    """Send an HTML email via SMTP."""
     if not settings.smtp_host:
         logger.warning("SMTP not configured — skipping email to %s", to)
         return False
@@ -36,11 +36,49 @@ async def send_email(to: str, subject: str, html_body: str, settings: Settings |
             use_tls=settings.smtp_use_tls,
             start_tls=settings.smtp_start_tls,
         )
-        logger.info("Email sent to %s: %s", to, subject)
+        logger.info("Email sent via SMTP to %s: %s", to, subject)
         return True
     except Exception:
-        logger.exception("Failed to send email to %s", to)
+        logger.exception("Failed to send email via SMTP to %s", to)
         return False
+
+
+async def _send_via_resend(to: str, subject: str, html_body: str, settings: Settings) -> bool:
+    """Send an HTML email via the Resend API (httpx)."""
+    if not settings.resend_api_key:
+        logger.warning("Resend API key not configured — skipping email to %s", to)
+        return False
+
+    from_addr = f"{settings.resend_from_name} <{settings.resend_from_email}>"
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                RESEND_API_URL,
+                headers={"Authorization": f"Bearer {settings.resend_api_key}"},
+                json={
+                    "from": from_addr,
+                    "to": [to],
+                    "subject": subject,
+                    "html": html_body,
+                },
+                timeout=30,
+            )
+            resp.raise_for_status()
+        logger.info("Email sent via Resend to %s: %s", to, subject)
+        return True
+    except Exception:
+        logger.exception("Failed to send email via Resend to %s", to)
+        return False
+
+
+async def send_email(to: str, subject: str, html_body: str, settings: Settings | None = None) -> bool:
+    """Send an HTML email using the configured provider. Returns True on success."""
+    if settings is None:
+        settings = Settings()
+
+    if settings.email_provider == "resend":
+        return await _send_via_resend(to, subject, html_body, settings)
+    return await _send_via_smtp(to, subject, html_body, settings)
 
 
 # ---------------------------------------------------------------------------

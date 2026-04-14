@@ -10,6 +10,7 @@
 #    ./setup.sh --redeploy  Rebuild and restart from current code (no git pull)
 #    ./setup.sh --seed      Update verified catalog (add new seed data)
 #    ./setup.sh --reingest  Re-ingest all knowledge base content into ChromaDB
+#    ./setup.sh --reset-email  Reconfigure email provider (SMTP or Resend)
 # ============================================================================
 
 set -uo pipefail
@@ -239,6 +240,81 @@ preflight() {
 }
 
 # ---------------------------------------------------------------------------
+# Set or add a key=value in the backend .env file
+# ---------------------------------------------------------------------------
+set_env() {
+  local key="$1" value="$2"
+  if grep -q "^${key}=" "$ENV_FILE" 2>/dev/null; then
+    sed -i.bak "s|^${key}=.*|${key}=${value}|" "$ENV_FILE" && rm -f "${ENV_FILE}.bak"
+  else
+    echo "${key}=${value}" >> "$ENV_FILE"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Email configuration (shared by first-time setup and --reset-email)
+# ---------------------------------------------------------------------------
+configure_email() {
+  echo ""
+  echo -e "  ${DIM}  1)${RESET} ${CYAN}SMTP${RESET}     ${DIM}— traditional mail server${RESET}"
+  echo -e "  ${DIM}  2)${RESET} ${CYAN}Resend${RESET}   ${DIM}— API-based email (resend.com)${RESET}"
+  echo ""
+  echo -ne "  ${SYM_ARROW}  Email provider ${DIM}[1]${RESET}: "
+  local provider_choice
+  read -r provider_choice
+  provider_choice="${provider_choice:-1}"
+
+  if [[ "$provider_choice" == "2" ]]; then
+    # --- Resend ---
+    set_env "EMAIL_PROVIDER" "resend"
+    echo ""
+    prompt "Resend API key" "" RESEND_API_KEY true
+    prompt "From email (must be verified in Resend)" "" RESEND_FROM
+    prompt "From name" "Vandalizer" RESEND_FROM_NAME
+
+    set_env "RESEND_API_KEY" "$RESEND_API_KEY"
+    set_env "RESEND_FROM_EMAIL" "$RESEND_FROM"
+    set_env "RESEND_FROM_NAME" "$RESEND_FROM_NAME"
+    echo -e "  ${SYM_CHECK}  Resend configured"
+  else
+    # --- SMTP ---
+    set_env "EMAIL_PROVIDER" "smtp"
+    echo ""
+    prompt "SMTP host" "" SMTP_HOST
+    prompt "SMTP port" "587" SMTP_PORT
+    prompt "SMTP username" "" SMTP_USER
+    prompt "SMTP password" "" SMTP_PASSWORD true
+    prompt "From email" "" SMTP_FROM
+    prompt "From name" "Vandalizer" SMTP_FROM_NAME
+
+    set_env "SMTP_HOST" "$SMTP_HOST"
+    set_env "SMTP_PORT" "$SMTP_PORT"
+    set_env "SMTP_USER" "$SMTP_USER"
+    set_env "SMTP_PASSWORD" "$SMTP_PASSWORD"
+    set_env "SMTP_FROM_EMAIL" "$SMTP_FROM"
+    set_env "SMTP_FROM_NAME" "$SMTP_FROM_NAME"
+    echo -e "  ${SYM_CHECK}  SMTP configured"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Standalone email reset (./setup.sh --reset-email)
+# ---------------------------------------------------------------------------
+reset_email() {
+  section "⚡" "Email Configuration"
+
+  if [[ ! -f "$ENV_FILE" ]]; then
+    die "No backend/.env found. Run ./setup.sh first to create the environment."
+  fi
+
+  configure_email
+
+  echo ""
+  echo -e "  ${BRIGHT_GREEN}${BOLD}Email settings updated.${RESET}"
+  echo -e "  ${DIM}     Restart the backend for changes to take effect.${RESET}"
+}
+
+# ---------------------------------------------------------------------------
 # Phase 1: Environment configuration
 # ---------------------------------------------------------------------------
 configure_env() {
@@ -331,26 +407,12 @@ configure_env() {
   fi
   echo -e "  ${SYM_CHECK}  Web server will listen on port ${BOLD}${WEB_PORT}${RESET}"
 
-  # --- SMTP (optional) ---
+  # --- Email (optional) ---
   echo ""
-  if confirm "Configure email notifications (SMTP)?" "n"; then
-    echo ""
-    prompt "SMTP host" "" SMTP_HOST
-    prompt "SMTP port" "587" SMTP_PORT
-    prompt "SMTP username" "" SMTP_USER
-    prompt "SMTP password" "" SMTP_PASSWORD true
-    prompt "From email" "" SMTP_FROM
-    prompt "From name" "Vandalizer" SMTP_FROM_NAME
-
-    sed -i.bak "s|^SMTP_HOST=.*|SMTP_HOST=${SMTP_HOST}|" "$ENV_FILE" && rm -f "${ENV_FILE}.bak"
-    sed -i.bak "s|^SMTP_PORT=.*|SMTP_PORT=${SMTP_PORT}|" "$ENV_FILE" && rm -f "${ENV_FILE}.bak"
-    sed -i.bak "s|^SMTP_USER=.*|SMTP_USER=${SMTP_USER}|" "$ENV_FILE" && rm -f "${ENV_FILE}.bak"
-    sed -i.bak "s|^SMTP_PASSWORD=.*|SMTP_PASSWORD=${SMTP_PASSWORD}|" "$ENV_FILE" && rm -f "${ENV_FILE}.bak"
-    sed -i.bak "s|^SMTP_FROM_EMAIL=.*|SMTP_FROM_EMAIL=${SMTP_FROM}|" "$ENV_FILE" && rm -f "${ENV_FILE}.bak"
-    sed -i.bak "s|^SMTP_FROM_NAME=.*|SMTP_FROM_NAME=${SMTP_FROM_NAME}|" "$ENV_FILE" && rm -f "${ENV_FILE}.bak"
-    echo -e "  ${SYM_CHECK}  SMTP configured"
+  if confirm "Configure email notifications?" "n"; then
+    configure_email
   else
-    echo -e "  ${DIM}     Email notifications disabled. You can configure SMTP later in backend/.env.${RESET}"
+    echo -e "  ${DIM}     Email notifications disabled. You can configure email later via: ./setup.sh --reset-email${RESET}"
   fi
 
   echo ""
@@ -886,6 +948,7 @@ finale() {
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}./setup.sh --upgrade${RESET}       ${DIM}Pull, backup, rebuild${RESET}      ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}./setup.sh --redeploy${RESET}      ${DIM}Rebuild current code${RESET}       ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}./setup.sh --seed${RESET}          ${DIM}Update verified catalog${RESET}    ${MAGENTA}${BOLD}║${RESET}"
+  echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}./setup.sh --reset-email${RESET}   ${DIM}Reconfigure email${RESET}        ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}./status.sh${RESET}                ${DIM}Full system status${RESET}          ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}docker compose logs -f api${RESET} ${DIM}Stream API logs${RESET}            ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}docker compose down${RESET}        ${DIM}Stop everything${RESET}            ${MAGENTA}${BOLD}║${RESET}"
@@ -1659,6 +1722,12 @@ main() {
       echo ""
       exit 0
       ;;
+    --reset-email|reset-email)
+      show_banner
+      reset_email
+      echo ""
+      exit 0
+      ;;
     --help|-h|help)
       echo ""
       echo -e "  ${BOLD}Usage:${RESET} ./setup.sh [command]"
@@ -1670,6 +1739,7 @@ main() {
       echo -e "    ${CYAN}--redeploy${RESET}   Rebuild and restart from current code (no git pull)"
       echo -e "    ${CYAN}--seed${RESET}       Update verified catalog with new seed data"
       echo -e "    ${CYAN}--reingest${RESET}   Re-ingest all knowledge base content into ChromaDB"
+      echo -e "    ${CYAN}--reset-email${RESET} Reconfigure email provider (SMTP or Resend)"
       echo -e "    ${CYAN}--help${RESET}       Show this help"
       echo ""
       exit 0
