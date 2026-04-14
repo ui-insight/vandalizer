@@ -48,7 +48,10 @@ export interface ActivityEvent {
 }
 
 export interface StreamChunk {
-  kind: 'text' | 'thinking' | 'thinking_done' | 'error'
+  kind: 'text' | 'thinking' | 'thinking_done' | 'error' | 'usage'
   content: string
   duration?: number
+  request_tokens?: number
+  response_tokens?: number
+  total_tokens?: number
 }

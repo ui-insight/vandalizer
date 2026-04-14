@@ -147,6 +147,9 @@ export function getHistory(conversationUuid: string) {
     messages: ChatMessage[]
     url_attachments: UrlAttachment[]
     file_attachments: FileAttachment[]
+    context_mode?: 'full' | 'truncated' | 'compacted'
+    context_cutoff_index?: number
+    compact_summary?: string | null
   }>(`/api/chat/history/${conversationUuid}`)
 }
 
@@ -154,4 +157,37 @@ export function deleteHistory(conversationUuid: string) {
   return apiFetch<{ success: boolean }>(`/api/chat/history/${conversationUuid}`, {
     method: 'DELETE',
   })
+}
+
+export function truncateContext(conversationUuid: string, cutoffIndex?: number) {
+  return apiFetch<{ success: boolean; context_mode: string; context_cutoff_index: number }>(
+    '/api/chat/truncate',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        conversation_uuid: conversationUuid,
+        ...(cutoffIndex != null ? { cutoff_index: cutoffIndex } : {}),
+      }),
+    },
+  )
+}
+
+export function compactContext(conversationUuid: string) {
+  return apiFetch<{ success: boolean; context_mode: string; context_cutoff_index: number; summary: string }>(
+    '/api/chat/compact',
+    {
+      method: 'POST',
+      body: JSON.stringify({ conversation_uuid: conversationUuid }),
+    },
+  )
+}
+
+export function clearContext(conversationUuid: string) {
+  return apiFetch<{ success: boolean; context_mode: string; context_cutoff_index: number }>(
+    '/api/chat/clear-context',
+    {
+      method: 'POST',
+      body: JSON.stringify({ conversation_uuid: conversationUuid }),
+    },
+  )
 }

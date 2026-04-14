@@ -30,3 +30,16 @@ class ChatHistoryResponse(BaseModel):
 class ChatDownloadRequest(BaseModel):
     content: str
     format: str = "txt"
+
+
+class TruncateContextRequest(BaseModel):
+    conversation_uuid: str
+    cutoff_index: int = 0
+
+
+class CompactContextRequest(BaseModel):
+    conversation_uuid: str
+
+
+class ClearContextRequest(BaseModel):
+    conversation_uuid: str

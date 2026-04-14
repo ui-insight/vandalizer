@@ -104,6 +104,11 @@ class ChatConversation(Document):
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
     updated_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
 
+    # Context management
+    context_mode: str = "full"  # "full" | "truncated" | "compacted"
+    context_cutoff_index: int = 0
+    compact_summary: Optional[str] = None
+
     class Settings:
         name = "chat_conversation"
         indexes = [
@@ -143,7 +148,23 @@ class ChatConversation(Document):
         msgs = await ChatMessage.find({"_id": {"$in": self.messages}}).to_list()
         order = {mid: i for i, mid in enumerate(self.messages)}
         msgs.sort(key=lambda m: order.get(m.id, 0))
-        return [m.to_model_message() for m in msgs]
+
+        result: list[ModelMessage] = []
+
+        # When context has been compacted, prepend the summary
+        if self.context_mode == "compacted" and self.compact_summary:
+            result.append(ModelRequest(parts=[SystemPromptPart(
+                content=f"Previous conversation summary:\n{self.compact_summary}"
+            )]))
+
+        # Only include messages from the cutoff index onward
+        if self.context_mode in ("truncated", "compacted") and self.context_cutoff_index > 0:
+            active_msgs = msgs[self.context_cutoff_index:]
+        else:
+            active_msgs = msgs
+
+        result.extend([m.to_model_message() for m in active_msgs])
+        return result
 
     async def get_file_attachments(self) -> list[FileAttachment]:
         if not self.file_attachments:

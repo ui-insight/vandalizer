@@ -261,6 +261,19 @@ DEFAULT_CHAT_SYSTEM_PROMPT = (
     "- Keep answers under 150 words unless the user explicitly asks for detail.\n"
 )
 
+COMPACT_SYSTEM_PROMPT = (
+    "You are a conversation summarizer. Given a conversation history, produce a concise "
+    "summary that preserves all key facts, decisions, context, and user preferences mentioned. "
+    "The summary will replace the original messages as context for future responses, so include "
+    "anything the assistant would need to maintain continuity.\n\n"
+    "## Rules\n"
+    "- Preserve specific names, dates, numbers, and technical details.\n"
+    "- Note any user preferences or instructions that should carry forward.\n"
+    "- Summarize decisions and conclusions, not just topics discussed.\n"
+    "- Keep the summary under 500 words.\n"
+    "- Write in third person (e.g. 'The user asked about...').\n"
+)
+
 DOCUMENT_CHAT_SYSTEM_PROMPT = (
     "You are a document analysis assistant. The user has provided reference documents "
     "for you to answer questions about.\n\n"

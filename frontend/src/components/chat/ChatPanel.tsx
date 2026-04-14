@@ -4,14 +4,17 @@ import { useQueryClient } from '@tanstack/react-query'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
 import { AttachmentList } from './AttachmentList'
+import { ContextMeter } from './ContextMeter'
+import { ContextLimitDialog } from './ContextLimitDialog'
 import { useChat } from '../../hooks/useChat'
 import { useOnboarding } from '../../hooks/useOnboarding'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
-import { addLink, removeDocument, removeLink } from '../../api/chat'
+import { addLink, removeDocument, removeLink, truncateContext, compactContext, clearContext } from '../../api/chat'
 import { uploadFile } from '../../api/files'
 import { getUserConfig, updateUserConfig, markFirstSessionComplete } from '../../api/config'
 import type { FileAttachment, UrlAttachment } from '../../types/chat'
+import type { ModelInfo } from '../../types/workflow'
 
 const LOADING_WORDS = [
   'Thinking', 'Vandalizing', 'Pondering', 'Analyzing',
@@ -62,6 +65,12 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     activityId,
     conversationUuid,
     error,
+    contextTokens,
+    contextMode,
+    contextCutoffIndex,
+    setContextTokens,
+    setContextMode,
+    setContextCutoffIndex,
     send,
     loadHistory,
     setActivity,
@@ -83,6 +92,9 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const [urlAttachments, setUrlAttachments] = useState<UrlAttachment[]>([])
   const [attachLoading, setAttachLoading] = useState(false)
   const [selectedModel, setSelectedModel] = useState<string>('')
+  const [modelsList, setModelsList] = useState<ModelInfo[]>([])
+  const [showContextDialog, setShowContextDialog] = useState(false)
+  const contextDialogShownRef = useRef(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const lastLoadedConvo = useRef<string | null>(null)
   const prevStreamingRef = useRef(false)
@@ -95,6 +107,9 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   // Load saved model preference on mount
   useEffect(() => {
     getUserConfig().then(cfg => {
+      if (cfg.available_models?.length) {
+        setModelsList(cfg.available_models)
+      }
       if (cfg.model) {
         setSelectedModel(cfg.model)
       } else if (cfg.available_models?.length) {
@@ -104,6 +119,27 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       }
     }).catch(() => {})
   }, [])
+
+  // Derive the context window size for the currently selected model
+  const contextWindow = (() => {
+    const match = modelsList.find(
+      m => m.tag === selectedModel || m.name === selectedModel,
+    )
+    return match?.context_window ?? 128000
+  })()
+
+  // Auto-trigger context limit dialog when usage exceeds 90%
+  useEffect(() => {
+    if (contextTokens > 0 && contextWindow > 0) {
+      const ratio = contextTokens / contextWindow
+      if (ratio >= 0.9 && !contextDialogShownRef.current) {
+        contextDialogShownRef.current = true
+        setShowContextDialog(true)
+      } else if (ratio < 0.9) {
+        contextDialogShownRef.current = false
+      }
+    }
+  }, [contextTokens, contextWindow])
 
   // Seed the first-session conversation with an opening assistant message
   useEffect(() => {
@@ -123,6 +159,30 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const handleModelChange = (model: string) => {
     setSelectedModel(model)
     updateUserConfig({ model }).catch(() => {})
+  }
+
+  const handleTruncate = async () => {
+    if (!conversationUuid) return
+    const result = await truncateContext(conversationUuid)
+    setContextMode('truncated')
+    setContextCutoffIndex(result.context_cutoff_index)
+    setContextTokens(0)
+  }
+
+  const handleCompact = async () => {
+    if (!conversationUuid) return
+    const result = await compactContext(conversationUuid)
+    setContextMode('compacted')
+    setContextCutoffIndex(result.context_cutoff_index)
+    setContextTokens(0)
+  }
+
+  const handleClearContext = async () => {
+    if (!conversationUuid) return
+    const result = await clearContext(conversationUuid)
+    setContextMode('truncated')
+    setContextCutoffIndex(result.context_cutoff_index)
+    setContextTokens(0)
   }
 
   const handleScroll = useCallback(() => {
@@ -646,14 +706,36 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
 
         {/* Chat messages — centered under banner for first-session */}
         <div style={effectiveFirstSession ? { maxWidth: 640, margin: '0 auto' } : undefined}>
-          {messages.map((msg, i) => (
-            <ChatMessage
-              key={i}
-              message={msg}
-              messageIndex={i}
-              conversationUuid={conversationUuid || undefined}
-            />
-        ))}
+          {messages.map((msg, i) => {
+            const isExcluded = contextMode !== 'full' && contextCutoffIndex > 0 && i < contextCutoffIndex
+            const showBoundary = contextMode !== 'full' && contextCutoffIndex > 0 && i === contextCutoffIndex
+            return (
+              <div key={i}>
+                {showBoundary && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    margin: '12px 0',
+                    fontSize: 11,
+                    color: '#9ca3af',
+                    userSelect: 'none',
+                  }}>
+                    <div style={{ flex: 1, height: 1, background: '#e5e7eb' }} />
+                    <span>{contextMode === 'compacted' ? 'Context compacted above' : 'Context starts here'}</span>
+                    <div style={{ flex: 1, height: 1, background: '#e5e7eb' }} />
+                  </div>
+                )}
+                <div style={isExcluded ? { opacity: 0.5 } : undefined}>
+                  <ChatMessage
+                    message={msg}
+                    messageIndex={i}
+                    conversationUuid={conversationUuid || undefined}
+                  />
+                </div>
+              </div>
+            )
+          })}
 
         {/* Streaming: thinking-only phase */}
         {isStreaming && thinkingContent && !streamingContent && (
@@ -775,6 +857,25 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         onExport={handleExport}
         hasMessages={messages.length > 0}
         hasDocuments={fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0 || selectedFolderUuids.length > 0}
+        contextMeter={
+          messages.length > 0 && contextTokens > 0 ? (
+            <ContextMeter
+              tokensUsed={contextTokens}
+              contextWindow={contextWindow}
+              onClick={() => setShowContextDialog(true)}
+            />
+          ) : null
+        }
+      />
+
+      {/* Context limit dialog */}
+      <ContextLimitDialog
+        open={showContextDialog}
+        onClose={() => setShowContextDialog(false)}
+        onTruncate={handleTruncate}
+        onCompact={handleCompact}
+        onClear={handleClearContext}
+        percent={contextWindow > 0 ? Math.round((contextTokens / contextWindow) * 100) : 0}
       />
     </div>
   )
