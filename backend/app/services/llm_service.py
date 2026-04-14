@@ -57,6 +57,10 @@ class InsightAIProvider(OpenRouterProvider):
         super().__init__(api_key=api_key)
 
     @property
+    def name(self) -> str:
+        return 'openai'
+
+    @property
     def base_url(self) -> str:
         if hasattr(self, "_endpoint") and self._endpoint:
             return self._endpoint
@@ -89,6 +93,10 @@ class OllamaProvider(OpenRouterProvider):
         super().__init__(api_key=api_key)
 
     @property
+    def name(self) -> str:
+        return 'openai'
+
+    @property
     def base_url(self) -> str:
         if hasattr(self, "_endpoint") and self._endpoint:
             if not self._endpoint.endswith("/v1") and not self._endpoint.endswith("/api/v1"):
@@ -119,6 +127,10 @@ class VLLMProvider(OpenRouterProvider):
         self._endpoint = endpoint
         self.thinking_enabled = thinking_enabled
         super().__init__(api_key=api_key)
+
+    @property
+    def name(self) -> str:
+        return 'openai'
 
     @property
     def base_url(self) -> str:

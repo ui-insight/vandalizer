@@ -348,14 +348,27 @@ async def chat_stream(
                 )
 
                 # Stream token usage so the frontend can display context utilization
-                if usage:
-                    yield json.dumps({
-                        "kind": "usage",
-                        "content": "",
-                        "request_tokens": usage.request_tokens or 0,
-                        "response_tokens": usage.response_tokens or 0,
-                        "total_tokens": (usage.request_tokens or 0) + (usage.response_tokens or 0),
-                    }) + "\n"
+                input_toks = usage.input_tokens if usage else 0
+                output_toks = usage.output_tokens if usage else 0
+
+                # Fallback: estimate tokens when provider doesn't report usage
+                if not input_toks:
+                    history_chars = sum(
+                        len(str(part))
+                        for m in previous_messages
+                        for part in m.parts
+                    )
+                    char_count = history_chars + len(prompt) + len(assistant_message)
+                    input_toks = max(char_count // 4, 1)
+                    output_toks = output_toks or max(len(assistant_message) // 4, 1)
+
+                yield json.dumps({
+                    "kind": "usage",
+                    "content": "",
+                    "request_tokens": input_toks,
+                    "response_tokens": output_toks,
+                    "total_tokens": input_toks + output_toks,
+                }) + "\n"
 
     except Exception as e:
         logger.error(f"Chat stream error: {e}")
@@ -405,9 +418,9 @@ async def _finalize(
             ev.message_count = len(conversation.messages) if conversation else 0
             ev.status = ActivityStatus.COMPLETED.value
             if usage:
-                ev.tokens_input = usage.request_tokens or 0
-                ev.tokens_output = usage.response_tokens or 0
-                ev.total_tokens = (usage.request_tokens or 0) + (usage.response_tokens or 0)
+                ev.tokens_input = usage.input_tokens or 0
+                ev.tokens_output = usage.output_tokens or 0
+                ev.total_tokens = (usage.input_tokens or 0) + (usage.output_tokens or 0)
             ev.documents_touched = len(documents)
             from datetime import datetime, timezone
             ev.finished_at = datetime.now(timezone.utc)
