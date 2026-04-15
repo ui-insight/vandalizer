@@ -3880,6 +3880,7 @@ function DemoTab() {
                 <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Organization</th>
                 <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Status</th>
                 <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Applied</th>
+                <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Expires</th>
                 <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Actions</th>
               </tr>
             </thead>
@@ -3910,6 +3911,9 @@ function DemoTab() {
                       </td>
                       <td style={{ padding: '12px 16px', color: '#6b7280', fontSize: 13 }}>
                         {formatDate(app.created_at)}
+                      </td>
+                      <td style={{ padding: '12px 16px', color: '#6b7280', fontSize: 13 }}>
+                        {app.expires_at ? formatDate(app.expires_at) : '—'}
                       </td>
                       <td style={{ padding: '12px 16px' }}>
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} onClick={(e) => e.stopPropagation()}>
@@ -4009,7 +4013,7 @@ function DemoTab() {
                     </tr>
                     {isExpanded && (
                       <tr style={{ borderBottom: '1px solid #f3f4f6' }}>
-                        <td colSpan={6} style={{ padding: '0 16px 20px', background: '#fafafa' }}>
+                        <td colSpan={7} style={{ padding: '0 16px 20px', background: '#fafafa' }}>
                           <DemoResponseDetail responses={app.questionnaire_responses} />
                         </td>
                       </tr>
