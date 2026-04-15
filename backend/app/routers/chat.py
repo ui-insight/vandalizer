@@ -122,6 +122,12 @@ async def chat(
     activity: Optional[ActivityEvent] = None
     conversation: Optional[ChatConversation] = None
 
+    # Auto-detect "show me" intent during first session → route to scripted demo
+    if body.is_first_session and not body.run_demo:
+        _msg = (body.message or "").strip().lower()
+        if _msg.startswith("show me") or _msg in {"demo", "just show me", "go", "let's go"}:
+            body.run_demo = True
+
     # Provision onboarding sample for agentic demo (first session or on-demand)
     onboarding_ctx = None
     if body.is_first_session or body.run_demo:

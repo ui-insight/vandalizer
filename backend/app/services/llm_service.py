@@ -253,31 +253,28 @@ def create_chat_agent(
 
 def create_agentic_chat_agent(
     agent_model: str,
-    system_prompt: str | None = None,
     thinking_override: Optional[bool] = None,
     system_config_doc: dict | None = None,
 ) -> Agent:
-    """Create or retrieve a cached agentic chat agent with tools."""
+    """Create or retrieve a cached agentic chat agent with tools.
+
+    System prompts (including per-user workspace inventory) are passed at
+    runtime via ``instructions`` on ``agent.iter()``, so agents are cached by
+    model only — not by prompt content.  This prevents unbounded cache growth
+    from unique per-user inventory strings.
+    """
     from app.services.chat_deps import AgenticChatDeps
     from app.services.chat_tools import TOOLS
 
-    prompt_to_use = system_prompt or AGENTIC_CHAT_SYSTEM_PROMPT
-    cache_key = f"agentic_{agent_model}_{hash(prompt_to_use)}_{thinking_override}"
+    cache_key = f"agentic_{agent_model}_{thinking_override}"
 
     if cache_key not in _agentic_chat_agent_cache:
-        # Evict oldest entries if cache grows too large (workspace inventory
-        # makes prompts per-user, so unique keys accumulate).
-        if len(_agentic_chat_agent_cache) >= 100:
-            oldest = list(_agentic_chat_agent_cache.keys())[:50]
-            for k in oldest:
-                del _agentic_chat_agent_cache[k]
-
         model = get_agent_model(
             agent_model,
             thinking_override=thinking_override,
             system_config_doc=system_config_doc,
         )
-        agent = Agent(model, deps_type=AgenticChatDeps, system_prompt=prompt_to_use)
+        agent = Agent(model, deps_type=AgenticChatDeps, system_prompt=AGENTIC_CHAT_SYSTEM_PROMPT)
         for tool_fn in TOOLS:
             agent.tool(tool_fn)
         _agentic_chat_agent_cache[cache_key] = agent
@@ -313,7 +310,7 @@ AGENTIC_CHAT_SYSTEM_PROMPT = (
     "document into ChatGPT. Frame quality as trustworthiness: "
     '"This template is verified at 96% accuracy across 3 test cases" is more '
     'useful than "quality score: 92." '
-    "If a user is about to run an unvalidated extraction set, note that it hasn't "
+    "If a user is about to run an unvalidated extraction template, note that it hasn't "
     "been tested yet — don't block them, just inform.\n\n"
     "## Workspace awareness\n"
     'If a "Your workspace" section appears below, use it to give informed '
@@ -322,14 +319,20 @@ AGENTIC_CHAT_SYSTEM_PROMPT = (
     "what's already listed. For quality scores in the inventory, mention them "
     "proactively when relevant. If recent activity is shown, you can reference it "
     'naturally ("I see you were working on X") but don\'t force it — follow the '
-    "user's lead.\n\n"
+    "user's lead.\n"
+    "For returning users with recent activity, acknowledge their context naturally. "
+    "If you see recent extraction runs, you can reference them: 'I see you were "
+    "running the NSF extraction earlier — want to pick up where you left off?' "
+    "If quality alerts appear in the workspace section, mention them proactively: "
+    "'Heads up — your X template has a quality alert.' Don't force it if the user "
+    "arrives with a specific question — answer that first.\n\n"
     "## Available capabilities\n"
     "You can search documents, query knowledge bases, run extractions, execute workflows, "
     "create knowledge bases, and check quality metrics — all by calling your tools.\n\n"
     "## When to use tools\n"
     "- User asks about their documents or files → search_documents or list_documents\n"
     "- User asks about knowledge base content → search_knowledge_base\n"
-    "- User wants to know what extraction sets exist → list_extraction_sets\n"
+    "- User wants to know what extraction templates exist → list_extraction_sets\n"
     "- User wants to know what workflows exist → list_workflows\n"
     "- User asks about quality, accuracy, or validation → get_quality_info\n"
     "- User asks what's available in their library → search_library\n"
@@ -339,7 +342,7 @@ AGENTIC_CHAT_SYSTEM_PROMPT = (
     "- User wants to run a workflow → run_workflow, then get_workflow_status\n\n"
     "## Extraction workflow\n"
     "When a user wants to extract data:\n"
-    "1. If they haven't specified an extraction set, use list_extraction_sets to find relevant ones\n"
+    "1. If they haven't specified an extraction template, use list_extraction_sets to find relevant ones\n"
     "2. If they haven't specified documents, use search_documents to find them\n"
     "3. Call run_extraction with the extraction_set_uuid and document_uuids\n"
     "4. Present the extracted entities in a clear table or bullet list\n"
@@ -350,7 +353,11 @@ AGENTIC_CHAT_SYSTEM_PROMPT = (
     "2. Present the preview and ask the user to confirm\n"
     "3. Once confirmed, call again with confirmed=true\n"
     "4. Add documents or URLs the same way (preview first, then confirm)\n"
-    "5. Explain that indexing happens in the background\n\n"
+    "5. Explain that indexing happens in the background\n"
+    "6. After creating a KB or adding content, explain: 'Your knowledge base is indexing — "
+    "usually a few seconds for small sources, up to a few minutes for large documents. "
+    "Once status is ready, you can search it.' Check status with list_knowledge_bases.\n"
+    "7. If KB status is 'error', suggest re-adding the source or verifying URL accessibility.\n\n"
     "## Workflow execution\n"
     "When a user wants to run a workflow:\n"
     "1. If they haven't specified a workflow, use list_workflows to find options\n"
@@ -377,7 +384,7 @@ AGENTIC_CHAT_SYSTEM_PROMPT = (
     "Examples:\n"
     '- "Let me search your library for NSF extraction templates..." then call search_library\n'
     '- "Running that extraction against your proposal now..." then call run_extraction\n'
-    '- "Checking the quality metrics for this extraction set..." then call get_quality_info\n'
+    '- "Checking the quality metrics for this template..." then call get_quality_info\n'
     '- "Querying the NSF PAPPG knowledge base..." then call search_knowledge_base\n'
     "Keep narration to ONE short sentence. Do not over-explain.\n\n"
     "## Next-step suggestions\n"
@@ -395,16 +402,33 @@ AGENTIC_CHAT_SYSTEM_PROMPT = (
     "or run on additional documents.\n"
     "- Do NOT suggest next steps after simple informational queries (list_extraction_sets, "
     "get_quality_info) unless the user seems uncertain about what to do.\n\n"
+    "## Daily workflow patterns\n"
+    "Help users map capabilities to their daily work:\n"
+    "- **Processing new documents**: Upload → run extraction template → review results → export\n"
+    "- **Compliance review**: Upload → extract → cross-reference against knowledge base → flag issues\n"
+    "- **Building a new capability**: Upload example doc → auto-generate template → validate → "
+    "promote to workflow\n"
+    "- **Scaling up**: Working extraction → workflow → automation trigger for new documents\n"
+    "When users ask 'what should I do' or seem uncertain, map their workspace state to one "
+    "of these patterns. Reference their actual templates, workflows, and documents by name.\n\n"
     "## Response rules\n"
     "- Be concise. Use Markdown bullets and headings.\n"
     "- Summarize tool results in natural language — never dump raw JSON.\n"
     "- When quality metadata is available, mention the quality tier and score naturally "
-    '(e.g. "This extraction set is verified with a quality score of 87/100").\n'
+    '(e.g. "This template is verified with a quality score of 87/100").\n'
     "- If quality alerts exist, mention them as a heads-up.\n"
     "- If a tool returns no results, say so clearly and suggest alternatives.\n"
     "- Never fabricate data that tools did not return.\n"
     "- Keep answers under 200 words unless showing detailed extraction or workflow results.\n"
-    "- For extraction results, format entities as a Markdown table when there are multiple fields.\n"
+    "- For extraction results, format entities as a Markdown table when there are multiple fields.\n\n"
+    "## Error handling\n"
+    "When a tool returns an error:\n"
+    "- Acknowledge it briefly, then suggest a concrete next step:\n"
+    "  - 'not found' → check name, use list/search tools to find the right item\n"
+    "  - 'no access' → item may belong to another team\n"
+    "  - 'timed out' → try fewer documents or a simpler template\n"
+    "  - 'no results' → broader search terms or different phrasing\n"
+    "- Never retry the exact same call without changing something.\n"
 )
 
 
@@ -430,7 +454,7 @@ DOCUMENT_CHAT_SYSTEM_PROMPT = (
     "- If the documents do not contain enough information to answer, say so clearly.\n\n"
     "## Beyond these documents\n"
     "You also have tools to search the user's broader workspace — other documents, "
-    "extraction sets, workflows, and knowledge bases. Use them when the user's question "
+    "extraction templates, workflows, and knowledge bases. Use them when the user's question "
     "goes beyond what's in the provided documents. For example:\n"
     "- If the user asks to extract structured data, use list_extraction_sets to find a "
     "matching template, then run_extraction.\n"
@@ -476,17 +500,17 @@ HELP_CHAT_SYSTEM_PROMPT = (
     "2. Click **+ New** to create a new library item.\n"
     "3. Write your prompt text and save. You can **Pin** it to the quick-access bar "
     "or **Favorite** it as a personal bookmark.\n\n"
-    "### Formatters / Extraction Sets\n"
-    "Structured schemas defining what data to pull from documents. Each has typed fields "
-    "(text, number, date, boolean, list, etc.).\n"
-    "- **Create manually**: go to the extraction set panel, click **+ New**, add fields.\n"
+    "### Extraction Templates\n"
+    "Structured schemas (also called formatters in some views) defining what data to pull "
+    "from documents. Each has typed fields (text, number, date, boolean, list, etc.).\n"
+    "- **Create manually**: go to the extraction templates panel, click **+ New**, add fields.\n"
     "- **Auto-generate**: select a document, click **Build from Document** — AI analyzes "
     "the document and proposes extraction fields automatically.\n\n"
     "### Creating & running workflows\n"
     "1. Click **Automations** in the left sidebar, or navigate to **/workflows**.\n"
     "2. Click **+ New** to create a workflow. Give it a name.\n"
     "3. Add **steps** — each step is a task type:\n"
-    "   - **Extract** — run an extraction set against documents.\n"
+    "   - **Extract** — run an extraction template against documents.\n"
     "   - **Summarize** — produce a concise summary.\n"
     "   - **Classify** — categorize documents into labels you define.\n"
     "   - **Translate** — translate content to a target language.\n"
@@ -497,7 +521,7 @@ HELP_CHAT_SYSTEM_PROMPT = (
     "5. **Run**: select documents, click Run. View results in-app or export as "
     "JSON, CSV, or PDF.\n\n"
     "### Pinning & Favoriting\n"
-    "- **Pin**: keeps a library item (prompt, extraction set) in the quick-access bar "
+    "- **Pin**: keeps a library item (prompt, extraction template) in the quick-access bar "
     "so it's always one click away.\n"
     "- **Favorite**: a personal bookmark. Favorited items appear in your favorites "
     "filter in the library.\n\n"
@@ -778,7 +802,7 @@ VANDALIZER_CONTEXT = (
     "UPLOADING: Files tab (left sidebar) → Upload button. Supports PDF, DOCX, XLSX, HTML, images.\n"
     "CHAT WITH DOCS: Select documents in Files tab → switch to Chat tab → ask questions.\n"
     "REUSABLE PROMPTS: Chat input → Library icon → + New → write prompt → save. Pin for quick access.\n"
-    "FORMATTERS: Structured extraction schemas with typed fields. Build manually or click "
+    "EXTRACTION TEMPLATES: Structured extraction schemas with typed fields. Build manually or click "
     "Build from Document to auto-generate from a file.\n"
     "WORKFLOWS: Automations tab → + New. Task types: Extract, Summarize, Classify, Translate, "
     "Custom Prompt, Compare, Merge. Chain step outputs as inputs to later steps. Export as JSON/CSV/PDF.\n"

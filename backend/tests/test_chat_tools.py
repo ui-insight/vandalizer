@@ -388,7 +388,14 @@ class TestRunWorkflow:
         from app.services.chat_tools import run_workflow
 
         ctx = _make_context()
-        with patch("app.services.workflow_service.run_workflow", new_callable=AsyncMock, return_value="session-123"):
+        wf = MagicMock()
+        wf.name = "My Workflow"
+        wf.verified = False
+        wf.user_id = "user1"
+        wf.team_id = "team1"
+        with patch("app.services.chat_tools.Workflow") as MockWF, \
+             patch("app.services.workflow_service.run_workflow", new_callable=AsyncMock, return_value="session-123"):
+            MockWF.get = AsyncMock(return_value=wf)
             result = await run_workflow(ctx, "wf-1", ["doc-1"], confirmed=True)
 
         assert result["session_id"] == "session-123"
@@ -399,7 +406,14 @@ class TestRunWorkflow:
         from app.services.chat_tools import run_workflow
 
         ctx = _make_context()
-        with patch("app.services.workflow_service.run_workflow", new_callable=AsyncMock, side_effect=ValueError("Workflow not found")):
+        wf = MagicMock()
+        wf.name = "Error Workflow"
+        wf.verified = False
+        wf.user_id = "user1"
+        wf.team_id = "team1"
+        with patch("app.services.chat_tools.Workflow") as MockWF, \
+             patch("app.services.workflow_service.run_workflow", new_callable=AsyncMock, side_effect=ValueError("Workflow not found")):
+            MockWF.get = AsyncMock(return_value=wf)
             result = await run_workflow(ctx, "nonexistent", ["doc-1"], confirmed=True)
 
         assert "error" in result

@@ -6,6 +6,7 @@ import datetime
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.dependencies import get_current_user
+from app.models.activity import ActivityEvent
 from app.models.automation import Automation
 from app.models.certification import CertificationProgress
 from app.models.chat import ChatConversation
@@ -193,6 +194,7 @@ def _generate_action_pills(
     knowledge_bases: list,
     has_chatted_with_docs: bool,
     quality_map: dict[str, float],
+    last_activity_title: str | None = None,
 ) -> list[str]:
     """Generate up to 4 personalised, action-oriented suggestion pills."""
     pills: list[str] = []
@@ -203,6 +205,10 @@ def _generate_action_pills(
         pills.append("Ask me anything about the sample NSF proposal")
         pills.append("Upload your own documents to get started")
         return pills[:4]
+
+    # Continue where you left off — returning users with real content
+    if last_activity_title and doc_count > 0:
+        pills.append(f"Pick up where I left off: {last_activity_title}")
 
     ready_kbs = [kb for kb in knowledge_bases if getattr(kb, "status", "") == "ready"]
 
@@ -258,6 +264,7 @@ async def get_onboarding_status(user: User = Depends(get_current_user)):
         doc_chat_count,
         conversation_count,
         cert_progress,
+        last_activity,
     ) = await asyncio.gather(
         SmartDocument.find(SmartDocument.user_id == uid).count(),
         SmartDocument.find(
@@ -282,6 +289,10 @@ async def get_onboarding_status(user: User = Depends(get_current_user)):
         # Any conversations at all
         ChatConversation.find(ChatConversation.user_id == uid).count(),
         CertificationProgress.find_one(CertificationProgress.user_id == uid),
+        # Most recent completed activity for "continue where you left off" pill
+        ActivityEvent.find(
+            {"user_id": uid, "status": "completed"}
+        ).sort("-last_updated_at").first_or_none(),
     )
 
     # Fetch quality scores for extraction sets to enrich action pills
@@ -297,6 +308,8 @@ async def get_onboarding_status(user: User = Depends(get_current_user)):
             if vr.item_id not in quality_map and vr.accuracy is not None:
                 quality_map[vr.item_id] = round(vr.accuracy * 100)
 
+    last_activity_title = last_activity.title if last_activity else None
+
     pills = _generate_action_pills(
         doc_count=doc_count,
         onboarding_doc_count=onboarding_doc_count,
@@ -305,6 +318,7 @@ async def get_onboarding_status(user: User = Depends(get_current_user)):
         knowledge_bases=knowledge_bases,
         has_chatted_with_docs=doc_chat_count > 0,
         quality_map=quality_map,
+        last_activity_title=last_activity_title,
     )
 
     return OnboardingStatusResponse(

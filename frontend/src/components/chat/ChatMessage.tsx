@@ -5,7 +5,7 @@ import { marked } from 'marked'
 import { submitChatFeedback } from '../../api/feedback'
 import { useCertificationPanel } from '../../contexts/CertificationPanelContext'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
-import { ToolCallDisplay, ToolStatusLine } from './ToolCallDisplay'
+import { ToolCallDisplay, ToolStatusLine, toolResultToText } from './ToolCallDisplay'
 import type { ChatMessage as ChatMessageType, StreamSegment, ToolCallInfo, ToolResultInfo } from '../../types/chat'
 
 // Matches [ACTION:type]Label[/ACTION] (correct) and also
@@ -82,12 +82,14 @@ interface Props {
   toolResults?: ToolResultInfo[]
   /** Ordered stream segments for interleaved rendering */
   streamSegments?: StreamSegment[]
+  /** Callback to inject a message into the chat (used for confirmation buttons) */
+  onSendMessage?: (message: string) => void
 }
 
 export function ChatMessage({
   message, messageIndex, conversationUuid, streamingThinking,
   thinkingDuration, isStreaming: isStreamingProp, activeToolCalls,
-  toolResults, streamSegments,
+  toolResults, streamSegments, onSendMessage,
 }: Props) {
   const isUser = message.role === 'user'
   const [feedback, setFeedback] = useState<'up' | 'down' | null>(null)
@@ -158,7 +160,31 @@ export function ChatMessage({
   }
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(message.content)
+    // Build full message text including tool results
+    const segs = segments || message.segments
+    let text: string
+    if (segs && segs.length > 0) {
+      const parts: string[] = []
+      for (const seg of segs) {
+        if (seg.kind === 'text') {
+          const cleaned = seg.content.replace(THINK_BLOCK_RE, '').replace(THINK_TRAILING_RE, '').trim()
+          if (cleaned) parts.push(cleaned)
+        } else if (seg.kind === 'tool_result') {
+          const body = toolResultToText(seg.result.tool_name, seg.result.content)
+          if (body) parts.push(body)
+        }
+      }
+      text = parts.join('\n\n')
+    } else {
+      // Fallback: message.content + any tool results
+      const parts = [message.content]
+      for (const r of (message.tool_results || [])) {
+        const body = toolResultToText(r.tool_name, r.content)
+        if (body) parts.push(body)
+      }
+      text = parts.join('\n\n')
+    }
+    navigator.clipboard.writeText(text)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
@@ -273,7 +299,7 @@ export function ChatMessage({
                   const isActive = !result && (isStreamingProp || activeCallIds.has(seg.call.tool_call_id))
                   return (
                     <div key={i} style={{ margin: '4px 0' }}>
-                      <ToolStatusLine call={seg.call} result={result} isActive={isActive} />
+                      <ToolStatusLine call={seg.call} result={result} isActive={isActive} onConfirm={onSendMessage} />
                     </div>
                   )
                 }

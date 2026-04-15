@@ -9,6 +9,7 @@ import time
 from typing import AsyncGenerator, Optional
 
 from pydantic_ai.agent import Agent
+from pydantic_ai.usage import UsageLimitExceeded, UsageLimits
 from pydantic_ai.messages import (
     FunctionToolCallEvent,
     FunctionToolResultEvent,
@@ -268,7 +269,13 @@ async def _run_scripted_demo(
                 )
                 return results
 
-            entities = await asyncio.to_thread(_extract)
+            try:
+                entities = await asyncio.wait_for(
+                    asyncio.to_thread(_extract), timeout=120,
+                )
+            except asyncio.TimeoutError:
+                logger.warning("Scripted demo extraction timed out")
+                entities = []
 
             extraction_result = {
                 "extraction_set": template_name,
@@ -358,7 +365,12 @@ async def _run_scripted_demo(
                 ", plus **policy cross-reference** to catch compliance issues automatically"
             )
         yield _text(
-            " — not just a prompt and a prayer.\n\n"
+            ".\n\n"
+            "Here's how this fits your daily work:\n"
+            "1. **Upload** your documents — they stay private and get auto-indexed\n"
+            "2. **Extract** structured data with validated templates\n"
+            "3. **Build & validate** your own templates from any document\n"
+            "4. **Scale** with workflows and automation triggers\n\n"
             "What would you like to do next?\n\n"
             "[ACTION:upload-docs]Upload your documents[/ACTION]  "
             "[ACTION:start-cert]Start the Certification Program[/ACTION]\n"
@@ -576,7 +588,9 @@ async def chat_stream(
         else:
             system_prompt = None  # uses default
 
-    # Select agent — agentic (with tools) when user context is available
+    # Select agent — agentic (with tools) when user context is available.
+    # Agents are cached by model; per-request system prompts (including
+    # workspace inventory) are passed via ``instructions`` at iter() time.
     deps = None
     if user and team_access:
         from app.services.chat_deps import AgenticChatDeps
@@ -599,11 +613,11 @@ async def chat_stream(
             active_kb_uuid=kb_uuid,
         )
         agent = create_agentic_chat_agent(
-            model_name, system_prompt=system_prompt, system_config_doc=sys_config_doc,
+            model_name, system_config_doc=sys_config_doc,
         )
     else:
         agent = create_chat_agent(
-            model_name, system_prompt=system_prompt, system_config_doc=sys_config_doc,
+            model_name, system_config_doc=sys_config_doc,
         )
 
     # Stream the response
@@ -619,9 +633,14 @@ async def chat_stream(
     try:
         think_parser = _ThinkTagParser()
 
-        iter_kwargs: dict = {"message_history": previous_messages}
+        iter_kwargs: dict = {
+            "message_history": previous_messages,
+            "usage_limits": UsageLimits(request_limit=25, tool_calls_limit=15),
+        }
         if deps is not None:
             iter_kwargs["deps"] = deps
+        if system_prompt is not None:
+            iter_kwargs["instructions"] = system_prompt
 
         async with agent.iter(prompt, **iter_kwargs) as agent_run:
             async for node in agent_run:
@@ -745,6 +764,14 @@ async def chat_stream(
                     segments=cleaned_segments or None,
                 )
 
+    except UsageLimitExceeded:
+        logger.warning("Chat usage limit reached for user %s", user_id)
+        yield json.dumps({"kind": "error", "content": "This response used too many tool calls. Try breaking your request into smaller steps."}) + "\n"
+        if activity_id:
+            ev = await ActivityEvent.get(activity_id)
+            if ev:
+                ev.status = ActivityStatus.COMPLETED.value
+                await ev.save()
     except Exception as e:
         logger.error(f"Chat stream error: {e}")
         yield json.dumps({"kind": "error", "content": str(e)}) + "\n"
@@ -964,14 +991,36 @@ async def _build_workspace_inventory(
             else:
                 lines.append(f"- {title} ({ts})")
 
+    # Active quality alerts for extraction templates
+    if search_sets and not all_onboarding:
+        from app.models.quality_alert import QualityAlert
+
+        ss_uuids = [ss.uuid for ss in search_sets]
+        active_alerts = await QualityAlert.find(
+            {"item_kind": "search_set", "item_id": {"$in": ss_uuids}, "acknowledged": {"$ne": True}}
+        ).sort("-created_at").limit(3).to_list()
+        if active_alerts:
+            lines.append("")
+            lines.append("## Active quality alerts")
+            for alert in active_alerts:
+                lines.append(f"- {alert.message}")
+
     # Post-demo bridge: guide users who only have the onboarding sample
     if all_onboarding:
         lines.append("")
+        lines.append("## Post-demo guidance")
         lines.append(
-            "Note: This user just completed the onboarding demo. They have a "
-            "sample NSF proposal but haven't uploaded their own documents yet. "
-            "If they ask what to do, suggest trying the sample doc or uploading "
-            "their own files. Be encouraging, not pushy."
+            "This user has only the onboarding sample — no real documents yet. "
+            "Guide them to one concrete next step:\n"
+            "- **Upload documents**: 'Upload a few documents you're working with "
+            "and I'll help you extract data or build a custom template.'\n"
+            "- **Explore the sample**: 'Want me to show you something else with "
+            "the sample proposal? I can run a different template or search the "
+            "knowledge base.'\n"
+            "- **Start certification**: 'The Vandal Workflow Architect program "
+            "walks you through everything with guided labs.'\n"
+            "Don't repeat the demo. Suggest uploading their own document as the "
+            "highest-value next action."
         )
 
     result = "\n".join(lines)

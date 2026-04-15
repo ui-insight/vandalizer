@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { ChevronRight, ExternalLink, FileText, Loader2 } from 'lucide-react'
+import { Check, ChevronRight, ClipboardCopy, Download, ExternalLink, FileText, Loader2 } from 'lucide-react'
 import { QualityBadge } from './QualityBadge'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import type { WorkspaceMode } from '../../contexts/WorkspaceContext'
@@ -17,7 +17,7 @@ const TOOL_META: Record<string, { label: string; category: ToolCategory }> = {
   list_documents:        { label: 'Listing documents',        category: 'read' },
   search_knowledge_base: { label: 'Querying knowledge base',  category: 'read' },
   list_knowledge_bases:  { label: 'Listing knowledge bases',  category: 'read' },
-  list_extraction_sets:  { label: 'Listing extraction sets',  category: 'read' },
+  list_extraction_sets:  { label: 'Listing extraction templates',  category: 'read' },
   list_workflows:        { label: 'Listing workflows',        category: 'read' },
   get_quality_info:      { label: 'Checking quality',         category: 'read' },
   search_library:        { label: 'Searching library',        category: 'read' },
@@ -204,22 +204,183 @@ function formatQualityHint(quality: QualityMeta | null): string {
 }
 
 // ---------------------------------------------------------------------------
-// Auto-shown rich content
+// Data export utilities
 // ---------------------------------------------------------------------------
 
-/** Key-value pairs for single-entity extractions, compact table for multi. */
-function renderExtractionContent(content: Record<string, unknown>): ReactNode {
+function csvEscape(val: unknown): string {
+  const s = val == null ? '' : String(val)
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+    return `"${s.replace(/"/g, '""')}"`
+  }
+  return s
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+/** Serialize a tool result's content to a human-readable clipboard string. */
+export function toolResultToText(toolName: string, content: unknown): string {
+  if (content == null) return ''
+  const obj = content as Record<string, unknown>
+
+  // Extraction: entities as tab-delimited table
+  if (toolName === 'run_extraction' && Array.isArray(obj.entities)) {
+    const entities = obj.entities as Array<Record<string, unknown>>
+    const fields = (obj.fields as string[]) || (entities.length > 0 ? Object.keys(entities[0]) : [])
+    if (fields.length === 0) return JSON.stringify(content, null, 2)
+    const header = fields.join('\t')
+    const rows = entities.map(e => fields.map(f => e[f] != null ? String(e[f]) : '').join('\t'))
+    return [header, ...rows].join('\n')
+  }
+
+  // KB passages: source + content
+  if (toolName === 'search_knowledge_base' && Array.isArray(content)) {
+    return (content as Array<Record<string, unknown>>)
+      .map(c => `[${c.source_name || 'Source'}]\n${c.content || ''}`)
+      .join('\n\n')
+  }
+
+  // Lists: pull title/name
+  if (Array.isArray(content)) {
+    return (content as Array<Record<string, unknown>>)
+      .map(item => String(item.title || item.name || item.uuid || JSON.stringify(item)))
+      .join('\n')
+  }
+
+  // Workflow output
+  if (toolName === 'get_workflow_status' && obj.output != null) {
+    if (typeof obj.output === 'string') return obj.output
+    return JSON.stringify(obj.output, null, 2)
+  }
+
+  // Document text
+  if (toolName === 'get_document_text' && obj.text) return String(obj.text)
+
+  // list_documents
+  if (toolName === 'list_documents' && Array.isArray(obj.documents)) {
+    return (obj.documents as Array<Record<string, unknown>>)
+      .map(d => String(d.title || d.name || 'Untitled'))
+      .join('\n')
+  }
+
+  // Fallback
+  return typeof content === 'string' ? content : JSON.stringify(content, null, 2)
+}
+
+function extractionToCSV(content: Record<string, unknown>): string | null {
   const entities = content.entities as Array<Record<string, unknown>> | undefined
   if (!entities || entities.length === 0) return null
   const fields = (content.fields as string[]) || Object.keys(entities[0])
   if (fields.length === 0) return null
+  const header = fields.map(csvEscape).join(',')
+  const rows = entities.map(e => fields.map(f => csvEscape(e[f])).join(','))
+  return [header, ...rows].join('\n')
+}
+
+/** Check whether a tool result has meaningful copyable data. */
+function hasCopyableContent(toolName: string, content: unknown): boolean {
+  if (content == null) return false
+  const obj = content as Record<string, unknown>
+  if (obj.error || obj.needs_confirmation) return false
+  if (toolName === 'run_extraction') return Array.isArray(obj.entities) && obj.entities.length > 0
+  if (toolName === 'search_knowledge_base') return Array.isArray(content) && content.length > 0
+  if (toolName === 'get_workflow_status') return obj.status === 'completed' && obj.output != null
+  if (toolName === 'get_document_text') return Boolean(obj.text)
+  if (toolName === 'list_documents') return Array.isArray(obj.documents) && obj.documents.length > 0
+  if (Array.isArray(content)) return content.length > 0
+  return false
+}
+
+/** Does this tool result render a rich content block that has its own copy/export buttons? */
+function hasRichContent(toolName: string, obj: Record<string, unknown> | undefined): boolean {
+  if (!obj) return false
+  if (toolName === 'run_extraction' && obj.entities != null) return true
+  if (toolName === 'search_knowledge_base') return true
+  if (toolName === 'get_workflow_status' && obj.status === 'completed' && obj.output != null) return true
+  return false
+}
+
+/** Small inline copy button with checkmark feedback. */
+function CopyButton({ text, label = 'Copy data' }: { text: string; label?: string }) {
+  const [copied, setCopied] = useState(false)
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+  return (
+    <button
+      onClick={handleCopy}
+      title={label}
+      aria-label={label}
+      style={{
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        width: 20, height: 20, borderRadius: 4, border: 'none',
+        background: 'transparent', cursor: 'pointer',
+        color: copied ? '#16a34a' : '#c4c9d1',
+        transition: 'color 0.15s',
+        flexShrink: 0,
+      }}
+    >
+      {copied ? <Check size={11} /> : <ClipboardCopy size={11} />}
+    </button>
+  )
+}
+
+/** Small inline CSV download button. */
+function CSVDownloadButton({ csv, filename }: { csv: string; filename: string }) {
+  const handleDownload = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    downloadBlob(new Blob([csv], { type: 'text/csv' }), filename)
+  }
+  return (
+    <button
+      onClick={handleDownload}
+      title="Download CSV"
+      aria-label="Download CSV"
+      style={{
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        width: 20, height: 20, borderRadius: 4, border: 'none',
+        background: 'transparent', cursor: 'pointer',
+        color: '#c4c9d1', transition: 'color 0.15s',
+        flexShrink: 0,
+      }}
+    >
+      <Download size={11} />
+    </button>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Auto-shown rich content
+// ---------------------------------------------------------------------------
+
+/** Key-value pairs for single-entity extractions, compact table for multi. */
+function ExtractionContent({ content }: { content: Record<string, unknown> }) {
+  const [showAll, setShowAll] = useState(false)
+  const entities = content.entities as Array<Record<string, unknown>> | undefined
+  if (!entities || entities.length === 0) return null
+  const fields = (content.fields as string[]) || Object.keys(entities[0])
+  if (fields.length === 0) return null
+
+  const copyText = toolResultToText('run_extraction', content)
+  const csv = extractionToCSV(content)
+  const setName = content.extraction_set ? String(content.extraction_set).replace(/\s+/g, '_') : 'extraction'
 
   // Single entity: key-value pairs
   if (entities.length === 1) {
     const entity = entities[0]
     const entries = fields
       .filter((f) => entity[f] != null && String(entity[f]).trim() !== '' && String(entity[f]) !== '--')
-    const shown = entries.slice(0, 8)
+    const visibleLimit = showAll ? entries.length : 8
+    const shown = entries.slice(0, visibleLimit)
     const remaining = entries.length - shown.length
 
     return (
@@ -234,19 +395,43 @@ function renderExtractionContent(content: Record<string, unknown>): ReactNode {
             </span>
           </div>
         ))}
-        {remaining > 0 && (
-          <div style={{ color: '#c4c9d1', fontSize: 11, marginTop: 2 }}>
-            +{remaining} more fields
-          </div>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+          {remaining > 0 && (
+            <button
+              onClick={() => setShowAll(true)}
+              style={{
+                background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                color: '#3b82f6', fontSize: 11,
+              }}
+            >
+              +{remaining} more fields
+            </button>
+          )}
+          {showAll && entries.length > 8 && (
+            <button
+              onClick={() => setShowAll(false)}
+              style={{
+                background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                color: '#3b82f6', fontSize: 11,
+              }}
+            >
+              Show less
+            </button>
+          )}
+          <span style={{ flex: 1 }} />
+          <CopyButton text={copyText} label="Copy extraction data" />
+          {csv && <CSVDownloadButton csv={csv} filename={`${setName}.csv`} />}
+        </div>
       </div>
     )
   }
 
   // Multiple entities: compact table with limited columns
-  const maxCols = 6
+  const maxCols = showAll ? fields.length : 6
+  const maxRows = showAll ? entities.length : 12
   const visibleFields = fields.slice(0, maxCols)
   const hiddenCols = fields.length - visibleFields.length
+  const hiddenRows = entities.length - Math.min(entities.length, maxRows)
 
   return (
     <div style={{ overflowX: 'auto', marginTop: 4, marginLeft: 20 }}>
@@ -266,7 +451,7 @@ function renderExtractionContent(content: Record<string, unknown>): ReactNode {
           </tr>
         </thead>
         <tbody>
-          {entities.slice(0, 12).map((entity, i) => (
+          {entities.slice(0, maxRows).map((entity, i) => (
             <tr key={i} style={{ borderBottom: '1px solid #f3f4f6' }}>
               {visibleFields.map((f) => (
                 <td key={f} style={{
@@ -280,9 +465,32 @@ function renderExtractionContent(content: Record<string, unknown>): ReactNode {
           ))}
         </tbody>
       </table>
-      <div style={{ color: '#c4c9d1', fontSize: 10, marginTop: 2, display: 'flex', gap: 12 }}>
-        {entities.length > 12 && <span>+{entities.length - 12} more rows</span>}
-        {hiddenCols > 0 && <span>+{hiddenCols} more columns</span>}
+      <div style={{ color: '#c4c9d1', fontSize: 10, marginTop: 2, display: 'flex', alignItems: 'center', gap: 12 }}>
+        {!showAll && (hiddenRows > 0 || hiddenCols > 0) && (
+          <button
+            onClick={() => setShowAll(true)}
+            style={{
+              background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+              color: '#3b82f6', fontSize: 10,
+            }}
+          >
+            {[hiddenRows > 0 && `+${hiddenRows} rows`, hiddenCols > 0 && `+${hiddenCols} cols`].filter(Boolean).join(', ')} — show all
+          </button>
+        )}
+        {showAll && (entities.length > 12 || fields.length > 6) && (
+          <button
+            onClick={() => setShowAll(false)}
+            style={{
+              background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+              color: '#3b82f6', fontSize: 10,
+            }}
+          >
+            Show less
+          </button>
+        )}
+        <span style={{ flex: 1 }} />
+        <CopyButton text={copyText} label="Copy extraction data" />
+        {csv && <CSVDownloadButton csv={csv} filename={`${setName}.csv`} />}
       </div>
     </div>
   )
@@ -303,9 +511,10 @@ interface KBSourceActions {
   setWorkspaceMode: (mode: WorkspaceMode) => void
 }
 
-function renderKBPassages(content: unknown, actions?: KBSourceActions): ReactNode {
+function KBPassages({ content, actions }: { content: unknown; actions?: KBSourceActions }) {
   if (!Array.isArray(content) || content.length === 0) return null
   const passages = content as Array<Record<string, unknown>>
+  const copyText = toolResultToText('search_knowledge_base', content)
 
   return (
     <div style={{ marginTop: 4, marginLeft: 20, display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -358,8 +567,67 @@ function renderKBPassages(content: unknown, actions?: KBSourceActions): ReactNod
           </div>
         )
       })}
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <CopyButton text={copyText} label="Copy passages" />
+      </div>
     </div>
   )
+}
+
+/** Render completed workflow output as structured content. */
+function WorkflowOutput({ content }: { content: Record<string, unknown> }) {
+  const status = content.status as string | undefined
+  if (status !== 'completed') return null
+
+  const output = content.output
+  if (output == null) return null
+
+  const copyText = typeof output === 'string' ? output : JSON.stringify(output, null, 2)
+
+  // If output is a string, show it as a block
+  if (typeof output === 'string') {
+    if (output.trim().length === 0) return null
+    return (
+      <div style={{ marginTop: 4, marginLeft: 20 }}>
+        <div style={{
+          fontSize: 12, lineHeight: 1.6,
+          color: '#374151', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+          maxHeight: 200, overflow: 'auto', padding: '8px 12px',
+          background: '#fafafa', borderRadius: 6, border: '1px solid #f3f4f6',
+        }}>
+          {output.length > 1000 ? output.slice(0, 997) + '...' : output}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 2 }}>
+          <CopyButton text={copyText} label="Copy workflow output" />
+        </div>
+      </div>
+    )
+  }
+
+  // If output is an object with key-value data, render as pairs
+  if (typeof output === 'object' && !Array.isArray(output)) {
+    const entries = Object.entries(output as Record<string, unknown>)
+      .filter(([, v]) => v != null && String(v).trim() !== '')
+      .slice(0, 12)
+    if (entries.length === 0) return null
+    return (
+      <div style={{ marginTop: 4, marginLeft: 20, fontSize: 12, lineHeight: 1.7 }}>
+        {entries.map(([k, v]) => (
+          <div key={k} style={{ display: 'flex', gap: 8 }}>
+            <span style={{ color: '#9ca3af', minWidth: 140, flexShrink: 0 }}>{k}</span>
+            <span style={{ color: '#374151' }}>
+              {String(v).length > 80 ? String(v).slice(0, 77) + '...' : String(v)}
+            </span>
+          </div>
+        ))}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 2 }}>
+          <CopyButton text={copyText} label="Copy workflow output" />
+        </div>
+      </div>
+    )
+  }
+
+  return null
 }
 
 // ---------------------------------------------------------------------------
@@ -370,10 +638,12 @@ export function ToolStatusLine({
   call,
   result,
   isActive,
+  onConfirm,
 }: {
   call?: ToolCallInfo
   result?: ToolResultInfo
   isActive?: boolean
+  onConfirm?: (message: string) => void
 }) {
   const { viewDocument, setHighlightTerms, setWorkspaceMode } = useWorkspace()
   const name = result?.tool_name || call?.tool_name || 'unknown'
@@ -382,6 +652,8 @@ export function ToolStatusLine({
   const args = call?.args || {}
   const obj = result?.content as Record<string, unknown> | undefined
   const isError = Boolean(obj?.error)
+
+  const needsConfirmation = !isActive && obj?.needs_confirmation === true
 
   const activeHint = isActive ? getActiveHint(name, args) : ''
   const { text: summaryText, qualityHint } = result
@@ -441,18 +713,54 @@ export function ToolStatusLine({
 
         <span style={{ flex: 1 }} />
 
+        {/* Per-result copy button — shown on status line for tools without rich content blocks */}
+        {result && !isActive && hasCopyableContent(name, result.content) &&
+          !hasRichContent(name, obj) && (
+          <CopyButton
+            text={toolResultToText(name, result.content)}
+            label="Copy result"
+          />
+        )}
+
         {/* Quality badge — compact, with tooltip for details */}
         {result?.quality && (
           <QualityBadge quality={result.quality as QualityMeta} />
         )}
       </div>
 
-      {/* Auto-shown rich content */}
+      {/* Auto-shown rich content (copy/export buttons are inside each block) */}
       {result && name === 'run_extraction' && obj?.entities != null && (
-        renderExtractionContent(obj)
+        <ExtractionContent content={obj} />
       )}
       {result && name === 'search_knowledge_base' && (
-        renderKBPassages(result.content, kbActions)
+        <KBPassages content={result.content} actions={kbActions} />
+      )}
+      {result && name === 'get_workflow_status' && obj?.status === 'completed' && obj?.output != null && (
+        <WorkflowOutput content={obj} />
+      )}
+
+      {/* Confirmation buttons for write tools awaiting user approval */}
+      {needsConfirmation && onConfirm && (
+        <div style={{ display: 'flex', gap: 6, marginTop: 6, marginLeft: 20 }}>
+          <button
+            onClick={() => onConfirm('Yes, go ahead')}
+            className="chat-action-btn"
+            style={{ fontSize: 12, padding: '5px 14px' }}
+          >
+            Confirm
+          </button>
+          <button
+            onClick={() => onConfirm('No, cancel that')}
+            style={{
+              padding: '5px 14px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
+              borderRadius: 8, border: '1px solid #d1d5db',
+              background: '#fff', color: '#374151', cursor: 'pointer',
+              transition: 'all 0.15s',
+            }}
+          >
+            Cancel
+          </button>
+        </div>
       )}
     </div>
   )

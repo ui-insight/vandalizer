@@ -187,6 +187,9 @@ async def search_knowledge_base(
         if kb.team_id != team_id:
             return [{"error": "You do not have access to this knowledge base."}]
 
+    if kb.status and kb.status != "ready":
+        return [{"error": f"Knowledge base \"{kb.title}\" is currently {kb.status}. Try again in a few minutes once indexing completes."}]
+
     dm = get_document_manager()
     results = await asyncio.to_thread(dm.query_kb, uuid, query, 8)
 
@@ -265,11 +268,11 @@ async def list_extraction_sets(
     context: RunContext[AgenticChatDeps],
     search: Optional[str] = None,
 ) -> list[dict]:
-    """List extraction sets (formatters) available to the user.
+    """List extraction templates available to the user.
 
     Args:
         context: The call context.
-        search: Optional text to filter extraction sets by title.
+        search: Optional text to filter extraction templates by title.
     """
     team_id = context.deps.team_id
     user_id = context.deps.user_id
@@ -480,12 +483,15 @@ async def run_extraction(
     extraction_set_uuid: str,
     document_uuids: list[str],
 ) -> dict:
-    """Run an extraction set against one or more documents. Returns extracted entities with quality metadata.
+    """Run an extraction template against one or more documents. Returns extracted entities with quality metadata.
+
+    Maximum 10 documents per call. Results are capped at 50 entities.
+    If you need to process more documents, call this tool multiple times.
 
     Args:
         context: The call context.
-        extraction_set_uuid: UUID of the extraction set (search set) to run.
-        document_uuids: List of document UUIDs to extract from.
+        extraction_set_uuid: UUID of the extraction template to run.
+        document_uuids: List of document UUIDs to extract from (max 10).
     """
     from app.services.extraction_engine import ExtractionEngine
 
@@ -555,13 +561,21 @@ async def run_extraction(
         )
         return results, engine.tokens_in, engine.tokens_out
 
-    results, tokens_in, tokens_out = await asyncio.to_thread(_run)
+    try:
+        results, tokens_in, tokens_out = await asyncio.wait_for(
+            asyncio.to_thread(_run), timeout=120,
+        )
+    except asyncio.TimeoutError:
+        return {"error": "Extraction timed out after 2 minutes. Try with fewer documents or a smaller extraction set."}
 
     # Attach quality metadata as sidecar if validation data exists
     latest_run = await ValidationRun.find(
         ValidationRun.item_kind == "search_set",
         ValidationRun.item_id == extraction_set_uuid,
     ).sort("-created_at").first_or_none()
+
+    docs_requested = len(document_uuids)
+    docs_skipped = docs_requested - len(doc_names)
 
     response: dict = {
         "extraction_set": ss.title,
@@ -571,6 +585,10 @@ async def run_extraction(
         "entity_count": len(results),
         "token_usage": {"input": tokens_in, "output": tokens_out},
     }
+    if docs_skipped > 0:
+        response["note"] = f"{docs_skipped} of {docs_requested} document(s) were skipped (not found or not accessible)."
+    if len(results) > 50:
+        response["note"] = response.get("note", "") + f" Results truncated to 50 of {len(results)} entities."
 
     # Quality sidecar — streaming layer strips "quality" key before LLM sees it
     if latest_run and latest_run.score is not None:
@@ -764,13 +782,21 @@ async def run_workflow(
         document_uuids: List of document UUIDs to process.
         confirmed: Must be true to actually run. If false, returns a preview for user confirmation.
     """
+    # Look up workflow and verify access
+    wf = await Workflow.get(workflow_id)
+    if not wf:
+        return {"error": f"Workflow '{workflow_id}' not found."}
+
+    team_id = context.deps.team_id
+    user_id = context.deps.user_id
+    if not wf.verified and getattr(wf, "user_id", None) != user_id:
+        if not (team_id and getattr(wf, "team_id", None) == team_id):
+            return {"error": "You do not have access to this workflow."}
+
     if not confirmed:
-        # Look up workflow name for the preview
-        wf = await Workflow.get(workflow_id)
-        wf_name = wf.name if wf else workflow_id
         return {
             "action": "run_workflow",
-            "preview": f"Run workflow \"{wf_name}\" on {len(document_uuids)} document(s)",
+            "preview": f"Run workflow \"{wf.name}\" on {len(document_uuids)} document(s)",
             "needs_confirmation": True,
         }
 

@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
 import { AttachmentList } from './AttachmentList'
+import { toolResultToText } from './ToolCallDisplay'
 import { useChat } from '../../hooks/useChat'
 import { useOnboarding } from '../../hooks/useOnboarding'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
@@ -82,6 +83,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const effectiveFirstSession = lockedFirstSession.current ?? isFirstSession
   const firstSessionSeeded = useRef(false)
   const firstSessionMarked = useRef(false)
+  const demoTriggered = useRef(false)
   const [fileAttachments, setFileAttachments] = useState<FileAttachment[]>([])
   const [urlAttachments, setUrlAttachments] = useState<UrlAttachment[]>([])
   const [attachLoading, setAttachLoading] = useState(false)
@@ -213,17 +215,23 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     // In first-session mode, every message uses the first-session system prompt.
     // Use the locked ref so remounts / refetches can't flip this mid-conversation.
     const firstSession = effectiveFirstSession && !hasDocContext && !activeKBUuid
+    // Detect "show me" to track demo trigger (backend does the real routing)
+    if (firstSession && /^show\s*me/i.test(message.trim())) {
+      demoTriggered.current = true
+    }
     send(message, selectedDocUuids, selectedModel || undefined, activeKBUuid || undefined, includeOnboardingContext, selectedFolderUuids, firstSession || undefined)
-    // Defer markFirstSessionComplete until the user has experienced the demo.
-    // messages.length counts both user + assistant; 6 = 3 full exchanges
-    // (enough for the agentic demo with tool calls to complete).
-    if (firstSession && !firstSessionMarked.current && messages.length >= 6) {
+    // Mark first-session complete after:
+    // - Demo path: 3 messages (greeting + user msg + demo response)
+    // - Conversational path: 6 messages (3 full exchanges)
+    const threshold = demoTriggered.current ? 3 : 6
+    if (firstSession && !firstSessionMarked.current && messages.length >= threshold) {
       firstSessionMarked.current = true
       markFirstSessionComplete().catch(() => {})
     }
   }
 
   const handleRunDemo = () => {
+    demoTriggered.current = true
     send(
       "Show me what Vandalizer can do",
       selectedDocUuids,
@@ -342,23 +350,92 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   }
 
   const handleExport = (format: string) => {
-    const text = messages
-      .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}:\n${m.content}`)
-      .join('\n\n---\n\n')
+    /** Serialize a single message including any tool results from its segments. */
+    const messageToText = (m: typeof messages[number]): string => {
+      const role = m.role === 'user' ? 'User' : 'Assistant'
+      const segs = m.segments
+      if (segs && segs.length > 0) {
+        const parts: string[] = []
+        for (const seg of segs) {
+          if (seg.kind === 'text') {
+            const cleaned = seg.content.trim()
+            if (cleaned) parts.push(cleaned)
+          } else if (seg.kind === 'tool_result') {
+            const body = toolResultToText(seg.result.tool_name, seg.result.content)
+            if (body) parts.push(`[${seg.result.tool_name}]\n${body}`)
+          }
+        }
+        return `${role}:\n${parts.join('\n\n')}`
+      }
+      // Fallback: content + tool results
+      const parts = [m.content]
+      if (m.tool_results) {
+        for (const r of m.tool_results) {
+          const body = toolResultToText(r.tool_name, r.content)
+          if (body) parts.push(`[${r.tool_name}]\n${body}`)
+        }
+      }
+      return `${role}:\n${parts.join('\n\n')}`
+    }
+
+    const fullText = messages.map(messageToText).join('\n\n---\n\n')
+
     if (format === 'text') {
-      const blob = new Blob([text], { type: 'text/plain' })
+      const blob = new Blob([fullText], { type: 'text/plain' })
       downloadBlob(blob, 'conversation.txt')
     } else if (format === 'csv') {
+      const csvEscape = (s: string) => `"${s.replace(/"/g, '""')}"`
       const rows = [['Role', 'Content']]
-      messages.forEach(m => rows.push([m.role, m.content.replace(/"/g, '""')]))
-      const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n')
+      messages.forEach(m => {
+        const segs = m.segments
+        let content = m.content
+        if (segs && segs.length > 0) {
+          const parts: string[] = []
+          for (const seg of segs) {
+            if (seg.kind === 'text') {
+              const cleaned = seg.content.trim()
+              if (cleaned) parts.push(cleaned)
+            } else if (seg.kind === 'tool_result') {
+              const body = toolResultToText(seg.result.tool_name, seg.result.content)
+              if (body) parts.push(`[${seg.result.tool_name}] ${body}`)
+            }
+          }
+          content = parts.join('\n')
+        } else if (m.tool_results) {
+          const extras = m.tool_results
+            .map(r => toolResultToText(r.tool_name, r.content))
+            .filter(Boolean)
+          if (extras.length) content += '\n' + extras.join('\n')
+        }
+        rows.push([m.role, content])
+      })
+      const csv = rows.map(r => r.map(csvEscape).join(',')).join('\n')
       const blob = new Blob([csv], { type: 'text/csv' })
       downloadBlob(blob, 'conversation.csv')
     } else if (format === 'pdf') {
+      const escHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')
       const html = `<html><head><title>Conversation</title><style>body{font-family:sans-serif;padding:40px;max-width:800px;margin:0 auto}
       .msg{margin-bottom:20px;padding:12px;border-radius:8px}.user{background:#f3f4f6;border-left:4px solid #eab308}
-      .assistant{background:#fafafa}.role{font-weight:bold;margin-bottom:4px;font-size:12px;text-transform:uppercase;color:#666}</style></head>
-      <body>${messages.map(m => `<div class="msg ${m.role}"><div class="role">${m.role}</div><div>${m.content.replace(/\n/g, '<br>')}</div></div>`).join('')}</body></html>`
+      .assistant{background:#fafafa}.role{font-weight:bold;margin-bottom:4px;font-size:12px;text-transform:uppercase;color:#666}
+      .tool-data{background:#f0f4f8;padding:8px 12px;border-radius:4px;font-size:12px;margin:8px 0;white-space:pre-wrap;font-family:monospace}</style></head>
+      <body>${messages.map(m => {
+        const parts = [escHtml(m.content)]
+        const segs = m.segments
+        if (segs) {
+          for (const seg of segs) {
+            if (seg.kind === 'tool_result') {
+              const body = toolResultToText(seg.result.tool_name, seg.result.content)
+              if (body) parts.push(`<div class="tool-data"><strong>${seg.result.tool_name}</strong><br>${escHtml(body)}</div>`)
+            }
+          }
+        } else if (m.tool_results) {
+          for (const r of m.tool_results) {
+            const body = toolResultToText(r.tool_name, r.content)
+            if (body) parts.push(`<div class="tool-data"><strong>${r.tool_name}</strong><br>${escHtml(body)}</div>`)
+          }
+        }
+        return `<div class="msg ${m.role}"><div class="role">${m.role}</div><div>${parts.join('')}</div></div>`
+      }).join('')}</body></html>`
       const win = window.open('', '_blank')
       if (win) { win.document.write(html); win.document.close(); win.print() }
     }
@@ -715,6 +792,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
               message={msg}
               messageIndex={i}
               conversationUuid={conversationUuid || undefined}
+              onSendMessage={msg.role === 'assistant' && i === messages.length - 1 && !isStreaming ? (m) => handleSend(m) : undefined}
             />
         ))}
 

@@ -10,8 +10,8 @@ interface PillDef {
 const FEATURE_PILLS: PillDef[] = [
   { id: 'add-file', label: 'How do I upload a document?', gateFlag: 'has_documents' },
   { id: 'create-prompt', label: 'How do I save a reusable prompt?', gateFlag: 'has_library_items' },
-  { id: 'create-formatter', label: 'What are formatters?', gateFlag: 'has_extraction_sets' },
-  { id: 'build-from-doc', label: 'Can I auto-generate an extraction set?', gateFlag: 'has_extraction_sets' },
+  { id: 'create-formatter', label: 'What are extraction templates?', gateFlag: 'has_extraction_sets' },
+  { id: 'build-from-doc', label: 'Can I auto-generate a template?', gateFlag: 'has_extraction_sets' },
   { id: 'create-workflow', label: 'How do I set up a workflow?', gateFlag: 'has_workflows' },
   { id: 'pin-item', label: 'What does pinning do?', gateFlag: 'has_pinned_item' },
   { id: 'favorite-item', label: 'What does favoriting do?', gateFlag: 'has_favorited_item' },
