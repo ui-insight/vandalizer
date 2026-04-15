@@ -397,7 +397,7 @@ async def admin_release_user(demo_uuid: str) -> bool:
 async def admin_restart_trial(demo_uuid: str) -> bool:
     """Admin: restart the trial for an expired demo user (reset to 14 days)."""
     app = await DemoApplication.find_one(DemoApplication.uuid == demo_uuid)
-    if not app or app.status not in ("expired", "completed"):
+    if not app or app.status not in ("active", "expired", "completed"):
         return False
 
     now = datetime.datetime.now(datetime.timezone.utc)

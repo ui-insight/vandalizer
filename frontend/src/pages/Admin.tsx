@@ -3839,7 +3839,7 @@ function DemoTab() {
                               Release
                             </button>
                           )}
-                          {(app.status === 'expired' || app.status === 'completed') && (
+                          {(app.status === 'active' || app.status === 'expired' || app.status === 'completed') && (
                             <button
                               onClick={() => handleRestartTrial(app.uuid)}
                               disabled={actionLoading === `restart-${app.uuid}`}

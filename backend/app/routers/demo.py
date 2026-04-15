@@ -164,7 +164,7 @@ async def admin_restart_trial(demo_uuid: str, user: User = Depends(get_current_u
     if not success:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Application not found or not in expired/completed status",
+            detail="Application not found or not in active/expired/completed status",
         )
     return {"ok": True}
 
