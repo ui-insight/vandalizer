@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ZoomIn, ZoomOut, Maximize2, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { ZoomIn, ZoomOut, Maximize2, ChevronLeft, ChevronRight, Loader2, X } from 'lucide-react'
 import { downloadFileUrl } from '../../api/files'
 import { pollStatus } from '../../api/documents'
 import { SpreadsheetViewer } from './SpreadsheetViewer'
@@ -13,6 +13,7 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 interface DocumentViewerProps {
   docUuid: string
   highlightTerms?: string[]
+  onClearHighlights?: () => void
   processing?: boolean
   taskStatus?: string | null
 }
@@ -59,7 +60,7 @@ const STATUS_MESSAGES: Record<string, { title: string; message: string }> = {
   },
 }
 
-export function DocumentViewer({ docUuid, highlightTerms = [], processing, taskStatus }: DocumentViewerProps) {
+export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights, processing, taskStatus }: DocumentViewerProps) {
   const [zoom, setZoom] = useState(2) // index into ZOOM_LEVELS, default 100%
   const [isPdf, setIsPdf] = useState<boolean | null>(null) // null = loading
   const [isSpreadsheet, setIsSpreadsheet] = useState(false)
@@ -786,6 +787,21 @@ export function DocumentViewer({ docUuid, highlightTerms = [], processing, taskS
             >
               <ChevronRight size={18} />
             </button>
+            {onClearHighlights && (
+              <button
+                onClick={onClearHighlights}
+                style={{
+                  ...btnStyle,
+                  width: 34, height: 34,
+                  border: 'none',
+                  background: 'none',
+                }}
+                title="Clear highlights"
+                aria-label="Clear highlights"
+              >
+                <X size={18} />
+              </button>
+            )}
           </div>
         )}
       </div>

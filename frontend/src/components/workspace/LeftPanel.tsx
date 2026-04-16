@@ -8,7 +8,7 @@ import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { pollStatus, searchDocuments } from '../../api/documents'
 
 export function LeftPanel() {
-  const { setSelectedDocUuids, setSelectedDocNames, setSelectedFolderUuids, highlightTerms, setProcessingDoc, viewDocumentRequest, clearViewDocumentRequest } = useWorkspace()
+  const { setSelectedDocUuids, setSelectedDocNames, setSelectedFolderUuids, highlightTerms, setHighlightTerms, setProcessingDoc, viewDocumentRequest, clearViewDocumentRequest } = useWorkspace()
   const [viewingDoc, setViewingDoc] = useState<{
     uuid: string
     title: string
@@ -237,6 +237,7 @@ export function LeftPanel() {
           <DocumentViewer
             docUuid={viewingDoc.uuid}
             highlightTerms={highlightTerms}
+            onClearHighlights={() => setHighlightTerms([])}
             processing={viewingDoc.processing}
             taskStatus={viewingDoc.taskStatus}
           />
