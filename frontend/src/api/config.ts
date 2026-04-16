@@ -38,6 +38,21 @@ export function updateThemeConfig(data: { highlight_color?: string; ui_radius?: 
 
 // Onboarding status
 
+export interface RecentActivityItem {
+  type: string
+  title: string
+  relative_time: string
+  status: string
+}
+
+export interface ActiveAlertItem {
+  message: string
+  severity: string
+  item_name: string
+}
+
+export type MaturityStage = 'newcomer' | 'explorer' | 'practitioner' | 'builder' | 'architect'
+
 export interface OnboardingStatus {
   has_documents: boolean
   has_workflows: boolean
@@ -59,6 +74,12 @@ export interface OnboardingStatus {
   has_only_onboarding_docs: boolean
   top_extraction_set_name: string | null
   top_workflow_name: string | null
+  recent_activity: RecentActivityItem[]
+  active_alerts: ActiveAlertItem[]
+  maturity_stage: MaturityStage
+  unprocessed_doc_count: number
+  daily_guidance: string | null
+  since_last_visit: string | null
 }
 
 export function getOnboardingStatus() {

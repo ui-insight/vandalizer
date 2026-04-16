@@ -1005,6 +1005,39 @@ async def _build_workspace_inventory(
             for alert in active_alerts:
                 lines.append(f"- {alert.message}")
 
+    # Capabilities the user hasn't tried yet — enables progressive discovery
+    if not all_onboarding and doc_count > 0:
+        untried: list[str] = []
+        if not search_sets and doc_count >= 1:
+            untried.append(
+                "**Extraction templates**: This user has documents but no extraction templates. "
+                "If they mention wanting structured data, offer to build a template from one of their documents."
+            )
+        if search_sets and not workflows:
+            untried.append(
+                "**Workflows**: This user has extraction templates but no workflows. "
+                "If they mention wanting to repeat a process or handle batches, suggest chaining extractions into a workflow."
+            )
+        if not knowledge_bases and doc_count >= 3:
+            untried.append(
+                "**Knowledge bases**: This user has several documents but no knowledge base. "
+                "If they ask questions that span multiple documents, suggest building a KB for cross-document search."
+            )
+        if workflows and not any(True for wf in workflows if wf.num_executions and wf.num_executions > 0):
+            untried.append(
+                "**Workflow execution**: This user has workflows but hasn't run any. "
+                "If they mention processing documents, remind them they can run their workflow."
+            )
+        if untried:
+            lines.append("")
+            lines.append("## Capabilities this user hasn't tried yet")
+            lines.append(
+                "Don't force these — only mention when the user's question or context "
+                "naturally connects. One gentle suggestion at most per conversation."
+            )
+            for hint in untried[:3]:
+                lines.append(f"- {hint}")
+
     # Post-demo bridge: guide users who only have the onboarding sample
     if all_onboarding:
         lines.append("")

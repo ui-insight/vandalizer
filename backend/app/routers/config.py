@@ -20,8 +20,10 @@ from app.models.user import User
 from app.models.user_config import UserModelConfig
 from app.models.workflow import Workflow, WorkflowResult
 from app.schemas.config import (
+    ActiveAlertItem,
     ModelInfo,
     OnboardingStatusResponse,
+    RecentActivityItem,
     ThemeConfigResponse,
     UpdateThemeConfigRequest,
     UpdateUserConfigRequest,
@@ -185,6 +187,135 @@ async def get_features(user: User = Depends(get_current_user)):
 # ---------------------------------------------------------------------------
 
 
+def _compute_maturity_stage(
+    *,
+    doc_count: int,
+    extraction_run_count: int,
+    workflows: list,
+    has_enabled_automation: bool,
+    is_certified: bool,
+) -> str:
+    """Determine user maturity stage for progressive guidance."""
+    if is_certified or has_enabled_automation:
+        return "architect"
+    if workflows:
+        return "builder"
+    if extraction_run_count >= 3:
+        return "practitioner"
+    if doc_count > 0:
+        return "explorer"
+    return "newcomer"
+
+
+def _generate_daily_guidance(
+    *,
+    recent_activity: list,
+    active_alerts: list,
+    maturity_stage: str,
+    has_only_onboarding_docs: bool,
+    doc_count: int,
+) -> str | None:
+    """Synthesize alerts + activity + maturity into a single actionable sentence."""
+    # Post-demo: bridge to real work
+    if has_only_onboarding_docs:
+        return (
+            "You've seen Vandalizer in action with a sample proposal. "
+            "Upload one of your own documents and I'll help you build a custom template for it."
+        )
+
+    # Critical alerts take priority
+    critical = [a for a in active_alerts if getattr(a, "severity", "") == "critical"]
+    if critical:
+        return f"Your {critical[0].item_name} has a critical quality issue — want me to diagnose it?"
+
+    # Warning alerts
+    warnings = [a for a in active_alerts if getattr(a, "severity", "") == "warning"]
+    if warnings:
+        return f"Your {warnings[0].item_name} flagged a quality warning — want me to take a look?"
+
+    # Failed recent activity
+    failed = [a for a in recent_activity if getattr(a, "status", "") == "failed"]
+    if failed:
+        title = getattr(failed[0], "title", "activity") or "activity"
+        return f'Your "{title}" run failed — want me to help figure out what went wrong?'
+
+    # Running activity
+    running = [a for a in recent_activity if getattr(a, "status", "") == "running"]
+    if running:
+        title = getattr(running[0], "title", "activity") or "activity"
+        return f'Your "{title}" is still running — I can check on it when you\'re ready.'
+
+    # Maturity-driven nudge for users with no pressing items
+    if maturity_stage == "newcomer" and doc_count == 0:
+        return "Upload your first document and I'll help you get value from it immediately."
+    if maturity_stage == "explorer" and doc_count > 0:
+        return "You have documents ready — want me to run an extraction template on them?"
+
+    # Recent success — offer next step
+    completed = [a for a in recent_activity if getattr(a, "status", "") == "completed"]
+    if completed:
+        title = getattr(completed[0], "title", "") or "activity"
+        return f'Your latest "{title}" completed successfully — ready to continue?'
+
+    return None
+
+
+def _generate_since_last_visit(
+    *,
+    last_login_at: datetime.datetime | None,
+    recent_activity: list,
+    active_alerts: list,
+) -> str | None:
+    """Summarize what happened since the user was last here."""
+    if not last_login_at:
+        return None
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    delta = now - last_login_at
+    if delta.total_seconds() < 3600:  # Less than 1 hour — not meaningful
+        return None
+
+    # Count events since last visit
+    completed_since = 0
+    failed_since = 0
+    for ev in recent_activity:
+        ev_time = getattr(ev, "last_updated_at", None)
+        if ev_time and ev_time > last_login_at:
+            status = getattr(ev, "status", "")
+            if status == "completed":
+                completed_since += 1
+            elif status == "failed":
+                failed_since += 1
+
+    new_alerts = sum(
+        1 for a in active_alerts
+        if getattr(a, "created_at", None) and a.created_at > last_login_at
+    )
+
+    parts: list[str] = []
+
+    # Format time away
+    hours = delta.total_seconds() / 3600
+    if hours < 24:
+        time_str = f"{int(hours)} hour{'s' if int(hours) != 1 else ''}"
+    else:
+        days = int(hours / 24)
+        time_str = f"{days} day{'s' if days != 1 else ''}"
+
+    if completed_since == 0 and failed_since == 0 and new_alerts == 0:
+        return None
+
+    parts.append(f"Since you were last here ({time_str} ago):")
+    if completed_since > 0:
+        parts.append(f"{completed_since} run{'s' if completed_since != 1 else ''} completed successfully")
+    if failed_since > 0:
+        parts.append(f"{failed_since} run{'s' if failed_since != 1 else ''} failed")
+    if new_alerts > 0:
+        parts.append(f"{new_alerts} quality alert{'s' if new_alerts != 1 else ''} raised")
+
+    return " — ".join(parts) if len(parts) > 1 else None
+
+
 def _generate_action_pills(
     *,
     doc_count: int,
@@ -195,6 +326,7 @@ def _generate_action_pills(
     has_chatted_with_docs: bool,
     quality_map: dict[str, float],
     last_activity_title: str | None = None,
+    maturity_stage: str = "newcomer",
 ) -> list[str]:
     """Generate up to 4 personalised, action-oriented suggestion pills."""
     pills: list[str] = []
@@ -245,6 +377,19 @@ def _generate_action_pills(
     if doc_count == 0:
         pills.append("Upload your first document to get started")
 
+    # 8. Maturity-aware escalation pills (fill remaining slots)
+    if len(pills) < 4:
+        if maturity_stage == "explorer" and search_sets:
+            pills.append(f"Check quality score for {search_sets[0].title}")
+        elif maturity_stage == "practitioner" and search_sets and not workflows:
+            pills.append(f"Chain {search_sets[0].title} into a repeatable workflow")
+        elif maturity_stage == "builder":
+            pills.append("Set up a folder watch to automate your workflow")
+        elif maturity_stage == "architect":
+            low_quality = [ss for ss in search_sets if quality_map.get(ss.uuid, 100) < 80]
+            if low_quality:
+                pills.append(f"Tune {low_quality[0].title} to improve extraction accuracy")
+
     return pills[:4]
 
 
@@ -264,7 +409,8 @@ async def get_onboarding_status(user: User = Depends(get_current_user)):
         doc_chat_count,
         conversation_count,
         cert_progress,
-        last_activity,
+        recent_activities,
+        extraction_run_count,
     ) = await asyncio.gather(
         SmartDocument.find(SmartDocument.user_id == uid).count(),
         SmartDocument.find(
@@ -289,26 +435,48 @@ async def get_onboarding_status(user: User = Depends(get_current_user)):
         # Any conversations at all
         ChatConversation.find(ChatConversation.user_id == uid).count(),
         CertificationProgress.find_one(CertificationProgress.user_id == uid),
-        # Most recent completed activity for "continue where you left off" pill
+        # Recent activities for workspace briefing + "continue where you left off" pill
         ActivityEvent.find(
-            {"user_id": uid, "status": "completed"}
-        ).sort("-last_updated_at").first_or_none(),
+            {"user_id": uid, "status": {"$in": ["completed", "failed", "running"]}}
+        ).sort("-last_updated_at").limit(3).to_list(),
+        # Completed extraction runs — drives maturity stage progression
+        ActivityEvent.find(
+            {"user_id": uid, "type": "search_set_run", "status": "completed"}
+        ).count(),
     )
 
-    # Fetch quality scores for extraction sets to enrich action pills
+    # Fetch quality scores + alerts for extraction sets
     quality_map: dict[str, float] = {}
+    quality_alerts: list = []
     if search_sets:
+        from app.models.quality_alert import QualityAlert
         from app.models.validation_run import ValidationRun
 
         ss_uuids = [ss.uuid for ss in search_sets]
-        vr_list = await ValidationRun.find(
-            {"item_kind": "search_set", "item_id": {"$in": ss_uuids}}
-        ).sort("-created_at").to_list()
+        vr_list, quality_alerts = await asyncio.gather(
+            ValidationRun.find(
+                {"item_kind": "search_set", "item_id": {"$in": ss_uuids}}
+            ).sort("-created_at").to_list(),
+            QualityAlert.find(
+                {"item_kind": "search_set", "item_id": {"$in": ss_uuids}, "acknowledged": {"$ne": True}}
+            ).sort("-created_at").limit(3).to_list(),
+        )
         for vr in vr_list:
             if vr.item_id not in quality_map and vr.accuracy is not None:
                 quality_map[vr.item_id] = round(vr.accuracy * 100)
 
-    last_activity_title = last_activity.title if last_activity else None
+    last_activity_title = recent_activities[0].title if recent_activities else None
+
+    is_certified = bool(cert_progress and cert_progress.certified)
+    has_enabled_automation = any(getattr(a, "enabled", False) for a in automations)
+
+    maturity_stage = _compute_maturity_stage(
+        doc_count=doc_count,
+        extraction_run_count=extraction_run_count,
+        workflows=workflows,
+        has_enabled_automation=has_enabled_automation,
+        is_certified=is_certified,
+    )
 
     pills = _generate_action_pills(
         doc_count=doc_count,
@@ -319,7 +487,54 @@ async def get_onboarding_status(user: User = Depends(get_current_user)):
         has_chatted_with_docs=doc_chat_count > 0,
         quality_map=quality_map,
         last_activity_title=last_activity_title,
+        maturity_stage=maturity_stage,
     )
+
+    # Format recent activity for frontend briefing
+    from app.services.chat_service import _relative_time
+
+    recent_activity_items = [
+        RecentActivityItem(
+            type=ev.type,
+            title=ev.title or "Activity",
+            relative_time=_relative_time(ev.last_updated_at) if ev.last_updated_at else "",
+            status=ev.status,
+        )
+        for ev in recent_activities[:3]
+    ]
+
+    alert_items = [
+        ActiveAlertItem(
+            message=alert.message,
+            severity=alert.severity,
+            item_name=alert.item_name,
+        )
+        for alert in quality_alerts
+    ]
+
+    # Unprocessed doc count: simple heuristic — all docs are unprocessed if
+    # user has never run an extraction
+    unprocessed = doc_count if (doc_count > 0 and extraction_run_count == 0) else 0
+
+    has_only_sample = doc_count > 0 and doc_count == onboarding_doc_count
+
+    daily_guidance = _generate_daily_guidance(
+        recent_activity=recent_activities,
+        active_alerts=quality_alerts,
+        maturity_stage=maturity_stage,
+        has_only_onboarding_docs=has_only_sample,
+        doc_count=doc_count,
+    )
+
+    since_last_visit = _generate_since_last_visit(
+        last_login_at=user.last_login_at,
+        recent_activity=recent_activities,
+        active_alerts=quality_alerts,
+    )
+
+    # Update last_login_at for future delta computation (fire-and-forget)
+    user.last_login_at = datetime.datetime.now(datetime.timezone.utc)
+    asyncio.ensure_future(user.save())
 
     return OnboardingStatusResponse(
         has_documents=doc_count > 0,
@@ -331,17 +546,23 @@ async def get_onboarding_status(user: User = Depends(get_current_user)):
         has_favorited_item=any(getattr(i, "favorited", False) for i in library_items),
         has_team_members=membership_count > 1,
         has_automations=len(automations) > 0,
-        has_enabled_automation=any(getattr(a, "enabled", False) for a in automations),
+        has_enabled_automation=has_enabled_automation,
         has_knowledge_base=len(knowledge_bases) > 0,
         has_ready_knowledge_base=any(getattr(kb, "status", "") == "ready" for kb in knowledge_bases),
         has_chatted_with_docs=doc_chat_count > 0,
         has_conversations=conversation_count > 0,
         first_session_completed=user.first_session_completed,
-        is_certified=bool(cert_progress and cert_progress.certified),
+        is_certified=is_certified,
         suggestion_pills=pills,
         has_only_onboarding_docs=(doc_count > 0 and doc_count == onboarding_doc_count),
         top_extraction_set_name=search_sets[0].title if search_sets else None,
         top_workflow_name=workflows[0].name if workflows else None,
+        recent_activity=recent_activity_items,
+        active_alerts=alert_items,
+        maturity_stage=maturity_stage,
+        unprocessed_doc_count=unprocessed,
+        daily_guidance=daily_guidance,
+        since_last_visit=since_last_visit,
     )
 
 

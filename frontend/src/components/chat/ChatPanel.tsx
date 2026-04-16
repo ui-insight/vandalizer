@@ -5,6 +5,8 @@ import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
 import { AttachmentList } from './AttachmentList'
 import { toolResultToText } from './ToolCallDisplay'
+import { WorkspaceBriefing } from './WorkspaceBriefing'
+import { OnboardingStepper } from './WelcomeExperience'
 import { useChat } from '../../hooks/useChat'
 import { useOnboarding } from '../../hooks/useOnboarding'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
@@ -659,7 +661,9 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                         ? `Knowledge Base: ${activeKBTitle}`
                         : hasDocContext
                           ? 'Documents ready for analysis'
-                          : 'What would you like to work on?'}
+                          : onboardingStatus?.maturity_stage && onboardingStatus.maturity_stage !== 'newcomer'
+                            ? 'Welcome back'
+                            : 'What would you like to work on?'}
                   </div>
                   <div style={{ fontSize: 13, opacity: 0.8, marginTop: 2, fontWeight: 400 }}>
                     {processingDoc
@@ -672,7 +676,9 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                         ? 'Ask questions grounded in your indexed documents and sources.'
                         : hasDocContext
                           ? 'Summarize, extract data, compare, or ask anything about your selected documents.'
-                          : 'Select documents to analyze, activate a knowledge base, or ask me anything.'}
+                          : (onboardingStatus?.recent_activity?.length ?? 0) > 0
+                            ? 'Here\'s what\'s been happening in your workspace.'
+                            : 'Select documents to analyze, activate a knowledge base, or ask me anything.'}
                   </div>
                 </div>
               </div>
@@ -694,9 +700,25 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
               )}
             </div>
 
+            {/* Workspace briefing for returning users with data, guidance, or post-demo state */}
+            {((onboardingStatus?.recent_activity?.length ?? 0) > 0 || onboardingStatus?.daily_guidance || onboardingStatus?.has_only_onboarding_docs) && (
+              <div style={{ marginTop: 12 }}>
+                <WorkspaceBriefing
+                  recentActivity={onboardingStatus!.recent_activity}
+                  activeAlerts={onboardingStatus!.active_alerts ?? []}
+                  maturityStage={onboardingStatus!.maturity_stage ?? 'newcomer'}
+                  unprocessedDocCount={onboardingStatus!.unprocessed_doc_count ?? 0}
+                  dailyGuidance={onboardingStatus!.daily_guidance}
+                  sinceLastVisit={onboardingStatus!.since_last_visit}
+                  hasOnlyOnboardingDocs={onboardingStatus!.has_only_onboarding_docs}
+                  onSendMessage={(msg) => handleSend(msg)}
+                />
+              </div>
+            )}
+
             <div style={{ marginTop: 16, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {/* Demo pill — hidden once user has deeply engaged */}
-              {!(onboardingStatus?.has_run_workflow || onboardingStatus?.is_certified || (onboardingStatus?.has_extraction_sets && onboardingStatus?.has_workflows)) && (
+              {/* Demo pill — hidden once user reaches practitioner stage or has deeply engaged */}
+              {!(onboardingStatus?.has_run_workflow || onboardingStatus?.is_certified || (onboardingStatus?.has_extraction_sets && onboardingStatus?.has_workflows) || (onboardingStatus?.maturity_stage && ['practitioner', 'builder', 'architect'].includes(onboardingStatus.maturity_stage))) && (
               <button
                 disabled={!!processingDoc}
                 onClick={handleRunDemo}
@@ -781,6 +803,16 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                 </button>
               ))}
             </div>
+
+            {/* Getting-started stepper for returning users who haven't finished basics */}
+            {onboardingStatus && (
+              <div style={{ marginTop: 12 }}>
+                <OnboardingStepper
+                  status={onboardingStatus}
+                  hasChatAboutDocs={onboardingStatus.has_chatted_with_docs}
+                />
+              </div>
+            )}
           </div>
         )}
 

@@ -43,6 +43,19 @@ class UpdateThemeConfigRequest(BaseModel):
     ui_radius: Optional[str] = None
 
 
+class RecentActivityItem(BaseModel):
+    type: str  # conversation | search_set_run | workflow_run
+    title: str
+    relative_time: str  # "2h ago", "yesterday"
+    status: str  # completed | failed | running
+
+
+class ActiveAlertItem(BaseModel):
+    message: str
+    severity: str  # info | warning | critical
+    item_name: str
+
+
 class OnboardingStatusResponse(BaseModel):
     has_documents: bool = False
     has_workflows: bool = False
@@ -64,3 +77,9 @@ class OnboardingStatusResponse(BaseModel):
     has_only_onboarding_docs: bool = False
     top_extraction_set_name: Optional[str] = None
     top_workflow_name: Optional[str] = None
+    recent_activity: list[RecentActivityItem] = []
+    active_alerts: list[ActiveAlertItem] = []
+    maturity_stage: str = "newcomer"
+    unprocessed_doc_count: int = 0
+    daily_guidance: Optional[str] = None
+    since_last_visit: Optional[str] = None
