@@ -801,6 +801,7 @@ function DesignTab({
   activeResultIdx: number
   onSetActiveResultIdx: (idx: number) => void
 }) {
+  const { toast } = useToast()
   const [dragIdx, setDragIdx] = useState<number | null>(null)
   const [overIdx, setOverIdx] = useState<number | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -1145,7 +1146,9 @@ function DesignTab({
                     onClick={() => {
                       if (resultVal && resultVal !== 'N/A') {
                         onHighlightValue([resultVal])
-                        navigator.clipboard.writeText(resultVal).catch(() => {})
+                        navigator.clipboard.writeText(resultVal)
+                          .then(() => toast('Copied to clipboard', 'success'))
+                          .catch(() => toast('Failed to copy to clipboard', 'error'))
                       }
                     }}
                     style={{

@@ -239,7 +239,17 @@ export function DocumentViewer({ docUuid, highlightTerms = [], processing, taskS
       return
     }
 
-    let count = 0
+    // PDFs break runs of text into many TextItems — a single visible phrase like
+    // "University of Idaho" can span 1..N items. So instead of substring-matching
+    // against each item independently, we concatenate the page's text into one
+    // string (with a space between items so adjacent tokens don't fuse) and
+    // keep a parallel map from each char position back to (itemIdx, localIdx).
+    // We then search in the concatenated string and project matches back to
+    // per-item rectangles.
+    type TextItem = { str: string; transform: number[]; width: number; height: number }
+    type CharRef = { itemIdx: number; localIdx: number } | null
+
+    let matchCount = 0
 
     for (let i = 1; i <= doc.numPages; i++) {
       const page = await doc.getPage(i)
@@ -249,25 +259,59 @@ export function DocumentViewer({ docUuid, highlightTerms = [], processing, taskS
       const overlay = wrapper?.querySelector('.pdf-overlay')
       if (!overlay) continue
 
-      for (const item of textContent.items) {
-        if (!('str' in item)) continue
-        const textItem = item as { str: string; transform: number[]; width: number; height: number }
-        const textStr = textItem.str
-        if (!textStr) continue
+      const items: TextItem[] = []
+      for (const raw of textContent.items) {
+        if ('str' in raw) items.push(raw as TextItem)
+      }
 
-        const textLower = textStr.toLowerCase()
+      const charRefs: CharRef[] = []
+      let concat = ''
+      for (let idx = 0; idx < items.length; idx++) {
+        const s = items[idx].str
+        for (let j = 0; j < s.length; j++) {
+          charRefs.push({ itemIdx: idx, localIdx: j })
+          concat += s[j]
+        }
+        if (s.length > 0 && idx < items.length - 1) {
+          charRefs.push(null) // separator — not part of any item
+          concat += ' '
+        }
+      }
+      const concatLower = concat.toLowerCase()
 
-        for (const term of terms) {
-          if (!term) continue
-          const termLower = term.toLowerCase()
-          let searchFrom = 0
+      for (const term of terms) {
+        if (!term) continue
+        // Collapse internal whitespace in the search term so multi-word values
+        // match regardless of exactly where the PDF broke the runs.
+        const termLower = term.toLowerCase().replace(/\s+/g, ' ').trim()
+        if (!termLower) continue
 
-          while (searchFrom < textLower.length) {
-            const matchIndex = textLower.indexOf(termLower, searchFrom)
-            if (matchIndex === -1) break
-            searchFrom = matchIndex + 1
+        let from = 0
+        while (from < concatLower.length) {
+          const matchStart = concatLower.indexOf(termLower, from)
+          if (matchStart === -1) break
+          const matchEnd = matchStart + termLower.length
+          from = matchStart + 1
 
-            // Derive font height from transform matrix (textItem.height is often 0)
+          // Gather the span of each item that is covered by this match.
+          const perItem = new Map<number, { start: number; end: number }>()
+          for (let k = matchStart; k < matchEnd; k++) {
+            const ref = charRefs[k]
+            if (!ref) continue
+            const existing = perItem.get(ref.itemIdx)
+            if (!existing) {
+              perItem.set(ref.itemIdx, { start: ref.localIdx, end: ref.localIdx })
+            } else {
+              if (ref.localIdx < existing.start) existing.start = ref.localIdx
+              if (ref.localIdx > existing.end) existing.end = ref.localIdx
+            }
+          }
+
+          for (const [itemIdx, span] of perItem) {
+            const textItem = items[itemIdx]
+            const textStr = textItem.str
+            if (!textStr) continue
+
             const fontHeight = Math.sqrt(
               textItem.transform[2] * textItem.transform[2] +
               textItem.transform[3] * textItem.transform[3]
@@ -276,21 +320,20 @@ export function DocumentViewer({ docUuid, highlightTerms = [], processing, taskS
             const tx = textItem.transform[4]
             const ty = textItem.transform[5]
 
-            // Convert PDF coordinates to viewport (pixel) coordinates
             const vt = viewport.transform
             const vpX = vt[0] * tx + vt[2] * ty + vt[4]
             const vpY = vt[1] * tx + vt[3] * ty + vt[5]
             const fontHeightVp = fontHeight * viewport.scale
 
-            // Estimate position and width of just the matched substring
             const fullWidth = textItem.width * viewport.scale
             const charCount = textStr.length
-            const xOffset = charCount > 0 ? (matchIndex / charCount) * fullWidth : 0
-            const matchWidth = charCount > 0 ? (term.length / charCount) * fullWidth : fullWidth
+            const xOffset = charCount > 0 ? (span.start / charCount) * fullWidth : 0
+            const matchLen = span.end - span.start + 1
+            const matchWidth = charCount > 0 ? (matchLen / charCount) * fullWidth : fullWidth
 
             const hl = document.createElement('div')
             hl.className = 'pdf-highlight'
-            hl.dataset.highlightIndex = String(count)
+            hl.dataset.highlightIndex = String(matchCount)
             Object.assign(hl.style, {
               position: 'absolute',
               left: `${vpX + xOffset}px`,
@@ -303,14 +346,15 @@ export function DocumentViewer({ docUuid, highlightTerms = [], processing, taskS
               borderRadius: '2px',
             })
             overlay.appendChild(hl)
-            count++
           }
+
+          matchCount++
         }
       }
     }
 
-    setTotalHighlights(count)
-    if (count > 0) {
+    setTotalHighlights(matchCount)
+    if (matchCount > 0) {
       setCurrentHighlight(0)
       // Double rAF ensures DOM layout is complete before scrolling
       requestAnimationFrame(() => {
@@ -323,15 +367,22 @@ export function DocumentViewer({ docUuid, highlightTerms = [], processing, taskS
     const container = containerRef.current
     if (!container) return
 
-    const highlights = container.querySelectorAll('.pdf-highlight')
-    if (highlights.length === 0 || index < 0 || index >= highlights.length) return
+    const allHighlights = container.querySelectorAll('.pdf-highlight')
+    if (allHighlights.length === 0) return
 
-    // Update opacity on all highlights
-    highlights.forEach((hl, idx) => {
-      ;(hl as HTMLElement).style.opacity = idx === index ? '0.75' : '0.45'
+    // A single match may have multiple rects (cross-text-item). Update opacity
+    // by match index and scroll to the first rect of the active match.
+    allHighlights.forEach((hl) => {
+      const el = hl as HTMLElement
+      const idx = Number(el.dataset.highlightIndex)
+      el.style.opacity = idx === index ? '0.75' : '0.45'
     })
 
-    const target = highlights[index] as HTMLElement
+    const target = container.querySelector(
+      `.pdf-highlight[data-highlight-index="${index}"]`
+    ) as HTMLElement | null
+    if (!target) return
+
     const scrollParent = container.parentElement
     if (!scrollParent) return
 
