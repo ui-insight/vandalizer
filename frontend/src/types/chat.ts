@@ -81,11 +81,14 @@ export type StreamSegment =
   | { kind: 'tool_result'; result: ToolResultInfo }
 
 export interface StreamChunk {
-  kind: 'text' | 'thinking' | 'thinking_done' | 'error' | 'tool_call' | 'tool_result'
+  kind: 'text' | 'thinking' | 'thinking_done' | 'error' | 'tool_call' | 'tool_result' | 'usage'
   content: string
   duration?: number
   tool_name?: string
   tool_call_id?: string
   args?: Record<string, unknown>
   quality?: QualityMeta | null
+  request_tokens?: number
+  response_tokens?: number
+  total_tokens?: number
 }

@@ -58,6 +58,10 @@ export function releaseDemoUser(demoUuid: string) {
   return apiFetch<{ ok: boolean }>(`/api/demo/admin/release/${demoUuid}`, { method: 'POST' })
 }
 
+export function restartDemoTrial(demoUuid: string) {
+  return apiFetch<{ ok: boolean }>(`/api/demo/admin/restart-trial/${demoUuid}`, { method: 'POST' })
+}
+
 export function activateDemoUser(demoUuid: string) {
   return apiFetch<{ ok: boolean }>(`/api/demo/admin/activate/${demoUuid}`, { method: 'POST' })
 }
@@ -74,6 +78,19 @@ export function sendTestEmail(to: string) {
 
 export function adminResendCredentials(demoUuid: string) {
   return apiFetch<{ ok: boolean; message: string }>(`/api/demo/resend-credentials/${demoUuid}`, {
+    method: 'POST',
+  })
+}
+
+export function adminAddDemoUser(data: { first_name: string; last_name: string; email: string }) {
+  return apiFetch<{ ok: boolean; uuid: string }>('/api/demo/admin/add-user', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export function adminGetMagicLink(demoUuid: string) {
+  return apiFetch<{ ok: boolean; url: string }>(`/api/demo/admin/magic-link/${demoUuid}`, {
     method: 'POST',
   })
 }

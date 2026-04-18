@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import {
   Globe,
-  Chrome,
   MonitorPlay,
   Circle,
   Play,
@@ -102,7 +101,7 @@ export default function BrowserAutomation() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100">
-                    <Chrome className="h-5 w-5 text-gray-600" />
+                    <Globe className="h-5 w-5 text-gray-600" />
                   </div>
                   <div>
                     <div className="text-sm font-semibold text-gray-900">Chrome Extension</div>

@@ -206,7 +206,8 @@ async def download_results(
                 pass
         if isinstance(data, list):
             if data and isinstance(data[0], dict):
-                headers = list(data[0].keys())
+                # Collect keys from ALL items so no columns are missing
+                headers = list(dict.fromkeys(k for row in data for k in row.keys()))
                 writer.writerow(headers)
                 for row in data:
                     writer.writerow([_csv_cell(row.get(h, "")) for h in headers])
@@ -215,12 +216,16 @@ async def download_results(
                 for item in data:
                     writer.writerow([str(item)])
         elif isinstance(data, dict):
-            headers = list(data.keys())
-            writer.writerow(headers)
-            writer.writerow([_csv_cell(data[h]) for h in headers])
+            # Transpose to Field/Value rows instead of one wide row
+            writer.writerow(["Field", "Value"])
+            for k, v in data.items():
+                writer.writerow([str(k), _csv_cell(v)])
         else:
             writer.writerow(["Output"])
-            writer.writerow([str(data)])
+            text = str(data)
+            for line in text.split("\n"):
+                if line.strip():
+                    writer.writerow([line])
         return StreamingResponse(
             io.BytesIO(buf.getvalue().encode()),
             media_type="text/csv",
@@ -246,84 +251,82 @@ async def download_results(
         )
 
     if format == "pdf":
-        # Build a human-readable text representation for the PDF
+        from fpdf import FPDF
+        from fpdf.fonts import FontFace
+
         data = output_data
         if isinstance(data, str):
             try:
                 data = json.loads(data)
             except (json.JSONDecodeError, ValueError):
                 pass
-        if isinstance(data, str):
-            text = _strip_markdown(data)
-        elif isinstance(data, dict):
-            text = "\n".join(f"{k}: {v}" for k, v in data.items())
-        elif isinstance(data, list):
-            if data and isinstance(data[0], dict):
-                parts: list[str] = []
+
+        pdf = FPDF()
+        pdf.set_auto_page_break(auto=True, margin=20)
+        pdf.add_page()
+        pdf.set_font("Helvetica", "B", 14)
+        pdf.cell(0, 10, "Workflow Results", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(4)
+
+        heading_style = FontFace(color=255, fill_color=(55, 65, 81), emphasis="BOLD")
+
+        if isinstance(data, list) and data and isinstance(data[0], dict):
+            headers = list(dict.fromkeys(k for row in data for k in row.keys()))
+            usable = pdf.w - pdf.l_margin - pdf.r_margin
+            # Smart column widths: allocate proportionally to max content length
+            max_lens = []
+            for h in headers:
+                col_max = len(str(h))
+                for row in data:
+                    col_max = max(col_max, len(str(row.get(h, ""))))
+                max_lens.append(min(col_max, 80))
+            total = sum(max_lens) or 1
+            col_widths = tuple(max(usable * (ml / total), 20) for ml in max_lens)
+
+            pdf.set_font("Helvetica", "", 9)
+            with pdf.table(
+                col_widths=col_widths,
+                headings_style=heading_style,
+                text_align="LEFT",
+            ) as table:
+                header_row = table.row()
+                for h in headers:
+                    header_row.cell(str(h))
                 for i, item in enumerate(data):
-                    if len(data) > 1:
-                        parts.append(f"--- Result {i + 1} ---")
-                    parts.extend(f"{k}: {v}" for k, v in item.items())
-                    parts.append("")
-                text = "\n".join(parts)
-            else:
-                text = "\n".join(str(item) for item in data)
+                    row = table.row()
+                    for h in headers:
+                        val = item.get(h, "")
+                        cell_text = str(val) if val is not None else ""
+                        if isinstance(val, (dict, list)):
+                            cell_text = json.dumps(val, default=str)
+                        row.cell(cell_text)
+
+        elif isinstance(data, dict):
+            usable = pdf.w - pdf.l_margin - pdf.r_margin
+            pdf.set_font("Helvetica", "", 10)
+            with pdf.table(
+                col_widths=(usable * 0.3, usable * 0.7),
+                headings_style=heading_style,
+                text_align="LEFT",
+            ) as table:
+                header_row = table.row()
+                header_row.cell("Field")
+                header_row.cell("Value")
+                for k, v in data.items():
+                    row = table.row()
+                    row.cell(str(k))
+                    val_text = str(v) if not isinstance(v, (dict, list)) else json.dumps(v, default=str)
+                    row.cell(val_text)
+
+        elif isinstance(data, str):
+            text = _strip_markdown(data)
+            pdf.set_font("Helvetica", "", 10)
+            pdf.multi_cell(0, 5, text)
         else:
-            text = str(data)
+            pdf.set_font("Helvetica", "", 10)
+            pdf.multi_cell(0, 5, str(data) if data else "")
 
-        # Minimal PDF generation without external dependencies
-        lines = text.split("\n")
-        pdf_lines: list[str] = []
-        for line in lines:
-            # Escape special PDF characters
-            safe = line.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
-            pdf_lines.append(safe)
-
-        # Build PDF objects
-        objects: list[str] = []
-        offsets: list[int] = []
-
-        def _add_obj(content: str) -> int:
-            idx = len(objects) + 1
-            objects.append(f"{idx} 0 obj\n{content}\nendobj\n")
-            return idx
-
-        catalog_id = _add_obj("<< /Type /Catalog /Pages 2 0 R >>")
-        _pages_id = _add_obj("")  # placeholder, will be replaced
-
-        # Build page content stream
-        stream_lines = ["BT", "/F1 10 Tf", "36 756 Td", "12 TL"]
-        for pl in pdf_lines:
-            stream_lines.append(f"({pl}) '")
-        stream_lines.append("ET")
-        stream_body = "\n".join(stream_lines)
-        stream_id = _add_obj(f"<< /Length {len(stream_body)} >>\nstream\n{stream_body}\nendstream")
-
-        font_id = _add_obj("<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>")
-        page_id = _add_obj(
-            f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
-            f"/Contents {stream_id} 0 R /Resources << /Font << /F1 {font_id} 0 R >> >> >>"
-        )
-        # Fix pages object
-        objects[1] = f"2 0 obj\n<< /Type /Pages /Kids [{page_id} 0 R] /Count 1 >>\nendobj\n"
-
-        pdf_buf = io.BytesIO()
-        pdf_buf.write(b"%PDF-1.4\n")
-        for obj in objects:
-            offsets.append(pdf_buf.tell())
-            pdf_buf.write(obj.encode("latin-1", errors="replace"))
-        xref_offset = pdf_buf.tell()
-        pdf_buf.write(b"xref\n")
-        pdf_buf.write(f"0 {len(objects) + 1}\n".encode())
-        pdf_buf.write(b"0000000000 65535 f \n")
-        for off in offsets:
-            pdf_buf.write(f"{off:010d} 00000 n \n".encode())
-        pdf_buf.write(b"trailer\n")
-        pdf_buf.write(f"<< /Size {len(objects) + 1} /Root {catalog_id} 0 R >>\n".encode())
-        pdf_buf.write(b"startxref\n")
-        pdf_buf.write(f"{xref_offset}\n".encode())
-        pdf_buf.write(b"%%EOF\n")
-        pdf_buf.seek(0)
+        pdf_buf = io.BytesIO(pdf.output())
 
         return StreamingResponse(
             pdf_buf,
@@ -568,6 +571,47 @@ async def reorder_steps(workflow_id: str, req: ReorderStepsRequest, user: User =
     if not ok:
         raise HTTPException(status_code=400, detail="Invalid step IDs or workflow not found")
     return {"ok": True}
+
+
+@router.get("/{workflow_id}/history")
+async def get_workflow_history(
+    workflow_id: str, limit: int = 50, user: User = Depends(get_current_user),
+):
+    """List the current user's past runs of this workflow."""
+    wf = await get_authorized_workflow(workflow_id, user)
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    from app.models.activity import ActivityEvent
+    events = (
+        await ActivityEvent.find(
+            ActivityEvent.workflow == wf.id,
+            ActivityEvent.user_id == user.user_id,
+            ActivityEvent.type == "workflow_run",
+        )
+        .sort("-started_at")
+        .limit(limit)
+        .to_list()
+    )
+    return {
+        "runs": [
+            {
+                "id": str(ev.id),
+                "status": ev.status,
+                "started_at": ev.started_at.isoformat() if ev.started_at else None,
+                "finished_at": ev.finished_at.isoformat() if ev.finished_at else None,
+                "duration_ms": ev.duration_ms,
+                "error": ev.error or "",
+                "tokens_input": ev.tokens_input,
+                "tokens_output": ev.tokens_output,
+                "documents_touched": ev.documents_touched,
+                "steps_completed": ev.steps_completed,
+                "steps_total": ev.steps_total,
+                "session_id": ev.workflow_session_id,
+                "result_snapshot": ev.result_snapshot or {},
+            }
+            for ev in events
+        ],
+    }
 
 
 @router.get("/{workflow_id}/quality-history")

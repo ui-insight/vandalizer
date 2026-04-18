@@ -58,9 +58,15 @@ export function useActivities(externalSignal?: number) {
     }
   }, [])
 
-  // Initial fetch + re-fetch on external signal
+  // Initial fetch + re-fetch on external signal.
+  // Signal bumps mean "something was just kicked off" — enter the tail window
+  // so polling runs even before the activity record is visible. Avoids a race
+  // where the first refresh lands before the backend has created the record.
   useEffect(() => {
     refresh()
+    if (externalSignal !== undefined) {
+      lastActiveAtRef.current = Date.now()
+    }
   }, [refresh, externalSignal])
 
   // Poll while active, then keep polling for TAIL_DURATION after completion

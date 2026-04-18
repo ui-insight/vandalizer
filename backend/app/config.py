@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     sentry_dsn: str = ""
     log_format: str = "json"  # "json" for structured logging, "text" for human-readable
 
+    # Email provider: "smtp" or "resend"
+    email_provider: str = "smtp"
+
     # SMTP email settings
     smtp_host: str = ""
     smtp_port: int = 587
@@ -37,6 +40,11 @@ class Settings(BaseSettings):
     smtp_start_tls: bool = True  # STARTTLS upgrade (port 587)
     smtp_from_email: str = ""
     smtp_from_name: str = "Vandalizer"
+
+    # Resend email settings (used when email_provider=resend)
+    resend_api_key: str = ""
+    resend_from_email: str = ""
+    resend_from_name: str = "Vandalizer"
 
     # Encryption key for sensitive config values (API keys) stored in MongoDB.
     # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"

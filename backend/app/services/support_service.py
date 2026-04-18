@@ -149,6 +149,20 @@ async def create_ticket(
     return _ticket_to_dict(ticket)
 
 
+async def get_ticket_stats() -> dict:
+    """Return aggregate ticket counts by status."""
+    open_count = await SupportTicket.find({"status": "open"}).count()
+    in_progress_count = await SupportTicket.find({"status": "in_progress"}).count()
+    closed_count = await SupportTicket.find({"status": "closed"}).count()
+    total = open_count + in_progress_count + closed_count
+    return {
+        "total": total,
+        "open": open_count,
+        "in_progress": in_progress_count,
+        "closed": closed_count,
+    }
+
+
 async def list_tickets(
     user_id: str | None = None,
     status: str | None = None,

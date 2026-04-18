@@ -16,6 +16,7 @@ class ModelInfo(BaseModel):
     supports_structured: bool = True
     multimodal: bool = False
     supports_pdf: bool = False
+    context_window: int = 128000
 
 
 class UserConfigResponse(BaseModel):

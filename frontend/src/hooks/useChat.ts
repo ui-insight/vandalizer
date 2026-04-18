@@ -17,6 +17,9 @@ export function useChat() {
   const [activeToolCalls, setActiveToolCalls] = useState<ToolCallInfo[]>([])
   const [toolResults, setToolResults] = useState<ToolResultInfo[]>([])
   const [segments, setSegments] = useState<StreamSegment[]>([])
+  const [contextTokens, setContextTokens] = useState(0)
+  const [contextMode, setContextMode] = useState<'full' | 'truncated' | 'compacted'>('full')
+  const [contextCutoffIndex, setContextCutoffIndex] = useState(0)
 
   const streamingRef = useRef('')
   const thinkingRef = useRef('')
@@ -100,6 +103,8 @@ export function useChat() {
               setActiveToolCalls([...toolCallsRef.current])
               segmentsRef.current.push({ kind: 'tool_result', result: res })
               setSegments([...segmentsRef.current])
+            } else if (chunk.kind === 'usage') {
+              setContextTokens(chunk.request_tokens ?? 0)
             } else if (chunk.kind === 'error') {
               setError(chunk.content)
             }
@@ -168,6 +173,8 @@ export function useChat() {
       const data = await getHistory(uuid)
       setMessages(data.messages)
       setConversationUuid(uuid)
+      if (data.context_mode) setContextMode(data.context_mode)
+      if (data.context_cutoff_index != null) setContextCutoffIndex(data.context_cutoff_index)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load history')
     }
@@ -185,6 +192,9 @@ export function useChat() {
     setActiveToolCalls([])
     setToolResults([])
     setSegments([])
+    setContextTokens(0)
+    setContextMode('full')
+    setContextCutoffIndex(0)
   }, [])
 
   const setActivity = useCallback((newActivityId: string, newConversationUuid: string) => {
@@ -205,6 +215,12 @@ export function useChat() {
     activeToolCalls,
     toolResults,
     segments,
+    contextTokens,
+    contextMode,
+    contextCutoffIndex,
+    setContextTokens,
+    setContextMode,
+    setContextCutoffIndex,
     send,
     loadHistory,
     reset,

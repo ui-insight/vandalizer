@@ -10,7 +10,6 @@ import {
   Code,
   GitPullRequest,
   GraduationCap,
-  Github,
   ExternalLink,
   Menu,
   X,
@@ -637,7 +636,7 @@ export default function Docs() {
               rel="noopener noreferrer"
               className="hidden sm:inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-[#f1b300] transition-colors"
             >
-              <Github className="w-4 h-4" />
+              <ExternalLink className="w-4 h-4" />
               GitHub
             </a>
             {/* Mobile TOC toggle */}

@@ -178,6 +178,12 @@ app.add_middleware(
 
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+
+# Azure AD may be registered with a redirect URI that differs from the
+# canonical /api/auth/oauth/azure/callback path.  Mount the same callback
+# handler at the legacy path so it is reachable without changing the Azure
+# app registration.
+app.get("/login/azure/authorized", include_in_schema=False)(auth.oauth_azure_callback)
 app.include_router(files.router, prefix="/api/files", tags=["files"])
 app.include_router(folders.router, prefix="/api/folders", tags=["folders"])
 app.include_router(documents.router, prefix="/api/documents", tags=["documents"])

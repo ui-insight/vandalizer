@@ -20,6 +20,7 @@ from app.services.email_service import (
     recapture_email,
 )
 from app.utils.security import hash_password
+import redis.asyncio as aioredis
 
 logger = logging.getLogger(__name__)
 
@@ -190,6 +191,7 @@ async def _activate_application(app: DemoApplication, settings: Settings) -> Non
     # Seed recapture drip — first email 24h after activation
     app.recapture_step = 0
     app.recapture_next_at = now + datetime.timedelta(days=_RECAPTURE_SCHEDULE_DAYS[0])
+    await app.save()
 
     # Send activation email
     expires_str = expires_at.strftime("%B %d, %Y")
@@ -352,6 +354,27 @@ async def resend_credentials(uuid: str, settings: Settings | None = None) -> boo
     return True
 
 
+async def generate_magic_link(uuid: str, settings: Settings) -> str | None:
+    """Generate a one-time magic login link for a demo user (24h TTL)."""
+    app = await DemoApplication.find_one(DemoApplication.uuid == uuid)
+    if not app or app.status != "active" or not app.user_id:
+        return None
+
+    user = await User.find_one(User.user_id == app.user_id)
+    if not user:
+        return None
+
+    token = secrets.token_urlsafe(32)
+    r = aioredis.from_url(f"redis://{settings.redis_host}:6379")
+    try:
+        await r.set(f"magic_login:{token}", user.user_id, ex=86400)  # 24 hours
+    finally:
+        await r.aclose()
+
+    logger.info("Generated magic link for demo user %s", app.email)
+    return f"{settings.frontend_url}/api/auth/magic-login?token={token}"
+
+
 async def admin_release_user(demo_uuid: str) -> bool:
     """Admin: release an expired demo user so they can log in again."""
     app = await DemoApplication.find_one(DemoApplication.uuid == demo_uuid)
@@ -369,6 +392,66 @@ async def admin_release_user(demo_uuid: str) -> bool:
             await user.save()
 
     return True
+
+
+async def admin_restart_trial(demo_uuid: str) -> bool:
+    """Admin: restart the trial for an expired demo user (reset to 14 days)."""
+    app = await DemoApplication.find_one(DemoApplication.uuid == demo_uuid)
+    if not app or app.status not in ("active", "expired", "completed"):
+        return False
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    new_expires = now + datetime.timedelta(days=TRIAL_DAYS)
+
+    app.status = "active"
+    app.expires_at = new_expires
+    app.expired_at = None
+    app.recapture_step = 0
+    app.recapture_next_at = now + datetime.timedelta(days=_RECAPTURE_SCHEDULE_DAYS[0])
+    await app.save()
+
+    if app.user_id:
+        user = await User.find_one(User.user_id == app.user_id)
+        if user:
+            user.demo_status = "active"
+            user.demo_expires_at = new_expires
+            await user.save()
+
+    return True
+
+
+async def admin_add_demo_user(
+    first_name: str,
+    last_name: str,
+    email: str,
+    settings: Settings | None = None,
+) -> DemoApplication:
+    """Admin: create a demo user directly, skipping the application/waitlist flow."""
+    if settings is None:
+        settings = Settings()
+
+    existing = await DemoApplication.find_one(DemoApplication.email == email)
+    if existing:
+        raise ValueError("An application with this email already exists")
+
+    existing_user = await User.find_one(User.email == email)
+    if existing_user:
+        raise ValueError("An account with this email already exists")
+
+    name = f"{first_name} {last_name}"
+    app = DemoApplication(
+        uuid=secrets.token_urlsafe(16),
+        name=name,
+        email=email,
+        organization="Direct Add",
+        questionnaire_responses={},
+        status="pending",
+        created_at=datetime.datetime.now(datetime.timezone.utc),
+    )
+    await app.insert()
+
+    await _activate_application(app, settings)
+    return app
 
 
 async def admin_activate_user(demo_uuid: str, settings: Settings | None = None) -> bool:
@@ -593,12 +676,22 @@ async def bulk_resend_credentials(settings: Settings | None = None) -> dict:
             skipped += 1
             continue
 
-        # Generate new password and update
+        # Reset trial expiration to 14 days from now
+        now = datetime.datetime.now(datetime.timezone.utc)
+        new_expires = now + datetime.timedelta(days=TRIAL_DAYS)
+        app.expires_at = new_expires
+        # Restart recapture drip so they get reminder emails
+        app.recapture_step = 0
+        app.recapture_next_at = now + datetime.timedelta(days=_RECAPTURE_SCHEDULE_DAYS[0])
+        await app.save()
+
+        # Generate new password and update user
         password = secrets.token_urlsafe(10)
         user.password_hash = hash_password(password)
+        user.demo_expires_at = new_expires
         await user.save()
 
-        expires_str = app.expires_at.strftime("%B %d, %Y") if app.expires_at else "N/A"
+        expires_str = new_expires.strftime("%B %d, %Y")
         subject, html = activation_email(
             app.name, user.user_id, password, expires_str, settings.frontend_url
         )

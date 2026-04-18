@@ -257,6 +257,7 @@ class ModelAddRequest(BaseModel):
     supports_structured: bool = True
     multimodal: bool = False
     supports_pdf: bool = False
+    context_window: int = 128000
 
 
 class OAuthProviderRequest(BaseModel):
@@ -264,7 +265,8 @@ class OAuthProviderRequest(BaseModel):
     display_name: str
     client_id: str
     client_secret: str
-    redirect_uri: str
+    redirect_uri: Optional[str] = None
+    enabled: bool = True
     tenant_id: Optional[str] = None
     metadata_url: Optional[str] = None
     entity_id: Optional[str] = None
@@ -1295,6 +1297,7 @@ async def add_model(
             "supports_structured": body.supports_structured,
             "multimodal": body.multimodal,
             "supports_pdf": body.supports_pdf,
+            "context_window": body.context_window,
         }
     )
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
@@ -1343,6 +1346,7 @@ async def update_model(
         "supports_structured": body.supports_structured,
         "multimodal": body.multimodal,
         "supports_pdf": body.supports_pdf,
+        "context_window": body.context_window,
     }
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
     cfg.updated_by = user.user_id
@@ -1391,6 +1395,7 @@ async def add_oauth_provider(
 
     cfg = await SystemConfig.get_config()
     provider_dict = body.model_dump(exclude_none=True)
+    provider_dict["enabled"] = True
     if provider_dict.get("client_secret"):
         provider_dict["client_secret"] = encrypt_value(provider_dict["client_secret"])
     cfg.oauth_providers.append(provider_dict)

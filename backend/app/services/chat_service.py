@@ -34,8 +34,6 @@ from app.services.llm_service import (
     create_agentic_chat_agent,
     create_chat_agent,
     DOCUMENT_CHAT_SYSTEM_PROMPT,
-    FIRST_SESSION_AGENTIC_PROMPT_TEMPLATE,
-    FIRST_SESSION_SYSTEM_PROMPT,
     HELP_CHAT_SYSTEM_PROMPT,
     VANDALIZER_CONTEXT,
 )
@@ -189,19 +187,19 @@ async def _run_scripted_demo(
     try:
         # -- Step 1: Introduction ------------------------------------------------
         yield _text(
-            "I placed a sample NSF proposal in your workspace. Let me show you "
-            "what Vandalizer does with it.\n\n"
-            "Most tools just throw your document at an LLM and hope for the best. "
-            "Vandalizer uses **validated extraction templates** — tested against "
-            "real documents with known answers, so you know the accuracy *before* "
-            "you trust the results.\n\n"
-            "Let me find the right template…\n\n"
+            "Watch me do something most AI tools can't.\n\n"
+            "I'm going to pull structured data out of a real NSF grant proposal — "
+            "and tell you, up front, *how accurate it is*. Not a hope. A **measured "
+            "number**, from real test cases.\n\n"
+            "Whether your week is grants, IRB, contracts, or something else, "
+            "the pattern is the same: drop in the doc, run a validated template, "
+            "trust the number. Here's what that looks like.\n\n"
         )
 
         # -- Step 2: Search library ----------------------------------------------
         call_id_1 = str(uuid.uuid4())[:12]
         yield _tool_call("search_library", call_id_1, {"query": "NSF", "kind": "search_set"})
-        await asyncio.sleep(0)  # flush chunk so spinner appears
+        await asyncio.sleep(0.05)  # real flush so the spinner reaches the client before slow work blocks the loop
 
         from app.services.library_service import search_libraries
         lib_results = await search_libraries(user, query="NSF", team_id=team_id, kind="search_set")
@@ -239,7 +237,7 @@ async def _run_scripted_demo(
             "extraction_set_uuid": ctx.extraction_set_uuid,
             "document_uuids": [ctx.sample_doc_uuid],
         })
-        await asyncio.sleep(0)  # flush chunk so spinner appears before LLM extraction runs
+        await asyncio.sleep(0.05)  # real flush so the spinner reaches the client before slow work blocks the loop before LLM extraction runs
 
         # Execute the actual extraction
         from app.services.extraction_engine import ExtractionEngine
@@ -328,7 +326,7 @@ async def _run_scripted_demo(
                 "query": "NSF budget indirect costs MTDC equipment exclusion",
                 "kb_uuid": ctx.kb_uuid,
             })
-            await asyncio.sleep(0)  # flush chunk so spinner appears
+            await asyncio.sleep(0.05)  # real flush so the spinner reaches the client before slow work blocks the loop
 
             from app.services.document_manager import get_document_manager
             dm = get_document_manager()
@@ -358,22 +356,21 @@ async def _run_scripted_demo(
 
         # -- Step 5: Hand off ------------------------------------------------------
         yield _text(
-            "That's Vandalizer: **validated extraction** that you can measure and trust"
+            "That's the pattern: **validated extraction** you can measure and trust"
         )
         if ctx.kb_uuid:
             yield _text(
-                ", plus **policy cross-reference** to catch compliance issues automatically"
+                ", plus **policy cross-reference** that catches compliance issues automatically"
             )
         yield _text(
             ".\n\n"
-            "Here's how this fits your daily work:\n"
-            "1. **Upload** your documents — they stay private and get auto-indexed\n"
-            "2. **Extract** structured data with validated templates\n"
-            "3. **Build & validate** your own templates from any document\n"
-            "4. **Scale** with workflows and automation triggers\n\n"
-            "What would you like to do next?\n\n"
-            "[ACTION:upload-docs]Upload your documents[/ACTION]  "
-            "[ACTION:start-cert]Start the Certification Program[/ACTION]\n"
+            "**Now do it with one of yours.** Drop in a grant, IRB protocol, "
+            "contract, or any document you actually work with — I'll find the "
+            "right template and run it.\n\n"
+            "[ACTION:upload-docs]Try it on one of yours[/ACTION]\n\n"
+            "Want the bigger picture on why validated workflows matter for "
+            "research admin? [ACTION:start-cert]Start the Certification Program[/ACTION]\n\n"
+            "Or just ask me anything — I know this tool and your documents.\n"
         )
 
         # -- Finalize: save to conversation & activity ----------------------------
@@ -531,17 +528,20 @@ async def chat_stream(
     if attachment_context:
         parts.append(attachment_context)
 
-    # Build workspace inventory for organic and document-chat modes.
-    # First-session / demo / help paths don't need it.
+    # Build workspace inventory for all non-demo, non-help paths.
+    # run_demo returns early (scripted demo path); help path uses its own context.
     team_id = str(user.current_team) if user and user.current_team else None
     inventory = ""
-    if user and not is_first_session and not run_demo and not include_onboarding_context:
+    if user and not run_demo and not include_onboarding_context:
         try:
             inventory = await _build_workspace_inventory(user_id, team_id)
         except Exception as e:
             logger.warning("Workspace inventory failed: %s", e)
 
-    # Select system prompt based on whether we have document context
+    # Select system prompt based on whether we have document context.
+    # Note: run_demo is handled via scripted demo and returns early above, so
+    # it never reaches this block. First-session non-demo messages fall through
+    # to normal agentic chat (no special "pitch the demo" prompt).
     if parts:
         context_block = "\n\n".join(parts)
         prompt = (
@@ -553,24 +553,6 @@ async def chat_stream(
         system_prompt = DOCUMENT_CHAT_SYSTEM_PROMPT
         if inventory:
             system_prompt = system_prompt + "\n\n" + inventory
-    elif is_first_session or run_demo:
-        if onboarding_context and onboarding_context.extraction_set_uuid:
-            # Agentic demo: build a dynamic prompt with real UUIDs
-            # so the agent can run live tool calls during the demo.
-            system_prompt = FIRST_SESSION_AGENTIC_PROMPT_TEMPLATE.format(
-                sample_doc_uuid=onboarding_context.sample_doc_uuid,
-                sample_doc_title=onboarding_context.sample_doc_title,
-                extraction_set_uuid=onboarding_context.extraction_set_uuid,
-                extraction_set_title=onboarding_context.extraction_set_title,
-                kb_uuid=onboarding_context.kb_uuid or "NOT AVAILABLE",
-                kb_title=onboarding_context.kb_title or "N/A",
-            )
-        elif is_first_session:
-            # Fallback: text-only conversational onboarding
-            system_prompt = FIRST_SESSION_SYSTEM_PROMPT
-        else:
-            system_prompt = None  # run_demo but no seed content — use default
-        prompt = message
     elif include_onboarding_context:
         # Inject Vandalizer help context only when explicitly requested
         # (triggered by the placeholder pills in the chat UI).
@@ -588,6 +570,16 @@ async def chat_stream(
         else:
             system_prompt = None  # uses default
 
+    # Expose open documents to the agent so tools like run_extraction can
+    # reference them by UUID without a blind search_documents call. Without
+    # this, the model has to search by filename — which is both fragile and
+    # expensive on large workspaces (see chat_tools.search_documents).
+    if documents:
+        open_docs_block = _build_open_documents_block(documents)
+        if open_docs_block:
+            base = system_prompt if system_prompt is not None else AGENTIC_CHAT_SYSTEM_PROMPT
+            system_prompt = base + "\n\n" + open_docs_block
+
     # Select agent — agentic (with tools) when user context is available.
     # Agents are cached by model; per-request system prompts (including
     # workspace inventory) are passed via ``instructions`` at iter() time.
@@ -595,9 +587,11 @@ async def chat_stream(
     if user and team_access:
         from app.services.chat_deps import AgenticChatDeps
 
-        # Include onboarding sample doc UUID so agent tools can access it
+        # Only inject the onboarding sample doc during the scripted demo.
+        # Outside the demo, force-injecting it leaks a phantom NSF proposal
+        # into normal agent tool calls.
         effective_doc_uuids = list(document_uuids)
-        if onboarding_context and onboarding_context.sample_doc_uuid:
+        if run_demo and onboarding_context and onboarding_context.sample_doc_uuid:
             if onboarding_context.sample_doc_uuid not in effective_doc_uuids:
                 effective_doc_uuids.append(onboarding_context.sample_doc_uuid)
 
@@ -764,6 +758,29 @@ async def chat_stream(
                     segments=cleaned_segments or None,
                 )
 
+                # Stream token usage so the frontend can display context utilization
+                input_toks = usage.input_tokens if usage else 0
+                output_toks = usage.output_tokens if usage else 0
+
+                # Fallback: estimate tokens when provider doesn't report usage
+                if not input_toks:
+                    history_chars = sum(
+                        len(str(part))
+                        for m in previous_messages
+                        for part in m.parts
+                    )
+                    char_count = history_chars + len(prompt) + len(assistant_message)
+                    input_toks = max(char_count // 4, 1)
+                    output_toks = output_toks or max(len(assistant_message) // 4, 1)
+
+                yield json.dumps({
+                    "kind": "usage",
+                    "content": "",
+                    "request_tokens": input_toks,
+                    "response_tokens": output_toks,
+                    "total_tokens": input_toks + output_toks,
+                }) + "\n"
+
     except UsageLimitExceeded:
         logger.warning("Chat usage limit reached for user %s", user_id)
         yield json.dumps({"kind": "error", "content": "This response used too many tool calls. Try breaking your request into smaller steps."}) + "\n"
@@ -792,6 +809,21 @@ def _get_full_text(documents: list[SmartDocument]) -> str:
         if doc.raw_text:
             parts.append(f"\n\n## Document: {doc.title}\n{doc.raw_text}")
     return "".join(parts)
+
+
+def _build_open_documents_block(documents: list[SmartDocument]) -> str:
+    """Format the documents currently open in chat so the model can reference
+    them by UUID without calling search_documents.
+    """
+    lines = [
+        "## Documents open in this chat",
+        "The user has these documents selected. Use their UUIDs directly for "
+        "tools like run_extraction or get_document_text — do NOT call "
+        "search_documents to look them up.",
+    ]
+    for doc in documents:
+        lines.append(f'- "{doc.title}" (uuid: {doc.uuid})')
+    return "\n".join(lines)
 
 
 # ---------------------------------------------------------------------------
@@ -1103,9 +1135,9 @@ async def _finalize(
             ev.message_count = len(conversation.messages) if conversation else 0
             ev.status = ActivityStatus.COMPLETED.value
             if usage:
-                ev.tokens_input = usage.request_tokens or 0
-                ev.tokens_output = usage.response_tokens or 0
-                ev.total_tokens = (usage.request_tokens or 0) + (usage.response_tokens or 0)
+                ev.tokens_input = usage.input_tokens or 0
+                ev.tokens_output = usage.output_tokens or 0
+                ev.total_tokens = (usage.input_tokens or 0) + (usage.output_tokens or 0)
             ev.documents_touched = len(documents)
             from datetime import datetime, timezone
             ev.finished_at = datetime.now(timezone.utc)

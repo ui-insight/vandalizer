@@ -6,7 +6,7 @@ import {
   CheckCircle2, XCircle, Clock, Download, TrendingUp, TrendingDown,
   ChevronDown, ChevronUp, ArrowUpDown, Play, Minus, AlertCircle,
   ArrowLeft, FileText, FolderTree, X, Eye, Check, CheckCircle,
-  Mail, Send,
+  Mail, Send, Link, UserPlus,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -23,7 +23,7 @@ import {
   getTeamDetail, getUserDetail,
   getWorkflowEvents, getSystemConfig, updateSystemConfig, updateM365Config,
   addModel, updateModel, deleteModel, testOcr, testModel, addOAuthProvider,
-  deleteOAuthProvider, updateAuthMethods,
+  updateOAuthProvider, deleteOAuthProvider, updateAuthMethods,
   getQualitySummary, getQualityTimeline, runRegressionSuite,
   getQualityAlerts, acknowledgeAlert, getQualityItems, getQualityItemDetail,
   adminListAllTeams, adminCreateTeam, adminAddUserToTeam, adminRemoveUserFromTeam, getIsolatedUsers,
@@ -33,10 +33,13 @@ import { getTeamMembers } from '../api/teams'
 import * as orgApi from '../api/organizations'
 import type { Organization, OrgMember, OrgTeam } from '../api/organizations'
 import {
-  getDemoStats, getDemoApplications, releaseDemoUser, activateDemoUser,
-  getPostExperienceResponses, sendTestEmail, adminResendCredentials,
+  getDemoStats, getDemoApplications, releaseDemoUser, activateDemoUser, restartDemoTrial,
+  getPostExperienceResponses, sendTestEmail, adminResendCredentials, adminGetMagicLink,
+  adminAddDemoUser,
 } from '../api/demo'
 import { getAdminPromptOverview, adminUpdatePrompt, type PromptOverview } from '../api/feedbackPrompt'
+import * as supportApi from '../api/support'
+import type { SupportTicket, SupportTicketSummary } from '../types/support'
 import type { DemoAdminStats, DemoApplication as DemoApp, PostExperienceResponseAdmin } from '../types/demo'
 import { POST_SURVEY_FIELDS } from '../components/survey/postSurveyFields'
 import { PRE_SURVEY_FIELDS } from './Demo'
@@ -64,7 +67,7 @@ function applyThemeToDOM(theme: ThemeConfig) {
   root.style.setProperty('--ui-radius', theme.ui_radius)
 }
 
-type Tab = 'usage' | 'users' | 'teams' | 'organizations' | 'workflows' | 'quality' | 'approvals' | 'audit' | 'demo' | 'debugging' | 'config'
+type Tab = 'usage' | 'users' | 'teams' | 'organizations' | 'workflows' | 'quality' | 'approvals' | 'support' | 'audit' | 'demo' | 'debugging' | 'config'
 
 const TABS: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'usage', label: 'Usage', icon: BarChart3 },
@@ -74,6 +77,7 @@ const TABS: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'workflows', label: 'Workflows', icon: Workflow },
   { key: 'quality', label: 'Quality', icon: ShieldCheck },
   { key: 'approvals', label: 'Approvals', icon: CheckCircle2 },
+  { key: 'support', label: 'Support Center', icon: MessageSquare },
   { key: 'audit', label: 'Audit Log', icon: FileText },
   { key: 'demo', label: 'Demo', icon: Zap },
   { key: 'debugging', label: 'Debugging', icon: Bug },
@@ -2206,9 +2210,11 @@ function ConfigTab() {
   const [m365Saving, setM365Saving] = useState(false)
   const [m365Saved, setM365Saved] = useState(false)
 
-  // Add provider form
+  // Add/edit provider form
   const [showAddProvider, setShowAddProvider] = useState(false)
   const [newProvider, setNewProvider] = useState({ provider: 'oauth', display_name: '', client_id: '', client_secret: '', redirect_uri: '', tenant_id: '' })
+  const [editingProviderIndex, setEditingProviderIndex] = useState<number | null>(null)
+  const [editingProvider, setEditingProvider] = useState({ provider: 'oauth', display_name: '', client_id: '', client_secret: '', redirect_uri: '', tenant_id: '' })
 
   useEffect(() => {
     setLoading(true)
@@ -2441,6 +2447,34 @@ function ConfigTab() {
       setCfg(c)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to delete provider')
+    }
+  }
+
+  const handleEditProvider = (index: number) => {
+    const p = cfg?.oauth_providers?.[index] as Record<string, unknown> | undefined
+    if (!p) return
+    setEditingProviderIndex(index)
+    setEditingProvider({
+      provider: (p.provider as string) || 'oauth',
+      display_name: (p.display_name as string) || '',
+      client_id: (p.client_id as string) || '',
+      client_secret: '***',
+      redirect_uri: (p.redirect_uri as string) || '',
+      tenant_id: (p.tenant_id as string) || '',
+    })
+    setShowAddProvider(false)
+  }
+
+  const handleUpdateProvider = async () => {
+    if (editingProviderIndex === null) return
+    if (!editingProvider.display_name || !editingProvider.client_id) return
+    try {
+      await updateOAuthProvider(editingProviderIndex, editingProvider as unknown as Record<string, string>)
+      const c = await getSystemConfig()
+      setCfg(c)
+      setEditingProviderIndex(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to update provider')
     }
   }
 
@@ -2768,26 +2802,97 @@ function ConfigTab() {
             {cfg?.oauth_providers && cfg.oauth_providers.length > 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {cfg.oauth_providers.map((p, i) => (
-                  <div key={i} style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    padding: '10px 16px', background: '#f9fafb', borderRadius: 'var(--ui-radius, 12px)',
-                    border: '1px solid #e5e7eb',
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <Globe size={16} color="#6b7280" />
-                      <span style={{ fontSize: 14, fontWeight: 500 }}>{(p as Record<string, unknown>).display_name as string || (p as Record<string, unknown>).provider as string}</span>
-                      <span style={{
-                        fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#dbeafe', color: '#1e40af', fontWeight: 600,
-                      }}>
-                        {((p as Record<string, unknown>).provider as string || 'oauth').toUpperCase()}
-                      </span>
+                  <div key={i}>
+                    <div style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      padding: '10px 16px', background: '#f9fafb', borderRadius: 'var(--ui-radius, 12px)',
+                      border: '1px solid #e5e7eb',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <Globe size={16} color="#6b7280" />
+                        <span style={{ fontSize: 14, fontWeight: 500 }}>{(p as Record<string, unknown>).display_name as string || (p as Record<string, unknown>).provider as string}</span>
+                        <span style={{
+                          fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#dbeafe', color: '#1e40af', fontWeight: 600,
+                        }}>
+                          {((p as Record<string, unknown>).provider as string || 'oauth').toUpperCase()}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <button
+                          onClick={() => editingProviderIndex === i ? setEditingProviderIndex(null) : handleEditProvider(i)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4 }}
+                        >
+                          <Pencil size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteProvider(i)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 4 }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </div>
-                    <button
-                      onClick={() => handleDeleteProvider(i)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 4 }}
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    {editingProviderIndex === i && (
+                      <div style={{ marginTop: 8, padding: 16, background: '#f9fafb', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #e5e7eb' }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Edit Provider</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                          <div>
+                            <label style={labelStyle}>Type</label>
+                            <select
+                              value={editingProvider.provider}
+                              onChange={e => setEditingProvider({ ...editingProvider, provider: e.target.value })}
+                              style={inputStyle}
+                            >
+                              <option value="oauth">OAuth 2.0</option>
+                              <option value="azure">Azure AD</option>
+                              <option value="saml">SAML</option>
+                            </select>
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Display Name</label>
+                            <input value={editingProvider.display_name} onChange={e => setEditingProvider({ ...editingProvider, display_name: e.target.value })} style={inputStyle} />
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Client ID</label>
+                            <input value={editingProvider.client_id} onChange={e => setEditingProvider({ ...editingProvider, client_id: e.target.value })} style={inputStyle} />
+                          </div>
+                          <div>
+                            <label style={labelStyle}>Client Secret</label>
+                            <input type="password" value={editingProvider.client_secret} onChange={e => setEditingProvider({ ...editingProvider, client_secret: e.target.value })} style={inputStyle} placeholder="Leave as *** to keep existing" />
+                          </div>
+                          <div style={{ gridColumn: '1 / -1' }}>
+                            <label style={labelStyle}>Redirect URI</label>
+                            <input value={editingProvider.redirect_uri} onChange={e => setEditingProvider({ ...editingProvider, redirect_uri: e.target.value })} style={inputStyle} />
+                          </div>
+                          {editingProvider.provider === 'azure' && (
+                            <div style={{ gridColumn: '1 / -1' }}>
+                              <label style={labelStyle}>Tenant ID</label>
+                              <input value={editingProvider.tenant_id} onChange={e => setEditingProvider({ ...editingProvider, tenant_id: e.target.value })} style={inputStyle} />
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                          <button
+                            onClick={handleUpdateProvider}
+                            style={{
+                              padding: '8px 16px', borderRadius: 'var(--ui-radius, 12px)', border: 'none',
+                              background: 'var(--highlight-color, #eab308)', color: 'var(--highlight-text-color, #000)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                            }}
+                          >
+                            Save Changes
+                          </button>
+                          <button
+                            onClick={() => setEditingProviderIndex(null)}
+                            style={{
+                              padding: '8px 16px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db',
+                              background: '#fff', fontSize: 13, cursor: 'pointer',
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -2824,8 +2929,8 @@ function ConfigTab() {
                     <input type="password" value={newProvider.client_secret} onChange={e => setNewProvider({ ...newProvider, client_secret: e.target.value })} style={inputStyle} />
                   </div>
                   <div style={{ gridColumn: '1 / -1' }}>
-                    <label style={labelStyle}>Redirect URI</label>
-                    <input value={newProvider.redirect_uri} onChange={e => setNewProvider({ ...newProvider, redirect_uri: e.target.value })} style={inputStyle} />
+                    <label style={labelStyle}>Redirect URI (set automatically — register this in your identity provider)</label>
+                    <input value={`${window.location.origin}/api/auth/oauth/azure/callback`} readOnly style={{ ...inputStyle, opacity: 0.7, cursor: 'default' }} />
                   </div>
                   {newProvider.provider === 'azure' && (
                     <div style={{ gridColumn: '1 / -1' }}>
@@ -3438,6 +3543,80 @@ function DemoTab() {
 
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
+  async function handleExport() {
+    setActionLoading('export')
+    try {
+      // Fetch all applications (unfiltered) and post-survey responses
+      const [allApps, postResponses] = await Promise.all([
+        getDemoApplications(),
+        getPostExperienceResponses(),
+      ])
+
+      // Index post-survey responses by email for matching
+      const postByEmail = new Map<string, Record<string, unknown>>()
+      for (const pr of postResponses) {
+        postByEmail.set(pr.email, pr.responses)
+      }
+
+      // Build pre-survey column definitions (key + label)
+      const preCols: { key: string; label: string }[] = []
+      for (const f of PRE_SURVEY_FIELDS) {
+        if (f.type === 'info') continue
+        if (f.type === 'likert_group' && f.statements) {
+          for (const s of f.statements) preCols.push({ key: s.key, label: `Pre: ${s.label}` })
+        } else {
+          preCols.push({ key: f.key, label: `Pre: ${f.label}` })
+        }
+      }
+
+      // Build post-survey column definitions
+      const postCols: { key: string; label: string }[] = []
+      for (const f of POST_SURVEY_FIELDS) {
+        if (f.type === 'info') continue
+        if (f.type === 'likert_group' && f.statements) {
+          for (const s of f.statements) postCols.push({ key: s.key, label: `Post: ${s.label}` })
+        } else {
+          postCols.push({ key: f.key, label: `Post: ${f.label}` })
+        }
+      }
+
+      const headers = [
+        'Name', 'Title', 'Email', 'Organization', 'Status',
+        'Applied', 'Activated', 'Expires', 'Post-Survey Completed',
+        ...preCols.map(c => c.label),
+        ...postCols.map(c => c.label),
+      ]
+
+      const rows = allApps.map(app => {
+        const pre = app.questionnaire_responses || {}
+        const post = postByEmail.get(app.email) || {}
+        const fmt = (v: unknown) => {
+          if (v === null || v === undefined || v === '') return null
+          return Array.isArray(v) ? v.join('; ') : String(v)
+        }
+        return [
+          app.name,
+          app.title || null,
+          app.email,
+          app.organization,
+          app.status,
+          app.created_at ? formatDate(app.created_at) : null,
+          app.activated_at ? formatDate(app.activated_at) : null,
+          app.expires_at ? formatDate(app.expires_at) : null,
+          app.post_questionnaire_completed ? 'Yes' : 'No',
+          ...preCols.map(c => fmt(pre[c.key])),
+          ...postCols.map(c => fmt(post[c.key])),
+        ] as (string | number | null)[]
+      })
+
+      downloadCSV('demo_export.csv', headers, rows)
+    } catch {
+      alert('Failed to export demo data')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
   async function handleActivate(uuid: string) {
     await activateDemoUser(uuid)
     loadData()
@@ -3446,6 +3625,19 @@ function DemoTab() {
   async function handleRelease(uuid: string) {
     await releaseDemoUser(uuid)
     loadData()
+  }
+
+  async function handleRestartTrial(uuid: string) {
+    if (!confirm('Restart this user\'s trial? This will give them a fresh 14-day trial.')) return
+    setActionLoading(`restart-${uuid}`)
+    try {
+      await restartDemoTrial(uuid)
+      loadData()
+    } catch {
+      alert('Failed to restart trial')
+    } finally {
+      setActionLoading(null)
+    }
   }
 
   async function handleTestEmail(email: string) {
@@ -3473,6 +3665,41 @@ function DemoTab() {
     }
   }
 
+  async function handleCopyMagicLink(uuid: string) {
+    setActionLoading(`magic-${uuid}`)
+    try {
+      const result = await adminGetMagicLink(uuid)
+      await navigator.clipboard.writeText(result.url)
+      alert('Magic link copied to clipboard! It expires in 24 hours and can only be used once.')
+    } catch {
+      alert('Failed to generate magic link')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  // --- Add user form ---
+  const [showAddUser, setShowAddUser] = useState(false)
+  const [addUserForm, setAddUserForm] = useState({ first_name: '', last_name: '', email: '' })
+  const [addUserError, setAddUserError] = useState<string | null>(null)
+
+  async function handleAddUser(e: React.FormEvent) {
+    e.preventDefault()
+    setAddUserError(null)
+    setActionLoading('add-user')
+    try {
+      await adminAddDemoUser(addUserForm)
+      setAddUserForm({ first_name: '', last_name: '', email: '' })
+      setShowAddUser(false)
+      loadData()
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to add user'
+      setAddUserError(msg)
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
   const statusColors: Record<string, { bg: string; text: string }> = {
     pending: { bg: '#fef3c7', text: '#92400e' },
     active: { bg: '#dcfce7', text: '#166534' },
@@ -3484,17 +3711,106 @@ function DemoTab() {
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
         <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Demo Program</h2>
-        <button
-          onClick={loadData}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '8px 16px', border: '1px solid #e5e7eb', borderRadius: 8,
-            background: '#fff', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
-          }}
-        >
-          <RefreshCw size={14} /> Refresh
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={() => setShowAddUser(!showAddUser)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 16px', border: '1px solid #16a34a', borderRadius: 8,
+              background: showAddUser ? '#f0fdf4' : '#fff', color: '#16a34a',
+              cursor: 'pointer', fontSize: 13, fontFamily: 'inherit', fontWeight: 600,
+            }}
+          >
+            <UserPlus size={14} /> Add User
+          </button>
+          <button
+            onClick={handleExport}
+            disabled={actionLoading === 'export'}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 16px', border: '1px solid #e5e7eb', borderRadius: 8,
+              background: '#fff', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
+              opacity: actionLoading === 'export' ? 0.5 : 1,
+            }}
+          >
+            <Download size={14} /> {actionLoading === 'export' ? 'Exporting...' : 'Export CSV'}
+          </button>
+          <button
+            onClick={loadData}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 16px', border: '1px solid #e5e7eb', borderRadius: 8,
+              background: '#fff', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
+            }}
+          >
+            <RefreshCw size={14} /> Refresh
+          </button>
+        </div>
       </div>
+
+      {/* Add user form */}
+      {showAddUser && (
+        <form onSubmit={handleAddUser} style={{
+          marginBottom: 24, padding: 20, borderRadius: 12,
+          border: '1px solid #bbf7d0', background: '#f0fdf4',
+        }}>
+          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12 }}>Add User to Trial</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: 12, alignItems: 'end' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#374151', marginBottom: 4 }}>First Name</label>
+              <input
+                required
+                value={addUserForm.first_name}
+                onChange={(e) => setAddUserForm({ ...addUserForm, first_name: e.target.value })}
+                style={{
+                  width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db',
+                  fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box',
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#374151', marginBottom: 4 }}>Last Name</label>
+              <input
+                required
+                value={addUserForm.last_name}
+                onChange={(e) => setAddUserForm({ ...addUserForm, last_name: e.target.value })}
+                style={{
+                  width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db',
+                  fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box',
+                }}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 500, color: '#374151', marginBottom: 4 }}>Email</label>
+              <input
+                required
+                type="email"
+                value={addUserForm.email}
+                onChange={(e) => setAddUserForm({ ...addUserForm, email: e.target.value })}
+                style={{
+                  width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #d1d5db',
+                  fontSize: 14, fontFamily: 'inherit', boxSizing: 'border-box',
+                }}
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={actionLoading === 'add-user'}
+              style={{
+                padding: '8px 20px', borderRadius: 8, border: 'none',
+                background: '#16a34a', color: '#fff', fontSize: 14, fontWeight: 600,
+                cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
+                opacity: actionLoading === 'add-user' ? 0.5 : 1,
+              }}
+            >
+              {actionLoading === 'add-user' ? 'Adding...' : 'Add & Activate'}
+            </button>
+          </div>
+          {addUserError && (
+            <div style={{ marginTop: 8, color: '#dc2626', fontSize: 13 }}>{addUserError}</div>
+          )}
+        </form>
+      )}
 
       {/* Stats cards */}
       {stats && (
@@ -3564,6 +3880,7 @@ function DemoTab() {
                 <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Organization</th>
                 <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Status</th>
                 <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Applied</th>
+                <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Expires</th>
                 <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Actions</th>
               </tr>
             </thead>
@@ -3595,6 +3912,9 @@ function DemoTab() {
                       <td style={{ padding: '12px 16px', color: '#6b7280', fontSize: 13 }}>
                         {formatDate(app.created_at)}
                       </td>
+                      <td style={{ padding: '12px 16px', color: '#6b7280', fontSize: 13 }}>
+                        {app.expires_at ? formatDate(app.expires_at) : '—'}
+                      </td>
                       <td style={{ padding: '12px 16px' }}>
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} onClick={(e) => e.stopPropagation()}>
                           {app.status === 'pending' && (
@@ -3621,6 +3941,21 @@ function DemoTab() {
                               Release
                             </button>
                           )}
+                          {(app.status === 'active' || app.status === 'expired' || app.status === 'completed') && (
+                            <button
+                              onClick={() => handleRestartTrial(app.uuid)}
+                              disabled={actionLoading === `restart-${app.uuid}`}
+                              title="Reset trial to 14 days and re-activate"
+                              style={{
+                                padding: '4px 12px', borderRadius: 6, border: '1px solid #d97706',
+                                background: '#fffbeb', color: '#92400e', fontSize: 12, fontWeight: 600,
+                                cursor: 'pointer', fontFamily: 'inherit',
+                                opacity: actionLoading === `restart-${app.uuid}` ? 0.5 : 1,
+                              }}
+                            >
+                              Restart Trial
+                            </button>
+                          )}
                           <button
                             onClick={() => handleTestEmail(app.email)}
                             disabled={actionLoading === `test-${app.email}`}
@@ -3636,20 +3971,36 @@ function DemoTab() {
                             <Mail size={12} /> Test Email
                           </button>
                           {app.status === 'active' && (
-                            <button
-                              onClick={() => handleResendCredentials(app.uuid, app.email)}
-                              disabled={actionLoading === `resend-${app.uuid}`}
-                              title={`Resend credentials to ${app.email}`}
-                              style={{
-                                display: 'flex', alignItems: 'center', gap: 4,
-                                padding: '4px 12px', borderRadius: 6, border: '1px solid #d97706',
-                                background: '#fffbeb', color: '#92400e', fontSize: 12, fontWeight: 600,
-                                cursor: 'pointer', fontFamily: 'inherit',
-                                opacity: actionLoading === `resend-${app.uuid}` ? 0.5 : 1,
-                              }}
-                            >
-                              <Send size={12} /> Resend Creds
-                            </button>
+                            <>
+                              <button
+                                onClick={() => handleResendCredentials(app.uuid, app.email)}
+                                disabled={actionLoading === `resend-${app.uuid}`}
+                                title={`Resend credentials to ${app.email}`}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: 4,
+                                  padding: '4px 12px', borderRadius: 6, border: '1px solid #d97706',
+                                  background: '#fffbeb', color: '#92400e', fontSize: 12, fontWeight: 600,
+                                  cursor: 'pointer', fontFamily: 'inherit',
+                                  opacity: actionLoading === `resend-${app.uuid}` ? 0.5 : 1,
+                                }}
+                              >
+                                <Send size={12} /> Resend Creds
+                              </button>
+                              <button
+                                onClick={() => handleCopyMagicLink(app.uuid)}
+                                disabled={actionLoading === `magic-${app.uuid}`}
+                                title="Copy a one-time magic login link"
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: 4,
+                                  padding: '4px 12px', borderRadius: 6, border: '1px solid #7c3aed',
+                                  background: '#f5f3ff', color: '#5b21b6', fontSize: 12, fontWeight: 600,
+                                  cursor: 'pointer', fontFamily: 'inherit',
+                                  opacity: actionLoading === `magic-${app.uuid}` ? 0.5 : 1,
+                                }}
+                              >
+                                <Link size={12} /> Copy Magic Link
+                              </button>
+                            </>
                           )}
                           {app.admin_released && (
                             <span style={{ fontSize: 12, color: '#16a34a', fontWeight: 500 }}>Released</span>
@@ -3662,7 +4013,7 @@ function DemoTab() {
                     </tr>
                     {isExpanded && (
                       <tr style={{ borderBottom: '1px solid #f3f4f6' }}>
-                        <td colSpan={6} style={{ padding: '0 16px 20px', background: '#fafafa' }}>
+                        <td colSpan={7} style={{ padding: '0 16px 20px', background: '#fafafa' }}>
                           <DemoResponseDetail responses={app.questionnaire_responses} />
                         </td>
                       </tr>
@@ -4581,6 +4932,282 @@ function OrganizationsTab() {
 }
 
 // ---------------------------------------------------------------------------
+// Support Center Tab
+// ---------------------------------------------------------------------------
+
+function timeAgo(dateStr: string | null): string {
+  if (!dateStr) return ''
+  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000)
+  if (diff < 60) return 'just now'
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
+  return `${Math.floor(diff / 86400)}d ago`
+}
+
+function SupportTab() {
+  const [stats, setStats] = useState<{ total: number; open: number; in_progress: number; closed: number } | null>(null)
+  const [tickets, setTickets] = useState<SupportTicketSummary[]>([])
+  const [loading, setLoading] = useState(true)
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null)
+  const [replyText, setReplyText] = useState('')
+  const [replying, setReplying] = useState(false)
+  const { user } = useAuth()
+
+  const load = useCallback(() => {
+    setLoading(true)
+    const statusParam = statusFilter === 'all' ? undefined : statusFilter
+    Promise.all([supportApi.getTicketStats(), supportApi.listTickets(statusParam, 200)])
+      .then(([s, t]) => { setStats(s); setTickets(t.tickets) })
+      .finally(() => setLoading(false))
+  }, [statusFilter])
+
+  useEffect(() => { load() }, [load])
+
+  const openThread = async (uuid: string) => {
+    const t = await supportApi.getTicket(uuid)
+    setSelectedTicket(t)
+    await supportApi.markTicketRead(uuid)
+  }
+
+  const handleReply = async () => {
+    if (!selectedTicket || !replyText.trim()) return
+    setReplying(true)
+    try {
+      const updated = await supportApi.addMessage(selectedTicket.uuid, replyText.trim())
+      setSelectedTicket(updated)
+      setReplyText('')
+      load()
+    } finally {
+      setReplying(false)
+    }
+  }
+
+  const handleStatusChange = async (uuid: string, newStatus: string) => {
+    try {
+      const updated = await supportApi.updateTicket(uuid, { status: newStatus })
+      setSelectedTicket(updated)
+      load()
+    } catch { /* ignore */ }
+  }
+
+  const statCardStyle = (color: string) => ({
+    flex: 1, padding: '16px 20px', background: '#fff', borderRadius: 'var(--ui-radius, 12px)',
+    border: '1px solid #e5e7eb', borderLeft: `4px solid ${color}`,
+  })
+
+  if (loading && !stats) return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading support data...</div>
+
+  // Thread detail view
+  if (selectedTicket) {
+    const t = selectedTicket
+    const statusColors: Record<string, string> = { open: '#f59e0b', in_progress: '#3b82f6', closed: '#9ca3af' }
+    const priorityColors: Record<string, string> = { low: '#9ca3af', normal: '#3b82f6', high: '#ef4444' }
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <button
+          onClick={() => { setSelectedTicket(null); load() }}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px',
+            border: '1px solid #d1d5db', borderRadius: 'var(--ui-radius, 12px)', background: '#fff',
+            fontSize: 13, cursor: 'pointer', alignSelf: 'flex-start',
+          }}
+        >
+          <ArrowLeft size={14} /> Back to tickets
+        </button>
+
+        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
+          {/* Header */}
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>{t.subject}</h3>
+              <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>
+                {t.user_name || t.user_id} {t.user_email ? `(${t.user_email})` : ''} &middot; {timeAgo(t.created_at)}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: `${priorityColors[t.priority] || '#3b82f6'}20`, color: priorityColors[t.priority] || '#3b82f6', fontWeight: 600, textTransform: 'uppercase' }}>
+                {t.priority}
+              </span>
+              <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: `${statusColors[t.status] || '#9ca3af'}20`, color: statusColors[t.status] || '#9ca3af', fontWeight: 600, textTransform: 'uppercase' }}>
+                {t.status.replace('_', ' ')}
+              </span>
+              {t.status !== 'closed' && (
+                <select
+                  value={t.status}
+                  onChange={e => handleStatusChange(t.uuid, e.target.value)}
+                  style={{ fontSize: 12, padding: '4px 8px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db' }}
+                >
+                  <option value="open">Open</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="closed">Closed</option>
+                </select>
+              )}
+              {t.status === 'closed' && (
+                <button
+                  onClick={() => handleStatusChange(t.uuid, 'open')}
+                  style={{ fontSize: 12, padding: '4px 10px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' }}
+                >
+                  Reopen
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Messages */}
+          <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 500, overflowY: 'auto' }}>
+            {t.messages.map((m, i) => {
+              const isSupport = m.is_support_reply
+              return (
+                <div key={i} style={{
+                  padding: '10px 14px', borderRadius: 'var(--ui-radius, 12px)',
+                  background: isSupport ? '#eff6ff' : '#f9fafb',
+                  border: `1px solid ${isSupport ? '#bfdbfe' : '#e5e7eb'}`,
+                  maxWidth: '85%', alignSelf: isSupport ? 'flex-end' : 'flex-start',
+                }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: isSupport ? '#1e40af' : '#374151', marginBottom: 4 }}>
+                    {m.user_name || m.user_id}
+                    {isSupport && <span style={{ marginLeft: 6, fontSize: 10, color: '#3b82f6', fontWeight: 500 }}>Support</span>}
+                    <span style={{ marginLeft: 8, fontWeight: 400, color: '#9ca3af' }}>{timeAgo(m.created_at)}</span>
+                  </div>
+                  <div style={{ fontSize: 14, color: '#374151', whiteSpace: 'pre-wrap' }}>{m.content}</div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Reply */}
+          {t.status !== 'closed' && (
+            <div style={{ padding: '12px 20px', borderTop: '1px solid #e5e7eb', display: 'flex', gap: 8 }}>
+              <input
+                value={replyText}
+                onChange={e => setReplyText(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleReply() } }}
+                placeholder="Type a reply..."
+                style={{ flex: 1, padding: '8px 12px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db', fontSize: 14, outline: 'none' }}
+              />
+              <button
+                onClick={handleReply}
+                disabled={replying || !replyText.trim()}
+                style={{
+                  padding: '8px 16px', borderRadius: 'var(--ui-radius, 12px)', border: 'none',
+                  background: 'var(--highlight-color, #eab308)', color: 'var(--highlight-text-color, #000)',
+                  fontSize: 13, fontWeight: 600, cursor: replyText.trim() ? 'pointer' : 'not-allowed',
+                  opacity: replying ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                <Send size={14} /> {replying ? 'Sending...' : 'Reply'}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // Stats + list view
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Stats cards */}
+      {stats && (
+        <div style={{ display: 'flex', gap: 12 }}>
+          <div style={statCardStyle('#6b7280')}>
+            <div style={{ fontSize: 24, fontWeight: 700 }}>{stats.total}</div>
+            <div style={{ fontSize: 13, color: '#6b7280' }}>Total Tickets</div>
+          </div>
+          <div style={statCardStyle('#f59e0b')}>
+            <div style={{ fontSize: 24, fontWeight: 700, color: '#f59e0b' }}>{stats.open}</div>
+            <div style={{ fontSize: 13, color: '#6b7280' }}>Open</div>
+          </div>
+          <div style={statCardStyle('#3b82f6')}>
+            <div style={{ fontSize: 24, fontWeight: 700, color: '#3b82f6' }}>{stats.in_progress}</div>
+            <div style={{ fontSize: 13, color: '#6b7280' }}>In Progress</div>
+          </div>
+          <div style={statCardStyle('#22c55e')}>
+            <div style={{ fontSize: 24, fontWeight: 700, color: '#22c55e' }}>{stats.closed}</div>
+            <div style={{ fontSize: 13, color: '#6b7280' }}>Closed</div>
+          </div>
+        </div>
+      )}
+
+      {/* Ticket list */}
+      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
+        <div style={{ padding: '14px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: 15, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <MessageSquare size={18} color="#6b7280" /> Tickets
+          </div>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {['all', 'open', 'in_progress', 'closed'].map(s => (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                style={{
+                  padding: '4px 12px', fontSize: 12, fontWeight: statusFilter === s ? 600 : 400,
+                  borderRadius: 9999, border: '1px solid #e5e7eb', cursor: 'pointer',
+                  background: statusFilter === s ? '#111827' : '#fff',
+                  color: statusFilter === s ? '#fff' : '#6b7280',
+                }}
+              >
+                {s === 'in_progress' ? 'In Progress' : s.charAt(0).toUpperCase() + s.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {loading ? (
+          <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>Loading...</div>
+        ) : tickets.length === 0 ? (
+          <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>No tickets found.</div>
+        ) : (
+          <div>
+            {tickets.map(t => {
+              const statusColors: Record<string, string> = { open: '#f59e0b', in_progress: '#3b82f6', closed: '#9ca3af' }
+              const priorityColors: Record<string, string> = { low: '#9ca3af', normal: '#3b82f6', high: '#ef4444' }
+              const needsAttention = t.status !== 'closed' && t.last_message_user_id && !t.last_message_is_support_reply && user && !t.read_by?.includes(user.user_id)
+              return (
+                <div
+                  key={t.uuid}
+                  onClick={() => openThread(t.uuid)}
+                  style={{
+                    padding: '12px 20px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    background: needsAttention ? '#fffbeb' : '#fff',
+                    transition: 'background 0.1s',
+                  }}
+                  onMouseEnter={e => { if (!needsAttention) (e.currentTarget as HTMLDivElement).style.background = '#f9fafb' }}
+                  onMouseLeave={e => { if (!needsAttention) (e.currentTarget as HTMLDivElement).style.background = '#fff' }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {needsAttention && <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3b82f6', flexShrink: 0 }} />}
+                      <span style={{ fontSize: 14, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.subject}</span>
+                      <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 9999, background: `${statusColors[t.status]}20`, color: statusColors[t.status], fontWeight: 600 }}>
+                        {t.status.replace('_', ' ')}
+                      </span>
+                      <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 9999, background: `${priorityColors[t.priority]}20`, color: priorityColors[t.priority], fontWeight: 600 }}>
+                        {t.priority}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {t.user_name || t.user_id} &middot; {t.message_count} message{t.message_count !== 1 ? 's' : ''}
+                      {t.last_message_preview ? ` \u2014 ${t.last_message_preview}` : ''}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 12, color: '#9ca3af', flexShrink: 0, marginLeft: 16 }}>
+                    {timeAgo(t.updated_at || t.created_at)}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+
+// ---------------------------------------------------------------------------
 // Approvals Tab
 // ---------------------------------------------------------------------------
 
@@ -4831,7 +5458,7 @@ export default function Admin() {
   const hasAccess = isGlobalAdmin || isStaff || isExaminer || isTeamAdmin
 
   // Staff see everything except config; examiners see analytics tabs only
-  const hiddenForNonAdmin = ['config', 'quality', 'demo', 'debugging', 'organizations', 'approvals', 'audit']
+  const hiddenForNonAdmin = ['config', 'quality', 'demo', 'debugging', 'organizations', 'approvals', 'support', 'audit']
   let visibleTabs = isGlobalAdmin
     ? TABS
     : isStaff
@@ -4910,6 +5537,7 @@ export default function Admin() {
           {activeTab === 'workflows' && <WorkflowsTab />}
           {activeTab === 'quality' && <QualityTab />}
           {activeTab === 'approvals' && (isGlobalAdmin || isStaff) && <ApprovalsTab />}
+          {activeTab === 'support' && (isGlobalAdmin || isStaff) && <SupportTab />}
           {activeTab === 'audit' && (isGlobalAdmin || isStaff) && <AuditTab />}
           {activeTab === 'demo' && (isGlobalAdmin || isStaff) && <DemoTab />}
           {activeTab === 'debugging' && (isGlobalAdmin || isStaff) && <DebuggingTab />}

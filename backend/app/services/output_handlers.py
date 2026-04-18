@@ -97,10 +97,20 @@ def _save_as_csv(file_path: Path, data) -> None:
         file_path.write_text("")
         return
     if isinstance(data, list) and data and isinstance(data[0], dict):
+        # Collect keys from ALL items so no columns are missing
+        all_keys = list(dict.fromkeys(k for row in data for k in row.keys()))
         with open(file_path, "w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=data[0].keys())
+            writer = csv.DictWriter(f, fieldnames=all_keys, extrasaction="ignore")
             writer.writeheader()
             writer.writerows(data)
+    elif isinstance(data, dict):
+        # Transpose to Field/Value rows instead of dumping into one wide row
+        with open(file_path, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["Field", "Value"])
+            for k, v in data.items():
+                cell = json.dumps(v, default=str) if isinstance(v, (dict, list)) else str(v)
+                writer.writerow([str(k), cell])
     else:
         file_path.write_text(str(data))
 
@@ -147,54 +157,64 @@ def _save_workflow_as_markdown(file_path: Path, data, title: str = "Results") ->
 
 
 def _save_workflow_as_pdf(file_path: Path, data, title: str = "Results") -> None:
-    """Save workflow output as a PDF table."""
+    """Save workflow output as a PDF table with text wrapping and pagination."""
     from fpdf import FPDF
+    from fpdf.fonts import FontFace
 
     pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=20)
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 16)
     pdf.cell(0, 12, title.replace("_", " "), new_x="LMARGIN", new_y="NEXT")
     pdf.ln(4)
 
+    heading_style = FontFace(color=255, fill_color=(55, 65, 81), emphasis="BOLD")
+
     if isinstance(data, list) and data and isinstance(data[0], dict):
-        headers = list(data[0].keys())
-        n_cols = len(headers)
+        headers = list(dict.fromkeys(k for row in data for k in row.keys()))
         usable = pdf.w - pdf.l_margin - pdf.r_margin
-        col_w = usable / n_cols
-
-        # Header row
-        pdf.set_font("Helvetica", "B", 9)
-        pdf.set_fill_color(55, 65, 81)
-        pdf.set_text_color(255, 255, 255)
+        # Smart column widths proportional to max content length
+        max_lens = []
         for h in headers:
-            pdf.cell(col_w, 8, str(h)[:30], border=1, fill=True)
-        pdf.ln()
+            col_max = len(str(h))
+            for row in data:
+                col_max = max(col_max, len(str(row.get(h, ""))))
+            max_lens.append(min(col_max, 80))
+        total = sum(max_lens) or 1
+        col_widths = tuple(max(usable * (ml / total), 20) for ml in max_lens)
 
-        # Data rows
         pdf.set_font("Helvetica", "", 9)
-        pdf.set_text_color(0, 0, 0)
-        for i, row in enumerate(data):
-            if i % 2 == 1:
-                pdf.set_fill_color(249, 250, 251)
-            else:
-                pdf.set_fill_color(255, 255, 255)
+        with pdf.table(
+            col_widths=col_widths,
+            headings_style=heading_style,
+            text_align="LEFT",
+        ) as table:
+            header_row = table.row()
             for h in headers:
-                pdf.cell(col_w, 7, str(row.get(h, ""))[:40], border=1, fill=True)
-            pdf.ln()
+                header_row.cell(str(h))
+            for item in data:
+                row = table.row()
+                for h in headers:
+                    val = item.get(h, "")
+                    cell_text = json.dumps(val, default=str) if isinstance(val, (dict, list)) else str(val) if val is not None else ""
+                    row.cell(cell_text)
+
     elif isinstance(data, dict):
-        col_w_field = 70
-        col_w_value = pdf.w - pdf.l_margin - pdf.r_margin - col_w_field
-        pdf.set_font("Helvetica", "B", 10)
-        pdf.set_fill_color(55, 65, 81)
-        pdf.set_text_color(255, 255, 255)
-        pdf.cell(col_w_field, 8, "Field", border=1, fill=True)
-        pdf.cell(col_w_value, 8, "Value", border=1, fill=True, new_x="LMARGIN", new_y="NEXT")
+        usable = pdf.w - pdf.l_margin - pdf.r_margin
         pdf.set_font("Helvetica", "", 10)
-        pdf.set_text_color(0, 0, 0)
-        for i, (k, v) in enumerate(data.items()):
-            pdf.set_fill_color(249, 250, 251) if i % 2 == 1 else pdf.set_fill_color(255, 255, 255)
-            pdf.cell(col_w_field, 7, str(k)[:50], border=1, fill=True)
-            pdf.cell(col_w_value, 7, str(v)[:120], border=1, fill=True, new_x="LMARGIN", new_y="NEXT")
+        with pdf.table(
+            col_widths=(usable * 0.3, usable * 0.7),
+            headings_style=heading_style,
+            text_align="LEFT",
+        ) as table:
+            header_row = table.row()
+            header_row.cell("Field")
+            header_row.cell("Value")
+            for k, v in data.items():
+                row = table.row()
+                row.cell(str(k))
+                val_text = json.dumps(v, default=str) if isinstance(v, (dict, list)) else str(v)
+                row.cell(val_text)
     else:
         pdf.set_font("Helvetica", "", 11)
         pdf.multi_cell(0, 6, str(data) if data else "")
@@ -214,34 +234,33 @@ def _save_extraction_as_markdown(file_path: Path, data: dict, title: str = "Extr
 
 
 def _save_extraction_as_pdf(file_path: Path, data: dict, title: str = "Extraction Results") -> None:
-    """Save extraction results as a simple PDF table."""
+    """Save extraction results as a PDF table with text wrapping."""
     from fpdf import FPDF
+    from fpdf.fonts import FontFace
 
     pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=20)
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 16)
     pdf.cell(0, 12, title.replace("_", " "), new_x="LMARGIN", new_y="NEXT")
     pdf.ln(4)
 
-    # Table header
-    col_w_field = 70
-    col_w_value = pdf.w - pdf.l_margin - pdf.r_margin - col_w_field
-    pdf.set_font("Helvetica", "B", 10)
-    pdf.set_fill_color(55, 65, 81)
-    pdf.set_text_color(255, 255, 255)
-    pdf.cell(col_w_field, 8, "Field", border=1, fill=True)
-    pdf.cell(col_w_value, 8, "Value", border=1, fill=True, new_x="LMARGIN", new_y="NEXT")
-
-    # Table rows
+    usable = pdf.w - pdf.l_margin - pdf.r_margin
+    heading_style = FontFace(color=255, fill_color=(55, 65, 81), emphasis="BOLD")
     pdf.set_font("Helvetica", "", 10)
-    pdf.set_text_color(0, 0, 0)
-    for i, (k, v) in enumerate(data.items()):
-        if i % 2 == 1:
-            pdf.set_fill_color(249, 250, 251)
-        else:
-            pdf.set_fill_color(255, 255, 255)
-        pdf.cell(col_w_field, 7, str(k)[:50], border=1, fill=True)
-        pdf.cell(col_w_value, 7, str(v)[:120], border=1, fill=True, new_x="LMARGIN", new_y="NEXT")
+    with pdf.table(
+        col_widths=(usable * 0.3, usable * 0.7),
+        headings_style=heading_style,
+        text_align="LEFT",
+    ) as table:
+        header_row = table.row()
+        header_row.cell("Field")
+        header_row.cell("Value")
+        for k, v in data.items():
+            row = table.row()
+            row.cell(str(k))
+            val_text = json.dumps(v, default=str) if isinstance(v, (dict, list)) else str(v)
+            row.cell(val_text)
 
     pdf.output(str(file_path))
 

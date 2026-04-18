@@ -6,6 +6,7 @@ from app.config import Settings
 from app.dependencies import get_current_user, get_settings
 from app.models.user import User
 from app.schemas.demo import (
+    AdminAddDemoUserRequest,
     DemoSignupRequest,
     DemoSignupResponse,
     WaitlistStatusResponse,
@@ -156,6 +157,39 @@ async def admin_release(demo_uuid: str, user: User = Depends(get_current_user)):
     return {"ok": True}
 
 
+@router.post("/admin/restart-trial/{demo_uuid}")
+async def admin_restart_trial(demo_uuid: str, user: User = Depends(get_current_user)):
+    """Restart the trial for an expired demo user (reset to 14 days)."""
+    _require_admin(user)
+    success = await demo_service.admin_restart_trial(demo_uuid)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Application not found or not in active/expired/completed status",
+        )
+    return {"ok": True}
+
+
+@router.post("/admin/add-user")
+async def admin_add_user(
+    body: AdminAddDemoUserRequest,
+    user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+):
+    """Directly add a user to the demo trial by name and email."""
+    _require_admin(user)
+    try:
+        app = await demo_service.admin_add_demo_user(
+            first_name=body.first_name,
+            last_name=body.last_name,
+            email=body.email,
+            settings=settings,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    return {"ok": True, "uuid": app.uuid}
+
+
 @router.post("/admin/activate/{demo_uuid}")
 async def admin_activate(
     demo_uuid: str,
@@ -200,6 +234,23 @@ async def admin_bulk_resend_credentials(
     _require_admin(user)
     result = await demo_service.bulk_resend_credentials(settings)
     return {"ok": True, **result}
+
+
+@router.post("/admin/magic-link/{demo_uuid}")
+async def admin_magic_link(
+    demo_uuid: str,
+    user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+):
+    """Generate a one-time magic login link for a demo user."""
+    _require_admin(user)
+    url = await demo_service.generate_magic_link(demo_uuid, settings)
+    if not url:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Application not found or not in active status",
+        )
+    return {"ok": True, "url": url}
 
 
 @router.post("/admin/recapture")

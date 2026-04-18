@@ -5,7 +5,7 @@ import {
   CheckCircle,
   Loader2,
   ArrowLeft,
-  Github,
+  ExternalLink,
   AlertCircle,
 } from 'lucide-react'
 import { Footer } from '../components/layout/Footer'
@@ -105,7 +105,7 @@ export default function DemoFeedback() {
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-[#f1b300] transition-colors"
           >
-            <Github className="w-4 h-4" />
+            <ExternalLink className="w-4 h-4" />
             GitHub
           </a>
         </div>

@@ -67,10 +67,10 @@ def get_chroma_client(host: str | None) -> chromadb.ClientAPI:
         logger.info("Connecting to ChromaDB at %s:%d", hostname, port)
         return chromadb.HttpClient(host=hostname, port=port)
     else:
-        from app.config import Settings
+        from app.services.document_manager import get_chroma_client as _get_chroma
         settings = Settings()
         logger.info("Using PersistentClient at %s", settings.chromadb_persist_dir)
-        return chromadb.PersistentClient(path=settings.chromadb_persist_dir)
+        return _get_chroma(settings.chromadb_persist_dir)
 
 
 def add_to_kb(client: chromadb.ClientAPI, kb_uuid: str, source_id: str,

@@ -9,7 +9,7 @@ import {
   Users,
   FileText,
   Cpu,
-  Github,
+  ExternalLink,
   Mail,
 } from 'lucide-react'
 import { Footer } from '../components/layout/Footer'
@@ -487,7 +487,7 @@ export default function Demo() {
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-[#f1b300] transition-colors"
             >
-              <Github className="w-4 h-4" />
+              <ExternalLink className="w-4 h-4" />
               GitHub
             </a>
           </div>

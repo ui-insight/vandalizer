@@ -25,7 +25,9 @@ import {
   importSearchSet,
   getTuningResult,
   clearTuningResult,
+  getExtractionHistory,
 } from '../../api/extractions'
+import { RunHistoryTab } from './RunHistoryTab'
 import type { ValidationV2Result, QualityHistoryRun, ValidationSource, TuningResult, TuningStreamEvent } from '../../api/extractions'
 import { findBestSettingsStream } from '../../api/extractions'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
@@ -44,7 +46,7 @@ import DOMPurify from 'dompurify'
 
 marked.setOptions({ breaks: true, gfm: true })
 
-type Tab = 'design' | 'tools' | 'validate' | 'advanced'
+type Tab = 'design' | 'tools' | 'validate' | 'advanced' | 'history'
 
 interface ExtractionConfig {
   mode?: 'one_pass' | 'two_pass'
@@ -156,6 +158,10 @@ export function ExtractionEditorPanel() {
   const handleRun = async () => {
     if (!openExtractionId || selectedDocUuids.length === 0) return
     setRunning(true)
+    // Bump activity signal now so the side rail starts polling immediately and
+    // picks up the running record the backend creates — otherwise no entry
+    // shows until this sync request returns.
+    bumpActivitySignal()
     try {
       const resp = await runExtractionSync({
         search_set_uuid: openExtractionId,
@@ -443,7 +449,7 @@ export function ExtractionEditorPanel() {
           flexShrink: 0,
         }}
       >
-        {(['design', 'tools', 'validate', 'advanced'] as const).map((tab) => {
+        {(['design', 'tools', 'validate', 'advanced', 'history'] as const).map((tab) => {
           const isActive = activeTab === tab
           // Colored dot for validate tab
           let tabDot: string | null = null
@@ -578,6 +584,14 @@ export function ExtractionEditorPanel() {
           onSetUseDefaults={setUseDefaults}
           onSaveConfig={saveConfig}
         />
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: activeTab === 'history' ? undefined : 'none' }}>
+        {openExtractionId && (
+          <RunHistoryTab
+            fetchHistory={() => getExtractionHistory(openExtractionId)}
+            type="extraction"
+          />
+        )}
       </div>
 
       {/* Nudge banner for unvalidated items */}
@@ -791,6 +805,7 @@ function DesignTab({
   activeResultIdx: number
   onSetActiveResultIdx: (idx: number) => void
 }) {
+  const { toast } = useToast()
   const [dragIdx, setDragIdx] = useState<number | null>(null)
   const [overIdx, setOverIdx] = useState<number | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -1135,7 +1150,9 @@ function DesignTab({
                     onClick={() => {
                       if (resultVal && resultVal !== 'N/A') {
                         onHighlightValue([resultVal])
-                        navigator.clipboard.writeText(resultVal).catch(() => {})
+                        navigator.clipboard.writeText(resultVal)
+                          .then(() => toast('Copied to clipboard', 'success'))
+                          .catch(() => toast('Failed to copy to clipboard', 'error'))
                       }
                     }}
                     style={{

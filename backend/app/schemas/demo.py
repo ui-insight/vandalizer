@@ -45,6 +45,12 @@ class DemoApplicationResponse(BaseModel):
     created_at: str
 
 
+class AdminAddDemoUserRequest(BaseModel):
+    first_name: str
+    last_name: str
+    email: str
+
+
 class DemoAdminStatsResponse(BaseModel):
     total_applications: int
     active_count: int

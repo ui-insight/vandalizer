@@ -65,6 +65,10 @@ export function markTicketRead(ticketUuid: string) {
   })
 }
 
+export function getTicketStats() {
+  return apiFetch<{ total: number; open: number; in_progress: number; closed: number }>('/api/support/stats')
+}
+
 export function getSupportContacts() {
   return apiFetch<{ contacts: SupportContact[] }>('/api/support/contacts')
 }

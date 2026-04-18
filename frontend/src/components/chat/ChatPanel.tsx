@@ -7,14 +7,17 @@ import { AttachmentList } from './AttachmentList'
 import { toolResultToText } from './ToolCallDisplay'
 import { WorkspaceBriefing } from './WorkspaceBriefing'
 import { OnboardingStepper } from './WelcomeExperience'
+import { ContextMeter } from './ContextMeter'
+import { ContextLimitDialog } from './ContextLimitDialog'
 import { useChat } from '../../hooks/useChat'
 import { useOnboarding } from '../../hooks/useOnboarding'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
-import { addLink, removeDocument, removeLink } from '../../api/chat'
+import { addLink, removeDocument, removeLink, truncateContext, compactContext, clearContext } from '../../api/chat'
 import { uploadFile } from '../../api/files'
 import { getUserConfig, updateUserConfig, markFirstSessionComplete } from '../../api/config'
 import type { FileAttachment, UrlAttachment } from '../../types/chat'
+import type { ModelInfo } from '../../types/workflow'
 
 const LOADING_WORDS = [
   'Thinking', 'Vandalizing', 'Pondering', 'Analyzing',
@@ -48,6 +51,60 @@ function StreamingLabel() {
   )
 }
 
+const VALUE_TAGLINES: Array<{
+  icon: typeof Shield
+  title: string
+  detail: string
+}> = [
+  { icon: Shield, title: 'Your documents stay private', detail: 'Files never leave your institution — you choose the model.' },
+  { icon: CheckCircle2, title: 'Workflows you can trust', detail: 'Every extraction template has documented accuracy metrics.' },
+  { icon: Upload, title: 'Built for research administration', detail: 'Purpose-built for grants, compliance, and institutional docs.' },
+]
+
+/** Single-line rotator that fades between the three value props inside the first-session banner. */
+function ValueTaglineRotator() {
+  const [index, setIndex] = useState(0)
+  const [fade, setFade] = useState(true)
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setFade(false)
+      setTimeout(() => {
+        setIndex(i => (i + 1) % VALUE_TAGLINES.length)
+        setFade(true)
+      }, 380)
+    }, 4200)
+    return () => clearInterval(interval)
+  }, [])
+
+  const { icon: Icon, title, detail } = VALUE_TAGLINES[index]
+
+  return (
+    <div
+      aria-live="polite"
+      style={{
+        marginTop: 14,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        padding: '8px 12px',
+        borderRadius: 10,
+        background: 'rgba(255,255,255,0.12)',
+        backdropFilter: 'blur(4px)',
+        opacity: fade ? 1 : 0,
+        transition: 'opacity 0.38s ease',
+        minHeight: 38,
+      }}
+    >
+      <Icon size={15} style={{ flexShrink: 0, opacity: 0.95 }} />
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '4px 8px', lineHeight: 1.35 }}>
+        <span style={{ fontSize: 13, fontWeight: 600 }}>{title}</span>
+        <span style={{ fontSize: 12, opacity: 0.82 }}>{detail}</span>
+      </div>
+    </div>
+  )
+}
+
 interface ChatPanelProps {
   conversationToLoad?: string | null
   pendingMessage?: string | null
@@ -68,6 +125,12 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     activeToolCalls,
     toolResults,
     segments,
+    contextTokens,
+    contextMode,
+    contextCutoffIndex,
+    setContextTokens,
+    setContextMode,
+    setContextCutoffIndex,
     send,
     loadHistory,
     setActivity,
@@ -90,6 +153,9 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const [urlAttachments, setUrlAttachments] = useState<UrlAttachment[]>([])
   const [attachLoading, setAttachLoading] = useState(false)
   const [selectedModel, setSelectedModel] = useState<string>('')
+  const [modelsList, setModelsList] = useState<ModelInfo[]>([])
+  const [showContextDialog, setShowContextDialog] = useState(false)
+  const contextDialogShownRef = useRef(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const lastLoadedConvo = useRef<string | null>(null)
   const prevStreamingRef = useRef(false)
@@ -102,6 +168,9 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   // Load saved model preference on mount
   useEffect(() => {
     getUserConfig().then(cfg => {
+      if (cfg.available_models?.length) {
+        setModelsList(cfg.available_models)
+      }
       if (cfg.model) {
         setSelectedModel(cfg.model)
       } else if (cfg.available_models?.length) {
@@ -112,6 +181,27 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     }).catch(() => {})
   }, [])
 
+  // Derive the context window size for the currently selected model
+  const contextWindow = (() => {
+    const match = modelsList.find(
+      m => m.tag === selectedModel || m.name === selectedModel,
+    )
+    return match?.context_window ?? 128000
+  })()
+
+  // Auto-trigger context limit dialog when usage exceeds 90%
+  useEffect(() => {
+    if (contextTokens > 0 && contextWindow > 0) {
+      const ratio = contextTokens / contextWindow
+      if (ratio >= 0.9 && !contextDialogShownRef.current) {
+        contextDialogShownRef.current = true
+        setShowContextDialog(true)
+      } else if (ratio < 0.9) {
+        contextDialogShownRef.current = false
+      }
+    }
+  }, [contextTokens, contextWindow])
+
   // Seed the first-session conversation with an opening assistant message
   useEffect(() => {
     if (effectiveFirstSession && !onboardingLoading && messages.length === 0 && !firstSessionSeeded.current && !conversationToLoad) {
@@ -120,10 +210,10 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         role: 'assistant',
         content:
           "Hi! I'm your Vandalizer assistant.\n\n" +
-          "I've placed a sample NSF proposal in your workspace so I can show you " +
-          "what this platform does — live, with real tools.\n\n" +
-          "What kind of documents do you typically work with? " +
-          "(Or just say **\"show me\"** and I'll jump right in.)",
+          "I specialize in document intelligence for research administration — " +
+          "extraction with **measured accuracy**, not guesses.\n\n" +
+          "Want a quick demo? Say **\"show me\"** and I'll run one live against a sample grant proposal.\n\n" +
+          "Or just ask me about your own documents.",
       }])
     }
   }, [effectiveFirstSession, onboardingLoading, messages.length, setMessages, conversationToLoad])
@@ -131,6 +221,30 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const handleModelChange = (model: string) => {
     setSelectedModel(model)
     updateUserConfig({ model }).catch(() => {})
+  }
+
+  const handleTruncate = async () => {
+    if (!conversationUuid) return
+    const result = await truncateContext(conversationUuid)
+    setContextMode('truncated')
+    setContextCutoffIndex(result.context_cutoff_index)
+    setContextTokens(0)
+  }
+
+  const handleCompact = async () => {
+    if (!conversationUuid) return
+    const result = await compactContext(conversationUuid)
+    setContextMode('compacted')
+    setContextCutoffIndex(result.context_cutoff_index)
+    setContextTokens(0)
+  }
+
+  const handleClearContext = async () => {
+    if (!conversationUuid) return
+    const result = await clearContext(conversationUuid)
+    setContextMode('truncated')
+    setContextCutoffIndex(result.context_cutoff_index)
+    setContextTokens(0)
   }
 
   const handleScroll = useCallback(() => {
@@ -214,7 +328,6 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const hasDocContext = fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0 || selectedFolderUuids.length > 0
 
   const handleSend = (message: string, includeOnboardingContext?: boolean) => {
-    // In first-session mode, every message uses the first-session system prompt.
     // Use the locked ref so remounts / refetches can't flip this mid-conversation.
     const firstSession = effectiveFirstSession && !hasDocContext && !activeKBUuid
     // Detect "show me" to track demo trigger (backend does the real routing)
@@ -222,11 +335,9 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       demoTriggered.current = true
     }
     send(message, selectedDocUuids, selectedModel || undefined, activeKBUuid || undefined, includeOnboardingContext, selectedFolderUuids, firstSession || undefined)
-    // Mark first-session complete after:
-    // - Demo path: 3 messages (greeting + user msg + demo response)
-    // - Conversational path: 6 messages (3 full exchanges)
-    const threshold = demoTriggered.current ? 3 : 6
-    if (firstSession && !firstSessionMarked.current && messages.length >= threshold) {
+    // End first-session mode on the user's first real message. One exchange is
+    // enough — staying in first-session state leaks demo behavior into normal chat.
+    if (firstSession && !firstSessionMarked.current) {
       firstSessionMarked.current = true
       markFirstSessionComplete().catch(() => {})
     }
@@ -510,14 +621,13 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         className="flex-1 overflow-y-auto hide-scrollbar"
         style={{ padding: '20px 20px 180px 20px', position: 'relative' }}
       >
-        {/* First-session: value proposition welcome */}
+        {/* First-session: compact value-prop banner with rotating taglines */}
         {effectiveFirstSession && !onboardingLoading && (
-          <div style={{ maxWidth: 640, margin: '0 auto 20px' }}>
-            {/* Header banner */}
+          <div style={{ maxWidth: 640, margin: '0 auto 16px' }}>
             <div
               className="relative overflow-hidden text-white"
               style={{
-                padding: '28px 24px',
+                padding: '20px 22px',
                 borderRadius: 'var(--ui-radius, 12px)',
                 background: 'linear-gradient(135deg, var(--highlight-complement, #6a11cb), color-mix(in srgb, var(--highlight-color, #f1b300) 70%, #ffffff 30%))',
               }}
@@ -530,90 +640,21 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                   animation: 'rotateBG 32s linear infinite',
                 }}
               />
-              <div className="relative z-[1] flex items-center gap-4">
-                <div style={{ animation: 'float 3s ease-in-out infinite' }} className="shrink-0">
-                  <img src="/images/joevandal.png" alt="Joe Vandal" style={{ width: 22, height: 35 }} className="opacity-90" />
-                </div>
-                <div>
-                  <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3 }}>
-                    Welcome to Vandalizer
+              <div className="relative z-[1]">
+                <div className="flex items-center gap-4">
+                  <div style={{ animation: 'float 3s ease-in-out infinite' }} className="shrink-0">
+                    <img src="/images/joevandal.png" alt="Joe Vandal" style={{ width: 22, height: 35 }} className="opacity-90" />
                   </div>
-                  <div style={{ fontSize: 13, opacity: 0.8, marginTop: 2, fontWeight: 400 }}>
-                    AI-powered document intelligence — watch it in action below
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Value proposition cards */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-              <div style={{
-                display: 'flex', gap: 12, padding: '14px 16px',
-                borderRadius: 'var(--ui-radius, 12px)',
-                backgroundColor: '#fff', border: '1px solid #e5e7eb',
-              }}>
-                <div style={{
-                  flexShrink: 0, width: 36, height: 36, borderRadius: 8,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 10%, white)',
-                  color: 'var(--highlight-color, #eab308)',
-                }}>
-                  <Shield size={18} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#111827', lineHeight: 1.3 }}>
-                    Your documents stay private
-                  </div>
-                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 3, lineHeight: 1.5 }}>
-                    Unlike ChatGPT and Claude, your files never leave your institution's control. You choose the model — if it's a private endpoint, your data never touches a third party.
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3 }}>
+                      Welcome to Vandalizer
+                    </div>
+                    <div style={{ fontSize: 13, opacity: 0.8, marginTop: 2, fontWeight: 400 }}>
+                      AI-powered document intelligence — watch it in action below
+                    </div>
                   </div>
                 </div>
-              </div>
-
-              <div style={{
-                display: 'flex', gap: 12, padding: '14px 16px',
-                borderRadius: 'var(--ui-radius, 12px)',
-                backgroundColor: '#fff', border: '1px solid #e5e7eb',
-              }}>
-                <div style={{
-                  flexShrink: 0, width: 36, height: 36, borderRadius: 8,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 10%, white)',
-                  color: 'var(--highlight-color, #eab308)',
-                }}>
-                  <CheckCircle2 size={18} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#111827', lineHeight: 1.3 }}>
-                    Workflows you can trust
-                  </div>
-                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 3, lineHeight: 1.5 }}>
-                    Every extraction workflow has documented quality metrics. Accuracy, consistency, and edge cases are tested and maintained — you see exactly how well it performs before you trust it.
-                  </div>
-                </div>
-              </div>
-
-              <div style={{
-                display: 'flex', gap: 12, padding: '14px 16px',
-                borderRadius: 'var(--ui-radius, 12px)',
-                backgroundColor: '#fff', border: '1px solid #e5e7eb',
-              }}>
-                <div style={{
-                  flexShrink: 0, width: 36, height: 36, borderRadius: 8,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 10%, white)',
-                  color: 'var(--highlight-color, #eab308)',
-                }}>
-                  <Upload size={18} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#111827', lineHeight: 1.3 }}>
-                    Built for research administration
-                  </div>
-                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 3, lineHeight: 1.5 }}>
-                    Purpose-built for grants, compliance, and institutional documents. Multi-format support, automatic OCR, and team collaboration — not a generic chatbot with a file upload bolted on.
-                  </div>
-                </div>
+                <ValueTaglineRotator />
               </div>
             </div>
           </div>
@@ -818,15 +859,37 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
 
         {/* Chat messages — centered under banner for first-session */}
         <div style={effectiveFirstSession ? { maxWidth: 640, margin: '0 auto' } : undefined}>
-          {messages.map((msg, i) => (
-            <ChatMessage
-              key={i}
-              message={msg}
-              messageIndex={i}
-              conversationUuid={conversationUuid || undefined}
-              onSendMessage={msg.role === 'assistant' && i === messages.length - 1 && !isStreaming ? (m) => handleSend(m) : undefined}
-            />
-        ))}
+          {messages.map((msg, i) => {
+            const isExcluded = contextMode !== 'full' && contextCutoffIndex > 0 && i < contextCutoffIndex
+            const showBoundary = contextMode !== 'full' && contextCutoffIndex > 0 && i === contextCutoffIndex
+            return (
+              <div key={i}>
+                {showBoundary && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    margin: '12px 0',
+                    fontSize: 11,
+                    color: '#9ca3af',
+                    userSelect: 'none',
+                  }}>
+                    <div style={{ flex: 1, height: 1, background: '#e5e7eb' }} />
+                    <span>{contextMode === 'compacted' ? 'Context compacted above' : 'Context starts here'}</span>
+                    <div style={{ flex: 1, height: 1, background: '#e5e7eb' }} />
+                  </div>
+                )}
+                <div style={isExcluded ? { opacity: 0.5 } : undefined}>
+                  <ChatMessage
+                    message={msg}
+                    messageIndex={i}
+                    conversationUuid={conversationUuid || undefined}
+                    onSendMessage={msg.role === 'assistant' && i === messages.length - 1 && !isStreaming ? (m) => handleSend(m) : undefined}
+                  />
+                </div>
+              </div>
+            )
+          })}
 
         {/* Streaming: thinking-only phase (no text or tools yet) */}
         {isStreaming && thinkingContent && !streamingContent && segments.length === 0 && (
@@ -954,6 +1017,25 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         onExport={handleExport}
         hasMessages={messages.length > 0}
         hasDocuments={fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0 || selectedFolderUuids.length > 0}
+        contextMeter={
+          messages.length > 0 && contextTokens > 0 ? (
+            <ContextMeter
+              tokensUsed={contextTokens}
+              contextWindow={contextWindow}
+              onClick={() => setShowContextDialog(true)}
+            />
+          ) : null
+        }
+      />
+
+      {/* Context limit dialog */}
+      <ContextLimitDialog
+        open={showContextDialog}
+        onClose={() => setShowContextDialog(false)}
+        onTruncate={handleTruncate}
+        onCompact={handleCompact}
+        onClear={handleClearContext}
+        percent={contextWindow > 0 ? Math.round((contextTokens / contextWindow) * 100) : 0}
       />
     </div>
   )

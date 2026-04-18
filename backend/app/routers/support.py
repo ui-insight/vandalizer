@@ -229,6 +229,15 @@ async def update_ticket(
     return result
 
 
+@router.get("/stats")
+async def get_ticket_stats(user: User = Depends(get_current_user)):
+    """Aggregate ticket counts by status. Support users / admins only."""
+    is_support = await _is_support_user(user)
+    if not is_support:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    return await support_service.get_ticket_stats()
+
+
 @router.get("/contacts")
 async def get_support_contacts(user: User = Depends(get_current_user)):
     """Get list of support contacts (for admin config UI)."""

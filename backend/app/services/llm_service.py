@@ -59,6 +59,10 @@ class InsightAIProvider(OpenRouterProvider):
         super().__init__(api_key=api_key)
 
     @property
+    def name(self) -> str:
+        return 'openai'
+
+    @property
     def base_url(self) -> str:
         if hasattr(self, "_endpoint") and self._endpoint:
             return self._endpoint
@@ -91,6 +95,10 @@ class OllamaProvider(OpenRouterProvider):
         super().__init__(api_key=api_key)
 
     @property
+    def name(self) -> str:
+        return 'openai'
+
+    @property
     def base_url(self) -> str:
         if hasattr(self, "_endpoint") and self._endpoint:
             if not self._endpoint.endswith("/v1") and not self._endpoint.endswith("/api/v1"):
@@ -121,6 +129,10 @@ class VLLMProvider(OpenRouterProvider):
         self._endpoint = endpoint
         self.thinking_enabled = thinking_enabled
         super().__init__(api_key=api_key)
+
+    @property
+    def name(self) -> str:
+        return 'openai'
 
     @property
     def base_url(self) -> str:
@@ -450,6 +462,19 @@ DEFAULT_CHAT_SYSTEM_PROMPT = (
     "- Be concise. Use short Markdown bullets and headings — never write walls of text.\n"
     "- Do NOT restate the question.\n"
     "- Keep answers under 150 words unless the user explicitly asks for detail.\n"
+)
+
+COMPACT_SYSTEM_PROMPT = (
+    "You are a conversation summarizer. Given a conversation history, produce a concise "
+    "summary that preserves all key facts, decisions, context, and user preferences mentioned. "
+    "The summary will replace the original messages as context for future responses, so include "
+    "anything the assistant would need to maintain continuity.\n\n"
+    "## Rules\n"
+    "- Preserve specific names, dates, numbers, and technical details.\n"
+    "- Note any user preferences or instructions that should carry forward.\n"
+    "- Summarize decisions and conclusions, not just topics discussed.\n"
+    "- Keep the summary under 500 words.\n"
+    "- Write in third person (e.g. 'The user asked about...').\n"
 )
 
 DOCUMENT_CHAT_SYSTEM_PROMPT = (
