@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import DOMPurify from 'dompurify'
 import { ThumbsUp, ThumbsDown, Copy, Check, ChevronRight } from 'lucide-react'
 import { marked } from 'marked'
@@ -115,23 +115,15 @@ export function ChatMessage({
     return renderMarkdown(message.content)
   }, [message.content, isUser, segments])
 
-  // Attach click handlers to action buttons after render
-  useEffect(() => {
-    const el = contentRef.current
-    if (!el) return
-    const buttons = el.querySelectorAll<HTMLButtonElement>('[data-action]')
-    const handlers: Array<[HTMLButtonElement, () => void]> = []
-    buttons.forEach(btn => {
-      const action = btn.getAttribute('data-action')
-      const handler = () => {
-        if (action === 'start-cert') certPanel.openPanel()
-        else if (action === 'upload-docs') setWorkspaceMode('files')
-      }
-      btn.addEventListener('click', handler)
-      handlers.push([btn, handler])
-    })
-    return () => { handlers.forEach(([b, h]) => b.removeEventListener('click', h)) }
-  }, [renderedHtml, segments, certPanel, setWorkspaceMode])
+  // Handle action button clicks via event delegation — robust across
+  // streaming deltas and dangerouslySetInnerHTML remounts.
+  const handleActionClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const target = (e.target as HTMLElement).closest<HTMLElement>('[data-action]')
+    if (!target) return
+    const action = target.getAttribute('data-action')
+    if (action === 'start-cert') certPanel.openPanel()
+    else if (action === 'upload-docs') setWorkspaceMode('files')
+  }, [certPanel, setWorkspaceMode])
 
   const handleFeedback = async (rating: 'up' | 'down') => {
     setFeedback(rating)
@@ -279,7 +271,7 @@ export function ChatMessage({
 
           {/* Interleaved segment rendering (streaming + persisted) */}
           {segments && segments.length > 0 ? (
-            <div ref={contentRef}>
+            <div ref={contentRef} onClick={handleActionClick}>
               {segments.map((seg, i) => {
                 if (seg.kind === 'text') {
                   const cleaned = seg.content.replace(THINK_BLOCK_RE, '').replace(THINK_TRAILING_RE, '')
@@ -321,6 +313,7 @@ export function ChatMessage({
               {message.content && (
                 <div
                   ref={contentRef}
+                  onClick={handleActionClick}
                   className="select-text chat-markdown"
                   style={{ fontSize: 14, lineHeight: 1.6 }}
                   dangerouslySetInnerHTML={{ __html: renderedHtml! }}

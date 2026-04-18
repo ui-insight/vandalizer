@@ -101,10 +101,11 @@ class TestWordsToRegex:
         from app.services.chat_tools import _words_to_regex
         import re
 
-        pattern = _words_to_regex("file.pdf copy")
-        assert re.search(pattern, "file.pdf copy_2", re.IGNORECASE)
+        # Use a quoted phrase so punctuation survives tokenization
+        pattern = _words_to_regex('"a.b" copy')
+        assert re.search(pattern, "a.b copy_2", re.IGNORECASE)
         # The dot should be escaped, not match any character
-        assert not re.search(pattern, "filexpdf copy_2", re.IGNORECASE)
+        assert not re.search(pattern, "axb copy_2", re.IGNORECASE)
 
 
 class TestSearchDocuments:
@@ -126,8 +127,10 @@ class TestSearchDocuments:
         assert result[0]["title"] == "Test Doc"
 
     @pytest.mark.asyncio
-    async def test_multi_word_query_builds_or_filter(self):
-        """Multi-word queries should search both title and raw_text."""
+    async def test_default_query_searches_title_only(self):
+        """Default (search_content=False) should match title only — raw_text
+        scans on a non-indexed field are expensive and will time out on
+        large workspaces."""
         from app.services.chat_tools import search_documents
 
         ctx = _make_context()
@@ -135,10 +138,25 @@ class TestSearchDocuments:
             MockDoc.find.return_value.sort.return_value.limit.return_value.to_list = AsyncMock(return_value=[])
             await search_documents(ctx, "composer agreement")
 
-        # Verify the filter includes $or with title and raw_text
         call_args = MockDoc.find.call_args[0][0]
         assert "$and" in call_args
-        text_filter = call_args["$and"][1]
+        text_filter = call_args["$and"][2]
+        assert "title" in text_filter
+        assert "$or" not in text_filter
+
+    @pytest.mark.asyncio
+    async def test_search_content_expands_to_raw_text(self):
+        """search_content=True opts in to the full-scan $or across title
+        and raw_text."""
+        from app.services.chat_tools import search_documents
+
+        ctx = _make_context()
+        with patch("app.services.chat_tools.SmartDocument") as MockDoc:
+            MockDoc.find.return_value.sort.return_value.limit.return_value.to_list = AsyncMock(return_value=[])
+            await search_documents(ctx, "composer agreement", search_content=True)
+
+        call_args = MockDoc.find.call_args[0][0]
+        text_filter = call_args["$and"][2]
         assert "$or" in text_filter
         fields = {list(c.keys())[0] for c in text_filter["$or"]}
         assert fields == {"title", "raw_text"}

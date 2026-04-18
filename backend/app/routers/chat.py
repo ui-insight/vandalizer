@@ -135,9 +135,11 @@ async def chat(
         if _msg.startswith("show me") or _msg in {"demo", "just show me", "go", "let's go"}:
             body.run_demo = True
 
-    # Provision onboarding sample for agentic demo (first session or on-demand)
+    # Provision the onboarding sample ONLY when the scripted demo is actually
+    # going to run. Provisioning for every first-session message leaks the
+    # sample doc into normal chat and makes the agent hallucinate about it.
     onboarding_ctx = None
-    if body.is_first_session or body.run_demo:
+    if body.run_demo:
         from app.services.onboarding_service import provision_onboarding_sample
         onboarding_ctx = await provision_onboarding_sample(user)
 

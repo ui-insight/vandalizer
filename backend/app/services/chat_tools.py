@@ -46,51 +46,119 @@ def _score_to_tier(score: float | None) -> str | None:
 # ---------------------------------------------------------------------------
 
 
-def _words_to_regex(query: str) -> str:
-    r"""Build a regex that requires every word in *query* to appear (any order).
+# Filler words that add noise to search queries like "what's in the X document"
+_QUERY_STOPWORDS = frozenset({
+    "a", "an", "the", "in", "on", "of", "is", "are", "was", "were", "be", "to",
+    "for", "with", "about", "and", "or", "but", "my", "your",
+    "what", "whats", "what's", "whos", "who's", "where", "when", "which", "how",
+    "show", "find", "search", "get", "tell", "me", "please",
+    "document", "documents", "file", "files", "doc", "docs", "guide", "sheet",
+    # File extensions — dropped so "foo.pdf" tokenizes to ["foo"] instead of
+    # forcing a lookahead on "pdf" that matches every PDF in the workspace.
+    "pdf", "docx", "xlsx", "xls", "html", "htm", "txt", "csv", "jpg", "jpeg",
+    "png", "gif", "ppt", "pptx",
+})
 
-    "composer agreement" → ``(?=[\s\S]*composer)(?=[\s\S]*agreement)`` which
-    matches titles like ``Composer-Performer_Agreement_copy_4.pdf`` and also
-    multi-line raw_text where words appear on different lines.
 
-    Uses ``[\s\S]`` instead of ``.`` so the lookahead crosses newline
-    boundaries (MongoDB regex does not enable dotall by default).
+def _tokenize_query(query: str) -> list[str]:
+    """Normalize and tokenize a search query.
+
+    - Lowercases
+    - Replaces separators (_ - . /) with spaces so "elven garden guide"
+      can match titles like "Elven_Garden_Guide.pdf"
+    - Drops filler words so "what's in my elven garden guide" reduces to
+      ["elven", "garden"]
+    - Preserves quoted phrases as single tokens (e.g. ``"thirty meter telescope"``)
     """
-    words = query.split()
-    if not words:
+    if not query:
+        return []
+    # Extract quoted phrases first so they survive tokenization
+    quoted = re.findall(r'"([^"]+)"', query)
+    remainder = re.sub(r'"[^"]+"', " ", query)
+    # Replace separators with spaces and lowercase
+    remainder = re.sub(r"[_\-./\\,;:!?()\[\]{}]+", " ", remainder.lower())
+    raw_tokens = [t for t in remainder.split() if t]
+    content_tokens = [t for t in raw_tokens if t not in _QUERY_STOPWORDS]
+    # Reinsert quoted phrases (as-is, lowered) at the front
+    tokens = [q.lower().strip() for q in quoted if q.strip()] + content_tokens
+    # If stopword stripping killed everything (e.g. query was only "the guide"),
+    # fall back to the raw tokens so we still search *something*.
+    return tokens or raw_tokens
+
+
+def _words_to_regex(query: str) -> str:
+    r"""Build a regex that requires every tokenized word in *query* to appear (any order).
+
+    ``"what's in my elven garden guide"`` tokenizes to ``["elven", "garden"]``
+    and produces ``(?=[\s\S]*elven)(?=[\s\S]*garden)``.
+
+    Uses ``[\s\S]`` instead of ``.`` so the lookahead crosses newline boundaries
+    (MongoDB regex does not enable dotall by default).
+    """
+    tokens = _tokenize_query(query)
+    if not tokens:
         return ""
-    if len(words) == 1:
-        return re.escape(words[0])
-    return "".join(rf"(?=[\s\S]*{re.escape(w)})" for w in words)
+    if len(tokens) == 1:
+        return re.escape(tokens[0])
+    return "".join(rf"(?=[\s\S]*{re.escape(t)})" for t in tokens)
+
+
+def _build_owner_filter(deps: "AgenticChatDeps") -> dict:
+    """Build the owner-scope filter for user + all accessible teams.
+
+    Mirrors the logic in ``routers/documents.py`` so chat tools see the same
+    documents the file browser does. Previously the tool only scoped by a
+    single team_id *or* user_id, silently hiding personal docs whenever the
+    user had a current_team set.
+    """
+    ta = deps.team_access
+    conditions: list[dict] = [{"user_id": deps.user_id}]
+    if ta and ta.team_uuids:
+        conditions.append({"team_id": {"$in": list(ta.team_uuids)}})
+    if ta and ta.team_object_ids:
+        conditions.append({"team_id": {"$in": list(ta.team_object_ids)}})
+    return {"$or": conditions}
 
 
 async def search_documents(
     context: RunContext[AgenticChatDeps],
     query: str,
+    search_content: bool = False,
 ) -> list[dict]:
-    """Search the user's documents by title or content. Returns matching documents with metadata.
+    """Search the user's documents by title (fast) or full content (slow).
 
     Args:
         context: The call context.
-        query: A text query to match against document titles or content.
-               Multi-word queries match each word independently (any order).
+        query: A text query to match against document titles (or content if
+               search_content=True). Multi-word queries match each word
+               independently (any order). Common filler words ("the",
+               "what's in", "document") and file extensions (".pdf", ".docx")
+               are stripped.
+        search_content: If True, also regex-match the document's extracted
+               text. Off by default because content search is a full
+               collection scan (no text index) and can time out on large
+               workspaces. Only set this when a title search returns nothing
+               and the user is describing content rather than a filename.
     """
-    team_id = context.deps.team_id
-    base_filters: dict = {"soft_deleted": {"$ne": True}}
-    if team_id:
-        base_filters["team_id"] = team_id
-    else:
-        base_filters["user_id"] = context.deps.user_id
+    owner_filter = _build_owner_filter(context.deps)
+    base_filters: dict = {"$and": [owner_filter, {"soft_deleted": {"$ne": True}}]}
 
     if query:
         pattern = _words_to_regex(query)
-        text_filter = {
-            "$or": [
-                {"title": {"$regex": pattern, "$options": "i"}},
-                {"raw_text": {"$regex": pattern, "$options": "i"}},
-            ],
-        }
-        filters = {"$and": [base_filters, text_filter]}
+        if pattern:
+            title_regex = {"title": {"$regex": pattern, "$options": "i"}}
+            if search_content:
+                text_filter = {
+                    "$or": [
+                        title_regex,
+                        {"raw_text": {"$regex": pattern, "$options": "i"}},
+                    ],
+                }
+            else:
+                text_filter = title_regex
+            filters = {"$and": [*base_filters["$and"], text_filter]}
+        else:
+            filters = base_filters
     else:
         filters = base_filters
 
@@ -119,23 +187,19 @@ async def list_documents(
         context: The call context.
         folder_uuid: UUID of the folder to list. Omit or pass null for the root.
     """
-    team_id = context.deps.team_id
-    doc_filters: dict = {"soft_deleted": {"$ne": True}}
-    folder_filters: dict = {}
-
-    if team_id:
-        doc_filters["team_id"] = team_id
-        folder_filters["team_id"] = team_id
-    else:
-        doc_filters["user_id"] = context.deps.user_id
-        folder_filters["user_id"] = context.deps.user_id
+    owner_filter = _build_owner_filter(context.deps)
+    doc_conditions: list[dict] = [owner_filter, {"soft_deleted": {"$ne": True}}]
+    folder_conditions: list[dict] = [owner_filter]
 
     if folder_uuid:
-        doc_filters["folder"] = folder_uuid
-        folder_filters["parent_id"] = folder_uuid
+        doc_conditions.append({"folder": folder_uuid})
+        folder_conditions.append({"parent_id": folder_uuid})
     else:
-        doc_filters["folder"] = {"$in": [None, "", "0"]}
-        folder_filters["parent_id"] = {"$in": [None, ""]}
+        doc_conditions.append({"folder": {"$in": [None, "", "0"]}})
+        folder_conditions.append({"parent_id": {"$in": [None, ""]}})
+
+    doc_filters = {"$and": doc_conditions}
+    folder_filters = {"$and": folder_conditions}
 
     folders = await SmartFolder.find(folder_filters).sort("title").limit(50).to_list()
     docs = await SmartDocument.find(doc_filters).sort("-created_at").limit(MAX_RESULTS).to_list()

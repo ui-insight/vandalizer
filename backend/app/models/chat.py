@@ -12,6 +12,8 @@ from pydantic_ai.messages import (
     ModelResponse,
     SystemPromptPart,
     TextPart,
+    ToolCallPart,
+    ToolReturnPart,
     UserPromptPart,
 )
 
@@ -49,14 +51,75 @@ class ChatMessage(Document):
             d["segments"] = self.segments
         return d
 
-    def to_model_message(self) -> ModelMessage:
+    def to_model_messages(self) -> list[ModelMessage]:
+        """Reconstruct pydantic-ai messages for this stored chat message.
+
+        Assistant turns may expand into multiple messages when tool calls were
+        made: the original ModelResponse (text + ToolCallParts), followed by a
+        ModelRequest of ToolReturnParts, then any subsequent ModelResponse
+        chunks. Walking ``segments`` preserves the interleaved order so the
+        model sees real tool results on the next turn instead of fabricating
+        them from its own prior text.
+        """
         if self.role == ChatRole.USER:
-            return ModelRequest(parts=[UserPromptPart(content=self.message)])
-        elif self.role == ChatRole.ASSISTANT:
-            return ModelResponse(parts=[TextPart(content=self.message)])
-        elif self.role == ChatRole.SYSTEM:
-            return ModelRequest(parts=[SystemPromptPart(content=self.message)])
-        return ModelRequest(parts=[UserPromptPart(content=self.message)])
+            return [ModelRequest(parts=[UserPromptPart(content=self.message)])]
+        if self.role == ChatRole.SYSTEM:
+            return [ModelRequest(parts=[SystemPromptPart(content=self.message)])]
+        if self.role != ChatRole.ASSISTANT:
+            return [ModelRequest(parts=[UserPromptPart(content=self.message)])]
+
+        if not self.segments:
+            if self.message:
+                return [ModelResponse(parts=[TextPart(content=self.message)])]
+            return []
+
+        messages: list[ModelMessage] = []
+        response_parts: list = []
+        request_parts: list = []
+
+        def flush_response() -> None:
+            if response_parts:
+                messages.append(ModelResponse(parts=list(response_parts)))
+                response_parts.clear()
+
+        def flush_request() -> None:
+            if request_parts:
+                messages.append(ModelRequest(parts=list(request_parts)))
+                request_parts.clear()
+
+        for seg in self.segments:
+            kind = seg.get("kind")
+            if kind == "text":
+                flush_request()
+                content = seg.get("content", "")
+                if content:
+                    response_parts.append(TextPart(content=content))
+            elif kind == "tool_call":
+                flush_request()
+                call = seg.get("call", {})
+                call_id = call.get("tool_call_id") or ""
+                if not call_id:
+                    continue
+                response_parts.append(ToolCallPart(
+                    tool_name=call.get("tool_name", ""),
+                    args=call.get("args", {}),
+                    tool_call_id=call_id,
+                ))
+            elif kind == "tool_result":
+                flush_response()
+                result = seg.get("result", {})
+                call_id = result.get("tool_call_id") or ""
+                if not call_id:
+                    continue
+                request_parts.append(ToolReturnPart(
+                    tool_name=result.get("tool_name", ""),
+                    content=result.get("content", ""),
+                    tool_call_id=call_id,
+                ))
+
+        flush_response()
+        flush_request()
+        return messages
 
 
 class FileAttachment(Document):
@@ -178,7 +241,8 @@ class ChatConversation(Document):
         else:
             active_msgs = msgs
 
-        result.extend([m.to_model_message() for m in active_msgs])
+        for m in active_msgs:
+            result.extend(m.to_model_messages())
         return result
 
     async def get_file_attachments(self) -> list[FileAttachment]:
