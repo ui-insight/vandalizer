@@ -16,6 +16,7 @@ interface DocumentViewerProps {
   onClearHighlights?: () => void
   processing?: boolean
   taskStatus?: string | null
+  hideHighlightNavBar?: boolean
 }
 
 const ZOOM_LEVELS = [0.5, 0.75, 1, 1.25, 1.5, 2]
@@ -60,7 +61,7 @@ const STATUS_MESSAGES: Record<string, { title: string; message: string }> = {
   },
 }
 
-export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights, processing, taskStatus }: DocumentViewerProps) {
+export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights, processing, taskStatus, hideHighlightNavBar }: DocumentViewerProps) {
   const [zoom, setZoom] = useState(2) // index into ZOOM_LEVELS, default 100%
   const [isPdf, setIsPdf] = useState<boolean | null>(null) // null = loading
   const [isSpreadsheet, setIsSpreadsheet] = useState(false)
@@ -726,7 +727,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
         <div ref={containerRef} style={{ paddingBottom: 20 }} />
 
         {/* Highlight navigation bar */}
-        {totalHighlights > 0 && (
+        {totalHighlights > 0 && !hideHighlightNavBar && (
           <div style={{
             position: 'sticky',
             bottom: 12,

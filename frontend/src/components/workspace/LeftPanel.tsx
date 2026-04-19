@@ -4,11 +4,18 @@ import { FileBrowser } from '../files/FileBrowser'
 import type { ContentMatch } from '../files/FileBrowser'
 import { DocumentViewer } from '../files/DocumentViewer'
 import { RawTextModal } from '../files/RawTextModal'
+import { VerificationNavBar } from '../files/VerificationNavBar'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { pollStatus, searchDocuments } from '../../api/documents'
+import { getVerificationSession } from '../../api/verificationSessions'
 
 export function LeftPanel() {
-  const { setSelectedDocUuids, setSelectedDocNames, setSelectedFolderUuids, highlightTerms, setHighlightTerms, setProcessingDoc, viewDocumentRequest, clearViewDocumentRequest } = useWorkspace()
+  const {
+    setSelectedDocUuids, setSelectedDocNames, setSelectedFolderUuids,
+    highlightTerms, setHighlightTerms,
+    setProcessingDoc, viewDocumentRequest, clearViewDocumentRequest,
+    verificationSession, setVerificationSession, setVerificationCompletion,
+  } = useWorkspace()
   const [viewingDoc, setViewingDoc] = useState<{
     uuid: string
     title: string
@@ -50,6 +57,31 @@ export function LeftPanel() {
       clearViewDocumentRequest()
     }
   }, [viewDocumentRequest, clearViewDocumentRequest, setSelectedDocUuids, setSelectedDocNames])
+
+  // Once a verification session is active, fetch the full state from the
+  // backend so we have persisted field statuses (the chat tool result only
+  // seeds the UUID + extracted values).
+  const verificationActive = Boolean(
+    verificationSession && viewingDoc && verificationSession.document_uuid === viewingDoc.uuid,
+  )
+  useEffect(() => {
+    if (!verificationSession) return
+    if (verificationSession.status !== 'pending') return
+    // Only refetch if we haven't already loaded persisted state (created_at is
+    // set after a round-trip from the backend).
+    if (verificationSession.created_at) return
+    let cancelled = false
+    getVerificationSession(verificationSession.uuid)
+      .then((s) => {
+        if (!cancelled) setVerificationSession(s)
+      })
+      .catch(() => {
+        // If we can't fetch, leave the seeded session in place.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [verificationSession?.uuid, verificationSession?.created_at, verificationSession?.status, setVerificationSession])
 
   // Sync processing state to workspace context so ChatPanel can show it
   useEffect(() => {
@@ -233,14 +265,55 @@ export function LeftPanel() {
 
       {/* Content area */}
       {viewingDoc ? (
-        <div style={{ height: 'calc(100% - 50px)' }}>
+        <div style={{ height: 'calc(100% - 50px)', position: 'relative' }}>
           <DocumentViewer
             docUuid={viewingDoc.uuid}
             highlightTerms={highlightTerms}
-            onClearHighlights={() => setHighlightTerms([])}
+            onClearHighlights={verificationActive ? undefined : () => setHighlightTerms([])}
             processing={viewingDoc.processing}
             taskStatus={viewingDoc.taskStatus}
+            hideHighlightNavBar={verificationActive}
           />
+          {verificationActive && verificationSession && (
+            <div
+              style={{
+                position: 'absolute',
+                left: 0,
+                right: 0,
+                bottom: 12,
+                pointerEvents: 'none',
+                zIndex: 200,
+              }}
+            >
+              <div style={{ pointerEvents: 'auto' }}>
+                <VerificationNavBar
+                  session={verificationSession}
+                  onSessionUpdated={setVerificationSession}
+                  onActiveValueChange={(value) => {
+                    // Drive the PDF's runtime string search to the active field value.
+                    setHighlightTerms(value ? [value] : [])
+                  }}
+                  onCompleted={({ session, testCaseUuid, outcome }) => {
+                    const approved = session.fields.filter((f) => f.status === 'approved').length
+                    const corrected = session.fields.filter((f) => f.status === 'corrected').length
+                    const skipped = session.fields.filter((f) => f.status === 'skipped').length
+                    setVerificationCompletion({
+                      sessionId: session.uuid,
+                      extractionSetUuid: session.search_set_uuid,
+                      documentTitle: session.document_title,
+                      testCaseUuid,
+                      outcome,
+                      approvedCount: approved,
+                      correctedCount: corrected,
+                      skippedCount: skipped,
+                    })
+                    setVerificationSession(null)
+                    setHighlightTerms([])
+                  }}
+                />
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="overflow-auto hide-scrollbar" style={{ height: 'calc(100% - 50px)', paddingTop: 10, paddingBottom: 60 }}>

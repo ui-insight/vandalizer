@@ -30,6 +30,7 @@ from app.models.kb_suggestion import KBSuggestion
 from app.models.extraction_test_case import ExtractionTestCase
 from app.models.validation_run import ValidationRun
 from app.models.quality_alert import QualityAlert
+from app.models.verification_session import VerificationSession
 from app.models.demo import DemoApplication, PostExperienceResponse
 from app.models.passive import WorkflowTriggerEvent, ExtractionTriggerEvent, GraphSubscription, M365AuditEntry
 from app.models.certification import CertificationProgress
@@ -82,6 +83,7 @@ ALL_MODELS = [
     ExtractionTestCase,
     ValidationRun,
     QualityAlert,
+    VerificationSession,
     DemoApplication,
     PostExperienceResponse,
     WorkflowTriggerEvent,

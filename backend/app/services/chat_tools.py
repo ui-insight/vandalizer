@@ -14,11 +14,13 @@ from typing import Optional
 from pydantic_ai.tools import RunContext
 
 from app.models.document import SmartDocument
+from app.models.extraction_test_case import ExtractionTestCase
 from app.models.folder import SmartFolder
 from app.models.knowledge import KnowledgeBase, KnowledgeBaseSource
 from app.models.quality_alert import QualityAlert
 from app.models.search_set import SearchSet, SearchSetItem
 from app.models.validation_run import ValidationRun
+from app.models.verification_session import VerificationField, VerificationSession
 from app.models.workflow import Workflow, WorkflowStep
 from app.services.chat_deps import AgenticChatDeps
 from app.services.document_manager import get_document_manager
@@ -951,6 +953,425 @@ async def get_workflow_status(
 
 
 # ---------------------------------------------------------------------------
+# Phase 5 — Validation & guided verification tools
+# ---------------------------------------------------------------------------
+
+
+async def list_test_cases(
+    context: RunContext[AgenticChatDeps],
+    extraction_set_uuid: str,
+) -> dict:
+    """List existing test cases (ground truth) for an extraction set.
+
+    Use this to understand validation coverage before proposing new test cases
+    — e.g., if the set already has 5 test cases, suggest one with different
+    characteristics instead of a near-duplicate.
+
+    Args:
+        context: The call context.
+        extraction_set_uuid: UUID of the extraction template.
+    """
+    ss = await SearchSet.find_one(SearchSet.uuid == extraction_set_uuid)
+    if not ss:
+        return {"error": f"Extraction set '{extraction_set_uuid}' not found."}
+
+    team_id = context.deps.team_id
+    user_id = context.deps.user_id
+    if not ss.verified and ss.user_id != user_id:
+        if not (team_id and ss.team_id == team_id):
+            return {"error": "You do not have access to this extraction set."}
+
+    test_cases = await ExtractionTestCase.find(
+        ExtractionTestCase.search_set_uuid == extraction_set_uuid
+    ).sort("-created_at").limit(MAX_RESULTS).to_list()
+
+    return {
+        "extraction_set": ss.title,
+        "count": len(test_cases),
+        "test_cases": [
+            {
+                "uuid": tc.uuid,
+                "label": tc.label,
+                "source_type": tc.source_type,
+                "document_uuid": tc.document_uuid,
+                "field_count": len(tc.expected_values or {}),
+                "created_at": tc.created_at.isoformat() if tc.created_at else None,
+            }
+            for tc in test_cases
+        ],
+    }
+
+
+async def propose_test_case(
+    context: RunContext[AgenticChatDeps],
+    extraction_set_uuid: str,
+    document_uuid: str,
+    label: Optional[str] = None,
+) -> dict:
+    """Propose a new test case by extracting values and opening a guided verification session.
+
+    This runs the extraction once and creates a VerificationSession — it does
+    NOT persist a test case yet. The frontend opens the document in the viewer
+    with each extracted value highlighted so the user can approve or correct
+    each one in context. Only after the user finalizes the session does an
+    ExtractionTestCase get created with user-verified ground truth.
+
+    Prefer this over assuming an extraction is correct. Use this whenever the
+    user says things like "looks right", "save this as a test case", "use this
+    for validation", or when you notice a good candidate document for
+    validation (well-structured, representative, known-good).
+
+    Args:
+        context: The call context.
+        extraction_set_uuid: UUID of the extraction template.
+        document_uuid: UUID of the document to extract from.
+        label: Optional human-readable label for the test case. Defaults to the document title.
+    """
+    from app.services.extraction_engine import ExtractionEngine
+
+    ss = await SearchSet.find_one(SearchSet.uuid == extraction_set_uuid)
+    if not ss:
+        return {"error": f"Extraction set '{extraction_set_uuid}' not found."}
+
+    user_id = context.deps.user_id
+    team_id = context.deps.team_id
+    if not ss.verified and ss.user_id != user_id:
+        if not (team_id and ss.team_id == team_id):
+            return {"error": "You do not have access to this extraction set."}
+
+    doc = await SmartDocument.find_one(SmartDocument.uuid == document_uuid)
+    if not doc:
+        return {"error": f"Document '{document_uuid}' not found."}
+    if team_id:
+        if doc.team_id != team_id and doc.user_id != user_id:
+            return {"error": "You do not have access to this document."}
+    else:
+        if doc.user_id != user_id:
+            return {"error": "You do not have access to this document."}
+    if not doc.raw_text:
+        return {"error": "Document has no extracted text yet."}
+
+    items = await ss.get_extraction_items()
+    keys = [item.searchphrase for item in items if item.searchphrase]
+    if not keys:
+        return {"error": "Extraction set has no fields defined."}
+
+    field_metadata = [
+        {"key": i.searchphrase, "is_optional": i.is_optional, "enum_values": i.enum_values}
+        for i in items
+        if i.searchphrase
+    ]
+
+    sys_cfg = context.deps.system_config_doc
+
+    def _run():
+        engine = ExtractionEngine(system_config_doc=sys_cfg, domain=ss.domain)
+        return engine.extract(
+            extract_keys=keys,
+            doc_texts=[doc.raw_text],
+            extraction_config_override=ss.extraction_config or None,
+            field_metadata=field_metadata,
+        )
+
+    try:
+        results = await asyncio.wait_for(asyncio.to_thread(_run), timeout=120)
+    except asyncio.TimeoutError:
+        return {"error": "Extraction timed out. Try a smaller extraction set."}
+
+    flat: dict = {}
+    if results and isinstance(results, list):
+        for item in results:
+            if isinstance(item, dict):
+                flat.update(item)
+
+    fields = [
+        VerificationField(
+            key=k,
+            extracted=str(flat.get(k)) if flat.get(k) is not None else "",
+            status="pending",
+        )
+        for k in keys
+    ]
+
+    session = VerificationSession(
+        search_set_uuid=extraction_set_uuid,
+        document_uuid=document_uuid,
+        document_title=doc.title or document_uuid,
+        label=label or (doc.title or document_uuid),
+        fields=fields,
+        user_id=user_id,
+        team_id=team_id,
+    )
+    await session.insert()
+
+    return {
+        "verification_session_id": session.uuid,
+        "extraction_set": ss.title,
+        "extraction_set_uuid": extraction_set_uuid,
+        "document_uuid": document_uuid,
+        "document_title": doc.title or document_uuid,
+        "label": session.label,
+        "status": "pending_verification",
+        "fields": [
+            {"key": f.key, "extracted": f.extracted, "status": f.status}
+            for f in fields
+        ],
+        "field_count": len(fields),
+        "message": (
+            f"Opened a verification session for '{doc.title}'. "
+            "Review each extracted value in the document viewer and approve or correct it. "
+            "The test case will be saved only after you finish verifying."
+        ),
+    }
+
+
+async def create_extraction_from_document(
+    context: RunContext[AgenticChatDeps],
+    document_uuids: list[str],
+    title: Optional[str] = None,
+    domain: Optional[str] = None,
+    confirmed: bool = False,
+) -> dict:
+    """Create a new extraction set by analyzing one or more documents.
+
+    Uses the LLM to read the document(s) and propose field names worth
+    extracting (e.g. "PI name", "award amount", "period of performance").
+    A new SearchSet is created with those fields, and its UUID is returned.
+
+    Use this when the user asks things like "build an extraction from this
+    grant notice", "make a template out of this RFP", or "what fields should
+    we pull from this?". After creating, it's natural to follow up with
+    ``propose_test_case`` using the same document — the user-verified values
+    become the first test case and seed validation from day one.
+
+    Call first with confirmed=false to preview. Then call again with
+    confirmed=true after the user approves — field discovery uses an LLM
+    call and mutates workspace state.
+
+    Args:
+        context: The call context.
+        document_uuids: Document(s) to analyze. The first document's title
+            seeds the default extraction set title when no title is provided.
+            Max 5 documents per call.
+        title: Optional name for the new extraction set.
+        domain: Optional domain hint — one of 'nsf', 'nih', 'dod', 'doe'.
+            Activates domain-specific extraction prompts.
+        confirmed: Must be true to create. If false, returns a preview.
+    """
+    user_id = context.deps.user_id
+    team_id = context.deps.team_id
+
+    doc_uuids = document_uuids[:5]
+    if not doc_uuids:
+        return {"error": "At least one document_uuid is required."}
+
+    # Authorize and collect document titles for the preview / default title
+    docs: list[SmartDocument] = []
+    for doc_uuid in doc_uuids:
+        doc = await SmartDocument.find_one(SmartDocument.uuid == doc_uuid)
+        if not doc:
+            continue
+        if team_id:
+            if doc.team_id != team_id and doc.user_id != user_id:
+                continue
+        else:
+            if doc.user_id != user_id:
+                continue
+        docs.append(doc)
+
+    if not docs:
+        return {"error": "No accessible documents found."}
+
+    if any(not d.raw_text for d in docs):
+        # At least one doc is missing text — filter them out; reject if none remain
+        docs = [d for d in docs if d.raw_text]
+        if not docs:
+            return {"error": "Documents have no extracted text yet. Try again once processing completes."}
+
+    default_title = title or f"Extraction from {docs[0].title or doc_uuids[0]}"
+
+    if not confirmed:
+        doc_names = ", ".join(f'"{d.title}"' for d in docs[:3])
+        if len(docs) > 3:
+            doc_names += f" + {len(docs) - 3} more"
+        return {
+            "action": "create_extraction_from_document",
+            "preview": (
+                f'Create a new extraction set "{default_title}" by analyzing {doc_names}. '
+                "The LLM will propose field names worth extracting."
+            ),
+            "needs_confirmation": True,
+            "document_count": len(docs),
+            "default_title": default_title,
+        }
+
+    from app.services import search_set_service as svc
+
+    ss = await svc.create_search_set(
+        title=default_title,
+        user_id=user_id,
+        set_type="extraction",
+        team_id=team_id,
+    )
+    if domain:
+        ss.domain = domain
+        await ss.save()
+
+    try:
+        discovered_fields = await svc.build_from_documents(
+            search_set_uuid=ss.uuid,
+            document_uuids=[d.uuid for d in docs],
+            user_id=user_id,
+            model=context.deps.model_name or None,
+        )
+    except RuntimeError as e:
+        # Tear down the empty set if field discovery fails
+        await ss.delete()
+        return {"error": f"Field discovery failed: {e}"}
+
+    if not discovered_fields:
+        return {
+            "extraction_set_uuid": ss.uuid,
+            "title": ss.title,
+            "fields": [],
+            "document_uuids": [d.uuid for d in docs],
+            "message": (
+                "Created an empty extraction set — the LLM didn't find clear "
+                "fields in the document. You can add fields manually."
+            ),
+        }
+
+    return {
+        "extraction_set_uuid": ss.uuid,
+        "title": ss.title,
+        "fields": discovered_fields,
+        "field_count": len(discovered_fields),
+        "document_uuids": [d.uuid for d in docs],
+        "document_titles": [d.title or d.uuid for d in docs],
+        "message": (
+            f'Created "{ss.title}" with {len(discovered_fields)} proposed field(s). '
+            "You can now run extraction on other documents, or propose this same "
+            "document as the first test case to lock in ground truth."
+        ),
+    }
+
+
+async def run_validation(
+    context: RunContext[AgenticChatDeps],
+    extraction_set_uuid: str,
+    num_runs: int = 3,
+    test_case_uuids: Optional[list[str]] = None,
+    confirmed: bool = False,
+) -> dict:
+    """Run validation on an extraction set's test cases. Measures accuracy and consistency.
+
+    Runs extraction N times on each test case and compares against user-verified
+    expected values. Returns a unified 0-100 score plus per-field accuracy and
+    consistency. Persists a ValidationRun record and updates the extraction set's
+    quality tier.
+
+    Call first with confirmed=false to preview. Then call again with confirmed=true
+    after the user approves — validation uses LLM calls and can take 30–90s depending
+    on test case count and num_runs.
+
+    Args:
+        context: The call context.
+        extraction_set_uuid: UUID of the extraction template to validate.
+        num_runs: How many times to run extraction per test case (3+ recommended for consistency measurement). Default 3.
+        test_case_uuids: Optional — validate only these test cases. If omitted, validates all.
+        confirmed: Must be true to execute. If false, returns a preview.
+    """
+    from app.services import extraction_validation_service as val_svc
+
+    ss = await SearchSet.find_one(SearchSet.uuid == extraction_set_uuid)
+    if not ss:
+        return {"error": f"Extraction set '{extraction_set_uuid}' not found."}
+
+    user_id = context.deps.user_id
+    team_id = context.deps.team_id
+    if not ss.verified and ss.user_id != user_id:
+        if not (team_id and ss.team_id == team_id):
+            return {"error": "You do not have access to this extraction set."}
+
+    tc_count = await ExtractionTestCase.find(
+        ExtractionTestCase.search_set_uuid == extraction_set_uuid
+    ).count()
+    effective_count = len(test_case_uuids) if test_case_uuids else tc_count
+    if effective_count == 0:
+        return {
+            "error": "No test cases found for this extraction set. Use propose_test_case first to add ground truth.",
+        }
+
+    if not confirmed:
+        return {
+            "action": "run_validation",
+            "preview": (
+                f"Validate \"{ss.title}\" with {effective_count} test case(s), "
+                f"running extraction {num_runs} time(s) each."
+            ),
+            "needs_confirmation": True,
+            "num_test_cases": effective_count,
+            "num_runs": num_runs,
+        }
+
+    try:
+        result = await val_svc.run_validation(
+            search_set_uuid=extraction_set_uuid,
+            user_id=user_id,
+            test_case_uuids=test_case_uuids,
+            num_runs=num_runs,
+            model=context.deps.model_name or None,
+        )
+    except ValueError as e:
+        return {"error": str(e)}
+
+    # Fetch the ValidationRun we just persisted so we can surface the score.
+    latest = await ValidationRun.find(
+        ValidationRun.item_kind == "search_set",
+        ValidationRun.item_id == extraction_set_uuid,
+    ).sort("-created_at").first_or_none()
+
+    score = latest.score if latest else None
+    response: dict = {
+        "extraction_set": ss.title,
+        "extraction_set_uuid": extraction_set_uuid,
+        "num_test_cases": effective_count,
+        "num_runs": num_runs,
+        "accuracy": result.get("aggregate_accuracy"),
+        "consistency": result.get("aggregate_consistency"),
+        "score": score,
+        "tier": _score_to_tier(score),
+        "challenging_fields": [
+            {
+                "field": cf.get("field") or cf.get("key"),
+                "accuracy": cf.get("accuracy"),
+                "consistency": cf.get("consistency"),
+            }
+            for cf in (result.get("challenging_fields") or [])[:8]
+        ],
+    }
+
+    if latest and latest.score_breakdown:
+        response["score_breakdown"] = latest.score_breakdown
+
+    # Quality sidecar for the badge UI
+    if score is not None:
+        response["quality"] = {
+            "score": score,
+            "tier": _score_to_tier(score),
+            "accuracy": latest.accuracy if latest else None,
+            "consistency": latest.consistency if latest else None,
+            "num_test_cases": effective_count,
+            "num_runs": num_runs,
+            "last_validated_at": (
+                latest.created_at.isoformat() if latest and latest.created_at else None
+            ),
+        }
+
+    return response
+
+
+# ---------------------------------------------------------------------------
 # Tool registry — imported by llm_service.create_agentic_chat_agent()
 # ---------------------------------------------------------------------------
 
@@ -974,4 +1395,9 @@ TOOLS = [
     # Phase 4 — Workflow orchestration
     run_workflow,
     get_workflow_status,
+    # Phase 5 — Validation & guided verification
+    list_test_cases,
+    propose_test_case,
+    run_validation,
+    create_extraction_from_document,
 ]

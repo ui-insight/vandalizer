@@ -1,8 +1,20 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
+import type { VerificationSession } from '../api/verificationSessions'
 
 type RightTab = 'assistant' | 'library'
 export type WorkspaceMode = 'chat' | 'files' | 'automations' | 'knowledge'
+
+export interface VerificationCompletion {
+  sessionId: string
+  extractionSetUuid: string
+  documentTitle: string
+  testCaseUuid: string | null
+  outcome: 'finalized' | 'cancelled'
+  approvedCount: number
+  correctedCount: number
+  skippedCount: number
+}
 
 // ---------------------------------------------------------------------------
 // 1. Navigation Context — URL-synced panels, mode, tab
@@ -73,6 +85,10 @@ interface UIStateContextValue {
   viewDocumentRequest: { uuid: string; title: string } | null
   viewDocument: (uuid: string, title: string) => void
   clearViewDocumentRequest: () => void
+  verificationSession: VerificationSession | null
+  setVerificationSession: (s: VerificationSession | null) => void
+  verificationCompletion: VerificationCompletion | null
+  setVerificationCompletion: (c: VerificationCompletion | null) => void
 }
 
 const UIStateContext = createContext<UIStateContextValue | null>(null)
@@ -165,6 +181,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [activeKBUuid, setActiveKBUuid] = useState<string | null>(null)
   const [activeKBTitle, setActiveKBTitle] = useState<string | null>(null)
   const [viewDocumentRequest, setViewDocumentRequest] = useState<{ uuid: string; title: string } | null>(null)
+  const [verificationSession, setVerificationSession] = useState<VerificationSession | null>(null)
+  const [verificationCompletion, setVerificationCompletion] = useState<VerificationCompletion | null>(null)
   const pendingExtractionResultsRef = useRef<Record<string, string> | null>(null)
   const pendingWorkflowSessionRef = useRef<string | null>(null)
 
@@ -366,12 +384,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     highlightTerms, setHighlightTerms,
     activitySignal, bumpActivitySignal,
     viewDocumentRequest, viewDocument, clearViewDocumentRequest,
+    verificationSession, setVerificationSession,
+    verificationCompletion, setVerificationCompletion,
   }), [
     selectedDocUuids, selectedDocNames, selectedFolderUuids,
     railDocked, toggleRailDocked,
     panelSplit, setPanelSplit,
     highlightTerms, activitySignal, bumpActivitySignal,
     viewDocumentRequest, viewDocument, clearViewDocumentRequest,
+    verificationSession, verificationCompletion,
   ])
 
   return (

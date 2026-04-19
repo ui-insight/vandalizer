@@ -28,6 +28,10 @@ const TOOL_META: Record<string, { label: string; category: ToolCategory }> = {
   add_url_to_kb:         { label: 'Adding URL to KB',         category: 'write' },
   run_workflow:          { label: 'Running workflow',          category: 'workflow' },
   get_workflow_status:   { label: 'Checking workflow status',  category: 'workflow' },
+  list_test_cases:       { label: 'Listing test cases',         category: 'read' },
+  propose_test_case:     { label: 'Preparing guided verification', category: 'extract' },
+  run_validation:        { label: 'Running validation',         category: 'workflow' },
+  create_extraction_from_document: { label: 'Building extraction from document', category: 'write' },
 }
 
 const CATEGORY_ACCENT: Record<ToolCategory, string> = {
@@ -61,6 +65,10 @@ function getActiveHint(toolName: string, args: Record<string, unknown>): string 
     case 'run_extraction': {
       const docs = Array.isArray(args.document_uuids) ? args.document_uuids.length : 0
       return docs > 0 ? `on ${docs} document${docs !== 1 ? 's' : ''}` : ''
+    }
+    case 'create_extraction_from_document': {
+      const docs = Array.isArray(args.document_uuids) ? args.document_uuids.length : 0
+      return docs > 0 ? `from ${docs} document${docs !== 1 ? 's' : ''}` : ''
     }
     case 'get_document_text':
       return ''
@@ -155,6 +163,41 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
         text: setName ? `${setName} — ${parts}` : parts,
         qualityHint,
       }
+    }
+
+    case 'propose_test_case': {
+      const count = Array.isArray(obj.fields) ? (obj.fields as unknown[]).length : 0
+      const title = obj.document_title ? `"${String(obj.document_title).slice(0, 40)}"` : ''
+      return {
+        text: `${title} — ${count} field${count !== 1 ? 's' : ''} ready to verify`,
+        qualityHint: '',
+      }
+    }
+
+    case 'run_validation': {
+      if (obj.score != null) {
+        const tc = obj.num_test_cases || 0
+        return {
+          text: `Score: ${Math.round(obj.score as number)}/100 · ${tc} test case${tc !== 1 ? 's' : ''}`,
+          qualityHint,
+        }
+      }
+      return { text: 'Validation complete', qualityHint: '' }
+    }
+
+    case 'list_test_cases': {
+      const count = (obj.count as number) || 0
+      const setName = obj.extraction_set ? `"${obj.extraction_set}"` : ''
+      return { text: `${setName} — ${count} test case${count !== 1 ? 's' : ''}`, qualityHint: '' }
+    }
+
+    case 'create_extraction_from_document': {
+      const fields = Array.isArray(obj.fields) ? (obj.fields as unknown[]).length : 0
+      const title = obj.title ? `"${String(obj.title).slice(0, 40)}"` : ''
+      if (fields > 0) {
+        return { text: `${title} — ${fields} field${fields !== 1 ? 's' : ''} discovered`, qualityHint: '' }
+      }
+      return { text: obj.message ? String(obj.message) : 'Created', qualityHint: '' }
     }
 
     case 'get_quality_info':
@@ -630,6 +673,63 @@ function WorkflowOutput({ content }: { content: Record<string, unknown> }) {
   return null
 }
 
+interface VerificationLauncherActions {
+  viewDocument: (uuid: string, title: string) => void
+  setWorkspaceMode: (mode: WorkspaceMode) => void
+  openVerification: (sessionId: string) => void
+}
+
+function VerificationLauncher({
+  content,
+  actions,
+}: {
+  content: Record<string, unknown>
+  actions: VerificationLauncherActions
+}) {
+  const sessionId = content.verification_session_id as string | undefined
+  const docUuid = content.document_uuid as string | undefined
+  const docTitle = String(content.document_title || 'document')
+  const fields = (content.fields as Array<Record<string, unknown>>) || []
+  const label = String(content.label || '')
+
+  if (!sessionId || !docUuid) return null
+
+  const handleStart = () => {
+    actions.setWorkspaceMode('files')
+    actions.viewDocument(docUuid, docTitle)
+    actions.openVerification(sessionId)
+  }
+
+  return (
+    <div style={{ marginTop: 6, marginLeft: 20 }}>
+      <div style={{
+        border: '1px solid #fde68a',
+        background: '#fffbeb',
+        borderRadius: 8,
+        padding: '10px 12px',
+        fontSize: 12,
+        color: '#374151',
+      }}>
+        <div style={{ fontWeight: 600, marginBottom: 4, color: '#92400e' }}>
+          Guided verification ready
+        </div>
+        <div style={{ lineHeight: 1.5, marginBottom: 8 }}>
+          {fields.length} field{fields.length !== 1 ? 's' : ''} to confirm in{' '}
+          <span style={{ fontWeight: 500 }}>{label || docTitle}</span>.{' '}
+          The test case will be saved only after you finish reviewing each value in the document.
+        </div>
+        <button
+          onClick={handleStart}
+          className="chat-action-btn"
+          style={{ fontSize: 12, padding: '6px 16px' }}
+        >
+          Open document to verify
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // Exported single-tool status line — used for interleaved segment rendering
 // ---------------------------------------------------------------------------
@@ -645,7 +745,7 @@ export function ToolStatusLine({
   isActive?: boolean
   onConfirm?: (message: string) => void
 }) {
-  const { viewDocument, setHighlightTerms, setWorkspaceMode } = useWorkspace()
+  const { viewDocument, setHighlightTerms, setWorkspaceMode, setVerificationSession } = useWorkspace()
   const name = result?.tool_name || call?.tool_name || 'unknown'
   const meta = getMeta(name)
   const accent = CATEGORY_ACCENT[meta.category]
@@ -661,6 +761,33 @@ export function ToolStatusLine({
     : { text: '', qualityHint: '' }
 
   const kbActions: KBSourceActions = { viewDocument, setHighlightTerms, setWorkspaceMode }
+
+  const verificationActions: VerificationLauncherActions = {
+    viewDocument,
+    setWorkspaceMode,
+    openVerification: (sessionId: string) => {
+      // Seed a minimal session placeholder; LeftPanel/DocumentViewer will
+      // fetch the full session from the backend and keep it fresh.
+      setVerificationSession({
+        uuid: sessionId,
+        search_set_uuid: String(obj?.extraction_set_uuid || ''),
+        document_uuid: String(obj?.document_uuid || ''),
+        document_title: String(obj?.document_title || ''),
+        label: String(obj?.label || ''),
+        status: 'pending',
+        test_case_uuid: null,
+        fields: ((obj?.fields as Array<Record<string, unknown>>) || []).map((f) => ({
+          key: String(f.key),
+          extracted: String(f.extracted ?? ''),
+          expected: null,
+          status: 'pending',
+        })),
+        all_resolved: false,
+        created_at: null,
+        updated_at: null,
+      })
+    },
+  }
 
   return (
     <div>
@@ -737,6 +864,9 @@ export function ToolStatusLine({
       )}
       {result && name === 'get_workflow_status' && obj?.status === 'completed' && obj?.output != null && (
         <WorkflowOutput content={obj} />
+      )}
+      {result && name === 'propose_test_case' && obj?.verification_session_id != null && (
+        <VerificationLauncher content={obj} actions={verificationActions} />
       )}
 
       {/* Confirmation buttons for write tools awaiting user approval */}
