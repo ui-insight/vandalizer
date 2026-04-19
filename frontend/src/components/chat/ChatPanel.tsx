@@ -132,6 +132,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     setContextMode,
     setContextCutoffIndex,
     send,
+    stop,
     loadHistory,
     setActivity,
   } = useChat()
@@ -1012,6 +1013,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         onAttachFile={handleAttachFile}
         onAttachLink={handleAttachLink}
         disabled={isStreaming}
+        isStreaming={isStreaming}
+        onStop={stop}
         selectedModel={selectedModel}
         onModelChange={handleModelChange}
         onExport={handleExport}

@@ -257,6 +257,10 @@ async def search_knowledge_base(
     dm = get_document_manager()
     results = await asyncio.to_thread(dm.query_kb, uuid, query, 8)
 
+    # Record behavioral memory — best-effort, never blocks the tool.
+    from app.services import user_memory_service
+    await user_memory_service.record_kb_query(user_id, team_id, uuid, kb.title or uuid)
+
     # Batch-lookup KnowledgeBaseSource records to enrich results with
     # source_type, document_uuid, and url so the frontend can link back
     # to the original document or website.
@@ -632,6 +636,12 @@ async def run_extraction(
     except asyncio.TimeoutError:
         return {"error": "Extraction timed out after 2 minutes. Try with fewer documents or a smaller extraction set."}
 
+    # Record behavioral memory — best-effort, never blocks the tool.
+    from app.services import user_memory_service
+    await user_memory_service.record_extraction(
+        user_id, team_id, extraction_set_uuid, ss.title or extraction_set_uuid
+    )
+
     # Attach quality metadata as sidecar if validation data exists
     latest_run = await ValidationRun.find(
         ValidationRun.item_kind == "search_set",
@@ -879,6 +889,12 @@ async def run_workflow(
     except Exception as e:
         logger.error("Workflow launch failed: %s", e)
         return {"error": f"Failed to start workflow: {e}"}
+
+    # Record behavioral memory — best-effort, never blocks the tool.
+    from app.services import user_memory_service
+    await user_memory_service.record_workflow(
+        user_id, team_id, workflow_id, wf.name or workflow_id
+    )
 
     return {
         "session_id": session_id,

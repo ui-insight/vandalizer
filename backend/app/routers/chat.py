@@ -724,3 +724,35 @@ async def clear_context(
         "context_mode": "truncated",
         "context_cutoff_index": len(conversation.messages),
     }
+
+
+@router.get("/memory")
+async def get_user_memory(
+    user: User = Depends(get_current_user),
+):
+    """Return what the assistant remembers about this user's habits.
+
+    Shows the same items that feed the "Your patterns" block in the
+    system prompt, so the user can verify what the assistant references.
+    """
+    from app.services import user_memory_service
+
+    team_id = str(user.current_team) if user.current_team else None
+    return await user_memory_service.get_patterns(user.user_id, team_id)
+
+
+@router.delete("/memory")
+async def clear_user_memory(
+    user: User = Depends(get_current_user),
+):
+    """Wipe the user's behavioral memory for the current team scope.
+
+    Research admins can use this if the patterns the assistant references
+    feel stale or wrong. Only clears the current (user, team) memory —
+    other team scopes keep their own.
+    """
+    from app.services import user_memory_service
+
+    team_id = str(user.current_team) if user.current_team else None
+    removed = await user_memory_service.clear_memory(user.user_id, team_id)
+    return {"success": True, "removed": removed}

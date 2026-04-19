@@ -789,6 +789,45 @@ async def chat_stream(
             if ev:
                 ev.status = ActivityStatus.COMPLETED.value
                 await ev.save()
+    except asyncio.CancelledError:
+        # User hit Stop (or client disconnected). Persist whatever we have
+        # so the partial response isn't lost, then re-raise so the server
+        # knows the request was cancelled.
+        logger.info("Chat stream cancelled for user %s", user_id)
+        try:
+            partial_text = _THINK_BLOCK_RE.sub("", "".join(full_response)).strip()
+            thinking_text = "".join(full_thinking) or None
+            cleaned_segments: list[dict] = []
+            for seg in streamed_segments:
+                if seg.get("kind") == "text":
+                    cleaned = _THINK_BLOCK_RE.sub("", seg["content"]).strip()
+                    if cleaned:
+                        cleaned_segments.append({"kind": "text", "content": cleaned})
+                else:
+                    cleaned_segments.append(seg)
+
+            if partial_text or streamed_tool_calls or streamed_tool_results:
+                await conversation.add_message(
+                    ChatRole.ASSISTANT,
+                    partial_text,
+                    thinking=thinking_text,
+                    thinking_duration=thinking_duration,
+                    tool_calls=streamed_tool_calls or None,
+                    tool_results=streamed_tool_results or None,
+                    segments=cleaned_segments or None,
+                )
+
+            if activity_id:
+                ev = await ActivityEvent.get(activity_id)
+                if ev:
+                    ev.status = ActivityStatus.CANCELED.value
+                    from datetime import datetime, timezone
+                    ev.finished_at = datetime.now(timezone.utc)
+                    ev.last_updated_at = datetime.now(timezone.utc)
+                    await ev.save()
+        except Exception as cleanup_err:
+            logger.warning("Cancel cleanup failed: %s", cleanup_err)
+        raise
     except Exception as e:
         logger.error(f"Chat stream error: {e}")
         yield json.dumps({"kind": "error", "content": str(e)}) + "\n"
@@ -1069,6 +1108,17 @@ async def _build_workspace_inventory(
             )
             for hint in untried[:3]:
                 lines.append(f"- {hint}")
+
+    # Cross-session behavioral memory — tools the user actually exercises
+    try:
+        from app.services import user_memory_service
+
+        patterns = await user_memory_service.build_patterns_block(user_id, team_id)
+        if patterns:
+            lines.append("")
+            lines.append(patterns)
+    except Exception as _e:
+        logger.warning("Could not load user memory patterns: %s", _e)
 
     # Post-demo bridge: guide users who only have the onboarding sample
     if all_onboarding:

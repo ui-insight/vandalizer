@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, type KeyboardEvent, type ReactNode } from 'react'
-import { Send, Plus, FileUp, Globe, Download, ChevronDown, Cpu } from 'lucide-react'
+import { Send, Square, Plus, FileUp, Globe, Download, ChevronDown, Cpu } from 'lucide-react'
 import { getModels } from '../../api/config'
 import type { ModelInfo } from '../../types/workflow'
 import { ModelEffortPicker } from '../ModelEffortPicker'
@@ -9,6 +9,8 @@ interface Props {
   onAttachFile?: (files: File[]) => void
   onAttachLink?: (url: string) => void
   disabled?: boolean
+  isStreaming?: boolean
+  onStop?: () => void
   selectedModel?: string
   onModelChange?: (model: string) => void
   onExport?: (format: string) => void
@@ -19,6 +21,7 @@ interface Props {
 
 export function ChatInput({
   onSend, onAttachFile, onAttachLink, disabled,
+  isStreaming, onStop,
   selectedModel, onModelChange, onExport, hasMessages, hasDocuments,
   contextMeter,
 }: Props) {
@@ -268,15 +271,26 @@ export function ChatInput({
             </div>
           )}
 
-          {/* Send button */}
-          <button
-            onClick={handleSend}
-            disabled={!message.trim() || disabled}
-            aria-label="Send message"
-            className="flex items-center justify-center rounded-[var(--ui-radius)] bg-highlight p-1.5 text-highlight-text transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Send className="h-4 w-4" />
-          </button>
+          {/* Send / Stop button */}
+          {isStreaming && onStop ? (
+            <button
+              onClick={onStop}
+              aria-label="Stop response"
+              title="Stop"
+              className="flex items-center justify-center rounded-[var(--ui-radius)] bg-highlight p-1.5 text-highlight-text transition-opacity"
+            >
+              <Square className="h-4 w-4 fill-current" />
+            </button>
+          ) : (
+            <button
+              onClick={handleSend}
+              disabled={!message.trim() || disabled}
+              aria-label="Send message"
+              className="flex items-center justify-center rounded-[var(--ui-radius)] bg-highlight p-1.5 text-highlight-text transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Send className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
     </div>

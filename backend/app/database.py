@@ -39,6 +39,7 @@ from app.models.approval import ApprovalRequest
 from app.models.notification import Notification
 from app.models.support import SupportTicket
 from app.models.feedback_prompt import FeedbackPrompt, FeedbackPromptResponse
+from app.models.user_memory import UserMemory
 
 ALL_MODELS = [
     User,
@@ -96,6 +97,7 @@ ALL_MODELS = [
     SupportTicket,
     FeedbackPrompt,
     FeedbackPromptResponse,
+    UserMemory,
 ]
 
 

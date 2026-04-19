@@ -27,6 +27,7 @@ export function useChat() {
   const toolCallsRef = useRef<ToolCallInfo[]>([])
   const toolResultsRef = useRef<ToolResultInfo[]>([])
   const segmentsRef = useRef<StreamSegment[]>([])
+  const abortRef = useRef<AbortController | null>(null)
 
   const send = useCallback(
     async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuid?: string, includeOnboardingContext?: boolean, folderUuids?: string[], isFirstSession?: boolean, runDemo?: boolean) => {
@@ -47,6 +48,9 @@ export function useChat() {
 
       // Add user message immediately
       setMessages((prev) => [...prev, { role: 'user', content: message }])
+
+      const controller = new AbortController()
+      abortRef.current = controller
 
       try {
         const result = await streamChat(
@@ -115,6 +119,7 @@ export function useChat() {
           folderUuids,
           isFirstSession,
           runDemo,
+          controller.signal,
         )
 
         setConversationUuid(result.conversationUuid)
@@ -154,8 +159,41 @@ export function useChat() {
           setMessages((prev) => [...prev, assistantMsg])
         }
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Chat failed')
+        const wasAborted =
+          (e instanceof DOMException && e.name === 'AbortError') ||
+          (e instanceof Error && e.name === 'AbortError')
+        if (wasAborted) {
+          // User hit Stop. Keep whatever partial content streamed — the backend
+          // persisted it on its side; mirror that in the local message list so
+          // the UI doesn't lose the response.
+          const finalContent = streamingRef.current.replace(THINK_BLOCK_RE, '').trim()
+          if (finalContent || toolResultsRef.current.length > 0) {
+            const assistantMsg: ChatMessage = {
+              role: 'assistant',
+              content: finalContent,
+            }
+            if (thinkingRef.current) {
+              assistantMsg.thinking = thinkingRef.current
+              if (thinkingDurationRef.current != null) {
+                assistantMsg.thinking_duration = thinkingDurationRef.current
+              }
+            }
+            if (segmentsRef.current.length > 0) {
+              assistantMsg.segments = segmentsRef.current
+                .map((seg) =>
+                  seg.kind === 'text'
+                    ? { ...seg, content: seg.content.replace(THINK_BLOCK_RE, '').replace(THINK_TRAILING_RE, '') }
+                    : seg,
+                )
+                .filter((seg) => seg.kind !== 'text' || seg.content.trim().length > 0)
+            }
+            setMessages((prev) => [...prev, assistantMsg])
+          }
+        } else {
+          setError(e instanceof Error ? e.message : 'Chat failed')
+        }
       } finally {
+        abortRef.current = null
         setIsStreaming(false)
         setStreamingContent('')
         setThinkingContent('')
@@ -167,6 +205,10 @@ export function useChat() {
     },
     [activityId],
   )
+
+  const stop = useCallback(() => {
+    abortRef.current?.abort()
+  }, [])
 
   const loadHistory = useCallback(async (uuid: string) => {
     try {
@@ -222,6 +264,7 @@ export function useChat() {
     setContextMode,
     setContextCutoffIndex,
     send,
+    stop,
     loadHistory,
     reset,
     setActivity,

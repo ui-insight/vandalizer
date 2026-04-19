@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { User, KeyRound, Save, Eye, EyeOff, Copy, Check, RefreshCw, Trash2, Code } from 'lucide-react'
+import { User, KeyRound, Save, Eye, EyeOff, Copy, Check, RefreshCw, Trash2, Code, Brain } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
 import { useAuth } from '../hooks/useAuth'
 import { generateApiToken, revokeApiToken, getApiTokenStatus, updateProfile } from '../api/auth'
+import { getUserMemory, clearUserMemory, type UserMemoryResponse } from '../api/chat'
 
 export default function Account() {
   const { user, refreshUser } = useAuth()
@@ -96,6 +97,39 @@ export default function Account() {
     setTokenCopied(true)
     setTimeout(() => setTokenCopied(false), 2000)
   }
+
+  // Chat memory state
+  const [memory, setMemory] = useState<UserMemoryResponse | null>(null)
+  const [memoryLoading, setMemoryLoading] = useState(true)
+  const [memoryClearing, setMemoryClearing] = useState(false)
+  const [memoryError, setMemoryError] = useState<string | null>(null)
+
+  useEffect(() => {
+    getUserMemory()
+      .then(setMemory)
+      .catch(err => {
+        const msg = err instanceof Error ? err.message : 'Failed to load memory'
+        setMemoryError(msg)
+      })
+      .finally(() => setMemoryLoading(false))
+  }, [])
+
+  const handleClearMemory = async () => {
+    if (!confirm("Clear what the assistant remembers? This only affects suggestions — your documents, templates, and workflows aren't changed.")) return
+    setMemoryClearing(true)
+    setMemoryError(null)
+    try {
+      await clearUserMemory()
+      setMemory({ extractions: [], workflows: [], kbs: [] })
+    } catch (err) {
+      setMemoryError(err instanceof Error ? err.message : 'Failed to clear memory')
+    } finally {
+      setMemoryClearing(false)
+    }
+  }
+
+  const hasMemoryItems =
+    !!memory && (memory.extractions.length + memory.workflows.length + memory.kbs.length) > 0
 
   // API code sample tab
   const [apiTab, setApiTab] = useState<'python' | 'bash'>('python')
@@ -211,6 +245,74 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
                 </span>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* Chat Memory */}
+        <div className="rounded-lg border border-gray-200 bg-white">
+          <div className="flex items-center gap-2 border-b border-gray-200 px-4 py-3">
+            <Brain className="h-4 w-4 text-gray-400" />
+            <h3 className="font-medium text-gray-900">What the assistant remembers</h3>
+          </div>
+          <div className="p-4 space-y-4">
+            <p className="text-sm text-gray-600">
+              To personalize its suggestions, the chat assistant tracks which extraction
+              templates, workflows, and knowledge bases you use most often in this team.
+              It doesn't read your conversations — just counts what you run.
+            </p>
+
+            {memoryError && (
+              <div className="rounded-md border border-red-200 bg-red-50 p-3">
+                <p className="text-sm text-red-700">{memoryError}</p>
+              </div>
+            )}
+
+            {memoryLoading ? (
+              <p className="text-sm text-gray-400">Loading...</p>
+            ) : hasMemoryItems ? (
+              <>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  {([
+                    { label: 'Extraction templates', items: memory!.extractions },
+                    { label: 'Workflows', items: memory!.workflows },
+                    { label: 'Knowledge bases', items: memory!.kbs },
+                  ] as const).map(group => (
+                    <div key={group.label}>
+                      <p className="text-xs font-medium uppercase text-gray-400 mb-2">{group.label}</p>
+                      {group.items.length === 0 ? (
+                        <p className="text-sm text-gray-400">—</p>
+                      ) : (
+                        <ul className="space-y-1">
+                          {group.items.map(item => (
+                            <li key={item.title} className="text-sm text-gray-900">
+                              {item.title}
+                              <span className="ml-1 text-xs text-gray-400">
+                                ({item.count}×)
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={handleClearMemory}
+                  disabled={memoryClearing}
+                  className="flex items-center gap-1.5 rounded-md border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  {memoryClearing ? 'Clearing...' : 'Clear and start fresh'}
+                </button>
+              </>
+            ) : (
+              <div className="rounded-md border border-blue-100 bg-blue-50 p-3">
+                <p className="text-sm text-blue-700">
+                  Nothing yet. Once you run extraction templates, workflows, or query knowledge
+                  bases, the assistant will remember your patterns here.
+                </p>
+              </div>
+            )}
           </div>
         </div>
 

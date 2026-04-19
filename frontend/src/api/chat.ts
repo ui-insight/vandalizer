@@ -12,11 +12,13 @@ export async function streamChat(
   folderUuids?: string[],
   isFirstSession?: boolean,
   runDemo?: boolean,
+  signal?: AbortSignal,
 ): Promise<{ conversationUuid: string; activityId: string }> {
   const res = await fetch('/api/chat', {
     method: 'POST',
     credentials: 'include',
     headers: csrfHeaders({ 'Content-Type': 'application/json' }),
+    signal,
     body: JSON.stringify({
       message,
       document_uuids: documentUuids,
@@ -192,4 +194,26 @@ export function clearContext(conversationUuid: string) {
       body: JSON.stringify({ conversation_uuid: conversationUuid }),
     },
   )
+}
+
+export interface MemoryItem {
+  title: string
+  count: number
+  last_used: string
+}
+
+export interface UserMemoryResponse {
+  extractions: MemoryItem[]
+  workflows: MemoryItem[]
+  kbs: MemoryItem[]
+}
+
+export function getUserMemory() {
+  return apiFetch<UserMemoryResponse>('/api/chat/memory')
+}
+
+export function clearUserMemory() {
+  return apiFetch<{ success: boolean; removed: boolean }>('/api/chat/memory', {
+    method: 'DELETE',
+  })
 }
