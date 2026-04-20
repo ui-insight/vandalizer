@@ -599,6 +599,9 @@ LOG_FORMAT=json
 INSIGHT_ENDPOINT=${LLM_ENDPOINT}
 
 # ── ChromaDB ─────────────────────────────────────────────────
+# Backend connects to the chromadb service via HTTP — PersistentClient is
+# not process-safe for concurrent writers (FastAPI workers + Celery).
+CHROMADB_HOST=chromadb:8000
 CHROMADB_PERSIST_DIR=/app/static/db
 
 # ── File Storage ─────────────────────────────────────────────

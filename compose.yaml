@@ -71,13 +71,12 @@ services:
     environment:
       - REDIS_HOST=redis
       - MONGO_HOST=mongodb://mongo:27017/
-      - CHROMADB_PERSIST_DIR=/app/static/db
+      - CHROMADB_HOST=chromadb:8000
       - UPLOAD_DIR=/app/static/uploads
     networks:
       - vandalizer
     volumes:
       - uploads:/app/static/uploads
-      - chroma-data:/app/static/db
     restart: unless-stopped
     deploy:
       resources:
@@ -100,13 +99,12 @@ services:
     environment:
       - REDIS_HOST=redis
       - MONGO_HOST=mongodb://mongo:27017/
-      - CHROMADB_PERSIST_DIR=/app/static/db
+      - CHROMADB_HOST=chromadb:8000
       - UPLOAD_DIR=/app/static/uploads
     networks:
       - vandalizer
     volumes:
       - uploads:/app/static/uploads
-      - chroma-data:/app/static/db
     entrypoint: ["sh", "run_celery.sh", "start"]
     restart: unless-stopped
     deploy:
