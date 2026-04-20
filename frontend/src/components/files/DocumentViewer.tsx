@@ -101,7 +101,12 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
           if (cancelled) return
           pdfDataRef.current = data
           setIsPdf(true)
-        } else if (ct.includes('wordprocessingml') || ct.includes('msword')) {
+        } else if (
+          ct.includes('wordprocessingml') ||
+          ct.includes('msword') ||
+          ct.includes('markdown') ||
+          ct.includes('text/plain')
+        ) {
           setIsDocx(true)
           setIsPdf(false)
           pollStatus(docUuid).then(res => {
