@@ -64,7 +64,7 @@ function LandingLoginForm() {
         required
         value={userId}
         onChange={(e) => setUserId(e.target.value)}
-        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50"
+        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-highlight/50 focus:outline-none focus:ring-1 focus:ring-highlight/50"
       />
       <input
         type="password"
@@ -72,17 +72,17 @@ function LandingLoginForm() {
         required
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50"
+        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-highlight/50 focus:outline-none focus:ring-1 focus:ring-highlight/50"
       />
       <button
         type="submit"
         disabled={submitting}
-        className="w-full rounded-lg bg-[#f1b300] px-4 py-3 font-bold text-black transition-all hover:bg-[#d49e00] disabled:opacity-50"
+        className="w-full rounded-lg bg-highlight px-4 py-3 font-bold text-highlight-text transition-all hover:bg-highlight-hover disabled:opacity-50"
       >
         {submitting ? 'Signing in...' : 'SIGN IN'}
       </button>
       <p className="text-center text-sm">
-        <Link to="/reset-password" search={{ token: undefined }} className="text-gray-400 hover:text-[#f1b300] transition-colors">
+        <Link to="/reset-password" search={{ token: undefined }} className="text-gray-400 hover:text-highlight transition-colors">
           Forgot password?
         </Link>
       </p>
@@ -124,7 +124,7 @@ function LandingRegisterForm({ onSwitch }: { onSwitch: () => void }) {
         placeholder="Full Name"
         value={name}
         onChange={(e) => setName(e.target.value)}
-        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50"
+        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-highlight/50 focus:outline-none focus:ring-1 focus:ring-highlight/50"
       />
       <input
         type="email"
@@ -132,7 +132,7 @@ function LandingRegisterForm({ onSwitch }: { onSwitch: () => void }) {
         required
         value={email}
         onChange={(e) => setEmail(e.target.value)}
-        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50"
+        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-highlight/50 focus:outline-none focus:ring-1 focus:ring-highlight/50"
       />
       <input
         type="password"
@@ -140,18 +140,18 @@ function LandingRegisterForm({ onSwitch }: { onSwitch: () => void }) {
         required
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50"
+        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-highlight/50 focus:outline-none focus:ring-1 focus:ring-highlight/50"
       />
       <button
         type="submit"
         disabled={submitting}
-        className="w-full rounded-lg bg-[#f1b300] px-4 py-3 font-bold text-black transition-all hover:bg-[#d49e00] disabled:opacity-50"
+        className="w-full rounded-lg bg-highlight px-4 py-3 font-bold text-highlight-text transition-all hover:bg-highlight-hover disabled:opacity-50"
       >
         {submitting ? 'Creating account...' : 'CREATE ACCOUNT'}
       </button>
       <p className="text-center text-sm text-gray-400">
         Already have an account?{' '}
-        <button type="button" onClick={onSwitch} className="font-bold text-white hover:text-[#f1b300]">
+        <button type="button" onClick={onSwitch} className="font-bold text-white hover:text-highlight">
           Sign in
         </button>
       </p>
@@ -172,7 +172,7 @@ function AuthBlock({ config }: { config: AuthConfig | null }) {
   if (!config) {
     return (
       <div className="flex justify-center py-8">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#f1b300] border-t-transparent" />
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-highlight border-t-transparent" />
       </div>
     )
   }
@@ -209,7 +209,7 @@ function AuthBlock({ config }: { config: AuthConfig | null }) {
         <div className="mb-6">
           <a
             href="/api/auth/saml/login"
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#f1b300] px-4 py-3 font-bold text-black transition-all hover:bg-[#d4a017]"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-highlight px-4 py-3 font-bold text-highlight-text transition-all hover:bg-highlight-hover"
           >
             {samlProvider.display_name || 'Sign in with University SSO'}
           </a>
@@ -236,7 +236,7 @@ function AuthBlock({ config }: { config: AuthConfig | null }) {
                 Don&apos;t have an account?{' '}
                 <button
                   onClick={() => setMode('register')}
-                  className="font-bold text-white hover:text-[#f1b300]"
+                  className="font-bold text-white hover:text-highlight"
                 >
                   Create account
                 </button>
@@ -251,7 +251,7 @@ function AuthBlock({ config }: { config: AuthConfig | null }) {
       {!passwordEnabled && config.demo_login_enabled && (
         <p className="mt-6 text-center text-sm text-gray-400">
           Have a trial account?{' '}
-          <Link to="/login" className="font-bold text-white hover:text-[#f1b300]">
+          <Link to="/login" className="font-bold text-white hover:text-highlight">
             Log in here
           </Link>
         </p>
@@ -308,7 +308,7 @@ export default function Landing() {
           <div className="flex items-center gap-4">
             <Link
               to="/docs"
-              className="text-sm text-gray-400 hover:text-[#f1b300] transition-colors"
+              className="text-sm text-gray-400 hover:text-highlight transition-colors"
             >
               Docs
             </Link>
@@ -316,7 +316,7 @@ export default function Landing() {
               href="https://github.com/ui-insight/vandalizer"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-[#f1b300] transition-colors"
+              className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-highlight transition-colors"
             >
               <ExternalLink className="w-4 h-4" />
               GitHub
@@ -350,22 +350,22 @@ export default function Landing() {
                 d="M-160 44c30 0 58-18 88-18s 58 18 88 18 58-18 88-18 58 18 88 18"
               />
             </defs>
-            <g className="tech-wave">
-              <use xlinkHref="#tech-line" x="48" y="0" fill="none" stroke="#f1b300" strokeWidth="0.3" />
-              <use xlinkHref="#tech-line" x="48" y="3" fill="none" stroke="#f1b300" strokeWidth="0.5" />
-              <use xlinkHref="#tech-line" x="48" y="5" fill="none" stroke="#f1b300" strokeWidth="0.2" />
-              <use xlinkHref="#tech-line" x="48" y="7" fill="none" stroke="#f1b300" strokeWidth="0.1" />
-              <use xlinkHref="#tech-line" x="48" y="12" fill="none" stroke="#f1b300" strokeWidth="0.4" />
-              <use xlinkHref="#tech-line" x="48" y="20" fill="none" stroke="#f1b300" strokeWidth="0.15" />
+            <g className="tech-wave stroke-highlight">
+              <use xlinkHref="#tech-line" x="48" y="0" fill="none" strokeWidth="0.3" />
+              <use xlinkHref="#tech-line" x="48" y="3" fill="none" strokeWidth="0.5" />
+              <use xlinkHref="#tech-line" x="48" y="5" fill="none" strokeWidth="0.2" />
+              <use xlinkHref="#tech-line" x="48" y="7" fill="none" strokeWidth="0.1" />
+              <use xlinkHref="#tech-line" x="48" y="12" fill="none" strokeWidth="0.4" />
+              <use xlinkHref="#tech-line" x="48" y="20" fill="none" strokeWidth="0.15" />
             </g>
           </svg>
         </div>
 
         <div className="relative z-10 flex flex-col items-center text-center px-4">
           {/* Early Access Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#f1b300]/10 border border-[#f1b300]/20 mb-10 hover:bg-[#f1b300]/20 transition-colors cursor-default">
-            <span className="flex h-2 w-2 rounded-full bg-[#f1b300] animate-pulse" />
-            <span className="text-sm font-bold text-[#f1b300] tracking-wide uppercase">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-highlight/10 border border-highlight/20 mb-10 hover:bg-highlight/20 transition-colors cursor-default">
+            <span className="flex h-2 w-2 rounded-full bg-highlight animate-pulse" />
+            <span className="text-sm font-bold text-highlight tracking-wide uppercase">
               Now in Limited Early Access
             </span>
           </div>
@@ -387,10 +387,10 @@ export default function Landing() {
             <div className="mb-8">
               <Link
                 to="/demo"
-                className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/20 px-6 py-3 font-bold text-white transition-all hover:bg-white/20 hover:border-[#f1b300]/30"
+                className="inline-flex items-center gap-2 rounded-full bg-white/10 border border-white/20 px-6 py-3 font-bold text-white transition-all hover:bg-white/20 hover:border-highlight/30"
               >
                 Try the Free Trial
-                <span className="text-[#f1b300]">&rarr;</span>
+                <span className="text-highlight">&rarr;</span>
               </Link>
             </div>
           )}
@@ -404,7 +404,7 @@ export default function Landing() {
       <main className="relative z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <div className="mt-24 relative mx-auto max-w-5xl hidden md:block" style={{ animation: 'float 6s ease-in-out infinite' }}>
-            <div className="absolute -inset-1 bg-gradient-to-r from-[#d49e00] to-yellow-600 rounded-xl blur opacity-20" />
+            <div className="absolute -inset-1 bg-gradient-to-r from-highlight-hover to-yellow-600 rounded-xl blur opacity-20" />
             <div className="relative glass-panel rounded-xl border border-white/10 overflow-hidden shadow-2xl">
               {/* Window chrome */}
               <div className="flex items-center px-4 py-3 border-b border-white/5 bg-black/40">
@@ -420,7 +420,7 @@ export default function Landing() {
                 {/* Input */}
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-xl font-semibold text-gray-400 uppercase tracking-wider">
-                    <FileText className="w-4 h-4 text-[#f1b300]" /> Input
+                    <FileText className="w-4 h-4 text-highlight" /> Input
                   </div>
                   <div className="bg-[#262626] p-4 rounded-lg border border-white/5 font-mono text-xs text-gray-400 leading-relaxed">
                     <span className="text-gray-500"># NIH_Grant_Announcement.pdf</span>
@@ -436,14 +436,14 @@ export default function Landing() {
                     <Cpu className="w-4 h-4 text-cyan-400" /> Processing
                   </div>
                   <div className="bg-[#262626] p-4 rounded-lg border border-cyan-500/20 font-mono text-xs relative overflow-hidden h-full">
-                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#f1b300] to-transparent" style={{ animation: 'landing-shimmer 2s infinite' }} />
+                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-highlight to-transparent" style={{ animation: 'landing-shimmer 2s infinite' }} />
                     <div className="space-y-2 pt-1">
                       <div className="flex justify-between">
-                        <span className="text-[#f1b300]">Extracting...</span>
+                        <span className="text-highlight">Extracting...</span>
                         <Check className="w-3 h-3 text-green-500" />
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-[#f1b300]">Verifying...</span>
+                        <span className="text-highlight">Verifying...</span>
                         <ShieldCheck className="w-3 h-3 text-green-500" />
                       </div>
                     </div>
@@ -474,16 +474,16 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col lg:flex-row gap-16 items-center">
             <div className="w-full lg:w-1/2">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#f1b300]/10 border border-[#f1b300]/20 mb-8">
-                <CheckCircle className="w-5 h-5 text-[#f1b300]" />
-                <span className="text-sm font-bold text-[#f1b300] uppercase tracking-wider">
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-highlight/10 border border-highlight/20 mb-8">
+                <CheckCircle className="w-5 h-5 text-highlight" />
+                <span className="text-sm font-bold text-highlight uppercase tracking-wider">
                   Atomic Units of Work
                 </span>
               </div>
               <h2 className="text-4xl md:text-5xl font-bold text-white mb-8 leading-tight">
-                Verified <span className="text-[#f1b300]">Tasks</span> &{' '}
+                Verified <span className="text-highlight">Tasks</span> &{' '}
                 <br />
-                Reliable <span className="text-[#f1b300]">Extractions</span>
+                Reliable <span className="text-highlight">Extractions</span>
               </h2>
               <p className="text-xl text-gray-400 leading-relaxed mb-8">
                 Forget generic &ldquo;chat with PDF&rdquo;. Vandalizer uses specialized tasks to
@@ -492,7 +492,7 @@ export default function Landing() {
               <div className="space-y-6">
                 <div className="flex gap-4">
                   <div className="p-3 rounded-lg bg-white/5 border border-white/10 h-fit">
-                    <ScanText className="w-6 h-6 text-[#f1b300]" />
+                    <ScanText className="w-6 h-6 text-highlight" />
                   </div>
                   <div>
                     <h4 className="text-xl font-bold text-white mb-2">Structured Extraction</h4>
@@ -503,7 +503,7 @@ export default function Landing() {
                 </div>
                 <div className="flex gap-4">
                   <div className="p-3 rounded-lg bg-white/5 border border-white/10 h-fit">
-                    <FileEdit className="w-6 h-6 text-[#f1b300]" />
+                    <FileEdit className="w-6 h-6 text-highlight" />
                   </div>
                   <div>
                     <h4 className="text-xl font-bold text-white mb-2">Smart Summarization</h4>
@@ -527,7 +527,7 @@ export default function Landing() {
                   </div>
                   <div className="space-y-2 font-mono text-sm">
                     <div className="text-gray-400">&quot;action&quot;: &quot;extract_deadline&quot;</div>
-                    <div className="text-[#f1b300]">&quot;result&quot;: &quot;extraction.csv&quot;</div>
+                    <div className="text-highlight">&quot;result&quot;: &quot;extraction.csv&quot;</div>
                   </div>
                 </div>
                 <div className="glass-panel p-6 rounded-xl border border-white/10 mb-4 transform -translate-x-4 z-10 relative bg-[#262626]">
@@ -599,10 +599,13 @@ export default function Landing() {
 
                   <ArrowDown className="w-6 h-6 text-gray-600" />
 
-                  <div className="w-full p-4 rounded-lg bg-[#262626] border border-[#f1b300]/30 flex items-center justify-between shadow-[0_0_15px_rgba(241,179,0,0.1)]">
+                  <div
+                    className="w-full p-4 rounded-lg bg-[#262626] border border-highlight/30 flex items-center justify-between"
+                    style={{ boxShadow: '0 0 15px color-mix(in srgb, var(--highlight-color) 10%, transparent)' }}
+                  >
                     <div className="flex items-center gap-3">
-                      <div className="p-2 rounded bg-[#f1b300]/10">
-                        <ScanLine className="w-5 h-5 text-[#f1b300]" />
+                      <div className="p-2 rounded bg-highlight/10">
+                        <ScanLine className="w-5 h-5 text-highlight" />
                       </div>
                       <span className="font-mono text-sm text-white">
                         Task: Extract Requirements
@@ -643,12 +646,12 @@ export default function Landing() {
             {/* Feature 1: Collaborative Workspace (large) */}
             <div className="col-span-1 md:col-span-2 glass-panel rounded-2xl p-8 hover:bg-white/5 transition-colors group border border-white/5 relative overflow-hidden">
               <div className="flex items-start justify-between mb-6 relative z-10">
-                <div className="p-3 rounded-lg bg-[#f1b300]/10 text-[#f1b300]">
+                <div className="p-3 rounded-lg bg-highlight/10 text-highlight">
                   <Users className="w-8 h-8" />
                 </div>
                 <span className="text-sm font-mono text-gray-500">01</span>
               </div>
-              <h3 className="text-2xl font-bold text-white mb-4 group-hover:text-[#f1b300] transition-colors relative z-10">
+              <h3 className="text-2xl font-bold text-white mb-4 group-hover:text-highlight transition-colors relative z-10">
                 Unified Team Workspace
               </h3>
               <p className="text-gray-400 text-xl leading-relaxed mb-6 relative z-10 max-w-lg">
@@ -656,7 +659,7 @@ export default function Landing() {
                 entire pipelines instantly. No more emailing refined prompts or Python scripts back
                 and forth.
               </p>
-              <div className="absolute -bottom-6 -right-6 w-40 h-40 bg-[#f1b300]/5 rounded-full blur-2xl group-hover:bg-[#f1b300]/10 transition-colors" />
+              <div className="absolute -bottom-6 -right-6 w-40 h-40 bg-highlight/5 rounded-full blur-2xl group-hover:bg-highlight/10 transition-colors" />
             </div>
 
             {/* Feature 2: Private & Secure */}
@@ -696,12 +699,12 @@ export default function Landing() {
             {/* Feature 4: Evaluate Once (large) */}
             <div className="col-span-1 md:col-span-2 glass-panel rounded-2xl p-8 hover:bg-white/5 transition-colors group border border-white/5 relative overflow-hidden">
               <div className="flex items-start justify-between mb-6 relative z-10">
-                <div className="p-3 rounded-lg bg-[#f1b300]/10 text-[#f1b300]">
+                <div className="p-3 rounded-lg bg-highlight/10 text-highlight">
                   <CheckCircle className="w-8 h-8" />
                 </div>
                 <span className="text-sm font-mono text-gray-500">04</span>
               </div>
-              <h3 className="text-2xl font-bold text-white mb-4 group-hover:text-[#f1b300] transition-colors relative z-10">
+              <h3 className="text-2xl font-bold text-white mb-4 group-hover:text-highlight transition-colors relative z-10">
                 Verify Once, Deploy with Confidence
               </h3>
               <p className="text-gray-400 text-xl leading-relaxed mb-6 relative z-10 max-w-lg">
@@ -709,7 +712,7 @@ export default function Landing() {
                 TaMPER scoring. Once verified, publish it to your team knowing it has been tested
                 against real data.
               </p>
-              <div className="absolute -bottom-6 -right-6 w-40 h-40 bg-[#f1b300]/5 rounded-full blur-2xl group-hover:bg-[#f1b300]/10 transition-colors" />
+              <div className="absolute -bottom-6 -right-6 w-40 h-40 bg-highlight/5 rounded-full blur-2xl group-hover:bg-highlight/10 transition-colors" />
             </div>
           </div>
         </div>
@@ -744,7 +747,7 @@ export default function Landing() {
                   },
                 ].map((step) => (
                   <div key={step.n} className="flex gap-6">
-                    <div className="w-10 h-10 rounded-full bg-[#f1b300]/20 flex items-center justify-center text-lg font-bold text-[#f1b300] shrink-0">
+                    <div className="w-10 h-10 rounded-full bg-highlight/20 flex items-center justify-center text-lg font-bold text-highlight shrink-0">
                       {step.n}
                     </div>
                     <div>
@@ -756,7 +759,7 @@ export default function Landing() {
               </div>
 
               <div className="mt-12">
-                <blockquote className="border-l-4 border-[#f1b300] pl-6 italic text-gray-300 text-xl leading-relaxed">
+                <blockquote className="border-l-4 border-highlight pl-6 italic text-gray-300 text-xl leading-relaxed">
                   &ldquo;Vandalizer allows RAs to leverage their institutional knowledge to create
                   flexible workflows targeted at common issues.&rdquo;
                 </blockquote>
@@ -787,21 +790,24 @@ export default function Landing() {
                   </div>
 
                   {/* Step 2: Core */}
-                  <div className="relative p-6 rounded-xl bg-[#0a0a0a] border border-[#f1b300]/30 shadow-[0_0_30px_rgba(241,179,0,0.1)]">
-                    <div className="absolute inset-0 bg-[#f1b300]/5 animate-pulse rounded-xl" />
+                  <div
+                    className="relative p-6 rounded-xl bg-[#0a0a0a] border border-highlight/30"
+                    style={{ boxShadow: '0 0 30px color-mix(in srgb, var(--highlight-color) 10%, transparent)' }}
+                  >
+                    <div className="absolute inset-0 bg-highlight/5 animate-pulse rounded-xl" />
                     <div className="relative flex items-center gap-4">
-                      <div className="p-3 rounded-lg bg-[#f1b300]/10 text-[#f1b300]">
+                      <div className="p-3 rounded-lg bg-highlight/10 text-highlight">
                         <Cpu className="w-8 h-8" />
                       </div>
                       <div className="flex-1">
-                        <div className="text-sm font-mono text-[#f1b300] mb-1">Vandalizer Core</div>
+                        <div className="text-sm font-mono text-highlight mb-1">Vandalizer Core</div>
                         <div className="text-white font-bold">AI Processing & Extraction</div>
                       </div>
                     </div>
                     <div className="mt-4 p-3 rounded bg-black/50 font-mono text-xs text-gray-400 border border-white/5">
-                      <span className="text-[#f1b300]">&gt;&gt;</span> Extracting key_dates...
+                      <span className="text-highlight">&gt;&gt;</span> Extracting key_dates...
                       <br />
-                      <span className="text-[#f1b300]">&gt;&gt;</span> Validating budget_caps...
+                      <span className="text-highlight">&gt;&gt;</span> Validating budget_caps...
                       <br />
                       <span className="text-green-500">&#10003;</span> Confidence: 98.5%
                     </div>
@@ -859,7 +865,7 @@ export default function Landing() {
 
           <div className="flex flex-wrap justify-center gap-8 opacity-70 hover:opacity-100 transition-opacity duration-300">
             <div className="h-20 px-8 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center hover:bg-white/10 transition-colors">
-              <span className="text-2xl font-bold text-[#f1b300] tracking-wider">
+              <span className="text-2xl font-bold text-highlight tracking-wider">
                 University of Idaho
               </span>
             </div>
@@ -877,7 +883,7 @@ export default function Landing() {
 
       {/* Collaboration CTA */}
       <section className="py-24 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0a] to-[#f1b300]/5 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0a] to-highlight/5 pointer-events-none" />
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
           <h2 className="text-4xl font-bold text-white mb-6">Help Shape the Future of RA</h2>
           <p className="text-gray-300 text-lg mb-10 max-w-2xl mx-auto">
