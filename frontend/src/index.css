@@ -8,6 +8,7 @@ html {
   --color-highlight: var(--highlight-color, #eab308);
   --color-highlight-text: var(--highlight-text-color, #000000);
   --color-highlight-complement: var(--highlight-complement, #154cf7);
+  --color-highlight-hover: var(--highlight-hover, #d49e00);
   --color-panel-dark: #191919;
   --color-panel-bg: #EEEEEE;
   --radius-ui: var(--ui-radius, 12px);
@@ -17,6 +18,7 @@ html {
   --highlight-color: #eab308;
   --highlight-text-color: #000000;
   --highlight-complement: #154cf7;
+  --highlight-hover: #d49e00;
   --ui-radius: 12px;
   --rail-w: 220px;
   font-family: "Public Sans", Arial, sans-serif;

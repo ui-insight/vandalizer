@@ -62,3 +62,10 @@ export function getComplementaryColor(hex: string): string {
   if (s < 0.1) return '#154cf7'
   return hslToHex(h - 30, Math.min(s + 0.3, 1), 0.22)
 }
+
+/** Returns a slightly darker variant of the given color for hover states. */
+export function getHoverColor(hex: string): string {
+  const { r, g, b } = hexToRgb(hex)
+  const { h, s, l } = rgbToHsl(r, g, b)
+  return hslToHex(h, s, Math.max(l - 0.08, 0))
+}
