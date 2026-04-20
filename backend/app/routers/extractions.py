@@ -212,9 +212,14 @@ async def export_search_set(uuid: str, user: User = Depends(get_current_user)):
 @router.post("/search-sets/import", response_model=SearchSetResponse)
 async def import_search_set(
     file: UploadFile = File(...),
+    target_uuid: Optional[str] = Form(None),
     user: User = Depends(get_current_user),
 ):
-    """Import an extraction from an exported JSON file."""
+    """Import an extraction from an exported JSON file.
+
+    If *target_uuid* is provided, items are appended to that existing SearchSet
+    and its extraction_config is replaced. Otherwise a new SearchSet is created.
+    """
     from app.services import export_import_service as eis
 
     content = await file.read()
@@ -223,9 +228,13 @@ async def import_search_set(
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON file")
 
+    target = None
+    if target_uuid:
+        target = await _get_search_set_or_404(target_uuid, user, manage=True)
+
     team_id = str(user.current_team) if user.current_team else None
     try:
-        ss = await eis.import_search_set(data, user.user_id, team_id=team_id)
+        ss = await eis.import_search_set(data, user.user_id, team_id=team_id, target=target)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
