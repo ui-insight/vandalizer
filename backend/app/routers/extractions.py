@@ -526,7 +526,7 @@ async def build_from_document(request: Request, uuid: str, req: BuildFromDocumen
     await _get_search_set_or_404(uuid, user)
     document_uuids = await _authorize_documents(req.document_uuids, user)
     try:
-        entities = await svc.build_from_documents(
+        entities, _ = await svc.build_from_documents(
             search_set_uuid=uuid,
             document_uuids=document_uuids,
             user_id=user.user_id,

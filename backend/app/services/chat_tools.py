@@ -1218,7 +1218,7 @@ async def create_extraction_from_document(
         await ss.save()
 
     try:
-        discovered_fields = await svc.build_from_documents(
+        discovered_fields, suggested_title = await svc.build_from_documents(
             search_set_uuid=ss.uuid,
             document_uuids=[d.uuid for d in docs],
             user_id=user_id,
@@ -1228,6 +1228,20 @@ async def create_extraction_from_document(
         # Tear down the empty set if field discovery fails
         await ss.delete()
         return {"error": f"Field discovery failed: {e}"}
+
+    # When the caller didn't pass an explicit title, prefer the LLM's
+    # content-aware suggestion over the generic "Extraction from <doc>" fallback.
+    if not title and suggested_title:
+        ss.title = suggested_title
+        await ss.save()
+
+    try:
+        from app.services.library_service import add_item, get_or_create_personal_library
+
+        lib = await get_or_create_personal_library(user_id)
+        await add_item(str(lib.id), context.deps.user, str(ss.id), "search_set")
+    except Exception:
+        pass
 
     if not discovered_fields:
         return {
