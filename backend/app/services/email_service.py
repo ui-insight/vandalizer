@@ -130,18 +130,40 @@ def waitlist_confirmation_email(name: str, position: int, frontend_url: str, sta
     return subject, html
 
 
-def activation_email(name: str, user_id: str, password: str, expires_at: str, frontend_url: str) -> tuple[str, str]:
+_CODE_STYLE = (
+    "font-family:'SF Mono',Monaco,Consolas,'Courier New',monospace;"
+    "background:#0a0a0a;color:#fff;padding:3px 8px;border-radius:4px;"
+    "border:1px solid rgba(255,255,255,0.15);font-size:14px;"
+    "white-space:nowrap;user-select:all;-webkit-user-select:all;letter-spacing:0.5px;"
+)
+
+
+def activation_email(
+    name: str,
+    user_id: str,
+    password: str,
+    expires_at: str,
+    frontend_url: str,
+    magic_link: str | None = None,
+) -> tuple[str, str]:
     """Returns (subject, html_body) for demo account activation."""
     subject = "Your Vandalizer Demo Account is Ready!"
+    if magic_link:
+        magic_section = f"""
+      <p style="margin-top:24px"><a class="btn" href="{magic_link}">Click here to sign in</a></p>
+      <p style="font-size:13px;color:#6b7280">This one-click link expires in 48 hours. If it doesn't work, use the credentials below.</p>
+      <p style="margin-top:24px">Or sign in manually:</p>"""
+    else:
+        magic_section = ""
     html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
     <div class="container"><div class="card">
       <div class="logo">Vandalizer</div>
       <h1>Your demo account is active!</h1>
-      <p>Hi {name}, great news &mdash; your Vandalizer demo account is ready to go. You have <span class="highlight">2 weeks</span> of full platform access.</p>
-      <p><strong style="color:#fff">Username:</strong> {user_id}<br/>
-         <strong style="color:#fff">Password:</strong> {password}</p>
+      <p>Hi {name}, great news &mdash; your Vandalizer demo account is ready to go. You have <span class="highlight">2 weeks</span> of full platform access.</p>{magic_section}
+      <p><strong style="color:#fff">Username:</strong> <code style="{_CODE_STYLE}">{user_id}</code><br/><br/>
+         <strong style="color:#fff">Password:</strong> <code style="{_CODE_STYLE}">{password}</code></p>
       <p>Your trial expires on <span class="highlight">{expires_at}</span>.</p>
-      <p style="margin-top:24px"><a class="btn" href="{frontend_url}/login">Sign In Now</a></p>
+      <p style="margin-top:24px"><a class="btn" href="{frontend_url}/login">Sign In with Credentials</a></p>
       <div class="footer">Vandalizer</div>
     </div></div></body></html>"""
     return subject, html

@@ -28,6 +28,34 @@ MAX_ACTIVE_DEMOS = 50
 MAX_PER_ORGANIZATION = 5
 TRIAL_DAYS = 14
 
+MAGIC_LINK_TTL_SECONDS = 48 * 60 * 60
+
+# Excludes look-alikes (I, O, i, l, o, 0, 1) so copied/typed passwords don't fail silently.
+_UNAMBIGUOUS_ALPHABET = (
+    "ABCDEFGHJKLMNPQRSTUVWXYZ"
+    "abcdefghjkmnpqrstuvwxyz"
+    "23456789"
+)
+_DEMO_PASSWORD_LENGTH = 14
+
+
+def _generate_demo_password() -> str:
+    """Generate a demo password using an alphabet free of look-alike characters."""
+    return "".join(
+        secrets.choice(_UNAMBIGUOUS_ALPHABET) for _ in range(_DEMO_PASSWORD_LENGTH)
+    )
+
+
+async def _create_magic_login_token(user_id: str, settings: Settings) -> str:
+    """Create a one-time magic login URL (48h TTL) for the given user."""
+    token = secrets.token_urlsafe(32)
+    r = aioredis.from_url(f"redis://{settings.redis_host}:6379")
+    try:
+        await r.set(f"magic_login:{token}", user_id, ex=MAGIC_LINK_TTL_SECONDS)
+    finally:
+        await r.aclose()
+    return f"{settings.frontend_url}/api/auth/magic-login?token={token}"
+
 
 async def submit_application(
     name: str,
@@ -136,7 +164,7 @@ async def _activate_application(app: DemoApplication, settings: Settings) -> Non
     """Create user account + team and mark application as active."""
     now = datetime.datetime.now(datetime.timezone.utc)
     expires_at = now + datetime.timedelta(days=TRIAL_DAYS)
-    password = secrets.token_urlsafe(10)
+    password = _generate_demo_password()
 
     # Create user
     user_id = app.email
@@ -194,9 +222,11 @@ async def _activate_application(app: DemoApplication, settings: Settings) -> Non
     await app.save()
 
     # Send activation email
+    magic_link = await _create_magic_login_token(user_id, settings)
     expires_str = expires_at.strftime("%B %d, %Y")
     subject, html = activation_email(
-        app.name, user_id, password, expires_str, settings.frontend_url
+        app.name, user_id, password, expires_str, settings.frontend_url,
+        magic_link=magic_link,
     )
     await send_email(app.email, subject, html, settings)
 
@@ -339,14 +369,16 @@ async def resend_credentials(uuid: str, settings: Settings | None = None) -> boo
         return False
 
     # Generate new password and update
-    password = secrets.token_urlsafe(10)
+    password = _generate_demo_password()
     user.password_hash = hash_password(password)
     await user.save()
 
-    # Resend activation email with new credentials
+    # Resend activation email with new credentials + fresh magic link
+    magic_link = await _create_magic_login_token(user.user_id, settings)
     expires_str = app.expires_at.strftime("%B %d, %Y") if app.expires_at else "N/A"
     subject, html = activation_email(
-        app.name, user.user_id, password, expires_str, settings.frontend_url
+        app.name, user.user_id, password, expires_str, settings.frontend_url,
+        magic_link=magic_link,
     )
     await send_email(app.email, subject, html, settings)
 
@@ -355,7 +387,7 @@ async def resend_credentials(uuid: str, settings: Settings | None = None) -> boo
 
 
 async def generate_magic_link(uuid: str, settings: Settings) -> str | None:
-    """Generate a one-time magic login link for a demo user (24h TTL)."""
+    """Generate a one-time magic login link for a demo user (48h TTL)."""
     app = await DemoApplication.find_one(DemoApplication.uuid == uuid)
     if not app or app.status != "active" or not app.user_id:
         return None
@@ -364,15 +396,9 @@ async def generate_magic_link(uuid: str, settings: Settings) -> str | None:
     if not user:
         return None
 
-    token = secrets.token_urlsafe(32)
-    r = aioredis.from_url(f"redis://{settings.redis_host}:6379")
-    try:
-        await r.set(f"magic_login:{token}", user.user_id, ex=86400)  # 24 hours
-    finally:
-        await r.aclose()
-
+    url = await _create_magic_login_token(user.user_id, settings)
     logger.info("Generated magic link for demo user %s", app.email)
-    return f"{settings.frontend_url}/api/auth/magic-login?token={token}"
+    return url
 
 
 async def admin_release_user(demo_uuid: str) -> bool:
@@ -686,14 +712,16 @@ async def bulk_resend_credentials(settings: Settings | None = None) -> dict:
         await app.save()
 
         # Generate new password and update user
-        password = secrets.token_urlsafe(10)
+        password = _generate_demo_password()
         user.password_hash = hash_password(password)
         user.demo_expires_at = new_expires
         await user.save()
 
+        magic_link = await _create_magic_login_token(user.user_id, settings)
         expires_str = new_expires.strftime("%B %d, %Y")
         subject, html = activation_email(
-            app.name, user.user_id, password, expires_str, settings.frontend_url
+            app.name, user.user_id, password, expires_str, settings.frontend_url,
+            magic_link=magic_link,
         )
         success = await send_email(app.email, subject, html, settings)
         if success:
