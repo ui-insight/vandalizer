@@ -94,6 +94,15 @@ async def invite(
     return {"token": inv.token, "email": inv.email}
 
 
+@router.get("/invite/info/{token}")
+async def invite_info(token: str):
+    """Public — return team + inviter metadata for a pending invite token."""
+    info = await team_service.get_invite_info(token)
+    if not info:
+        raise HTTPException(status_code=404, detail="Invalid or already-used invite")
+    return info
+
+
 @router.post("/invite/accept/{token}")
 async def accept_invite(
     token: str,

@@ -142,6 +142,28 @@ async def register(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Registration failed. Please check your details and try again.",
         )
+
+    # If the user was signing up to accept a team invite, auto-accept it.
+    # Only accepts when the registered email matches the invite's recipient
+    # email — otherwise silently ignore and let them accept manually later.
+    if body.invite_token:
+        from app.services import team_service
+
+        invite = await team_service.get_invite_info(body.invite_token)
+        if (
+            invite
+            and not invite["expired"]
+            and invite["email"].strip().lower() == body.email.strip().lower()
+        ):
+            try:
+                await team_service.accept_invite(body.invite_token, user)
+            except ValueError:
+                logger.warning(
+                    "Auto-accept of invite %s failed for new user %s",
+                    body.invite_token[:8],
+                    user.user_id,
+                )
+
     _set_tokens(response, user, settings)
     return await _user_response(user)
 

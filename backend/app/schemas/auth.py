@@ -14,6 +14,7 @@ class RegisterRequest(BaseModel):
     email: str
     password: str
     name: Optional[str] = None
+    invite_token: Optional[str] = None
 
     @field_validator("password")
     @classmethod
