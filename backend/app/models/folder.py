@@ -9,6 +9,7 @@ class SmartFolder(Document):
     uuid: str
     user_id: Optional[str] = None
     team_id: Optional[str] = None
+    created_by: Optional[str] = None
     is_shared_team_root: bool = False
 
     class Settings:

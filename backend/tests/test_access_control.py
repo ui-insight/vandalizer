@@ -42,10 +42,12 @@ def _make_user(user_id="user1", is_admin=False):
     return u
 
 
-def _make_folder(user_id="user1", team_id=None):
+def _make_folder(user_id="user1", team_id=None, created_by=None, is_shared_team_root=False):
     f = MagicMock()
     f.user_id = user_id
     f.team_id = team_id
+    f.created_by = created_by
+    f.is_shared_team_root = is_shared_team_root
     f.uuid = "folder-uuid"
     return f
 
@@ -209,6 +211,38 @@ class TestCanManageFolder:
     def test_team_member_cannot_manage_team_folder(self):
         user = _make_user("member1")
         folder = _make_folder("owner1", team_id="team-abc")
+        access = _team_access(
+            team_uuids={"team-abc"},
+            roles={"team-abc": "member"},
+        )
+        assert can_manage_folder(folder, user, access) is False
+
+    def test_creator_can_manage_own_team_folder(self):
+        user = _make_user("member1")
+        folder = _make_folder(None, team_id="team-abc", created_by="member1")
+        access = _team_access(
+            team_uuids={"team-abc"},
+            roles={"team-abc": "member"},
+        )
+        assert can_manage_folder(folder, user, access) is True
+
+    def test_creator_cannot_manage_shared_team_root(self):
+        user = _make_user("member1")
+        folder = _make_folder(
+            None,
+            team_id="team-abc",
+            created_by="member1",
+            is_shared_team_root=True,
+        )
+        access = _team_access(
+            team_uuids={"team-abc"},
+            roles={"team-abc": "member"},
+        )
+        assert can_manage_folder(folder, user, access) is False
+
+    def test_non_creator_member_cannot_manage_team_folder(self):
+        user = _make_user("member2")
+        folder = _make_folder(None, team_id="team-abc", created_by="member1")
         access = _team_access(
             team_uuids={"team-abc"},
             roles={"team-abc": "member"},

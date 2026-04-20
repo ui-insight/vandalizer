@@ -234,6 +234,9 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
       await Promise.all(promises)
       setSelectedUuids(new Set())
       refresh()
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to delete')
+      refresh()
     } finally {
       setBulkDeleting(false)
     }
@@ -359,10 +362,14 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
 
   const handleDelete = useCallback(
     async (type: 'folder' | 'doc', uuid: string) => {
-      if (type === 'doc') {
-        await deleteFile(uuid)
-      } else {
-        await deleteFolder(uuid)
+      try {
+        if (type === 'doc') {
+          await deleteFile(uuid)
+        } else {
+          await deleteFolder(uuid)
+        }
+      } catch (err: unknown) {
+        alert(err instanceof Error ? err.message : `Failed to delete ${type}`)
       }
       refresh()
     },
