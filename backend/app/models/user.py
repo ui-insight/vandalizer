@@ -13,7 +13,7 @@ class User(Document):
     is_examiner: bool = False
     name: Optional[str] = None
     current_team: Optional[PydanticObjectId] = None
-    api_token: Optional[str] = None
+    api_token_hash: Optional[str] = None
     api_token_created_at: Optional[datetime.datetime] = None
     api_token_expires_at: Optional[datetime.datetime] = None
     browser_automation_session_id: Optional[str] = None
@@ -38,5 +38,5 @@ class User(Document):
         indexes = [
             "user_id",
             "email",
-            "api_token",
+            "api_token_hash",
         ]

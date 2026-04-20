@@ -15,7 +15,7 @@ from bson import ObjectId
 from httpx import ASGITransport, AsyncClient
 
 from app.config import Settings
-from app.utils.security import create_access_token
+from app.utils.security import create_access_token, hash_api_token
 
 _TEST_SETTINGS = Settings(jwt_secret_key="test-secret-key", environment="development")
 
@@ -24,6 +24,7 @@ _TEST_SETTINGS = Settings(jwt_secret_key="test-secret-key", environment="develop
 # ---------------------------------------------------------------------------
 
 API_KEY = "test-api-key-12345"
+_API_KEY_HASH = hash_api_token(API_KEY)
 
 
 def _make_user(user_id="testuser", current_team=None, **overrides):
@@ -32,7 +33,7 @@ def _make_user(user_id="testuser", current_team=None, **overrides):
         "user_id": user_id,
         "email": f"{user_id}@example.com",
         "name": "Test User",
-        "api_token": API_KEY,
+        "api_token_hash": _API_KEY_HASH,
         "api_token_expires_at": None,
         "is_admin": False,
         "is_examiner": False,

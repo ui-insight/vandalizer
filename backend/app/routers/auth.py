@@ -351,13 +351,16 @@ _API_TOKEN_EXPIRY_DAYS = 365
 async def generate_api_token(user: User = Depends(get_current_user)):
     """Generate a new API token for the current user (expires in 365 days)."""
     try:
+        from app.utils.security import hash_api_token
+
         token = secrets.token_urlsafe(32)
         now = datetime.datetime.now(datetime.timezone.utc)
-        user.api_token = token
+        user.api_token_hash = hash_api_token(token)
         user.api_token_created_at = now
         user.api_token_expires_at = now + datetime.timedelta(days=_API_TOKEN_EXPIRY_DAYS)
         await user.save()
         logger.info(f"API token generated for user: {user.user_id}")
+        # Plaintext is returned exactly once; only the hash is persisted.
         return {
             "api_token": token,
             "created_at": user.api_token_created_at.isoformat(),
@@ -375,7 +378,7 @@ async def generate_api_token(user: User = Depends(get_current_user)):
 async def revoke_api_token(user: User = Depends(get_current_user)):
     """Revoke the current user's API token."""
     try:
-        user.api_token = None
+        user.api_token_hash = None
         user.api_token_created_at = None
         user.api_token_expires_at = None
         await user.save()
@@ -399,7 +402,7 @@ async def api_token_status(user: User = Depends(get_current_user)):
             expires = expires.replace(tzinfo=datetime.timezone.utc)
         expired = expires is not None and expires < now
         return {
-            "has_token": user.api_token is not None,
+            "has_token": user.api_token_hash is not None,
             "created_at": user.api_token_created_at.isoformat() if user.api_token_created_at else None,
             "expires_at": user.api_token_expires_at.isoformat() if user.api_token_expires_at else None,
             "expired": expired,

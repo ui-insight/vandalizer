@@ -1038,10 +1038,12 @@ def deliver_callback(
         logger.error("Invalid callback_url for event %s: %s", trigger_event_id, e)
         return {"status": "rejected", "error": str(e)}
 
-    # Look up the user's API token to use as HMAC signing secret
+    # Sign with the stored API-token hash. Receivers derive the signing
+    # secret from their plaintext token via sha256(token) — the server never
+    # stores plaintext, so the hash is the only shared value available.
     db = get_sync_db()
     user = db.user.find_one({"user_id": user_id})
-    signing_secret = (user.get("api_token") or "") if user else ""
+    signing_secret = (user.get("api_token_hash") or "") if user else ""
 
     payload_bytes = json.dumps(payload, default=str).encode("utf-8")
 

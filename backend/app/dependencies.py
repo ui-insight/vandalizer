@@ -45,7 +45,9 @@ async def get_api_key_user(
     """Authenticate via x-api-key header (for external API integrations)."""
     import datetime
 
-    user = await User.find_one(User.api_token == x_api_key)
+    from app.utils.security import hash_api_token
+
+    user = await User.find_one(User.api_token_hash == hash_api_token(x_api_key))
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

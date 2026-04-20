@@ -13,7 +13,9 @@ def _make_api_user(user_id="testuser", current_team=None):
     user.user_id = user_id
     user.email = f"{user_id}@example.com"
     user.name = "Test User"
-    user.api_token = "test-api-key"
+    from app.utils.security import hash_api_token
+
+    user.api_token_hash = hash_api_token("test-api-key")
     user.api_token_expires_at = None
     user.is_admin = False
     user.is_examiner = False

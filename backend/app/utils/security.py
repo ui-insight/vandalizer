@@ -1,3 +1,4 @@
+import hashlib
 from datetime import datetime, timedelta, timezone
 
 import jwt
@@ -13,6 +14,13 @@ def hash_password(password: str) -> str:
 
 def verify_password(password: str, password_hash: str) -> bool:
     return check_password_hash(password_hash, password)
+
+
+def hash_api_token(token: str) -> str:
+    # SHA-256 (unsalted) is appropriate here: tokens are 256 bits of entropy
+    # from secrets.token_urlsafe(32), so rainbow-table / dictionary attacks
+    # are infeasible. Determinism lets us index and look up by hash.
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 def create_access_token(user_id: str, settings: Settings) -> str:

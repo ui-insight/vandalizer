@@ -41,7 +41,7 @@ def _make_user(**overrides):
         "password_hash": hash_password("correct-password"),
         "is_demo_user": False,
         "demo_status": None,
-        "api_token": None,
+        "api_token_hash": None,
         "api_token_created_at": None,
         "api_token_expires_at": None,
     }
@@ -528,7 +528,7 @@ class TestAPITokenEndpoints:
 
     @pytest.mark.asyncio
     async def test_revoke_api_token(self, client):
-        user = _make_user(api_token="some-token")
+        user = _make_user(api_token_hash="somehash")
         csrf_token = secrets.token_urlsafe(32)
 
         with (
@@ -544,7 +544,7 @@ class TestAPITokenEndpoints:
 
         assert resp.status_code == 200
         assert resp.json()["ok"] is True
-        assert user.api_token is None
+        assert user.api_token_hash is None
         user.save.assert_awaited_once()
 
     @pytest.mark.asyncio
@@ -573,7 +573,7 @@ class TestAPITokenEndpoints:
         now = datetime.datetime.now(datetime.timezone.utc)
         expires = now + datetime.timedelta(days=365)
         user = _make_user(
-            api_token="some-token",
+            api_token_hash="somehash",
             api_token_created_at=now,
             api_token_expires_at=expires,
         )

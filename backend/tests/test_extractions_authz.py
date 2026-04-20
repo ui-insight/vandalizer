@@ -25,7 +25,9 @@ def _make_user(user_id="user1"):
     user.current_team = None
     user.is_demo_user = False
     user.demo_status = None
-    user.api_token = "test-api-key"
+    from app.utils.security import hash_api_token
+
+    user.api_token_hash = hash_api_token("test-api-key")
     user.api_token_created_at = None
     user.api_token_expires_at = None
     return user
