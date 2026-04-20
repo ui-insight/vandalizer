@@ -19,6 +19,7 @@ from app.services._json_schema_utils import inline_defs
 
 from app.models.system_config import DEFAULT_EXTRACTION_CONFIG, _deep_merge
 from app.services.llm_service import (
+    build_thinking_model_settings,
     create_chat_agent,
     get_agent_model,
     get_model_api_protocol,
@@ -690,14 +691,14 @@ class ExtractionEngine:
             fields_str = self._build_fields_prompt(keys, meta_map)
             prompt = self._build_user_prompt(content, fields_str, draft_hint=draft_hint)
 
-            model_settings = None
+            model_settings = build_thinking_model_settings(
+                model_name, thinking_override, self._sys_cfg,
+            )
             if api_protocol == "vllm":
                 schema = _build_structured_output_schema()
-                model_settings = {
-                    "extra_body": {
-                        "structured_outputs": {"json": schema}
-                    }
-                }
+                extra_body = dict(model_settings.get("extra_body") or {})
+                extra_body["structured_outputs"] = {"json": schema}
+                model_settings["extra_body"] = extra_body
 
             model = get_agent_model(model_name, thinking_override=thinking_override, system_config_doc=self._sys_cfg)
             agent = Agent(

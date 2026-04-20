@@ -51,9 +51,8 @@ class RagDeps:
 class InsightAIProvider(OpenRouterProvider):
     """Custom OpenRouter provider for UIdaho Insight AI server."""
 
-    def __init__(self, api_key: str, thinking_enabled: bool = False, endpoint: Optional[str] = None):
+    def __init__(self, api_key: str, endpoint: Optional[str] = None):
         self._endpoint = endpoint
-        self.thinking_enabled = thinking_enabled
         super().__init__(api_key=api_key)
 
     @property
@@ -69,27 +68,17 @@ class InsightAIProvider(OpenRouterProvider):
     def model_profile(self, model_name: str) -> Optional[ModelProfile]:
         if "/" not in model_name:
             profile = openai_model_profile(model_name)
-            model_profile = OpenAIModelProfile(
+            return OpenAIModelProfile(
                 json_schema_transformer=OpenAIJsonSchemaTransformer
             ).update(profile)
-            if not self.thinking_enabled:
-                try:
-                    if hasattr(model_profile, "model_copy"):
-                        model_profile = model_profile.model_copy(update={"supports_thinking": False})
-                    elif hasattr(model_profile, "supports_thinking"):
-                        model_profile.supports_thinking = False
-                except Exception:
-                    pass
-            return model_profile
         return super().model_profile(model_name)
 
 
 class OllamaProvider(OpenRouterProvider):
     """Provider for Ollama API-compatible servers."""
 
-    def __init__(self, api_key: str, endpoint: str, thinking_enabled: bool = False):
+    def __init__(self, api_key: str, endpoint: str):
         self._endpoint = endpoint
-        self.thinking_enabled = thinking_enabled
         super().__init__(api_key=api_key)
 
     @property
@@ -106,26 +95,16 @@ class OllamaProvider(OpenRouterProvider):
 
     def model_profile(self, model_name: str) -> Optional[ModelProfile]:
         profile = openai_model_profile(model_name)
-        model_profile = OpenAIModelProfile(
+        return OpenAIModelProfile(
             json_schema_transformer=OpenAIJsonSchemaTransformer
         ).update(profile)
-        if not self.thinking_enabled:
-            try:
-                if hasattr(model_profile, "model_copy"):
-                    model_profile = model_profile.model_copy(update={"supports_thinking": False})
-                elif hasattr(model_profile, "supports_thinking"):
-                    model_profile.supports_thinking = False
-            except Exception:
-                pass
-        return model_profile
 
 
 class VLLMProvider(OpenRouterProvider):
     """Provider for VLLM API-compatible servers."""
 
-    def __init__(self, api_key: str, endpoint: str, thinking_enabled: bool = False):
+    def __init__(self, api_key: str, endpoint: str):
         self._endpoint = endpoint
-        self.thinking_enabled = thinking_enabled
         super().__init__(api_key=api_key)
 
     @property
@@ -143,18 +122,9 @@ class VLLMProvider(OpenRouterProvider):
     def model_profile(self, model_name: str) -> Optional[ModelProfile]:
         if "/" not in model_name:
             profile = openai_model_profile(model_name)
-            model_profile = OpenAIModelProfile(
+            return OpenAIModelProfile(
                 json_schema_transformer=OpenAIJsonSchemaTransformer
             ).update(profile)
-            if not self.thinking_enabled:
-                try:
-                    if hasattr(model_profile, "model_copy"):
-                        model_profile = model_profile.model_copy(update={"supports_thinking": False})
-                    elif hasattr(model_profile, "supports_thinking"):
-                        model_profile.supports_thinking = False
-                except Exception:
-                    pass
-            return model_profile
         return super().model_profile(model_name)
 
 
@@ -206,6 +176,45 @@ def get_model_api_protocol(model_name: str, system_config_doc: dict | None = Non
     return detect_api_protocol(model_name, model_config)
 
 
+def resolve_thinking_enabled(
+    agent_model: str,
+    thinking_override: Optional[bool] = None,
+    system_config_doc: dict | None = None,
+) -> bool:
+    """Resolve the effective thinking preference for a model call."""
+    if thinking_override is not None:
+        return thinking_override
+    model_config = _get_model_config_sync(agent_model, system_config_doc)
+    return bool(model_config.get("thinking", False)) if model_config else False
+
+
+def build_thinking_model_settings(
+    agent_model: str,
+    thinking_override: Optional[bool] = None,
+    system_config_doc: dict | None = None,
+) -> dict:
+    """Build ModelSettings that explicitly enable/disable thinking for the request.
+
+    pydantic-ai's unified `thinking` setting handles OpenAI (reasoning_effort),
+    Anthropic, Gemini, etc. For vLLM and Ollama OpenAI-compatible servers whose
+    thinking models are toggled via non-standard fields, we also set `extra_body`
+    so the server actually honors the preference server-side.
+    """
+    thinking_enabled = resolve_thinking_enabled(agent_model, thinking_override, system_config_doc)
+    model_config = _get_model_config_sync(agent_model, system_config_doc)
+    api_protocol = detect_api_protocol(agent_model, model_config)
+
+    settings: dict = {"thinking": thinking_enabled}
+    extra_body: dict = {}
+    if api_protocol == "vllm":
+        extra_body["chat_template_kwargs"] = {"enable_thinking": thinking_enabled}
+    elif api_protocol == "ollama":
+        extra_body["think"] = thinking_enabled
+    if extra_body:
+        settings["extra_body"] = extra_body
+    return settings
+
+
 def get_agent_model(
     agent_model: str,
     thinking_override: Optional[bool] = None,
@@ -213,9 +222,6 @@ def get_agent_model(
 ) -> OpenAIModel:
     """Get the appropriate model instance. Sync  - safe for Celery workers."""
     model_config = _get_model_config_sync(agent_model, system_config_doc)
-    thinking_enabled = model_config.get("thinking", False) if model_config else False
-    if thinking_override is not None:
-        thinking_enabled = thinking_override
 
     # Resolve per-model API key from system config (decrypt if encrypted)
     raw_key = (model_config.get("api_key", "") if model_config else "") or ""
@@ -235,11 +241,11 @@ def get_agent_model(
         return OpenAIModel(model_name=model_name, openai_client=client)
 
     if api_protocol == "ollama":
-        provider = OllamaProvider(api_key=api_key, endpoint=endpoint, thinking_enabled=thinking_enabled)
+        provider = OllamaProvider(api_key=api_key, endpoint=endpoint)
     elif api_protocol == "vllm":
-        provider = VLLMProvider(api_key=api_key, endpoint=endpoint, thinking_enabled=thinking_enabled)
+        provider = VLLMProvider(api_key=api_key, endpoint=endpoint)
     else:
-        provider = InsightAIProvider(api_key=api_key, thinking_enabled=thinking_enabled, endpoint=endpoint)
+        provider = InsightAIProvider(api_key=api_key, endpoint=endpoint)
 
     return OpenAIModel(model_name=agent_model, provider=provider)
 
@@ -256,7 +262,8 @@ def create_chat_agent(
 
     if cache_key not in _chat_agent_cache:
         model = get_agent_model(agent_model, thinking_override=thinking_override, system_config_doc=system_config_doc)
-        _chat_agent_cache[cache_key] = Agent(model, system_prompt=prompt_to_use)
+        model_settings = build_thinking_model_settings(agent_model, thinking_override, system_config_doc)
+        _chat_agent_cache[cache_key] = Agent(model, system_prompt=prompt_to_use, model_settings=model_settings)
 
     return _chat_agent_cache[cache_key]
 
@@ -615,10 +622,12 @@ def create_rag_agent(
 
     if cache_key not in _rag_agent_cache:
         model = get_agent_model(agent_model, system_config_doc=system_config_doc)
+        model_settings = build_thinking_model_settings(agent_model, system_config_doc=system_config_doc)
         _rag_agent_cache[cache_key] = Agent(
             model,
             deps_type=RagDeps,
             system_prompt=RAG_SYSTEM_PROMPT,
+            model_settings=model_settings,
         )
 
         @_rag_agent_cache[cache_key].tool
@@ -689,9 +698,11 @@ def create_prompt_agent(
 
     if cache_key not in _prompt_agent_cache:
         model = get_agent_model(agent_model, system_config_doc=system_config_doc)
+        model_settings = build_thinking_model_settings(agent_model, system_config_doc=system_config_doc)
         _prompt_agent_cache[cache_key] = Agent(
             model,
             system_prompt=PROMPT_AGENT_SYSTEM_PROMPT,
+            model_settings=model_settings,
         )
 
     return _prompt_agent_cache[cache_key]
