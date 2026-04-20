@@ -12,15 +12,27 @@ logger = logging.getLogger(__name__)
 
 
 def get_chroma_client(persist_directory: str | None = None) -> chromadb.ClientAPI:
-    """Create a ChromaDB PersistentClient with consistent settings.
+    """Create a ChromaDB client — HttpClient if CHROMADB_HOST is set, else PersistentClient.
 
-    All code that needs a ChromaDB client should use this function to avoid
-    the 'instance already exists with different settings' error.
+    PersistentClient is not process-safe for concurrent writers. Any deployment
+    with more than one writer (multi-worker uvicorn + Celery) must set
+    CHROMADB_HOST and run the Chroma server container.
     """
-    if persist_directory is None:
-        from app.config import Settings
+    from app.config import Settings
 
-        persist_directory = Settings().chromadb_persist_dir
+    settings = Settings()
+    host = (settings.chromadb_host or "").strip()
+    if host:
+        hostname, _, port_str = host.partition(":")
+        port = int(port_str) if port_str else 8000
+        return chromadb.HttpClient(
+            host=hostname,
+            port=port,
+            settings=ChromaSettings(anonymized_telemetry=False),
+        )
+
+    if persist_directory is None:
+        persist_directory = settings.chromadb_persist_dir
     Path(persist_directory).mkdir(parents=True, exist_ok=True)
     return chromadb.PersistentClient(
         path=persist_directory,

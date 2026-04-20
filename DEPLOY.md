@@ -154,6 +154,7 @@ CONFIG_ENCRYPTION_KEY=<generate-a-fernet-key>
 UPLOAD_DIR=/app/static/uploads
 FRONTEND_URL=https://vandalizer.example.edu
 ENVIRONMENT=production
+CHROMADB_HOST=chromadb:8000
 CHROMADB_PERSIST_DIR=../app/static/db
 ```
 
@@ -164,6 +165,7 @@ Key notes:
 - **`MONGO_HOST`**: Use the Docker service name (`mongo`) if running in Docker Compose, or the hostname/IP of your MongoDB instance if externalized.
 - **`UPLOAD_DIR`**: Directory where user-uploaded documents are stored. Must be a persistent volume.
 - **`FRONTEND_URL`**: The public URL users will access. Used for CORS and redirect configuration.
+- **`CHROMADB_HOST`**: Hostname:port of the Chroma server. Required for any multi-process deployment — the Python `PersistentClient` is not process-safe for concurrent writers, so FastAPI workers + Celery workers sharing a persist directory will hit "attempt to write a readonly database" errors. Leave unset only for single-process local development.
 
 ### LLM Configuration
 

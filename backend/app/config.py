@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     environment: str = "development"
     insight_endpoint: str = ""
     chromadb_persist_dir: str = "../app/static/db"
+    # If set (e.g. "chromadb:8000"), connect to a Chroma server via HttpClient.
+    # Required when multiple processes (FastAPI workers + Celery) share Chroma —
+    # PersistentClient is not process-safe for concurrent writers.
+    chromadb_host: str = ""
     max_context_length: int = 100000
     max_upload_size_mb: int = 500
 
