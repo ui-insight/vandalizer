@@ -250,12 +250,18 @@ export function LeftPanel() {
             currentFolder={currentFolder}
             onFolderNavigate={setCurrentFolder}
             onDocClick={(doc) => {
-              setViewingDoc({
+              const next = {
                 uuid: doc.uuid,
                 title: doc.title,
                 processing: doc.processing,
                 taskStatus: doc.task_status,
-              })
+              }
+              // Sync-update the ref so handleSelectionChange's guard sees
+              // "viewing" immediately. When the auto-open-after-upload effect
+              // and the checkbox-sync effect fire in the same commit, the
+              // sync effect would otherwise clear the selection we just set.
+              viewingDocRef.current = next
+              setViewingDoc(next)
               setSelectedDocUuids([doc.uuid])
               setSelectedDocNames({ [doc.uuid]: doc.title })
             }}
