@@ -22,8 +22,18 @@ async def get_llm_models() -> list[dict]:
 
 
 async def get_default_model_name() -> str:
-    """Return the first configured model name (never empty when models exist)."""
-    models = await get_llm_models()
+    """Return the configured default model name, or fall back to the first
+    available model. Never returns empty when at least one model is configured.
+    """
+    config = await SystemConfig.get_config()
+    models = config.available_models if config and config.available_models else []
+
+    configured_default = (config.default_model or "").strip() if config else ""
+    if configured_default:
+        for m in models:
+            if isinstance(m, dict) and m.get("name") == configured_default:
+                return configured_default
+
     for m in models:
         if isinstance(m, dict):
             name = m.get("name", "")

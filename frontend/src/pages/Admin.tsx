@@ -6,7 +6,7 @@ import {
   CheckCircle2, XCircle, Clock, Download, TrendingUp, TrendingDown,
   ChevronDown, ChevronUp, ArrowUpDown, Play, Minus, AlertCircle,
   ArrowLeft, FileText, FolderTree, X, Eye, Check, CheckCircle,
-  Mail, Send, Link, UserPlus,
+  Mail, Send, Link, UserPlus, Star,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -22,7 +22,7 @@ import {
   getUsageStats, getUsageTimeseries, getUserLeaderboard, getTeamLeaderboard,
   getTeamDetail, getUserDetail,
   getWorkflowEvents, getSystemConfig, updateSystemConfig, updateM365Config,
-  addModel, updateModel, deleteModel, testOcr, testModel, addOAuthProvider,
+  addModel, updateModel, deleteModel, setDefaultModel, testOcr, testModel, addOAuthProvider,
   updateOAuthProvider, deleteOAuthProvider, updateAuthMethods,
   getQualitySummary, getQualityTimeline, runRegressionSuite,
   getQualityAlerts, acknowledgeAlert, getQualityItems, getQualityItemDetail,
@@ -2346,7 +2346,14 @@ function ConfigTab() {
       } else {
         res = await addModel(newModel)
       }
-      if (cfg) setCfg({ ...cfg, available_models: res.models })
+      if (cfg) {
+        const resDefault = (res as { default_model?: string }).default_model
+        setCfg({
+          ...cfg,
+          available_models: res.models,
+          ...(resDefault !== undefined ? { default_model: resDefault } : {}),
+        })
+      }
       setNewModel({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '', speed: '', tier: '', privacy: '', supports_structured: true, multimodal: false, supports_pdf: false })
       setShowModelForm(false)
       setEditingModelIndex(null)
@@ -2381,14 +2388,29 @@ function ConfigTab() {
 
   const handleDeleteModel = async (index: number) => {
     try {
-      await deleteModel(index)
+      const res = await deleteModel(index)
       if (cfg) {
         const models = [...cfg.available_models]
         models.splice(index, 1)
-        setCfg({ ...cfg, available_models: models })
+        setCfg({
+          ...cfg,
+          available_models: models,
+          ...(res.default_model !== undefined ? { default_model: res.default_model } : {}),
+        })
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to delete model')
+    }
+  }
+
+  const handleSetDefaultModel = async (name: string) => {
+    try {
+      // Toggle off if clicking the current default.
+      const next = cfg?.default_model === name ? '' : name
+      const res = await setDefaultModel(next)
+      if (cfg) setCfg({ ...cfg, default_model: res.default_model })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to set default model')
     }
   }
 
@@ -2573,6 +2595,11 @@ function ConfigTab() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: 14, fontWeight: 600, color: '#111' }}>{m.name}</span>
                       <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#f3f4f6', color: '#6b7280', fontWeight: 600 }}>{m.tag}</span>
+                      {cfg?.default_model === m.name && (
+                        <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#fef9c3', color: '#854d0e', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <Star size={11} fill="currentColor" /> Default
+                        </span>
+                      )}
                       {m.external && (
                         <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#fef3c7', color: '#92400e', fontWeight: 600 }}>External</span>
                       )}
@@ -2604,6 +2631,17 @@ function ConfigTab() {
                         {modelTestResults[i].ok ? <CheckCircle2 size={14} style={{ verticalAlign: -2 }} /> : <XCircle size={14} style={{ verticalAlign: -2 }} />}
                       </span>
                     )}
+                    <button
+                      onClick={() => handleSetDefaultModel(m.name)}
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: cfg?.default_model === m.name ? '#ca8a04' : '#9ca3af',
+                        padding: 4,
+                      }}
+                      title={cfg?.default_model === m.name ? 'Remove as default' : 'Set as default model'}
+                    >
+                      <Star size={16} fill={cfg?.default_model === m.name ? 'currentColor' : 'none'} />
+                    </button>
                     <button
                       onClick={() => handleTestModel(i)}
                       disabled={modelTesting === i}

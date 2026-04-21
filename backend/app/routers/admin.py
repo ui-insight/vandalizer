@@ -1224,6 +1224,7 @@ async def get_config(
         "auth_methods": cfg.auth_methods,
         "oauth_providers": _sanitize_providers(cfg.oauth_providers),
         "available_models": _sanitize_models(cfg.available_models),
+        "default_model": cfg.default_model or "",
         "ocr_endpoint": cfg.ocr_endpoint,
         "ocr_api_key": "***" if decrypt_value(cfg.ocr_api_key) else "",
         "llm_endpoint": cfg.llm_endpoint,
@@ -1334,6 +1335,7 @@ async def update_model(
     else:
         new_api_key = encrypt_value(new_api_key)
 
+    prev_name = cfg.available_models[index].get("name", "")
     cfg.available_models[index] = {
         "name": body.name,
         "tag": body.tag,
@@ -1350,13 +1352,16 @@ async def update_model(
         "supports_pdf": body.supports_pdf,
         "context_window": body.context_window,
     }
+    # Keep default_model pointer stable when the default is renamed.
+    if cfg.default_model and cfg.default_model == prev_name and body.name != prev_name:
+        cfg.default_model = body.name
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
     cfg.updated_by = user.user_id
     await cfg.save()
     clear_agent_caches()
     await _audit(user, "update_model", f"Updated model at index {index}: {body.tag}")
 
-    return {"status": "ok", "models": _sanitize_models(cfg.available_models)}
+    return {"status": "ok", "models": _sanitize_models(cfg.available_models), "default_model": cfg.default_model or ""}
 
 
 # ---------------------------------------------------------------------------
@@ -1375,13 +1380,52 @@ async def delete_model(
         raise HTTPException(status_code=404, detail="Model index out of range")
 
     removed = cfg.available_models.pop(index)
+    # Clear default_model if we just deleted it.
+    if cfg.default_model and cfg.default_model == removed.get("name", ""):
+        cfg.default_model = ""
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
     cfg.updated_by = user.user_id
     await cfg.save()
     clear_agent_caches()
     await _audit(user, "delete_model", f"Deleted model at index {index}: {removed.get('tag', '?')}")
 
-    return {"status": "ok", "removed": removed, "models": cfg.available_models}
+    return {"status": "ok", "removed": removed, "models": cfg.available_models, "default_model": cfg.default_model or ""}
+
+
+# ---------------------------------------------------------------------------
+# 8b. PUT /config/models/default  - Set (or clear) the system default model
+# ---------------------------------------------------------------------------
+
+class DefaultModelRequest(BaseModel):
+    name: str = ""
+
+
+@router.put("/config/models/default")
+async def set_default_model(
+    body: DefaultModelRequest,
+    user: User = Depends(get_current_user),
+):
+    await _require_superadmin(user)
+
+    cfg = await SystemConfig.get_config()
+    name = (body.name or "").strip()
+
+    if name:
+        match = next(
+            (m for m in cfg.available_models if isinstance(m, dict) and m.get("name") == name),
+            None,
+        )
+        if not match:
+            raise HTTPException(status_code=404, detail=f"Model '{name}' is not configured")
+
+    cfg.default_model = name
+    cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
+    cfg.updated_by = user.user_id
+    await cfg.save()
+    clear_agent_caches()
+    await _audit(user, "set_default_model", f"Default model: {name or '(cleared)'}")
+
+    return {"status": "ok", "default_model": cfg.default_model or ""}
 
 
 # ---------------------------------------------------------------------------
