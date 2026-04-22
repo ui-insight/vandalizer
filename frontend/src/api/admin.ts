@@ -213,6 +213,7 @@ export interface SystemConfigData {
   auth_methods: string[]
   oauth_providers: Record<string, unknown>[]
   available_models: { name: string; tag: string; external: boolean; thinking: boolean; endpoint?: string; api_protocol?: string; api_key?: string; speed?: string; tier?: string; privacy?: string; supports_structured?: boolean; multimodal?: boolean; supports_pdf?: boolean }[]
+  default_model: string
   ocr_endpoint: string
   ocr_api_key: string
   llm_endpoint: string
@@ -302,7 +303,14 @@ export function updateModel(index: number, data: { name: string; tag: string; ex
 }
 
 export function deleteModel(index: number) {
-  return apiFetch<{ status: string }>(`/api/admin/config/models/${index}`, { method: 'DELETE' })
+  return apiFetch<{ status: string; default_model?: string }>(`/api/admin/config/models/${index}`, { method: 'DELETE' })
+}
+
+export function setDefaultModel(name: string) {
+  return apiFetch<{ status: string; default_model: string }>('/api/admin/config/models/default', {
+    method: 'PUT',
+    body: JSON.stringify({ name }),
+  })
 }
 
 // Test connectivity

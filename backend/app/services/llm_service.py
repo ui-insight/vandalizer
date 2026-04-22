@@ -195,21 +195,39 @@ def build_thinking_model_settings(
 ) -> dict:
     """Build ModelSettings that explicitly enable/disable thinking for the request.
 
-    pydantic-ai's unified `thinking` setting handles OpenAI (reasoning_effort),
-    Anthropic, Gemini, etc. For vLLM and Ollama OpenAI-compatible servers whose
-    thinking models are toggled via non-standard fields, we also set `extra_body`
-    so the server actually honors the preference server-side.
+    pydantic-ai's unified `thinking` setting only fires when the profile's
+    `supports_thinking` flag is true. The default `openai_model_profile` sets
+    that to false for most model names (including Qwen, DeepSeek-R1, etc.), so
+    the unified setting alone is silently ignored. We therefore also send the
+    provider-native extra_body signal:
+      - vLLM/OpenAI-compatible: `chat_template_kwargs.enable_thinking` (this is
+        what Qwen3, DeepSeek-R1, etc. read when served via vLLM — safe
+        unknown-field passthrough on most OpenAI-compatible gateways)
+      - Ollama: `think`
+    We skip `chat_template_kwargs` only for truly external OpenAI-protocol
+    models (external=true + api_protocol=openai), since the canonical OpenAI
+    API can reject unknown fields and has its own reasoning controls.
     """
     thinking_enabled = resolve_thinking_enabled(agent_model, thinking_override, system_config_doc)
     model_config = _get_model_config_sync(agent_model, system_config_doc)
-    api_protocol = detect_api_protocol(agent_model, model_config)
+    # Use the raw configured protocol, not the name-based auto-detect — the
+    # detect fallback picks "ollama" for any bare model name, which then drops
+    # the chat_template_kwargs signal for Qwen3 on vLLM-backed endpoints.
+    raw_protocol = (model_config.get("api_protocol", "") if model_config else "").strip().lower()
+    is_external = bool(model_config and model_config.get("external", False))
 
     settings: dict = {"thinking": thinking_enabled}
     extra_body: dict = {}
-    if api_protocol == "vllm":
-        extra_body["chat_template_kwargs"] = {"enable_thinking": thinking_enabled}
-    elif api_protocol == "ollama":
+    if raw_protocol == "ollama":
         extra_body["think"] = thinking_enabled
+    elif not (raw_protocol == "openai" and is_external):
+        # vllm, openai-internal (e.g. InsightAI), or auto-detect internal:
+        # all are OpenAI-compatible servers that may be serving Qwen/DeepSeek/
+        # other thinking models via vLLM. chat_template_kwargs is the
+        # Qwen3-style control and passes through unknown-field-tolerant
+        # gateways. Skip only for truly external OpenAI (strict validation,
+        # has native reasoning_effort via unified `thinking`).
+        extra_body["chat_template_kwargs"] = {"enable_thinking": thinking_enabled}
     if extra_body:
         settings["extra_body"] = extra_body
     return settings
