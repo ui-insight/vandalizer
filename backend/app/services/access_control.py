@@ -126,6 +126,10 @@ def can_manage_folder(
     if allow_admin and user.is_admin:
         return True
     if folder.team_id:
+        if folder.is_shared_team_root:
+            return _team_role(folder.team_id, team_access) in TEAM_MANAGE_ROLES
+        if folder.created_by and folder.created_by == user.user_id:
+            return _has_team_membership(folder.team_id, team_access)
         return _team_role(folder.team_id, team_access) in TEAM_MANAGE_ROLES
     return folder.user_id == user.user_id
 

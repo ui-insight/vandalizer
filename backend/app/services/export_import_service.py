@@ -358,8 +358,18 @@ async def export_search_set(search_set_uuid: str, user_email: str) -> dict:
     return _envelope("search_set", user_email, [export_item])
 
 
-async def import_search_set(data: dict, user_id: str, team_id: str | None = None) -> SearchSet:
-    """Import a search set from export data. Returns the new SearchSet."""
+async def import_search_set(
+    data: dict,
+    user_id: str,
+    team_id: str | None = None,
+    target: SearchSet | None = None,
+) -> SearchSet:
+    """Import a search set from export data.
+
+    If *target* is provided, items and test cases are appended to it and its
+    extraction_config is replaced with the imported one. Otherwise a new
+    SearchSet is created. Returns the target or newly-created SearchSet.
+    """
     err = validate_export_data(data)
     if err:
         raise ValueError(err)
@@ -367,24 +377,30 @@ async def import_search_set(data: dict, user_id: str, team_id: str | None = None
         raise ValueError("Expected a search_set export file")
 
     item = data["items"][0]
-    new_uuid = str(uuid_mod.uuid4())
 
-    clone = SearchSet(
-        title=f"{item['title']} (Imported)",
-        uuid=new_uuid,
-        team_id=team_id,
-        status="active",
-        set_type=item.get("set_type", "extraction"),
-        user_id=user_id,
-        created_by_user_id=user_id,
-        extraction_config=item.get("extraction_config", {}),
-    )
-    await clone.insert()
+    if target is not None:
+        target.extraction_config = item.get("extraction_config", {})
+        await target.save()
+        ss_uuid = target.uuid
+        result = target
+    else:
+        ss_uuid = str(uuid_mod.uuid4())
+        result = SearchSet(
+            title=f"{item['title']} (Imported)",
+            uuid=ss_uuid,
+            team_id=team_id,
+            status="active",
+            set_type=item.get("set_type", "extraction"),
+            user_id=user_id,
+            created_by_user_id=user_id,
+            extraction_config=item.get("extraction_config", {}),
+        )
+        await result.insert()
 
     for field in item.get("items", []):
         new_item = SearchSetItem(
             searchphrase=field["searchphrase"],
-            searchset=new_uuid,
+            searchset=ss_uuid,
             searchtype=field.get("searchtype", "extraction"),
             title=field.get("title", field["searchphrase"]),
             user_id=user_id,
@@ -396,7 +412,7 @@ async def import_search_set(data: dict, user_id: str, team_id: str | None = None
     # Import text-based test cases
     for tc_data in item.get("test_cases", []):
         tc = ExtractionTestCase(
-            search_set_uuid=new_uuid,
+            search_set_uuid=ss_uuid,
             label=tc_data.get("label", "Imported test case"),
             source_type="text",
             source_text=tc_data.get("source_text", ""),
@@ -405,7 +421,7 @@ async def import_search_set(data: dict, user_id: str, team_id: str | None = None
         )
         await tc.insert()
 
-    return clone
+    return result
 
 
 # ---------------------------------------------------------------------------

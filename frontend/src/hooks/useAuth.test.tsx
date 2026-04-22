@@ -123,7 +123,7 @@ describe('useAuth', () => {
       await result.current.register('bob', 'bob@test.com', 'pass', 'Bob')
     })
 
-    expect(mockRegister).toHaveBeenCalledWith('bob', 'bob@test.com', 'pass', 'Bob')
+    expect(mockRegister).toHaveBeenCalledWith('bob', 'bob@test.com', 'pass', 'Bob', undefined)
     expect(result.current.user).toEqual(user)
   })
 

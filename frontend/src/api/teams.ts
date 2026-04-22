@@ -46,6 +46,23 @@ export function acceptInvite(token: string) {
   })
 }
 
+export interface InviteInfo {
+  email: string
+  role: string
+  team_name: string
+  team_uuid: string | null
+  inviter_name: string | null
+  expired: boolean
+}
+
+export async function getInviteInfo(token: string): Promise<InviteInfo> {
+  const res = await fetch(`/api/teams/invite/info/${encodeURIComponent(token)}`)
+  if (!res.ok) {
+    throw new Error('Invalid or expired invite link.')
+  }
+  return res.json()
+}
+
 export function changeMemberRole(team_id: string, user_id: string, role: string) {
   return apiFetch<{ ok: boolean }>('/api/teams/member/role', {
     method: 'POST',

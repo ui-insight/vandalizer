@@ -8,7 +8,7 @@ import { CertificationPanelProvider } from './contexts/CertificationPanelContext
 import { queryClient } from './lib/queryClient'
 import { router } from './router'
 import { getThemeConfig } from './api/config'
-import { getContrastTextColor, getComplementaryColor } from './utils/color'
+import { getContrastTextColor, getComplementaryColor, getHoverColor } from './utils/color'
 
 class ErrorBoundary extends Component<
   { children: ReactNode },
@@ -75,6 +75,7 @@ function useThemeLoader() {
         root.style.setProperty('--ui-radius', theme.ui_radius)
         root.style.setProperty('--highlight-text-color', getContrastTextColor(theme.highlight_color))
         root.style.setProperty('--highlight-complement', getComplementaryColor(theme.highlight_color))
+        root.style.setProperty('--highlight-hover', getHoverColor(theme.highlight_color))
       })
       .catch(() => {
         // Use CSS defaults if theme fetch fails (e.g. not logged in)

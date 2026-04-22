@@ -145,7 +145,8 @@ async def update_user_config(req: UpdateUserConfigRequest, user: User = Depends(
 
 
 @router.get("/theme", response_model=ThemeConfigResponse)
-async def get_theme(user: User = Depends(get_current_user)):
+async def get_theme():
+    """Public endpoint  - returns brand theme so the landing page can render it."""
     config = await SystemConfig.get_config()
     return ThemeConfigResponse(
         highlight_color=config.highlight_color,

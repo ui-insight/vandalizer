@@ -166,7 +166,41 @@ Suggested smoke checks after restore:
 
 ## Upgrade Procedure
 
-The recommended way to upgrade is the interactive setup wizard:
+There are two supported upgrade paths. Prefer the tagged-release path in production — it pulls pre-built, CI-validated images from GHCR instead of rebuilding on the host.
+
+### Upgrade via tagged release (recommended)
+
+Prerequisites:
+
+- [`compose.prod.yaml`](compose.prod.yaml) and [`upgrade.sh`](upgrade.sh) are present at the repo root.
+- The target tag (e.g. `v2026.04.1`) has images published at `ghcr.io/ui-insight/vandalizer-{backend,frontend}:<tag>`. Check the tag exists under GitHub → Releases.
+- For private GHCR images: run `docker login ghcr.io` on the host first.
+
+Upgrade:
+
+```bash
+# 1. Take a backup (see Backup Procedure above).
+# 2. Pull the repo so compose.prod.yaml and upgrade.sh match the target tag.
+git fetch --tags && git checkout <tag>
+
+# 3. Preview, then apply.
+./upgrade.sh <tag> --dry-run
+./upgrade.sh <tag>
+```
+
+`upgrade.sh` verifies both GHCR images exist before touching anything, records the previous version to `.vandalizer_version.prev`, pulls the new images, recreates only `api`, `celery`, and `frontend` (infrastructure untouched), then polls `/api/health` for 60s.
+
+Rollback to the previous tag:
+
+```bash
+./upgrade.sh --rollback
+```
+
+This reads `.vandalizer_version.prev` and reapplies that tag. Use the full restore procedure instead if the failed release ran an incompatible migration.
+
+### Upgrade via local rebuild (dev / pre-release)
+
+For development hosts or when testing an unreleased branch, the interactive setup wizard rebuilds from the working tree:
 
 ```bash
 ./setup.sh --upgrade
@@ -268,5 +302,4 @@ This guide improves the current operator path, but a few roadmap items are still
 
 - no built-in automated backup scheduler ships with the repo yet
 - no S3-backed storage backup flow is documented yet
-- no release-specific upgrade notes or rollback matrix ship with tags yet
 - no automated restore drill exists in CI

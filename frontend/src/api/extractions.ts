@@ -431,9 +431,10 @@ export function exportSearchSetUrl(uuid: string) {
   return `/api/extractions/search-sets/${uuid}/export`
 }
 
-export async function importSearchSet(file: File): Promise<SearchSet> {
+export async function importSearchSet(file: File, targetUuid?: string): Promise<SearchSet> {
   const form = new FormData()
   form.append('file', file)
+  if (targetUuid) form.append('target_uuid', targetUuid)
   const res = await fetch('/api/extractions/search-sets/import', {
     method: 'POST',
     credentials: 'include',

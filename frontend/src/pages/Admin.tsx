@@ -6,7 +6,7 @@ import {
   CheckCircle2, XCircle, Clock, Download, TrendingUp, TrendingDown,
   ChevronDown, ChevronUp, ArrowUpDown, Play, Minus, AlertCircle,
   ArrowLeft, FileText, FolderTree, X, Eye, Check, CheckCircle,
-  Mail, Send, Link, UserPlus,
+  Mail, Send, Link, UserPlus, Star,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -22,12 +22,13 @@ import {
   getUsageStats, getUsageTimeseries, getUserLeaderboard, getTeamLeaderboard,
   getTeamDetail, getUserDetail,
   getWorkflowEvents, getSystemConfig, updateSystemConfig, updateM365Config,
-  addModel, updateModel, deleteModel, testOcr, testModel, addOAuthProvider,
+  addModel, updateModel, deleteModel, setDefaultModel, testOcr, testModel, addOAuthProvider,
   updateOAuthProvider, deleteOAuthProvider, updateAuthMethods,
   getQualitySummary, getQualityTimeline, runRegressionSuite,
   getQualityAlerts, acknowledgeAlert, getQualityItems, getQualityItemDetail,
   adminListAllTeams, adminCreateTeam, adminAddUserToTeam, adminRemoveUserFromTeam, getIsolatedUsers,
   updateUserRoles,
+  getEmailAnalytics,
 } from '../api/admin'
 import { getTeamMembers } from '../api/teams'
 import * as orgApi from '../api/organizations'
@@ -51,6 +52,7 @@ import type {
   QualitySummary, QualityTimelinePoint, RegressionResult,
   QualityAlert, QualityItem, QualityItemDetail,
   AdminTeamItem, IsolatedUserItem,
+  EmailAnalyticsResponse,
 } from '../api/admin'
 import { relativeTime } from '../utils/time'
 import { ModelCharacterBars } from '../components/ModelEffortPicker'
@@ -60,6 +62,7 @@ import type { ApprovalRequest } from '../api/approvals'
 import * as auditApi from '../api/audit'
 import type { AuditLogEntry } from '../api/audit'
 import { getAuthConfig } from '../api/auth'
+import { UpdateBanner } from '../components/admin/UpdateBanner'
 
 function applyThemeToDOM(theme: ThemeConfig) {
   const root = document.documentElement
@@ -67,7 +70,7 @@ function applyThemeToDOM(theme: ThemeConfig) {
   root.style.setProperty('--ui-radius', theme.ui_radius)
 }
 
-type Tab = 'usage' | 'users' | 'teams' | 'organizations' | 'workflows' | 'quality' | 'approvals' | 'support' | 'audit' | 'demo' | 'debugging' | 'config'
+type Tab = 'usage' | 'users' | 'teams' | 'organizations' | 'workflows' | 'quality' | 'approvals' | 'support' | 'audit' | 'demo' | 'email' | 'debugging' | 'config'
 
 const TABS: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'usage', label: 'Usage', icon: BarChart3 },
@@ -80,6 +83,7 @@ const TABS: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'support', label: 'Support Center', icon: MessageSquare },
   { key: 'audit', label: 'Audit Log', icon: FileText },
   { key: 'demo', label: 'Demo', icon: Zap },
+  { key: 'email', label: 'Email', icon: Mail },
   { key: 'debugging', label: 'Debugging', icon: Bug },
   { key: 'config', label: 'Config', icon: Settings },
 ]
@@ -2345,7 +2349,14 @@ function ConfigTab() {
       } else {
         res = await addModel(newModel)
       }
-      if (cfg) setCfg({ ...cfg, available_models: res.models })
+      if (cfg) {
+        const resDefault = (res as { default_model?: string }).default_model
+        setCfg({
+          ...cfg,
+          available_models: res.models,
+          ...(resDefault !== undefined ? { default_model: resDefault } : {}),
+        })
+      }
       setNewModel({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '', speed: '', tier: '', privacy: '', supports_structured: true, multimodal: false, supports_pdf: false })
       setShowModelForm(false)
       setEditingModelIndex(null)
@@ -2380,14 +2391,29 @@ function ConfigTab() {
 
   const handleDeleteModel = async (index: number) => {
     try {
-      await deleteModel(index)
+      const res = await deleteModel(index)
       if (cfg) {
         const models = [...cfg.available_models]
         models.splice(index, 1)
-        setCfg({ ...cfg, available_models: models })
+        setCfg({
+          ...cfg,
+          available_models: models,
+          ...(res.default_model !== undefined ? { default_model: res.default_model } : {}),
+        })
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to delete model')
+    }
+  }
+
+  const handleSetDefaultModel = async (name: string) => {
+    try {
+      // Toggle off if clicking the current default.
+      const next = cfg?.default_model === name ? '' : name
+      const res = await setDefaultModel(next)
+      if (cfg) setCfg({ ...cfg, default_model: res.default_model })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to set default model')
     }
   }
 
@@ -2572,6 +2598,11 @@ function ConfigTab() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: 14, fontWeight: 600, color: '#111' }}>{m.name}</span>
                       <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#f3f4f6', color: '#6b7280', fontWeight: 600 }}>{m.tag}</span>
+                      {cfg?.default_model === m.name && (
+                        <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#fef9c3', color: '#854d0e', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <Star size={11} fill="currentColor" /> Default
+                        </span>
+                      )}
                       {m.external && (
                         <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: '#fef3c7', color: '#92400e', fontWeight: 600 }}>External</span>
                       )}
@@ -2603,6 +2634,17 @@ function ConfigTab() {
                         {modelTestResults[i].ok ? <CheckCircle2 size={14} style={{ verticalAlign: -2 }} /> : <XCircle size={14} style={{ verticalAlign: -2 }} />}
                       </span>
                     )}
+                    <button
+                      onClick={() => handleSetDefaultModel(m.name)}
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        color: cfg?.default_model === m.name ? '#ca8a04' : '#9ca3af',
+                        padding: 4,
+                      }}
+                      title={cfg?.default_model === m.name ? 'Remove as default' : 'Set as default model'}
+                    >
+                      <Star size={16} fill={cfg?.default_model === m.name ? 'currentColor' : 'none'} />
+                    </button>
                     <button
                       onClick={() => handleTestModel(i)}
                       disabled={modelTesting === i}
@@ -4163,6 +4205,157 @@ function TrialCheckinsSection() {
   )
 }
 
+function EmailAnalyticsTab() {
+  const [data, setData] = useState<EmailAnalyticsResponse | null>(null)
+  const [days, setDays] = useState(30)
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(() => {
+    setLoading(true)
+    getEmailAnalytics(days)
+      .then(d => setData(d))
+      .finally(() => setLoading(false))
+  }, [days])
+
+  useEffect(() => { load() }, [load])
+
+  if (loading && !data) {
+    return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading email analytics...</div>
+  }
+  if (!data) return null
+
+  const successPct = (data.success_rate * 100).toFixed(1)
+  const overallHealthColor =
+    data.total_sent + data.total_failed === 0 ? '#6b7280'
+    : data.success_rate >= 0.99 ? '#22c55e'
+    : data.success_rate >= 0.9 ? '#f59e0b' : '#ef4444'
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 13, color: '#6b7280', fontWeight: 500 }}>Time Range:</span>
+        {[7, 14, 30, 90].map(d => (
+          <button
+            key={d}
+            onClick={() => setDays(d)}
+            style={{
+              padding: '5px 14px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #e5e7eb',
+              fontSize: 13, fontWeight: 500, cursor: 'pointer',
+              backgroundColor: days === d ? 'var(--highlight-color, #eab308)' : '#fff',
+              color: days === d ? 'var(--highlight-text-color, #000)' : '#374151',
+            }}
+          >
+            {d}d
+          </button>
+        ))}
+        <button onClick={load} style={{ marginLeft: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4 }}>
+          <RefreshCw size={16} />
+        </button>
+        {data.providers.length > 0 && (
+          <span style={{ marginLeft: 'auto', fontSize: 12, color: '#6b7280' }}>
+            Provider{data.providers.length > 1 ? 's' : ''}: {data.providers.join(', ')}
+          </span>
+        )}
+      </div>
+
+      {/* KPIs */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+        <KpiCard label="Sent" value={formatNumber(data.total_sent)} icon={Send} color="#22c55e" />
+        <KpiCard label="Failed" value={formatNumber(data.total_failed)} icon={XCircle} color="#ef4444" />
+        <KpiCard label="Success Rate" value={`${successPct}%`} icon={CheckCircle2} color={overallHealthColor} />
+      </div>
+
+      {/* Daily chart */}
+      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', padding: 20 }}>
+        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>Daily Email Volume</div>
+        <ResponsiveContainer width="100%" height={260}>
+          <AreaChart data={data.by_day}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+            <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9ca3af' }} tickFormatter={v => v.slice(5)} />
+            <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} width={40} allowDecimals={false} />
+            <Tooltip contentStyle={{ borderRadius: 8, fontSize: 13, border: '1px solid #e5e7eb' }} />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Area type="monotone" dataKey="sent" stackId="1" stroke="#22c55e" fill="#22c55e" fillOpacity={0.2} name="Sent" />
+            <Area type="monotone" dataKey="failed" stackId="1" stroke="#ef4444" fill="#ef4444" fillOpacity={0.25} name="Failed" />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* By type */}
+      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px', borderBottom: '1px solid #f3f4f6' }}>
+          By Email Type
+        </div>
+        {data.by_type.length === 0 ? (
+          <div style={{ padding: 40, textAlign: 'center', color: '#6b7280', fontSize: 13 }}>
+            No emails sent in this window.
+          </div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead style={{ background: '#fafafa' }}>
+              <tr>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Type</th>
+                <th style={{ padding: '10px 16px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Sent</th>
+                <th style={{ padding: '10px 16px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Failed</th>
+                <th style={{ padding: '10px 16px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Success Rate</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.by_type.map(row => {
+                const rate = row.success_rate * 100
+                const color = row.sent + row.failed === 0 ? '#6b7280'
+                  : row.success_rate >= 0.99 ? '#22c55e'
+                  : row.success_rate >= 0.9 ? '#f59e0b' : '#ef4444'
+                return (
+                  <tr key={row.email_type} style={{ borderTop: '1px solid #f3f4f6' }}>
+                    <td style={{ padding: '10px 16px', fontSize: 13, color: '#111827' }}>{row.email_type}</td>
+                    <td style={{ padding: '10px 16px', fontSize: 13, textAlign: 'right', fontFamily: 'ui-monospace, monospace' }}>{row.sent}</td>
+                    <td style={{ padding: '10px 16px', fontSize: 13, textAlign: 'right', fontFamily: 'ui-monospace, monospace', color: row.failed > 0 ? '#ef4444' : '#6b7280' }}>{row.failed}</td>
+                    <td style={{ padding: '10px 16px', fontSize: 13, textAlign: 'right', fontFamily: 'ui-monospace, monospace', color, fontWeight: 600 }}>{rate.toFixed(1)}%</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Recent failures */}
+      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <AlertCircle size={16} color="#ef4444" /> Recent Failures
+        </div>
+        {data.recent_failures.length === 0 ? (
+          <div style={{ padding: 40, textAlign: 'center', color: '#6b7280', fontSize: 13 }}>
+            No failures in this window. Deliverability is healthy.
+          </div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead style={{ background: '#fafafa' }}>
+              <tr>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>When</th>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Recipient</th>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Type</th>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Error</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.recent_failures.map((f, i) => (
+                <tr key={i} style={{ borderTop: '1px solid #f3f4f6' }}>
+                  <td style={{ padding: '10px 16px', fontSize: 12, color: '#6b7280', whiteSpace: 'nowrap' }}>{formatDateTime(f.created_at)}</td>
+                  <td style={{ padding: '10px 16px', fontSize: 13, color: '#111827', fontFamily: 'ui-monospace, monospace' }}>{f.recipient}</td>
+                  <td style={{ padding: '10px 16px', fontSize: 13, color: '#374151' }}>{f.email_type}</td>
+                  <td style={{ padding: '10px 16px', fontSize: 12, color: '#ef4444', fontFamily: 'ui-monospace, monospace', maxWidth: 420, overflow: 'hidden', textOverflow: 'ellipsis' }} title={f.error || ''}>{f.error || '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function DebuggingTab() {
   const [responses, setResponses] = useState<PostExperienceResponseAdmin[]>([])
   const [loading, setLoading] = useState(true)
@@ -5530,6 +5723,7 @@ export default function Admin() {
 
         {/* Content */}
         <div style={{ flex: 1, padding: '20px 32px', minWidth: 0 }}>
+          <UpdateBanner />
           {activeTab === 'usage' && <UsageTab />}
           {activeTab === 'users' && <UsersTab />}
           {activeTab === 'teams' && <TeamsTab />}
@@ -5540,6 +5734,7 @@ export default function Admin() {
           {activeTab === 'support' && (isGlobalAdmin || isStaff) && <SupportTab />}
           {activeTab === 'audit' && (isGlobalAdmin || isStaff) && <AuditTab />}
           {activeTab === 'demo' && (isGlobalAdmin || isStaff) && <DemoTab />}
+          {activeTab === 'email' && (isGlobalAdmin || isStaff) && <EmailAnalyticsTab />}
           {activeTab === 'debugging' && (isGlobalAdmin || isStaff) && <DebuggingTab />}
           {activeTab === 'config' && isGlobalAdmin && <ConfigTab />}
         </div>

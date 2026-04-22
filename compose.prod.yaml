@@ -1,0 +1,23 @@
+# Production compose — pulls pre-built images from GHCR instead of building
+# locally. Used in combination with compose.yaml via an explicit -f flag:
+#
+#   docker compose -f compose.yaml -f compose.prod.yaml pull
+#   docker compose -f compose.yaml -f compose.prod.yaml up -d
+#
+# VANDALIZER_VERSION must be set (e.g. v2026.04.1) in the environment or .env
+# file in the same directory. The upgrade.sh wrapper manages this.
+services:
+  api:
+    build: !reset null
+    image: ghcr.io/ui-insight/vandalizer-backend:${VANDALIZER_VERSION:?VANDALIZER_VERSION must be set}
+    pull_policy: always
+
+  celery:
+    build: !reset null
+    image: ghcr.io/ui-insight/vandalizer-backend:${VANDALIZER_VERSION:?VANDALIZER_VERSION must be set}
+    pull_policy: always
+
+  frontend:
+    build: !reset null
+    image: ghcr.io/ui-insight/vandalizer-frontend:${VANDALIZER_VERSION:?VANDALIZER_VERSION must be set}
+    pull_policy: always

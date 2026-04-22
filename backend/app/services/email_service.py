@@ -8,17 +8,20 @@ import aiosmtplib
 import httpx
 
 from app.config import Settings
+from app.models.email_log import EmailLog
 
 logger = logging.getLogger(__name__)
 
 RESEND_API_URL = "https://api.resend.com/emails"
 
+_ERROR_MAX_LEN = 500
 
-async def _send_via_smtp(to: str, subject: str, html_body: str, settings: Settings) -> bool:
-    """Send an HTML email via SMTP."""
+
+async def _send_via_smtp(to: str, subject: str, html_body: str, settings: Settings) -> tuple[bool, str | None]:
+    """Send an HTML email via SMTP. Returns (success, error_message)."""
     if not settings.smtp_host:
         logger.warning("SMTP not configured — skipping email to %s", to)
-        return False
+        return False, "SMTP not configured"
 
     msg = MIMEMultipart("alternative")
     msg["From"] = f"{settings.smtp_from_name} <{settings.smtp_from_email}>"
@@ -37,17 +40,17 @@ async def _send_via_smtp(to: str, subject: str, html_body: str, settings: Settin
             start_tls=settings.smtp_start_tls,
         )
         logger.info("Email sent via SMTP to %s: %s", to, subject)
-        return True
-    except Exception:
+        return True, None
+    except Exception as exc:
         logger.exception("Failed to send email via SMTP to %s", to)
-        return False
+        return False, f"{type(exc).__name__}: {exc}"[:_ERROR_MAX_LEN]
 
 
-async def _send_via_resend(to: str, subject: str, html_body: str, settings: Settings) -> bool:
-    """Send an HTML email via the Resend API (httpx)."""
+async def _send_via_resend(to: str, subject: str, html_body: str, settings: Settings) -> tuple[bool, str | None]:
+    """Send an HTML email via the Resend API (httpx). Returns (success, error_message)."""
     if not settings.resend_api_key:
         logger.warning("Resend API key not configured — skipping email to %s", to)
-        return False
+        return False, "Resend API key not configured"
 
     from_addr = f"{settings.resend_from_name} <{settings.resend_from_email}>"
     try:
@@ -65,20 +68,56 @@ async def _send_via_resend(to: str, subject: str, html_body: str, settings: Sett
             )
             resp.raise_for_status()
         logger.info("Email sent via Resend to %s: %s", to, subject)
-        return True
-    except Exception:
+        return True, None
+    except httpx.HTTPStatusError as exc:
         logger.exception("Failed to send email via Resend to %s", to)
-        return False
+        body = exc.response.text if exc.response is not None else ""
+        return False, f"HTTP {exc.response.status_code}: {body}"[:_ERROR_MAX_LEN]
+    except Exception as exc:
+        logger.exception("Failed to send email via Resend to %s", to)
+        return False, f"{type(exc).__name__}: {exc}"[:_ERROR_MAX_LEN]
 
 
-async def send_email(to: str, subject: str, html_body: str, settings: Settings | None = None) -> bool:
-    """Send an HTML email using the configured provider. Returns True on success."""
+async def _log_send(
+    recipient: str, subject: str, email_type: str, provider: str,
+    success: bool, error: str | None,
+) -> None:
+    """Persist an EmailLog row. Never raises."""
+    try:
+        await EmailLog(
+            recipient=recipient,
+            subject=subject,
+            email_type=email_type,
+            provider=provider,
+            status="sent" if success else "failed",
+            error=error,
+        ).insert()
+    except Exception:
+        logger.exception("Failed to persist EmailLog for %s", recipient)
+
+
+async def send_email(
+    to: str,
+    subject: str,
+    html_body: str,
+    settings: Settings | None = None,
+    email_type: str = "other",
+) -> bool:
+    """Send an HTML email using the configured provider. Returns True on success.
+
+    Every attempt is persisted to the email_log collection for admin analytics.
+    """
     if settings is None:
         settings = Settings()
 
-    if settings.email_provider == "resend":
-        return await _send_via_resend(to, subject, html_body, settings)
-    return await _send_via_smtp(to, subject, html_body, settings)
+    provider = settings.email_provider if settings.email_provider == "resend" else "smtp"
+    if provider == "resend":
+        success, error = await _send_via_resend(to, subject, html_body, settings)
+    else:
+        success, error = await _send_via_smtp(to, subject, html_body, settings)
+
+    await _log_send(to, subject, email_type, provider, success, error)
+    return success
 
 
 # ---------------------------------------------------------------------------
@@ -130,18 +169,40 @@ def waitlist_confirmation_email(name: str, position: int, frontend_url: str, sta
     return subject, html
 
 
-def activation_email(name: str, user_id: str, password: str, expires_at: str, frontend_url: str) -> tuple[str, str]:
+_CODE_STYLE = (
+    "font-family:'SF Mono',Monaco,Consolas,'Courier New',monospace;"
+    "background:#0a0a0a;color:#fff;padding:3px 8px;border-radius:4px;"
+    "border:1px solid rgba(255,255,255,0.15);font-size:14px;"
+    "white-space:nowrap;user-select:all;-webkit-user-select:all;letter-spacing:0.5px;"
+)
+
+
+def activation_email(
+    name: str,
+    user_id: str,
+    password: str,
+    expires_at: str,
+    frontend_url: str,
+    magic_link: str | None = None,
+) -> tuple[str, str]:
     """Returns (subject, html_body) for demo account activation."""
     subject = "Your Vandalizer Demo Account is Ready!"
+    if magic_link:
+        magic_section = f"""
+      <p style="margin-top:24px"><a class="btn" href="{magic_link}">Click here to sign in</a></p>
+      <p style="font-size:13px;color:#6b7280">This one-click link expires in 48 hours. If it doesn't work, use the credentials below.</p>
+      <p style="margin-top:24px">Or sign in manually:</p>"""
+    else:
+        magic_section = ""
     html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
     <div class="container"><div class="card">
       <div class="logo">Vandalizer</div>
       <h1>Your demo account is active!</h1>
-      <p>Hi {name}, great news &mdash; your Vandalizer demo account is ready to go. You have <span class="highlight">2 weeks</span> of full platform access.</p>
-      <p><strong style="color:#fff">Username:</strong> {user_id}<br/>
-         <strong style="color:#fff">Password:</strong> {password}</p>
+      <p>Hi {name}, great news &mdash; your Vandalizer demo account is ready to go. You have <span class="highlight">2 weeks</span> of full platform access.</p>{magic_section}
+      <p><strong style="color:#fff">Username:</strong> <code style="{_CODE_STYLE}">{user_id}</code><br/><br/>
+         <strong style="color:#fff">Password:</strong> <code style="{_CODE_STYLE}">{password}</code></p>
       <p>Your trial expires on <span class="highlight">{expires_at}</span>.</p>
-      <p style="margin-top:24px"><a class="btn" href="{frontend_url}/login">Sign In Now</a></p>
+      <p style="margin-top:24px"><a class="btn" href="{frontend_url}/login">Sign In with Credentials</a></p>
       <div class="footer">Vandalizer</div>
     </div></div></body></html>"""
     return subject, html

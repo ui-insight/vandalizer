@@ -41,6 +41,7 @@ from app.models.notification import Notification
 from app.models.support import SupportTicket
 from app.models.feedback_prompt import FeedbackPrompt, FeedbackPromptResponse
 from app.models.user_memory import UserMemory
+from app.models.email_log import EmailLog
 
 ALL_MODELS = [
     User,
@@ -100,6 +101,7 @@ ALL_MODELS = [
     FeedbackPrompt,
     FeedbackPromptResponse,
     UserMemory,
+    EmailLog,
 ]
 
 

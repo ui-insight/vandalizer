@@ -116,16 +116,6 @@ export function ExtractionEditorPanel() {
     getQualityStatus(openExtractionId).then(setQualityStatus).catch(() => {})
   }, [openExtractionId, refreshSparkline])
 
-  // Clear stale results when document selection changes
-  const prevDocUuidsRef = useRef(selectedDocUuids)
-  useEffect(() => {
-    if (prevDocUuidsRef.current !== selectedDocUuids) {
-      prevDocUuidsRef.current = selectedDocUuids
-      setResultSets([])
-      setActiveResultIdx(0)
-    }
-  }, [selectedDocUuids])
-
   // Nudge dismissal state
   useEffect(() => {
     if (!openExtractionId) return
@@ -537,8 +527,13 @@ export function ExtractionEditorPanel() {
               if (!f) return
               e.target.value = ''
               try {
-                const result = await importSearchSet(f)
-                openExtraction(result.uuid)
+                const result = await importSearchSet(f, openExtractionId ?? undefined)
+                if (openExtractionId) {
+                  await refresh()
+                  await refreshItems()
+                } else {
+                  openExtraction(result.uuid)
+                }
               } catch (err: unknown) {
                 alert(err instanceof Error ? err.message : 'Import failed')
               }

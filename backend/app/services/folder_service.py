@@ -34,6 +34,7 @@ async def create_folder(
         parent_id=parent_id,
         user_id=user.user_id if not effective_team_id else None,
         team_id=effective_team_id,
+        created_by=user.user_id,
         uuid=uuid.uuid4().hex,
     )
     await folder.insert()

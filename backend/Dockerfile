@@ -11,13 +11,20 @@ RUN uv sync --frozen --no-dev
 # ---------------------------------------------------------------------------
 FROM python:3.12-slim AS runtime
 
+# Build-time version identifier (release tag, SHA, or "dev"). Written to
+# /app/VERSION so the app can self-report its version at runtime.
+ARG VERSION=dev
+
 RUN groupadd --gid 1000 appuser && \
     useradd --uid 1000 --gid appuser --create-home appuser
 
 WORKDIR /app
 
 ENV VIRTUAL_ENV=/app/.venv \
-    PATH="/app/.venv/bin:$PATH"
+    PATH="/app/.venv/bin:$PATH" \
+    VANDALIZER_VERSION=${VERSION}
+
+RUN echo "${VERSION}" > /app/VERSION
 
 COPY --from=builder /app/.venv /app/.venv
 

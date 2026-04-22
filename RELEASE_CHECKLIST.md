@@ -58,18 +58,20 @@ The canonical `bootstrap_install.py` entrypoint is covered directly in the backe
 
 ## 5. Tag And Publish
 
-When the candidate is approved:
+When the candidate is approved, from a clean `main` that is in sync with `origin/main`:
 
 ```bash
-git tag -a vX.Y.Z -m "Release vX.Y.Z"
-git push origin vX.Y.Z
+./scripts/cut_release.sh --dry-run   # preview the tag and commit list
+./scripts/cut_release.sh             # prompts, then creates and pushes the tag
 ```
 
-The tagged GitHub Actions release workflow will:
+The script computes the next CalVer tag (`vYYYY.MM.N`), refuses to run if the tree is dirty or out of sync with origin, and pushes an annotated tag. Pushing the tag triggers the release workflow, which will:
 
 - rerun `make release-check`
 - publish versioned backend and frontend GHCR images
 - create the GitHub release entry for the tag
+
+If you need to cut a SemVer-style tag instead (`vMAJOR.MINOR.PATCH`), tag manually — the release workflow accepts both since both match `v*.*.*`.
 
 ## 6. Finalize Operator Notes
 

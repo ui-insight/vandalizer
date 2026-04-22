@@ -2018,24 +2018,42 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
             )}
 
             {task.name === 'Prompt' && (
-              <div>
-                <label style={{
-                  display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8,
-                }}>
-                  Prompt
-                </label>
-                <textarea
-                  value={getTextValue('prompt')}
-                  onChange={e => setTextValue('prompt', e.target.value)}
-                  placeholder="e.g., Summarize this for me into a todo list"
-                  rows={10}
-                  style={{
-                    width: '100%', padding: '10px 12px', fontSize: 14,
-                    fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
-                    outline: 'none', resize: 'vertical', boxSizing: 'border-box',
-                    lineHeight: 1.5,
-                  }}
-                />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                    Prompt Name
+                  </label>
+                  <input
+                    type="text"
+                    value={getTextValue('name')}
+                    onChange={e => setTextValue('name', e.target.value)}
+                    placeholder="Name for this prompt task"
+                    style={{
+                      width: '100%', padding: '8px 12px', fontSize: 13,
+                      fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
+                      outline: 'none', boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{
+                    display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8,
+                  }}>
+                    Prompt
+                  </label>
+                  <textarea
+                    value={getTextValue('prompt')}
+                    onChange={e => setTextValue('prompt', e.target.value)}
+                    placeholder="e.g., Summarize this for me into a todo list"
+                    rows={10}
+                    style={{
+                      width: '100%', padding: '10px 12px', fontSize: 14,
+                      fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
+                      outline: 'none', resize: 'vertical', boxSizing: 'border-box',
+                      lineHeight: 1.5,
+                    }}
+                  />
+                </div>
               </div>
             )}
 

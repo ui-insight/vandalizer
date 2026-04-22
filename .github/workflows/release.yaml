@@ -63,6 +63,8 @@ jobs:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
           push: true
+          build-args: |
+            VERSION=${{ github.ref_name }}
           tags: ghcr.io/${{ github.repository }}-${{ matrix.image_name }}:${{ github.ref_name }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}

@@ -450,7 +450,7 @@ async def _notify_support_contacts_new_ticket(ticket: SupportTicket) -> None:
                 ticket_uuid=ticket.uuid,
                 frontend_url=settings.frontend_url,
             )
-            await send_email(email, subject, html, settings)
+            await send_email(email, subject, html, settings, email_type="support_new_ticket")
 
 
 async def _notify_support_contacts_new_message(
@@ -486,7 +486,7 @@ async def _notify_support_contacts_new_message(
                     ticket_uuid=ticket.uuid,
                     frontend_url=settings.frontend_url,
                 )
-                await send_email(email, subject, html, settings)
+                await send_email(email, subject, html, settings, email_type="support_new_message")
 
 
 async def _email_ticket_owner_reply(
@@ -507,7 +507,7 @@ async def _email_ticket_owner_reply(
         ticket_uuid=ticket.uuid,
         frontend_url=settings.frontend_url,
     )
-    await send_email(owner.email, subject, html, settings)
+    await send_email(owner.email, subject, html, settings, email_type="support_reply")
 
 
 async def _email_ticket_owner_status(
@@ -526,7 +526,7 @@ async def _email_ticket_owner_status(
         ticket_uuid=ticket.uuid,
         frontend_url=settings.frontend_url,
     )
-    await send_email(owner.email, subject, html, settings)
+    await send_email(owner.email, subject, html, settings, email_type="support_status")
 
 
 # ---------------------------------------------------------------------------

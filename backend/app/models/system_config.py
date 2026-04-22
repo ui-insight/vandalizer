@@ -111,6 +111,9 @@ class SystemConfig(Document):
     ocr_api_key: str = ""
     llm_endpoint: str = ""
     available_models: list[dict] = []
+    # Name of the model to use when no explicit model is chosen. Empty = fall
+    # back to the first entry in available_models.
+    default_model: str = ""
 
     # Legacy fields kept for backwards compatibility
     extraction_model: str = ""

@@ -9,11 +9,13 @@ from bson import ObjectId as BsonObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from app.config import Settings
 from app.dependencies import get_current_user
 from app.models.activity import ActivityEvent
 from app.models.audit_log import AdminAuditLog
 from app.models.system_config import SystemConfig
 from app.services.llm_service import clear_agent_caches, get_agent_model
+from app.services.version_service import get_update_status
 from app.utils.encryption import decrypt_value, encrypt_value
 from app.models.team import Team, TeamMembership
 from app.models.user import User
@@ -1222,6 +1224,7 @@ async def get_config(
         "auth_methods": cfg.auth_methods,
         "oauth_providers": _sanitize_providers(cfg.oauth_providers),
         "available_models": _sanitize_models(cfg.available_models),
+        "default_model": cfg.default_model or "",
         "ocr_endpoint": cfg.ocr_endpoint,
         "ocr_api_key": "***" if decrypt_value(cfg.ocr_api_key) else "",
         "llm_endpoint": cfg.llm_endpoint,
@@ -1332,6 +1335,7 @@ async def update_model(
     else:
         new_api_key = encrypt_value(new_api_key)
 
+    prev_name = cfg.available_models[index].get("name", "")
     cfg.available_models[index] = {
         "name": body.name,
         "tag": body.tag,
@@ -1348,13 +1352,16 @@ async def update_model(
         "supports_pdf": body.supports_pdf,
         "context_window": body.context_window,
     }
+    # Keep default_model pointer stable when the default is renamed.
+    if cfg.default_model and cfg.default_model == prev_name and body.name != prev_name:
+        cfg.default_model = body.name
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
     cfg.updated_by = user.user_id
     await cfg.save()
     clear_agent_caches()
     await _audit(user, "update_model", f"Updated model at index {index}: {body.tag}")
 
-    return {"status": "ok", "models": _sanitize_models(cfg.available_models)}
+    return {"status": "ok", "models": _sanitize_models(cfg.available_models), "default_model": cfg.default_model or ""}
 
 
 # ---------------------------------------------------------------------------
@@ -1373,13 +1380,52 @@ async def delete_model(
         raise HTTPException(status_code=404, detail="Model index out of range")
 
     removed = cfg.available_models.pop(index)
+    # Clear default_model if we just deleted it.
+    if cfg.default_model and cfg.default_model == removed.get("name", ""):
+        cfg.default_model = ""
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
     cfg.updated_by = user.user_id
     await cfg.save()
     clear_agent_caches()
     await _audit(user, "delete_model", f"Deleted model at index {index}: {removed.get('tag', '?')}")
 
-    return {"status": "ok", "removed": removed, "models": cfg.available_models}
+    return {"status": "ok", "removed": removed, "models": cfg.available_models, "default_model": cfg.default_model or ""}
+
+
+# ---------------------------------------------------------------------------
+# 8b. PUT /config/models/default  - Set (or clear) the system default model
+# ---------------------------------------------------------------------------
+
+class DefaultModelRequest(BaseModel):
+    name: str = ""
+
+
+@router.put("/config/models/default")
+async def set_default_model(
+    body: DefaultModelRequest,
+    user: User = Depends(get_current_user),
+):
+    await _require_superadmin(user)
+
+    cfg = await SystemConfig.get_config()
+    name = (body.name or "").strip()
+
+    if name:
+        match = next(
+            (m for m in cfg.available_models if isinstance(m, dict) and m.get("name") == name),
+            None,
+        )
+        if not match:
+            raise HTTPException(status_code=404, detail=f"Model '{name}' is not configured")
+
+    cfg.default_model = name
+    cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
+    cfg.updated_by = user.user_id
+    await cfg.save()
+    clear_agent_caches()
+    await _audit(user, "set_default_model", f"Default model: {name or '(cleared)'}")
+
+    return {"status": "ok", "default_model": cfg.default_model or ""}
 
 
 # ---------------------------------------------------------------------------
@@ -1989,3 +2035,148 @@ async def test_model(index: int, user: User = Depends(get_current_user)):
         }
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Model test failed: {e}")
+
+
+# ---------------------------------------------------------------------------
+# Version / update check
+# ---------------------------------------------------------------------------
+
+
+@router.get("/system/version")
+async def get_system_version(user: User = Depends(get_current_user)) -> dict:
+    """Report the running version and whether an upstream release is newer."""
+    await _require_admin(user)
+    return await get_update_status(Settings())
+
+
+# ---------------------------------------------------------------------------
+# Email analytics — deliverability monitoring
+# ---------------------------------------------------------------------------
+
+
+class EmailDailyPoint(BaseModel):
+    date: str  # YYYY-MM-DD (UTC)
+    sent: int
+    failed: int
+
+
+class EmailTypeRow(BaseModel):
+    email_type: str
+    sent: int
+    failed: int
+    success_rate: float  # 0..1, or 1.0 when no attempts (vacuously healthy)
+
+
+class EmailFailureRow(BaseModel):
+    created_at: datetime.datetime
+    recipient: str
+    email_type: str
+    provider: str
+    subject: str
+    error: Optional[str] = None
+
+
+class EmailAnalyticsResponse(BaseModel):
+    window_days: int
+    total_sent: int
+    total_failed: int
+    success_rate: float
+    by_day: list[EmailDailyPoint]
+    by_type: list[EmailTypeRow]
+    recent_failures: list[EmailFailureRow]
+    providers: list[str]
+
+
+@router.get("/email-analytics", response_model=EmailAnalyticsResponse)
+async def email_analytics(
+    days: int = Query(default=30, ge=1, le=365),
+    user: User = Depends(get_current_user),
+) -> EmailAnalyticsResponse:
+    """Deliverability stats over the last `days` days.
+
+    Returns totals, a daily time series, per-email-type breakdown with success
+    rate, and the most recent failures so admins can spot configuration issues.
+    """
+    await _require_admin(user)
+
+    from app.models.email_log import EmailLog
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    cutoff = now - datetime.timedelta(days=days)
+
+    logs = await EmailLog.find(EmailLog.created_at >= cutoff).to_list()
+
+    total_sent = 0
+    total_failed = 0
+    day_buckets: dict[str, dict[str, int]] = {}
+    type_buckets: dict[str, dict[str, int]] = {}
+    providers: set[str] = set()
+
+    for i in range(days):
+        d = (now - datetime.timedelta(days=days - 1 - i)).strftime("%Y-%m-%d")
+        day_buckets[d] = {"sent": 0, "failed": 0}
+
+    for log in logs:
+        key = log.created_at.strftime("%Y-%m-%d")
+        bucket = day_buckets.setdefault(key, {"sent": 0, "failed": 0})
+        t_bucket = type_buckets.setdefault(log.email_type, {"sent": 0, "failed": 0})
+        providers.add(log.provider)
+
+        if log.status == "sent":
+            total_sent += 1
+            bucket["sent"] += 1
+            t_bucket["sent"] += 1
+        else:
+            total_failed += 1
+            bucket["failed"] += 1
+            t_bucket["failed"] += 1
+
+    by_day = [
+        EmailDailyPoint(date=d, sent=v["sent"], failed=v["failed"])
+        for d, v in sorted(day_buckets.items())
+    ]
+
+    by_type: list[EmailTypeRow] = []
+    for et, v in sorted(type_buckets.items()):
+        attempts = v["sent"] + v["failed"]
+        rate = (v["sent"] / attempts) if attempts else 1.0
+        by_type.append(
+            EmailTypeRow(
+                email_type=et,
+                sent=v["sent"],
+                failed=v["failed"],
+                success_rate=round(rate, 4),
+            )
+        )
+    by_type.sort(key=lambda r: r.sent + r.failed, reverse=True)
+
+    failures = await EmailLog.find(
+        EmailLog.created_at >= cutoff,
+        EmailLog.status == "failed",
+    ).sort(-EmailLog.created_at).limit(25).to_list()
+
+    recent_failures = [
+        EmailFailureRow(
+            created_at=f.created_at,
+            recipient=f.recipient,
+            email_type=f.email_type,
+            provider=f.provider,
+            subject=f.subject,
+            error=f.error,
+        )
+        for f in failures
+    ]
+
+    total_attempts = total_sent + total_failed
+    overall_rate = (total_sent / total_attempts) if total_attempts else 1.0
+
+    return EmailAnalyticsResponse(
+        window_days=days,
+        total_sent=total_sent,
+        total_failed=total_failed,
+        success_rate=round(overall_rate, 4),
+        by_day=by_day,
+        by_type=by_type,
+        recent_failures=recent_failures,
+        providers=sorted(providers),
+    )

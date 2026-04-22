@@ -179,7 +179,34 @@ async def _send_invite_email(
 
     accept_url = f"{settings.frontend_url}/invite?token={invite.token}"
     subject, html = team_invite_email(inviter_name, team.name, invite.role, accept_url)
-    await send_email(invite.email, subject, html, settings)
+    await send_email(invite.email, subject, html, settings, email_type="team_invite")
+
+
+async def get_invite_info(token: str) -> dict | None:
+    """Return metadata about an invite token, or None if missing/expired/accepted.
+
+    Public — used so an unauthenticated invitee can see which team invited them
+    before signing up or logging in.
+    """
+    invite = await TeamInvite.find_one(TeamInvite.token == token)
+    if not invite:
+        return None
+    if invite.accepted:
+        return None
+    expired = bool(
+        invite.created_at
+        and (datetime.datetime.now() - invite.created_at).days > INVITE_EXPIRY_DAYS
+    )
+    team = await Team.get(invite.team)
+    inviter = await User.find_one(User.user_id == invite.invited_by_user_id)
+    return {
+        "email": invite.email,
+        "role": invite.role,
+        "team_name": team.name if team else "a team",
+        "team_uuid": team.uuid if team else None,
+        "inviter_name": (inviter.name or inviter.user_id) if inviter else None,
+        "expired": expired,
+    }
 
 
 async def accept_invite(token: str, user: User) -> Team:
@@ -212,14 +239,17 @@ async def accept_invite(token: str, user: User) -> Team:
         existing.role = invite.role
         await existing.save()
 
+    was_new_acceptance = not invite.accepted
     invite.accepted = True
     await invite.save()
 
     user.current_team = team.id
     await user.save()
 
-    # Notify the inviter that the invitation was accepted
-    await _notify_invite_accepted(invite, team, user)
+    # Notify the inviter only the first time — later re-accepts (e.g. a
+    # register-then-explicit-accept sequence) must not fire duplicate emails.
+    if was_new_acceptance:
+        await _notify_invite_accepted(invite, team, user)
 
     return team
 
@@ -256,7 +286,7 @@ async def _notify_invite_accepted(
             team_name=team.name,
             frontend_url=settings.frontend_url,
         )
-        await send_email(inviter.email, subject, html, settings)
+        await send_email(inviter.email, subject, html, settings, email_type="team_member_joined")
 
 
 async def switch_team(team_uuid: str, user: User) -> Team:

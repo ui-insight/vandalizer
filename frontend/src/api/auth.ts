@@ -37,10 +37,16 @@ export function login(user_id: string, password: string) {
   })
 }
 
-export function register(user_id: string, email: string, password: string, name?: string) {
+export function register(
+  user_id: string,
+  email: string,
+  password: string,
+  name?: string,
+  invite_token?: string,
+) {
   return apiFetch<User>('/api/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ user_id, email, password, name }),
+    body: JSON.stringify({ user_id, email, password, name, invite_token }),
   })
 }
 
