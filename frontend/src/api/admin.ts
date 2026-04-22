@@ -447,3 +447,42 @@ export function getQualityItems(sort = 'score', order = 'asc', limit = 100) {
 export function getQualityItemDetail(itemKind: string, itemId: string) {
   return apiFetch<QualityItemDetail>(`/api/admin/quality/items/${itemKind}/${itemId}`)
 }
+
+// Email analytics
+
+export interface EmailDailyPoint {
+  date: string
+  sent: number
+  failed: number
+}
+
+export interface EmailTypeRow {
+  email_type: string
+  sent: number
+  failed: number
+  success_rate: number
+}
+
+export interface EmailFailureRow {
+  created_at: string
+  recipient: string
+  email_type: string
+  provider: string
+  subject: string
+  error: string | null
+}
+
+export interface EmailAnalyticsResponse {
+  window_days: number
+  total_sent: number
+  total_failed: number
+  success_rate: number
+  by_day: EmailDailyPoint[]
+  by_type: EmailTypeRow[]
+  recent_failures: EmailFailureRow[]
+  providers: string[]
+}
+
+export function getEmailAnalytics(days: number = 30) {
+  return apiFetch<EmailAnalyticsResponse>(`/api/admin/email-analytics?days=${days}`)
+}

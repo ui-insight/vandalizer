@@ -92,7 +92,7 @@ async def process_onboarding_drips(settings: Settings | None = None) -> int:
             module_description=module["description"],
             frontend_url=settings.frontend_url,
         )
-        success = await send_email(user.email, subject, html, settings)
+        success = await send_email(user.email, subject, html, settings, email_type="onboarding_drip")
         if success:
             sent += 1
 
@@ -154,7 +154,7 @@ async def process_inactivity_nudges(settings: Settings | None = None) -> int:
             new_items=new_items,
             frontend_url=settings.frontend_url,
         )
-        success = await send_email(user.email, subject, html, settings)
+        success = await send_email(user.email, subject, html, settings, email_type="inactivity_nudge")
         if success:
             sent += 1
 

@@ -53,7 +53,7 @@ def _notify_approval_reviewers_sync(
             )
             try:
                 loop = asyncio.new_event_loop()
-                loop.run_until_complete(send_email(user_doc["email"], subject, html, settings))
+                loop.run_until_complete(send_email(user_doc["email"], subject, html, settings, email_type="approval_request"))
                 loop.close()
             except Exception:
                 logger.exception("Failed to send approval email to %s", user_id)
