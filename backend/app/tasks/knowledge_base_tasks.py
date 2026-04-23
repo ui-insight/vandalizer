@@ -7,6 +7,8 @@ Uses pymongo (sync) for DB access.
 import datetime
 import logging
 
+import httpx
+
 from app.celery_app import celery_app
 from app.tasks import TRANSIENT_EXCEPTIONS
 
@@ -167,7 +169,6 @@ def kb_ingest_url(self, source_uuid: str) -> None:
             return
 
         # Fetch URL content
-        import httpx
         from bs4 import BeautifulSoup
         from app.utils.url_validation import validate_outbound_url
 
@@ -222,6 +223,20 @@ def kb_ingest_url(self, source_uuid: str) -> None:
             },
         )
 
+    except httpx.HTTPStatusError as e:
+        if 400 <= e.response.status_code < 500:
+            logger.warning("URL source %s returned %d: %s", source_uuid, e.response.status_code, e.request.url)
+            db.knowledge_base_sources.update_one(
+                {"uuid": source_uuid},
+                {"$set": {"status": "error", "error_message": str(e)[:2000]}},
+            )
+        else:
+            logger.error("Error ingesting URL source %s: %s", source_uuid, e)
+            db.knowledge_base_sources.update_one(
+                {"uuid": source_uuid},
+                {"$set": {"status": "error", "error_message": str(e)[:2000]}},
+            )
+            raise
     except Exception as e:
         logger.error("Error ingesting URL source %s: %s", source_uuid, e)
         db.knowledge_base_sources.update_one(

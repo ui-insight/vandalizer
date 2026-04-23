@@ -791,6 +791,15 @@ async def _ingest_url_source(
         source.processed_at = datetime.datetime.now(tz=datetime.timezone.utc)
         await source.save()
         return raw_html
+    except httpx.HTTPStatusError as e:
+        if 400 <= e.response.status_code < 500:
+            logger.warning("URL source %s returned %d: %s", source.uuid, e.response.status_code, e.request.url)
+        else:
+            logger.error(f"Error ingesting URL source {source.uuid}: {e}")
+        source.status = "error"
+        source.error_message = str(e)[:2000]
+        await source.save()
+        return None
     except Exception as e:
         logger.error(f"Error ingesting URL source {source.uuid}: {e}")
         source.status = "error"
