@@ -613,10 +613,16 @@ async def run_extraction_integrated(
     request: Request,
     search_set_uuid: str = Form(...),
     document_uuids: Optional[str] = Form(None),
+    text: Optional[str] = Form(None),
+    text_title: Optional[str] = Form(None),
     files: list[UploadFile] = File(default=[]),
     user: User = Depends(get_api_key_user),
 ) -> dict:
-    """Run extraction via external API. Accepts optional file uploads and/or existing document UUIDs."""
+    """Run extraction via external API.
+
+    Accepts any combination of file uploads, existing document UUIDs, and a
+    raw ``text`` payload. At least one must be provided.
+    """
     import uuid as _uuid
     from pathlib import Path
     from app.config import Settings
@@ -629,6 +635,25 @@ async def run_extraction_integrated(
     # Parse existing document UUIDs
     if document_uuids:
         all_doc_uuids.extend(u.strip() for u in document_uuids.split(",") if u.strip())
+
+    # Handle raw text — store as a SmartDocument with raw_text set, skipping
+    # the file pipeline since there's nothing to parse.
+    if text and text.strip():
+        uid = _uuid.uuid4().hex.upper()
+        doc = SmartDocument(
+            title=(text_title or "API text input")[:200],
+            processing=False,
+            valid=True,
+            raw_text=text,
+            downloadpath="",
+            path="",
+            extension="txt",
+            uuid=uid,
+            user_id=user.user_id,
+            folder="0",
+        )
+        await doc.insert()
+        all_doc_uuids.append(uid)
 
     # Handle file uploads
     for upload in files:
@@ -666,7 +691,10 @@ async def run_extraction_integrated(
         all_doc_uuids.append(uid)
 
     if not all_doc_uuids:
-        raise HTTPException(status_code=400, detail="No documents or files provided")
+        raise HTTPException(
+            status_code=400,
+            detail="Provide at least one of: files, document_uuids, text",
+        )
 
     # Look up the search set
     ss = await _get_search_set_or_404(search_set_uuid, user)

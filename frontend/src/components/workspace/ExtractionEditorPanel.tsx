@@ -1732,6 +1732,25 @@ print(response.json())`
   -F "search_set_uuid=${searchSetUuid}" \\
   -F "document_uuids=UUID1,UUID2"`
 
+  const pythonTextSnippet = `import requests
+
+response = requests.post(
+    "${endpoint}",
+    headers={"x-api-key": "YOUR_API_KEY"},
+    data={
+        "search_set_uuid": "${searchSetUuid}",
+        "text": "Paste or stream the document text you want to extract from here.",
+        # Optional: "text_title": "Invoice #1234",
+    },
+)
+print(response.json())`
+
+  const curlTextSnippet = `curl -X POST "${endpoint}" \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -F "search_set_uuid=${searchSetUuid}" \\
+  -F "text=Paste or stream the document text you want to extract from here." \\
+  -F "text_title=Invoice #1234"`
+
   const statusSnippet = lang === 'python'
     ? `# Check extraction status by activity_id
 response = requests.get(
@@ -1816,6 +1835,15 @@ print(response.json())`
           style={codeBlockStyle}
         />
 
+        <ApiCodeBlock
+          title="Submit raw text"
+          code={lang === 'python' ? pythonTextSnippet : curlTextSnippet}
+          id="text"
+          copied={copied}
+          onCopy={copyToClipboard}
+          style={codeBlockStyle}
+        />
+
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
             Response
@@ -1844,8 +1872,10 @@ print(response.json())`
 
       <div style={{ fontSize: 11, color: '#9ca3af', lineHeight: 1.6, marginTop: 8 }}>
         Parameters: <code>search_set_uuid</code> (required), <code>files</code> (optional, multipart uploads),{' '}
-        <code>document_uuids</code> (optional, comma-separated UUIDs of existing documents). At least one of{' '}
-        <code>files</code> or <code>document_uuids</code> must be provided.
+        <code>document_uuids</code> (optional, comma-separated UUIDs of existing documents),{' '}
+        <code>text</code> (optional, raw text to extract from) with an optional{' '}
+        <code>text_title</code>. At least one of <code>files</code>, <code>document_uuids</code>, or{' '}
+        <code>text</code> must be provided.
       </div>
     </div>
   )
