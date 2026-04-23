@@ -7,6 +7,7 @@ import uuid as uuid_mod
 from typing import TYPE_CHECKING
 
 from beanie import PydanticObjectId
+from bson import ObjectId
 from celery.result import AsyncResult
 
 from app.celery_app import celery_app
@@ -34,6 +35,20 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 # Workflow CRUD
 # ---------------------------------------------------------------------------
+
+
+def _sanitize_for_json(value):
+    """Recursively convert ObjectId → str so free-form dict fields serialize cleanly."""
+    if isinstance(value, ObjectId):
+        return str(value)
+    if isinstance(value, dict):
+        return {k: _sanitize_for_json(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_sanitize_for_json(v) for v in value]
+    if isinstance(value, tuple):
+        return tuple(_sanitize_for_json(v) for v in value)
+    return value
+
 
 async def create_workflow(name: str, user_id: str, description: str | None = None, team_id: str | None = None) -> Workflow:
     wf = Workflow(
@@ -107,12 +122,12 @@ async def get_workflow(workflow_id: str, user: User | None = None) -> dict | Non
                 tasks.append({
                     "id": str(task.id),
                     "name": task.name,
-                    "data": task.data,
+                    "data": _sanitize_for_json(task.data),
                 })
         steps.append({
             "id": str(step.id),
             "name": step.name,
-            "data": step.data,
+            "data": _sanitize_for_json(step.data),
             "is_output": step.is_output,
             "tasks": tasks,
         })
@@ -124,9 +139,9 @@ async def get_workflow(workflow_id: str, user: User | None = None) -> dict | Non
         "user_id": wf.user_id,
         "num_executions": wf.num_executions,
         "steps": steps,
-        "input_config": wf.input_config,
-        "validation_plan": wf.validation_plan,
-        "validation_inputs": wf.validation_inputs,
+        "input_config": _sanitize_for_json(wf.input_config),
+        "validation_plan": _sanitize_for_json(wf.validation_plan),
+        "validation_inputs": _sanitize_for_json(wf.validation_inputs),
     }
 
 
