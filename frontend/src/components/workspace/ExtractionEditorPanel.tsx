@@ -46,7 +46,7 @@ import DOMPurify from 'dompurify'
 
 marked.setOptions({ breaks: true, gfm: true })
 
-type Tab = 'design' | 'tools' | 'validate' | 'advanced' | 'history' | 'api'
+type Tab = 'design' | 'tools' | 'validate' | 'advanced' | 'history'
 
 interface ExtractionConfig {
   mode?: 'one_pass' | 'two_pass'
@@ -439,7 +439,7 @@ export function ExtractionEditorPanel() {
           flexShrink: 0,
         }}
       >
-        {(['design', 'tools', 'validate', 'advanced', 'history', 'api'] as const).map((tab) => {
+        {(['design', 'tools', 'validate', 'advanced', 'history'] as const).map((tab) => {
           const isActive = activeTab === tab
           // Colored dot for validate tab
           let tabDot: string | null = null
@@ -578,6 +578,7 @@ export function ExtractionEditorPanel() {
           useDefaults={useDefaults}
           onSetUseDefaults={setUseDefaults}
           onSaveConfig={saveConfig}
+          searchSetUuid={openExtractionId ?? undefined}
         />
       </div>
       <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: activeTab === 'history' ? undefined : 'none' }}>
@@ -587,9 +588,6 @@ export function ExtractionEditorPanel() {
             type="extraction"
           />
         )}
-      </div>
-      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: activeTab === 'api' ? undefined : 'none' }}>
-        {openExtractionId && <ApiTab searchSetUuid={openExtractionId} />}
       </div>
 
       {/* Nudge banner for unvalidated items */}
@@ -1500,11 +1498,13 @@ function AdvancedTab({
   useDefaults,
   onSetUseDefaults,
   onSaveConfig,
+  searchSetUuid,
 }: {
   config: ExtractionConfig
   useDefaults: boolean
   onSetUseDefaults: (v: boolean) => void
   onSaveConfig: (c: ExtractionConfig) => void
+  searchSetUuid?: string
 }) {
   const mode = config.mode ?? 'one_pass'
   const [models, setModels] = useState<ModelInfo[]>([])
@@ -1519,22 +1519,31 @@ function AdvancedTab({
     onSaveConfig({ ...config, ...patch })
   }
 
-  return (
-    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Use system defaults */}
-      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-        <input
-          type="checkbox"
-          checked={useDefaults}
-          onChange={(e) => onSetUseDefaults(e.target.checked)}
-        />
-        <span style={{ fontSize: 14, fontWeight: 500, color: '#202124' }}>
-          Use system defaults
-        </span>
-      </label>
+  const cardStyle: React.CSSProperties = {
+    padding: 16, backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb',
+  }
 
-      {!useDefaults && (
-        <>
+  return (
+    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
+          Extraction Settings
+        </div>
+
+        {/* Use system defaults */}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={useDefaults}
+            onChange={(e) => onSetUseDefaults(e.target.checked)}
+          />
+          <span style={{ fontSize: 14, fontWeight: 500, color: '#202124' }}>
+            Use system defaults
+          </span>
+        </label>
+
+        {!useDefaults && (
+          <>
           {/* Mode selector */}
           <div>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#202124', marginBottom: 6 }}>
@@ -1665,8 +1674,11 @@ function AdvancedTab({
               Run the extraction multiple times and use consensus to improve accuracy.
             </div>
           </div>
-        </>
-      )}
+          </>
+        )}
+      </div>
+
+      {searchSetUuid && <ApiTab searchSetUuid={searchSetUuid} />}
     </div>
   )
 }
@@ -1751,12 +1763,11 @@ print(response.json())`
   })
 
   return (
-    <div style={{ padding: 24 }}>
-      <div style={{ padding: 16, backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <label style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
-            Run this extraction via API
-          </label>
+    <div style={{ padding: 16, backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <label style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
+          Run this extraction via API
+        </label>
           <div style={{ display: 'flex', gap: 4 }}>
             <button onClick={() => setLang('python')} style={tabStyle(lang === 'python')}>Python</button>
             <button onClick={() => setLang('curl')} style={tabStyle(lang === 'curl')}>cURL</button>
@@ -1831,11 +1842,10 @@ print(response.json())`
           />
         </div>
 
-        <div style={{ fontSize: 11, color: '#9ca3af', lineHeight: 1.6, marginTop: 8 }}>
-          Parameters: <code>search_set_uuid</code> (required), <code>files</code> (optional, multipart uploads),{' '}
-          <code>document_uuids</code> (optional, comma-separated UUIDs of existing documents). At least one of{' '}
-          <code>files</code> or <code>document_uuids</code> must be provided.
-        </div>
+      <div style={{ fontSize: 11, color: '#9ca3af', lineHeight: 1.6, marginTop: 8 }}>
+        Parameters: <code>search_set_uuid</code> (required), <code>files</code> (optional, multipart uploads),{' '}
+        <code>document_uuids</code> (optional, comma-separated UUIDs of existing documents). At least one of{' '}
+        <code>files</code> or <code>document_uuids</code> must be provided.
       </div>
     </div>
   )
