@@ -53,11 +53,11 @@ const STATUS_MESSAGES: Record<string, { title: string; message: string }> = {
   },
   security: {
     title: 'Scanning Your Document for Security...',
-    message: "Please hang tight — we're checking for any sensitive information.",
+    message: "Please hang tight. We're checking for any sensitive information.",
   },
   readying: {
     title: 'Preparing Your Document...',
-    message: 'Almost done — indexing your document for search and analysis.',
+    message: 'Almost done. Indexing your document for search and analysis.',
   },
 }
 

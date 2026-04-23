@@ -87,7 +87,7 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
   }, [lastUploadedUuid, documents, onDocClick, clearLastUploaded])
 
   // Sort state
-  const [sort, setSort] = useState<SortState>({ column: 'name', direction: 'asc' })
+  const [sort, setSort] = useState<SortState>({ column: 'modified', direction: 'desc' })
   const handleSort = useCallback((column: SortColumn) => {
     setSort(prev =>
       prev.column === column

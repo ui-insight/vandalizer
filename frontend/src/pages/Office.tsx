@@ -286,8 +286,8 @@ export default function Office() {
                           <div className="text-sm font-medium text-gray-900">{intake.name}</div>
                           <div className="text-xs text-gray-500">
                             {typeInfo?.label || intake.intake_type}
-                            {intake.mailbox_address && ` — ${intake.mailbox_address}`}
-                            {intake.folder_path && ` — ${intake.folder_path}`}
+                            {intake.mailbox_address && ` · ${intake.mailbox_address}`}
+                            {intake.folder_path && ` · ${intake.folder_path}`}
                           </div>
                         </div>
                       </div>

@@ -1,4 +1,4 @@
-import { useEffect, Component, type ReactNode } from 'react'
+import { useEffect, Component, type ErrorInfo, type ReactNode } from 'react'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { RouterProvider } from '@tanstack/react-router'
 import { AuthProvider } from './contexts/AuthContext'
@@ -6,6 +6,7 @@ import { TeamProvider } from './contexts/TeamContext'
 import { ToastProvider } from './contexts/ToastContext'
 import { CertificationPanelProvider } from './contexts/CertificationPanelContext'
 import { queryClient } from './lib/queryClient'
+import { Sentry } from './lib/sentry'
 import { router } from './router'
 import { getThemeConfig } from './api/config'
 import { getContrastTextColor, getComplementaryColor, getHoverColor } from './utils/color'
@@ -21,6 +22,10 @@ class ErrorBoundary extends Component<
 
   static getDerivedStateFromError(error: Error) {
     return { hasError: true, error }
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    Sentry.captureException(error, { contexts: { react: { componentStack: info.componentStack } } })
   }
 
   render() {

@@ -41,9 +41,9 @@ export const MODULES: ModuleDefinition[] = [
       'Reflect on your own experience and comfort level with AI tools',
     ],
     tips: [
-      'There are no wrong answers on the self-assessment — it\'s for your own reflection',
+      'There are no wrong answers on the self-assessment; it\'s for your own reflection',
       'The key terms in this module will come up repeatedly in later modules',
-      'If you\'re skeptical about AI, that\'s healthy — this module is designed to give you an honest picture',
+      'If you\'re skeptical about AI, that\'s healthy. This module is designed to give you an honest picture',
     ],
     lessons: [
       {
@@ -55,9 +55,9 @@ export const MODULES: ModuleDefinition[] = [
         knowledgeCheck: {
           question: 'An LLM generates text by...',
           options: [
-            { text: 'Thinking through the problem logically, like a human would', correct: false, explanation: 'LLMs don\'t "think" — they predict patterns based on training data.' },
+            { text: 'Thinking through the problem logically, like a human would', correct: false, explanation: 'LLMs don\'t "think". They predict patterns based on training data.' },
             { text: 'Predicting the most likely next words based on patterns from training data', correct: true, explanation: 'Correct! LLMs are pattern-completion engines trained on vast text.' },
-            { text: 'Looking up answers in a database of facts', correct: false, explanation: 'LLMs don\'t have a database — they learned patterns from training text.' },
+            { text: 'Looking up answers in a database of facts', correct: false, explanation: 'LLMs don\'t have a database; they learned patterns from training text.' },
             { text: 'Running a search engine to find relevant information', correct: false, explanation: 'LLMs generate text from learned patterns, not from searching the internet.' },
           ],
         },
@@ -342,8 +342,8 @@ export const MODULES: ModuleDefinition[] = [
           options: [
             { text: 'When you\'re not sure what value to expect', correct: false, explanation: 'Uncertainty about value isn\'t the reason to mark optional. Optional means the field might not exist in the document at all.' },
             { text: 'When the field may not appear in every document of that type', correct: true, explanation: 'Correct! Marking a field optional tells the extraction engine not to hallucinate a value when the field simply isn\'t present.' },
-            { text: 'When you want the LLM to skip the field to save processing time', correct: false, explanation: 'Optional fields still get processed — the flag tells the engine it\'s acceptable to return null, not to skip the field.' },
-            { text: 'When the field contains numbers instead of text', correct: false, explanation: 'Data type doesn\'t determine optionality. A budget figure might always be present — that\'s not optional.' },
+            { text: 'When you want the LLM to skip the field to save processing time', correct: false, explanation: 'Optional fields still get processed. The flag tells the engine it\'s acceptable to return null, not to skip the field.' },
+            { text: 'When the field contains numbers instead of text', correct: false, explanation: 'Data type doesn\'t determine optionality. A budget figure might always be present; that\'s not optional.' },
           ],
         },
       },
@@ -394,9 +394,9 @@ export const MODULES: ModuleDefinition[] = [
           question: 'What does a step receive as input by default?',
           options: [
             { text: 'The original uploaded document, regardless of step position', correct: false, explanation: 'After step 1, the input source switches to the previous step\'s output, not the original document.' },
-            { text: 'The output of the previous step', correct: true, explanation: 'Correct! Each step\'s default input source is "step_input" — the output of the step before it in the chain.' },
+            { text: 'The output of the previous step', correct: true, explanation: 'Correct! Each step\'s default input source is "step_input": the output of the step before it in the chain.' },
             { text: 'All outputs from every previous step, combined into one', correct: false, explanation: 'Steps receive their immediate predecessor\'s output by default, not a combined history of all prior steps.' },
-            { text: 'A fresh, empty context with only the system prompt', correct: false, explanation: 'Steps are connected \u2014 each one builds on the previous step\'s work.' },
+            { text: 'A fresh, empty context with only the system prompt', correct: false, explanation: 'Steps are connected; each one builds on the previous step\'s work.' },
           ],
         },
       },
@@ -1022,7 +1022,7 @@ export default function Certification() {
       checkTierCompletion(moduleId)
     } catch {
       // Validation failed - show what's missing
-      toast('Module not ready — check the requirements below', 'error')
+      toast('Module not ready. Check the requirements below.', 'error')
       await handleValidate(moduleId)
     } finally {
       setCompleting(false)
@@ -1150,7 +1150,7 @@ export default function Certification() {
               >
                 <Award size={16} className="text-yellow-600 shrink-0" />
                 <p className="text-xs text-yellow-800">
-                  <span className="font-bold">Vandal Workflow Architect (VWA)</span> — a University of Idaho credential recognizing your ability to design, build, and deploy AI-powered document workflows for research administration.
+                  <span className="font-bold">Vandal Workflow Architect (VWA)</span>: a University of Idaho credential recognizing your ability to design, build, and deploy AI-powered document workflows for research administration.
                 </p>
               </div>
 

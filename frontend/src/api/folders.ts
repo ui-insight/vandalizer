@@ -28,3 +28,16 @@ export function getBreadcrumbs(folderUuid: string) {
     `/api/folders/breadcrumbs/${folderUuid}`,
   )
 }
+
+export interface FolderSummary {
+  uuid: string
+  title: string
+  path: string
+  parent_id: string
+  is_shared_team_root: boolean
+  team_id: string | null
+}
+
+export function listAllFolders() {
+  return apiFetch<FolderSummary[]>('/api/folders/all')
+}

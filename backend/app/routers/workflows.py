@@ -57,6 +57,22 @@ def _strip_markdown(text: str) -> str:
     return text
 
 
+_PDF_UNICODE_REPLACEMENTS = str.maketrans({
+    "‘": "'", "’": "'", "‚": "'", "‛": "'",
+    "“": '"', "”": '"', "„": '"', "‟": '"',
+    "–": "-", "—": "-", "−": "-", "‐": "-", "‑": "-",
+    "…": "...", " ": " ", "​": "", "‌": "", "‍": "",
+    "•": "*", "·": "*", "™": "(TM)", "®": "(R)", "©": "(C)",
+})
+
+
+def _pdf_safe(value) -> str:
+    """Coerce a value to a latin-1-safe string for fpdf core fonts."""
+    text = value if isinstance(value, str) else ("" if value is None else str(value))
+    text = text.translate(_PDF_UNICODE_REPLACEMENTS)
+    return text.encode("latin-1", errors="replace").decode("latin-1")
+
+
 async def _authorize_documents(document_uuids: list[str], user: User) -> list[str]:
     team_access = await access_control.get_team_access_context(user)
     authorized: list[str] = []
@@ -265,7 +281,7 @@ async def download_results(
         pdf.set_auto_page_break(auto=True, margin=20)
         pdf.add_page()
         pdf.set_font("Helvetica", "B", 14)
-        pdf.cell(0, 10, "Workflow Results", new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(0, 10, _pdf_safe("Workflow Results"), new_x="LMARGIN", new_y="NEXT")
         pdf.ln(4)
 
         heading_style = FontFace(color=255, fill_color=(55, 65, 81), emphasis="BOLD")
@@ -291,7 +307,7 @@ async def download_results(
             ) as table:
                 header_row = table.row()
                 for h in headers:
-                    header_row.cell(str(h))
+                    header_row.cell(_pdf_safe(h))
                 for i, item in enumerate(data):
                     row = table.row()
                     for h in headers:
@@ -299,7 +315,7 @@ async def download_results(
                         cell_text = str(val) if val is not None else ""
                         if isinstance(val, (dict, list)):
                             cell_text = json.dumps(val, default=str)
-                        row.cell(cell_text)
+                        row.cell(_pdf_safe(cell_text))
 
         elif isinstance(data, dict):
             usable = pdf.w - pdf.l_margin - pdf.r_margin
@@ -310,21 +326,21 @@ async def download_results(
                 text_align="LEFT",
             ) as table:
                 header_row = table.row()
-                header_row.cell("Field")
-                header_row.cell("Value")
+                header_row.cell(_pdf_safe("Field"))
+                header_row.cell(_pdf_safe("Value"))
                 for k, v in data.items():
                     row = table.row()
-                    row.cell(str(k))
+                    row.cell(_pdf_safe(k))
                     val_text = str(v) if not isinstance(v, (dict, list)) else json.dumps(v, default=str)
-                    row.cell(val_text)
+                    row.cell(_pdf_safe(val_text))
 
         elif isinstance(data, str):
             text = _strip_markdown(data)
             pdf.set_font("Helvetica", "", 10)
-            pdf.multi_cell(0, 5, text)
+            pdf.multi_cell(0, 5, _pdf_safe(text))
         else:
             pdf.set_font("Helvetica", "", 10)
-            pdf.multi_cell(0, 5, str(data) if data else "")
+            pdf.multi_cell(0, 5, _pdf_safe(str(data) if data else ""))
 
         pdf_buf = io.BytesIO(pdf.output())
 

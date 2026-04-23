@@ -1364,13 +1364,13 @@ function TeamsTab() {
       {subTab === 'isolated' && (
         <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
           <div style={{ padding: '14px 20px', borderBottom: '1px solid #e5e7eb', fontSize: 14, fontWeight: 600 }}>
-            Isolated Users — only on their personal team ({isolated.length})
+            Isolated Users (only on their personal team) ({isolated.length})
           </div>
           {loadingIsolated && !isolatedLoaded ? (
             <div style={{ padding: 32, textAlign: 'center', color: '#9ca3af' }}>Loading...</div>
           ) : isolated.length === 0 ? (
             <div style={{ padding: 32, textAlign: 'center', color: '#6b7280' }}>
-              No isolated users — everyone is on at least one shared team.
+              No isolated users. Everyone is on at least one shared team.
             </div>
           ) : isolated.map(u => (
             <div key={u.user_id} style={{ padding: '12px 20px', borderBottom: '1px solid #f3f4f6', display: 'flex', alignItems: 'center', gap: 12 }}>

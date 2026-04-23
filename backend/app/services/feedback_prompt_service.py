@@ -29,7 +29,10 @@ async def evaluate_eligible_prompt(
     if not user.is_demo_user or not user.demo_expires_at:
         return None
 
-    activation_date = user.demo_expires_at - datetime.timedelta(days=TRIAL_DAYS)
+    expires_at = user.demo_expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=datetime.timezone.utc)
+    activation_date = expires_at - datetime.timedelta(days=TRIAL_DAYS)
     now = datetime.datetime.now(datetime.timezone.utc)
     trial_day = max(0, (now - activation_date).days)
 
@@ -50,8 +53,13 @@ async def evaluate_eligible_prompt(
     # Find the most recent shown_at across all prompts for cooldown
     last_shown_at: Optional[datetime.datetime] = None
     for r in existing:
-        if r.shown_at and (last_shown_at is None or r.shown_at > last_shown_at):
-            last_shown_at = r.shown_at
+        shown = r.shown_at
+        if shown is None:
+            continue
+        if shown.tzinfo is None:
+            shown = shown.replace(tzinfo=datetime.timezone.utc)
+        if last_shown_at is None or shown > last_shown_at:
+            last_shown_at = shown
 
     for prompt in prompts:
         # Skip if already processed

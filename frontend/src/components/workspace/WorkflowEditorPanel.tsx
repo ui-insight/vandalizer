@@ -23,13 +23,12 @@ import { RunHistoryTab } from './RunHistoryTab'
 import type { ValidationCheck, ValidationCheckDefinition, ValidationInputDefinition, QualityHistoryRun, BatchStatus, WorkflowQualityStatus } from '../../api/workflows'
 import { ItemPickerModal } from './ItemPickerModal'
 import { getModels } from '../../api/config'
-import { listContents, searchDocuments } from '../../api/documents'
+import { searchDocuments } from '../../api/documents'
 import { uploadFile } from '../../api/files'
 import { listKnowledgeBases } from '../../api/knowledge'
 import type { KnowledgeBase } from '../../types/knowledge'
 import { useWorkflowRunner } from '../../hooks/useWorkflowRunner'
 import type { Workflow, WorkflowStep, WorkflowTask, WorkflowStatus, ModelInfo } from '../../types/workflow'
-import type { Document as VDoc } from '../../types/document'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
@@ -569,12 +568,12 @@ export function WorkflowEditorPanel() {
                       </div>
                       {qualityStatus.config_changed && (
                         <div style={{ fontSize: 12, color: '#92400e', marginTop: 4 }}>
-                          Workflow changed since last validation — re-validate for accurate results
+                          Workflow changed since last validation. Re-validate for accurate results.
                         </div>
                       )}
                       {qualityStatus.stale && !qualityStatus.config_changed && (
                         <div style={{ fontSize: 12, color: '#92400e', marginTop: 4 }}>
-                          Last validated over 2 weeks ago — consider re-validating
+                          Last validated over 2 weeks ago. Consider re-validating.
                         </div>
                       )}
                     </div>
@@ -1631,7 +1630,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
     (task.data.selected_document_uuid as string) || ''
   )
   const [docSearchQuery, setDocSearchQuery] = useState('')
-  const [docSearchResults, setDocSearchResults] = useState<VDoc[]>([])
+  const [docSearchResults, setDocSearchResults] = useState<{ uuid: string; title: string }[]>([])
   const [showDocDropdown, setShowDocDropdown] = useState(false)
 
   // Fixed documents for workflow_documents input source
@@ -1691,28 +1690,28 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
     finally { setUploading(false) }
   }
 
-  // Fixed doc search debounce
+  // Fixed doc search debounce — empty query loads recent docs so the field
+  // doubles as a browsable picker.
   const fixedSearchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
-    if (!fixedDocSearch.trim()) {
-      setFixedDocResults([])
-      setShowFixedDocDropdown(false)
-      return
-    }
+    if (inputSource !== 'workflow_documents') return
     if (fixedSearchTimeoutRef.current) clearTimeout(fixedSearchTimeoutRef.current)
+    const query = fixedDocSearch.trim()
     fixedSearchTimeoutRef.current = setTimeout(async () => {
       try {
-        const res = await searchDocuments(fixedDocSearch, 10)
+        const res = await searchDocuments(query, 20)
         setFixedDocResults(
           res.items
             .filter(d => !fixedDocs.some(fd => fd.uuid === d.uuid))
             .map(d => ({ uuid: d.uuid, title: d.title }))
         )
-        setShowFixedDocDropdown(true)
-      } catch { /* ignore */ }
-    }, 300)
+      } catch (err) {
+        console.error('Document search failed', err)
+        setFixedDocResults([])
+      }
+    }, query ? 250 : 0)
     return () => { if (fixedSearchTimeoutRef.current) clearTimeout(fixedSearchTimeoutRef.current) }
-  }, [fixedDocSearch, fixedDocs])
+  }, [fixedDocSearch, fixedDocs, inputSource])
 
   // Output post-process
   const [postProcessEnabled, setPostProcessEnabled] = useState(
@@ -1758,27 +1757,25 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
     }
   }, [task.name])
 
-  // Document search debounce
+  // Document search debounce — uses searchDocuments so files in any folder
+  // (personal subfolders, team folders) are findable, not just the root.
+  // Empty query loads recent docs so the field doubles as a browsable picker.
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
-    if (!docSearchQuery.trim()) {
-      setDocSearchResults([])
-      setShowDocDropdown(false)
-      return
-    }
+    if (inputSource !== 'select_document') return
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
+    const query = docSearchQuery.trim()
     searchTimeoutRef.current = setTimeout(async () => {
       try {
-        const res = await listContents()
-        const filtered = res.documents.filter(d =>
-          d.title.toLowerCase().includes(docSearchQuery.toLowerCase())
-        )
-        setDocSearchResults(filtered.slice(0, 10))
-        setShowDocDropdown(true)
-      } catch { /* ignore */ }
-    }, 300)
+        const res = await searchDocuments(query, 20)
+        setDocSearchResults(res.items.map(d => ({ uuid: d.uuid, title: d.title })))
+      } catch (err) {
+        console.error('Document search failed', err)
+        setDocSearchResults([])
+      }
+    }, query ? 250 : 0)
     return () => { if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current) }
-  }, [docSearchQuery])
+  }, [docSearchQuery, inputSource])
 
   // Cleanup test intervals on unmount
   useEffect(() => {
@@ -2549,7 +2546,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                   <option value="">Use workflow default</option>
                   {models.map(m => {
                     const hints = [m.speed, m.tier ? `${m.tier} tier` : ''].filter(Boolean).join(', ')
-                    const label = (m.tag || m.name) + (m.external ? ' (External)' : '') + (hints ? ` — ${hints}` : '')
+                    const label = (m.tag || m.name) + (m.external ? ' (External)' : '') + (hints ? ` - ${hints}` : '')
                     return <option key={m.name} value={m.name}>{label}</option>
                   })}
                 </select>
@@ -2648,17 +2645,21 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                           fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
                           outline: 'none', boxSizing: 'border-box',
                         }}
-                        onFocus={() => docSearchResults.length > 0 && setShowDocDropdown(true)}
+                        onFocus={() => setShowDocDropdown(true)}
                         onBlur={() => setTimeout(() => setShowDocDropdown(false), 200)}
                       />
-                      {showDocDropdown && docSearchResults.length > 0 && (
+                      {showDocDropdown && (
                         <div style={{
                           position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4,
                           backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: 6,
                           boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 10,
                           maxHeight: 200, overflowY: 'auto',
                         }}>
-                          {docSearchResults.map(doc => (
+                          {docSearchResults.length === 0 ? (
+                            <div style={{ padding: '8px 12px', fontSize: 13, color: '#9ca3af' }}>
+                              No documents found
+                            </div>
+                          ) : docSearchResults.map(doc => (
                             <div
                               key={doc.uuid}
                               onMouseDown={() => {
@@ -2763,18 +2764,22 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                               fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
                               outline: 'none', boxSizing: 'border-box',
                             }}
-                            onFocus={() => fixedDocResults.length > 0 && setShowFixedDocDropdown(true)}
+                            onFocus={() => setShowFixedDocDropdown(true)}
                             onBlur={() => setTimeout(() => setShowFixedDocDropdown(false), 200)}
                           />
                         </div>
-                        {showFixedDocDropdown && fixedDocResults.length > 0 && (
+                        {showFixedDocDropdown && (
                           <div style={{
                             position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4,
                             backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: 6,
                             boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 10,
                             maxHeight: 160, overflowY: 'auto',
                           }}>
-                            {fixedDocResults.map(doc => (
+                            {fixedDocResults.length === 0 ? (
+                              <div style={{ padding: '7px 10px', fontSize: 12, color: '#9ca3af' }}>
+                                No documents found
+                              </div>
+                            ) : fixedDocResults.map(doc => (
                               <div
                                 key={doc.uuid}
                                 onMouseDown={() => {
@@ -3067,7 +3072,7 @@ function WorkflowOutputCard({ status, sessionId, running, runElapsed, showDownlo
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 500,
                   color: approval.status === 'approved' ? '#16a34a' : '#dc2626' }}>
                   {approval.status === 'approved'
-                    ? <><CheckCircle style={{ width: 16, height: 16 }} /> Approved — workflow resuming</>
+                    ? <><CheckCircle style={{ width: 16, height: 16 }} /> Approved. Workflow resuming.</>
                     : <><XCircle style={{ width: 16, height: 16 }} /> Rejected</>
                   }
                 </div>
@@ -4698,7 +4703,7 @@ function ValidateTab({
                           }}
                           labelFormatter={(label, payload) => {
                             const item = payload?.[0]?.payload
-                            if (item) return `${label} — Grade ${item.grade} (${item.passed}/${item.passed + item.failed} passed)`
+                            if (item) return `${label} · Grade ${item.grade} (${item.passed}/${item.passed + item.failed} passed)`
                             return label
                           }}
                         />

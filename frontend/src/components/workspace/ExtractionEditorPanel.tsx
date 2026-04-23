@@ -734,7 +734,7 @@ const AI_TIPS: { text: string; condition?: (ctx: { mode: string; chunking: boole
   { text: 'Repetition mode runs the extraction multiple times and uses consensus to improve accuracy.', condition: (c) => c.repetition },
   { text: 'Structured output mode constrains the AI to return valid JSON, reducing formatting errors.' },
   { text: 'The AI processes each document independently so results stay isolated and accurate.', condition: (c) => c.docCount > 1 },
-  { text: 'Longer documents may take more time — the AI is reading the full text to find your fields.' },
+  { text: 'Longer documents may take more time. The AI is reading the full text to find your fields.' },
   { text: 'Tip: You can customize thinking and structured modes per extraction in the Advanced tab.' },
   { text: 'The model maps each field name to the most relevant passage in your document.' },
   { text: 'Extraction results are generated in a single structured response for consistency.' },
@@ -1367,7 +1367,7 @@ function ToolsTab({
           title={attachingTemplate ? 'Attaching...' : hasTemplate ? 'Replace Template' : 'Attach Template'}
           description={
             hasTemplate
-              ? 'A fillable PDF template is attached — click to replace it'
+              ? 'A fillable PDF template is attached. Click to replace it.'
               : 'Upload a fillable PDF to auto-generate extraction fields and enable PDF export'
           }
           onClick={onAttachTemplate}
@@ -1803,8 +1803,8 @@ function useValidationProgress(
       } else {
         const stepFrac = stepProgress - currentStep
         if (mode === 'two_pass') {
-          if (stepFrac < 0.4) phase = 'Pass 1 — Draft extraction'
-          else if (stepFrac < 0.8) phase = 'Pass 2 — Structured extraction'
+          if (stepFrac < 0.4) phase = 'Pass 1: Draft extraction'
+          else if (stepFrac < 0.8) phase = 'Pass 2: Structured extraction'
           else phase = 'Computing field metrics'
         } else {
           if (stepFrac < 0.7) phase = 'Extracting fields'
@@ -2251,7 +2251,7 @@ function ValidateTab({
       }
     } catch (e) {
       if (abort.signal.aborted) {
-        setFillError('Extraction timed out. The LLM call may be too slow — try a faster model.')
+        setFillError('Extraction timed out. The LLM call may be too slow. Try a faster model.')
       } else {
         setFillError(e instanceof Error ? e.message : 'Failed to run extraction')
       }
@@ -2537,7 +2537,7 @@ function ValidateTab({
                                 }}
                               />
                               <label
-                                title={item.is_optional ? 'Field is optional — no accuracy penalty when blank' : 'Mark as optional'}
+                                title={item.is_optional ? 'Field is optional. No accuracy penalty when blank.' : 'Mark as optional'}
                                 style={{ display: 'flex', alignItems: 'center', flexShrink: 0, cursor: 'pointer' }}
                               >
                                 <input

@@ -383,7 +383,7 @@ function ChatView({
     if (fileInputRef.current) fileInputRef.current.value = ''
     const sizeMB = (file.size / (1024 * 1024)).toFixed(1)
     if (file.size > 10 * 1024 * 1024) {
-      toast(`File is ${sizeMB}MB — must be under 10MB`, 'error')
+      toast(`File is ${sizeMB}MB. Must be under 10MB.`, 'error')
       return
     }
     toast(`Uploading ${file.name} (${sizeMB}MB)...`, 'info')

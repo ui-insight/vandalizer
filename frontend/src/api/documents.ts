@@ -28,9 +28,10 @@ export interface SearchResult {
   token_count: number
 }
 
-export function searchDocuments(query: string = '', limit: number = 20) {
+export function searchDocuments(query: string = '', limit: number = 20, folder?: string | null) {
   const params = new URLSearchParams({ limit: String(limit) })
   if (query) params.set('q', query)
+  if (folder !== undefined && folder !== null) params.set('folder', folder)
   return apiFetch<{ items: SearchResult[]; total: number }>(
     `/api/documents/search?${params}`
   )
