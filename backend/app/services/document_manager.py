@@ -304,8 +304,12 @@ class DocumentManager:
         return output
 
     def delete_kb_collection(self, kb_uuid: str) -> None:
-        """Drop an entire KB collection."""
+        """Drop an entire KB collection. No-op if the collection never existed."""
         collection_name = f"kb_{kb_uuid}"
+        try:
+            self.client.get_collection(name=collection_name)
+        except Exception:
+            return
         try:
             self.client.delete_collection(name=collection_name)
         except Exception as e:
