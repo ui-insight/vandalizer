@@ -6,6 +6,40 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [5.0.0] — Fully Agentic
+
+The biggest change since launch: chat now drives the entire platform. Documents, knowledge bases, extractions, and workflows are all reachable through one conversation — with quality scores, source citations, and confirmation flows built in.
+
+### Added — Agentic chat
+- **Agentic chat agent** (`create_agentic_chat_agent` in `llm_service.py`) — activates automatically whenever a request has a user and team context; falls back to plain chat otherwise
+- **19 pydantic-ai tools** registered on the agentic agent across 5 categories:
+  - **Read-only discovery** (8): `search_documents`, `list_documents`, `search_knowledge_base`, `list_knowledge_bases`, `list_extraction_sets`, `list_workflows`, `get_quality_info`, `search_library`
+  - **Extraction** (2): `get_document_text`, `run_extraction`
+  - **Knowledge-base writes** (3): `create_knowledge_base`, `add_documents_to_kb`, `add_url_to_kb` — all gated by 2-step confirmation
+  - **Workflow orchestration** (2): `run_workflow` (async Celery dispatch), `get_workflow_status` (live polling)
+  - **Validation & guided verification** (4): `list_test_cases`, `propose_test_case`, `run_validation`, `create_extraction_from_document`
+- **Quality-signal sidecar** — tools that return validation metadata surface it via `deps.quality_annotations` (never polluting the LLM context); frontend renders `QualityBadge` with tier, accuracy, consistency, test-case count, and active alerts
+- **Streaming tool-call UX** — `chat_service.py` emits `tool_call` and `tool_result` events; `ToolStatusLine` renders live spinners and result summaries; rich content blocks for extraction tables, KB passages, workflow output, and guided-verification launchers
+- **Confirmation flow for writes** — KB creation, URL ingestion, extraction-set creation, workflow dispatch, and validation runs all preview first, then execute only after user confirmation
+- **Landing page rewrite** — hero, feature sections, and demo flow reframed around agentic chat and quality signals; added certification callout
+- **Demo-request form** — new landing-page form posting to `POST /api/demo/request-contact` with confirmation and admin-notification emails
+- **v5.0 launch email funnel**:
+  - One-time launch announcement email, triggerable by admins via `POST /api/admin/announcements/v5-launch`
+  - 5-step agentic-chat tutorial drip (Celery beat: daily 10:15am)
+  - Certification-complete celebration email (fires once per user when all 11 modules are done)
+  - Idempotent send tracking via `v5_announcement_sent_at`, `agentic_drip_step`, `certification_complete_sent_at` on `User`
+- **Chat milestone tracking** — `first_chat_workflow_at`, `chat_workflow_count`, `powerup_milestone_sent_at` on `User`, recorded when `run_workflow` succeeds
+- **Role segmentation** — `role_segment` field on `User` for future cohort-targeted drips
+- **Certification curriculum updated for v5** — Module 1 ("AI Literacy") reframed to position agentic chat as the professional answer rather than a problem; Foundations, Extraction, Multi-Step, Advanced Nodes, Output Delivery, Validation & QA, Batch, and Governance exercises rewritten to drive from chat prompts
+- **Docs**: `AGENTIC_CHAT_PLAN.md` (implementation plan, all phases shipped); user and quality-signal guides in `docs/`
+
+### Changed — v5.0
+- Chat activation logic: plain chat is now a fallback; agentic agent is the default when a team context is available
+- `email_preferences` gains an `announcements` key (defaults to opted-in)
+- Inactivity-nudge copy updated to speak to chat usage instead of "extractions and knowledge bases ready to use"
+
+## [Pre-5.0 Unreleased]
+
 ### Added
 - Docker Compose stack with healthchecks for all services (Redis, MongoDB, ChromaDB, API, Celery, frontend)
 - `backend/Dockerfile` — multi-stage build with non-root user and healthcheck

@@ -1,5 +1,7 @@
 """Demo waitlist API endpoints."""
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.config import Settings
@@ -16,6 +18,7 @@ from app.schemas.demo import (
 )
 from app.services import demo_service
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 

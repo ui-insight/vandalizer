@@ -29,6 +29,8 @@ import {
   adminListAllTeams, adminCreateTeam, adminAddUserToTeam, adminRemoveUserFromTeam, getIsolatedUsers,
   updateUserRoles,
   getEmailAnalytics,
+  triggerV5LaunchAnnouncement,
+  backfillAgenticChatDrip,
 } from '../api/admin'
 import { getTeamMembers } from '../api/teams'
 import * as orgApi from '../api/organizations'
@@ -4205,6 +4207,166 @@ function TrialCheckinsSection() {
   )
 }
 
+function V5LaunchAnnouncementPanel() {
+  const [batchSize, setBatchSize] = useState(200)
+  const [eligible, setEligible] = useState<number | null>(null)
+  const [lastSent, setLastSent] = useState<number | null>(null)
+  const [busy, setBusy] = useState<'dry' | 'send' | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const run = async (dry_run: boolean) => {
+    setBusy(dry_run ? 'dry' : 'send')
+    setError(null)
+    try {
+      const r = await triggerV5LaunchAnnouncement(batchSize, dry_run)
+      setEligible(r.eligible)
+      if (!dry_run) setLastSent(r.sent)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Request failed')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  return (
+    <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', padding: 20 }}>
+      <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>v5.0 Launch Announcement</div>
+      <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>
+        Blast the v5.0 agentic-chat announcement email to users who haven&apos;t received it yet.
+        Idempotent — each user is emailed at most once. Run batches until &ldquo;sent&rdquo; hits 0.
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+        <label style={{ fontSize: 13, color: '#374151' }}>Batch size</label>
+        <input
+          type="number"
+          min={1}
+          max={5000}
+          value={batchSize}
+          onChange={(e) => setBatchSize(Math.max(1, Math.min(5000, Number(e.target.value) || 200)))}
+          style={{ width: 100, padding: '6px 8px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 13 }}
+        />
+        <button
+          onClick={() => run(true)}
+          disabled={busy !== null}
+          style={{
+            padding: '6px 14px', borderRadius: 8, border: '1px solid #e5e7eb',
+            fontSize: 13, fontWeight: 500, cursor: busy ? 'wait' : 'pointer',
+            backgroundColor: '#fff', color: '#374151',
+          }}
+        >
+          {busy === 'dry' ? 'Checking...' : 'Dry run'}
+        </button>
+        <button
+          onClick={() => {
+            if (confirm(`Send the v5.0 announcement to up to ${batchSize} eligible users. Continue?`)) {
+              run(false)
+            }
+          }}
+          disabled={busy !== null}
+          style={{
+            padding: '6px 14px', borderRadius: 8, border: 'none',
+            fontSize: 13, fontWeight: 600, cursor: busy ? 'wait' : 'pointer',
+            backgroundColor: 'var(--highlight-color, #eab308)',
+            color: 'var(--highlight-text-color, #000)',
+          }}
+        >
+          {busy === 'send' ? 'Sending...' : 'Send batch'}
+        </button>
+      </div>
+
+      {error && (
+        <div style={{ fontSize: 13, color: '#ef4444', marginTop: 8 }}>{error}</div>
+      )}
+      {eligible !== null && (
+        <div style={{ fontSize: 13, color: '#374151', marginTop: 8 }}>
+          <strong>{eligible}</strong> user{eligible === 1 ? '' : 's'} still eligible
+          {lastSent !== null && <> · last run sent <strong>{lastSent}</strong></>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+
+function AgenticDripBackfillPanel() {
+  const [batchSize, setBatchSize] = useState(500)
+  const [eligible, setEligible] = useState<number | null>(null)
+  const [lastEnrolled, setLastEnrolled] = useState<number | null>(null)
+  const [busy, setBusy] = useState<'dry' | 'send' | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const run = async (dry_run: boolean) => {
+    setBusy(dry_run ? 'dry' : 'send')
+    setError(null)
+    try {
+      const r = await backfillAgenticChatDrip(batchSize, dry_run)
+      setEligible(r.eligible)
+      if (!dry_run) setLastEnrolled(r.enrolled)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Request failed')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  return (
+    <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', padding: 20 }}>
+      <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Agentic-chat drip backfill</div>
+      <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>
+        Enroll pre-v5 users into the 5-step agentic-chat tutorial drip. Idempotent — users already enrolled
+        or opted-out are skipped. The first step fires on the next daily run.
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+        <label style={{ fontSize: 13, color: '#374151' }}>Batch size</label>
+        <input
+          type="number"
+          min={1}
+          max={5000}
+          value={batchSize}
+          onChange={(e) => setBatchSize(Math.max(1, Math.min(5000, Number(e.target.value) || 500)))}
+          style={{ width: 100, padding: '6px 8px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 13 }}
+        />
+        <button
+          onClick={() => run(true)}
+          disabled={busy !== null}
+          style={{
+            padding: '6px 14px', borderRadius: 8, border: '1px solid #e5e7eb',
+            fontSize: 13, fontWeight: 500, cursor: busy ? 'wait' : 'pointer',
+            backgroundColor: '#fff', color: '#374151',
+          }}
+        >
+          {busy === 'dry' ? 'Checking...' : 'Dry run'}
+        </button>
+        <button
+          onClick={() => {
+            if (confirm(`Enroll up to ${batchSize} eligible users into the agentic-chat drip. Continue?`)) {
+              run(false)
+            }
+          }}
+          disabled={busy !== null}
+          style={{
+            padding: '6px 14px', borderRadius: 8, border: 'none',
+            fontSize: 13, fontWeight: 600, cursor: busy ? 'wait' : 'pointer',
+            backgroundColor: 'var(--highlight-color, #eab308)',
+            color: 'var(--highlight-text-color, #000)',
+          }}
+        >
+          {busy === 'send' ? 'Enrolling...' : 'Enroll batch'}
+        </button>
+      </div>
+      {error && <div style={{ fontSize: 13, color: '#ef4444', marginTop: 8 }}>{error}</div>}
+      {eligible !== null && (
+        <div style={{ fontSize: 13, color: '#374151', marginTop: 8 }}>
+          <strong>{eligible}</strong> user{eligible === 1 ? '' : 's'} still eligible
+          {lastEnrolled !== null && <> · last run enrolled <strong>{lastEnrolled}</strong></>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+
 function EmailAnalyticsTab() {
   const [data, setData] = useState<EmailAnalyticsResponse | null>(null)
   const [days, setDays] = useState(30)
@@ -4257,6 +4419,12 @@ function EmailAnalyticsTab() {
           </span>
         )}
       </div>
+
+      {/* v5.0 launch blast */}
+      <V5LaunchAnnouncementPanel />
+
+      {/* Agentic-chat drip backfill */}
+      <AgenticDripBackfillPanel />
 
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>

@@ -97,6 +97,16 @@ celery.conf.beat_schedule = {
         "task": "tasks.engagement.process_inactivity_nudges",
         "schedule": crontab(hour=10, minute=30),  # daily at 10:30am
     },
+    # v5.0 launch funnel — agentic-chat tutorial drip (daily)
+    "engagement-agentic-chat-drip": {
+        "task": "tasks.engagement.process_agentic_chat_drip",
+        "schedule": crontab(hour=10, minute=15),  # daily at 10:15am
+    },
+    # Power-user upsell — fires when users cross 30 chat-run workflows
+    "engagement-powerup-milestones": {
+        "task": "tasks.engagement.process_powerup_milestones",
+        "schedule": crontab(hour=10, minute=45),  # daily at 10:45am
+    },
 }
 
 if not settings.enable_trial_system:

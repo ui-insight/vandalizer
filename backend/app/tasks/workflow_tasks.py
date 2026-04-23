@@ -308,7 +308,8 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
         try:
             from datetime import datetime, timezone
             doc_uuids = trigger_step_data.get("doc_uuids", [])
-            # Read step counts from the WorkflowResult
+            # Read step counts + tags from the ActivityEvent to decide whether
+            # this run counts toward the chat-workflow milestone.
             wr_doc = db.workflow_result.find_one(
                 {"_id": ObjectId(workflow_result_id)},
                 {"num_steps_completed": 1, "num_steps_total": 1},
@@ -328,6 +329,17 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
                 {"_id": ObjectId(activity_id)},
                 {"$set": usage_update},
             )
+            # Chat-workflow milestone: increment only for chat-dispatched runs
+            # that actually completed (not dispatches that later failed).
+            activity_doc = db.activity_event.find_one(
+                {"_id": ObjectId(activity_id)},
+                {"tags": 1, "user_id": 1},
+            )
+            if activity_doc and "chat" in (activity_doc.get("tags") or []):
+                db.user.update_one(
+                    {"user_id": activity_doc["user_id"]},
+                    {"$inc": {"chat_workflow_count": 1}},
+                )
             from app.tasks.activity_tasks import generate_activity_description_task
             generate_activity_description_task.delay(activity_id, "workflow_run", doc_uuids)
         except Exception as e:

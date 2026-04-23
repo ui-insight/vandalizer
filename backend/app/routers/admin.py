@@ -2180,3 +2180,89 @@ async def email_analytics(
         recent_failures=recent_failures,
         providers=sorted(providers),
     )
+
+
+# ---------------------------------------------------------------------------
+# v5.0 launch announcement — one-time blast trigger
+# ---------------------------------------------------------------------------
+
+
+class V5AnnouncementTriggerRequest(BaseModel):
+    """Payload for manually triggering the v5.0 announcement blast."""
+
+    batch_size: int = Field(default=200, ge=1, le=5000)
+    dry_run: bool = False  # if True, counts eligible users but doesn't send
+
+
+class V5AnnouncementTriggerResponse(BaseModel):
+    sent: int
+    eligible: int
+    dry_run: bool
+
+
+@router.post("/announcements/v5-launch", response_model=V5AnnouncementTriggerResponse)
+async def trigger_v5_launch_announcement(
+    body: V5AnnouncementTriggerRequest,
+    user: User = Depends(get_current_user),
+):
+    """Admin-only: blast the v5.0 announcement to eligible users.
+
+    Idempotent — only users without `v5_announcement_sent_at` receive it.
+    Run in batches; re-invoke until `sent == 0` to flush the queue.
+    """
+    await _require_admin(user)
+
+    eligible = await User.find(
+        User.v5_announcement_sent_at == None,  # noqa: E711
+        User.is_demo_user != True,  # noqa: E712
+    ).count()
+
+    if body.dry_run:
+        return V5AnnouncementTriggerResponse(
+            sent=0, eligible=eligible, dry_run=True,
+        )
+
+    from app.services.engagement_service import process_v5_launch_announcement
+    sent = await process_v5_launch_announcement(batch_size=body.batch_size)
+    return V5AnnouncementTriggerResponse(
+        sent=sent, eligible=eligible, dry_run=False,
+    )
+
+
+class AgenticDripBackfillRequest(BaseModel):
+    """Payload for backfilling existing users into the agentic-chat drip."""
+
+    batch_size: int = Field(default=500, ge=1, le=5000)
+    dry_run: bool = False
+
+
+class AgenticDripBackfillResponse(BaseModel):
+    enrolled: int
+    eligible: int
+    dry_run: bool
+
+
+@router.post("/announcements/backfill-agentic-drip", response_model=AgenticDripBackfillResponse)
+async def backfill_agentic_drip(
+    body: AgenticDripBackfillRequest,
+    user: User = Depends(get_current_user),
+):
+    """Admin-only: enroll existing users into the agentic-chat tutorial drip.
+
+    New-user drip enrollment happens automatically at registration; this
+    backfill is the one-shot for users who signed up before v5.0.
+    """
+    await _require_admin(user)
+
+    eligible = await User.find(
+        User.agentic_drip_next_at == None,  # noqa: E711
+        User.agentic_drip_step == 0,
+        User.is_demo_user != True,  # noqa: E712
+    ).count()
+
+    if body.dry_run:
+        return AgenticDripBackfillResponse(enrolled=0, eligible=eligible, dry_run=True)
+
+    from app.services.engagement_service import backfill_agentic_chat_drip
+    enrolled = await backfill_agentic_chat_drip(batch_size=body.batch_size)
+    return AgenticDripBackfillResponse(enrolled=enrolled, eligible=eligible, dry_run=False)

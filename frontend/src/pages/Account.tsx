@@ -1,8 +1,16 @@
 import { useEffect, useState } from 'react'
-import { User, KeyRound, Save, Eye, EyeOff, Copy, Check, RefreshCw, Trash2, Code, Brain } from 'lucide-react'
+import { User, KeyRound, Save, Eye, EyeOff, Copy, Check, RefreshCw, Trash2, Code, Brain, Mail } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
 import { useAuth } from '../hooks/useAuth'
-import { generateApiToken, revokeApiToken, getApiTokenStatus, updateProfile } from '../api/auth'
+import {
+  generateApiToken,
+  revokeApiToken,
+  getApiTokenStatus,
+  updateProfile,
+  getEmailPreferences,
+  updateEmailPreferences,
+  type EmailPreferences,
+} from '../api/auth'
 import { getUserMemory, clearUserMemory, type UserMemoryResponse } from '../api/chat'
 
 export default function Account() {
@@ -33,6 +41,32 @@ export default function Account() {
       setProfileMessage('Failed to save')
     } finally {
       setProfileSaving(false)
+    }
+  }
+
+  // Email preferences state
+  const [emailPrefs, setEmailPrefs] = useState<EmailPreferences | null>(null)
+  const [prefsSaving, setPrefsSaving] = useState<string | null>(null)
+
+  useEffect(() => {
+    getEmailPreferences()
+      .then(setEmailPrefs)
+      .catch(() => setEmailPrefs({ onboarding: true, nudges: true, announcements: true }))
+  }, [])
+
+  const togglePref = async (key: keyof EmailPreferences) => {
+    if (!emailPrefs) return
+    const next = { ...emailPrefs, [key]: !emailPrefs[key] }
+    setEmailPrefs(next)
+    setPrefsSaving(key)
+    try {
+      const saved = await updateEmailPreferences({ [key]: next[key] })
+      setEmailPrefs(saved)
+    } catch {
+      // revert on failure
+      setEmailPrefs(emailPrefs)
+    } finally {
+      setPrefsSaving(null)
     }
   }
 
@@ -311,6 +345,59 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
                   Nothing yet. Once you run extraction templates, workflows, or query knowledge
                   bases, the assistant will remember your patterns here.
                 </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Email Preferences */}
+        <div className="rounded-lg border border-gray-200 bg-white">
+          <div className="flex items-center gap-2 border-b border-gray-200 px-4 py-3">
+            <Mail className="h-4 w-4 text-gray-400" />
+            <h3 className="font-medium text-gray-900">Email Preferences</h3>
+          </div>
+          <div className="p-4 space-y-4">
+            <p className="text-sm text-gray-600">
+              Choose which emails we send you. We never share your address.
+            </p>
+            {!emailPrefs ? (
+              <p className="text-sm text-gray-400">Loading...</p>
+            ) : (
+              <div className="space-y-3">
+                {([
+                  {
+                    key: 'onboarding' as const,
+                    label: 'Onboarding & tutorials',
+                    hint: 'Step-by-step guides when you sign up, including the 5-part agentic-chat tutorial.',
+                  },
+                  {
+                    key: 'nudges' as const,
+                    label: 'Activity nudges',
+                    hint: "Reminders when there's something new in the catalog and you haven't logged in for a while.",
+                  },
+                  {
+                    key: 'announcements' as const,
+                    label: 'Product announcements',
+                    hint: 'Major release notes and feature launches. We keep these rare.',
+                  },
+                ]).map(({ key, label, hint }) => (
+                  <label key={key} className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={emailPrefs[key]}
+                      disabled={prefsSaving === key}
+                      onChange={() => togglePref(key)}
+                      className="mt-1 h-4 w-4 rounded border-gray-300 text-highlight focus:ring-highlight"
+                    />
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-gray-900">{label}</div>
+                      <div className="text-xs text-gray-500">{hint}</div>
+                    </div>
+                    {prefsSaving === key && (
+                      <span className="text-xs text-gray-400">Saving...</span>
+                    )}
+                  </label>
+                ))}
               </div>
             )}
           </div>

@@ -143,6 +143,14 @@ async def register(
             detail="Registration failed. Please check your details and try again.",
         )
 
+    # Capture role cohort + enroll new users in the agentic-chat drip.
+    _ALLOWED_ROLES = {"research_admin", "pi", "sponsored_programs", "compliance", "it", "other"}
+    if body.role_segment and body.role_segment in _ALLOWED_ROLES:
+        user.role_segment = body.role_segment
+    from app.services.engagement_service import start_agentic_chat_drip
+    start_agentic_chat_drip(user)
+    await user.save()
+
     # If the user was signing up to accept a team invite, auto-accept it.
     # Only accepts when the registered email matches the invite's recipient
     # email — otherwise silently ignore and let them accept manually later.
@@ -298,7 +306,13 @@ async def update_profile(
 @router.get("/email-preferences")
 async def get_email_preferences(user: User = Depends(get_current_user)):
     """Get the current user's email notification preferences."""
-    return user.email_preferences or {"onboarding": True, "nudges": True}
+    base = user.email_preferences or {}
+    # Defaults — opt-in for everything unless the user explicitly turned it off
+    return {
+        "onboarding": base.get("onboarding", True),
+        "nudges": base.get("nudges", True),
+        "announcements": base.get("announcements", True),
+    }
 
 
 @router.put("/email-preferences")
@@ -308,7 +322,7 @@ async def update_email_preferences(
 ):
     """Update email notification preferences."""
     prefs = user.email_preferences or {}
-    for key in ("onboarding", "nudges"):
+    for key in ("onboarding", "nudges", "announcements"):
         if key in body:
             prefs[key] = bool(body[key])
     user.email_preferences = prefs

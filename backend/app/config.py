@@ -50,6 +50,10 @@ class Settings(BaseSettings):
     resend_from_email: str = ""
     resend_from_name: str = "Vandalizer"
 
+    # Landing-page demo-request form: where admin-notification emails go.
+    # Falls back to resend_from_email / smtp_from_email if unset.
+    demo_request_to_email: str = ""
+
     # Encryption key for sensitive config values (API keys) stored in MongoDB.
     # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     config_encryption_key: str = ""

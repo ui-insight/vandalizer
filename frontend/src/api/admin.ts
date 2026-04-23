@@ -494,3 +494,29 @@ export interface EmailAnalyticsResponse {
 export function getEmailAnalytics(days: number = 30) {
   return apiFetch<EmailAnalyticsResponse>(`/api/admin/email-analytics?days=${days}`)
 }
+
+export interface V5AnnouncementTriggerResponse {
+  sent: number
+  eligible: number
+  dry_run: boolean
+}
+
+export function triggerV5LaunchAnnouncement(batch_size: number, dry_run: boolean) {
+  return apiFetch<V5AnnouncementTriggerResponse>('/api/admin/announcements/v5-launch', {
+    method: 'POST',
+    body: JSON.stringify({ batch_size, dry_run }),
+  })
+}
+
+export interface AgenticDripBackfillResponse {
+  enrolled: number
+  eligible: number
+  dry_run: boolean
+}
+
+export function backfillAgenticChatDrip(batch_size: number, dry_run: boolean) {
+  return apiFetch<AgenticDripBackfillResponse>('/api/admin/announcements/backfill-agentic-drip', {
+    method: 'POST',
+    body: JSON.stringify({ batch_size, dry_run }),
+  })
+}

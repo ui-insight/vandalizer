@@ -14,7 +14,7 @@ from app.database import init_db
 from app.exceptions import AppError
 from app.middleware.csrf import CSRFMiddleware
 from app.rate_limit import limiter
-from app.routers import activity, admin, approvals, audit, auth, automations, browser_automation, certification, chat, config, demo, documents, extractions, feedback, feedback_prompt, files, folders, graph_webhooks, knowledge, library, notifications, office, organizations, spaces, support, teams, verification, verification_sessions, workflows
+from app.routers import activity, admin, approvals, audit, auth, automations, browser_automation, certification, chat, config, contact, demo, documents, extractions, feedback, feedback_prompt, files, folders, graph_webhooks, knowledge, library, notifications, office, organizations, spaces, support, teams, verification, verification_sessions, workflows
 
 
 @lru_cache
@@ -200,6 +200,10 @@ app.include_router(verification_sessions.router, prefix="/api/verification-sessi
 app.include_router(office.router, prefix="/api/office", tags=["office"])
 app.include_router(automations.router, prefix="/api/automations", tags=["automations"])
 app.include_router(knowledge.router, prefix="/api/knowledge", tags=["knowledge"])
+# Landing-page demo-request form is always-on (not gated by trial system).
+# Mounted under /api/demo so the route `/api/demo/request-contact` works
+# regardless of whether the trial waitlist is enabled for this install.
+app.include_router(contact.router, prefix="/api/demo", tags=["contact"])
 if _boot_settings.enable_trial_system:
     app.include_router(demo.router, prefix="/api/demo", tags=["demo"])
 app.include_router(graph_webhooks.router, prefix="/api/webhooks/graph", tags=["webhooks"])

@@ -323,13 +323,17 @@ async def complete_module(user_id: str, module_id: str) -> dict:
         prog.modules.get(m, {}).get("completed", False)
         for m in MODULE_ORDER
     )
-    if all_complete and not prog.certified:
+    newly_certified = all_complete and not prog.certified
+    if newly_certified:
         prog.certified = True
         prog.certified_at = datetime.datetime.now(tz=datetime.timezone.utc)
 
     _update_streak(prog)
     prog.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
     await prog.save()
+
+    if newly_certified:
+        await _fire_certification_complete_hooks(prog.user_id)
 
     return {
         "module_id": module_id,
@@ -387,6 +391,58 @@ async def _get_extraction_fields(workflows: list) -> tuple[int, list[str]]:
                         max_fields = len(field_names)
                         all_field_names = field_names
     return max_fields, all_field_names
+
+
+async def _get_user_search_set_fields(user_id: str) -> tuple[int, list[str], list[str]]:
+    """Chat-driven path: find the user's SearchSet with the most fields.
+
+    Returns (max_field_count, all_field_names, search_set_uuids). Matches the
+    classical Workflow+Extraction discovery so chat-only cert paths are equivalent.
+    """
+    from app.models.search_set import SearchSet as _SS, SearchSetItem as _SSI
+
+    ss_list = await _SS.find(_SS.user_id == user_id).to_list()
+    max_fields = 0
+    all_field_names: list[str] = []
+    uuids: list[str] = []
+    for ss in ss_list:
+        uuids.append(ss.uuid)
+        items = await _SSI.find(_SSI.searchset == ss.uuid).to_list()
+        names = [i.searchphrase for i in items if i.searchphrase]
+        if len(names) > max_fields:
+            max_fields = len(names)
+            all_field_names = names
+    return max_fields, all_field_names, uuids
+
+
+async def _user_ran_search_set(user_id: str, search_set_uuids: list[str]) -> bool:
+    """Check for a completed SEARCH_SET_RUN activity event for any of the UUIDs."""
+    if not search_set_uuids:
+        return False
+    from app.models.activity import ActivityEvent, ActivityType, ActivityStatus
+
+    evt = await ActivityEvent.find_one(
+        ActivityEvent.user_id == user_id,
+        ActivityEvent.type == ActivityType.SEARCH_SET_RUN.value,
+        ActivityEvent.status == ActivityStatus.COMPLETED.value,
+        {"search_set_uuid": {"$in": search_set_uuids}},
+    )
+    return evt is not None
+
+
+async def _user_ran_search_set_on_n_docs(user_id: str, min_docs: int) -> int:
+    """Return the largest single-run document count across completed chat extractions."""
+    from app.models.activity import ActivityEvent, ActivityType, ActivityStatus
+
+    evts = await ActivityEvent.find(
+        ActivityEvent.user_id == user_id,
+        ActivityEvent.type == ActivityType.SEARCH_SET_RUN.value,
+        ActivityEvent.status == ActivityStatus.COMPLETED.value,
+    ).to_list()
+    best = 0
+    for e in evts:
+        best = max(best, e.documents_touched or 0)
+    return best
 
 
 # ---------------------------------------------------------------------------
@@ -456,12 +512,15 @@ async def _validate_workflow_design(user_id: str) -> dict:
 
 
 async def _validate_foundations(user_id: str) -> dict:
+    """Accept either the classical Workflow+Extraction path or the v5 chat-driven
+    path (user-owned SearchSet + a logged SEARCH_SET_RUN activity).
+    """
     checks = []
     exercise = get_exercise("foundations")
     expected_fields = exercise.get("expected_fields", []) if exercise else []
 
     workflows = await Workflow.find(Workflow.user_id == user_id).to_list()
-    has_extraction_workflow = False
+    has_extraction_artifact = False
     extraction_field_count = 0
     matched_fields: list[str] = []
     has_execution = False
@@ -474,7 +533,7 @@ async def _validate_foundations(user_id: str) -> dict:
             for task_id in step.tasks:
                 task = await WorkflowStepTask.get(task_id)
                 if task and task.name == "Extraction":
-                    has_extraction_workflow = True
+                    has_extraction_artifact = True
                     field_names = await _resolve_extraction_field_names(task.data or {})
                     if len(field_names) > extraction_field_count:
                         extraction_field_count = len(field_names)
@@ -486,16 +545,36 @@ async def _validate_foundations(user_id: str) -> dict:
         if wf.num_executions and wf.num_executions >= 1:
             has_execution = True
 
+    # Chat-driven path: also inspect user SearchSets and SEARCH_SET_RUN events
+    ss_max_fields, ss_field_names, ss_uuids = await _get_user_search_set_fields(user_id)
+    if ss_max_fields > 0:
+        has_extraction_artifact = True
+    if ss_max_fields > extraction_field_count:
+        extraction_field_count = ss_max_fields
+        matched_fields = [
+            ef for ef in expected_fields if _fuzzy_field_match(ef, ss_field_names)
+        ]
+    if not has_execution and await _user_ran_search_set(user_id, ss_uuids):
+        has_execution = True
+
     missing_fields = [f for f in expected_fields if f not in matched_fields]
 
-    checks.append({"name": "Has extraction workflow", "passed": has_extraction_workflow, "detail": "Create a workflow with an Extraction step"})
+    checks.append({
+        "name": "Extraction template exists",
+        "passed": has_extraction_artifact,
+        "detail": "Create an extraction template (from chat or the Library tab)",
+    })
     checks.append({
         "name": "Expected fields configured",
         "passed": len(matched_fields) >= 3,
         "detail": f"Found {len(matched_fields)}/{len(expected_fields)} expected fields"
               + (f" (missing: {', '.join(missing_fields[:3])})" if missing_fields else ""),
     })
-    checks.append({"name": "Workflow executed", "passed": has_execution, "detail": "Run your workflow at least once"})
+    checks.append({
+        "name": "Extraction executed",
+        "passed": has_execution,
+        "detail": "Run the extraction at least once (the agent can do this for you)",
+    })
 
     passed = all(c["passed"] for c in checks)
     stars = 1 if passed else 0
@@ -513,7 +592,14 @@ async def _validate_extraction_engine(user_id: str) -> dict:
     expected_fields = exercise.get("expected_fields", []) if exercise else []
 
     workflows = await Workflow.find(Workflow.user_id == user_id).to_list()
-    max_fields, all_field_names = await _get_extraction_fields(workflows)
+    wf_max_fields, wf_field_names = await _get_extraction_fields(workflows)
+    ss_max_fields, ss_field_names, _ = await _get_user_search_set_fields(user_id)
+
+    # Take whichever path has more fields — chat and classical are equivalent here.
+    if ss_max_fields >= wf_max_fields:
+        max_fields, all_field_names = ss_max_fields, ss_field_names
+    else:
+        max_fields, all_field_names = wf_max_fields, wf_field_names
 
     matched_fields = [
         ef for ef in expected_fields
@@ -651,6 +737,9 @@ async def _validate_output_delivery(user_id: str) -> dict:
 
 
 async def _validate_validation_qa(user_id: str) -> dict:
+    """Accept either the classical (workflow-validation-plan) path or the v5
+    chat-driven path (test cases on a SearchSet + a ValidationRun).
+    """
     checks = []
     workflows = await Workflow.find(Workflow.user_id == user_id).to_list()
     max_checks = 0
@@ -662,8 +751,34 @@ async def _validate_validation_qa(user_id: str) -> dict:
         if plan_len >= 2 and wf.num_executions and wf.num_executions >= 1:
             has_validated = True
 
-    checks.append({"name": "Validation plan", "passed": max_checks >= 2, "detail": f"Best plan has {max_checks} checks (need 2+)"})
-    checks.append({"name": "Ran validation", "passed": has_validated, "detail": "Run a workflow that has a validation plan"})
+    # Chat-driven path: count test cases on user's SearchSets and any completed ValidationRun
+    from app.models.search_set import SearchSet as _SS
+    from app.models.extraction_test_case import ExtractionTestCase as _TC
+    from app.models.validation_run import ValidationRun as _VR
+
+    ss_list = await _SS.find(_SS.user_id == user_id).to_list()
+    uuids = [ss.uuid for ss in ss_list]
+    if uuids:
+        tc_count = await _TC.find({"search_set_uuid": {"$in": uuids}}).count()
+        if tc_count > max_checks:
+            max_checks = tc_count
+        vr = await _VR.find_one(
+            _VR.item_kind == "search_set",
+            {"item_id": {"$in": uuids}},
+        )
+        if vr is not None:
+            has_validated = True
+
+    checks.append({
+        "name": "Validation plan (test cases)",
+        "passed": max_checks >= 2,
+        "detail": f"Best plan has {max_checks} checks/test cases (need 2+)",
+    })
+    checks.append({
+        "name": "Ran validation",
+        "passed": has_validated,
+        "detail": "Run validation (from chat: 'validate this template') or a workflow with a validation plan",
+    })
 
     passed = all(c["passed"] for c in checks)
     stars = 1 if passed else 0
@@ -676,6 +791,9 @@ async def _validate_validation_qa(user_id: str) -> dict:
 
 
 async def _validate_batch_processing(user_id: str) -> dict:
+    """Accept either the classical batched-workflow path or a v5 chat-driven
+    run_extraction call that touched 3+ documents in a single invocation.
+    """
     checks = []
     results = await WorkflowResult.find(WorkflowResult.user_id == user_id).to_list()
 
@@ -692,8 +810,22 @@ async def _validate_batch_processing(user_id: str) -> dict:
             best_batch_size = count
             best_batch_all_ok = all(r.status == "completed" for r in batch_results)
 
-    checks.append({"name": "Batch execution", "passed": best_batch_size >= 3, "detail": f"Largest batch has {best_batch_size} documents (need 3+)"})
-    checks.append({"name": "All succeeded", "passed": best_batch_all_ok and best_batch_size >= 3, "detail": "All documents in batch must complete successfully"})
+    # Chat-driven path: a single SEARCH_SET_RUN with 3+ documents counts as a batch.
+    chat_batch_size = await _user_ran_search_set_on_n_docs(user_id, min_docs=3)
+    if chat_batch_size > best_batch_size:
+        best_batch_size = chat_batch_size
+        best_batch_all_ok = True  # Activity event is only written on success
+
+    checks.append({
+        "name": "Batch execution",
+        "passed": best_batch_size >= 3,
+        "detail": f"Largest batch has {best_batch_size} documents (need 3+)",
+    })
+    checks.append({
+        "name": "All succeeded",
+        "passed": best_batch_all_ok and best_batch_size >= 3,
+        "detail": "All documents in the batch must complete successfully",
+    })
 
     passed = all(c["passed"] for c in checks)
     stars = 1 if passed else 0
@@ -736,3 +868,32 @@ _VALIDATORS = {
     "batch_processing": _validate_batch_processing,
     "governance": _validate_governance,
 }
+
+
+async def _fire_certification_complete_hooks(user_id: str) -> None:
+    """Side-effects for newly certified users: email + in-app notification.
+
+    Never raises — logged and swallowed so that cert completion itself always
+    succeeds even if downstream notifications fail.
+    """
+    from app.models.user import User
+    from app.services.engagement_service import send_certification_complete_email_for
+    from app.services.notification_service import create_notification
+
+    try:
+        user = await User.find_one(User.user_id == user_id)
+        if user:
+            await send_certification_complete_email_for(user)
+    except Exception:
+        log.exception("Failed to send cert-complete email for %s", user_id)
+
+    try:
+        await create_notification(
+            user_id=user_id,
+            kind="certification_complete",
+            title="You're a Certified Vandal Workflow Architect",
+            body="All 11 modules complete. Your Certified badge is now visible on every workflow you publish.",
+            link="/certification",
+        )
+    except Exception:
+        log.exception("Failed to create cert-complete notification for %s", user_id)

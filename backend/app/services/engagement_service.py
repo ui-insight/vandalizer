@@ -1,4 +1,4 @@
-"""User engagement service — onboarding drip + inactivity nudges."""
+"""User engagement service — onboarding drip + inactivity nudges + v5 launch funnel."""
 
 import datetime
 import logging
@@ -10,6 +10,10 @@ from app.services.email_service import (
     send_email,
     onboarding_drip_email,
     inactivity_nudge_email,
+    v5_launch_announcement_email,
+    agentic_chat_drip_email,
+    certification_complete_email,
+    powerup_milestone_email,
 )
 
 logger = logging.getLogger(__name__)
@@ -209,3 +213,248 @@ async def _get_item_name(item_kind: str, item_id) -> str | None:
         obj = await KnowledgeBase.get(obj_id)
         return obj.name if obj else None
     return None
+
+
+# ---------------------------------------------------------------------------
+# v5.0 launch announcement — one-time send to existing users
+# ---------------------------------------------------------------------------
+
+
+async def process_v5_launch_announcement(
+    settings: Settings | None = None, batch_size: int = 200,
+) -> int:
+    """Send the v5.0 launch email to each eligible user once. Returns count sent.
+
+    Idempotent: records `v5_announcement_sent_at` on the user after a successful
+    send so repeat runs skip users who already received it.
+    """
+    if settings is None:
+        settings = Settings()
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    sent = 0
+
+    users = await User.find(
+        User.v5_announcement_sent_at == None,  # noqa: E711
+        User.is_demo_user != True,  # noqa: E712
+    ).limit(batch_size).to_list()
+
+    for user in users:
+        if not user.email:
+            continue
+        prefs = user.email_preferences or {}
+        # Respect announcement opt-out if set; default to opted-in
+        if prefs.get("announcements") is False:
+            continue
+
+        subject, html = v5_launch_announcement_email(
+            name=user.name or user.user_id,
+            frontend_url=settings.frontend_url,
+        )
+        success = await send_email(
+            user.email, subject, html, settings, email_type="v5_announcement",
+        )
+        if success:
+            user.v5_announcement_sent_at = now
+            await user.save()
+            sent += 1
+
+    if sent:
+        logger.info("Sent %d v5.0 launch announcement emails", sent)
+    return sent
+
+
+# ---------------------------------------------------------------------------
+# Agentic-chat tutorial drip (5-step) — a product-feature drip parallel to
+# the cert-module onboarding drip
+# ---------------------------------------------------------------------------
+
+_AGENTIC_DRIP_TOTAL_STEPS = 5
+_AGENTIC_DRIP_SCHEDULE_DAYS = [0, 2, 5, 9, 14]
+
+
+async def process_agentic_chat_drip(settings: Settings | None = None) -> int:
+    """Send due agentic-chat tutorial emails. Returns count sent."""
+    if settings is None:
+        settings = Settings()
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    sent = 0
+
+    users = await User.find(
+        User.agentic_drip_step < _AGENTIC_DRIP_TOTAL_STEPS,
+        User.agentic_drip_next_at <= now,
+    ).to_list()
+
+    for user in users:
+        if not user.email:
+            continue
+        prefs = user.email_preferences or {}
+        if not prefs.get("onboarding", True):
+            continue
+
+        step = user.agentic_drip_step  # 0-indexed; next step to send
+        subject, html = agentic_chat_drip_email(
+            name=user.name or user.user_id,
+            step=step + 1,
+            frontend_url=settings.frontend_url,
+            role=user.role_segment,
+        )
+        success = await send_email(
+            user.email, subject, html, settings, email_type="agentic_chat_drip",
+        )
+        if success:
+            sent += 1
+
+        user.agentic_drip_step = step + 1
+        if step + 1 < _AGENTIC_DRIP_TOTAL_STEPS:
+            days_until_next = (
+                _AGENTIC_DRIP_SCHEDULE_DAYS[step + 1] - _AGENTIC_DRIP_SCHEDULE_DAYS[step]
+            )
+            user.agentic_drip_next_at = now + datetime.timedelta(days=days_until_next)
+        else:
+            user.agentic_drip_next_at = None
+        await user.save()
+
+    if sent:
+        logger.info("Sent %d agentic-chat drip emails", sent)
+    return sent
+
+
+def start_agentic_chat_drip(user: User) -> None:
+    """Enroll a user in the agentic-chat drip if they haven't been enrolled yet.
+
+    Call this from registration / first-login hooks. Does not persist — caller
+    must save the user.
+    """
+    if user.agentic_drip_next_at is None and user.agentic_drip_step == 0:
+        user.agentic_drip_next_at = datetime.datetime.now(datetime.timezone.utc)
+
+
+async def backfill_agentic_chat_drip(
+    settings: Settings | None = None, batch_size: int = 500,
+) -> int:
+    """Enroll existing users into the agentic-chat drip (one-shot backfill).
+
+    Skips users who are demo-only, already enrolled, or have opted out of
+    onboarding emails. Returns count enrolled.
+    """
+    if settings is None:
+        settings = Settings()
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    users = await User.find(
+        User.agentic_drip_next_at == None,  # noqa: E711
+        User.agentic_drip_step == 0,
+        User.is_demo_user != True,  # noqa: E712
+    ).limit(batch_size).to_list()
+
+    enrolled = 0
+    for user in users:
+        prefs = user.email_preferences or {}
+        if prefs.get("onboarding") is False:
+            continue
+        if not user.email:
+            continue
+        user.agentic_drip_next_at = now
+        await user.save()
+        enrolled += 1
+
+    if enrolled:
+        logger.info("Backfilled %d users into agentic-chat drip", enrolled)
+    return enrolled
+
+
+# ---------------------------------------------------------------------------
+# Certification-complete notification
+# ---------------------------------------------------------------------------
+
+
+async def send_certification_complete_email_for(
+    user: User, settings: Settings | None = None,
+) -> bool:
+    """Send a certification-complete celebration email. Idempotent per user."""
+    if not user.email:
+        return False
+    if user.certification_complete_sent_at is not None:
+        return False
+
+    if settings is None:
+        settings = Settings()
+
+    subject, html = certification_complete_email(
+        name=user.name or user.user_id,
+        frontend_url=settings.frontend_url,
+    )
+    success = await send_email(
+        user.email, subject, html, settings, email_type="certification_complete",
+    )
+    if success:
+        user.certification_complete_sent_at = datetime.datetime.now(datetime.timezone.utc)
+        await user.save()
+    return success
+
+
+# ---------------------------------------------------------------------------
+# Chat-workflow milestone tracking (P2-13 trigger)
+# ---------------------------------------------------------------------------
+
+POWERUP_MILESTONE_THRESHOLD = 30
+
+
+async def record_chat_workflow_run(user_id: str) -> None:
+    """Increment a user's chat-workflow counter, recording first-run timestamp.
+
+    Called from the agentic chat tool layer whenever `run_workflow` succeeds.
+    Safe to call opportunistically — failures are logged but never raised.
+    """
+    try:
+        user = await User.find_one(User.user_id == user_id)
+        if not user:
+            return
+        now = datetime.datetime.now(datetime.timezone.utc)
+        if user.first_chat_workflow_at is None:
+            user.first_chat_workflow_at = now
+        user.chat_workflow_count = (user.chat_workflow_count or 0) + 1
+        await user.save()
+    except Exception:
+        logger.exception("Failed to record chat workflow run for %s", user_id)
+
+
+async def process_powerup_milestones(settings: Settings | None = None) -> int:
+    """Send the power-user upsell email to users who crossed the threshold.
+
+    Idempotent per user via `powerup_milestone_sent_at`.
+    """
+    if settings is None:
+        settings = Settings()
+
+    users = await User.find(
+        User.chat_workflow_count >= POWERUP_MILESTONE_THRESHOLD,
+        User.powerup_milestone_sent_at == None,  # noqa: E711
+    ).to_list()
+
+    sent = 0
+    now = datetime.datetime.now(datetime.timezone.utc)
+    for user in users:
+        if not user.email:
+            continue
+        prefs = user.email_preferences or {}
+        if prefs.get("announcements") is False:
+            continue
+        subject, html = powerup_milestone_email(
+            name=user.name or user.user_id,
+            workflow_count=user.chat_workflow_count,
+            frontend_url=settings.frontend_url,
+        )
+        success = await send_email(
+            user.email, subject, html, settings, email_type="powerup_milestone",
+        )
+        if success:
+            user.powerup_milestone_sent_at = now
+            await user.save()
+            sent += 1
+
+    if sent:
+        logger.info("Sent %d power-user milestone emails", sent)
+    return sent

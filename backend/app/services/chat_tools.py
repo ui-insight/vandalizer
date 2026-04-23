@@ -7,6 +7,7 @@ Tools are exported as the ``TOOLS`` list for bulk registration.
 """
 
 import asyncio
+import datetime
 import logging
 import re
 from typing import Optional
@@ -644,6 +645,31 @@ async def run_extraction(
         user_id, team_id, extraction_set_uuid, ss.title or extraction_set_uuid
     )
 
+    # Persist a SEARCH_SET_RUN activity event so cert validators + analytics can
+    # see that this extraction was actually run (matches what the REST route
+    # does for classical runs). Best-effort — never blocks the tool.
+    try:
+        from app.models.activity import ActivityEvent, ActivityType, ActivityStatus
+        now = datetime.datetime.now(datetime.timezone.utc)
+        await ActivityEvent(
+            type=ActivityType.SEARCH_SET_RUN.value,
+            title=f"Extraction: {ss.title or extraction_set_uuid}",
+            status=ActivityStatus.COMPLETED.value,
+            user_id=user_id,
+            team_id=team_id,
+            search_set_uuid=extraction_set_uuid,
+            started_at=now,
+            finished_at=now,
+            last_updated_at=now,
+            tokens_input=tokens_in,
+            tokens_output=tokens_out,
+            total_tokens=tokens_in + tokens_out,
+            documents_touched=len(doc_names),
+            tags=["chat"],
+        ).insert()
+    except Exception:
+        logger.exception("Failed to log SEARCH_SET_RUN activity for %s", extraction_set_uuid)
+
     # Attach quality metadata as sidecar if validation data exists
     latest_run = await ValidationRun.find(
         ValidationRun.item_kind == "search_set",
@@ -878,6 +904,28 @@ async def run_workflow(
 
     from app.services import workflow_service
 
+    # Create a chat-tagged activity event so the completion hook can increment
+    # chat_workflow_count only when the workflow actually finishes.
+    activity_id = None
+    try:
+        from app.models.activity import ActivityEvent, ActivityType, ActivityStatus
+        now = datetime.datetime.now(datetime.timezone.utc)
+        ev = ActivityEvent(
+            type=ActivityType.WORKFLOW_RUN.value,
+            title=f"Workflow: {wf.name or workflow_id}",
+            status=ActivityStatus.RUNNING.value,
+            user_id=user_id,
+            team_id=team_id,
+            started_at=now,
+            last_updated_at=now,
+            documents_touched=len(document_uuids),
+            tags=["chat"],
+        )
+        await ev.insert()
+        activity_id = str(ev.id)
+    except Exception:
+        logger.exception("Failed to create chat-tagged activity for workflow %s", workflow_id)
+
     try:
         session_id = await workflow_service.run_workflow(
             workflow_id=workflow_id,
@@ -885,6 +933,7 @@ async def run_workflow(
             user_id=context.deps.user_id,
             model=context.deps.model_name or None,
             user=context.deps.user,
+            activity_id=activity_id,
         )
     except ValueError as e:
         return {"error": str(e)}
@@ -897,6 +946,18 @@ async def run_workflow(
     await user_memory_service.record_workflow(
         user_id, team_id, workflow_id, wf.name or workflow_id
     )
+
+    # first_chat_workflow_at is set at dispatch time so we know *when a user
+    # first tried*, even if that run later failed. The power-user counter is
+    # incremented on completion via the activity tag (see workflow_tasks.py).
+    try:
+        from app.models.user import User as _User
+        u = await _User.find_one(_User.user_id == user_id)
+        if u and u.first_chat_workflow_at is None:
+            u.first_chat_workflow_at = datetime.datetime.now(datetime.timezone.utc)
+            await u.save()
+    except Exception:
+        logger.exception("Failed to stamp first_chat_workflow_at for %s", user_id)
 
     return {
         "session_id": session_id,

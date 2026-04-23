@@ -19,6 +19,7 @@ CSRF_EXEMPT_PREFIXES = (
     "/api/auth/config",
     "/api/webhooks/",
     "/api/demo/apply",
+    "/api/demo/request-contact",
     "/api/demo/status/",
     "/api/demo/feedback/",
     "/api/health",

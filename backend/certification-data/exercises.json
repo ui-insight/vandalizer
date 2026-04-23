@@ -48,16 +48,16 @@
     }
   },
   "foundations": {
-    "overview": "Build your first extraction workflow using a sample NSF proposal. Click **Set Up Lab** below to add the PDF to your workspace, then follow the steps to create a workflow, extract data from it, and verify the results. When you click **Check Progress**, the system validates that your workflow extracted the correct values from the document.",
+    "overview": "Build your first extraction workflow using a sample NSF proposal — driving the whole process from chat. Click **Set Up Lab** below to add the PDF to your workspace, then have a conversation with the agent to design, run, and verify the extraction. When you click **Check Progress**, the system validates that your extraction captured the correct values from the document.",
     "documents": ["nsf-proposal-alpine-ecology.pdf"],
     "instructions": [
       "Click **Set Up Lab** to add the sample NSF proposal to your workspace.",
-      "Go to your **Library** tab and click **New** to create a workflow.",
-      "Create a workflow named **NSF Proposal Extractor**.",
-      "Add a step with an **Extraction** task.",
-      "Create a Extraction with fields: `PI Name`, `Institution`, `Total Budget`, `Project Period`, `Sponsoring Agency`.",
-      "Run the workflow against **nsf-proposal-alpine-ecology.pdf**.",
-      "Verify: PI Name = Sarah Chen, Total Budget = $485,000."
+      "Open the chat and ask: *\"What documents do I have about NSF proposals?\"* — confirm the sample PDF is listed.",
+      "Ask the agent to create an extraction for grant proposals with fields: `PI Name`, `Institution`, `Total Budget`, `Project Period`, `Sponsoring Agency`. Confirm when prompted.",
+      "Name the resulting extraction set **NSF Proposal Extractor** (or rename it from the editor if you prefer).",
+      "Ask the agent to run that extraction on **nsf-proposal-alpine-ecology.pdf**.",
+      "Review the inline quality score and extracted table. Verify: PI Name = Sarah Chen, Total Budget = $485,000.",
+      "Prefer clicks? You can also build the same workflow from the Library tab — the agent is just a faster path to the same underlying system."
     ],
     "expected_fields": ["PI Name", "Institution", "Total Budget", "Project Period", "Sponsoring Agency"],
     "expected_values": {
@@ -73,15 +73,15 @@
     }
   },
   "extraction_engine": {
-    "overview": "Create a comprehensive extraction with 15+ fields using a sample NIH R01 proposal. Click **Set Up Lab** to add the PDF, then build a detailed Extraction and validate your results.",
+    "overview": "Create a comprehensive extraction with 15+ fields using a sample NIH R01 proposal. Click **Set Up Lab** to add the PDF, then work with the agent to propose an extraction set from the document and validate your results.",
     "documents": ["nih-r01-neuroscience.pdf"],
     "instructions": [
       "Click **Set Up Lab** to add the sample NIH R01 proposal to your workspace.",
-      "Create a new Extraction with 15+ fields covering all sections of the NIH proposal.",
-      "Include fields for: PI, institution, grant number, budget categories (personnel, equipment, travel, indirect costs), specific aims, human subjects, vertebrate animals, and key personnel.",
-      "Create a workflow with an Extraction task using your comprehensive Extraction.",
-      "Run the workflow against **nih-r01-neuroscience.pdf**.",
-      "Review the results — verify PI Name = James Park, Total Budget = $1,250,000."
+      "In chat, ask: *\"Propose a comprehensive extraction set for NIH R01 proposals based on **nih-r01-neuroscience.pdf**. Include fields for PI, institution, grant number, all budget categories (personnel, equipment, travel, indirect costs), specific aims, human subjects, vertebrate animals, and key personnel.\"*",
+      "Review the proposed field list, ask the agent to add any that are missing, and confirm creation when prompted.",
+      "Ask the agent to run the new extraction on **nih-r01-neuroscience.pdf**.",
+      "Review the results inline. Verify PI Name = James Park, Total Budget = $1,250,000.",
+      "If a field looks wrong, ask the agent to open guided verification so you can record the correct value as a test case."
     ],
     "expected_fields": [
       "PI Name", "Institution", "Grant Number", "Project Title", "Project Period",
@@ -105,16 +105,14 @@
     }
   },
   "multi_step": {
-    "overview": "Build a multi-step workflow pipeline using a sample subaward agreement. Click **Set Up Lab** to add the PDF, then create a 3+ step workflow that chains extraction, analysis, and formatting.",
+    "overview": "Build a multi-step workflow pipeline using a sample subaward agreement. Click **Set Up Lab** to add the PDF, then describe the process to the agent so it can help you design a 3+ step workflow that chains extraction, analysis, and formatting.",
     "documents": ["subaward-agreement.pdf"],
     "instructions": [
       "Click **Set Up Lab** to add the sample subaward agreement to your workspace.",
-      "Create a 3-step workflow:",
-      "  **Step 1** — Extraction: Create a Extraction with fields for parties, amounts, period, PI, deliverables, and compliance terms.",
-      "  **Step 2** — Prompt: Write a prompt that analyzes the extracted subaward data and identifies key obligations and deadlines.",
-      "  **Step 3** — Formatter: Format the analysis into a structured compliance summary report.",
-      "Run the workflow against **subaward-agreement.pdf**.",
-      "Verify the pipeline chains correctly: extraction → analysis → formatted report."
+      "In chat, describe the process you want: *\"I need a 3-step workflow for subaward review. Step 1 extracts parties, amounts, period, PI, deliverables, and compliance terms. Step 2 analyzes the extracted data to identify key obligations and deadlines. Step 3 formats the analysis into a compliance summary report.\"*",
+      "Work with the agent to refine the workflow in the editor — add the Extraction task (Step 1), the Prompt task (Step 2), and the Formatter task (Step 3).",
+      "Back in chat, ask the agent to run the new workflow on **subaward-agreement.pdf**.",
+      "Watch each step complete in the live status view and confirm the pipeline chains: extraction → analysis → formatted report."
     ],
     "expected_fields": [
       "Prime Recipient", "Subrecipient", "Subaward Amount", "Performance Period",
@@ -133,16 +131,15 @@
     }
   },
   "advanced_nodes": {
-    "overview": "Use advanced workflow nodes (Code Execution, parallel tasks) to process a sample budget justification. Click **Set Up Lab** to add the PDF, then build a workflow with advanced node types.",
+    "overview": "Use advanced workflow nodes (Code Execution, parallel tasks) to process a sample budget justification. Click **Set Up Lab** to add the PDF, then design a workflow with advanced node types using chat to scaffold and refine it.",
     "documents": ["budget-justification.pdf"],
     "instructions": [
       "Click **Set Up Lab** to add the sample budget justification to your workspace.",
-      "Create a workflow that processes the budget document using advanced nodes:",
-      "  **Step 1** — Extraction: Extract salary table, supply costs, travel, subawards, and indirect costs.",
-      "  **Step 2** — Code Execution: Write Python to sum line items and verify totals match the stated budget.",
-      "  **Step 3** — Add a second task in Step 2 (parallel): Use a Prompt task to generate a budget narrative summary.",
-      "Run the workflow against **budget-justification.pdf**.",
-      "Verify the Code Execution node produces computed totals and the parallel tasks both complete."
+      "In chat, sketch the workflow: *\"Design a 3-step workflow for budget verification. Step 1 extracts salary, supplies, travel, subawards, and indirect costs. Step 2 runs Python to sum line items and check totals. Step 3 (parallel to step 2) generates a budget narrative summary with a Prompt task.\"*",
+      "Open the workflow in the editor, add the Code Execution node and verify the Python sums line items correctly.",
+      "Ensure Step 2 has two parallel tasks: the Code Execution task and the Prompt narrative task.",
+      "From chat, run the workflow on **budget-justification.pdf**.",
+      "Confirm the Code Execution node produced computed totals and both parallel tasks completed."
     ],
     "expected_fields": [
       "Personnel", "Fringe Benefits", "Supplies", "Travel", "Subaward Costs",
@@ -159,16 +156,14 @@
     }
   },
   "output_delivery": {
-    "overview": "Create a workflow that produces a downloadable deliverable from a sample progress report. Click **Set Up Lab** to add the PDF, then build a pipeline that extracts, summarizes, and exports the data.",
+    "overview": "Create a workflow that produces a downloadable deliverable from a sample progress report. Click **Set Up Lab** to add the PDF, then use chat to scaffold a pipeline that extracts, summarizes, and exports the data.",
     "documents": ["progress-report-year2.pdf"],
     "instructions": [
       "Click **Set Up Lab** to add the sample progress report to your workspace.",
-      "Create a workflow that produces a downloadable deliverable from the progress report:",
-      "  **Step 1** — Extraction: Extract accomplishments, publications, students trained, budget expenditures, and milestones.",
-      "  **Step 2** — Prompt: Summarize the progress and highlight key achievements.",
-      "  **Step 3** — Document Renderer or Data Export: Produce a downloadable report or CSV export.",
-      "Run the workflow against **progress-report-year2.pdf**.",
-      "Download the output file and verify it contains the extracted data."
+      "Describe the pipeline in chat: *\"Design a 3-step workflow for annual progress reports. Step 1 extracts accomplishments, publications, students trained, budget expenditures, and milestones. Step 2 summarizes progress and highlights key achievements. Step 3 produces a downloadable report.\"*",
+      "Open the workflow in the editor and add a **Document Renderer**, **Data Export**, or **Package Builder** to Step 3 (the agent can suggest which fits your use case).",
+      "From chat, ask the agent to run the workflow on **progress-report-year2.pdf**.",
+      "Open the workflow run in the editor, download the output file, and verify it contains the extracted data."
     ],
     "expected_fields": [
       "Project Title", "PI Name", "Reporting Period", "Accomplishments",
@@ -186,16 +181,15 @@
     }
   },
   "validation_qa": {
-    "overview": "Add quality checks to a workflow you've already built. This module reuses the NSF proposal from Module 1 — no new documents needed.",
+    "overview": "Turn the extraction from Module 1 into a validated, trustworthy template by building a test-case library from chat. The more test cases you add, the higher the quality tier climbs and the stronger the trust signals your team sees inline.",
     "documents": ["nsf-proposal-alpine-ecology.pdf"],
     "instructions": [
       "This module reuses the NSF proposal from Module 1 (already in your workspace if you completed that module).",
-      "Open the workflow you created in Module 1 (or create a new one for this document).",
-      "Go to the **Validate** tab in the workflow editor.",
-      "Create a validation plan with at least 2 quality checks (e.g., 'PI Name is not null', 'Total Budget is a valid number').",
-      "Run validation against the NSF proposal document.",
-      "Review the validation results — check which quality checks passed and which failed.",
-      "Iterate on your extraction if needed to improve validation scores."
+      "In chat, ask: *\"List the test cases for my NSF Proposal Extractor.\"* — the agent will use `list_test_cases`. If none exist yet, that's expected.",
+      "Ask the agent to propose a test case from **nsf-proposal-alpine-ecology.pdf** using your NSF Proposal Extractor. Open the guided verification modal and confirm each extracted value (PI Name, Total Budget, etc.).",
+      "Ask the agent to run a validation across your test cases (it will use `run_validation` and show you the accuracy + consistency score).",
+      "In the chat results, click the quality badge to see the score breakdown. Check the tier (excellent / good / fair / poor) and active alerts.",
+      "Iterate: add at least one more test case, then run validation again to see the score change."
     ],
     "expected_fields": [],
     "expected_values": {},
@@ -206,14 +200,14 @@
     }
   },
   "batch_processing": {
-    "overview": "Run a workflow across multiple documents at once. Click **Set Up Lab** to add three sample proposals, then process them all in batch mode and verify the results.",
+    "overview": "Run an extraction across multiple documents at once, all from chat. Click **Set Up Lab** to add three sample proposals, then ask the agent to process them in batch and verify the results.",
     "documents": ["proposal-batch-1.pdf", "proposal-batch-2.pdf", "proposal-batch-3.pdf"],
     "instructions": [
       "Click **Set Up Lab** to add three sample NSF proposals to your workspace.",
-      "Use an existing extraction workflow (from Module 1 or 2) or create a new one.",
-      "Select all three batch documents: **proposal-batch-1.pdf**, **proposal-batch-2.pdf**, **proposal-batch-3.pdf**.",
-      "Run the workflow in **Batch** mode.",
-      "Monitor the batch progress as each document is processed.",
+      "In chat, ask: *\"List my extraction sets.\"* — confirm your NSF Proposal Extractor (from Module 1) or similar is available.",
+      "Ask the agent to run that extraction on **proposal-batch-1.pdf**, **proposal-batch-2.pdf**, and **proposal-batch-3.pdf** together.",
+      "Watch the streaming tool call — you'll see a single run_extraction with multiple documents in the batch.",
+      "Review the combined results table in the chat response.",
       "Verify all 3 documents completed successfully with correct PI names: Maria Lopez, Robert Kim, Amara Okafor."
     ],
     "expected_fields": ["PI Name", "Institution", "Total Budget", "Research Area", "Sponsoring Agency"],
@@ -227,16 +221,15 @@
     }
   },
   "governance": {
-    "overview": "Organize, verify, and share your workflows across spaces. This module uses workflows you've already built — no new documents needed.",
+    "overview": "Make your team's work discoverable: get workflows verified, published to the team library, and citable from every chat. This module uses workflows you've already built — no new documents needed.",
     "documents": [],
     "instructions": [
-      "This module uses workflows you've already built — no new documents needed.",
-      "If you don't already have multiple spaces, create a second space from the **Spaces** page.",
-      "Build or duplicate a workflow in your second space.",
-      "Ensure your workflow has a clear description explaining what it does.",
-      "Mark the workflow as **verified** in the workflow settings.",
-      "Try exporting the workflow as a `.vandalizer.json` file and importing it into another space.",
-      "You now have a verified, portable, well-documented workflow."
+      "This module uses workflows you've already built.",
+      "In chat, ask: *\"List my workflows and tell me which are verified.\"* The agent will use `list_workflows` and flag anything unverified.",
+      "Pick a workflow to promote. Ensure it has a clear description and passes validation (rerun `run_validation` if needed).",
+      "In the workflow editor, mark the workflow as **verified** and publish it to your team library.",
+      "If you work across multiple spaces, duplicate or export the workflow (`.vandalizer.json`) and import it into the other space.",
+      "Back in chat, ask: *\"What verified workflows are available to my team?\"* — confirm your workflow is now discoverable to teammates by name."
     ],
     "expected_fields": [],
     "expected_values": {},

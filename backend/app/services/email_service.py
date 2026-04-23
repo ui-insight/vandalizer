@@ -597,8 +597,243 @@ def inactivity_nudge_email(
       <h1>New in the catalog</h1>
       <p>Hi {name}, it's been {days_inactive} days since your last visit. Here's what's new:</p>
       <ul style="padding-left:20px;margin:16px 0">{items_html}</ul>
-      <p>These verified extractions and knowledge bases are ready to use in your workflows.</p>
+      <p>Ask the chat to use any of these — just describe what you need.</p>
       <p style="margin-top:24px"><a class="btn" href="{frontend_url}/library?tab=catalog">Browse Catalog</a></p>
       <div class="footer">Vandalizer</div>
+    </div></div></body></html>"""
+    return subject, html
+
+
+# ---------------------------------------------------------------------------
+# Demo-request contact form (public landing-page submissions)
+# ---------------------------------------------------------------------------
+
+
+def demo_request_confirmation_email(name: str) -> tuple[str, str]:
+    """Confirmation email sent to the requester who submitted the landing-page form."""
+    subject = "Thanks for your interest in Vandalizer"
+    html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
+    <div class="container"><div class="card">
+      <div class="logo">Vandalizer</div>
+      <h1>We got your demo request, {name}.</h1>
+      <p>Someone from the Vandalizer team will reach out within one business day to schedule a walkthrough tailored to your office's workflows.</p>
+      <p>In the meantime, feel free to explore the docs or read about how we validate every chat reply with real test cases.</p>
+      <div class="footer">Vandalizer &middot; AI for Research Administration &middot; University of Idaho</div>
+    </div></div></body></html>"""
+    return subject, html
+
+
+def demo_request_admin_notification_email(
+    name: str, email: str, institution: str, role: str, message: str,
+) -> tuple[str, str]:
+    """Admin-side notification email for a new demo-request submission."""
+    subject = f"[Demo Request] {name} — {institution}"
+    msg_html = (message or "<em>No message provided.</em>").replace("\n", "<br/>")
+    html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
+    <div class="container"><div class="card">
+      <div class="logo">Vandalizer</div>
+      <h1>New demo request</h1>
+      <p><strong style="color:#fff">Name:</strong> {name}<br/>
+         <strong style="color:#fff">Email:</strong> <a href="mailto:{email}" style="color:#f1b300">{email}</a><br/>
+         <strong style="color:#fff">Institution:</strong> {institution}<br/>
+         <strong style="color:#fff">Role:</strong> {role}</p>
+      <div style="margin:16px 0;padding:12px 16px;background:rgba(255,255,255,0.05);border-left:3px solid #f1b300;border-radius:4px;">
+        <p style="margin:0;font-size:14px;color:#d1d5db;"><strong style="color:#fff;">Message:</strong><br/>{msg_html}</p>
+      </div>
+      <div class="footer">Submitted via vandalizer.ai landing page</div>
+    </div></div></body></html>"""
+    return subject, html
+
+
+# ---------------------------------------------------------------------------
+# v5.0 launch announcement (sent once to existing users)
+# ---------------------------------------------------------------------------
+
+
+def v5_launch_announcement_email(name: str, frontend_url: str) -> tuple[str, str]:
+    """Subject + HTML for the one-time v5.0 agentic-chat announcement."""
+    subject = "Vandalizer 5.0 is here — chat with your documents, validated by default"
+    html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
+    <div class="container"><div class="card">
+      <div class="logo">Vandalizer 5.0</div>
+      <h1>Hi {name} — you now have a fully agentic Vandalizer.</h1>
+      <p>We just shipped the biggest change to Vandalizer since it launched. The chat now <strong style="color:#fff">drives the whole platform</strong>:</p>
+      <ul style="padding-left:20px;margin:16px 0;color:#d1d5db">
+        <li style="margin-bottom:8px">Search documents and knowledge bases in natural language</li>
+        <li style="margin-bottom:8px">Run validated extractions — with quality scores shown inline</li>
+        <li style="margin-bottom:8px">Dispatch workflows and watch each step execute live</li>
+        <li style="margin-bottom:8px">Build new knowledge bases and test cases from the conversation</li>
+      </ul>
+      <p>Every tool result shows its sources and its accuracy. That's the part generic AI chat can't give you.</p>
+      <p style="margin-top:24px"><a class="btn" href="{frontend_url}/">Try the new chat</a></p>
+      <p style="font-size:13px;color:#6b7280;margin-top:16px">Want a tour? Open the Certification panel — Module 1 walks through the agentic chat in about 10 minutes.</p>
+      <div class="footer">Vandalizer 5.0 &middot; Fully Agentic</div>
+    </div></div></body></html>"""
+    return subject, html
+
+
+# ---------------------------------------------------------------------------
+# Agentic chat tutorial drip (5-step sequence for new users)
+# ---------------------------------------------------------------------------
+
+_AGENTIC_DRIP_STEPS = [
+    {
+        "subject": "Step 1 of 5: Ask Vandalizer what's in your documents",
+        "heading": "Start a conversation, not a menu hunt",
+        "body": (
+            "Open the chat and say: <em>\"What documents do I have about NIH proposals?\"</em> "
+            "The agent searches across your workspace and lists matches — with folder context "
+            "and page counts. No clicking through file trees."
+        ),
+        "cta": "Try a search prompt",
+    },
+    {
+        "subject": "Step 2 of 5: Get answers from your knowledge bases, with sources",
+        "heading": "Grounded answers, citations you can click",
+        "body": (
+            "Every KB reply shows the exact passages it used. Click any snippet to jump to the "
+            "source document at the cited line. No hallucinated answers hiding in long paragraphs."
+        ),
+        "cta": "Query a knowledge base",
+    },
+    {
+        "subject": "Step 3 of 5: Run an extraction and see the quality score",
+        "heading": "Not just an answer — a trustworthy answer",
+        "body": (
+            "When the agent runs an extraction, it shows accuracy, consistency, and the number "
+            "of test cases behind the result. Tiers are color-coded so you can tell at a glance "
+            "whether a result is ready to act on."
+        ),
+        "cta": "Run your first extraction",
+    },
+    {
+        "subject": "Step 4 of 5: Dispatch a workflow by describing what you need",
+        "heading": "Your verified workflows, one sentence away",
+        "body": (
+            "Say <em>\"Run the NIH compliance check on this proposal\"</em> and the agent picks "
+            "the right workflow, runs it, and streams each step. Approval gates still pause "
+            "for a human when needed."
+        ),
+        "cta": "Try a workflow prompt",
+    },
+    {
+        "subject": "Step 5 of 5: Make the system smarter by verifying results",
+        "heading": "Build your test-case library in one click",
+        "body": (
+            "When an extraction looks right, ask the agent to turn it into a test case. The "
+            "guided verification modal lets you confirm or correct each field. Over time, this "
+            "is what powers the quality scores your team can trust."
+        ),
+        "cta": "Open guided verification",
+    },
+]
+
+
+# Role-specific overrides for drip step copy. Each entry swaps the example
+# prompt / scenario so the drip speaks to the recipient's day-to-day work.
+_ROLE_OVERRIDES: dict[str, dict[int, dict[str, str]]] = {
+    "pi": {
+        0: {
+            "body": (
+                "Open the chat and say: <em>\"What documents do I have related to my current R01?\"</em> "
+                "The agent pulls the proposal, progress reports, and any budget docs it can find — "
+                "no file-tree archaeology."
+            ),
+        },
+        3: {
+            "body": (
+                "Say <em>\"Extract the aims and budget from my R01 resubmission and check it against "
+                "my last progress report\"</em> — the agent runs the right workflow and pauses at the "
+                "approval gate if your team requires one."
+            ),
+        },
+    },
+    "compliance": {
+        2: {
+            "body": (
+                "When the agent runs a compliance-check extraction, it shows accuracy, consistency, and "
+                "the number of ground-truth test cases behind the template. For audit documentation, "
+                "every score ties back to a persisted ValidationRun you can point to."
+            ),
+        },
+    },
+    "sponsored_programs": {
+        0: {
+            "body": (
+                "Open the chat and say: <em>\"What proposals does OSP have due this month?\"</em> "
+                "The agent searches by deadline metadata across your office's queue — no more manual "
+                "spreadsheet upkeep."
+            ),
+        },
+    },
+}
+
+
+def agentic_chat_drip_email(
+    name: str, step: int, frontend_url: str, role: str | None = None,
+) -> tuple[str, str]:
+    """5-step drip series introducing the agentic chat. step is 1-indexed.
+
+    If `role` is a known segment, role-specific copy overrides apply to the step.
+    """
+    idx = max(1, min(step, len(_AGENTIC_DRIP_STEPS))) - 1
+    s = dict(_AGENTIC_DRIP_STEPS[idx])
+    if role:
+        override = _ROLE_OVERRIDES.get(role, {}).get(idx)
+        if override:
+            s.update(override)
+    html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
+    <div class="container"><div class="card">
+      <div class="logo">Vandalizer</div>
+      <h1>{s['heading']}</h1>
+      <p>Hi {name} —</p>
+      <p>{s['body']}</p>
+      <p style="margin-top:24px"><a class="btn" href="{frontend_url}/">{s['cta']}</a></p>
+      <p style="font-size:13px;color:#6b7280;margin-top:16px">
+        Step {idx + 1} of {len(_AGENTIC_DRIP_STEPS)} &middot; Reply to this email if you get stuck, or open the Certification panel for the full walkthrough.
+      </p>
+      <div class="footer">Vandalizer 5.0</div>
+    </div></div></body></html>"""
+    return s["subject"], html
+
+
+# ---------------------------------------------------------------------------
+# Certification completion email
+# ---------------------------------------------------------------------------
+
+
+def powerup_milestone_email(name: str, workflow_count: int, frontend_url: str) -> tuple[str, str]:
+    """Upsell email fired when a user crosses the 30-workflow milestone via chat."""
+    subject = f"You've run {workflow_count} workflows from chat — ready to go deeper?"
+    html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
+    <div class="container"><div class="card">
+      <div class="logo">Vandalizer</div>
+      <h1>You\'ve clearly found your flow, {name}.</h1>
+      <p>You\'ve driven <span class="highlight">{workflow_count}+ workflows</span> from chat. That puts you in power-user territory — here\'s what you can do next:</p>
+      <ul style="padding-left:20px;margin:16px 0;color:#d1d5db">
+        <li style="margin-bottom:8px">Promote your most-used extractions into <strong style="color:#fff">validated templates</strong> with test cases. Every teammate who uses them gets the same quality signals you see.</li>
+        <li style="margin-bottom:8px">Build a <strong style="color:#fff">team knowledge base</strong> from your OSP handbook so the agent can cite the right policy for every question.</li>
+        <li style="margin-bottom:8px">Finish the <strong style="color:#fff">Workflow Architect certification</strong> — the advanced modules cover multi-step orchestration and governance.</li>
+      </ul>
+      <p style="margin-top:24px"><a class="btn" href="{frontend_url}/">Open Vandalizer</a></p>
+      <div class="footer">Vandalizer 5.0 &middot; Power user tips</div>
+    </div></div></body></html>"""
+    return subject, html
+
+
+def certification_complete_email(name: str, frontend_url: str) -> tuple[str, str]:
+    """Celebration email sent when a user finishes all 11 certification modules."""
+    subject = "You're a Certified Vandal Workflow Architect"
+    html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
+    <div class="container"><div class="card">
+      <div class="logo">Vandalizer</div>
+      <h1>Certified. Nice work, {name}.</h1>
+      <p>You finished all 11 modules of the Vandal Workflow Architect certification. That's 1,600 XP across AI literacy, workflow design, extraction, validation, and governance.</p>
+      <p>Your <strong style="color:#fff">Certified</strong> badge is now visible on every workflow you publish, so your team knows those pipelines were built by someone who understands the full trust stack.</p>
+      <p style="margin-top:24px"><a class="btn" href="{frontend_url}/certification">View Your Certification</a></p>
+      <p style="font-size:13px;color:#6b7280;margin-top:16px">
+        Want to help a colleague get certified? Invite them to your team and they can start the journey with the same verified modules you did.
+      </p>
+      <div class="footer">Vandalizer &middot; Certified Workflow Architect</div>
     </div></div></body></html>"""
     return subject, html

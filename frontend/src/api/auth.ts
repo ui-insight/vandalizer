@@ -43,10 +43,28 @@ export function register(
   password: string,
   name?: string,
   invite_token?: string,
+  role_segment?: string,
 ) {
   return apiFetch<User>('/api/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ user_id, email, password, name, invite_token }),
+    body: JSON.stringify({ user_id, email, password, name, invite_token, role_segment }),
+  })
+}
+
+export interface EmailPreferences {
+  onboarding: boolean
+  nudges: boolean
+  announcements: boolean
+}
+
+export function getEmailPreferences() {
+  return apiFetch<EmailPreferences>('/api/auth/email-preferences')
+}
+
+export function updateEmailPreferences(prefs: Partial<EmailPreferences>) {
+  return apiFetch<EmailPreferences>('/api/auth/email-preferences', {
+    method: 'PUT',
+    body: JSON.stringify(prefs),
   })
 }
 
