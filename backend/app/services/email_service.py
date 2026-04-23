@@ -8,17 +8,20 @@ import aiosmtplib
 import httpx
 
 from app.config import Settings
+from app.models.email_log import EmailLog
 
 logger = logging.getLogger(__name__)
 
 RESEND_API_URL = "https://api.resend.com/emails"
 
+_ERROR_MAX_LEN = 500
 
-async def _send_via_smtp(to: str, subject: str, html_body: str, settings: Settings) -> bool:
-    """Send an HTML email via SMTP."""
+
+async def _send_via_smtp(to: str, subject: str, html_body: str, settings: Settings) -> tuple[bool, str | None]:
+    """Send an HTML email via SMTP. Returns (success, error_message)."""
     if not settings.smtp_host:
         logger.warning("SMTP not configured — skipping email to %s", to)
-        return False
+        return False, "SMTP not configured"
 
     msg = MIMEMultipart("alternative")
     msg["From"] = f"{settings.smtp_from_name} <{settings.smtp_from_email}>"
@@ -37,17 +40,17 @@ async def _send_via_smtp(to: str, subject: str, html_body: str, settings: Settin
             start_tls=settings.smtp_start_tls,
         )
         logger.info("Email sent via SMTP to %s: %s", to, subject)
-        return True
-    except Exception:
+        return True, None
+    except Exception as exc:
         logger.exception("Failed to send email via SMTP to %s", to)
-        return False
+        return False, f"{type(exc).__name__}: {exc}"[:_ERROR_MAX_LEN]
 
 
-async def _send_via_resend(to: str, subject: str, html_body: str, settings: Settings) -> bool:
-    """Send an HTML email via the Resend API (httpx)."""
+async def _send_via_resend(to: str, subject: str, html_body: str, settings: Settings) -> tuple[bool, str | None]:
+    """Send an HTML email via the Resend API (httpx). Returns (success, error_message)."""
     if not settings.resend_api_key:
         logger.warning("Resend API key not configured — skipping email to %s", to)
-        return False
+        return False, "Resend API key not configured"
 
     from_addr = f"{settings.resend_from_name} <{settings.resend_from_email}>"
     try:
@@ -65,20 +68,56 @@ async def _send_via_resend(to: str, subject: str, html_body: str, settings: Sett
             )
             resp.raise_for_status()
         logger.info("Email sent via Resend to %s: %s", to, subject)
-        return True
-    except Exception:
+        return True, None
+    except httpx.HTTPStatusError as exc:
         logger.exception("Failed to send email via Resend to %s", to)
-        return False
+        body = exc.response.text if exc.response is not None else ""
+        return False, f"HTTP {exc.response.status_code}: {body}"[:_ERROR_MAX_LEN]
+    except Exception as exc:
+        logger.exception("Failed to send email via Resend to %s", to)
+        return False, f"{type(exc).__name__}: {exc}"[:_ERROR_MAX_LEN]
 
 
-async def send_email(to: str, subject: str, html_body: str, settings: Settings | None = None) -> bool:
-    """Send an HTML email using the configured provider. Returns True on success."""
+async def _log_send(
+    recipient: str, subject: str, email_type: str, provider: str,
+    success: bool, error: str | None,
+) -> None:
+    """Persist an EmailLog row. Never raises."""
+    try:
+        await EmailLog(
+            recipient=recipient,
+            subject=subject,
+            email_type=email_type,
+            provider=provider,
+            status="sent" if success else "failed",
+            error=error,
+        ).insert()
+    except Exception:
+        logger.exception("Failed to persist EmailLog for %s", recipient)
+
+
+async def send_email(
+    to: str,
+    subject: str,
+    html_body: str,
+    settings: Settings | None = None,
+    email_type: str = "other",
+) -> bool:
+    """Send an HTML email using the configured provider. Returns True on success.
+
+    Every attempt is persisted to the email_log collection for admin analytics.
+    """
     if settings is None:
         settings = Settings()
 
-    if settings.email_provider == "resend":
-        return await _send_via_resend(to, subject, html_body, settings)
-    return await _send_via_smtp(to, subject, html_body, settings)
+    provider = settings.email_provider if settings.email_provider == "resend" else "smtp"
+    if provider == "resend":
+        success, error = await _send_via_resend(to, subject, html_body, settings)
+    else:
+        success, error = await _send_via_smtp(to, subject, html_body, settings)
+
+    await _log_send(to, subject, email_type, provider, success, error)
+    return success
 
 
 # ---------------------------------------------------------------------------

@@ -211,4 +211,4 @@ async def _notify_approval_resolved(
             comments=approval.reviewer_comments,
             frontend_url=settings.frontend_url,
         )
-        await send_email(owner.email, subject, html, settings)
+        await send_email(owner.email, subject, html, settings, email_type="approval_resolved")

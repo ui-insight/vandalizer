@@ -100,7 +100,7 @@ async def submit_application(
     subject, html = waitlist_confirmation_email(
         name, position, settings.frontend_url, app.uuid
     )
-    await send_email(email, subject, html, settings)
+    await send_email(email, subject, html, settings, email_type="waitlist_confirmation")
 
     return app
 
@@ -228,7 +228,7 @@ async def _activate_application(app: DemoApplication, settings: Settings) -> Non
         app.name, user_id, password, expires_str, settings.frontend_url,
         magic_link=magic_link,
     )
-    await send_email(app.email, subject, html, settings)
+    await send_email(app.email, subject, html, settings, email_type="demo_activation")
 
 
 async def _find_or_create_org_team(
@@ -289,7 +289,7 @@ async def check_expirations(settings: Settings | None = None) -> int:
         # Send feedback email
         feedback_url = f"{settings.frontend_url}/demo/feedback?token={app.post_questionnaire_token}"
         subject, html = trial_expired_email(app.name, feedback_url)
-        await send_email(app.email, subject, html, settings)
+        await send_email(app.email, subject, html, settings, email_type="trial_expired")
         count += 1
 
     if count:
@@ -320,7 +320,7 @@ async def send_expiry_warnings(settings: Settings | None = None) -> int:
         subject, html = expiry_warning_email(
             app.name, days_left, expires_str, settings.frontend_url
         )
-        await send_email(app.email, subject, html, settings)
+        await send_email(app.email, subject, html, settings, email_type="expiry_warning")
         count += 1
 
     return count
@@ -380,7 +380,7 @@ async def resend_credentials(uuid: str, settings: Settings | None = None) -> boo
         app.name, user.user_id, password, expires_str, settings.frontend_url,
         magic_link=magic_link,
     )
-    await send_email(app.email, subject, html, settings)
+    await send_email(app.email, subject, html, settings, email_type="credentials_resend")
 
     logger.info("Resent credentials for demo user %s", app.email)
     return True
@@ -619,7 +619,7 @@ async def process_recapture_drips(settings: Settings | None = None) -> int:
             frontend_url=settings.frontend_url,
             resend_url=resend_url,
         )
-        success = await send_email(app.email, subject, html, settings)
+        success = await send_email(app.email, subject, html, settings, email_type="recapture")
         if success:
             sent += 1
 
@@ -675,7 +675,7 @@ async def send_test_email(to: str, settings: Settings | None = None) -> bool:
     if settings is None:
         settings = Settings()
     subject, html = test_email(to)
-    return await send_email(to, subject, html, settings)
+    return await send_email(to, subject, html, settings, email_type="deliverability_test")
 
 
 async def bulk_resend_credentials(settings: Settings | None = None) -> dict:
@@ -723,7 +723,7 @@ async def bulk_resend_credentials(settings: Settings | None = None) -> dict:
             app.name, user.user_id, password, expires_str, settings.frontend_url,
             magic_link=magic_link,
         )
-        success = await send_email(app.email, subject, html, settings)
+        success = await send_email(app.email, subject, html, settings, email_type="bulk_credentials_resend")
         if success:
             sent += 1
         else:

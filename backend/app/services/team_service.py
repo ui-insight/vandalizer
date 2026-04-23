@@ -179,7 +179,7 @@ async def _send_invite_email(
 
     accept_url = f"{settings.frontend_url}/invite?token={invite.token}"
     subject, html = team_invite_email(inviter_name, team.name, invite.role, accept_url)
-    await send_email(invite.email, subject, html, settings)
+    await send_email(invite.email, subject, html, settings, email_type="team_invite")
 
 
 async def get_invite_info(token: str) -> dict | None:
@@ -286,7 +286,7 @@ async def _notify_invite_accepted(
             team_name=team.name,
             frontend_url=settings.frontend_url,
         )
-        await send_email(inviter.email, subject, html, settings)
+        await send_email(inviter.email, subject, html, settings, email_type="team_member_joined")
 
 
 async def switch_team(team_uuid: str, user: User) -> Team:

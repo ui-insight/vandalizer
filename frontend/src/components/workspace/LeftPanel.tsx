@@ -156,7 +156,7 @@ export function LeftPanel() {
         }}
       >
         {/* Back button */}
-        <div style={{ paddingLeft: 15, width: 50 }}>
+        <div style={{ paddingLeft: 15, width: 50, flexShrink: 0 }}>
           {viewingDoc && (
             <button
               onClick={() => { setViewingDoc(null); setSelectedDocUuids([]); setSelectedDocNames({}) }}
@@ -168,7 +168,7 @@ export function LeftPanel() {
         </div>
 
         {/* Title or search input - centered */}
-        <div className="flex-1 text-center">
+        <div className="flex-1 text-center" style={{ minWidth: 0 }}>
           {searchOpen && !viewingDoc ? (
             <div className="flex items-center gap-2 mx-auto" style={{ maxWidth: 'calc(100% - 60px)' }}>
               <Search className="h-4 w-4 text-gray-400 shrink-0" />
@@ -193,11 +193,13 @@ export function LeftPanel() {
           ) : (
             <p
               className="m-0 truncate text-white"
+              title={viewingDoc ? viewingDoc.title : undefined}
               style={{
                 fontSize: 18,
                 fontWeight: 600,
-                maxWidth: 'calc(100% - 60px)',
                 margin: '0 auto',
+                paddingLeft: 8,
+                paddingRight: 8,
               }}
             >
               {viewingDoc ? viewingDoc.title : 'Select or Upload PDFs'}
@@ -206,7 +208,7 @@ export function LeftPanel() {
         </div>
 
         {/* Right controls */}
-        <div style={{ paddingRight: 15, width: 50, display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
+        <div style={{ paddingRight: 15, width: 50, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'flex-end' }}>
           {viewingDoc ? (
             <button
               onClick={() => setShowRawText(true)}

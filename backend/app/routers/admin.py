@@ -2047,3 +2047,136 @@ async def get_system_version(user: User = Depends(get_current_user)) -> dict:
     """Report the running version and whether an upstream release is newer."""
     await _require_admin(user)
     return await get_update_status(Settings())
+
+
+# ---------------------------------------------------------------------------
+# Email analytics — deliverability monitoring
+# ---------------------------------------------------------------------------
+
+
+class EmailDailyPoint(BaseModel):
+    date: str  # YYYY-MM-DD (UTC)
+    sent: int
+    failed: int
+
+
+class EmailTypeRow(BaseModel):
+    email_type: str
+    sent: int
+    failed: int
+    success_rate: float  # 0..1, or 1.0 when no attempts (vacuously healthy)
+
+
+class EmailFailureRow(BaseModel):
+    created_at: datetime.datetime
+    recipient: str
+    email_type: str
+    provider: str
+    subject: str
+    error: Optional[str] = None
+
+
+class EmailAnalyticsResponse(BaseModel):
+    window_days: int
+    total_sent: int
+    total_failed: int
+    success_rate: float
+    by_day: list[EmailDailyPoint]
+    by_type: list[EmailTypeRow]
+    recent_failures: list[EmailFailureRow]
+    providers: list[str]
+
+
+@router.get("/email-analytics", response_model=EmailAnalyticsResponse)
+async def email_analytics(
+    days: int = Query(default=30, ge=1, le=365),
+    user: User = Depends(get_current_user),
+) -> EmailAnalyticsResponse:
+    """Deliverability stats over the last `days` days.
+
+    Returns totals, a daily time series, per-email-type breakdown with success
+    rate, and the most recent failures so admins can spot configuration issues.
+    """
+    await _require_admin(user)
+
+    from app.models.email_log import EmailLog
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    cutoff = now - datetime.timedelta(days=days)
+
+    logs = await EmailLog.find(EmailLog.created_at >= cutoff).to_list()
+
+    total_sent = 0
+    total_failed = 0
+    day_buckets: dict[str, dict[str, int]] = {}
+    type_buckets: dict[str, dict[str, int]] = {}
+    providers: set[str] = set()
+
+    for i in range(days):
+        d = (now - datetime.timedelta(days=days - 1 - i)).strftime("%Y-%m-%d")
+        day_buckets[d] = {"sent": 0, "failed": 0}
+
+    for log in logs:
+        key = log.created_at.strftime("%Y-%m-%d")
+        bucket = day_buckets.setdefault(key, {"sent": 0, "failed": 0})
+        t_bucket = type_buckets.setdefault(log.email_type, {"sent": 0, "failed": 0})
+        providers.add(log.provider)
+
+        if log.status == "sent":
+            total_sent += 1
+            bucket["sent"] += 1
+            t_bucket["sent"] += 1
+        else:
+            total_failed += 1
+            bucket["failed"] += 1
+            t_bucket["failed"] += 1
+
+    by_day = [
+        EmailDailyPoint(date=d, sent=v["sent"], failed=v["failed"])
+        for d, v in sorted(day_buckets.items())
+    ]
+
+    by_type: list[EmailTypeRow] = []
+    for et, v in sorted(type_buckets.items()):
+        attempts = v["sent"] + v["failed"]
+        rate = (v["sent"] / attempts) if attempts else 1.0
+        by_type.append(
+            EmailTypeRow(
+                email_type=et,
+                sent=v["sent"],
+                failed=v["failed"],
+                success_rate=round(rate, 4),
+            )
+        )
+    by_type.sort(key=lambda r: r.sent + r.failed, reverse=True)
+
+    failures = await EmailLog.find(
+        EmailLog.created_at >= cutoff,
+        EmailLog.status == "failed",
+    ).sort(-EmailLog.created_at).limit(25).to_list()
+
+    recent_failures = [
+        EmailFailureRow(
+            created_at=f.created_at,
+            recipient=f.recipient,
+            email_type=f.email_type,
+            provider=f.provider,
+            subject=f.subject,
+            error=f.error,
+        )
+        for f in failures
+    ]
+
+    total_attempts = total_sent + total_failed
+    overall_rate = (total_sent / total_attempts) if total_attempts else 1.0
+
+    return EmailAnalyticsResponse(
+        window_days=days,
+        total_sent=total_sent,
+        total_failed=total_failed,
+        success_rate=round(overall_rate, 4),
+        by_day=by_day,
+        by_type=by_type,
+        recent_failures=recent_failures,
+        providers=sorted(providers),
+    )

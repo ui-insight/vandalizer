@@ -1050,7 +1050,7 @@ async def _notify_submitter(
             reviewer_notes=reviewer_notes,
             frontend_url=settings.frontend_url,
         )
-        await send_email(submitter.email, subject, html, settings)
+        await send_email(submitter.email, subject, html, settings, email_type="verification_status")
 
 
 async def check_and_flag_stale_verification(item_kind: str, item_id: str) -> bool:
@@ -1158,4 +1158,4 @@ async def _notify_quality_alert(
             message=message,
             frontend_url=settings.frontend_url,
         )
-        await send_email(owner.email, subject, html, settings)
+        await send_email(owner.email, subject, html, settings, email_type="quality_alert")

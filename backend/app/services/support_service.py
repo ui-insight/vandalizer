@@ -393,27 +393,13 @@ async def get_support_contacts() -> list[dict]:
 
 
 async def _get_all_support_user_ids() -> list[dict]:
-    """Return deduplicated list of support contacts + admins as {user_id, email, name}."""
+    """Return the configured support contacts as {user_id, email, name}."""
     config = await SystemConfig.get_config()
-    contacts = list(config.support_contacts or [])
-    seen_ids = {c.get("user_id") for c in contacts if c.get("user_id")}
-
-    # Include admins who aren't already in the contacts list
-    admins = await User.find(User.is_admin == True).to_list()  # noqa: E712
-    for admin in admins:
-        if admin.user_id not in seen_ids:
-            contacts.append({
-                "user_id": admin.user_id,
-                "email": admin.email,
-                "name": admin.name or admin.user_id,
-            })
-            seen_ids.add(admin.user_id)
-
-    return contacts
+    return list(config.support_contacts or [])
 
 
 async def _notify_support_contacts_new_ticket(ticket: SupportTicket) -> None:
-    """Email and notify all support contacts and admins about a new ticket."""
+    """Email and notify configured support contacts about a new ticket."""
     contacts = await _get_all_support_user_ids()
     settings = Settings()
 
@@ -450,13 +436,13 @@ async def _notify_support_contacts_new_ticket(ticket: SupportTicket) -> None:
                 ticket_uuid=ticket.uuid,
                 frontend_url=settings.frontend_url,
             )
-            await send_email(email, subject, html, settings)
+            await send_email(email, subject, html, settings, email_type="support_new_ticket")
 
 
 async def _notify_support_contacts_new_message(
     ticket: SupportTicket, msg: SupportMessage
 ) -> None:
-    """Notify support contacts and admins about a new message on an existing ticket."""
+    """Notify configured support contacts about a new message on an existing ticket."""
     contacts = await _get_all_support_user_ids()
     settings = Settings()
 
@@ -486,7 +472,7 @@ async def _notify_support_contacts_new_message(
                     ticket_uuid=ticket.uuid,
                     frontend_url=settings.frontend_url,
                 )
-                await send_email(email, subject, html, settings)
+                await send_email(email, subject, html, settings, email_type="support_new_message")
 
 
 async def _email_ticket_owner_reply(
@@ -507,7 +493,7 @@ async def _email_ticket_owner_reply(
         ticket_uuid=ticket.uuid,
         frontend_url=settings.frontend_url,
     )
-    await send_email(owner.email, subject, html, settings)
+    await send_email(owner.email, subject, html, settings, email_type="support_reply")
 
 
 async def _email_ticket_owner_status(
@@ -526,7 +512,7 @@ async def _email_ticket_owner_status(
         ticket_uuid=ticket.uuid,
         frontend_url=settings.frontend_url,
     )
-    await send_email(owner.email, subject, html, settings)
+    await send_email(owner.email, subject, html, settings, email_type="support_status")
 
 
 # ---------------------------------------------------------------------------
