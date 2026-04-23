@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { X, FolderOpen, Globe, Loader2, Plus, ChevronRight, Mail } from 'lucide-react'
-import { createAutomation } from '../../api/automations'
+import { createAutomation, updateAutomation } from '../../api/automations'
 import { createFolder } from '../../api/folders'
 import { apiFetch } from '../../api/client'
 import { getFeatureFlags } from '../../api/config'
@@ -163,9 +163,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
         shared_with_team: sharedWithTeam,
       })
 
-      // Enable and set output config via update (create doesn't accept all fields)
       if (enabled || Object.keys(outputConfig).length > 0) {
-        const { updateAutomation } = await import('../../api/automations')
         await updateAutomation(auto.id, {
           enabled,
           ...(Object.keys(outputConfig).length > 0 ? { output_config: outputConfig } : {}),
