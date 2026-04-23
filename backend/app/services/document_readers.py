@@ -66,21 +66,34 @@ def ocr_extract_text_from_pdf(pdf_path: str, retries: int = 3) -> str:
     db = client[settings.mongo_db]
     cfg = db.system_config.find_one({})
     ocr_endpoint = (cfg or {}).get("ocr_endpoint", "")
-    ocr_api_key = decrypt_value((cfg or {}).get("ocr_api_key", ""))
+    raw_api_key = (cfg or {}).get("ocr_api_key", "")
+    ocr_api_key = decrypt_value(raw_api_key)
 
     if not ocr_endpoint:
         logger.warning("OCR_ENDPOINT not configured — skipping OCR for %s", pdf_path)
         return ""
-    logger.info("Extracting text with OCR for %s", pdf_path)
+
+    # If decrypt_value returned the raw 'enc:' ciphertext, CONFIG_ENCRYPTION_KEY
+    # is missing or wrong in this process (commonly the Celery worker env).
+    if ocr_api_key.startswith("enc:"):
+        logger.error(
+            "OCR api key could not be decrypted — CONFIG_ENCRYPTION_KEY missing "
+            "or mismatched in this worker. Fix the env var and restart Celery."
+        )
+        return ""
+
+    logger.info(
+        "Extracting text with OCR: endpoint=%s key_set=%s key_len=%d file=%s",
+        ocr_endpoint, bool(ocr_api_key), len(ocr_api_key), pdf_path,
+    )
 
     headers = {}
     if ocr_api_key:
         headers["Authorization"] = f"Bearer {ocr_api_key}"
 
-    for _attempt in range(retries):
+    import httpx
+    for attempt in range(retries):
         try:
-            import httpx
-
             with httpx.Client(timeout=120.0) as client:
                 with open(pdf_path, "rb") as f:
                     resp = client.post(
@@ -90,9 +103,14 @@ def ocr_extract_text_from_pdf(pdf_path: str, retries: int = 3) -> str:
                     )
                 if resp.status_code == 200:
                     return resp.text
+                logger.warning(
+                    "OCR attempt %d returned HTTP %d from %s — body: %s",
+                    attempt + 1, resp.status_code, ocr_endpoint, resp.text[:500],
+                )
         except Exception as e:
-            logger.warning("OCR attempt failed: %s", e)
+            logger.warning("OCR attempt %d raised: %s", attempt + 1, e)
 
+    logger.error("OCR failed after %d attempts for %s", retries, pdf_path)
     return ""
 
 
