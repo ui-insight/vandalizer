@@ -51,35 +51,35 @@ function GettingStarted() {
         <li className="flex items-start gap-2">
           <span className="text-[#f1b300] mt-1">&#x2022;</span>
           <span>
-            <strong className="text-white">Structured Extraction</strong> &mdash; Pull dates,
+            <strong className="text-white">Structured Extraction</strong>: pull dates,
             budgets, requirements, and more from PDFs into clean structured data
           </span>
         </li>
         <li className="flex items-start gap-2">
           <span className="text-[#f1b300] mt-1">&#x2022;</span>
           <span>
-            <strong className="text-white">Workflow Engine</strong> &mdash; Chain extraction tasks
+            <strong className="text-white">Workflow Engine</strong>: chain extraction tasks
             into repeatable pipelines with dependency resolution
           </span>
         </li>
         <li className="flex items-start gap-2">
           <span className="text-[#f1b300] mt-1">&#x2022;</span>
           <span>
-            <strong className="text-white">RAG Chat</strong> &mdash; Ask questions against your
+            <strong className="text-white">RAG Chat</strong>: ask questions against your
             document collection with citation-backed answers
           </span>
         </li>
         <li className="flex items-start gap-2">
           <span className="text-[#f1b300] mt-1">&#x2022;</span>
           <span>
-            <strong className="text-white">Team Collaboration</strong> &mdash; Multi-tenant
+            <strong className="text-white">Team Collaboration</strong>: multi-tenant
             workspaces with role-based access and shared libraries
           </span>
         </li>
         <li className="flex items-start gap-2">
           <span className="text-[#f1b300] mt-1">&#x2022;</span>
           <span>
-            <strong className="text-white">Self-Hosted</strong> &mdash; Run on your own
+            <strong className="text-white">Self-Hosted</strong>: run on your own
             infrastructure with full control over your data
           </span>
         </li>
@@ -95,7 +95,7 @@ function GettingStarted() {
         <div>docker compose up -d redis mongo chromadb</div>
         <div className="mt-3 text-gray-500"># Install backend dependencies & run</div>
         <div>cp backend/.env.example backend/.env && make backend-install && cd backend && uv run uvicorn app.main:app --reload --port 8001</div>
-        <div className="mt-3 text-gray-500"># In another terminal — start frontend</div>
+        <div className="mt-3 text-gray-500"># In another terminal, start frontend</div>
         <div>cd frontend && npm install && npm run dev</div>
       </div>
 
@@ -196,22 +196,22 @@ function Installation() {
       <ul className="space-y-1 text-gray-300 text-sm">
         <li>
           <span className="text-[#f1b300]">&#x2022;</span>{' '}
-          <strong className="text-white">MongoDB</strong> &mdash; Document storage and system
+          <strong className="text-white">MongoDB</strong>: document storage and system
           configuration
         </li>
         <li>
           <span className="text-[#f1b300]">&#x2022;</span>{' '}
-          <strong className="text-white">Redis</strong> &mdash; Celery broker, result backend, and
+          <strong className="text-white">Redis</strong>: Celery broker, result backend, and
           LLM response caching
         </li>
         <li>
           <span className="text-[#f1b300]">&#x2022;</span>{' '}
-          <strong className="text-white">ChromaDB</strong> &mdash; Vector store for document
+          <strong className="text-white">ChromaDB</strong>: vector store for document
           embeddings (RAG)
         </li>
         <li>
           <span className="text-[#f1b300]">&#x2022;</span>{' '}
-          <strong className="text-white">Pandoc + pdflatex</strong> &mdash; DOCX to PDF conversion
+          <strong className="text-white">Pandoc + pdflatex</strong>: DOCX to PDF conversion
           (optional)
         </li>
       </ul>
@@ -227,7 +227,7 @@ function UserGuide() {
       <h3 className="text-xl font-bold text-white mt-8">Uploading Documents</h3>
       <p className="text-gray-300 leading-relaxed">
         Drag and drop files into the workspace or use the upload button. Supported formats include
-        PDF, DOCX, XLSX, and HTML. Documents are processed asynchronously &mdash; text is extracted,
+        PDF, DOCX, XLSX, and HTML. Documents are processed asynchronously. Text is extracted,
         chunked, and embedded into ChromaDB for RAG search.
       </p>
 

@@ -63,14 +63,14 @@ def _build_candidate_configs(available_models: list[dict], num_fields: int) -> l
     for m in models:
         # Default two-pass with each model
         _add(
-            f"{m['tag']} — two-pass",
+            f"{m['tag']} - two-pass",
             m["name"],
             {"mode": "two_pass"},
         )
 
         # One-pass with each model
         _add(
-            f"{m['tag']} — one-pass",
+            f"{m['tag']} - one-pass",
             m["name"],
             {"mode": "one_pass", "one_pass": {"thinking": m["thinking"], "structured": m["structured"]}},
         )
@@ -78,7 +78,7 @@ def _build_candidate_configs(available_models: list[dict], num_fields: int) -> l
         # If model supports thinking, try two-pass with thinking on both passes
         if m["thinking"]:
             _add(
-                f"{m['tag']} — two-pass (full thinking)",
+                f"{m['tag']} - two-pass (full thinking)",
                 m["name"],
                 {"mode": "two_pass", "two_pass": {
                     "pass_1": {"thinking": True, "structured": False, "model": m["name"]},
@@ -88,7 +88,7 @@ def _build_candidate_configs(available_models: list[dict], num_fields: int) -> l
 
         # One-pass without thinking (fast mode)
         _add(
-            f"{m['tag']} — one-pass (fast, no thinking)",
+            f"{m['tag']} - one-pass (fast, no thinking)",
             m["name"],
             {"mode": "one_pass", "one_pass": {"thinking": False, "structured": m["structured"]}},
         )
@@ -97,13 +97,13 @@ def _build_candidate_configs(available_models: list[dict], num_fields: int) -> l
     if models:
         m = models[0]
         _add(
-            f"{m['tag']} — two-pass + consensus (3x runs)",
+            f"{m['tag']} - two-pass + consensus (3x runs)",
             m["name"],
             {"mode": "two_pass", "repetition": {"enabled": True}},
         )
         # Also try consensus with one-pass for a faster high-consistency option
         _add(
-            f"{m['tag']} — one-pass + consensus (3x runs)",
+            f"{m['tag']} - one-pass + consensus (3x runs)",
             m["name"],
             {"mode": "one_pass", "one_pass": {"thinking": m["thinking"], "structured": m["structured"]},
              "repetition": {"enabled": True}},
@@ -113,12 +113,12 @@ def _build_candidate_configs(available_models: list[dict], num_fields: int) -> l
     if num_fields > 12 and models:
         m = models[0]
         _add(
-            f"{m['tag']} — two-pass + chunking (8 fields/chunk)",
+            f"{m['tag']} - two-pass + chunking (8 fields/chunk)",
             m["name"],
             {"mode": "two_pass", "chunking": {"enabled": True, "max_keys_per_chunk": 8}},
         )
         _add(
-            f"{m['tag']} — two-pass + chunking (5 fields/chunk)",
+            f"{m['tag']} - two-pass + chunking (5 fields/chunk)",
             m["name"],
             {"mode": "two_pass", "chunking": {"enabled": True, "max_keys_per_chunk": 5}},
         )

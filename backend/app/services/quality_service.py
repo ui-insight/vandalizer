@@ -467,7 +467,7 @@ async def generate_improvement_suggestions(
         return res.output
     except Exception as exc:
         logger.exception("Failed to generate improvement suggestions for %s %s", item_kind, item_id)
-        return f"Unable to generate suggestions — {exc}"
+        return f"Unable to generate suggestions: {exc}"
 
 
 def _build_extraction_suggestion_prompt(result: dict) -> str:
@@ -481,7 +481,7 @@ def _build_extraction_suggestion_prompt(result: dict) -> str:
         "### Per-Test-Case Breakdown:",
     ]
     for tc in result.get("test_cases", []):
-        lines.append(f"\n**{tc.get('label', 'Unknown')}** — Accuracy: {_fmt_pct(tc.get('overall_accuracy'))}, Consistency: {_fmt_pct(tc.get('overall_consistency'))}")
+        lines.append(f"\n**{tc.get('label', 'Unknown')}** - Accuracy: {_fmt_pct(tc.get('overall_accuracy'))}, Consistency: {_fmt_pct(tc.get('overall_consistency'))}")
         for f in tc.get("fields", []):
             flag = ""
             if f.get("accuracy") is not None and f["accuracy"] < 0.9:
@@ -517,7 +517,7 @@ def _build_workflow_suggestion_prompt(result: dict) -> str:
         flag = " [NEEDS FIX]" if status in ("FAIL", "WARN") else ""
         lines.append(f"  - [{status}] {c.get('name', 'Unknown')}: {c.get('detail', 'No detail')}{flag}")
 
-    lines.append("\n---\nBased on these results, suggest specific improvements to raise the workflow quality to an A grade (all checks passing, no warnings). Focus on:\n1. Checks that failed — what might cause the failure and how to fix it\n2. Checks with warnings — how to address the concern\n3. General workflow structure improvements")
+    lines.append("\n---\nBased on these results, suggest specific improvements to raise the workflow quality to an A grade (all checks passing, no warnings). Focus on:\n1. Checks that failed: what might cause the failure and how to fix it\n2. Checks with warnings: how to address the concern\n3. General workflow structure improvements")
     return "\n".join(lines)
 
 
@@ -552,7 +552,7 @@ def _build_kb_suggestion_prompt(result: dict) -> str:
     lines.append("\n---\nBased on these results, suggest specific improvements to raise the knowledge base quality. Focus on:\n"
                  "1. Unhealthy or dead sources that should be replaced\n"
                  "2. Ways to improve retrieval precision (better source selection, chunk size)\n"
-                 "3. Coverage gaps — topics that need more sources")
+                 "3. Coverage gaps: topics that need more sources")
     return "\n".join(lines)
 
 

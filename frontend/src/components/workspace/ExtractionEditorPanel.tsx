@@ -1194,7 +1194,7 @@ function DesignTab({
                         style={{ accentColor: '#2563eb' }}
                       />
                       <span style={{ color: '#374151', fontWeight: 500 }}>Optional</span>
-                      <span style={{ color: '#9ca3af' }}>&mdash; skip accuracy penalty when not found</span>
+                      <span style={{ color: '#9ca3af' }}>skip accuracy penalty when not found</span>
                     </label>
                     <div>
                       <div style={{ color: '#374151', fontWeight: 500, marginBottom: 4 }}>Allowed values</div>
@@ -1294,7 +1294,7 @@ function QualityPulse({ searchSetUuid, itemCount = 0 }: { searchSetUuid?: string
         </div>
         {status.config_changed && (
           <div style={{ fontSize: 12, color: '#92400e', marginTop: 4 }}>
-            Config changed since last validation &mdash; re-validate for accurate results
+            Config changed since last validation. Re-validate for accurate results.
           </div>
         )}
       </div>
@@ -1764,7 +1764,7 @@ print(response.json())`
         </div>
 
         <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 16, lineHeight: 1.6 }}>
-          Call this extraction directly from any HTTP client — no automation required. The endpoint runs synchronously
+          Call this extraction directly from any HTTP client. No automation required. The endpoint runs synchronously
           and returns results in the response. Requires an API key; generate one from <strong>My Account</strong> in
           the top-right menu. Rate-limited to 10 requests/minute.
         </div>
@@ -2562,8 +2562,8 @@ function ValidateTab({
             }}>
               <AlertTriangle style={{ width: 16, height: 16, color: '#d97706', flexShrink: 0, marginTop: 1 }} />
               <div style={{ flex: 1, fontSize: 12, color: '#92400e', lineHeight: 1.5 }}>
-                <strong>Quality score reduced due to low sample size</strong>
-                {' '}&mdash;{' '}
+                <strong>Quality score reduced due to low sample size.</strong>
+                {' '}
                 Raw score: <strong>{Math.round(bd.raw_score)}%</strong>, final: <strong>{Math.round(bd.final_score)}%</strong>
                 <div style={{ marginTop: 4, fontSize: 11, color: '#78350f' }}>
                   {needMoreDocs && <>Add <strong>{3 - sources.length}</strong> more test document{3 - sources.length !== 1 ? 's' : ''} (need 3 total). </>}
@@ -2965,16 +2965,16 @@ function ValidateTab({
                         </td>
                         <td style={{ padding: '4px 6px', color: '#6b7280', fontSize: 10 }}>{r.model}</td>
                         <td style={{ padding: '4px 6px', textAlign: 'right', fontWeight: 600, color: scoreColor }}>
-                          {r.error ? '—' : Math.round(r.score)}
+                          {r.error ? '-' : Math.round(r.score)}
                         </td>
                         <td style={{ padding: '4px 6px', textAlign: 'right' }}>
-                          {r.error ? '—' : `${Math.round(r.accuracy * 100)}%`}
+                          {r.error ? '-' : `${Math.round(r.accuracy * 100)}%`}
                         </td>
                         <td style={{ padding: '4px 6px', textAlign: 'right' }}>
-                          {r.error ? '—' : `${Math.round(r.consistency * 100)}%`}
+                          {r.error ? '-' : `${Math.round(r.consistency * 100)}%`}
                         </td>
                         <td style={{ padding: '4px 6px', textAlign: 'right', color: '#6b7280' }}>
-                          {r.error ? '—' : `${r.elapsed_seconds.toFixed(1)}s`}
+                          {r.error ? '-' : `${r.elapsed_seconds.toFixed(1)}s`}
                         </td>
                       </tr>
                     )
@@ -3095,10 +3095,10 @@ function ValidateTab({
                           )}
                         </td>
                         <td style={{ padding: '4px 6px', textAlign: 'right', color: '#374151' }}>
-                          {run.accuracy != null ? `${Math.round(run.accuracy * 100)}%` : '—'}
+                          {run.accuracy != null ? `${Math.round(run.accuracy * 100)}%` : '-'}
                         </td>
                         <td style={{ padding: '4px 6px', textAlign: 'right', color: '#374151' }}>
-                          {run.consistency != null ? `${Math.round(run.consistency * 100)}%` : '—'}
+                          {run.consistency != null ? `${Math.round(run.consistency * 100)}%` : '-'}
                         </td>
                         <td style={{ padding: '4px 6px' }}>
                           <span style={{
@@ -3109,7 +3109,7 @@ function ValidateTab({
                           </span>
                         </td>
                         <td style={{ padding: '4px 6px', color: '#6b7280', fontSize: 10 }}>
-                          {run.model || '—'}
+                          {run.model || '-'}
                         </td>
                       </tr>
                       {isExpanded && (

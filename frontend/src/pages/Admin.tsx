@@ -2971,7 +2971,7 @@ function ConfigTab() {
                     <input type="password" value={newProvider.client_secret} onChange={e => setNewProvider({ ...newProvider, client_secret: e.target.value })} style={inputStyle} />
                   </div>
                   <div style={{ gridColumn: '1 / -1' }}>
-                    <label style={labelStyle}>Redirect URI (set automatically — register this in your identity provider)</label>
+                    <label style={labelStyle}>Redirect URI (set automatically; register this in your identity provider)</label>
                     <input value={`${window.location.origin}/api/auth/oauth/azure/callback`} readOnly style={{ ...inputStyle, opacity: 0.7, cursor: 'default' }} />
                   </div>
                   {newProvider.provider === 'azure' && (
@@ -3688,7 +3688,7 @@ function DemoTab() {
       await sendTestEmail(email)
       alert(`Test email sent to ${email}`)
     } catch {
-      alert('Failed to send test email — check SMTP configuration')
+      alert('Failed to send test email. Check SMTP configuration.')
     } finally {
       setActionLoading(null)
     }
@@ -3955,7 +3955,7 @@ function DemoTab() {
                         {formatDate(app.created_at)}
                       </td>
                       <td style={{ padding: '12px 16px', color: '#6b7280', fontSize: 13 }}>
-                        {app.expires_at ? formatDate(app.expires_at) : '—'}
+                        {app.expires_at ? formatDate(app.expires_at) : '-'}
                       </td>
                       <td style={{ padding: '12px 16px' }}>
                         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }} onClick={(e) => e.stopPropagation()}>
@@ -5514,7 +5514,7 @@ function ApprovalsTab() {
               </div>
             </div>
             <div style={{ fontSize: 12, color: '#9ca3af', flexShrink: 0 }}>
-              {a.created_at ? new Date(a.created_at).toLocaleDateString() : '—'}
+              {a.created_at ? new Date(a.created_at).toLocaleDateString() : '-'}
             </div>
             <button onClick={() => { setSelected(a); setComments('') }} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#fff', fontSize: 13, cursor: 'pointer', color: '#374151', fontFamily: 'inherit' }}>
               <Eye size={14} /> Review
@@ -5595,7 +5595,7 @@ function AuditTab() {
             ) : entries.map(entry => (
               <tr key={entry.uuid} style={{ borderBottom: '1px solid #f3f4f6' }}>
                 <td style={{ padding: '10px 14px', whiteSpace: 'nowrap', color: '#6b7280' }}>
-                  {entry.timestamp ? new Date(entry.timestamp).toLocaleDateString() + ' ' + new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+                  {entry.timestamp ? new Date(entry.timestamp).toLocaleDateString() + ' ' + new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}
                 </td>
                 <td style={{ padding: '10px 14px' }}>
                   <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: 12, fontSize: 11, fontWeight: 500, backgroundColor: ACTION_COLORS[entry.action] ?? '#f3f4f6', color: '#374151' }}>
@@ -5604,11 +5604,11 @@ function AuditTab() {
                 </td>
                 <td style={{ padding: '10px 14px', color: '#374151' }}>{entry.actor_user_id}</td>
                 <td style={{ padding: '10px 14px', color: '#374151' }}>
-                  {entry.resource_name || entry.resource_id || '—'}
+                  {entry.resource_name || entry.resource_id || '-'}
                   <span style={{ marginLeft: 6, fontSize: 11, color: '#9ca3af' }}>{entry.resource_type}</span>
                 </td>
                 <td style={{ padding: '10px 14px', color: '#6b7280', fontSize: 12, maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {Object.keys(entry.detail).length > 0 ? JSON.stringify(entry.detail).slice(0, 80) : '—'}
+                  {Object.keys(entry.detail).length > 0 ? JSON.stringify(entry.detail).slice(0, 80) : '-'}
                 </td>
               </tr>
             ))}

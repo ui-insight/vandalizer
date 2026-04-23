@@ -169,7 +169,7 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
             <div className="grid grid-cols-2 gap-x-8 gap-y-4">
               <div>
                 <label className="block text-xs font-medium uppercase text-gray-400 mb-1">User ID</label>
-                <p className="text-sm font-mono text-gray-900">{user?.user_id || '—'}</p>
+                <p className="text-sm font-mono text-gray-900">{user?.user_id || '-'}</p>
               </div>
               <div>
                 <label className="block text-xs font-medium uppercase text-gray-400 mb-1">Role</label>
@@ -223,7 +223,7 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
           <div className="p-4 space-y-4">
             <p className="text-sm text-gray-600">
               Use an API token to access Vandalizer from external integrations.
-              Keep it secure — it provides full access to your account.
+              Keep it secure. It provides full access to your account.
             </p>
 
             {tokenError && (
@@ -252,7 +252,7 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
                 {newToken && (
                   <div className="rounded-md border border-yellow-200 bg-yellow-50 p-3">
                     <p className="text-xs font-medium text-yellow-800 mb-2">
-                      Copy your token now — it won't be shown again.
+                      Copy your token now. It won't be shown again.
                     </p>
                     <div className="flex items-center gap-2">
                       <input

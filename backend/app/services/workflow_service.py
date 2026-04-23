@@ -1026,7 +1026,7 @@ async def generate_validation_plan(workflow_id: str, user: User) -> list[dict]:
     try:
         result = await agent.run(f"## Workflow\n{workflow_desc}")
     except Exception:
-        raise ValueError("LLM call failed — could not generate validation plan")
+        raise ValueError("LLM call failed - could not generate validation plan")
 
     parsed = _parse_json_array(result.output)
     if parsed is None:
@@ -1177,7 +1177,7 @@ async def validate_workflow(workflow_id: str, user: User | None = None) -> dict:
 
     plan = wf.validation_plan
     if not plan:
-        raise ValueError("No validation plan — generate or add checks first")
+        raise ValueError("No validation plan - generate or add checks first")
 
     wf_data = await get_workflow(workflow_id)
 

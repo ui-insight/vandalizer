@@ -484,7 +484,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                   style={{ width: 16, height: 16, accentColor: '#3b82f6' }}
                 />
                 <span style={{ fontWeight: 500 }}>Batch mode</span>
-                <span style={{ color: '#9ca3af', fontSize: 12 }}>&mdash; wait and process files together</span>
+                <span style={{ color: '#9ca3af', fontSize: 12 }}>wait and process files together</span>
               </label>
             </div>
           )}
@@ -579,7 +579,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                   style={{ width: 16, height: 16, accentColor: '#3b82f6' }}
                 />
                 <span style={{ fontWeight: 500 }}>Enable immediately</span>
-                <span style={{ color: '#9ca3af', fontSize: 12 }}>&mdash; start watching as soon as created</span>
+                <span style={{ color: '#9ca3af', fontSize: 12 }}>start watching as soon as created</span>
               </label>
 
               {/* Share with team */}
@@ -591,7 +591,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                   style={{ width: 16, height: 16, accentColor: '#3b82f6' }}
                 />
                 <span style={{ fontWeight: 500 }}>Share with team</span>
-                <span style={{ color: '#9ca3af', fontSize: 12 }}>&mdash; team members can view and manage</span>
+                <span style={{ color: '#9ca3af', fontSize: 12 }}>team members can view and manage</span>
               </label>
 
               <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16, marginBottom: 16 }}>

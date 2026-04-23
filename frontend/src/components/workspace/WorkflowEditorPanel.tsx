@@ -3159,7 +3159,7 @@ function WorkflowOutputCard({ status, sessionId, running, runElapsed, showDownlo
           <div style={{ fontSize: 12, color: '#9ca3af' }}>
             {runElapsed}s elapsed
             {status && status.num_steps_total > 0 && (
-              <> &mdash; Step {status.num_steps_completed + 1} of {status.num_steps_total}</>
+              <> - Step {status.num_steps_completed + 1} of {status.num_steps_total}</>
             )}
           </div>
           <div style={{
@@ -3224,12 +3224,13 @@ function WorkflowOutputCard({ status, sessionId, running, runElapsed, showDownlo
                 {([
                   { fmt: 'json', label: 'JSON', desc: 'Structured data' },
                   { fmt: 'csv', label: 'CSV', desc: 'Spreadsheet format' },
+                  { fmt: 'csv', label: 'CSV (parse structured)', desc: 'Detect JSON/tables in prompt output', parseStructured: true },
                   { fmt: 'pdf', label: 'PDF', desc: 'Printable report' },
                   { fmt: 'text', label: 'Plain Text', desc: 'Raw text output' },
-                ] as const).map(({ fmt, label, desc }) => (
+                ] as const).map(({ fmt, label, desc, parseStructured }) => (
                   <a
-                    key={fmt}
-                    href={downloadResults(sessionId, fmt)}
+                    key={label}
+                    href={downloadResults(sessionId, fmt, { parseStructured })}
                     onClick={() => setShowDownloadPopup(false)}
                     style={{
                       display: 'flex', flexDirection: 'column', gap: 1,
@@ -3302,7 +3303,7 @@ function BatchOutputCard({ batchStatus, running, runElapsed }: {
       <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 8 }}>
         {batchStatus.completed} of {batchStatus.total} completed
         {batchStatus.failed > 0 && <span style={{ color: '#dc2626' }}> ({batchStatus.failed} failed)</span>}
-        {running && <span> &mdash; {runElapsed}s elapsed</span>}
+        {running && <span> - {runElapsed}s elapsed</span>}
       </div>
 
       {/* Progress bar */}
@@ -4767,14 +4768,14 @@ function ValidateTab({
                                     display: 'inline-block', padding: '1px 6px', borderRadius: 4,
                                     backgroundColor: gc.bg, color: gc.text, fontSize: 10, fontWeight: 700,
                                   }}>
-                                    {run.grade || '—'}
+                                    {run.grade || '-'}
                                   </span>
                                 </td>
                                 <td style={{ padding: '4px 6px', textAlign: 'right', color: '#374151' }}>
                                   {run.checks_passed}/{run.checks_passed + run.checks_failed}
                                 </td>
                                 <td style={{ padding: '4px 6px', color: '#6b7280', fontSize: 10 }}>
-                                  {run.model || '—'}
+                                  {run.model || '-'}
                                 </td>
                               </tr>
                               {isExpanded && (

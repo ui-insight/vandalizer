@@ -234,7 +234,7 @@ export function ActivityRail() {
                           : 'bg-white/90 backdrop-blur-sm shadow-[0_1px_3px_rgba(0,0,0,0.1)] hover:bg-white/95',
                       )}
                       title={activity.status === 'failed' && activity.error
-                        ? `Delete — Error: ${activity.error}`
+                        ? `Delete - Error: ${activity.error}`
                         : 'Delete'}
                     >
                       <Trash2 className="h-3 w-3" />

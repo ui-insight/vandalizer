@@ -247,7 +247,7 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
               >
                 <span className="flex items-center gap-1.5 text-sm font-medium text-green-800">
                   <CheckCircle2 size={14} className="text-green-600 shrink-0" />
-                  Lab ready — challenge has {exercise.instructions.length} steps
+                  Lab ready. Challenge has {exercise.instructions.length} steps.
                 </span>
                 <button
                   onClick={() => handleTabChange('challenge')}

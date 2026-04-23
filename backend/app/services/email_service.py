@@ -141,14 +141,14 @@ _BASE_STYLE = """
 
 def test_email(to: str) -> tuple[str, str]:
     """Returns (subject, html_body) for a deliverability test email."""
-    subject = "Vandalizer — Email Deliverability Test"
+    subject = "Vandalizer Email Deliverability Test"
     html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
     <div class="container"><div class="card">
       <div class="logo">Vandalizer</div>
       <h1>Email Test</h1>
       <p>This is a test email sent to <span class="highlight">{to}</span>.</p>
       <p>If you're reading this in your <strong style="color:#fff">inbox</strong> (not spam), deliverability is working correctly.</p>
-      <div class="footer">Vandalizer — Email Deliverability Test</div>
+      <div class="footer">Vandalizer Email Deliverability Test</div>
     </div></div></body></html>"""
     return subject, html
 
@@ -198,7 +198,7 @@ def activation_email(
     <div class="container"><div class="card">
       <div class="logo">Vandalizer</div>
       <h1>Your demo account is active!</h1>
-      <p>Hi {name}, great news &mdash; your Vandalizer demo account is ready to go. You have <span class="highlight">2 weeks</span> of full platform access.</p>{magic_section}
+      <p>Hi {name}, great news: your Vandalizer demo account is ready to go. You have <span class="highlight">2 weeks</span> of full platform access.</p>{magic_section}
       <p><strong style="color:#fff">Username:</strong> <code style="{_CODE_STYLE}">{user_id}</code><br/><br/>
          <strong style="color:#fff">Password:</strong> <code style="{_CODE_STYLE}">{password}</code></p>
       <p>Your trial expires on <span class="highlight">{expires_at}</span>.</p>
@@ -306,7 +306,7 @@ def verification_status_email(
     }
     label, default_body = status_labels.get(new_status, (new_status.title(), ""))
     body_text = reviewer_notes or default_body
-    subject = f'Verification update: "{item_name}" — {label}'
+    subject = f'Verification update: "{item_name}" - {label}'
 
     notes_block = ""
     if reviewer_notes:
@@ -501,13 +501,13 @@ _RECAPTURE_SEQUENCE = [
         "body": (
             "You were activated for a Vandalizer demo "
             "but we noticed you haven't logged in yet. "
-            "Your credentials were included in your activation email &mdash; "
+            "Your credentials were included in your activation email. "
             "check your inbox (and spam folder) for an email from us."
         ),
         "cta": "Sign In Now",
     },
     {
-        "subject": "Don't miss out — your Vandalizer trial is ticking",
+        "subject": "Don't miss out on your Vandalizer trial",
         "heading": "Your trial clock is running",
         "body": (
             "Your 2-week Vandalizer demo is already active, but you haven't "
@@ -517,10 +517,10 @@ _RECAPTURE_SEQUENCE = [
         "cta": "Log In Now",
     },
     {
-        "subject": "Last reminder — your Vandalizer demo expires soon",
+        "subject": "Last reminder: your Vandalizer demo expires soon",
         "heading": "Running out of time",
         "body": (
-            "This is our last reminder &mdash; your Vandalizer demo trial will expire "
+            "This is our last reminder. Your Vandalizer demo trial will expire "
             "soon and you haven't logged in yet. "
             "We'd hate for you to miss the chance to try out AI-powered document intelligence. "
             "If something went wrong with your account, reply to this email and we'll sort it out."
@@ -558,10 +558,10 @@ def onboarding_drip_email(
 ) -> tuple[str, str]:
     """Returns (subject, html_body) for an onboarding drip email."""
     subjects = {
-        1: "Welcome to Vandalizer — start your certification journey",
+        1: "Welcome to Vandalizer: start your certification journey",
         2: f"Ready for hands-on? {module_title} is next",
-        3: f"Keep building — {module_title} awaits",
-        4: "You're making great progress — keep going!",
+        3: f"Keep building: {module_title} awaits",
+        4: "You're making great progress. Keep going!",
     }
     subject = subjects.get(step, f"Continue your certification: {module_title}")
 

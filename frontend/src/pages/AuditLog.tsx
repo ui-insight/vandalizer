@@ -20,7 +20,7 @@ const ACTION_COLORS: Record<string, string> = {
 }
 
 function formatTime(ts: string | null): string {
-  if (!ts) return '—'
+  if (!ts) return '-'
   const d = new Date(ts)
   return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
@@ -165,13 +165,13 @@ export default function AuditLog() {
                       )}
                     </td>
                     <td className="px-4 py-3 text-sm">
-                      <span className="text-gray-700">{entry.resource_name || entry.resource_id || '—'}</span>
+                      <span className="text-gray-700">{entry.resource_name || entry.resource_id || '-'}</span>
                       <span className="ml-1 text-xs text-gray-400">{entry.resource_type}</span>
                     </td>
                     <td className="max-w-xs truncate px-4 py-3 text-xs text-gray-500">
                       {Object.keys(entry.detail).length > 0
                         ? JSON.stringify(entry.detail).slice(0, 80)
-                        : '—'}
+                        : '-'}
                     </td>
                   </tr>
                 ))
