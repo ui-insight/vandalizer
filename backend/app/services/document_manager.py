@@ -1,6 +1,7 @@
 """Document Manager  - ChromaDB-backed document ingestion and semantic search for RAG."""
 
 import logging
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
@@ -9,6 +10,47 @@ import chromadb
 from chromadb.config import Settings as ChromaSettings
 
 logger = logging.getLogger(__name__)
+
+# Process-wide singletons. ChromaDB's default (ONNX MiniLM) does a stateful,
+# file-descriptor-heavy tarball extraction on first use; constructing a fresh
+# instance per task can exhaust fds (EMFILE on `onnx.tar.gz`) because Chroma's
+# `_download_model_if_not_exists` re-extracts whenever the extracted folder
+# isn't complete. Caching one instance per worker process ensures the model is
+# initialized exactly once.
+_EF_LOCK = threading.Lock()
+_DEFAULT_EF: Any = None
+_DM_LOCK = threading.Lock()
+_SHARED_DM: "DocumentManager | None" = None
+
+
+def get_default_embedding_function() -> Any:
+    """Return a process-wide cached ChromaDB default embedding function.
+
+    Lazily initialized on first call (inside the Celery worker process, after
+    fork) so model download/extraction happens once per process.
+    """
+    global _DEFAULT_EF
+    if _DEFAULT_EF is None:
+        with _EF_LOCK:
+            if _DEFAULT_EF is None:
+                from chromadb.utils import embedding_functions
+                _DEFAULT_EF = embedding_functions.DefaultEmbeddingFunction()
+    return _DEFAULT_EF
+
+
+def get_document_manager() -> "DocumentManager":
+    """Return a process-wide cached DocumentManager.
+
+    Reusing one DocumentManager (and therefore one PersistentClient + one
+    embedding function instance) across tasks prevents fd leaks and repeated
+    ONNX model initialization.
+    """
+    global _SHARED_DM
+    if _SHARED_DM is None:
+        with _DM_LOCK:
+            if _SHARED_DM is None:
+                _SHARED_DM = DocumentManager()
+    return _SHARED_DM
 
 
 def get_chroma_client(persist_directory: str | None = None) -> chromadb.ClientAPI:
@@ -78,7 +120,11 @@ def _split_text(text: str, chunk_size: int, chunk_overlap: int) -> list[str]:
 class DocumentManager:
     """Synchronous document manager  - safe to call from asyncio.to_thread()."""
 
-    def __init__(self, persist_directory: str | None = None) -> None:
+    def __init__(
+        self,
+        persist_directory: str | None = None,
+        embedding_function: Any = None,
+    ) -> None:
         if persist_directory is None:
             from app.config import Settings
             persist_directory = Settings().chromadb_persist_dir
@@ -87,10 +133,16 @@ class DocumentManager:
         self.chunk_overlap = 200
 
         self.client = get_chroma_client(persist_directory)
+        # Always pass an explicit embedding function to get_or_create_collection
+        # so Chroma doesn't construct a fresh ONNXMiniLM_L6_V2 per collection.
+        self.embedding_function = embedding_function or get_default_embedding_function()
 
     def get_user_collection(self, user_id: str) -> chromadb.Collection:
         collection_name = f"user_{user_id}_docs"
-        return self.client.get_or_create_collection(name=collection_name)
+        return self.client.get_or_create_collection(
+            name=collection_name,
+            embedding_function=self.embedding_function,
+        )
 
     def add_document(
         self,
@@ -175,7 +227,10 @@ class DocumentManager:
     def get_kb_collection(self, kb_uuid: str) -> chromadb.Collection:
         """Get or create a ChromaDB collection for a knowledge base."""
         collection_name = f"kb_{kb_uuid}"
-        return self.client.get_or_create_collection(name=collection_name)
+        return self.client.get_or_create_collection(
+            name=collection_name,
+            embedding_function=self.embedding_function,
+        )
 
     def add_to_kb(
         self,

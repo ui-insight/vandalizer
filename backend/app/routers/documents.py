@@ -43,9 +43,14 @@ async def list_documents(
 async def search_documents(
     q: str = Query(default="", min_length=0),
     limit: int = Query(default=20, ge=1, le=100),
+    folder: str | None = Query(default=None),
     user: User = Depends(get_current_user),
 ):
-    """Search documents by title or content text. Returns recent docs when q is empty."""
+    """Search documents by title or content text. Returns recent docs when q is empty.
+
+    When `folder` is provided, results are restricted to that folder value.
+    Pass folder="__root__" to match documents with no folder assigned.
+    """
     # Include user's own docs and team-scoped docs
     team_access = await access_control.get_team_access_context(user)
     owner_conditions: list[dict] = [{"user_id": user.user_id}]
@@ -53,18 +58,23 @@ async def search_documents(
         owner_conditions.append({"team_id": {"$in": list(team_access.team_uuids)}})
     if team_access.team_object_ids:
         owner_conditions.append({"team_id": {"$in": list(team_access.team_object_ids)}})
-    owner_filter = {"$or": owner_conditions}
+    owner_filter: dict = {"$or": owner_conditions}
+
+    base_conditions: list[dict] = [owner_filter]
+    if folder is not None:
+        if folder == "__root__":
+            base_conditions.append({"$or": [{"folder": None}, {"folder": ""}, {"folder": "0"}]})
+        else:
+            base_conditions.append({"folder": folder})
 
     if not q.strip():
-        results = await SmartDocument.find(
-            owner_filter,
-        ).sort(-SmartDocument.created_at).limit(limit).to_list()
+        query: dict = {"$and": base_conditions} if len(base_conditions) > 1 else owner_filter
+        results = await SmartDocument.find(query).sort(-SmartDocument.created_at).limit(limit).to_list()
     else:
         regex = re.compile(re.escape(q), re.IGNORECASE)
         results = await SmartDocument.find(
             {
-                "$and": [
-                    owner_filter,
+                "$and": base_conditions + [
                     {
                         "$or": [
                             {"title": {"$regex": regex.pattern, "$options": "i"}},

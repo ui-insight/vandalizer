@@ -170,9 +170,9 @@ class TestKbIngestDocument:
         assert error_call[1]["$set"]["status"] == "error"
         assert "no text content" in error_call[1]["$set"]["error_message"]
 
-    @patch("app.services.document_manager.DocumentManager")
+    @patch("app.services.document_manager.get_document_manager")
     @patch("app.tasks.knowledge_base_tasks._get_db")
-    def test_successful_ingestion_sets_ready(self, mock_get_db, MockDM):
+    def test_successful_ingestion_sets_ready(self, mock_get_db, mock_get_dm):
         from app.tasks.knowledge_base_tasks import kb_ingest_document
 
         db = MagicMock()
@@ -186,10 +186,9 @@ class TestKbIngestDocument:
 
         mock_dm_instance = MagicMock()
         mock_dm_instance.add_to_kb.return_value = 42
-        MockDM.return_value = mock_dm_instance
+        mock_get_dm.return_value = mock_dm_instance
 
-        with patch("app.config.Settings"):
-            kb_ingest_document("src-uuid")
+        kb_ingest_document("src-uuid")
 
         mock_dm_instance.add_to_kb.assert_called_once_with(
             kb_uuid="kb-uuid",
@@ -204,9 +203,9 @@ class TestKbIngestDocument:
         assert ready_call[1]["$set"]["status"] == "ready"
         assert ready_call[1]["$set"]["chunk_count"] == 42
 
-    @patch("app.services.document_manager.DocumentManager")
+    @patch("app.services.document_manager.get_document_manager")
     @patch("app.tasks.knowledge_base_tasks._get_db")
-    def test_ingestion_error_sets_error_and_reraises(self, mock_get_db, MockDM):
+    def test_ingestion_error_sets_error_and_reraises(self, mock_get_db, mock_get_dm):
         from app.tasks.knowledge_base_tasks import kb_ingest_document
 
         db = MagicMock()
@@ -220,11 +219,10 @@ class TestKbIngestDocument:
 
         mock_dm_instance = MagicMock()
         mock_dm_instance.add_to_kb.side_effect = RuntimeError("ChromaDB down")
-        MockDM.return_value = mock_dm_instance
+        mock_get_dm.return_value = mock_dm_instance
 
-        with patch("app.config.Settings"):
-            with pytest.raises(RuntimeError, match="ChromaDB down"):
-                kb_ingest_document("src-uuid")
+        with pytest.raises(RuntimeError, match="ChromaDB down"):
+            kb_ingest_document("src-uuid")
 
         # Should have set error status
         calls = db.knowledge_base_sources.update_one.call_args_list
@@ -269,9 +267,9 @@ class TestKbIngestUrl:
         assert error_call[1]["$set"]["status"] == "error"
         assert "No URL specified" in error_call[1]["$set"]["error_message"]
 
-    @patch("app.services.document_manager.DocumentManager")
+    @patch("app.services.document_manager.get_document_manager")
     @patch("app.tasks.knowledge_base_tasks._get_db")
-    def test_successful_url_ingestion(self, mock_get_db, MockDM):
+    def test_successful_url_ingestion(self, mock_get_db, mock_get_dm):
         from app.tasks.knowledge_base_tasks import kb_ingest_url
 
         db = MagicMock()
@@ -283,14 +281,13 @@ class TestKbIngestUrl:
 
         mock_dm_instance = MagicMock()
         mock_dm_instance.add_to_kb.return_value = 7
-        MockDM.return_value = mock_dm_instance
+        mock_get_dm.return_value = mock_dm_instance
 
         mock_response = MagicMock()
         mock_response.text = "<html><head><title>Example Page</title></head><body><p>Hello world</p></body></html>"
         mock_response.raise_for_status = MagicMock()
 
-        with patch("app.config.Settings"), \
-             patch("httpx.get", return_value=mock_response), \
+        with patch("httpx.get", return_value=mock_response), \
              patch("app.utils.url_validation.validate_outbound_url"):
             kb_ingest_url("src-uuid")
 

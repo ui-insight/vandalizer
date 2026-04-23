@@ -77,6 +77,10 @@ services:
       - vandalizer
     volumes:
       - uploads:/app/static/uploads
+    ulimits:
+      nofile:
+        soft: 8192
+        hard: 8192
     restart: unless-stopped
     deploy:
       resources:
@@ -105,6 +109,10 @@ services:
       - vandalizer
     volumes:
       - uploads:/app/static/uploads
+    ulimits:
+      nofile:
+        soft: 8192
+        hard: 8192
     entrypoint: ["sh", "run_celery.sh", "start"]
     restart: unless-stopped
     deploy:
