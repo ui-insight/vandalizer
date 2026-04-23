@@ -5,6 +5,7 @@ export interface PendingPrompt {
   question_text: string
   subject: string
   stage: string
+  ticket_uuid: string | null
 }
 
 export interface ShowPromptResult {
