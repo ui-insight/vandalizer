@@ -1,6 +1,12 @@
 import { useState, useCallback, useRef } from 'react'
 import { streamChat, getHistory } from '../api/chat'
-import type { ChatMessage, StreamChunk } from '../types/chat'
+import type { ChatMessage, ContextBudgetPlan, StreamChunk } from '../types/chat'
+
+export interface ContextNotice {
+  action: string
+  detail: string
+  tokens_dropped: number
+}
 
 const THINK_BLOCK_RE = /<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>\n?/g
 const THINK_TRAILING_RE = /<think(?:ing)?>[\s\S]*$/
@@ -17,6 +23,8 @@ export function useChat() {
   const [contextTokens, setContextTokens] = useState(0)
   const [contextMode, setContextMode] = useState<'full' | 'truncated' | 'compacted'>('full')
   const [contextCutoffIndex, setContextCutoffIndex] = useState(0)
+  const [contextPlan, setContextPlan] = useState<ContextBudgetPlan | null>(null)
+  const [contextNotices, setContextNotices] = useState<ContextNotice[]>([])
 
   const streamingRef = useRef('')
   const thinkingRef = useRef('')
@@ -29,6 +37,8 @@ export function useChat() {
       setStreamingContent('')
       setThinkingContent('')
       setThinkingDuration(null)
+      setContextPlan(null)
+      setContextNotices([])
       streamingRef.current = ''
       thinkingRef.current = ''
       thinkingDurationRef.current = null
@@ -57,6 +67,23 @@ export function useChat() {
               setThinkingDuration(chunk.duration ?? null)
             } else if (chunk.kind === 'usage') {
               setContextTokens(chunk.request_tokens ?? 0)
+            } else if (chunk.kind === 'context_budget') {
+              if (chunk.plan) {
+                setContextPlan(chunk.plan)
+                // Use the planner's estimate until the real usage chunk arrives.
+                if (chunk.plan.total_input_tokens) {
+                  setContextTokens(chunk.plan.total_input_tokens)
+                }
+              }
+            } else if (chunk.kind === 'context_notice') {
+              setContextNotices((prev) => [
+                ...prev,
+                {
+                  action: chunk.action ?? 'notice',
+                  detail: chunk.content,
+                  tokens_dropped: chunk.tokens_dropped ?? 0,
+                },
+              ])
             } else if (chunk.kind === 'error') {
               setError(chunk.content)
             }
@@ -122,6 +149,8 @@ export function useChat() {
     setContextTokens(0)
     setContextMode('full')
     setContextCutoffIndex(0)
+    setContextPlan(null)
+    setContextNotices([])
   }, [])
 
   const setActivity = useCallback((newActivityId: string, newConversationUuid: string) => {
@@ -142,6 +171,8 @@ export function useChat() {
     contextTokens,
     contextMode,
     contextCutoffIndex,
+    contextPlan,
+    contextNotices,
     setContextTokens,
     setContextMode,
     setContextCutoffIndex,
