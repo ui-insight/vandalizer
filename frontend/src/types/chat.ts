@@ -47,11 +47,35 @@ export interface ActivityEvent {
   result_snapshot: Record<string, unknown>
 }
 
+export interface ContextBudgetPlan {
+  model: string
+  context_window: number
+  response_reserve: number
+  input_budget: number
+  total_input_tokens: number
+  system_tokens: number
+  user_message_tokens: number
+  history_tokens: number
+  documents_tokens: number
+  attachments_tokens: number
+  headroom_tokens: number
+}
+
 export interface StreamChunk {
-  kind: 'text' | 'thinking' | 'thinking_done' | 'error' | 'usage'
+  kind:
+    | 'text'
+    | 'thinking'
+    | 'thinking_done'
+    | 'error'
+    | 'usage'
+    | 'context_budget'
+    | 'context_notice'
   content: string
   duration?: number
   request_tokens?: number
   response_tokens?: number
   total_tokens?: number
+  plan?: ContextBudgetPlan
+  action?: string
+  tokens_dropped?: number
 }

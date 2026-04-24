@@ -3239,6 +3239,7 @@ dependencies = [
     { name = "reportlab" },
     { name = "sentry-sdk", extra = ["celery", "fastapi"] },
     { name = "slowapi" },
+    { name = "tiktoken" },
     { name = "uvicorn", extra = ["standard"] },
     { name = "werkzeug" },
 ]
@@ -3300,6 +3301,7 @@ requires-dist = [
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.11,<1" },
     { name = "sentry-sdk", extras = ["fastapi", "celery"], specifier = ">=2.0,<3" },
     { name = "slowapi", specifier = ">=0.1,<1" },
+    { name = "tiktoken", specifier = ">=0.9,<1" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.34,<1" },
     { name = "werkzeug", specifier = ">=3.1,<4" },
 ]
