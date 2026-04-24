@@ -42,7 +42,9 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
     """
     from app.services.document_readers import (
         convert_to_markdown,
+        extract_docx_extras,
         extract_text_from_file,
+        extract_text_from_xlsx,
         remove_images_from_markdown,
     )
 
@@ -68,7 +70,10 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
 
         raw_text = ""
 
-        if extension in ("xlsx", "xls"):
+        if extension == "xlsx":
+            raw_text = extract_text_from_xlsx(str(absolute_path))
+
+        elif extension == "xls":
             raw_text = convert_to_markdown(str(absolute_path))
 
         elif extension in ("docx", "doc"):
@@ -79,6 +84,11 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
                 raw_text = remove_images_from_markdown(raw_text)
             except Exception:
                 raw_text = convert_to_markdown(str(absolute_path), keep_data_uris=False)
+
+            if extension == "docx":
+                extras = extract_docx_extras(str(absolute_path))
+                if extras:
+                    raw_text = (raw_text or "").rstrip() + "\n\n" + extras
 
         else:
             raw_text = extract_text_from_file(str(absolute_path), extension)
