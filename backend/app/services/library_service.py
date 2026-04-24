@@ -725,7 +725,6 @@ async def _clone_underlying_object(item: LibraryItem, user_id: str, *, team_id: 
                 searchtype=oi.searchtype,
                 title=oi.title,
                 user_id=user_id,
-                space_id=oi.space_id,
             )
             await new_item.insert()
 
