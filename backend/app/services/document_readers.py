@@ -357,7 +357,7 @@ def extract_docx_extras(docx_path: str) -> str:
     nothing notable. Research admins live in Word comments during
     proposal review, and pypandoc/MarkItDown both drop them silently.
     """
-    import xml.etree.ElementTree as ET
+    import defusedxml.ElementTree as ET
     import zipfile
 
     try:
