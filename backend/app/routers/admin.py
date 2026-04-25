@@ -2025,7 +2025,7 @@ async def test_model(index: int, user: User = Depends(get_current_user)):
     try:
         from pydantic_ai import Agent
 
-        model = get_agent_model(model_name)
+        model = get_agent_model(model_name, system_config_doc=cfg.model_dump())
         agent = Agent(model, system_prompt="Reply with exactly: ok")
         result = await agent.run("Say ok")
         return {
