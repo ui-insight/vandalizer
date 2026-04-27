@@ -8,7 +8,7 @@ import { ContextMeter } from './ContextMeter'
 import { ContextLimitDialog } from './ContextLimitDialog'
 import { useChat } from '../../hooks/useChat'
 import { useOnboarding } from '../../hooks/useOnboarding'
-import { useWorkspace } from '../../contexts/WorkspaceContext'
+import { useWorkspace, type PendingChatMessage } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
 import { addLink, removeDocument, removeLink, truncateContext, compactContext, clearContext } from '../../api/chat'
 import { uploadFile } from '../../api/files'
@@ -50,7 +50,7 @@ function StreamingLabel() {
 
 interface ChatPanelProps {
   conversationToLoad?: string | null
-  pendingMessage?: string | null
+  pendingMessage?: PendingChatMessage | null
   onPendingMessageConsumed?: () => void
 }
 
@@ -255,11 +255,13 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     }
   }, [conversationToLoad, loadHistory])
 
-  const pendingHandled = useRef<string | null>(null)
+  const pendingHandled = useRef<PendingChatMessage | null>(null)
   useEffect(() => {
     if (pendingMessage && pendingMessage !== pendingHandled.current && !isStreaming) {
       pendingHandled.current = pendingMessage
-      send(pendingMessage, selectedDocUuids, undefined, undefined, undefined, selectedFolderUuids)
+      const docs = pendingMessage.documentUuids ?? selectedDocUuids
+      const folders = pendingMessage.folderUuids ?? selectedFolderUuids
+      send(pendingMessage.message, docs, undefined, undefined, undefined, folders)
       onPendingMessageConsumed?.()
     }
   }, [pendingMessage, isStreaming, send, onPendingMessageConsumed])
