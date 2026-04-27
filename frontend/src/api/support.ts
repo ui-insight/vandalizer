@@ -1,11 +1,29 @@
 import { apiFetch, ApiError, csrfHeaders } from './client'
 import type { SupportTicket, SupportTicketSummary, SupportContact } from '../types/support'
 
-export function createTicket(subject: string, message: string, priority = 'normal') {
-  return apiFetch<SupportTicket>('/api/support/tickets', {
+export async function createTicket(
+  subject: string,
+  message: string,
+  priority = 'normal',
+  files: File[] = [],
+) {
+  const form = new FormData()
+  form.append('subject', subject)
+  form.append('message', message)
+  form.append('priority', priority)
+  for (const f of files) form.append('files', f)
+
+  const res = await fetch('/api/support/tickets', {
     method: 'POST',
-    body: JSON.stringify({ subject, message, priority }),
+    credentials: 'include',
+    headers: csrfHeaders(),
+    body: form,
   })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ detail: 'Failed to create ticket' }))
+    throw new ApiError(res.status, body.detail || 'Failed to create ticket')
+  }
+  return res.json() as Promise<SupportTicket>
 }
 
 export function listTickets(status?: string, limit = 50, offset = 0) {

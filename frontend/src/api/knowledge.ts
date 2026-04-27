@@ -191,6 +191,60 @@ export function cloneKnowledgeBase(uuid: string, title?: string) {
   })
 }
 
+// Export / Import
+
+export interface KBExportPayload {
+  format_version: number
+  exported_at?: string | null
+  title: string
+  description?: string | null
+  sources: {
+    source_type: 'document' | 'url'
+    document_uuid?: string | null
+    document_title?: string | null
+    url?: string | null
+    url_title?: string | null
+    content?: string | null
+    crawl_enabled?: boolean
+    max_crawl_pages?: number
+    parent_source_uuid?: string | null
+    crawled_urls?: string[] | null
+  }[]
+}
+
+/** Fetch an export payload for a knowledge base. Caller can serialize and save it. */
+export async function fetchKBExport(uuid: string): Promise<KBExportPayload> {
+  return apiFetch<KBExportPayload>(`/api/knowledge/${uuid}/export`)
+}
+
+/** Download a knowledge base as a .kb.json file in the browser. */
+export async function downloadKBExport(uuid: string, fallbackTitle = 'knowledge_base'): Promise<void> {
+  const payload = await fetchKBExport(uuid)
+  const title = payload.title || fallbackTitle
+  const safeTitle = title.replace(/[^A-Za-z0-9_.-]+/g, '_').replace(/^_+|_+$/g, '') || 'knowledge_base'
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${safeTitle}.kb.json`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+export function importKnowledgeBase(payload: KBExportPayload, title?: string) {
+  return apiFetch<{ uuid: string; title: string; imported_sources: number }>(
+    '/api/knowledge/import',
+    {
+      method: 'POST',
+      body: JSON.stringify({ payload, title }),
+      // Importing may involve many re-embed calls; allow more time.
+      timeoutMs: 300_000,
+    },
+  )
+}
+
 // Suggestions
 
 export function submitKBSuggestion(uuid: string, data: {

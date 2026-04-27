@@ -1,4 +1,5 @@
 import React, { Fragment, useCallback, useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { ExtractionTutorial } from './ExtractionTutorial'
 import { X, Pencil, Loader2, Copy, Trash2, GripVertical, Plus, ChevronDown, ChevronRight, Play, TrendingUp, Sparkles, FileText, AlertTriangle, Eye, Shield, ShieldCheck, Download, Check } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
@@ -60,6 +61,7 @@ interface ExtractionConfig {
 }
 
 export function ExtractionEditorPanel() {
+  const queryClient = useQueryClient()
   const { openExtractionId, openExtraction, closeExtraction, selectedDocUuids, setHighlightTerms, bumpActivitySignal, consumeExtractionResults } = useWorkspace()
   const { toast } = useToast()
   const [searchSet, setSearchSet] = useState<SearchSet | null>(null)
@@ -528,6 +530,7 @@ export function ExtractionEditorPanel() {
               e.target.value = ''
               try {
                 const result = await importSearchSet(f, openExtractionId ?? undefined)
+                await queryClient.invalidateQueries({ queryKey: ['searchSets'] })
                 if (openExtractionId) {
                   await refresh()
                   await refreshItems()
@@ -1346,6 +1349,30 @@ function ToolsTab({
           gap: 16,
         }}
       >
+        {/* Import Definition */}
+        <ToolCard
+          title="Import Definition"
+          description="Create a new extraction from an exported JSON file"
+          onClick={onImportDefinition}
+        />
+        {/* Export Definition */}
+        <ToolCard
+          title="Export Definition"
+          description="Download as a shareable JSON file"
+          onClick={onExportDefinition}
+        />
+        {/* Export PDF */}
+        <ToolCard
+          title={exportingPdf ? 'Exporting...' : 'Export PDF'}
+          description={
+            hasTemplate
+              ? 'Download a filled copy of the PDF template with extracted values'
+              : 'Download extraction results as a PDF report'
+          }
+          onClick={onExportPdf}
+          disabled={exportingPdf || !hasResults}
+          style={{ gridColumn: '1 / -1' }}
+        />
         {/* From Document */}
         <ToolCard
           title={buildingFromDoc ? 'Building...' : 'From Document'}
@@ -1378,29 +1405,7 @@ function ToolsTab({
             onClick: onGenerateTemplate,
             disabled: generatingTemplate || attachingTemplate || !hasItems,
           }}
-        />
-        {/* Export PDF */}
-        <ToolCard
-          title={exportingPdf ? 'Exporting...' : 'Export PDF'}
-          description={
-            hasTemplate
-              ? 'Download a filled copy of the PDF template with extracted values'
-              : 'Download extraction results as a PDF report'
-          }
-          onClick={onExportPdf}
-          disabled={exportingPdf || !hasResults}
-        />
-        {/* Export Definition */}
-        <ToolCard
-          title="Export Definition"
-          description="Download as a shareable JSON file"
-          onClick={onExportDefinition}
-        />
-        {/* Import Definition */}
-        <ToolCard
-          title="Import Definition"
-          description="Create a new extraction from an exported JSON file"
-          onClick={onImportDefinition}
+          style={{ gridColumn: '1 / -1' }}
         />
         {/* Delete */}
         <ToolCard

@@ -94,3 +94,40 @@ class KBStatusResponse(BaseModel):
     sources_failed: int = 0
     total_chunks: int = 0
     sources: list[dict] = []
+
+
+# --- Export / Import ---
+
+KB_EXPORT_FORMAT_VERSION = 1
+
+
+class KBExportSource(BaseModel):
+    source_type: str  # "document" | "url"
+    document_uuid: Optional[str] = None
+    document_title: Optional[str] = None  # snapshot of SmartDocument.title at export time
+    url: Optional[str] = None
+    url_title: Optional[str] = None
+    content: Optional[str] = None  # cached raw text (for URLs) or document raw_text (for docs)
+    crawl_enabled: bool = False
+    max_crawl_pages: int = 5
+    parent_source_uuid: Optional[str] = None
+    crawled_urls: Optional[list[str]] = None
+
+
+class KBExportPayload(BaseModel):
+    format_version: int = KB_EXPORT_FORMAT_VERSION
+    exported_at: Optional[str] = None
+    title: str
+    description: Optional[str] = None
+    sources: list[KBExportSource] = []
+
+
+class ImportKBRequest(BaseModel):
+    payload: KBExportPayload
+    title: Optional[str] = None  # override title on import
+
+
+class ImportKBResponse(BaseModel):
+    uuid: str
+    title: str
+    imported_sources: int

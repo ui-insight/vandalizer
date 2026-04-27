@@ -705,6 +705,130 @@ async def _crawl_from_source(
     return added
 
 
+# --- Export / Import ---
+
+
+async def export_knowledge_base(kb: KnowledgeBase) -> dict:
+    """Serialize a KB and its sources into a self-contained JSON-safe dict.
+
+    Includes cached raw text for each source (document raw_text or URL-extracted
+    text) so the importer can reconstruct + re-embed without re-fetching. Does
+    NOT include ChromaDB vectors — embeddings are regenerated on import.
+    """
+    sources = await get_kb_sources(kb.uuid)
+    exported_sources: list[dict] = []
+    for s in sources:
+        content = s.content
+        document_title: str | None = None
+        if s.source_type == "document" and s.document_uuid:
+            doc = await SmartDocument.find_one(SmartDocument.uuid == s.document_uuid)
+            if doc:
+                document_title = doc.title
+                if not content:
+                    content = doc.raw_text or None
+        exported_sources.append({
+            "source_type": s.source_type,
+            "document_uuid": s.document_uuid,
+            "document_title": document_title,
+            "url": s.url,
+            "url_title": s.url_title,
+            "content": content,
+            "crawl_enabled": s.crawl_enabled,
+            "max_crawl_pages": s.max_crawl_pages,
+            "parent_source_uuid": s.parent_source_uuid,
+            "crawled_urls": s.crawled_urls,
+        })
+    return {
+        "format_version": 1,
+        "exported_at": datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
+        "title": kb.title,
+        "description": kb.description,
+        "sources": exported_sources,
+    }
+
+
+async def import_knowledge_base(
+    payload: dict,
+    user: User,
+    *,
+    title_override: str | None = None,
+) -> KnowledgeBase:
+    """Create a new KB for the user from an exported payload and re-ingest sources."""
+    format_version = payload.get("format_version", 1)
+    if format_version != 1:
+        raise ValueError(f"Unsupported export format version: {format_version}")
+
+    raw_title = (title_override or payload.get("title") or "Imported Knowledge Base").strip()
+    if not raw_title:
+        raw_title = "Imported Knowledge Base"
+
+    team_id = str(user.current_team) if user.current_team else None
+    kb = KnowledgeBase(
+        title=raw_title[:300],
+        description=(payload.get("description") or "")[:5000] or None,
+        user_id=user.user_id,
+        team_id=team_id,
+    )
+    await kb.insert()
+
+    imported = 0
+    dm = _get_dm()
+
+    for src in payload.get("sources", []) or []:
+        source_type = src.get("source_type")
+        content = src.get("content")
+        if source_type not in ("document", "url"):
+            continue
+
+        new_src = KnowledgeBaseSource(
+            knowledge_base_uuid=kb.uuid,
+            source_type=source_type,
+            document_uuid=src.get("document_uuid"),
+            url=(src.get("url") or None),
+            url_title=src.get("url_title"),
+            content=content,
+            crawl_enabled=bool(src.get("crawl_enabled", False)),
+            max_crawl_pages=int(src.get("max_crawl_pages") or 5),
+            parent_source_uuid=src.get("parent_source_uuid"),
+            crawled_urls=src.get("crawled_urls"),
+        )
+        await new_src.insert()
+        imported += 1
+
+        if content and content.strip():
+            label = (
+                src.get("document_title")
+                or new_src.url_title
+                or new_src.url
+                or "Imported Source"
+            )
+            new_src.status = "processing"
+            await new_src.save()
+            try:
+                chunk_count = await asyncio.to_thread(
+                    dm.add_to_kb, kb.uuid, new_src.uuid, label, content,
+                )
+                new_src.chunk_count = chunk_count
+                new_src.status = "ready"
+                new_src.processed_at = datetime.datetime.now(tz=datetime.timezone.utc)
+                await new_src.save()
+            except Exception as e:
+                logger.error(f"Error ingesting imported source {new_src.uuid}: {e}")
+                new_src.status = "error"
+                new_src.error_message = str(e)[:2000]
+                await new_src.save()
+        elif source_type == "url" and new_src.url:
+            # No cached content — re-fetch the URL
+            await _ingest_url_source(new_src, kb)
+        else:
+            new_src.status = "error"
+            new_src.error_message = "Imported source had no content and no URL to re-fetch"
+            await new_src.save()
+
+    await recalculate_stats(kb)
+    return kb
+
+
 # --- Ingestion helpers ---
 
 

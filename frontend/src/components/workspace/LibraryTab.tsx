@@ -35,7 +35,7 @@ type KindFilter = 'all' | 'workflow' | 'search_set'
 type SortOption = 'recent' | 'az'
 
 export function LibraryTab() {
-  const { openWorkflow, openExtraction, sendChatMessage } = useWorkspace()
+  const { openWorkflow, openExtraction, sendChatMessage, selectedDocUuids, selectedFolderUuids } = useWorkspace()
   const { user } = useAuth()
   const teamId = user?.current_team ?? undefined
   const { libraries, loading: libLoading, error, refresh } = useLibraries(teamId)
@@ -985,7 +985,10 @@ export function LibraryTab() {
                       openWorkflow(it.item_id)
                     } else if (it.set_type === 'prompt' || it.set_type === 'formatter') {
                       const content = it.description || it.name
-                      sendChatMessage(content)
+                      sendChatMessage(content, {
+                        documentUuids: selectedDocUuids,
+                        folderUuids: selectedFolderUuids,
+                      })
                     } else if (it.set_type === 'extraction' && it.item_uuid) {
                       openExtraction(it.item_uuid)
                     }
