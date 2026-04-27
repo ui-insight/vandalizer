@@ -148,7 +148,7 @@ export function ChatInput({
             placeholder={hasDocuments ? "Ask anything about this document..." : "Ask Vandalizer anything..."}
             aria-label="Message input"
             rows={1}
-            className="block w-full resize-none border-0 bg-transparent text-base font-medium caret-highlight placeholder:text-[#8a8f98] placeholder:font-medium focus:outline-none overflow-y-auto"
+            className="block w-full resize-none border-0 bg-transparent text-base font-medium caret-highlight placeholder:text-[#8a8f98] placeholder:font-medium focus:outline-none focus-visible:outline-none overflow-y-auto"
             style={{ fontSize: 16, maxHeight: '25vh' }}
             disabled={disabled}
           />
