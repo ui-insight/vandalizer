@@ -21,6 +21,7 @@ from app.models.workflow import (
     WorkflowStepTask,
 )
 from app.services.access_control import (
+    can_manage_workflow,
     can_view_workflow,
     get_authorized_document,
     get_authorized_workflow,
@@ -105,10 +106,15 @@ async def get_workflow(workflow_id: str, user: User | None = None) -> dict | Non
         wf = await get_authorized_workflow(workflow_id, user)
         if not wf:
             return None
+        team_access = await get_team_access_context(user)
+        can_manage = can_manage_workflow(wf, user, team_access)
     else:
         wf = await Workflow.get(PydanticObjectId(workflow_id))
         if not wf:
             return None
+        # Without a user (e.g. internal export), assume manage to preserve
+        # existing behavior — callers that gate on this pass a user.
+        can_manage = True
 
     steps = []
     for step_id in wf.steps:
@@ -142,6 +148,7 @@ async def get_workflow(workflow_id: str, user: User | None = None) -> dict | Non
         "input_config": _sanitize_for_json(wf.input_config),
         "validation_plan": _sanitize_for_json(wf.validation_plan),
         "validation_inputs": _sanitize_for_json(wf.validation_inputs),
+        "can_manage": can_manage,
     }
 
 
