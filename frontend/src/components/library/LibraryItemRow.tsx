@@ -87,7 +87,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
       onClick={() => onOpen?.(item)}
       style={{
         display: 'grid',
-        gridTemplateColumns: '1fr auto',
+        gridTemplateColumns: '4fr 2fr 150px',
         padding: '12px 24px',
         borderBottom: '1px solid #f0f0f0',
         alignItems: 'center',
@@ -147,13 +147,14 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
         )}
       </div>
 
-      {/* Last used / actions column */}
+      {/* Last used column */}
+      <div style={{ fontSize: 12, color: '#9aa0a6', whiteSpace: 'nowrap' }}>
+        {item.last_used_at ? relativeTime(item.last_used_at) : item.created_at ? relativeTime(item.created_at) : 'Never'}
+      </div>
+
+      {/* Actions column */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, flexShrink: 0 }}>
-        {!hovered && !menuOpen ? (
-          <div style={{ fontSize: 12, color: '#9aa0a6', whiteSpace: 'nowrap' }}>
-            {item.last_used_at ? relativeTime(item.last_used_at) : item.created_at ? relativeTime(item.created_at) : 'Never'}
-          </div>
-        ) : (
+        {(hovered || menuOpen) && (
           <>
             {/* Top row: action buttons */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
