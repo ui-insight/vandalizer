@@ -545,8 +545,33 @@ async def delete_step(step_id: str, user: User = Depends(get_current_user)):
 async def add_task(step_id: str, req: AddTaskRequest, user: User = Depends(get_current_user)):
     task = await svc.add_task(step_id, req.name, user=user, data=req.data)
     if not task:
-        raise HTTPException(status_code=404, detail="Step not found")
+        status_code, detail = await _diagnose_step_mutation_failure(step_id, user)
+        raise HTTPException(status_code=status_code, detail=detail)
     return task
+
+
+async def _diagnose_step_mutation_failure(step_id: str, user: User) -> tuple[int, str]:
+    """Why did a step-scoped mutation return None?
+
+    The service collapses "step missing", "orphan workflow", and "user lacks
+    permission" into the same `None` return. This walks the same lookups to
+    pick a clearer status + detail for the client.
+    """
+    from app.models.workflow import WorkflowStep
+
+    try:
+        step = await WorkflowStep.get(PydanticObjectId(step_id))
+    except Exception:
+        return 404, "Step not found"
+    if not step:
+        return 404, "Step not found"
+    parent = await svc._get_workflow_for_step(step.id)
+    if not parent:
+        return 404, "Step's workflow not found"
+    team_access = await access_control.get_team_access_context(user)
+    if not access_control.can_manage_workflow(parent, user, team_access):
+        return 403, "You don't have permission to edit this workflow"
+    return 500, "Failed to update step"
 
 
 @router.patch("/tasks/{task_id}")

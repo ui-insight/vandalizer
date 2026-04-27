@@ -11,6 +11,7 @@ import {
   Upload, Clock,
 } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
+import { useToast } from '../../contexts/ToastContext'
 import {
   getWorkflow, addStep, deleteStep, addTask, deleteTask, updateTask,
   updateWorkflow, updateStep, downloadResults, testStep, getTestStepStatus,
@@ -138,6 +139,7 @@ const TEST_MESSAGES = [
 
 export function WorkflowEditorPanel() {
   const queryClient = useQueryClient()
+  const { toast } = useToast()
   const { openWorkflowId, openWorkflow, closeWorkflow, consumeWorkflowSession, selectedDocUuids, bumpActivitySignal } = useWorkspace()
   const [workflow, setWorkflow] = useState<Workflow | null>(null)
   const [loading, setLoading] = useState(true)
@@ -260,9 +262,19 @@ export function WorkflowEditorPanel() {
 
   const handleAddTask = async (taskType: TaskTypeDef) => {
     if (!editingStepId) return
-    await addTask(editingStepId, { name: taskType.name })
-    setShowTaskPicker(false)
-    refresh()
+    try {
+      await addTask(editingStepId, { name: taskType.name })
+      setShowTaskPicker(false)
+      refresh()
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to add task'
+      toast(msg, 'error')
+      // Recover: close the picker, drop the (likely stale) step selection,
+      // and reload the workflow so the editor matches server state.
+      setShowTaskPicker(false)
+      setEditingStepId(null)
+      refresh()
+    }
   }
 
   const handleDeleteTask = async (taskId: string) => {
