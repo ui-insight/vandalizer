@@ -87,6 +87,7 @@ export function FileList({
           </th>
           <th
             style={headerStyle}
+            className={onSort ? 'hover:bg-[#a6b5c945] hover:text-[#191919] transition-colors' : undefined}
             onClick={() => onSort?.('name')}
           >
             Name
@@ -94,6 +95,7 @@ export function FileList({
           </th>
           <th
             style={headerStyle}
+            className={onSort ? 'hover:bg-[#a6b5c945] hover:text-[#191919] transition-colors' : undefined}
             onClick={() => onSort?.('modified')}
           >
             Modified
