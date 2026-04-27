@@ -190,18 +190,46 @@ function NewTicketView({
   const [subject, setSubject] = useState('')
   const [message, setMessage] = useState('')
   const [priority, setPriority] = useState('normal')
+  const [files, setFiles] = useState<File[]>([])
   const [submitting, setSubmitting] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
+
+  const MAX_BYTES = 10 * 1024 * 1024
+
+  const handleFilesPicked = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = Array.from(e.target.files ?? [])
+    if (fileInputRef.current) fileInputRef.current.value = ''
+    const accepted: File[] = []
+    for (const f of picked) {
+      if (f.size > MAX_BYTES) {
+        toast(`${f.name} is over 10MB`, 'error')
+        continue
+      }
+      accepted.push(f)
+    }
+    if (accepted.length) setFiles((prev) => [...prev, ...accepted])
+  }
+
+  const removeFile = (idx: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== idx))
+  }
 
   const handleSubmit = async () => {
     if (!subject.trim() || !message.trim()) return
     setSubmitting(true)
     try {
-      const ticket = await supportApi.createTicket(subject.trim(), message.trim(), priority)
+      const ticket = await supportApi.createTicket(
+        subject.trim(),
+        message.trim(),
+        priority,
+        files,
+      )
       toast('Ticket created', 'success')
       onCreated(ticket)
-    } catch {
-      toast('Failed to create ticket', 'error')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to create ticket'
+      toast(msg, 'error')
     } finally {
       setSubmitting(false)
     }
@@ -247,6 +275,46 @@ function NewTicketView({
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
             placeholder="Describe your issue..."
           />
+        </div>
+        <div>
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-medium text-gray-600">Attachments</label>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="inline-flex items-center gap-1 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              title="Attach file"
+            >
+              <Paperclip className="h-4 w-4" />
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={handleFilesPicked}
+            />
+          </div>
+          {files.length > 0 && (
+            <ul className="mt-1 space-y-1">
+              {files.map((f, i) => (
+                <li
+                  key={`${f.name}-${i}`}
+                  className="flex items-center justify-between gap-2 rounded border border-gray-200 bg-gray-50 px-2 py-1 text-xs"
+                >
+                  <span className="truncate text-gray-700" title={f.name}>{f.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeFile(i)}
+                    className="shrink-0 rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600"
+                    title="Remove"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
       <div className="border-t p-3">
