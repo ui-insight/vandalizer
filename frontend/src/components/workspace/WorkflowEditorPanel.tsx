@@ -11,6 +11,7 @@ import {
   Upload, Clock,
 } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
+import { useToast } from '../../contexts/ToastContext'
 import {
   getWorkflow, addStep, deleteStep, addTask, deleteTask, updateTask,
   updateWorkflow, updateStep, downloadResults, testStep, getTestStepStatus,
@@ -18,7 +19,7 @@ import {
   getWorkflowQualityHistory, getWorkflowImprovementSuggestions, getWorkflowQualityStatus,
   getValidationPlan, updateValidationPlan, generateValidationPlan,
   getValidationInputs, updateValidationInputs,
-  exportWorkflowUrl, importWorkflow, getWorkflowHistory,
+  exportWorkflowUrl, importWorkflow, getWorkflowHistory, duplicateWorkflow,
 } from '../../api/workflows'
 import { RunHistoryTab } from './RunHistoryTab'
 import type { ValidationCheck, ValidationCheckDefinition, ValidationInputDefinition, QualityHistoryRun, BatchStatus, WorkflowQualityStatus } from '../../api/workflows'
@@ -138,6 +139,7 @@ const TEST_MESSAGES = [
 
 export function WorkflowEditorPanel() {
   const queryClient = useQueryClient()
+  const { toast } = useToast()
   const { openWorkflowId, openWorkflow, closeWorkflow, consumeWorkflowSession, selectedDocUuids, bumpActivitySignal } = useWorkspace()
   const [workflow, setWorkflow] = useState<Workflow | null>(null)
   const [loading, setLoading] = useState(true)
@@ -244,11 +246,22 @@ export function WorkflowEditorPanel() {
 
   const handleAddStep = async () => {
     if (!openWorkflowId || !newStepName.trim()) return
-    const result = (await addStep(openWorkflowId, { name: newStepName.trim() })) as { id?: string }
-    setShowNewStepModal(false)
-    setNewStepName('')
-    await refresh()
-    if (result?.id) setEditingStepId(result.id)
+    if (workflow?.can_manage === false) {
+      toast('Make a copy to edit this workflow', 'error')
+      setShowNewStepModal(false)
+      return
+    }
+    try {
+      const result = (await addStep(openWorkflowId, { name: newStepName.trim() })) as { id?: string }
+      setShowNewStepModal(false)
+      setNewStepName('')
+      await refresh()
+      if (result?.id) setEditingStepId(result.id)
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to add step', 'error')
+      setShowNewStepModal(false)
+      refresh()
+    }
   }
 
   const handleDeleteStep = async (stepId: string) => {
@@ -260,9 +273,24 @@ export function WorkflowEditorPanel() {
 
   const handleAddTask = async (taskType: TaskTypeDef) => {
     if (!editingStepId) return
-    await addTask(editingStepId, { name: taskType.name })
-    setShowTaskPicker(false)
-    refresh()
+    if (workflow?.can_manage === false) {
+      toast('Make a copy to edit this workflow', 'error')
+      setShowTaskPicker(false)
+      return
+    }
+    try {
+      await addTask(editingStepId, { name: taskType.name })
+      setShowTaskPicker(false)
+      refresh()
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to add task'
+      toast(msg, 'error')
+      // Recover: close the picker, drop the (likely stale) step selection,
+      // and reload the workflow so the editor matches server state.
+      setShowTaskPicker(false)
+      setEditingStepId(null)
+      refresh()
+    }
   }
 
   const handleDeleteTask = async (taskId: string) => {
@@ -320,6 +348,28 @@ export function WorkflowEditorPanel() {
       if (uuids.length === 0) return
       setActiveTab('design')
       await runner.start(openWorkflowId, uuids, undefined, batchMode)
+    }
+  }
+
+  const canManage = workflow?.can_manage !== false
+  const [duplicating, setDuplicating] = useState(false)
+
+  const handleMakeCopy = async () => {
+    if (!openWorkflowId || duplicating) return
+    setDuplicating(true)
+    try {
+      const copy = (await duplicateWorkflow(openWorkflowId)) as { id?: string }
+      if (copy?.id) {
+        toast('Copied workflow — opening your editable version', 'success')
+        openWorkflow(copy.id)
+      } else {
+        toast('Failed to copy workflow', 'error')
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to copy workflow'
+      toast(msg, 'error')
+    } finally {
+      setDuplicating(false)
     }
   }
 
@@ -446,6 +496,37 @@ export function WorkflowEditorPanel() {
         )}
       </div>
 
+      {/* ===== READ-ONLY BANNER (shared workflow you don't own) ===== */}
+      {!canManage && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '10px 24px',
+          backgroundColor: '#fffbeb',
+          borderBottom: '1px solid #fde68a',
+          fontSize: 13,
+          color: '#78350f',
+          flexShrink: 0,
+        }}>
+          <ShieldCheck style={{ width: 16, height: 16, color: '#b45309', flexShrink: 0 }} />
+          <span style={{ flex: 1 }}>
+            This workflow is shared with you. Make a copy to edit it — your copy will be saved to your team.
+          </span>
+          <button
+            onClick={handleMakeCopy}
+            disabled={duplicating}
+            style={{
+              padding: '6px 14px', fontSize: 12, fontWeight: 700, fontFamily: 'inherit',
+              borderRadius: 6, border: '1px solid var(--highlight-color, #eab308)',
+              backgroundColor: 'var(--highlight-color, #eab308)',
+              color: 'var(--highlight-text-color, #000)', cursor: 'pointer',
+              whiteSpace: 'nowrap', opacity: duplicating ? 0.6 : 1,
+            }}
+          >
+            {duplicating ? 'Copying...' : 'Make a copy to edit'}
+          </button>
+        </div>
+      )}
+
       {/* ===== TAB BAR ===== */}
       <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb', padding: '0 24px', backgroundColor: '#fff', flexShrink: 0 }}>
         {TABS.map(tab => {
@@ -518,6 +599,7 @@ export function WorkflowEditorPanel() {
               onClickStep={setEditingStepId}
               onAddStep={() => { setNewStepName(''); setShowNewStepModal(true) }}
               onMoveStep={handleMoveStep}
+              canManage={canManage}
             />
             {/* Quality Pulse card */}
             {qualityStatus && openWorkflowId && (
@@ -728,6 +810,7 @@ export function WorkflowEditorPanel() {
           setTaskPickerCategory={setTaskPickerCategory}
           onSelectTaskType={handleAddTask}
           onCloseTaskPicker={() => setShowTaskPicker(false)}
+          canManage={canManage}
         />
       )}
 
@@ -853,6 +936,7 @@ function DesignCanvas({
   onClickStep,
   onAddStep,
   onMoveStep,
+  canManage,
 }: {
   workflow: Workflow
   selectedDocCount: number
@@ -866,6 +950,7 @@ function DesignCanvas({
   onClickStep: (stepId: string) => void
   onAddStep: () => void
   onMoveStep: (stepIndex: number, direction: 'up' | 'down') => void
+  canManage: boolean
 }) {
   return (
     <div style={{
@@ -937,8 +1022,8 @@ function DesignCanvas({
         ))
       })()}
 
-      {/* +ADD STEP — hidden when the last step is an output step */}
-      {!(workflow.steps.length > 0 && workflow.steps[workflow.steps.length - 1].is_output) && (
+      {/* +ADD STEP — hidden when read-only or when the last step is an output step */}
+      {canManage && !(workflow.steps.length > 0 && workflow.steps[workflow.steps.length - 1].is_output) && (
         <>
           <ConnectionLine />
           <div style={{ display: 'flex', justifyContent: 'center' }}>
@@ -1129,6 +1214,7 @@ function EditStepOverlay({
   onStepNameSave, onToggleOutput,
   showTaskPicker, taskPickerCategory, setTaskPickerCategory,
   onSelectTaskType, onCloseTaskPicker,
+  canManage,
 }: {
   step: WorkflowStep
   onClose: () => void
@@ -1143,6 +1229,7 @@ function EditStepOverlay({
   setTaskPickerCategory: (cat: TaskCategory) => void
   onSelectTaskType: (type: TaskTypeDef) => void
   onCloseTaskPicker: () => void
+  canManage: boolean
 }) {
   const [editingName, setEditingName] = useState(false)
   const [nameValue, setNameValue] = useState(step.name)
@@ -1295,22 +1382,24 @@ function EditStepOverlay({
             )
           })}
 
-          {/* Add task button */}
-          <div
-            onClick={onAddTask}
-            style={{
-              backgroundColor: '#191919', color: '#fff',
-              borderRadius: 'var(--ui-radius, 8px)',
-              padding: 16, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: 10,
-              marginTop: step.tasks.length > 0 ? 8 : 0,
-            }}
-          >
-            <Plus style={{ width: 18, height: 18 }} />
-            <span style={{ fontSize: 13, fontWeight: 600 }}>
-              {step.tasks.length > 0 ? 'ADD A TASK' : 'ADD YOUR FIRST TASK'}
-            </span>
-          </div>
+          {/* Add task button — hidden when the workflow is read-only */}
+          {canManage && (
+            <div
+              onClick={onAddTask}
+              style={{
+                backgroundColor: '#191919', color: '#fff',
+                borderRadius: 'var(--ui-radius, 8px)',
+                padding: 16, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 10,
+                marginTop: step.tasks.length > 0 ? 8 : 0,
+              }}
+            >
+              <Plus style={{ width: 18, height: 18 }} />
+              <span style={{ fontSize: 13, fontWeight: 600 }}>
+                {step.tasks.length > 0 ? 'ADD A TASK' : 'ADD YOUR FIRST TASK'}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
