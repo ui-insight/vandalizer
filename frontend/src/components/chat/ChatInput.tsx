@@ -131,7 +131,7 @@ export function ChatInput({
 
       {/* Ask question container */}
       <div
-        className="flex flex-col rounded-[var(--ui-radius)] p-2.5 ring-1 ring-transparent focus-within:ring-2 focus-within:ring-highlight transition-shadow"
+        className="flex flex-col rounded-[var(--ui-radius)] p-2.5"
         style={{ backgroundColor: '#19191913' }}
       >
         {/* Text input area */}
