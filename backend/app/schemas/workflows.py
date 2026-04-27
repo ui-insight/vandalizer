@@ -27,6 +27,7 @@ class WorkflowResponse(BaseModel):
     num_executions: int = 0
     steps: list[dict] = []  # Dereferenced step objects
     input_config: dict = {}
+    can_manage: bool = True
 
 
 # ---------------------------------------------------------------------------

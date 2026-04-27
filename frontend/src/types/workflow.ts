@@ -51,6 +51,7 @@ export interface Workflow {
   num_executions: number;
   steps: WorkflowStep[];
   input_config?: { trigger_type?: string };
+  can_manage?: boolean;
 }
 
 export interface WorkflowStatus {
