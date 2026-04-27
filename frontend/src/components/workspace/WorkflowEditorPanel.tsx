@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   X, Play, Loader2, Plus, Trash2, Pencil, SlidersHorizontal,
   FileText, Filter, Outdent, Globe, Image, Code,
@@ -136,6 +137,7 @@ const TEST_MESSAGES = [
 // ---------------------------------------------------------------------------
 
 export function WorkflowEditorPanel() {
+  const queryClient = useQueryClient()
   const { openWorkflowId, openWorkflow, closeWorkflow, consumeWorkflowSession, selectedDocUuids, bumpActivitySignal } = useWorkspace()
   const [workflow, setWorkflow] = useState<Workflow | null>(null)
   const [loading, setLoading] = useState(true)
@@ -425,6 +427,7 @@ export function WorkflowEditorPanel() {
               e.target.value = ''
               try {
                 const result = await importWorkflow(f)
+                await queryClient.invalidateQueries({ queryKey: ['workflows'] })
                 openWorkflow(result.id)
               } catch (err: unknown) {
                 alert(err instanceof Error ? err.message : 'Import failed')

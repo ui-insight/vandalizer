@@ -1,4 +1,5 @@
 import React, { Fragment, useCallback, useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { ExtractionTutorial } from './ExtractionTutorial'
 import { X, Pencil, Loader2, Copy, Trash2, GripVertical, Plus, ChevronDown, ChevronRight, Play, TrendingUp, Sparkles, FileText, AlertTriangle, Eye, Shield, ShieldCheck, Download, Check } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
@@ -60,6 +61,7 @@ interface ExtractionConfig {
 }
 
 export function ExtractionEditorPanel() {
+  const queryClient = useQueryClient()
   const { openExtractionId, openExtraction, closeExtraction, selectedDocUuids, setHighlightTerms, bumpActivitySignal, consumeExtractionResults } = useWorkspace()
   const { toast } = useToast()
   const [searchSet, setSearchSet] = useState<SearchSet | null>(null)
@@ -528,6 +530,7 @@ export function ExtractionEditorPanel() {
               e.target.value = ''
               try {
                 const result = await importSearchSet(f, openExtractionId ?? undefined)
+                await queryClient.invalidateQueries({ queryKey: ['searchSets'] })
                 if (openExtractionId) {
                   await refresh()
                   await refreshItems()
