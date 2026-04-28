@@ -219,21 +219,42 @@ async def chat_stream(
     # Document segments — one entry per SmartDocument so each can be trimmed
     # independently by the budget planner.
     doc_segments: list[DocumentSegment] = []
+    skipped_no_text: list[str] = []
     for doc in documents:
         if doc.raw_text:
             doc_segments.append(DocumentSegment(
                 label=f"doc:{doc.title or doc.uuid}",
                 text=f"\n\n## Document: {doc.title}\n{doc.raw_text}",
             ))
+        else:
+            skipped_no_text.append(doc.title or doc.uuid)
+
+    # Warn the caller about any selected document that the model won't see
+    # because text extraction hasn't finished (or produced no text).
+    missing_uuids = [u for u in document_uuids if u not in {d.uuid for d in documents}]
+    if skipped_no_text or missing_uuids:
+        names = list(skipped_no_text) + missing_uuids
+        joined = ", ".join(names[:5]) + ("…" if len(names) > 5 else "")
+        yield json.dumps({
+            "kind": "context_notice",
+            "content": (
+                f"{len(names)} selected document(s) had no extracted text yet "
+                f"and were not sent to the model: {joined}. "
+                "Wait for processing to finish, then re-send."
+            ),
+            "action": "documents_not_ready",
+            "tokens_dropped": 0,
+        }) + "\n"
 
     total_text_len = sum(len(s.text) for s in doc_segments)
     if document_uuids:
         logger.info(
-            "Chat doc context: requested=%d found=%d with_text=%d text_len=%d",
+            "Chat doc context: requested=%d found=%d with_text=%d text_len=%d skipped_no_text=%d",
             len(document_uuids),
             len(documents),
             sum(1 for d in documents if d.raw_text),
             total_text_len,
+            len(skipped_no_text),
         )
 
     # KB context: query ChromaDB for relevant chunks and add as a segment.

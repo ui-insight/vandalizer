@@ -149,7 +149,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
 
       {/* Last used column */}
       <div style={{ fontSize: 12, color: '#9aa0a6', whiteSpace: 'nowrap' }}>
-        {item.last_used_at ? relativeTime(item.last_used_at) : item.created_at ? relativeTime(item.created_at) : 'Never'}
+        {item.last_used_at ? relativeTime(item.last_used_at) : 'Never'}
       </div>
 
       {/* Actions column */}
