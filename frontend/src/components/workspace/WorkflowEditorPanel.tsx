@@ -20,9 +20,10 @@ import {
   getValidationPlan, updateValidationPlan, generateValidationPlan,
   getValidationInputs, updateValidationInputs,
   exportWorkflowUrl, importWorkflow, getWorkflowHistory, duplicateWorkflow,
+  improvePrompt,
 } from '../../api/workflows'
 import { RunHistoryTab } from './RunHistoryTab'
-import type { ValidationCheck, ValidationCheckDefinition, ValidationInputDefinition, QualityHistoryRun, BatchStatus, WorkflowQualityStatus } from '../../api/workflows'
+import type { ValidationCheck, ValidationCheckDefinition, ValidationInputDefinition, QualityHistoryRun, BatchStatus, WorkflowQualityStatus, PromptImprovement } from '../../api/workflows'
 import { ItemPickerModal } from './ItemPickerModal'
 import { getModels } from '../../api/config'
 import { searchDocuments } from '../../api/documents'
@@ -279,9 +280,12 @@ export function WorkflowEditorPanel() {
       return
     }
     try {
-      await addTask(editingStepId, { name: taskType.name })
+      const created = await addTask(editingStepId, { name: taskType.name })
       setShowTaskPicker(false)
-      refresh()
+      await refresh()
+      if (created?.id) {
+        setEditingTask({ id: created.id, name: created.name, data: { ...(created.data || {}) } })
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to add task'
       toast(msg, 'error')
@@ -1952,6 +1956,44 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
     setTaskData(prev => ({ ...prev, [key]: value }))
   }
 
+  // Prompt improvement (Prompt task)
+  const [improving, setImproving] = useState(false)
+  const [improvement, setImprovement] = useState<PromptImprovement | null>(null)
+  const [improveError, setImproveError] = useState<string | null>(null)
+
+  const handleImprovePrompt = async () => {
+    const currentPrompt = getTextValue('prompt')
+    if (!currentPrompt.trim()) {
+      setImproveError('Write a prompt first.')
+      return
+    }
+    setImproving(true)
+    setImproveError(null)
+    setImprovement(null)
+    try {
+      const result = await improvePrompt({
+        prompt: currentPrompt,
+        input_source: inputSource,
+      })
+      setImprovement(result)
+    } catch (err) {
+      setImproveError(err instanceof Error ? err.message : 'Failed to generate suggestion')
+    } finally {
+      setImproving(false)
+    }
+  }
+
+  const acceptImprovement = () => {
+    if (improvement) setTextValue('prompt', improvement.improved_prompt)
+    setImprovement(null)
+    setImproveError(null)
+  }
+
+  const rejectImprovement = () => {
+    setImprovement(null)
+    setImproveError(null)
+  }
+
   const handleSelectSavedSet = (id: string, name: string) => {
     setTaskData(prev => ({ ...prev, search_set_uuid: id, name: name || prev.name }))
     setShowSetPicker(false)
@@ -2125,11 +2167,31 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                   />
                 </div>
                 <div>
-                  <label style={{
-                    display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8,
-                  }}>
-                    Prompt
-                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <label style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
+                      Prompt
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleImprovePrompt}
+                      disabled={improving || !getTextValue('prompt').trim()}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                        padding: '4px 10px', fontSize: 12, fontWeight: 500,
+                        border: '1px solid #d1d5db', borderRadius: 6,
+                        background: improving ? '#f3f4f6' : 'white',
+                        color: '#374151',
+                        cursor: improving || !getTextValue('prompt').trim() ? 'not-allowed' : 'pointer',
+                        opacity: !getTextValue('prompt').trim() ? 0.5 : 1,
+                      }}
+                      title="Have the LLM suggest an improved version of this prompt"
+                    >
+                      {improving
+                        ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
+                        : <Sparkles size={12} />}
+                      {improving ? 'Thinking…' : 'Improve'}
+                    </button>
+                  </div>
                   <textarea
                     value={getTextValue('prompt')}
                     onChange={e => setTextValue('prompt', e.target.value)}
@@ -2142,6 +2204,81 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                       lineHeight: 1.5,
                     }}
                   />
+                  {improveError && (
+                    <div style={{
+                      marginTop: 8, padding: '8px 12px', background: '#fef2f2',
+                      border: '1px solid #fecaca', borderRadius: 6, fontSize: 12, color: '#991b1b',
+                    }}>
+                      {improveError}
+                    </div>
+                  )}
+                  {improvement && (
+                    <div style={{
+                      marginTop: 12, border: '1px solid #c7d2fe', background: '#eef2ff',
+                      borderRadius: 8, overflow: 'hidden',
+                    }}>
+                      <div style={{
+                        padding: '10px 12px', borderBottom: '1px solid #c7d2fe',
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        fontSize: 12, fontWeight: 600, color: '#3730a3',
+                      }}>
+                        <Sparkles size={14} />
+                        Suggested rewrite
+                      </div>
+                      <div style={{ padding: 12, background: 'white' }}>
+                        <pre style={{
+                          margin: 0, padding: 10, background: '#f9fafb',
+                          border: '1px solid #e5e7eb', borderRadius: 6,
+                          fontFamily: 'inherit', fontSize: 13, lineHeight: 1.5,
+                          whiteSpace: 'pre-wrap', color: '#111827',
+                        }}>
+                          {improvement.improved_prompt}
+                        </pre>
+                        {improvement.rationale.length > 0 && (
+                          <div style={{ marginTop: 12 }}>
+                            <div style={{
+                              fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6,
+                            }}>
+                              What changed
+                            </div>
+                            <ul style={{
+                              margin: 0, paddingLeft: 18, fontSize: 13, lineHeight: 1.5, color: '#374151',
+                            }}>
+                              {improvement.rationale.map((b, i) => (
+                                <li key={i} style={{ marginBottom: 4 }}>{b}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        <div style={{
+                          display: 'flex', gap: 8, marginTop: 12, justifyContent: 'flex-end',
+                        }}>
+                          <button
+                            type="button"
+                            onClick={rejectImprovement}
+                            style={{
+                              padding: '6px 12px', fontSize: 13, fontWeight: 500,
+                              border: '1px solid #d1d5db', borderRadius: 6,
+                              background: 'white', color: '#374151', cursor: 'pointer',
+                            }}
+                          >
+                            Discard
+                          </button>
+                          <button
+                            type="button"
+                            onClick={acceptImprovement}
+                            style={{
+                              padding: '6px 12px', fontSize: 13, fontWeight: 500,
+                              border: '1px solid #4f46e5', borderRadius: 6,
+                              background: '#4f46e5', color: 'white', cursor: 'pointer',
+                            }}
+                          >
+                            Use this prompt
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
