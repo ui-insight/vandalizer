@@ -524,6 +524,38 @@ async def import_workflow(
     return WorkflowResponse(**wf)
 
 
+@router.post("/{workflow_id}/import", response_model=WorkflowResponse)
+async def import_into_workflow(
+    workflow_id: str,
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+):
+    """Replace the contents of an existing workflow with imported JSON data.
+
+    The workflow's id, name, and description are preserved; steps, tasks,
+    and configs are replaced.
+    """
+    from app.services import export_import_service as eis
+
+    target = await get_authorized_workflow(workflow_id, user, manage=True)
+    if not target:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    content = await file.read()
+    try:
+        data = json.loads(content)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON file")
+
+    try:
+        team_id = str(user.current_team) if user.current_team else None
+        wf = await eis.import_into_workflow(workflow_id, data, user.user_id, team_id=team_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return WorkflowResponse(**wf)
+
+
 @router.get("/{workflow_id}", response_model=WorkflowResponse)
 async def get_workflow(workflow_id: str, user: User = Depends(get_current_user)):
     wf = await svc.get_workflow(workflow_id, user=user)

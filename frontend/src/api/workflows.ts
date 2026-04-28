@@ -198,6 +198,22 @@ export async function importWorkflow(file: File): Promise<Workflow> {
   return res.json()
 }
 
+export async function importIntoWorkflow(workflowId: string, file: File): Promise<Workflow> {
+  const form = new FormData()
+  form.append('file', file)
+  const res = await fetch(`/api/workflows/${workflowId}/import`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: csrfHeaders(),
+    body: form,
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ detail: 'Import failed' }))
+    throw new Error(body.detail || 'Import failed')
+  }
+  return res.json()
+}
+
 // Step reordering
 
 export function reorderSteps(workflowId: string, stepIds: string[]) {
