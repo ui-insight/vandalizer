@@ -1,7 +1,7 @@
 import React, { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ExtractionTutorial } from './ExtractionTutorial'
-import { X, Pencil, Loader2, Copy, Trash2, GripVertical, Plus, ChevronDown, ChevronRight, Play, TrendingUp, Sparkles, FileText, AlertTriangle, Eye, Shield, ShieldCheck, Download, Check } from 'lucide-react'
+import { X, Pencil, Loader2, Copy, Trash2, GripVertical, Plus, ChevronDown, ChevronRight, Play, TrendingUp, Sparkles, FileText, AlertTriangle, Eye, Shield, ShieldCheck, Download, Check, PenTool, Wrench, ClipboardCheck, SlidersHorizontal, Clock } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
 import { useSearchSetItems } from '../../hooks/useExtractions'
@@ -49,6 +49,14 @@ marked.setOptions({ breaks: true, gfm: true })
 
 type Tab = 'design' | 'tools' | 'validate' | 'advanced' | 'history'
 
+const TABS: { key: Tab; label: string; icon: typeof PenTool }[] = [
+  { key: 'design', label: 'Design', icon: PenTool },
+  { key: 'tools', label: 'Tools', icon: Wrench },
+  { key: 'validate', label: 'Validate', icon: ClipboardCheck },
+  { key: 'advanced', label: 'Advanced', icon: SlidersHorizontal },
+  { key: 'history', label: 'History', icon: Clock },
+]
+
 interface ExtractionConfig {
   mode?: 'one_pass' | 'two_pass'
   one_pass?: { thinking?: boolean; structured?: boolean; model?: string }
@@ -81,6 +89,20 @@ export function ExtractionEditorPanel() {
   const [exportingPdf, setExportingPdf] = useState(false)
   const templateInputRef = useRef<HTMLInputElement>(null)
   const importDefInputRef = useRef<HTMLInputElement>(null)
+  const tabBarRef = useRef<HTMLDivElement>(null)
+  const [tabsCompact, setTabsCompact] = useState(false)
+
+  useEffect(() => {
+    const el = tabBarRef.current
+    if (!el) return
+    const observer = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        setTabsCompact(entry.contentRect.width < 480)
+      }
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
 
   const [qualityStatus, setQualityStatus] = useState<QualityStatus | null>(null)
   const [nudgeDismissed, setNudgeDismissed] = useState(false)
@@ -433,15 +455,16 @@ export function ExtractionEditorPanel() {
 
       {/* Tab bar */}
       <div
+        ref={tabBarRef}
         style={{
           display: 'flex',
           gap: 0,
           borderBottom: '1px solid #e5e7eb',
-          paddingLeft: 24,
+          paddingLeft: tabsCompact ? 8 : 24,
           flexShrink: 0,
         }}
       >
-        {(['design', 'tools', 'validate', 'advanced', 'history'] as const).map((tab) => {
+        {TABS.map(({ key: tab, label, icon: TabIcon }) => {
           const isActive = activeTab === tab
           // Colored dot for validate tab
           let tabDot: string | null = null
@@ -454,8 +477,9 @@ export function ExtractionEditorPanel() {
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
+              title={label}
               style={{
-                padding: '10px 16px',
+                padding: tabsCompact ? '10px 12px' : '10px 16px',
                 fontSize: 13,
                 fontWeight: isActive ? 600 : 400,
                 fontFamily: 'inherit',
@@ -464,14 +488,14 @@ export function ExtractionEditorPanel() {
                 border: 'none',
                 borderBottom: isActive ? '2px solid #202124' : '2px solid transparent',
                 cursor: 'pointer',
-                textTransform: 'capitalize',
                 transition: 'color 0.15s',
                 display: 'flex',
                 alignItems: 'center',
-                gap: 4,
+                gap: 6,
               }}
             >
-              {tab}
+              <TabIcon style={{ width: 14, height: 14 }} />
+              {!tabsCompact && label}
               {tabDot && (
                 <span style={{
                   width: 6, height: 6, borderRadius: '50%',
@@ -506,61 +530,58 @@ export function ExtractionEditorPanel() {
           onSetActiveResultIdx={setActiveResultIdx}
         />
       </div>
+      {/* Hidden file inputs — kept outside tab panels so they remain mounted regardless of active tab */}
+      <input
+        ref={templateInputRef}
+        type="file"
+        accept=".pdf"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          if (f) handleAttachTemplate(f)
+          e.target.value = ''
+        }}
+      />
+      <input
+        ref={importDefInputRef}
+        type="file"
+        accept=".json"
+        style={{ display: 'none' }}
+        onChange={async (e) => {
+          const f = e.target.files?.[0]
+          if (!f) return
+          e.target.value = ''
+          try {
+            const result = await importSearchSet(f, openExtractionId ?? undefined)
+            await queryClient.invalidateQueries({ queryKey: ['searchSets'] })
+            if (openExtractionId) {
+              await refresh()
+              await refreshItems()
+            } else {
+              openExtraction(result.uuid)
+            }
+          } catch (err: unknown) {
+            alert(err instanceof Error ? err.message : 'Import failed')
+          }
+        }}
+      />
       <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: activeTab === 'tools' ? undefined : 'none' }}>
-        <>
-          <input
-            ref={templateInputRef}
-            type="file"
-            accept=".pdf"
-            style={{ display: 'none' }}
-            onChange={(e) => {
-              const f = e.target.files?.[0]
-              if (f) handleAttachTemplate(f)
-              e.target.value = ''
-            }}
-          />
-          <input
-            ref={importDefInputRef}
-            type="file"
-            accept=".json"
-            style={{ display: 'none' }}
-            onChange={async (e) => {
-              const f = e.target.files?.[0]
-              if (!f) return
-              e.target.value = ''
-              try {
-                const result = await importSearchSet(f, openExtractionId ?? undefined)
-                await queryClient.invalidateQueries({ queryKey: ['searchSets'] })
-                if (openExtractionId) {
-                  await refresh()
-                  await refreshItems()
-                } else {
-                  openExtraction(result.uuid)
-                }
-              } catch (err: unknown) {
-                alert(err instanceof Error ? err.message : 'Import failed')
-              }
-            }}
-          />
-          <ToolsTab
-            onClone={handleClone}
-            onDelete={handleDelete}
-            onAttachTemplate={() => templateInputRef.current?.click()}
-            onGenerateTemplate={handleGenerateTemplate}
-            onExportPdf={handleExportPdf}
-            onExportDefinition={() => window.open(exportSearchSetUrl(openExtractionId!), '_blank')}
-            onImportDefinition={() => importDefInputRef.current?.click()}
-            onBuildFromDocument={handleBuildFromDocument}
-            buildingFromDoc={buildingFromDoc}
-            attachingTemplate={attachingTemplate}
-            generatingTemplate={generatingTemplate}
-            exportingPdf={exportingPdf}
-            hasDocuments={selectedDocUuids.length > 0}
-            hasResults={Object.keys(results).length > 0}
-            hasTemplate={!!searchSet?.fillable_pdf_url}
-            hasItems={items.length > 0}
-          />
-        </>
+        <ToolsTab
+          onClone={handleClone}
+          onDelete={handleDelete}
+          onAttachTemplate={() => templateInputRef.current?.click()}
+          onGenerateTemplate={handleGenerateTemplate}
+          onExportPdf={handleExportPdf}
+          onBuildFromDocument={handleBuildFromDocument}
+          buildingFromDoc={buildingFromDoc}
+          attachingTemplate={attachingTemplate}
+          generatingTemplate={generatingTemplate}
+          exportingPdf={exportingPdf}
+          hasDocuments={selectedDocUuids.length > 0}
+          hasResults={Object.keys(results).length > 0}
+          hasTemplate={!!searchSet?.fillable_pdf_url}
+          hasItems={items.length > 0}
+        />
       </div>
       {openExtractionId && (
         <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: activeTab === 'validate' ? undefined : 'none' }}>
@@ -582,6 +603,8 @@ export function ExtractionEditorPanel() {
           onSetUseDefaults={setUseDefaults}
           onSaveConfig={saveConfig}
           searchSetUuid={openExtractionId ?? undefined}
+          onExportDefinition={() => openExtractionId && window.open(exportSearchSetUrl(openExtractionId), '_blank')}
+          onImportDefinition={() => importDefInputRef.current?.click()}
         />
       </div>
       <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: activeTab === 'history' ? undefined : 'none' }}>
@@ -1311,8 +1334,6 @@ function ToolsTab({
   onAttachTemplate,
   onGenerateTemplate,
   onExportPdf,
-  onExportDefinition,
-  onImportDefinition,
   onBuildFromDocument,
   buildingFromDoc,
   attachingTemplate,
@@ -1328,8 +1349,6 @@ function ToolsTab({
   onAttachTemplate: () => void
   onGenerateTemplate: () => void
   onExportPdf: () => void
-  onExportDefinition: () => void
-  onImportDefinition: () => void
   onBuildFromDocument: () => void
   buildingFromDoc: boolean
   attachingTemplate: boolean
@@ -1349,18 +1368,6 @@ function ToolsTab({
           gap: 16,
         }}
       >
-        {/* Import Definition */}
-        <ToolCard
-          title="Import Definition"
-          description="Create a new extraction from an exported JSON file"
-          onClick={onImportDefinition}
-        />
-        {/* Export Definition */}
-        <ToolCard
-          title="Export Definition"
-          description="Download as a shareable JSON file"
-          onClick={onExportDefinition}
-        />
         {/* Export PDF */}
         <ToolCard
           title={exportingPdf ? 'Exporting...' : 'Export PDF'}
@@ -1504,12 +1511,16 @@ function AdvancedTab({
   onSetUseDefaults,
   onSaveConfig,
   searchSetUuid,
+  onExportDefinition,
+  onImportDefinition,
 }: {
   config: ExtractionConfig
   useDefaults: boolean
   onSetUseDefaults: (v: boolean) => void
   onSaveConfig: (c: ExtractionConfig) => void
   searchSetUuid?: string
+  onExportDefinition: () => void
+  onImportDefinition: () => void
 }) {
   const mode = config.mode ?? 'one_pass'
   const [models, setModels] = useState<ModelInfo[]>([])
@@ -1530,6 +1541,20 @@ function AdvancedTab({
 
   return (
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Import / Export Definition */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <ToolCard
+          title="Import Definition"
+          description="Create a new extraction from an exported JSON file"
+          onClick={onImportDefinition}
+        />
+        <ToolCard
+          title="Export Definition"
+          description="Download as a shareable JSON file"
+          onClick={onExportDefinition}
+        />
+      </div>
+
       <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: 20 }}>
         <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
           Extraction Settings
