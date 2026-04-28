@@ -75,6 +75,7 @@ class WorkflowStatusResponse(BaseModel):
     current_step_preview: Optional[str] = None
     final_output: Optional[Any] = None
     steps_output: Optional[dict] = None
+    output_step_names: list[str] = []
 
 
 class BatchStatusItem(BaseModel):
