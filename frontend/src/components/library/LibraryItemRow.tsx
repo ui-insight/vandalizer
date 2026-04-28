@@ -319,6 +319,10 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                         <button
                           onMouseEnter={() => setFolderSubmenuOpen(true)}
                           onMouseLeave={() => setFolderSubmenuOpen(false)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setFolderSubmenuOpen(true)
+                          }}
                           style={{
                             display: 'flex',
                             width: '100%',
@@ -327,7 +331,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                             padding: '8px 16px',
                             background: 'none',
                             border: 'none',
-                            cursor: 'pointer',
+                            cursor: 'default',
                             fontSize: 13,
                             color: '#1f2937',
                             textAlign: 'left',
