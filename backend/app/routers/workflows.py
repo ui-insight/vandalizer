@@ -10,6 +10,7 @@ import re
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from app.dependencies import get_api_key_user, get_current_user
 from app.models.user import User
@@ -756,6 +757,35 @@ async def get_workflow_suggestions(
     result_snapshot = latest.get("result_snapshot", latest)
     suggestions = await generate_improvement_suggestions("workflow", workflow_id, result_snapshot)
     return {"suggestions": suggestions}
+
+
+class ImprovePromptRequest(BaseModel):
+    prompt: str
+    input_source: str | None = None
+    prev_step_name: str | None = None
+    sample_input: str | None = None
+
+
+@router.post("/improve-prompt")
+@limiter.limit("10/minute")
+async def improve_prompt_endpoint(
+    request: Request,
+    body: ImprovePromptRequest,
+    user: User = Depends(get_current_user),
+):
+    """LLM-suggested rewrite of a Prompt task's prompt, with rationale."""
+    if not body.prompt.strip():
+        raise HTTPException(status_code=400, detail="Prompt is required")
+    from app.services.prompt_improvement_service import improve_prompt
+    try:
+        return await improve_prompt(
+            prompt=body.prompt,
+            input_source=body.input_source,
+            prev_step_name=body.prev_step_name,
+            sample_input=body.sample_input,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to generate suggestion: {exc}")
 
 
 @router.get("/{workflow_id}/quality-status")
