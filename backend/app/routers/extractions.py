@@ -659,13 +659,28 @@ async def run_extraction_integrated(
     for upload in files:
         if not upload.filename:
             continue
+        file_data = await upload.read()
+        # Reject zero-byte uploads. The most common cause is a curl invocation
+        # like `-F "files=@document.pdf"` run from a directory that doesn't
+        # contain the file — curl prints a warning to stderr but still POSTs an
+        # empty part, and without this guard the request would silently produce
+        # an empty extraction result.
+        if not file_data:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Uploaded file '{upload.filename}' is empty. "
+                    "If you used curl with -F files=@<path>, check that the path "
+                    "is correct relative to your current working directory "
+                    "(consider using an absolute path)."
+                ),
+            )
         uid = _uuid.uuid4().hex.upper()
         ext = (upload.filename.rsplit(".", 1)[-1] if "." in upload.filename else "pdf").lower()
         relative_path = Path(user.user_id) / f"{uid}.{ext}"
         upload_dir = Path(settings.upload_dir) / user.user_id
         upload_dir.mkdir(parents=True, exist_ok=True)
         file_path = upload_dir / f"{uid}.{ext}"
-        file_data = await upload.read()
         file_path.write_bytes(file_data)
 
         doc = SmartDocument(
@@ -719,7 +734,32 @@ async def run_extraction_integrated(
         )
         await activity_service.activity_finish(activity.id, ActivityStatus.COMPLETED)
         await activity_service.activity_update(activity.id, documents_touched=len(all_doc_uuids))
-        return {"status": "completed", "activity_id": str(activity.id), "results": results}
+
+        # Per-document diagnostics. Empty results when uploading a file are
+        # almost always one of: still-processing (extraction worker behind),
+        # task_status="error" (text extraction failed), or task_status="complete"
+        # with raw_text_len=0 (e.g. scanned PDF with no OCR available). Surfacing
+        # this in the response lets API callers tell those cases apart without
+        # having to dig into server logs.
+        doc_diagnostics = []
+        for doc_uuid in all_doc_uuids:
+            doc = await SmartDocument.find_one(SmartDocument.uuid == doc_uuid)
+            if doc:
+                doc_diagnostics.append({
+                    "uuid": doc.uuid,
+                    "title": doc.title,
+                    "task_status": getattr(doc, "task_status", None),
+                    "processing": doc.processing,
+                    "raw_text_len": len(doc.raw_text or ""),
+                    "error_message": getattr(doc, "error_message", None),
+                })
+
+        return {
+            "status": "completed",
+            "activity_id": str(activity.id),
+            "results": results,
+            "documents": doc_diagnostics,
+        }
     except Exception as e:
         await activity_service.activity_finish(activity.id, ActivityStatus.FAILED, error=str(e))
         raise

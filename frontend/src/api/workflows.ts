@@ -48,7 +48,10 @@ export function deleteStep(stepId: string) {
 // Tasks
 
 export function addTask(stepId: string, data: { name: string; data?: Record<string, unknown> }) {
-  return apiFetch(`/api/workflows/steps/${stepId}/tasks`, { method: 'POST', body: JSON.stringify(data) })
+  return apiFetch<{ id: string; name: string; data: Record<string, unknown> }>(
+    `/api/workflows/steps/${stepId}/tasks`,
+    { method: 'POST', body: JSON.stringify(data) },
+  )
 }
 
 export function updateTask(taskId: string, data: { name?: string; data?: Record<string, unknown> }) {
@@ -60,6 +63,26 @@ export function updateTask(taskId: string, data: { name?: string; data?: Record<
 
 export function deleteTask(taskId: string) {
   return apiFetch<{ ok: boolean }>(`/api/workflows/tasks/${taskId}`, { method: 'DELETE' })
+}
+
+// Prompt improvement
+
+export interface PromptImprovement {
+  improved_prompt: string
+  rationale: string[]
+}
+
+export function improvePrompt(data: {
+  prompt: string
+  input_source?: string
+  prev_step_name?: string
+  sample_input?: string
+}) {
+  return apiFetch<PromptImprovement>('/api/workflows/improve-prompt', {
+    method: 'POST',
+    body: JSON.stringify(data),
+    timeoutMs: 90_000,
+  })
 }
 
 // Execution

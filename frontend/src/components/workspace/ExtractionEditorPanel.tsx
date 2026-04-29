@@ -1752,10 +1752,14 @@ response = requests.post(
 )
 print(response.json())`
 
-  const curlFileSnippet = `curl -X POST "${endpoint}" \\
+  const curlFileSnippet = `# Use an absolute path for the file. With a bare filename, curl resolves
+# the path against your current working directory — if the file isn't there
+# curl prints a warning to stderr but still POSTs an empty body, which the
+# server will reject as a 400.
+curl -X POST "${endpoint}" \\
   -H "x-api-key: YOUR_API_KEY" \\
   -F "search_set_uuid=${searchSetUuid}" \\
-  -F "files=@document.pdf"`
+  -F "files=@/absolute/path/to/document.pdf"`
 
   const curlDocUuidSnippet = `curl -X POST "${endpoint}" \\
   -H "x-api-key: YOUR_API_KEY" \\
@@ -1796,6 +1800,16 @@ print(response.json())`
   "activity_id": "...",
   "results": [
     { "field_name": "extracted value", ... }
+  ],
+  "documents": [
+    {
+      "uuid": "...",
+      "title": "document.pdf",
+      "task_status": "complete",  // or "extracting" / "error"
+      "processing": false,
+      "raw_text_len": 12345,       // 0 means no text was extracted
+      "error_message": null
+    }
   ]
 }`
 
@@ -1906,6 +1920,15 @@ print(response.json())`
         <code>text</code> (optional, raw text to extract from) with an optional{' '}
         <code>text_title</code>. At least one of <code>files</code>, <code>document_uuids</code>, or{' '}
         <code>text</code> must be provided.
+      </div>
+
+      <div style={{ fontSize: 11, color: '#9ca3af', lineHeight: 1.6, marginTop: 8 }}>
+        <strong style={{ color: '#6b7280' }}>Empty <code>results</code>?</strong>{' '}
+        Check the <code>documents</code> array in the response. <code>raw_text_len: 0</code>{' '}
+        with <code>task_status: "complete"</code> usually means a scanned PDF where the OCR
+        service couldn't extract text. <code>task_status: "error"</code> means text extraction
+        failed — see <code>error_message</code>. <code>processing: true</code> means the
+        worker didn't finish in time; retry the request or increase the timeout.
       </div>
     </div>
   )
