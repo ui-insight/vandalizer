@@ -970,6 +970,7 @@ export default function Certification() {
     const module = MODULES.find(m => m.id === moduleId)
     if (!module) return true
     if (module.number === 0) return false // Module 0 always unlocked
+    if (progress?.unlocked) return false // Admin debug unlock — bypass prerequisites
     const prevModule = MODULES.find(m => m.number === module.number - 1)
     if (!prevModule) return false
     return !progress?.modules[prevModule.id]?.completed

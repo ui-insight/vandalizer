@@ -115,6 +115,7 @@ async def get_progress_dict(user_id: str) -> dict:
         "certified_at": prog.certified_at.isoformat() if prog.certified_at else None,
         "streak_days": prog.streak_days,
         "last_activity_date": prog.last_activity_date,
+        "unlocked": prog.unlocked,
     }
 
 
