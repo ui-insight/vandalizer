@@ -350,30 +350,53 @@ async def complete_module(user_id: str, module_id: str) -> dict:
 async def _resolve_extraction_field_names(task_data: dict) -> list[str]:
     """Resolve extraction field names from a task's data dict.
 
-    Fields can come from a linked SearchSet (search_set_uuid) or be stored
-    inline as ``searchphrases`` (list or comma-separated string) / ``keys``.
+    Fields can come from a linked SearchSet (``search_set_uuid``) AND/OR be stored
+    inline as ``searchphrases`` / ``keys`` / ``extractions``. We merge every
+    source so a user who configured fields in either place — or both — gets
+    credit for every field they defined. Duplicates are deduped case-insensitively.
     """
-    # Try linked SearchSet first
+    names: list[str] = []
+    seen: set[str] = set()
+
+    def _add(values) -> None:
+        for raw in values:
+            if not raw:
+                continue
+            name = str(raw).strip()
+            key = name.lower()
+            if not name or key in seen:
+                continue
+            seen.add(key)
+            names.append(name)
+
+    # Linked SearchSet items
     ss_id = task_data.get("search_set_uuid")
     if ss_id:
         items = await SearchSetItem.find(SearchSetItem.searchset == ss_id).to_list()
-        names = [item.searchphrase for item in items if item.searchphrase]
-        if names:
-            return names
+        _add(item.searchphrase for item in items if item.searchphrase)
 
-    # Fall back to inline searchphrases / keys / extractions
-    raw = task_data.get("searchphrases") or task_data.get("keys") or task_data.get("extractions") or []
-    if isinstance(raw, str):
-        return [s.strip() for s in raw.split(",") if s.strip()]
-    if isinstance(raw, list):
-        return [str(s).strip() for s in raw if s]
-    return []
+    # Inline sources — accept all so users who pick a saved set and ALSO type
+    # fields directly on the task aren't silently shorted.
+    for key in ("searchphrases", "keys", "extractions"):
+        raw = task_data.get(key)
+        if isinstance(raw, str):
+            _add(s.strip() for s in raw.split(",") if s.strip())
+        elif isinstance(raw, list):
+            _add(raw)
+
+    return names
 
 
-async def _get_extraction_fields(workflows: list) -> tuple[int, list[str]]:
-    """Returns (max_field_count, all_field_names) across all extraction tasks."""
-    max_fields = 0
-    all_field_names: list[str] = []
+async def _collect_extraction_fields(workflows: list) -> tuple[list[str], int]:
+    """Aggregate extraction field names across every Extraction task in the user's workflows.
+
+    Returns ``(combined_field_names, largest_single_extraction_count)``. The combined list
+    is the union (case-insensitive dedupe) so the validator does not penalize users for
+    splitting fields across multiple Extraction tasks or for the order of those tasks.
+    """
+    seen: set[str] = set()
+    combined: list[str] = []
+    largest = 0
     for wf in workflows:
         for step_id in wf.steps:
             step = await WorkflowStep.get(step_id)
@@ -383,10 +406,14 @@ async def _get_extraction_fields(workflows: list) -> tuple[int, list[str]]:
                 task = await WorkflowStepTask.get(task_id)
                 if task and task.name == "Extraction":
                     field_names = await _resolve_extraction_field_names(task.data or {})
-                    if len(field_names) > max_fields:
-                        max_fields = len(field_names)
-                        all_field_names = field_names
-    return max_fields, all_field_names
+                    if len(field_names) > largest:
+                        largest = len(field_names)
+                    for name in field_names:
+                        key = name.lower()
+                        if key not in seen:
+                            seen.add(key)
+                            combined.append(name)
+    return combined, largest
 
 
 # ---------------------------------------------------------------------------
@@ -461,11 +488,10 @@ async def _validate_foundations(user_id: str) -> dict:
     expected_fields = exercise.get("expected_fields", []) if exercise else []
 
     workflows = await Workflow.find(Workflow.user_id == user_id).to_list()
-    has_extraction_workflow = False
-    extraction_field_count = 0
-    matched_fields: list[str] = []
-    has_execution = False
+    combined_fields, _largest = await _collect_extraction_fields(workflows)
 
+    has_extraction_workflow = False
+    has_execution = False
     for wf in workflows:
         for step_id in wf.steps:
             step = await WorkflowStep.get(step_id)
@@ -475,24 +501,20 @@ async def _validate_foundations(user_id: str) -> dict:
                 task = await WorkflowStepTask.get(task_id)
                 if task and task.name == "Extraction":
                     has_extraction_workflow = True
-                    field_names = await _resolve_extraction_field_names(task.data or {})
-                    if len(field_names) > extraction_field_count:
-                        extraction_field_count = len(field_names)
-                        matched_fields = [
-                            ef for ef in expected_fields
-                            if _fuzzy_field_match(ef, field_names)
-                        ]
-
         if wf.num_executions and wf.num_executions >= 1:
             has_execution = True
 
+    matched_fields = [
+        ef for ef in expected_fields
+        if _fuzzy_field_match(ef, combined_fields)
+    ]
     missing_fields = [f for f in expected_fields if f not in matched_fields]
 
     checks.append({"name": "Has extraction workflow", "passed": has_extraction_workflow, "detail": "Create a workflow with an Extraction step"})
     checks.append({
         "name": "Expected fields configured",
         "passed": len(matched_fields) >= 3,
-        "detail": f"Found {len(matched_fields)}/{len(expected_fields)} expected fields"
+        "detail": f"Found {len(matched_fields)}/{len(expected_fields)} expected fields across your extraction tasks"
               + (f" (missing: {', '.join(missing_fields[:3])})" if missing_fields else ""),
     })
     checks.append({"name": "Workflow executed", "passed": has_execution, "detail": "Run your workflow at least once"})
@@ -501,7 +523,7 @@ async def _validate_foundations(user_id: str) -> dict:
     stars = 1 if passed else 0
     if passed and len(matched_fields) >= 5:
         stars = 2
-    if passed and extraction_field_count >= 8:
+    if passed and len(combined_fields) >= 8:
         stars = 3
 
     return {"passed": passed, "stars": stars, "checks": checks}
@@ -513,19 +535,20 @@ async def _validate_extraction_engine(user_id: str) -> dict:
     expected_fields = exercise.get("expected_fields", []) if exercise else []
 
     workflows = await Workflow.find(Workflow.user_id == user_id).to_list()
-    max_fields, all_field_names = await _get_extraction_fields(workflows)
+    combined_fields, _largest = await _collect_extraction_fields(workflows)
+    total_fields = len(combined_fields)
 
     matched_fields = [
         ef for ef in expected_fields
-        if _fuzzy_field_match(ef, all_field_names)
+        if _fuzzy_field_match(ef, combined_fields)
     ]
     missing_fields = [f for f in expected_fields if f not in matched_fields]
 
     checks.append({
         "name": "15+ extraction fields",
-        "passed": max_fields >= 15,
-        "detail": f"Largest extraction has {max_fields} fields (need 15+)"
-              + (f" - matched {len(matched_fields)}/{len(expected_fields)} expected" if expected_fields else ""),
+        "passed": total_fields >= 15,
+        "detail": f"You have {total_fields} unique fields across your extraction tasks (need 15+)"
+              + (f" — matched {len(matched_fields)}/{len(expected_fields)} expected" if expected_fields else ""),
     })
     if missing_fields:
         checks.append({
@@ -534,11 +557,11 @@ async def _validate_extraction_engine(user_id: str) -> dict:
             "detail": f"Consider adding: {', '.join(missing_fields[:5])}",
         })
 
-    passed = max_fields >= 15
+    passed = total_fields >= 15
     stars = 1 if passed else 0
-    if passed and max_fields >= 20:
+    if passed and total_fields >= 20:
         stars = 2
-    if passed and max_fields >= 25:
+    if passed and total_fields >= 25:
         stars = 3
 
     return {"passed": passed, "stars": stars, "checks": checks}
