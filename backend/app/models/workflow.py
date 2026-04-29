@@ -77,6 +77,9 @@ class WorkflowResult(Document):
     num_steps_total: int = 0
     steps_output: dict = {}
     final_output: Optional[dict] = None
+    # Sanitized step names marked is_output, snapshotted at run start.
+    # Empty list means "no explicit selection" — fall back to the last step.
+    output_step_names: list[str] = []
     start_time: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
     status: str = "running"
     session_id: str

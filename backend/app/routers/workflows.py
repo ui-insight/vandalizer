@@ -6,6 +6,7 @@ import csv
 import io
 import json
 import re
+import zipfile
 
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
@@ -239,6 +240,34 @@ async def poll_step_test(task_id: str, user: User = Depends(get_current_user)):
     return svc.get_test_status(task_id)
 
 
+def _step_output_value(step_payload):
+    """Extract the displayable value from a stored step output payload.
+
+    Each entry in WorkflowResult.steps_output is the full node return dict
+    ({"output": ..., "input": ..., "step_name": ..., "formatted_output": ...}).
+    """
+    if not isinstance(step_payload, dict):
+        return step_payload
+    return step_payload.get("formatted_output") or step_payload.get("output")
+
+
+def _zip_member_for_step(step_name: str, value):
+    """Return (filename, bytes) for one step's output, for inclusion in a multi-output zip."""
+    safe_name = re.sub(r"[^A-Za-z0-9_\-]+", "_", step_name).strip("_") or "step"
+
+    if isinstance(value, dict) and value.get("type") == "file_download":
+        filename = value.get("filename") or f"{safe_name}.bin"
+        return filename, base64.b64decode(value.get("data_b64", ""))
+
+    if isinstance(value, (dict, list)):
+        return f"{safe_name}.json", json.dumps(value, indent=2, default=str).encode()
+
+    if value is None:
+        return f"{safe_name}.txt", b""
+
+    return f"{safe_name}.txt", str(value).encode()
+
+
 @router.get("/download")
 async def download_results(
     session_id: str,
@@ -246,13 +275,46 @@ async def download_results(
     parse_structured: bool = False,
     user: User = Depends(get_current_user),
 ):
-    """Download workflow results in specified format."""
+    """Download workflow results in specified format.
+
+    If the workflow has multiple steps marked as deliverables (is_output), the
+    response is a ZIP bundle containing one file per marked step. With 0 or 1
+    marked steps the single-output formatting paths below apply.
+    """
     status = await svc.get_workflow_status(session_id, user=user)
     if not status:
         raise HTTPException(status_code=404, detail="Workflow result not found")
 
     final_output = status.get("final_output", {})
-    output_data = final_output.get("output", "") if isinstance(final_output, dict) else final_output
+    steps_output = status.get("steps_output", {}) or {}
+    output_step_names = [n for n in (status.get("output_step_names") or []) if n in steps_output]
+
+    if len(output_step_names) >= 2:
+        zip_buf = io.BytesIO()
+        with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            seen: dict[str, int] = {}
+            for name in output_step_names:
+                value = _step_output_value(steps_output.get(name))
+                filename, payload = _zip_member_for_step(name, value)
+                # Disambiguate duplicate filenames.
+                if filename in seen:
+                    seen[filename] += 1
+                    stem, _, ext = filename.rpartition(".")
+                    filename = f"{stem}_{seen[filename]}.{ext}" if ext else f"{filename}_{seen[filename]}"
+                else:
+                    seen[filename] = 0
+                zf.writestr(filename, payload)
+        zip_buf.seek(0)
+        return StreamingResponse(
+            zip_buf,
+            media_type="application/zip",
+            headers={"Content-Disposition": 'attachment; filename="deliverables.zip"'},
+        )
+
+    if len(output_step_names) == 1:
+        output_data = _step_output_value(steps_output.get(output_step_names[0]))
+    else:
+        output_data = final_output.get("output", "") if isinstance(final_output, dict) else final_output
 
     # Check for file_download type (e.g., from DataExport or DocumentRenderer)
     if isinstance(output_data, dict) and output_data.get("type") == "file_download":
@@ -457,6 +519,38 @@ async def import_workflow(
     try:
         team_id = str(user.current_team) if user.current_team else None
         wf = await eis.import_workflow(data, user.user_id, team_id=team_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return WorkflowResponse(**wf)
+
+
+@router.post("/{workflow_id}/import", response_model=WorkflowResponse)
+async def import_into_workflow(
+    workflow_id: str,
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+):
+    """Replace the contents of an existing workflow with imported JSON data.
+
+    The workflow's id, name, and description are preserved; steps, tasks,
+    and configs are replaced.
+    """
+    from app.services import export_import_service as eis
+
+    target = await get_authorized_workflow(workflow_id, user, manage=True)
+    if not target:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    content = await file.read()
+    try:
+        data = json.loads(content)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON file")
+
+    try:
+        team_id = str(user.current_team) if user.current_team else None
+        wf = await eis.import_into_workflow(workflow_id, data, user.user_id, team_id=team_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 

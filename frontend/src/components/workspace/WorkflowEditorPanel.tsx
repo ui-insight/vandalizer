@@ -8,7 +8,7 @@ import {
   AlertTriangle, ChevronDown, ChevronRight, ArrowUp, ArrowDown,
   Circle, Hand, Keyboard, Sparkles, ShieldCheck, Type,
   ArrowRight, Pause, TrendingUp, RefreshCw,
-  Upload, Clock,
+  Upload, Clock, Copy, Check,
 } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
@@ -19,7 +19,7 @@ import {
   getWorkflowQualityHistory, getWorkflowImprovementSuggestions, getWorkflowQualityStatus,
   getValidationPlan, updateValidationPlan, generateValidationPlan,
   getValidationInputs, updateValidationInputs,
-  exportWorkflowUrl, importWorkflow, getWorkflowHistory, duplicateWorkflow,
+  exportWorkflowUrl, importIntoWorkflow, getWorkflowHistory, duplicateWorkflow,
   improvePrompt,
 } from '../../api/workflows'
 import { RunHistoryTab } from './RunHistoryTab'
@@ -48,7 +48,7 @@ import type { ApprovalRequest } from '../../api/approvals'
 // Types & constants
 // ---------------------------------------------------------------------------
 
-type Tab = 'design' | 'input' | 'validate' | 'history'
+type Tab = 'design' | 'input' | 'validate' | 'advanced' | 'history'
 type TaskCategory = 'all' | 'text' | 'files' | 'web' | 'output'
 type TaskSubTab = 'design' | 'input' | 'output'
 type TaskInputSource = 'step_input' | 'select_document' | 'workflow_documents'
@@ -93,6 +93,7 @@ const TABS: { key: Tab; label: string; icon: typeof PenTool }[] = [
   { key: 'design', label: 'Design', icon: PenTool },
   { key: 'input', label: 'Input', icon: Zap },
   { key: 'validate', label: 'Validate', icon: ClipboardCheck },
+  { key: 'advanced', label: 'Advanced', icon: SlidersHorizontal },
   { key: 'history', label: 'History', icon: Clock },
 ]
 
@@ -165,6 +166,20 @@ export function WorkflowEditorPanel() {
   const titleInputRef = useRef<HTMLInputElement>(null)
   const newStepInputRef = useRef<HTMLInputElement>(null)
   const importInputRef = useRef<HTMLInputElement>(null)
+  const tabBarRef = useRef<HTMLDivElement>(null)
+  const [tabsCompact, setTabsCompact] = useState(false)
+
+  useEffect(() => {
+    const el = tabBarRef.current
+    if (!el) return
+    const observer = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        setTabsCompact(entry.contentRect.width < 520)
+      }
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
 
   const editingStep = editingStepId
     ? workflow?.steps.find(s => s.id === editingStepId) ?? null
@@ -456,20 +471,6 @@ export function WorkflowEditorPanel() {
               )}
             </div>
           )}
-          <button
-            onClick={() => window.open(exportWorkflowUrl(workflow.id), '_blank')}
-            title="Export workflow"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 4, color: '#5f6368', display: 'flex', flexShrink: 0 }}
-          >
-            <Download style={{ width: 16, height: 16 }} />
-          </button>
-          <button
-            onClick={() => importInputRef.current?.click()}
-            title="Import workflow"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 4, color: '#5f6368', display: 'flex', flexShrink: 0 }}
-          >
-            <Upload style={{ width: 16, height: 16 }} />
-          </button>
           <input
             ref={importInputRef}
             type="file"
@@ -479,10 +480,17 @@ export function WorkflowEditorPanel() {
               const f = e.target.files?.[0]
               if (!f) return
               e.target.value = ''
+              if (!workflow) return
+              const hasContent = (workflow.steps?.length ?? 0) > 0
+              if (hasContent && !window.confirm(
+                `This will replace all steps and configuration in "${workflow.name}" with the contents of the imported file. This cannot be undone. Continue?`
+              )) {
+                return
+              }
               try {
-                const result = await importWorkflow(f)
+                await importIntoWorkflow(workflow.id, f)
                 await queryClient.invalidateQueries({ queryKey: ['workflows'] })
-                openWorkflow(result.id)
+                await refresh()
               } catch (err: unknown) {
                 alert(err instanceof Error ? err.message : 'Import failed')
               }
@@ -532,7 +540,7 @@ export function WorkflowEditorPanel() {
       )}
 
       {/* ===== TAB BAR ===== */}
-      <div style={{ display: 'flex', borderBottom: '1px solid #e5e7eb', padding: '0 24px', backgroundColor: '#fff', flexShrink: 0 }}>
+      <div ref={tabBarRef} style={{ display: 'flex', borderBottom: '1px solid #e5e7eb', padding: tabsCompact ? '0 8px' : '0 24px', backgroundColor: '#fff', flexShrink: 0 }}>
         {TABS.map(tab => {
           const TabIcon = tab.icon
           const badge = tab.key === 'input' ? inputBadge : 0
@@ -547,8 +555,9 @@ export function WorkflowEditorPanel() {
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
+              title={tab.label}
               style={{
-                padding: '12px 20px', fontSize: 13,
+                padding: tabsCompact ? '12px 12px' : '12px 20px', fontSize: 13,
                 fontWeight: activeTab === tab.key ? 700 : 500,
                 fontFamily: 'inherit', background: 'none', border: 'none',
                 borderBottom: activeTab === tab.key
@@ -563,7 +572,7 @@ export function WorkflowEditorPanel() {
               }}
             >
               <TabIcon style={{ width: 14, height: 14 }} />
-              {tab.label}
+              {!tabsCompact && tab.label}
               {tabDot && (
                 <span style={{
                   width: 6, height: 6, borderRadius: '50%',
@@ -684,6 +693,13 @@ export function WorkflowEditorPanel() {
               refreshSparkline()
               if (openWorkflowId) getWorkflowQualityStatus(openWorkflowId).then(setQualityStatus).catch(() => {})
             }}
+          />
+        )}
+        {activeTab === 'advanced' && (
+          <AdvancedTab
+            workflowId={workflow.id}
+            onImportDefinition={() => importInputRef.current?.click()}
+            onExportDefinition={() => window.open(exportWorkflowUrl(workflow.id), '_blank')}
           />
         )}
         {activeTab === 'history' && openWorkflowId && (
@@ -1010,6 +1026,8 @@ function DesignCanvas({
         const visibleSteps = workflow.steps
           .map((step, originalIdx) => ({ step, originalIdx }))
           .filter(({ step }) => !(step.name === 'Document' && step.tasks.length === 0))
+        const hasExplicitOutput = visibleSteps.some(({ step }) => step.is_output)
+        const lastDisplayIdx = visibleSteps.length - 1
         return visibleSteps.map(({ step, originalIdx }, displayIdx) => (
           <div key={step.id}>
             <ConnectionLine />
@@ -1017,6 +1035,7 @@ function DesignCanvas({
               step={step}
               index={displayIdx}
               totalSteps={visibleSteps.length}
+              isImplicitOutput={!hasExplicitOutput && displayIdx === lastDisplayIdx}
               isActive={runnerRunning && runnerStatus?.current_step_name === step.name}
               onClick={() => onClickStep(step.id)}
               onMoveUp={() => onMoveStep(originalIdx, 'up')}
@@ -1026,8 +1045,8 @@ function DesignCanvas({
         ))
       })()}
 
-      {/* +ADD STEP — hidden when read-only or when the last step is an output step */}
-      {canManage && !(workflow.steps.length > 0 && workflow.steps[workflow.steps.length - 1].is_output) && (
+      {/* +ADD STEP */}
+      {canManage && (
         <>
           <ConnectionLine />
           <div style={{ display: 'flex', justifyContent: 'center' }}>
@@ -1116,27 +1135,33 @@ function Connector({ position }: { position: 'top' | 'bottom' }) {
 // Step card
 // ---------------------------------------------------------------------------
 
-function StepCard({ step, index, totalSteps, isActive, onClick, onMoveUp, onMoveDown }: {
+function StepCard({ step, index, totalSteps, isImplicitOutput, isActive, onClick, onMoveUp, onMoveDown }: {
   step: WorkflowStep
   index: number
   totalSteps: number
+  isImplicitOutput: boolean
   isActive: boolean
   onClick: () => void
   onMoveUp: () => void
   onMoveDown: () => void
 }) {
-  const isOutput = step.is_output
+  const isExplicitOutput = step.is_output
+  const isDeliverable = isExplicitOutput || isImplicitOutput
   return (
     <div
       onClick={onClick}
       style={{
         position: 'relative',
-        backgroundColor: isOutput ? undefined : '#fff',
-        ...(isOutput ? { background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' } : {}),
+        backgroundColor: isExplicitOutput ? undefined : '#fff',
+        ...(isExplicitOutput ? { background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' } : {}),
         boxShadow: '0 6px 18px rgba(0,0,0,0.05)',
         borderRadius: 'var(--ui-radius, 8px)',
         padding: 15, cursor: 'pointer',
-        border: isActive ? '2px solid var(--highlight-color, #eab308)' : '2px solid transparent',
+        border: isActive
+          ? '2px solid var(--highlight-color, #eab308)'
+          : isImplicitOutput
+            ? '2px dashed #a78bfa'
+            : '2px solid transparent',
         transition: 'border-color 0.2s',
         marginTop: 10, marginBottom: 10,
       }}
@@ -1146,30 +1171,40 @@ function StepCard({ step, index, totalSteps, isActive, onClick, onMoveUp, onMove
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div style={{
           width: 36, height: 36, borderRadius: 6,
-          backgroundColor: isOutput ? 'rgba(255,255,255,0.2)' : '#f3f4f6',
+          backgroundColor: isExplicitOutput ? 'rgba(255,255,255,0.2)' : isImplicitOutput ? '#ede9fe' : '#f3f4f6',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           flexShrink: 0,
         }}>
-          {isOutput ? (
-            <Flag style={{ width: 18, height: 18, color: '#fff' }} />
+          {isDeliverable ? (
+            <Flag style={{ width: 18, height: 18, color: isExplicitOutput ? '#fff' : '#7c3aed' }} />
           ) : (
             <span style={{ fontSize: 18, fontWeight: 700, color: '#374151' }}>{index + 1}</span>
           )}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 600, fontSize: 14, color: isOutput ? '#fff' : '#202124' }}>
-            {isOutput ? 'WORKFLOW OUTPUT' : step.name}
+          <div style={{ fontWeight: 600, fontSize: 14, color: isExplicitOutput ? '#fff' : '#202124' }}>
+            {step.name}
+            {isDeliverable && (
+              <span style={{
+                marginLeft: 8, fontSize: 10, fontWeight: 700, letterSpacing: '0.05em',
+                padding: '2px 6px', borderRadius: 4,
+                color: isExplicitOutput ? '#fff' : '#7c3aed',
+                backgroundColor: isExplicitOutput ? 'rgba(255,255,255,0.2)' : '#ede9fe',
+              }}>
+                {isExplicitOutput ? 'DELIVERABLE' : 'DELIVERABLE (DEFAULT)'}
+              </span>
+            )}
             {isActive && (
               <Loader2 style={{
                 width: 14, height: 14, marginLeft: 8,
                 animation: 'spin 1s linear infinite',
                 display: 'inline', verticalAlign: 'middle',
-                color: isOutput ? '#fff' : 'var(--highlight-color, #eab308)',
+                color: isExplicitOutput ? '#fff' : 'var(--highlight-color, #eab308)',
               }} />
             )}
           </div>
-          <div style={{ fontSize: 12, color: isOutput ? 'rgba(255,255,255,0.7)' : '#6b7280', marginTop: 2 }}>
-            {isOutput ? step.name : `${step.tasks.length} task${step.tasks.length !== 1 ? 's' : ''}`}
+          <div style={{ fontSize: 12, color: isExplicitOutput ? 'rgba(255,255,255,0.7)' : '#6b7280', marginTop: 2 }}>
+            {`${step.tasks.length} task${step.tasks.length !== 1 ? 's' : ''}`}
           </div>
         </div>
         {/* Move up/down buttons */}
@@ -1180,7 +1215,7 @@ function StepCard({ step, index, totalSteps, isActive, onClick, onMoveUp, onMove
             style={{
               background: 'none', border: 'none', cursor: index === 0 ? 'default' : 'pointer',
               padding: 2, display: 'flex',
-              color: isOutput ? 'rgba(255,255,255,0.4)' : '#d1d5db',
+              color: isExplicitOutput ? 'rgba(255,255,255,0.4)' : '#d1d5db',
               opacity: index === 0 ? 0.3 : 1,
             }}
           >
@@ -1192,7 +1227,7 @@ function StepCard({ step, index, totalSteps, isActive, onClick, onMoveUp, onMove
             style={{
               background: 'none', border: 'none', cursor: index === totalSteps - 1 ? 'default' : 'pointer',
               padding: 2, display: 'flex',
-              color: isOutput ? 'rgba(255,255,255,0.4)' : '#d1d5db',
+              color: isExplicitOutput ? 'rgba(255,255,255,0.4)' : '#d1d5db',
               opacity: index === totalSteps - 1 ? 0.3 : 1,
             }}
           >
@@ -1201,7 +1236,7 @@ function StepCard({ step, index, totalSteps, isActive, onClick, onMoveUp, onMove
         </div>
         <SlidersHorizontal style={{
           width: 16, height: 16,
-          color: isOutput ? 'rgba(255,255,255,0.6)' : '#9ca3af',
+          color: isExplicitOutput ? 'rgba(255,255,255,0.6)' : '#9ca3af',
           flexShrink: 0,
         }} />
       </div>
@@ -1304,7 +1339,7 @@ function EditStepOverlay({
           Basic Setup
         </div>
 
-        {/* Output step toggle */}
+        {/* Deliverable toggle — multiple steps can be marked; their outputs are bundled at download */}
         <label style={{
           display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16,
           cursor: 'pointer', padding: '10px 14px',
@@ -1319,10 +1354,11 @@ function EditStepOverlay({
           />
           <div>
             <div style={{ fontSize: 13, fontWeight: 600, color: step.is_output ? '#7c3aed' : '#374151' }}>
-              Output Step
+              Include in deliverables
             </div>
             <div style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>
-              Mark this as the final output step of the workflow
+              When set, this step's output is included in the download. Mark multiple steps to bundle them as a ZIP.
+              If no step is marked, the last step is used by default.
             </div>
           </div>
         </label>
@@ -5125,6 +5161,237 @@ function ValidateTab({
           excludeUuids={inputs.filter(i => i.document_uuid).map(i => i.document_uuid!)}
         />
       )}
+    </div>
+  )
+}
+
+/* ── Advanced Tab ── */
+
+function AdvancedToolCard({
+  title,
+  description,
+  onClick,
+  style,
+}: {
+  title: string
+  description: string
+  onClick: () => void
+  style?: CSSProperties
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'flex', flexDirection: 'column', gap: 6, padding: 16,
+        border: '1px solid #e5e7eb', borderRadius: 8, backgroundColor: '#fff',
+        cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+        transition: 'box-shadow 0.15s', ...style,
+      }}
+    >
+      <div style={{ fontSize: 14, fontWeight: 600, color: '#202124' }}>{title}</div>
+      <div style={{ fontSize: 12, color: '#5f6368', lineHeight: 1.4 }}>{description}</div>
+    </button>
+  )
+}
+
+function AdvancedTab({
+  workflowId,
+  onImportDefinition,
+  onExportDefinition,
+}: {
+  workflowId: string
+  onImportDefinition: () => void
+  onExportDefinition: () => void
+}) {
+  return (
+    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Import / Export Definition */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <AdvancedToolCard
+          title="Import Definition"
+          description="Replace this workflow's steps and configuration with the contents of an exported JSON file"
+          onClick={onImportDefinition}
+        />
+        <AdvancedToolCard
+          title="Export Definition"
+          description="Download as a shareable JSON file"
+          onClick={onExportDefinition}
+        />
+      </div>
+
+      <WorkflowApiSection workflowId={workflowId} />
+    </div>
+  )
+}
+
+function WorkflowApiSection({ workflowId }: { workflowId: string }) {
+  const [lang, setLang] = useState<'python' | 'curl'>('python')
+  const [copied, setCopied] = useState<string | null>(null)
+
+  const baseUrl = window.location.origin
+  const endpoint = `${baseUrl}/api/workflows/run-integrated`
+  const statusEndpoint = `${baseUrl}/api/workflows/status?session_id={session_id}`
+
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text)
+    setCopied(id)
+    setTimeout(() => setCopied(null), 2000)
+  }
+
+  const pythonFileSnippet = `import requests
+
+response = requests.post(
+    "${endpoint}",
+    headers={"x-api-key": "YOUR_API_KEY"},
+    data={"workflow_id": "${workflowId}"},
+    files=[
+        ("files", ("document.pdf", open("document.pdf", "rb"), "application/pdf")),
+        # Add more files as needed
+    ],
+)
+print(response.json())`
+
+  const curlFileSnippet = `# Use an absolute path for the file. With a bare filename, curl resolves
+# the path against your current working directory — if the file isn't there
+# curl prints a warning to stderr but still POSTs an empty body, which the
+# server will reject as a 400.
+curl -X POST "${endpoint}" \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -F "workflow_id=${workflowId}" \\
+  -F "files=@/absolute/path/to/document.pdf"`
+
+  const statusSnippet = lang === 'python'
+    ? `# Poll workflow status using the session_id returned above
+response = requests.get(
+    "${baseUrl}/api/workflows/status",
+    headers={"x-api-key": "YOUR_API_KEY"},
+    params={"session_id": "SESSION_ID_FROM_RESPONSE"},
+)
+print(response.json())`
+    : `curl "${baseUrl}/api/workflows/status?session_id=SESSION_ID_FROM_RESPONSE" \\
+  -H "x-api-key: YOUR_API_KEY"`
+
+  const responseExample = `{
+  "status": "queued",
+  "activity_id": "...",
+  "session_id": "..."
+}`
+
+  const codeBlockStyle: CSSProperties = {
+    padding: '14px 16px', backgroundColor: '#1a1a2e', borderRadius: 6,
+    fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+    fontSize: 12, color: '#e2e8f0', whiteSpace: 'pre', overflowX: 'auto',
+    lineHeight: 1.6, position: 'relative',
+  }
+
+  const tabStyle = (active: boolean): CSSProperties => ({
+    padding: '4px 12px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+    borderRadius: 4, cursor: 'pointer', border: 'none',
+    backgroundColor: active ? '#3b82f6' : '#e5e7eb',
+    color: active ? '#fff' : '#6b7280',
+  })
+
+  return (
+    <div style={{ padding: 16, backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <label style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
+          Run this workflow via API
+        </label>
+        <div style={{ display: 'flex', gap: 4 }}>
+          <button onClick={() => setLang('python')} style={tabStyle(lang === 'python')}>Python</button>
+          <button onClick={() => setLang('curl')} style={tabStyle(lang === 'curl')}>cURL</button>
+        </div>
+      </div>
+
+      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 16, lineHeight: 1.6 }}>
+        Trigger this workflow directly from any HTTP client. The endpoint queues the run asynchronously
+        and returns a <code>session_id</code> you can poll for status. Requires an API key; generate one from{' '}
+        <strong>My Account</strong> in the top-right menu. Rate-limited to 10 requests/minute.
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+          Endpoint
+        </div>
+        <div style={{ ...codeBlockStyle, whiteSpace: 'nowrap' }}>
+          <span style={{ color: '#22d3ee' }}>POST</span>{' '}{endpoint}
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+          This workflow's ID
+        </div>
+        <div style={{ ...codeBlockStyle, whiteSpace: 'nowrap' }}>
+          {workflowId}
+        </div>
+      </div>
+
+      <WorkflowApiCodeBlock
+        title="Upload files"
+        code={lang === 'python' ? pythonFileSnippet : curlFileSnippet}
+        id="files"
+        copied={copied}
+        onCopy={copyToClipboard}
+        style={codeBlockStyle}
+      />
+
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+          Response
+        </div>
+        <div style={codeBlockStyle}>{responseExample}</div>
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+          Status lookup
+        </div>
+        <div style={{ ...codeBlockStyle, whiteSpace: 'nowrap', marginBottom: 8 }}>
+          <span style={{ color: '#22d3ee' }}>GET</span>{' '}{statusEndpoint}
+        </div>
+        <WorkflowApiCodeBlock
+          title="Poll a session"
+          code={statusSnippet}
+          id="status"
+          copied={copied}
+          onCopy={copyToClipboard}
+          style={codeBlockStyle}
+        />
+      </div>
+
+      <div style={{ fontSize: 11, color: '#9ca3af', lineHeight: 1.6, marginTop: 8 }}>
+        Parameters: <code>workflow_id</code> (required) and one or more <code>files</code> (multipart uploads).
+        At least one file must be provided.
+      </div>
+    </div>
+  )
+}
+
+function WorkflowApiCodeBlock({ title, code, id, copied, onCopy, style }: {
+  title: string; code: string; id: string; copied: string | null;
+  onCopy: (text: string, id: string) => void; style: CSSProperties;
+}) {
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          {title}
+        </div>
+        <button
+          onClick={() => onCopy(code, id)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 4, padding: '2px 8px', fontSize: 11,
+            fontWeight: 500, fontFamily: 'inherit', borderRadius: 4, cursor: 'pointer',
+            border: '1px solid #e5e7eb', backgroundColor: '#fff',
+            color: copied === id ? '#16a34a' : '#6b7280',
+          }}
+        >
+          {copied === id ? <Check style={{ width: 12, height: 12 }} /> : <Copy style={{ width: 12, height: 12 }} />}
+          {copied === id ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      <div style={style}>{code}</div>
     </div>
   )
 }
