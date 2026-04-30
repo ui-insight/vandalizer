@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Award, User, Users, Settings, LogOut, IdCard, Shield, ClipboardCheck, ChevronDown } from 'lucide-react'
+import { Award, User, Users, Settings, LogOut, IdCard, Shield, ClipboardCheck, ChevronDown, MessageSquare } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { useTeams } from '../../hooks/useTeams'
 import { useAuth } from '../../hooks/useAuth'
@@ -104,10 +104,26 @@ export function TeamsDropdown() {
             <span>Certification</span>
           </button>
 
+          {/* Support agent: Support Center */}
+          {user?.is_support_agent && (
+            <>
+              <hr className="my-1.5 border-0 h-px bg-[#cdcdcd]" />
+              <Link
+                to="/support"
+                search={{ ticket: undefined }}
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-2.5 rounded-md px-3.5 py-2.5 text-sm text-[#111] hover:bg-black/[.04] transition-colors"
+              >
+                <MessageSquare className="h-4 w-4 shrink-0" style={{ width: 18 }} />
+                <span>Support Center</span>
+              </Link>
+            </>
+          )}
+
           {/* Admin: System Configuration */}
           {(user?.is_admin || user?.is_examiner) && (
             <>
-              <hr className="my-1.5 border-0 h-px bg-[#cdcdcd]" />
+              {!user?.is_support_agent && <hr className="my-1.5 border-0 h-px bg-[#cdcdcd]" />}
               <Link
                 to="/admin"
                 onClick={() => setOpen(false)}

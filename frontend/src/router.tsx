@@ -19,6 +19,7 @@ const Admin = lazy(() => import('./pages/Admin'))
 const Account = lazy(() => import('./pages/Account'))
 const Automation = lazy(() => import('./pages/Automation'))
 const Verification = lazy(() => import('./pages/Verification'))
+const SupportCenter = lazy(() => import('./pages/SupportCenter'))
 const Docs = lazy(() => import('./pages/Docs'))
 const Demo = lazy(() => import('./pages/Demo'))
 const DemoFeedback = lazy(() => import('./pages/DemoFeedback'))
@@ -217,6 +218,19 @@ const verificationRoute = createRoute({
   ),
 })
 
+const supportRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/support',
+  validateSearch: (search: Record<string, unknown>) => ({
+    ticket: (search.ticket as string) || undefined,
+  }),
+  component: () => (
+    <ProtectedRoute>
+      <SupportCenter />
+    </ProtectedRoute>
+  ),
+})
+
 const docsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/docs',
@@ -308,6 +322,7 @@ const routeTree = rootRoute.addChildren([
   officeRoute,
   browserAutomationRoute,
   verificationRoute,
+  supportRoute,
   docsRoute,
   certificationRoute,
   demoRoute,
