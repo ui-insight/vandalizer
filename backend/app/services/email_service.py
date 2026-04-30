@@ -261,6 +261,27 @@ def password_reset_email(
     return subject, html
 
 
+def password_set_email(
+    name: str, reset_url: str,
+) -> tuple[str, str]:
+    """Returns (subject, html_body) for SSO-only users who don't yet have a password.
+
+    Same token flow as a reset, but the copy reflects that they're setting a
+    password for the first time and can keep using SSO afterward.
+    """
+    subject = "Set a password for your Vandalizer account"
+    html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
+    <div class="container"><div class="card">
+      <div class="logo">Vandalizer</div>
+      <h1>Set Your Password</h1>
+      <p>Hi {name}, you've been signing in with single sign-on (SSO), so your account doesn't have a password yet. Click the button below to set one.</p>
+      <p style="margin-top:24px"><a class="btn" href="{reset_url}">Set Password</a></p>
+      <p style="font-size:13px;color:#6b7280;margin-top:16px">After setting a password you can sign in either way &mdash; SSO will keep working. This link expires in 1 hour. If you didn't request this, you can safely ignore this email.</p>
+      <div class="footer">Vandalizer</div>
+    </div></div></body></html>"""
+    return subject, html
+
+
 # ---------------------------------------------------------------------------
 # Team invitation emails
 # ---------------------------------------------------------------------------

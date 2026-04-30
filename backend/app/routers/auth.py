@@ -175,13 +175,18 @@ async def forgot_password(
     body: ForgotPasswordRequest,
     settings: Settings = Depends(get_settings),
 ):
-    """Send a password reset email. Always returns success to avoid email enumeration."""
+    """Send a password reset (or set-password, for SSO-only users) email.
+
+    Always returns success to avoid email enumeration. SSO-only users have
+    `password_hash=None`; we still send them a link, but with copy explaining
+    they're setting a password for the first time.
+    """
     email = body.email.strip().lower()
     user = await User.find_one(User.email == email)
     if not user:
         user = await User.find_one(User.user_id == email)
-    if not user or not user.password_hash:
-        logger.info("Password reset: no matching user with password for %s", email)
+    if not user:
+        logger.info("Password reset: no matching user for %s", email)
         return {"ok": True}
 
     # Generate token, store in Redis with 1-hour TTL
@@ -192,12 +197,24 @@ async def forgot_password(
     finally:
         await r.aclose()
 
-    from app.services.email_service import send_email, password_reset_email
+    from app.services.email_service import send_email, password_reset_email, password_set_email
 
     reset_url = f"{settings.frontend_url}/reset-password?token={token}"
-    subject, html = password_reset_email(user.name or user.user_id, reset_url)
-    sent = await send_email(user.email or email, subject, html, settings, email_type="password_reset")
-    logger.info("Password reset: user=%s, email=%s, sent=%s", user.user_id, user.email, sent)
+    is_sso_only = not user.password_hash
+    if is_sso_only:
+        subject, html = password_set_email(user.name or user.user_id, reset_url)
+        email_type = "password_set"
+    else:
+        subject, html = password_reset_email(user.name or user.user_id, reset_url)
+        email_type = "password_reset"
+    sent = await send_email(user.email or email, subject, html, settings, email_type=email_type)
+    logger.info(
+        "Password %s: user=%s, email=%s, sent=%s",
+        "set" if is_sso_only else "reset",
+        user.user_id,
+        user.email,
+        sent,
+    )
 
     return {"ok": True}
 
