@@ -722,11 +722,18 @@ export function SupportChatPanel({
     return () => clearInterval(interval)
   }, [open, loadTickets])
 
-  // Reset when opened
+  // Sync with the ticket the parent asked to open. A notification click
+  // dispatches `open-support-panel` with a ticket uuid; without this effect
+  // we'd only honor it on first mount and subsequent clicks would just
+  // reveal the panel on whatever view it was last on.
   useEffect(() => {
-    if (open && !initialTicket) {
-      setView('list')
+    if (!open) return
+    if (initialTicket) {
+      setActiveTicket(initialTicket)
+      setView('chat')
+    } else {
       setActiveTicket(null)
+      setView('list')
     }
   }, [open, initialTicket])
 
