@@ -483,6 +483,56 @@ async def get_quality_info(
     return result
 
 
+async def get_app_help(
+    context: RunContext[AgenticChatDeps],
+    topic: str,
+) -> dict:
+    """Look up help content about Vandalizer itself — features, UI navigation, concepts.
+
+    Use this when the user asks what Vandalizer is, how to do something in the
+    UI, what a feature means, or why Vandalizer is different from generic AI
+    chat. Examples: "what is a knowledge base", "how do I create a workflow",
+    "what does the quality score mean", "how do I invite teammates",
+    "what makes this different from ChatGPT".
+
+    Do NOT call this for questions about the user's own documents, workflows,
+    or data — use the search/list tools for those.
+
+    Args:
+        context: The call context.
+        topic: A short phrase describing what the user wants to know about
+            (e.g. "knowledge bases", "validation", "team folders").
+    """
+    from app.services.help_content import find_topics, list_topic_index
+
+    matches = find_topics(topic, limit=3)
+    if not matches:
+        return {
+            "matched": False,
+            "query": topic,
+            "available_topics": list_topic_index(),
+            "note": (
+                "No help topic matched. The list above shows every topic "
+                "available — pick one and call again with its title or id."
+            ),
+        }
+
+    primary = matches[0]
+    result = {
+        "matched": True,
+        "topic": {
+            "id": primary["id"],
+            "title": primary["title"],
+            "body": primary["body"],
+        },
+    }
+    if len(matches) > 1:
+        result["related_topics"] = [
+            {"id": m["id"], "title": m["title"]} for m in matches[1:]
+        ]
+    return result
+
+
 async def search_library(
     context: RunContext[AgenticChatDeps],
     query: str,
@@ -1460,6 +1510,7 @@ TOOLS = [
     list_workflows,
     get_quality_info,
     search_library,
+    get_app_help,
     # Phase 2 — Extraction
     get_document_text,
     run_extraction,
