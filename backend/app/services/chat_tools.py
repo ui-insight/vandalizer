@@ -561,6 +561,112 @@ async def search_library(
 # ---------------------------------------------------------------------------
 
 
+# Caps for fetch_url. Raw bytes cap protects memory; text cap protects the
+# LLM context window. Both are deliberately smaller than the KB ingestion
+# path's 500KB cap because chat answers don't need the full document — the
+# LLM is summarizing, not indexing.
+_FETCH_URL_TIMEOUT_S = 20.0
+_FETCH_URL_MAX_BYTES = 2_000_000  # 2 MB raw HTML
+_FETCH_URL_MAX_CHARS = 25_000     # ~25k chars of extracted text to the LLM
+
+
+async def fetch_url(
+    context: RunContext[AgenticChatDeps],
+    url: str,
+) -> dict:
+    """Fetch a public web page and return its readable text so you can answer questions about it.
+
+    Use this when the user pastes a URL into chat, asks you to read/summarize/check
+    a specific page, or references "this article" / "that link". Auto-fire when
+    the user's message contains an http(s) URL they clearly want you to look at.
+
+    Does NOT work for pages behind login (SharePoint, Google Docs, Confluence,
+    etc.) — those return login HTML, not the real content. If a result looks
+    like a login page, tell the user and suggest uploading an export or using
+    M365 intake instead.
+
+    Does NOT fetch arbitrary file types (PDFs, ZIPs). For those, the user
+    should upload to Files instead — uploaded docs get OCR'd and indexed.
+
+    Args:
+        context: The call context.
+        url: The full URL to fetch (must start with http:// or https://).
+    """
+    import httpx
+
+    from app.services.knowledge_service import (
+        _extract_text_from_html,
+        _extract_title_from_html,
+    )
+    from app.utils.url_validation import validate_outbound_url
+
+    try:
+        validate_outbound_url(url)
+    except ValueError as e:
+        return {
+            "error": f"URL rejected: {e}",
+            "url": url,
+        }
+
+    try:
+        async with httpx.AsyncClient(
+            timeout=_FETCH_URL_TIMEOUT_S,
+            follow_redirects=True,
+            headers={"User-Agent": "Vandalizer-Chat/1.0 (+research-admin agent)"},
+        ) as client:
+            resp = await client.get(url)
+            resp.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        status = e.response.status_code
+        return {
+            "error": f"Page returned HTTP {status}.",
+            "url": url,
+            "status_code": status,
+        }
+    except httpx.TimeoutException:
+        return {
+            "error": f"Timed out after {int(_FETCH_URL_TIMEOUT_S)}s. The page may be slow or unreachable.",
+            "url": url,
+        }
+    except Exception as e:  # network errors, DNS, TLS, etc.
+        return {
+            "error": f"Could not fetch URL: {e}",
+            "url": url,
+        }
+
+    content_type = (resp.headers.get("content-type") or "").lower()
+    if content_type and "html" not in content_type and "text" not in content_type:
+        return {
+            "error": (
+                f"URL returned non-HTML content ({content_type}). "
+                "For PDFs and other documents, ask the user to upload via Files instead."
+            ),
+            "url": url,
+            "content_type": content_type,
+        }
+
+    raw_html = resp.text[:_FETCH_URL_MAX_BYTES]
+    text = _extract_text_from_html(raw_html)
+
+    if not text.strip():
+        return {
+            "error": "Fetched the page but could not extract readable text. May be JavaScript-only or empty.",
+            "url": str(resp.url),
+        }
+
+    truncated = len(text) > _FETCH_URL_MAX_CHARS
+    title = _extract_title_from_html(raw_html, str(resp.url))
+
+    return {
+        "url": str(resp.url),  # final URL after redirects
+        "title": title,
+        "text": text[:_FETCH_URL_MAX_CHARS],
+        "total_chars": len(text),
+        "truncated": truncated,
+        "fetched_at": datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
+    }
+
+
 async def get_document_text(
     context: RunContext[AgenticChatDeps],
     document_uuid: str,
@@ -1512,6 +1618,7 @@ TOOLS = [
     search_library,
     get_app_help,
     # Phase 2 — Extraction
+    fetch_url,
     get_document_text,
     run_extraction,
     # Phase 3 — KB write

@@ -380,6 +380,34 @@ HELP_TOPICS: list[dict] = [
         ),
     },
     {
+        "id": "fetch-url",
+        "title": "Reading web pages from chat",
+        "aliases": [
+            "read url", "fetch url", "open link", "read this link", "read website",
+            "summarize webpage", "summarize this page", "check this url",
+            "can you read urls", "can you visit websites", "browse",
+            "look at this link", "what does this page say",
+        ],
+        "body": (
+            "Drop a public URL into chat and the agent will fetch the page, "
+            "extract the readable text, and answer questions about it — "
+            "summary, key facts, comparisons against other docs, anything.\n\n"
+            "**What works:** public webpages (news, documentation, gov pages, "
+            "blog posts, RFPs posted online).\n\n"
+            "**What doesn't:**\n"
+            "- **Login-gated pages** (SharePoint, Google Docs, Confluence, "
+            "internal wikis) — the agent only sees the login screen. Upload "
+            "an export, or use an M365 intake automation.\n"
+            "- **PDFs and other file downloads** — upload them via the Files "
+            "tab instead so they get OCR'd and indexed.\n"
+            "- **JavaScript-only pages** — if the content only renders after "
+            "running JS, the fetch returns empty text.\n\n"
+            "**To save a page** for repeat queries with citations, ask the "
+            "chat to *\"add this URL to a knowledge base\"* — that runs the "
+            "full ingestion path with chunking and vector indexing."
+        ),
+    },
+    {
         "id": "confirmation-rule",
         "title": "Why writes ask for confirmation",
         "aliases": [
