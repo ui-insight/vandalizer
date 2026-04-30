@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { Navigate, useNavigate, useSearch } from '@tanstack/react-router'
 import {
-  ArrowLeft, MessageSquare, Send, Plus, Paperclip, X, Loader2,
+  ArrowLeft, MessageSquare, Send, Plus, Paperclip, X, Loader2, Link2,
 } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
 import { useAuth } from '../hooks/useAuth'
@@ -70,14 +70,17 @@ export default function SupportCenter() {
 
   useEffect(() => { load() }, [load])
 
-  // Deep link /support?ticket=X opens the ticket directly. Agents can view
-  // any ticket here, so we don't gate by ownership.
+  // Keep the URL in sync with the open ticket so agents can copy the address
+  // bar (or the explicit Copy link button) and share it with each other.
   useEffect(() => {
-    if (!search.ticket) return
-    setActiveTicketUuid(search.ticket)
-    setView('chat')
-    navigate({ to: '/support', search: { ticket: undefined } })
-  }, [search.ticket, navigate])
+    if (search.ticket && search.ticket !== activeTicketUuid) {
+      setActiveTicketUuid(search.ticket)
+      setView('chat')
+    } else if (!search.ticket && view === 'chat') {
+      setActiveTicketUuid(null)
+      setView('list')
+    }
+  }, [search.ticket, activeTicketUuid, view])
 
   if (!user?.is_support_agent) {
     return <Navigate to="/" search={{ mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined }} />
@@ -86,11 +89,13 @@ export default function SupportCenter() {
   const openTicket = (uuid: string) => {
     setActiveTicketUuid(uuid)
     setView('chat')
+    navigate({ to: '/support', search: { ticket: uuid } })
   }
 
   const backToList = () => {
     setActiveTicketUuid(null)
     setView('list')
+    navigate({ to: '/support', search: { ticket: undefined } })
     load()
   }
 
@@ -112,8 +117,7 @@ export default function SupportCenter() {
         <NewTicketView
           onBack={() => setView('list')}
           onCreated={(t) => {
-            setActiveTicketUuid(t.uuid)
-            setView('chat')
+            openTicket(t.uuid)
             load()
           }}
         />
@@ -599,6 +603,26 @@ function ChatView({
             </div>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button
+              onClick={async () => {
+                const url = `${window.location.origin}/support?ticket=${ticketUuid}`
+                try {
+                  await navigator.clipboard.writeText(url)
+                  toast('Link copied', 'success')
+                } catch {
+                  toast('Could not copy link', 'error')
+                }
+              }}
+              title="Copy shareable link to this ticket"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                fontSize: 12, padding: '4px 10px', borderRadius: 'var(--ui-radius, 12px)',
+                border: '1px solid #d1d5db', background: '#fff', color: '#374151',
+                cursor: 'pointer', fontFamily: 'inherit',
+              }}
+            >
+              <Link2 size={12} /> Copy link
+            </button>
             <span style={{
               fontSize: 11, padding: '2px 8px', borderRadius: 9999,
               background: `${PRIORITY_COLORS[ticket.priority]}20`,
