@@ -26,11 +26,17 @@ export async function createTicket(
   return res.json() as Promise<SupportTicket>
 }
 
-export function listTickets(status?: string, limit = 50, offset = 0) {
+export function listTickets(
+  status?: string,
+  limit = 50,
+  offset = 0,
+  scope?: 'mine',
+) {
   const params = new URLSearchParams()
   if (status) params.set('status', status)
   params.set('limit', String(limit))
   params.set('offset', String(offset))
+  if (scope) params.set('scope', scope)
   return apiFetch<{ tickets: SupportTicketSummary[] }>(
     `/api/support/tickets?${params}`,
   )

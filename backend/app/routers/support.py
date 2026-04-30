@@ -99,17 +99,24 @@ async def list_tickets(
     status: str | None = None,
     limit: int = 50,
     offset: int = 0,
+    scope: str | None = None,
     user: User = Depends(get_current_user),
 ):
-    """List tickets. Support users see all; regular users see only their own."""
+    """List tickets.
+
+    - Default: support users see all tickets, regular users see their own.
+    - ``scope=mine``: always return only the caller's own tickets, even for
+      support users. Used by the Support Center page (where agents file QA
+      tickets) so they see their personal queue, not the global one.
+    """
     is_support = await _is_support_user(user)
-    if is_support:
-        tickets = await support_service.list_all_tickets(
-            status=status, limit=limit, offset=offset
-        )
-    else:
+    if scope == "mine" or not is_support:
         tickets = await support_service.list_tickets(
             user_id=user.user_id, status=status, limit=limit, offset=offset
+        )
+    else:
+        tickets = await support_service.list_all_tickets(
+            status=status, limit=limit, offset=offset
         )
     return {"tickets": tickets}
 
