@@ -2,18 +2,17 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { Navigate, useNavigate, useSearch } from '@tanstack/react-router'
 import {
   ArrowLeft, MessageSquare, Send, Plus, Paperclip, X, Loader2,
-  CheckCircle2, Clock, Circle,
 } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../contexts/ToastContext'
-import { openSupportPanel } from '../utils/supportPanel'
 import * as supportApi from '../api/support'
 import type {
   SupportTicket, SupportTicketSummary, SupportAttachment,
 } from '../types/support'
 
 type View = 'list' | 'new' | 'chat'
+type StatusFilter = 'all' | 'open' | 'in_progress' | 'closed'
 
 const MAX_BYTES = 10 * 1024 * 1024
 
@@ -26,16 +25,18 @@ function timeAgo(dateStr: string | null): string {
   return `${Math.floor(diff / 86400)}d ago`
 }
 
-const STATUS_BG: Record<string, string> = {
-  open: '#fef3c7',
-  in_progress: '#dbeafe',
-  closed: '#f3f4f6',
+const STATUS_COLORS: Record<string, string> = {
+  open: '#f59e0b',
+  in_progress: '#3b82f6',
+  closed: '#9ca3af',
 }
-const STATUS_FG: Record<string, string> = {
-  open: '#b45309',
-  in_progress: '#1d4ed8',
-  closed: '#6b7280',
+const PRIORITY_COLORS: Record<string, string> = {
+  low: '#9ca3af',
+  normal: '#3b82f6',
+  high: '#ef4444',
 }
+
+type Stats = { total: number; open: number; in_progress: number; closed: number }
 
 export default function SupportCenter() {
   const { user } = useAuth()
@@ -45,39 +46,38 @@ export default function SupportCenter() {
 
   const [view, setView] = useState<View>('list')
   const [tickets, setTickets] = useState<SupportTicketSummary[]>([])
+  const [stats, setStats] = useState<Stats | null>(null)
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [loading, setLoading] = useState(true)
   const [activeTicketUuid, setActiveTicketUuid] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await supportApi.listTickets(undefined, 100, 0, 'mine')
-      setTickets(data.tickets)
+      const statusParam = statusFilter === 'all' ? undefined : statusFilter
+      const [s, t] = await Promise.all([
+        supportApi.getTicketStats(),
+        supportApi.listTickets(statusParam, 200),
+      ])
+      setStats(s)
+      setTickets(t.tickets)
     } catch {
       toast('Failed to load tickets', 'error')
     } finally {
       setLoading(false)
     }
-  }, [toast])
+  }, [toast, statusFilter])
 
   useEffect(() => { load() }, [load])
 
-  // Deep link: /support?ticket=X. If the ticket is mine, open it in chat view.
-  // If it isn't (i.e., a notification points at a queue item), hand off to the
-  // answering panel and clear the URL param so the page doesn't keep retrying.
+  // Deep link /support?ticket=X opens the ticket directly. Agents can view
+  // any ticket here, so we don't gate by ownership.
   useEffect(() => {
-    if (!search.ticket || !user) return
-    const uuid = search.ticket
-    supportApi.getTicket(uuid).then((t) => {
-      if (t.user_id === user.user_id) {
-        setActiveTicketUuid(uuid)
-        setView('chat')
-      } else {
-        openSupportPanel(uuid)
-        navigate({ to: '/support', search: { ticket: undefined } })
-      }
-    }).catch(() => { /* not found / not authorized — ignore */ })
-  }, [search.ticket, user, navigate])
+    if (!search.ticket) return
+    setActiveTicketUuid(search.ticket)
+    setView('chat')
+    navigate({ to: '/support', search: { ticket: undefined } })
+  }, [search.ticket, navigate])
 
   if (!user?.is_support_agent) {
     return <Navigate to="/" search={{ mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined }} />
@@ -99,7 +99,11 @@ export default function SupportCenter() {
       {view === 'list' && (
         <ListView
           tickets={tickets}
+          stats={stats}
           loading={loading}
+          statusFilter={statusFilter}
+          onStatusFilterChange={setStatusFilter}
+          currentUserId={user.user_id}
           onNew={() => setView('new')}
           onSelect={openTicket}
         />
@@ -116,6 +120,7 @@ export default function SupportCenter() {
       )}
       {view === 'chat' && activeTicketUuid && (
         <ChatView
+          key={activeTicketUuid}
           ticketUuid={activeTicketUuid}
           onBack={backToList}
         />
@@ -125,26 +130,36 @@ export default function SupportCenter() {
 }
 
 // ---------------------------------------------------------------------------
-// List view — my tickets + prominent New Ticket CTA
+// List view — full queue with stats, status filter, and requester-aware rows
 // ---------------------------------------------------------------------------
 
 function ListView({
-  tickets, loading, onNew, onSelect,
+  tickets, stats, loading, statusFilter, onStatusFilterChange, currentUserId, onNew, onSelect,
 }: {
   tickets: SupportTicketSummary[]
+  stats: Stats | null
   loading: boolean
+  statusFilter: StatusFilter
+  onStatusFilterChange: (s: StatusFilter) => void
+  currentUserId: string
   onNew: () => void
   onSelect: (uuid: string) => void
 }) {
+  const statCardStyle = (color: string): React.CSSProperties => ({
+    flex: 1, padding: '16px 20px', background: '#fff', borderRadius: 'var(--ui-radius, 12px)',
+    border: '1px solid #e5e7eb', borderLeft: `4px solid ${color}`,
+  })
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <MessageSquare size={20} color="#6b7280" />
           <div>
             <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>Support Center</h1>
             <p style={{ margin: '2px 0 0', fontSize: 13, color: '#6b7280' }}>
-              File your own tickets and run QA against the support workflow. The answering queue lives in the floating Support panel.
+              Triage and respond to all support tickets.
             </p>
           </div>
         </div>
@@ -160,10 +175,51 @@ function ListView({
         </button>
       </div>
 
-      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
-        <div style={{ padding: '14px 20px', borderBottom: '1px solid #e5e7eb', fontSize: 14, fontWeight: 600 }}>
-          My Tickets
+      {/* Stats cards */}
+      {stats && (
+        <div style={{ display: 'flex', gap: 12 }}>
+          <div style={statCardStyle('#6b7280')}>
+            <div style={{ fontSize: 24, fontWeight: 700 }}>{stats.total}</div>
+            <div style={{ fontSize: 13, color: '#6b7280' }}>Total Tickets</div>
+          </div>
+          <div style={statCardStyle('#f59e0b')}>
+            <div style={{ fontSize: 24, fontWeight: 700, color: '#f59e0b' }}>{stats.open}</div>
+            <div style={{ fontSize: 13, color: '#6b7280' }}>Open</div>
+          </div>
+          <div style={statCardStyle('#3b82f6')}>
+            <div style={{ fontSize: 24, fontWeight: 700, color: '#3b82f6' }}>{stats.in_progress}</div>
+            <div style={{ fontSize: 13, color: '#6b7280' }}>In Progress</div>
+          </div>
+          <div style={statCardStyle('#22c55e')}>
+            <div style={{ fontSize: 24, fontWeight: 700, color: '#22c55e' }}>{stats.closed}</div>
+            <div style={{ fontSize: 13, color: '#6b7280' }}>Closed</div>
+          </div>
         </div>
+      )}
+
+      {/* Ticket list */}
+      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
+        <div style={{ padding: '14px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontSize: 15, fontWeight: 600 }}>Tickets</div>
+          <div style={{ display: 'flex', gap: 4 }}>
+            {(['all', 'open', 'in_progress', 'closed'] as StatusFilter[]).map(s => (
+              <button
+                key={s}
+                onClick={() => onStatusFilterChange(s)}
+                style={{
+                  padding: '4px 12px', fontSize: 12, fontWeight: statusFilter === s ? 600 : 400,
+                  borderRadius: 9999, border: '1px solid #e5e7eb', cursor: 'pointer',
+                  background: statusFilter === s ? '#111827' : '#fff',
+                  color: statusFilter === s ? '#fff' : '#6b7280',
+                  fontFamily: 'inherit',
+                }}
+              >
+                {s === 'in_progress' ? 'In Progress' : s.charAt(0).toUpperCase() + s.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {loading ? (
           <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>
             <Loader2 size={20} style={{ display: 'inline-block', animation: 'spin 1s linear infinite', verticalAlign: 'middle' }} />
@@ -172,55 +228,61 @@ function ListView({
         ) : tickets.length === 0 ? (
           <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>
             <MessageSquare size={28} color="#d1d5db" style={{ display: 'block', margin: '0 auto 8px' }} />
-            <div style={{ fontSize: 14, marginBottom: 12 }}>You haven&rsquo;t filed any tickets.</div>
-            <button
-              onClick={onNew}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 6,
-                padding: '8px 14px', borderRadius: 'var(--ui-radius, 12px)', border: 'none',
-                background: '#2563eb', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-              }}
-            >
-              <Plus size={14} /> File your first ticket
-            </button>
+            <div style={{ fontSize: 14 }}>No tickets {statusFilter !== 'all' ? `with status "${statusFilter.replace('_', ' ')}"` : 'yet'}.</div>
           </div>
         ) : (
           <div>
-            {tickets.map((t) => (
-              <button
-                key={t.uuid}
-                onClick={() => onSelect(t.uuid)}
-                style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  width: '100%', padding: '12px 20px', borderBottom: '1px solid #f3f4f6',
-                  background: '#fff', border: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none',
-                  cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
-                }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb' }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#fff' }}
-              >
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 14, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {t.subject}
-                    </span>
-                    <span style={{
-                      fontSize: 11, padding: '1px 6px', borderRadius: 9999,
-                      background: STATUS_BG[t.status], color: STATUS_FG[t.status], fontWeight: 600,
-                    }}>
-                      {t.status.replace('_', ' ')}
-                    </span>
+            {tickets.map((t) => {
+              const needsAttention =
+                t.status !== 'closed'
+                && t.last_message_user_id !== null
+                && t.last_message_is_support_reply === false
+                && !t.read_by?.includes(currentUserId)
+              return (
+                <button
+                  key={t.uuid}
+                  onClick={() => onSelect(t.uuid)}
+                  style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    width: '100%', padding: '12px 20px', borderBottom: '1px solid #f3f4f6',
+                    background: needsAttention ? '#fffbeb' : '#fff',
+                    border: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none',
+                    cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
+                    transition: 'background 0.1s',
+                  }}
+                  onMouseEnter={(e) => { if (!needsAttention) (e.currentTarget as HTMLButtonElement).style.background = '#f9fafb' }}
+                  onMouseLeave={(e) => { if (!needsAttention) (e.currentTarget as HTMLButtonElement).style.background = '#fff' }}
+                >
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      {needsAttention && <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3b82f6', flexShrink: 0 }} />}
+                      <span style={{ fontSize: 14, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {t.subject}
+                      </span>
+                      <span style={{
+                        fontSize: 11, padding: '1px 6px', borderRadius: 9999,
+                        background: `${STATUS_COLORS[t.status]}20`, color: STATUS_COLORS[t.status], fontWeight: 600,
+                      }}>
+                        {t.status.replace('_', ' ')}
+                      </span>
+                      <span style={{
+                        fontSize: 11, padding: '1px 6px', borderRadius: 9999,
+                        background: `${PRIORITY_COLORS[t.priority]}20`, color: PRIORITY_COLORS[t.priority], fontWeight: 600,
+                      }}>
+                        {t.priority}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {t.user_name || t.user_id} &middot; {t.message_count} message{t.message_count !== 1 ? 's' : ''}
+                      {t.last_message_preview ? ` — ${t.last_message_preview}` : ''}
+                    </div>
                   </div>
-                  <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {t.message_count} message{t.message_count !== 1 ? 's' : ''}
-                    {t.last_message_preview ? ` — ${t.last_message_preview}` : ''}
+                  <div style={{ fontSize: 12, color: '#9ca3af', flexShrink: 0, marginLeft: 16 }}>
+                    {timeAgo(t.updated_at || t.created_at)}
                   </div>
-                </div>
-                <div style={{ fontSize: 12, color: '#9ca3af', flexShrink: 0, marginLeft: 16 }}>
-                  {timeAgo(t.updated_at || t.created_at)}
-                </div>
-              </button>
-            ))}
+                </button>
+              )
+            })}
           </div>
         )}
       </div>
@@ -229,7 +291,7 @@ function ListView({
 }
 
 // ---------------------------------------------------------------------------
-// New ticket form
+// New ticket form (agents file test tickets here for QA)
 // ---------------------------------------------------------------------------
 
 function NewTicketView({
@@ -288,13 +350,13 @@ function NewTicketView({
           fontSize: 13, cursor: 'pointer', alignSelf: 'flex-start',
         }}
       >
-        <ArrowLeft size={14} /> Back to my tickets
+        <ArrowLeft size={14} /> Back to tickets
       </button>
 
       <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', padding: 24 }}>
         <h2 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 700 }}>File a Ticket</h2>
         <p style={{ margin: '0 0 20px', fontSize: 13, color: '#6b7280' }}>
-          Tickets you create here go into the same queue your team answers from.
+          Drops into the same queue as customer tickets — useful for QA and dogfooding the support flow.
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -411,7 +473,7 @@ function NewTicketView({
 }
 
 // ---------------------------------------------------------------------------
-// Chat view — customer mode (no status controls, no agent badges)
+// Chat view — agent mode: status controls, agent/customer message styling
 // ---------------------------------------------------------------------------
 
 function ChatView({
@@ -420,7 +482,6 @@ function ChatView({
   ticketUuid: string
   onBack: () => void
 }) {
-  const { user } = useAuth()
   const { toast } = useToast()
   const [ticket, setTicket] = useState<SupportTicket | null>(null)
   const [loading, setLoading] = useState(true)
@@ -466,6 +527,15 @@ function ChatView({
     }
   }
 
+  const handleStatusChange = async (newStatus: string) => {
+    try {
+      const updated = await supportApi.updateTicket(ticketUuid, { status: newStatus })
+      setTicket(updated)
+    } catch {
+      toast('Failed to update status', 'error')
+    }
+  }
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -504,9 +574,6 @@ function ChatView({
     )
   }
 
-  const StatusIcon = ticket.status === 'closed' ? CheckCircle2 : ticket.status === 'in_progress' ? Clock : Circle
-  const statusColor = ticket.status === 'closed' ? '#9ca3af' : ticket.status === 'in_progress' ? '#3b82f6' : '#f59e0b'
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 900 }}>
       <button
@@ -517,44 +584,84 @@ function ChatView({
           fontSize: 13, cursor: 'pointer', alignSelf: 'flex-start',
         }}
       >
-        <ArrowLeft size={14} /> Back to my tickets
+        <ArrowLeft size={14} /> Back to tickets
       </button>
 
       <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden', position: 'relative' }}>
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-          <div style={{ minWidth: 0 }}>
+        {/* Header with requester + status controls */}
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
             <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>{ticket.subject}</h3>
-            <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <StatusIcon size={12} color={statusColor} />
-              <span style={{ textTransform: 'capitalize' }}>{ticket.status.replace('_', ' ')}</span>
-              <span>&middot; opened {timeAgo(ticket.created_at)}</span>
+            <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>
+              {ticket.user_name || ticket.user_id}
+              {ticket.user_email ? ` (${ticket.user_email})` : ''}
+              {' · opened '}{timeAgo(ticket.created_at)}
             </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <span style={{
+              fontSize: 11, padding: '2px 8px', borderRadius: 9999,
+              background: `${PRIORITY_COLORS[ticket.priority]}20`,
+              color: PRIORITY_COLORS[ticket.priority],
+              fontWeight: 600, textTransform: 'uppercase',
+            }}>
+              {ticket.priority}
+            </span>
+            <span style={{
+              fontSize: 11, padding: '2px 8px', borderRadius: 9999,
+              background: `${STATUS_COLORS[ticket.status]}20`,
+              color: STATUS_COLORS[ticket.status],
+              fontWeight: 600, textTransform: 'uppercase',
+            }}>
+              {ticket.status.replace('_', ' ')}
+            </span>
+            {ticket.status !== 'closed' ? (
+              <select
+                value={ticket.status}
+                onChange={(e) => handleStatusChange(e.target.value)}
+                style={{ fontSize: 12, padding: '4px 8px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db', fontFamily: 'inherit' }}
+              >
+                <option value="open">Open</option>
+                <option value="in_progress">In Progress</option>
+                <option value="closed">Closed</option>
+              </select>
+            ) : (
+              <button
+                onClick={() => handleStatusChange('open')}
+                style={{
+                  fontSize: 12, padding: '4px 10px', borderRadius: 'var(--ui-radius, 12px)',
+                  border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer', fontFamily: 'inherit',
+                }}
+              >
+                Reopen
+              </button>
+            )}
           </div>
         </div>
 
+        {/* Messages — agent on right (blue, "Support" label), customer on left */}
         <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 520, overflowY: 'auto' }}>
           {ticket.messages.map((m) => {
-            const isMine = m.user_id === user?.user_id
+            const isSupport = m.is_support_reply
             const msgAttachments = ticket.attachments.filter((a) => a.message_uuid === m.uuid)
             return (
-              <div key={m.uuid} style={{ display: 'flex', flexDirection: 'column', alignItems: isMine ? 'flex-end' : 'flex-start' }}>
+              <div key={m.uuid} style={{ display: 'flex', flexDirection: 'column', alignItems: isSupport ? 'flex-end' : 'flex-start' }}>
                 <div style={{
                   maxWidth: '85%', padding: '10px 14px', borderRadius: 'var(--ui-radius, 12px)',
-                  background: isMine ? '#2563eb' : '#f3f4f6',
-                  color: isMine ? '#fff' : '#111827',
+                  background: isSupport ? '#2563eb' : '#f3f4f6',
+                  color: isSupport ? '#fff' : '#111827',
                 }}>
-                  {!isMine && (
-                    <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 4 }}>
-                      {m.user_name || 'Support'}
-                    </div>
-                  )}
+                  <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4, color: isSupport ? 'rgba(255,255,255,0.85)' : '#6b7280' }}>
+                    {m.user_name || m.user_id}
+                    {isSupport && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 500, opacity: 0.85 }}>Support</span>}
+                  </div>
                   <div style={{ fontSize: 14, whiteSpace: 'pre-wrap' }}>{m.content}</div>
-                  <div style={{ fontSize: 10, marginTop: 4, color: isMine ? 'rgba(255,255,255,0.75)' : '#9ca3af' }}>
+                  <div style={{ fontSize: 10, marginTop: 4, color: isSupport ? 'rgba(255,255,255,0.75)' : '#9ca3af' }}>
                     {timeAgo(m.created_at)}
                   </div>
                 </div>
                 {msgAttachments.length > 0 && (
-                  <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6, alignItems: isMine ? 'flex-end' : 'flex-start' }}>
+                  <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6, alignItems: isSupport ? 'flex-end' : 'flex-start' }}>
                     {msgAttachments.map((a) => (
                       <AttachmentChip key={a.uuid} attachment={a} ticketUuid={ticketUuid} onPreview={setPreviewAttachment} />
                     ))}
@@ -573,7 +680,8 @@ function ChatView({
           <div ref={messagesEndRef} />
         </div>
 
-        {ticket.status !== 'closed' && (
+        {/* Reply input */}
+        {ticket.status !== 'closed' ? (
           <div style={{ padding: '12px 20px', borderTop: '1px solid #e5e7eb', display: 'flex', gap: 8, alignItems: 'center' }}>
             <button
               onClick={() => fileInputRef.current?.click()}
@@ -587,7 +695,7 @@ function ChatView({
               value={reply}
               onChange={(e) => setReply(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
-              placeholder="Type a reply..."
+              placeholder="Reply as support..."
               style={{
                 flex: 1, padding: '8px 12px', fontSize: 14,
                 border: '1px solid #d1d5db', borderRadius: 'var(--ui-radius, 12px)', outline: 'none',
@@ -607,10 +715,9 @@ function ChatView({
               <Send size={14} /> {sending ? 'Sending...' : 'Reply'}
             </button>
           </div>
-        )}
-        {ticket.status === 'closed' && (
+        ) : (
           <div style={{ padding: '12px 20px', borderTop: '1px solid #e5e7eb', fontSize: 13, color: '#6b7280', textAlign: 'center' }}>
-            This ticket is closed. An agent can reopen it from the Support panel.
+            This ticket is closed. Reopen to send a reply.
           </div>
         )}
 
