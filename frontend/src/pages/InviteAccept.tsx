@@ -1,8 +1,10 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import { useAuth } from '../hooks/useAuth'
 import { useTeams } from '../hooks/useTeams'
 import { acceptInvite, getInviteInfo, type InviteInfo } from '../api/teams'
+import { getAuthConfig, type AuthConfig } from '../api/auth'
+import { PENDING_INVITE_TOKEN_KEY } from '../lib/pendingInvite'
 
 type Status = 'loading' | 'ready' | 'accepting' | 'success' | 'error'
 
@@ -16,6 +18,18 @@ export default function InviteAccept() {
   const [status, setStatus] = useState<Status>('loading')
   const [info, setInfo] = useState<InviteInfo | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
+  const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null)
+  const acceptStartedRef = useRef(false)
+
+  // Clear any stashed pending token now that we've reached the invite page.
+  useEffect(() => {
+    sessionStorage.removeItem(PENDING_INVITE_TOKEN_KEY)
+  }, [])
+
+  // Auth config — only needed when unauthenticated, but the fetch is cheap.
+  useEffect(() => {
+    getAuthConfig().then(setAuthConfig).catch(() => setAuthConfig(null))
+  }, [])
 
   // Fetch invite metadata (public — works authed or not)
   useEffect(() => {
@@ -46,19 +60,18 @@ export default function InviteAccept() {
     }
   }, [token])
 
-  // If already authenticated, accept immediately
+  // Ref-gated, not closure-cancelled: setStatus('accepting') re-runs this effect, and a closure-scoped cancel flag would falsely abort the in-flight accept.
   useEffect(() => {
+    if (acceptStartedRef.current) return
     if (authLoading || status !== 'ready' || !user || !token) return
-    let cancelled = false
+    acceptStartedRef.current = true
     setStatus('accepting')
     acceptInvite(token)
       .then(async (result) => {
-        if (cancelled) return
         await refreshTeams()
         setInfo((prev) => (prev ? { ...prev, team_name: result.name } : prev))
         setStatus('success')
         setTimeout(() => {
-          if (cancelled) return
           navigate({
             to: '/',
             search: {
@@ -73,15 +86,11 @@ export default function InviteAccept() {
         }, 1500)
       })
       .catch((err) => {
-        if (cancelled) return
         setStatus('error')
         setErrorMsg(
           err instanceof Error ? err.message : 'Failed to accept invite.',
         )
       })
-    return () => {
-      cancelled = true
-    }
   }, [authLoading, user, token, status]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (status === 'loading' || authLoading) {
@@ -159,6 +168,7 @@ export default function InviteAccept() {
           <InviteAuthTabs
             info={info}
             token={token}
+            authConfig={authConfig}
             onLogin={login}
             onRegister={register}
           />
@@ -171,11 +181,13 @@ export default function InviteAccept() {
 function InviteAuthTabs({
   info,
   token,
+  authConfig,
   onLogin,
   onRegister,
 }: {
   info: InviteInfo
   token: string
+  authConfig: AuthConfig | null
   onLogin: (userId: string, password: string) => Promise<void>
   onRegister: (
     userId: string,
@@ -186,30 +198,79 @@ function InviteAuthTabs({
   ) => Promise<void>
 }) {
   const [mode, setMode] = useState<'register' | 'login'>('register')
+
+  const oauthEnabled = authConfig?.auth_methods.includes('oauth') ?? false
+  const passwordEnabled = authConfig?.auth_methods.includes('password') ?? true
+  const azureProvider = authConfig?.oauth_providers.find(
+    (p) => p.provider === 'azure' && p.configured,
+  )
+  const samlProvider = authConfig?.oauth_providers.find(
+    (p) => p.provider === 'saml',
+  )
+
+  const stashTokenForOAuth = () => {
+    sessionStorage.setItem(PENDING_INVITE_TOKEN_KEY, token)
+  }
+
   return (
     <>
-      <div className="mb-4 flex rounded-lg bg-white/5 p-1">
-        <button
-          onClick={() => setMode('register')}
-          className={`flex-1 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
-            mode === 'register' ? 'bg-[#f1b300] text-black' : 'text-gray-400 hover:text-white'
-          }`}
+      {oauthEnabled && azureProvider && (
+        <a
+          href="/api/auth/oauth/azure"
+          onClick={stashTokenForOAuth}
+          className="mb-3 flex w-full items-center justify-center gap-2 rounded-lg bg-white px-4 py-3 font-bold text-black transition-all hover:bg-gray-200"
         >
-          Create account
-        </button>
-        <button
-          onClick={() => setMode('login')}
-          className={`flex-1 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
-            mode === 'login' ? 'bg-[#f1b300] text-black' : 'text-gray-400 hover:text-white'
-          }`}
+          {azureProvider.display_name} & join {info.team_name}
+        </a>
+      )}
+
+      {samlProvider && (
+        <a
+          href="/api/auth/saml/login"
+          onClick={stashTokenForOAuth}
+          className="mb-3 flex w-full items-center justify-center gap-2 rounded-lg bg-[#f1b300] px-4 py-3 font-bold text-black transition-all hover:bg-[#d49e00]"
         >
-          Sign in
-        </button>
-      </div>
-      {mode === 'register' ? (
-        <InviteRegisterForm info={info} token={token} onRegister={onRegister} />
-      ) : (
-        <InviteLoginForm info={info} onLogin={onLogin} />
+          {samlProvider.display_name || 'Sign in with University SSO'} & join
+        </a>
+      )}
+
+      {((oauthEnabled && azureProvider) || samlProvider) && passwordEnabled && (
+        <div className="relative my-4">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-white/10" />
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="bg-[#171717] px-4 text-gray-500">or</span>
+          </div>
+        </div>
+      )}
+
+      {passwordEnabled && (
+        <>
+          <div className="mb-4 flex rounded-lg bg-white/5 p-1">
+            <button
+              onClick={() => setMode('register')}
+              className={`flex-1 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
+                mode === 'register' ? 'bg-[#f1b300] text-black' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Create account
+            </button>
+            <button
+              onClick={() => setMode('login')}
+              className={`flex-1 rounded-md px-3 py-2 text-sm font-semibold transition-colors ${
+                mode === 'login' ? 'bg-[#f1b300] text-black' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              Sign in
+            </button>
+          </div>
+          {mode === 'register' ? (
+            <InviteRegisterForm info={info} token={token} onRegister={onRegister} />
+          ) : (
+            <InviteLoginForm info={info} onLogin={onLogin} />
+          )}
+        </>
       )}
     </>
   )
