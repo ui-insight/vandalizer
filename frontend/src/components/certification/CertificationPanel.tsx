@@ -123,7 +123,7 @@ function ValidationResults({ result, onDismiss }: { result: ValidationResult; on
           <div key={i} className="flex items-center gap-2 text-sm">
             {check.passed ? <span className="text-green-600 shrink-0">&#10003;</span> : <X size={14} className="text-red-500 shrink-0" />}
             <span className={check.passed ? 'text-green-800' : 'text-red-700'}>{check.name}</span>
-            <span className="text-gray-500 text-xs">&mdash; {check.detail}</span>
+            <span className="text-gray-500 text-xs">{check.detail}</span>
           </div>
         ))}
       </div>
@@ -235,7 +235,7 @@ export function CertificationPanel() {
       setCompletionResult(result)
       checkTierCompletion(moduleId)
     } catch {
-      toast('Module not ready — check the requirements below', 'error')
+      toast('Module not ready. Check the requirements below.', 'error')
       await handleValidate(moduleId)
     } finally { setCompleting(false) }
   }

@@ -1,6 +1,7 @@
 import React, { Fragment, useCallback, useEffect, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { ExtractionTutorial } from './ExtractionTutorial'
-import { X, Pencil, Loader2, Copy, Trash2, GripVertical, Plus, ChevronDown, ChevronRight, Play, TrendingUp, Sparkles, FileText, AlertTriangle, Eye, Shield, ShieldCheck, Download } from 'lucide-react'
+import { X, Pencil, Loader2, Copy, Trash2, GripVertical, Plus, ChevronDown, ChevronRight, Play, TrendingUp, Sparkles, FileText, AlertTriangle, Eye, Shield, ShieldCheck, Download, Check, PenTool, Wrench, ClipboardCheck, SlidersHorizontal, Clock } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
 import { useSearchSetItems } from '../../hooks/useExtractions'
@@ -48,6 +49,14 @@ marked.setOptions({ breaks: true, gfm: true })
 
 type Tab = 'design' | 'tools' | 'validate' | 'advanced' | 'history'
 
+const TABS: { key: Tab; label: string; icon: typeof PenTool }[] = [
+  { key: 'design', label: 'Design', icon: PenTool },
+  { key: 'tools', label: 'Tools', icon: Wrench },
+  { key: 'validate', label: 'Validate', icon: ClipboardCheck },
+  { key: 'advanced', label: 'Advanced', icon: SlidersHorizontal },
+  { key: 'history', label: 'History', icon: Clock },
+]
+
 interface ExtractionConfig {
   mode?: 'one_pass' | 'two_pass'
   one_pass?: { thinking?: boolean; structured?: boolean; model?: string }
@@ -60,6 +69,7 @@ interface ExtractionConfig {
 }
 
 export function ExtractionEditorPanel() {
+  const queryClient = useQueryClient()
   const { openExtractionId, openExtraction, closeExtraction, selectedDocUuids, setHighlightTerms, bumpActivitySignal, consumeExtractionResults } = useWorkspace()
   const { toast } = useToast()
   const [searchSet, setSearchSet] = useState<SearchSet | null>(null)
@@ -79,6 +89,20 @@ export function ExtractionEditorPanel() {
   const [exportingPdf, setExportingPdf] = useState(false)
   const templateInputRef = useRef<HTMLInputElement>(null)
   const importDefInputRef = useRef<HTMLInputElement>(null)
+  const tabBarRef = useRef<HTMLDivElement>(null)
+  const [tabsCompact, setTabsCompact] = useState(false)
+
+  useEffect(() => {
+    const el = tabBarRef.current
+    if (!el) return
+    const observer = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        setTabsCompact(entry.contentRect.width < 480)
+      }
+    })
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
 
   const [qualityStatus, setQualityStatus] = useState<QualityStatus | null>(null)
   const [nudgeDismissed, setNudgeDismissed] = useState(false)
@@ -431,15 +455,16 @@ export function ExtractionEditorPanel() {
 
       {/* Tab bar */}
       <div
+        ref={tabBarRef}
         style={{
           display: 'flex',
           gap: 0,
           borderBottom: '1px solid #e5e7eb',
-          paddingLeft: 24,
+          paddingLeft: tabsCompact ? 8 : 24,
           flexShrink: 0,
         }}
       >
-        {(['design', 'tools', 'validate', 'advanced', 'history'] as const).map((tab) => {
+        {TABS.map(({ key: tab, label, icon: TabIcon }) => {
           const isActive = activeTab === tab
           // Colored dot for validate tab
           let tabDot: string | null = null
@@ -452,8 +477,9 @@ export function ExtractionEditorPanel() {
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
+              title={label}
               style={{
-                padding: '10px 16px',
+                padding: tabsCompact ? '10px 12px' : '10px 16px',
                 fontSize: 13,
                 fontWeight: isActive ? 600 : 400,
                 fontFamily: 'inherit',
@@ -462,14 +488,14 @@ export function ExtractionEditorPanel() {
                 border: 'none',
                 borderBottom: isActive ? '2px solid #202124' : '2px solid transparent',
                 cursor: 'pointer',
-                textTransform: 'capitalize',
                 transition: 'color 0.15s',
                 display: 'flex',
                 alignItems: 'center',
-                gap: 4,
+                gap: 6,
               }}
             >
-              {tab}
+              <TabIcon style={{ width: 14, height: 14 }} />
+              {!tabsCompact && label}
               {tabDot && (
                 <span style={{
                   width: 6, height: 6, borderRadius: '50%',
@@ -504,60 +530,58 @@ export function ExtractionEditorPanel() {
           onSetActiveResultIdx={setActiveResultIdx}
         />
       </div>
+      {/* Hidden file inputs — kept outside tab panels so they remain mounted regardless of active tab */}
+      <input
+        ref={templateInputRef}
+        type="file"
+        accept=".pdf"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const f = e.target.files?.[0]
+          if (f) handleAttachTemplate(f)
+          e.target.value = ''
+        }}
+      />
+      <input
+        ref={importDefInputRef}
+        type="file"
+        accept=".json"
+        style={{ display: 'none' }}
+        onChange={async (e) => {
+          const f = e.target.files?.[0]
+          if (!f) return
+          e.target.value = ''
+          try {
+            const result = await importSearchSet(f, openExtractionId ?? undefined)
+            await queryClient.invalidateQueries({ queryKey: ['searchSets'] })
+            if (openExtractionId) {
+              await refresh()
+              await refreshItems()
+            } else {
+              openExtraction(result.uuid)
+            }
+          } catch (err: unknown) {
+            alert(err instanceof Error ? err.message : 'Import failed')
+          }
+        }}
+      />
       <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: activeTab === 'tools' ? undefined : 'none' }}>
-        <>
-          <input
-            ref={templateInputRef}
-            type="file"
-            accept=".pdf"
-            style={{ display: 'none' }}
-            onChange={(e) => {
-              const f = e.target.files?.[0]
-              if (f) handleAttachTemplate(f)
-              e.target.value = ''
-            }}
-          />
-          <input
-            ref={importDefInputRef}
-            type="file"
-            accept=".json"
-            style={{ display: 'none' }}
-            onChange={async (e) => {
-              const f = e.target.files?.[0]
-              if (!f) return
-              e.target.value = ''
-              try {
-                const result = await importSearchSet(f, openExtractionId ?? undefined)
-                if (openExtractionId) {
-                  await refresh()
-                  await refreshItems()
-                } else {
-                  openExtraction(result.uuid)
-                }
-              } catch (err: unknown) {
-                alert(err instanceof Error ? err.message : 'Import failed')
-              }
-            }}
-          />
-          <ToolsTab
-            onClone={handleClone}
-            onDelete={handleDelete}
-            onAttachTemplate={() => templateInputRef.current?.click()}
-            onGenerateTemplate={handleGenerateTemplate}
-            onExportPdf={handleExportPdf}
-            onExportDefinition={() => window.open(exportSearchSetUrl(openExtractionId!), '_blank')}
-            onImportDefinition={() => importDefInputRef.current?.click()}
-            onBuildFromDocument={handleBuildFromDocument}
-            buildingFromDoc={buildingFromDoc}
-            attachingTemplate={attachingTemplate}
-            generatingTemplate={generatingTemplate}
-            exportingPdf={exportingPdf}
-            hasDocuments={selectedDocUuids.length > 0}
-            hasResults={Object.keys(results).length > 0}
-            hasTemplate={!!searchSet?.fillable_pdf_url}
-            hasItems={items.length > 0}
-          />
-        </>
+        <ToolsTab
+          onClone={handleClone}
+          onDelete={handleDelete}
+          onAttachTemplate={() => templateInputRef.current?.click()}
+          onGenerateTemplate={handleGenerateTemplate}
+          onExportPdf={handleExportPdf}
+          onBuildFromDocument={handleBuildFromDocument}
+          buildingFromDoc={buildingFromDoc}
+          attachingTemplate={attachingTemplate}
+          generatingTemplate={generatingTemplate}
+          exportingPdf={exportingPdf}
+          hasDocuments={selectedDocUuids.length > 0}
+          hasResults={Object.keys(results).length > 0}
+          hasTemplate={!!searchSet?.fillable_pdf_url}
+          hasItems={items.length > 0}
+        />
       </div>
       {openExtractionId && (
         <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: activeTab === 'validate' ? undefined : 'none' }}>
@@ -578,6 +602,9 @@ export function ExtractionEditorPanel() {
           useDefaults={useDefaults}
           onSetUseDefaults={setUseDefaults}
           onSaveConfig={saveConfig}
+          searchSetUuid={openExtractionId ?? undefined}
+          onExportDefinition={() => openExtractionId && window.open(exportSearchSetUrl(openExtractionId), '_blank')}
+          onImportDefinition={() => importDefInputRef.current?.click()}
         />
       </div>
       <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: activeTab === 'history' ? undefined : 'none' }}>
@@ -1191,7 +1218,7 @@ function DesignTab({
                         style={{ accentColor: '#2563eb' }}
                       />
                       <span style={{ color: '#374151', fontWeight: 500 }}>Optional</span>
-                      <span style={{ color: '#9ca3af' }}>&mdash; skip accuracy penalty when not found</span>
+                      <span style={{ color: '#9ca3af' }}>skip accuracy penalty when not found</span>
                     </label>
                     <div>
                       <div style={{ color: '#374151', fontWeight: 500, marginBottom: 4 }}>Allowed values</div>
@@ -1291,7 +1318,7 @@ function QualityPulse({ searchSetUuid, itemCount = 0 }: { searchSetUuid?: string
         </div>
         {status.config_changed && (
           <div style={{ fontSize: 12, color: '#92400e', marginTop: 4 }}>
-            Config changed since last validation &mdash; re-validate for accurate results
+            Config changed since last validation. Re-validate for accurate results.
           </div>
         )}
       </div>
@@ -1307,8 +1334,6 @@ function ToolsTab({
   onAttachTemplate,
   onGenerateTemplate,
   onExportPdf,
-  onExportDefinition,
-  onImportDefinition,
   onBuildFromDocument,
   buildingFromDoc,
   attachingTemplate,
@@ -1324,8 +1349,6 @@ function ToolsTab({
   onAttachTemplate: () => void
   onGenerateTemplate: () => void
   onExportPdf: () => void
-  onExportDefinition: () => void
-  onImportDefinition: () => void
   onBuildFromDocument: () => void
   buildingFromDoc: boolean
   attachingTemplate: boolean
@@ -1345,6 +1368,18 @@ function ToolsTab({
           gap: 16,
         }}
       >
+        {/* Export PDF */}
+        <ToolCard
+          title={exportingPdf ? 'Exporting...' : 'Export PDF'}
+          description={
+            hasTemplate
+              ? 'Download a filled copy of the PDF template with extracted values'
+              : 'Download extraction results as a PDF report'
+          }
+          onClick={onExportPdf}
+          disabled={exportingPdf || !hasResults}
+          style={{ gridColumn: '1 / -1' }}
+        />
         {/* From Document */}
         <ToolCard
           title={buildingFromDoc ? 'Building...' : 'From Document'}
@@ -1377,29 +1412,7 @@ function ToolsTab({
             onClick: onGenerateTemplate,
             disabled: generatingTemplate || attachingTemplate || !hasItems,
           }}
-        />
-        {/* Export PDF */}
-        <ToolCard
-          title={exportingPdf ? 'Exporting...' : 'Export PDF'}
-          description={
-            hasTemplate
-              ? 'Download a filled copy of the PDF template with extracted values'
-              : 'Download extraction results as a PDF report'
-          }
-          onClick={onExportPdf}
-          disabled={exportingPdf || !hasResults}
-        />
-        {/* Export Definition */}
-        <ToolCard
-          title="Export Definition"
-          description="Download as a shareable JSON file"
-          onClick={onExportDefinition}
-        />
-        {/* Import Definition */}
-        <ToolCard
-          title="Import Definition"
-          description="Create a new extraction from an exported JSON file"
-          onClick={onImportDefinition}
+          style={{ gridColumn: '1 / -1' }}
         />
         {/* Delete */}
         <ToolCard
@@ -1497,11 +1510,17 @@ function AdvancedTab({
   useDefaults,
   onSetUseDefaults,
   onSaveConfig,
+  searchSetUuid,
+  onExportDefinition,
+  onImportDefinition,
 }: {
   config: ExtractionConfig
   useDefaults: boolean
   onSetUseDefaults: (v: boolean) => void
   onSaveConfig: (c: ExtractionConfig) => void
+  searchSetUuid?: string
+  onExportDefinition: () => void
+  onImportDefinition: () => void
 }) {
   const mode = config.mode ?? 'one_pass'
   const [models, setModels] = useState<ModelInfo[]>([])
@@ -1516,22 +1535,45 @@ function AdvancedTab({
     onSaveConfig({ ...config, ...patch })
   }
 
-  return (
-    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Use system defaults */}
-      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-        <input
-          type="checkbox"
-          checked={useDefaults}
-          onChange={(e) => onSetUseDefaults(e.target.checked)}
-        />
-        <span style={{ fontSize: 14, fontWeight: 500, color: '#202124' }}>
-          Use system defaults
-        </span>
-      </label>
+  const cardStyle: React.CSSProperties = {
+    padding: 16, backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb',
+  }
 
-      {!useDefaults && (
-        <>
+  return (
+    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Import / Export Definition */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <ToolCard
+          title="Import Definition"
+          description="Create a new extraction from an exported JSON file"
+          onClick={onImportDefinition}
+        />
+        <ToolCard
+          title="Export Definition"
+          description="Download as a shareable JSON file"
+          onClick={onExportDefinition}
+        />
+      </div>
+
+      <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
+          Extraction Settings
+        </div>
+
+        {/* Use system defaults */}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={useDefaults}
+            onChange={(e) => onSetUseDefaults(e.target.checked)}
+          />
+          <span style={{ fontSize: 14, fontWeight: 500, color: '#202124' }}>
+            Use system defaults
+          </span>
+        </label>
+
+        {!useDefaults && (
+          <>
           {/* Mode selector */}
           <div>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#202124', marginBottom: 6 }}>
@@ -1662,8 +1704,260 @@ function AdvancedTab({
               Run the extraction multiple times and use consensus to improve accuracy.
             </div>
           </div>
-        </>
-      )}
+          </>
+        )}
+      </div>
+
+      {searchSetUuid && <ApiTab searchSetUuid={searchSetUuid} />}
+    </div>
+  )
+}
+
+function ApiTab({ searchSetUuid }: { searchSetUuid: string }) {
+  const [lang, setLang] = useState<'python' | 'curl'>('python')
+  const [copied, setCopied] = useState<string | null>(null)
+
+  const baseUrl = window.location.origin
+  const endpoint = `${baseUrl}/api/extractions/run-integrated`
+  const statusEndpoint = `${baseUrl}/api/extractions/status/{activity_id}`
+
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text)
+    setCopied(id)
+    setTimeout(() => setCopied(null), 2000)
+  }
+
+  const pythonFileSnippet = `import requests
+
+response = requests.post(
+    "${endpoint}",
+    headers={"x-api-key": "YOUR_API_KEY"},
+    data={"search_set_uuid": "${searchSetUuid}"},
+    files=[
+        ("files", ("document.pdf", open("document.pdf", "rb"), "application/pdf")),
+        # Add more files as needed
+    ],
+)
+print(response.json())`
+
+  const pythonDocUuidSnippet = `import requests
+
+response = requests.post(
+    "${endpoint}",
+    headers={"x-api-key": "YOUR_API_KEY"},
+    data={
+        "search_set_uuid": "${searchSetUuid}",
+        "document_uuids": "UUID1,UUID2",
+    },
+)
+print(response.json())`
+
+  const curlFileSnippet = `# Use an absolute path for the file. With a bare filename, curl resolves
+# the path against your current working directory — if the file isn't there
+# curl prints a warning to stderr but still POSTs an empty body, which the
+# server will reject as a 400.
+curl -X POST "${endpoint}" \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -F "search_set_uuid=${searchSetUuid}" \\
+  -F "files=@/absolute/path/to/document.pdf"`
+
+  const curlDocUuidSnippet = `curl -X POST "${endpoint}" \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -F "search_set_uuid=${searchSetUuid}" \\
+  -F "document_uuids=UUID1,UUID2"`
+
+  const pythonTextSnippet = `import requests
+
+response = requests.post(
+    "${endpoint}",
+    headers={"x-api-key": "YOUR_API_KEY"},
+    data={
+        "search_set_uuid": "${searchSetUuid}",
+        "text": "Paste or stream the document text you want to extract from here.",
+        # Optional: "text_title": "Invoice #1234",
+    },
+)
+print(response.json())`
+
+  const curlTextSnippet = `curl -X POST "${endpoint}" \\
+  -H "x-api-key: YOUR_API_KEY" \\
+  -F "search_set_uuid=${searchSetUuid}" \\
+  -F "text=Paste or stream the document text you want to extract from here." \\
+  -F "text_title=Invoice #1234"`
+
+  const statusSnippet = lang === 'python'
+    ? `# Check extraction status by activity_id
+response = requests.get(
+    "${baseUrl}/api/extractions/status/ACTIVITY_ID_FROM_RESPONSE",
+    headers={"x-api-key": "YOUR_API_KEY"},
+)
+print(response.json())`
+    : `curl "${baseUrl}/api/extractions/status/ACTIVITY_ID_FROM_RESPONSE" \\
+  -H "x-api-key: YOUR_API_KEY"`
+
+  const responseExample = `{
+  "status": "completed",
+  "activity_id": "...",
+  "results": [
+    { "field_name": "extracted value", ... }
+  ],
+  "documents": [
+    {
+      "uuid": "...",
+      "title": "document.pdf",
+      "task_status": "complete",  // or "extracting" / "error"
+      "processing": false,
+      "raw_text_len": 12345,       // 0 means no text was extracted
+      "error_message": null
+    }
+  ]
+}`
+
+  const codeBlockStyle: React.CSSProperties = {
+    padding: '14px 16px', backgroundColor: '#1a1a2e', borderRadius: 6, fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+    fontSize: 12, color: '#e2e8f0', whiteSpace: 'pre', overflowX: 'auto', lineHeight: 1.6, position: 'relative',
+  }
+
+  const tabStyle = (active: boolean): React.CSSProperties => ({
+    padding: '4px 12px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+    borderRadius: 4, cursor: 'pointer', border: 'none',
+    backgroundColor: active ? '#3b82f6' : '#e5e7eb',
+    color: active ? '#fff' : '#6b7280',
+  })
+
+  return (
+    <div style={{ padding: 16, backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <label style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
+          Run this extraction via API
+        </label>
+          <div style={{ display: 'flex', gap: 4 }}>
+            <button onClick={() => setLang('python')} style={tabStyle(lang === 'python')}>Python</button>
+            <button onClick={() => setLang('curl')} style={tabStyle(lang === 'curl')}>cURL</button>
+          </div>
+        </div>
+
+        <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 16, lineHeight: 1.6 }}>
+          Call this extraction directly from any HTTP client. No automation required. The endpoint runs synchronously
+          and returns results in the response. Requires an API key; generate one from <strong>My Account</strong> in
+          the top-right menu. Rate-limited to 10 requests/minute.
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+            Endpoint
+          </div>
+          <div style={{ ...codeBlockStyle, whiteSpace: 'nowrap' }}>
+            <span style={{ color: '#22d3ee' }}>POST</span>{' '}{endpoint}
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+            This extraction's UUID
+          </div>
+          <div style={{ ...codeBlockStyle, whiteSpace: 'nowrap' }}>
+            {searchSetUuid}
+          </div>
+        </div>
+
+        <ApiCodeBlock
+          title="Upload files"
+          code={lang === 'python' ? pythonFileSnippet : curlFileSnippet}
+          id="files"
+          copied={copied}
+          onCopy={copyToClipboard}
+          style={codeBlockStyle}
+        />
+
+        <ApiCodeBlock
+          title="Use existing documents"
+          code={lang === 'python' ? pythonDocUuidSnippet : curlDocUuidSnippet}
+          id="docs"
+          copied={copied}
+          onCopy={copyToClipboard}
+          style={codeBlockStyle}
+        />
+
+        <ApiCodeBlock
+          title="Submit raw text"
+          code={lang === 'python' ? pythonTextSnippet : curlTextSnippet}
+          id="text"
+          copied={copied}
+          onCopy={copyToClipboard}
+          style={codeBlockStyle}
+        />
+
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+            Response
+          </div>
+          <div style={codeBlockStyle}>
+            {responseExample}
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+            Status lookup (optional)
+          </div>
+          <div style={{ ...codeBlockStyle, whiteSpace: 'nowrap', marginBottom: 8 }}>
+            <span style={{ color: '#22d3ee' }}>GET</span>{' '}{statusEndpoint}
+          </div>
+          <ApiCodeBlock
+            title="Check an older run"
+            code={statusSnippet}
+            id="status"
+            copied={copied}
+            onCopy={copyToClipboard}
+            style={codeBlockStyle}
+          />
+        </div>
+
+      <div style={{ fontSize: 11, color: '#9ca3af', lineHeight: 1.6, marginTop: 8 }}>
+        Parameters: <code>search_set_uuid</code> (required), <code>files</code> (optional, multipart uploads),{' '}
+        <code>document_uuids</code> (optional, comma-separated UUIDs of existing documents),{' '}
+        <code>text</code> (optional, raw text to extract from) with an optional{' '}
+        <code>text_title</code>. At least one of <code>files</code>, <code>document_uuids</code>, or{' '}
+        <code>text</code> must be provided.
+      </div>
+
+      <div style={{ fontSize: 11, color: '#9ca3af', lineHeight: 1.6, marginTop: 8 }}>
+        <strong style={{ color: '#6b7280' }}>Empty <code>results</code>?</strong>{' '}
+        Check the <code>documents</code> array in the response. <code>raw_text_len: 0</code>{' '}
+        with <code>task_status: "complete"</code> usually means a scanned PDF where the OCR
+        service couldn't extract text. <code>task_status: "error"</code> means text extraction
+        failed — see <code>error_message</code>. <code>processing: true</code> means the
+        worker didn't finish in time; retry the request or increase the timeout.
+      </div>
+    </div>
+  )
+}
+
+function ApiCodeBlock({ title, code, id, copied, onCopy, style }: {
+  title: string; code: string; id: string; copied: string | null;
+  onCopy: (text: string, id: string) => void; style: React.CSSProperties;
+}) {
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          {title}
+        </div>
+        <button
+          onClick={() => onCopy(code, id)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 4, padding: '2px 8px', fontSize: 11,
+            fontWeight: 500, fontFamily: 'inherit', borderRadius: 4, cursor: 'pointer',
+            border: '1px solid #e5e7eb', backgroundColor: '#fff',
+            color: copied === id ? '#16a34a' : '#6b7280',
+          }}
+        >
+          {copied === id ? <Check style={{ width: 12, height: 12 }} /> : <Copy style={{ width: 12, height: 12 }} />}
+          {copied === id ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      <div style={style}>{code}</div>
     </div>
   )
 }
@@ -2361,8 +2655,8 @@ function ValidateTab({
             }}>
               <AlertTriangle style={{ width: 16, height: 16, color: '#d97706', flexShrink: 0, marginTop: 1 }} />
               <div style={{ flex: 1, fontSize: 12, color: '#92400e', lineHeight: 1.5 }}>
-                <strong>Quality score reduced due to low sample size</strong>
-                {' '}&mdash;{' '}
+                <strong>Quality score reduced due to low sample size.</strong>
+                {' '}
                 Raw score: <strong>{Math.round(bd.raw_score)}%</strong>, final: <strong>{Math.round(bd.final_score)}%</strong>
                 <div style={{ marginTop: 4, fontSize: 11, color: '#78350f' }}>
                   {needMoreDocs && <>Add <strong>{3 - sources.length}</strong> more test document{3 - sources.length !== 1 ? 's' : ''} (need 3 total). </>}
@@ -2764,16 +3058,16 @@ function ValidateTab({
                         </td>
                         <td style={{ padding: '4px 6px', color: '#6b7280', fontSize: 10 }}>{r.model}</td>
                         <td style={{ padding: '4px 6px', textAlign: 'right', fontWeight: 600, color: scoreColor }}>
-                          {r.error ? '—' : Math.round(r.score)}
+                          {r.error ? '-' : Math.round(r.score)}
                         </td>
                         <td style={{ padding: '4px 6px', textAlign: 'right' }}>
-                          {r.error ? '—' : `${Math.round(r.accuracy * 100)}%`}
+                          {r.error ? '-' : `${Math.round(r.accuracy * 100)}%`}
                         </td>
                         <td style={{ padding: '4px 6px', textAlign: 'right' }}>
-                          {r.error ? '—' : `${Math.round(r.consistency * 100)}%`}
+                          {r.error ? '-' : `${Math.round(r.consistency * 100)}%`}
                         </td>
                         <td style={{ padding: '4px 6px', textAlign: 'right', color: '#6b7280' }}>
-                          {r.error ? '—' : `${r.elapsed_seconds.toFixed(1)}s`}
+                          {r.error ? '-' : `${r.elapsed_seconds.toFixed(1)}s`}
                         </td>
                       </tr>
                     )
@@ -2894,10 +3188,10 @@ function ValidateTab({
                           )}
                         </td>
                         <td style={{ padding: '4px 6px', textAlign: 'right', color: '#374151' }}>
-                          {run.accuracy != null ? `${Math.round(run.accuracy * 100)}%` : '—'}
+                          {run.accuracy != null ? `${Math.round(run.accuracy * 100)}%` : '-'}
                         </td>
                         <td style={{ padding: '4px 6px', textAlign: 'right', color: '#374151' }}>
-                          {run.consistency != null ? `${Math.round(run.consistency * 100)}%` : '—'}
+                          {run.consistency != null ? `${Math.round(run.consistency * 100)}%` : '-'}
                         </td>
                         <td style={{ padding: '4px 6px' }}>
                           <span style={{
@@ -2908,7 +3202,7 @@ function ValidateTab({
                           </span>
                         </td>
                         <td style={{ padding: '4px 6px', color: '#6b7280', fontSize: 10 }}>
-                          {run.model || '—'}
+                          {run.model || '-'}
                         </td>
                       </tr>
                       {isExpanded && (

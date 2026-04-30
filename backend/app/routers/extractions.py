@@ -613,10 +613,16 @@ async def run_extraction_integrated(
     request: Request,
     search_set_uuid: str = Form(...),
     document_uuids: Optional[str] = Form(None),
+    text: Optional[str] = Form(None),
+    text_title: Optional[str] = Form(None),
     files: list[UploadFile] = File(default=[]),
     user: User = Depends(get_api_key_user),
 ) -> dict:
-    """Run extraction via external API. Accepts optional file uploads and/or existing document UUIDs."""
+    """Run extraction via external API.
+
+    Accepts any combination of file uploads, existing document UUIDs, and a
+    raw ``text`` payload. At least one must be provided.
+    """
     import uuid as _uuid
     from pathlib import Path
     from app.config import Settings
@@ -630,17 +636,51 @@ async def run_extraction_integrated(
     if document_uuids:
         all_doc_uuids.extend(u.strip() for u in document_uuids.split(",") if u.strip())
 
+    # Handle raw text — store as a SmartDocument with raw_text set, skipping
+    # the file pipeline since there's nothing to parse.
+    if text and text.strip():
+        uid = _uuid.uuid4().hex.upper()
+        doc = SmartDocument(
+            title=(text_title or "API text input")[:200],
+            processing=False,
+            valid=True,
+            raw_text=text,
+            downloadpath="",
+            path="",
+            extension="txt",
+            uuid=uid,
+            user_id=user.user_id,
+            folder="0",
+        )
+        await doc.insert()
+        all_doc_uuids.append(uid)
+
     # Handle file uploads
     for upload in files:
         if not upload.filename:
             continue
+        file_data = await upload.read()
+        # Reject zero-byte uploads. The most common cause is a curl invocation
+        # like `-F "files=@document.pdf"` run from a directory that doesn't
+        # contain the file — curl prints a warning to stderr but still POSTs an
+        # empty part, and without this guard the request would silently produce
+        # an empty extraction result.
+        if not file_data:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Uploaded file '{upload.filename}' is empty. "
+                    "If you used curl with -F files=@<path>, check that the path "
+                    "is correct relative to your current working directory "
+                    "(consider using an absolute path)."
+                ),
+            )
         uid = _uuid.uuid4().hex.upper()
         ext = (upload.filename.rsplit(".", 1)[-1] if "." in upload.filename else "pdf").lower()
         relative_path = Path(user.user_id) / f"{uid}.{ext}"
         upload_dir = Path(settings.upload_dir) / user.user_id
         upload_dir.mkdir(parents=True, exist_ok=True)
         file_path = upload_dir / f"{uid}.{ext}"
-        file_data = await upload.read()
         file_path.write_bytes(file_data)
 
         doc = SmartDocument(
@@ -666,7 +706,10 @@ async def run_extraction_integrated(
         all_doc_uuids.append(uid)
 
     if not all_doc_uuids:
-        raise HTTPException(status_code=400, detail="No documents or files provided")
+        raise HTTPException(
+            status_code=400,
+            detail="Provide at least one of: files, document_uuids, text",
+        )
 
     # Look up the search set
     ss = await _get_search_set_or_404(search_set_uuid, user)
@@ -691,7 +734,32 @@ async def run_extraction_integrated(
         )
         await activity_service.activity_finish(activity.id, ActivityStatus.COMPLETED)
         await activity_service.activity_update(activity.id, documents_touched=len(all_doc_uuids))
-        return {"status": "completed", "activity_id": str(activity.id), "results": results}
+
+        # Per-document diagnostics. Empty results when uploading a file are
+        # almost always one of: still-processing (extraction worker behind),
+        # task_status="error" (text extraction failed), or task_status="complete"
+        # with raw_text_len=0 (e.g. scanned PDF with no OCR available). Surfacing
+        # this in the response lets API callers tell those cases apart without
+        # having to dig into server logs.
+        doc_diagnostics = []
+        for doc_uuid in all_doc_uuids:
+            doc = await SmartDocument.find_one(SmartDocument.uuid == doc_uuid)
+            if doc:
+                doc_diagnostics.append({
+                    "uuid": doc.uuid,
+                    "title": doc.title,
+                    "task_status": getattr(doc, "task_status", None),
+                    "processing": doc.processing,
+                    "raw_text_len": len(doc.raw_text or ""),
+                    "error_message": getattr(doc, "error_message", None),
+                })
+
+        return {
+            "status": "completed",
+            "activity_id": str(activity.id),
+            "results": results,
+            "documents": doc_diagnostics,
+        }
     except Exception as e:
         await activity_service.activity_finish(activity.id, ActivityStatus.FAILED, error=str(e))
         raise

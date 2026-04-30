@@ -25,14 +25,16 @@ html {
 }
 
 /* Global keyboard focus indicator */
-:focus-visible {
-  outline: 2px solid var(--highlight-color, #eab308);
-  outline-offset: 2px;
-}
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--highlight-color, #eab308);
+    outline-offset: 2px;
+  }
 
-/* Remove focus ring for mouse users */
-:focus:not(:focus-visible) {
-  outline: none;
+  /* Remove focus ring for mouse users */
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
 }
 
 /* Rail shimmer animation for running activities */

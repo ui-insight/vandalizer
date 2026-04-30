@@ -11,7 +11,7 @@ import { ContextMeter } from './ContextMeter'
 import { ContextLimitDialog } from './ContextLimitDialog'
 import { useChat } from '../../hooks/useChat'
 import { useOnboarding } from '../../hooks/useOnboarding'
-import { useWorkspace } from '../../contexts/WorkspaceContext'
+import { useWorkspace, type PendingChatMessage } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
 import { addLink, removeDocument, removeLink, truncateContext, compactContext, clearContext } from '../../api/chat'
 import { uploadFile } from '../../api/files'
@@ -107,7 +107,7 @@ function ValueTaglineRotator() {
 
 interface ChatPanelProps {
   conversationToLoad?: string | null
-  pendingMessage?: string | null
+  pendingMessage?: PendingChatMessage | null
   onPendingMessageConsumed?: () => void
 }
 
@@ -128,6 +128,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     contextTokens,
     contextMode,
     contextCutoffIndex,
+    contextNotices,
     setContextTokens,
     setContextMode,
     setContextCutoffIndex,
@@ -317,11 +318,13 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     }
   }, [conversationToLoad, loadHistory])
 
-  const pendingHandled = useRef<string | null>(null)
+  const pendingHandled = useRef<PendingChatMessage | null>(null)
   useEffect(() => {
     if (pendingMessage && pendingMessage !== pendingHandled.current && !isStreaming) {
       pendingHandled.current = pendingMessage
-      send(pendingMessage, selectedDocUuids, undefined, undefined, undefined, selectedFolderUuids)
+      const docs = pendingMessage.documentUuids ?? selectedDocUuids
+      const folders = pendingMessage.folderUuids ?? selectedFolderUuids
+      send(pendingMessage.message, docs, undefined, undefined, undefined, folders)
       onPendingMessageConsumed?.()
     }
   }, [pendingMessage, isStreaming, send, onPendingMessageConsumed])
@@ -929,6 +932,17 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
 
         {error && (
           <div className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>
+        )}
+
+        {contextNotices.length > 0 && (
+          <div className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 border border-amber-200">
+            <div className="font-medium mb-1">Context was compacted to fit the model:</div>
+            <ul className="list-disc pl-4 space-y-0.5">
+              {contextNotices.map((n, i) => (
+                <li key={i}>{n.detail}</li>
+              ))}
+            </ul>
+          </div>
         )}
         </div>{/* end centering wrapper */}
 

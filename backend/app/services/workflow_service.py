@@ -7,6 +7,7 @@ import uuid as uuid_mod
 from typing import TYPE_CHECKING
 
 from beanie import PydanticObjectId
+from bson import ObjectId
 from celery.result import AsyncResult
 
 from app.celery_app import celery_app
@@ -20,6 +21,7 @@ from app.models.workflow import (
     WorkflowStepTask,
 )
 from app.services.access_control import (
+    can_manage_workflow,
     can_view_workflow,
     get_authorized_document,
     get_authorized_workflow,
@@ -34,6 +36,20 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 # Workflow CRUD
 # ---------------------------------------------------------------------------
+
+
+def _sanitize_for_json(value):
+    """Recursively convert ObjectId → str so free-form dict fields serialize cleanly."""
+    if isinstance(value, ObjectId):
+        return str(value)
+    if isinstance(value, dict):
+        return {k: _sanitize_for_json(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_sanitize_for_json(v) for v in value]
+    if isinstance(value, tuple):
+        return tuple(_sanitize_for_json(v) for v in value)
+    return value
+
 
 async def create_workflow(name: str, user_id: str, description: str | None = None, team_id: str | None = None) -> Workflow:
     wf = Workflow(
@@ -90,10 +106,15 @@ async def get_workflow(workflow_id: str, user: User | None = None) -> dict | Non
         wf = await get_authorized_workflow(workflow_id, user)
         if not wf:
             return None
+        team_access = await get_team_access_context(user)
+        can_manage = can_manage_workflow(wf, user, team_access)
     else:
         wf = await Workflow.get(PydanticObjectId(workflow_id))
         if not wf:
             return None
+        # Without a user (e.g. internal export), assume manage to preserve
+        # existing behavior — callers that gate on this pass a user.
+        can_manage = True
 
     steps = []
     for step_id in wf.steps:
@@ -107,12 +128,12 @@ async def get_workflow(workflow_id: str, user: User | None = None) -> dict | Non
                 tasks.append({
                     "id": str(task.id),
                     "name": task.name,
-                    "data": task.data,
+                    "data": _sanitize_for_json(task.data),
                 })
         steps.append({
             "id": str(step.id),
             "name": step.name,
-            "data": step.data,
+            "data": _sanitize_for_json(step.data),
             "is_output": step.is_output,
             "tasks": tasks,
         })
@@ -124,9 +145,10 @@ async def get_workflow(workflow_id: str, user: User | None = None) -> dict | Non
         "user_id": wf.user_id,
         "num_executions": wf.num_executions,
         "steps": steps,
-        "input_config": wf.input_config,
-        "validation_plan": wf.validation_plan,
-        "validation_inputs": wf.validation_inputs,
+        "input_config": _sanitize_for_json(wf.input_config),
+        "validation_plan": _sanitize_for_json(wf.validation_plan),
+        "validation_inputs": _sanitize_for_json(wf.validation_inputs),
+        "can_manage": can_manage,
     }
 
 
@@ -478,6 +500,7 @@ async def get_workflow_status(session_id: str, user: User | None = None) -> dict
         "current_step_preview": result.current_step_preview,
         "final_output": result.final_output,
         "steps_output": result.steps_output,
+        "output_step_names": result.output_step_names,
         "approval_request_id": result.approval_request_id,
     }
 
@@ -1026,7 +1049,7 @@ async def generate_validation_plan(workflow_id: str, user: User) -> list[dict]:
     try:
         result = await agent.run(f"## Workflow\n{workflow_desc}")
     except Exception:
-        raise ValueError("LLM call failed — could not generate validation plan")
+        raise ValueError("LLM call failed - could not generate validation plan")
 
     parsed = _parse_json_array(result.output)
     if parsed is None:
@@ -1177,7 +1200,7 @@ async def validate_workflow(workflow_id: str, user: User | None = None) -> dict:
 
     plan = wf.validation_plan
     if not plan:
-        raise ValueError("No validation plan — generate or add checks first")
+        raise ValueError("No validation plan - generate or add checks first")
 
     wf_data = await get_workflow(workflow_id)
 

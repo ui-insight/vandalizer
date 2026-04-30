@@ -497,7 +497,7 @@ function FolderWatchConfig({ automation, onSave }: { automation: Automation; onS
           style={{ width: 16, height: 16, accentColor: '#3b82f6' }}
         />
         <span style={{ fontWeight: 500 }}>Batch mode</span>
-        <span style={{ color: '#9ca3af', fontSize: 12 }}>— wait and process files together</span>
+        <span style={{ color: '#9ca3af', fontSize: 12 }}>wait and process files together</span>
       </label>
     </div>
   )

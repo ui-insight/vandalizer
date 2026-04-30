@@ -1,6 +1,9 @@
 """Knowledge Base API routes."""
 
+import re
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 
 from app.dependencies import get_current_user
 from app.rate_limit import limiter
@@ -11,6 +14,8 @@ from app.schemas.knowledge import (
     AddUrlsRequest,
     AdoptKBRequest,
     CreateKBRequest,
+    ImportKBRequest,
+    ImportKBResponse,
     KBDetailResponse,
     KBListResponse,
     KBReferenceResponse,
@@ -169,6 +174,44 @@ async def create_knowledge_base(req: CreateKBRequest, user: User = Depends(get_c
         team_id=team_id, description=req.description,
     )
     return _kb_response(kb)
+
+
+@router.post("/import", response_model=ImportKBResponse)
+async def import_knowledge_base(req: ImportKBRequest, user: User = Depends(get_current_user)):
+    """Import a knowledge base from a previously exported payload.
+
+    Creates a new KB owned by the importing user and re-ingests all sources
+    (regenerating embeddings). The importer's team becomes the KB's team.
+    """
+    try:
+        kb = await svc.import_knowledge_base(
+            req.payload.model_dump(),
+            user,
+            title_override=req.title,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return ImportKBResponse(
+        uuid=kb.uuid,
+        title=kb.title,
+        imported_sources=kb.total_sources,
+    )
+
+
+@router.get("/{uuid}/export")
+async def export_knowledge_base(uuid: str, user: User = Depends(get_current_user)):
+    """Download a JSON export of a knowledge base (metadata + source content).
+
+    Embeddings are not included — they are regenerated when the file is imported.
+    """
+    kb = await _get_kb_or_404(uuid, user)
+    payload = await svc.export_knowledge_base(kb)
+    safe_title = re.sub(r"[^A-Za-z0-9_.-]+", "_", kb.title or "knowledge_base").strip("_")
+    filename = f"{safe_title or 'knowledge_base'}.kb.json"
+    return JSONResponse(
+        content=payload,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/{uuid}", response_model=KBDetailResponse)

@@ -27,6 +27,7 @@ export interface CertificationProgress {
   certified_at: string | null
   streak_days: number
   last_activity_date: string | null
+  unlocked?: boolean
 }
 
 export interface ValidationCheck {

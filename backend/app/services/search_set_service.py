@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import uuid as uuid_mod
 from typing import TYPE_CHECKING
 
@@ -16,6 +17,8 @@ from app.services.extraction_engine import ExtractionEngine
 
 if TYPE_CHECKING:
     from app.models.user import User
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -395,6 +398,10 @@ async def run_extraction_sync(
     """Run extraction synchronously via asyncio.to_thread."""
     keys = await get_extraction_keys(search_set_uuid)
     if not keys:
+        logger.warning(
+            "Extraction skipped: search_set %s has no extraction keys",
+            search_set_uuid,
+        )
         return []
 
     # Wait for any documents still being processed (e.g. file uploads where
@@ -411,6 +418,17 @@ async def run_extraction_sync(
             break
         await _asyncio.sleep(_PROCESSING_POLL_INTERVAL)
         _waited += _PROCESSING_POLL_INTERVAL
+    else:
+        still_processing = await SmartDocument.find(
+            {"uuid": {"$in": document_uuids}, "processing": True},
+        ).count()
+        if still_processing:
+            logger.warning(
+                "Extraction proceeding after %ds with %d/%d docs still processing "
+                "for search_set %s — results will likely be empty for those docs",
+                _PROCESSING_TIMEOUT, still_processing, len(document_uuids),
+                search_set_uuid,
+            )
 
     # Pre-load document texts and file paths
     import os
@@ -419,6 +437,7 @@ async def run_extraction_sync(
 
     doc_texts: list[str] = []
     doc_file_paths: list[str] = []
+    empty_text_docs: list[str] = []
     for doc_uuid in document_uuids:
         doc = await SmartDocument.find_one(SmartDocument.uuid == doc_uuid)
         if doc and doc.raw_text:
@@ -426,10 +445,21 @@ async def run_extraction_sync(
         else:
             # Placeholder to keep indices aligned with doc_file_paths
             doc_texts.append("")
+            if doc:
+                empty_text_docs.append(
+                    f"{doc_uuid}(status={getattr(doc, 'task_status', None)!r})"
+                )
         if doc and doc.path:
             doc_file_paths.append(os.path.join(upload_dir, doc.path))
         else:
             doc_file_paths.append("")
+
+    if empty_text_docs:
+        logger.warning(
+            "Extraction has %d/%d docs with empty raw_text for search_set %s: %s",
+            len(empty_text_docs), len(document_uuids), search_set_uuid,
+            ", ".join(empty_text_docs),
+        )
 
     if not any(doc_texts) and not any(doc_file_paths):
         return []

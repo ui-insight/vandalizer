@@ -16,6 +16,7 @@ class CertificationProgress(Document):
     certified_at: Optional[datetime.datetime] = None
     streak_days: int = 0
     last_activity_date: Optional[str] = None  # YYYY-MM-DD for streak tracking
+    unlocked: bool = False  # Admin debug flag — bypasses module prerequisite gating
     created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
     updated_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
 

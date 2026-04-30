@@ -23,7 +23,7 @@ _DRIP_MODULES = [
     {
         "id": "ai_literacy",
         "title": "AI Literacy",
-        "description": "start with the fundamentals — what AI actually is, what it's good and bad at, and how it applies to research administration.",
+        "description": "start with the fundamentals: what AI actually is, what it's good and bad at, and how it applies to research administration.",
     },
     {
         "id": "foundations",

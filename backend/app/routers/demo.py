@@ -222,7 +222,7 @@ async def admin_test_email(
     if not success:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to send test email — check SMTP configuration",
+            detail="Failed to send test email. Check SMTP configuration.",
         )
     return {"ok": True, "message": f"Test email sent to {to}"}
 

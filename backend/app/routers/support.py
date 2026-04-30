@@ -3,7 +3,7 @@
 import base64
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import Response
 from pydantic import BaseModel
 
@@ -19,12 +19,6 @@ router = APIRouter()
 # ---------------------------------------------------------------------------
 # Schemas
 # ---------------------------------------------------------------------------
-
-class CreateTicketRequest(BaseModel):
-    subject: str
-    message: str
-    priority: str = "normal"
-
 
 class AddMessageRequest(BaseModel):
     content: str
@@ -55,17 +49,48 @@ async def _is_support_user(user: User) -> bool:
 
 @router.post("/tickets")
 async def create_ticket(
-    body: CreateTicketRequest,
+    subject: str = Form(...),
+    message: str = Form(...),
+    priority: str = Form("normal"),
+    files: list[UploadFile] = File(default=[]),
     user: User = Depends(get_current_user),
 ):
+    # Validate all file sizes up-front so we don't create a ticket and then fail
+    file_payloads: list[tuple[str, str | None, bytes]] = []
+    for f in files:
+        data = await f.read()
+        if len(data) > 10 * 1024 * 1024:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File '{f.filename}' must be under 10MB",
+            )
+        file_payloads.append((f.filename or "attachment", f.content_type, data))
+
     team_id = str(user.current_team) if user.current_team else None
     ticket = await support_service.create_ticket(
         user=user,
-        subject=body.subject,
-        message=body.message,
-        priority=body.priority,
+        subject=subject,
+        message=message,
+        priority=priority,
         team_id=team_id,
     )
+
+    if not file_payloads:
+        return ticket
+
+    initial_message_uuid = ticket["messages"][0]["uuid"] if ticket.get("messages") else None
+    for filename, content_type, data in file_payloads:
+        result = await support_service.add_attachment(
+            ticket_uuid=ticket["uuid"],
+            user=user,
+            filename=filename,
+            file_type=content_type,
+            file_bytes=data,
+            message_uuid=initial_message_uuid,
+        )
+        if result is not None:
+            ticket = result
+
     return ticket
 
 

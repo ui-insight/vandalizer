@@ -596,6 +596,21 @@ async def search_libraries(
 # ---------------------------------------------------------------------------
 
 
+def _iso_utc(dt: datetime.datetime | None) -> str | None:
+    """Serialize a datetime as ISO-8601 with an explicit UTC offset.
+
+    MongoDB stores datetimes as UTC milliseconds with no timezone metadata,
+    so Beanie returns naive datetimes by default.  ``naive.isoformat()`` then
+    produces a string with no timezone suffix, which JavaScript's ``Date``
+    parser interprets as local time and shifts by the user's UTC offset.
+    """
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
+    return dt.isoformat()
+
+
 def _item_created_at(item: LibraryItem) -> str | None:
     """Return a reliable ISO creation timestamp for a library item.
 
@@ -610,7 +625,7 @@ def _item_created_at(item: LibraryItem) -> str | None:
             return BsonObjectId(str(item.id)).generation_time.isoformat()
         except Exception:
             pass
-    return item.created_at.isoformat() if item.created_at else None
+    return _iso_utc(item.created_at)
 
 
 async def _dereference_item(item: LibraryItem) -> dict | None:
@@ -652,7 +667,7 @@ async def _dereference_item(item: LibraryItem) -> dict | None:
         "verified": item.verified,
         "added_by_user_id": item.added_by_user_id,
         "created_at": _item_created_at(item),
-        "last_used_at": item.last_used_at.isoformat() if item.last_used_at else None,
+        "last_used_at": _iso_utc(item.last_used_at),
     }
 
 
@@ -725,7 +740,6 @@ async def _clone_underlying_object(item: LibraryItem, user_id: str, *, team_id: 
                 searchtype=oi.searchtype,
                 title=oi.title,
                 user_id=user_id,
-                space_id=oi.space_id,
             )
             await new_item.insert()
 

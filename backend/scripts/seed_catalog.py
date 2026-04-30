@@ -1,19 +1,26 @@
 """Seed the verified catalog with research administration workflows and extraction templates.
 
 Creates verified workflows, search sets, metadata, and collections in the explore system.
-Idempotent — safe to run multiple times; existing items are skipped.
+Idempotent — safe to run multiple times. Existing items are preserved: top-level fields
+are refreshed from seed files and any new nested items (search set items, KB sources,
+test cases) are added, but no nested data is removed or overwritten.
 
 Usage:
     cd backend
-    python -m scripts.seed_catalog
+    python -m scripts.seed_catalog                              # seed everything (default)
+    python -m scripts.seed_catalog --only workflows
+    python -m scripts.seed_catalog --only extractions,knowledge-bases
+    python -m scripts.seed_catalog --only kbs                   # alias for knowledge-bases
 """
 
+import argparse
 import asyncio
 import datetime
 import json
 import logging
 import pathlib
 import uuid as uuid_mod
+from typing import Literal
 
 from beanie import PydanticObjectId
 
@@ -30,6 +37,47 @@ logger = logging.getLogger(__name__)
 
 SEEDS_DIR = pathlib.Path(__file__).resolve().parent.parent / "seeds"
 SYSTEM_USER = "system"
+
+SeedResult = Literal["created", "updated", "skipped"]
+
+# Canonical type names used internally
+TYPE_WORKFLOWS = "workflows"
+TYPE_EXTRACTIONS = "extractions"
+TYPE_KNOWLEDGE_BASES = "knowledge_bases"
+ALL_TYPES = {TYPE_WORKFLOWS, TYPE_EXTRACTIONS, TYPE_KNOWLEDGE_BASES}
+
+# CLI aliases → canonical names
+TYPE_ALIASES = {
+    "workflows": TYPE_WORKFLOWS,
+    "workflow": TYPE_WORKFLOWS,
+    "extractions": TYPE_EXTRACTIONS,
+    "extraction": TYPE_EXTRACTIONS,
+    "search-sets": TYPE_EXTRACTIONS,
+    "search_sets": TYPE_EXTRACTIONS,
+    "searchsets": TYPE_EXTRACTIONS,
+    "knowledge-bases": TYPE_KNOWLEDGE_BASES,
+    "knowledge_bases": TYPE_KNOWLEDGE_BASES,
+    "knowledgebases": TYPE_KNOWLEDGE_BASES,
+    "kbs": TYPE_KNOWLEDGE_BASES,
+    "kb": TYPE_KNOWLEDGE_BASES,
+}
+
+
+def _parse_types(only: str | None) -> set[str]:
+    """Parse the --only argument into a set of canonical type names."""
+    if not only:
+        return set(ALL_TYPES)
+    requested: set[str] = set()
+    for raw in only.split(","):
+        key = raw.strip().lower()
+        if not key:
+            continue
+        canonical = TYPE_ALIASES.get(key)
+        if not canonical:
+            valid = sorted({"workflows", "extractions", "knowledge-bases", "kbs"})
+            raise ValueError(f"Unknown seed type: {raw!r}. Valid: {', '.join(valid)}")
+        requested.add(canonical)
+    return requested or set(ALL_TYPES)
 
 
 # ---------------------------------------------------------------------------
@@ -82,24 +130,36 @@ async def add_to_collection(collection: VerifiedCollection, item_id: str):
         await collection.save()
 
 
-async def create_verified_metadata(
+async def upsert_verified_metadata(
     item_kind: str, item_id: str, display_name: str, description: str,
     quality_tier: str | None = None, quality_score: float | None = None,
     quality_grade: str | None = None,
 ):
-    """Create VerifiedItemMetadata if it doesn't already exist.
+    """Create or refresh VerifiedItemMetadata.
 
     If quality_score/grade are provided (e.g. from a previous validation export),
-    they are used directly. Otherwise the item is created without quality data,
-    indicating it has not yet been validated.
+    they are used directly. If the metadata already exists, display_name and
+    description are refreshed from the seed; existing quality fields are only
+    overwritten when the caller passes new values (so previously validated
+    records don't lose their scores to a later unvalidated seed run).
     """
     existing = await VerifiedItemMetadata.find_one(
         VerifiedItemMetadata.item_kind == item_kind,
         VerifiedItemMetadata.item_id == item_id,
     )
-    if existing:
-        return existing
     now = datetime.datetime.now(datetime.timezone.utc)
+    if existing:
+        existing.display_name = display_name
+        existing.description = description
+        if quality_tier is not None:
+            existing.quality_tier = quality_tier
+        if quality_score is not None:
+            existing.quality_score = quality_score
+        if quality_grade is not None:
+            existing.quality_grade = quality_grade
+        existing.updated_at = now
+        await existing.save()
+        return existing
     meta = VerifiedItemMetadata(
         item_kind=item_kind,
         item_id=item_id,
@@ -115,10 +175,23 @@ async def create_verified_metadata(
     return meta
 
 
-async def create_library_item(
+# Backwards-compat alias for existing call sites.
+create_verified_metadata = upsert_verified_metadata
+
+
+async def ensure_library_item(
     verified_lib: Library, item_id: PydanticObjectId, kind: LibraryItemKind,
 ):
-    """Create a LibraryItem and add it to the verified library."""
+    """Create a LibraryItem if one doesn't already exist for (item_id, kind),
+    and make sure the verified library references it."""
+    existing = await LibraryItem.find_one(
+        LibraryItem.item_id == item_id,
+        LibraryItem.kind == kind,
+    )
+    if existing:
+        if existing.id not in verified_lib.items:
+            verified_lib.items.append(existing.id)
+        return existing
     now = datetime.datetime.now(datetime.timezone.utc)
     lib_item = LibraryItem(
         item_id=item_id,
@@ -131,6 +204,10 @@ async def create_library_item(
     if lib_item.id not in verified_lib.items:
         verified_lib.items.append(lib_item.id)
     return lib_item
+
+
+# Backwards-compat alias.
+create_library_item = ensure_library_item
 
 
 # ---------------------------------------------------------------------------
@@ -187,20 +264,59 @@ async def _patch_inline_extractions(wf: Workflow, seed_item: dict) -> int:
 
 async def seed_workflow(
     data: dict, meta: dict, verified_lib: Library, slug_to_collection: dict[str, VerifiedCollection],
-) -> bool:
-    """Seed a single workflow. Returns True if created, False if skipped."""
+) -> SeedResult:
+    """Seed a single workflow. Returns "created", "updated", or "skipped"."""
     seed_id = meta["seed_id"]
+    item = data["items"][0]
 
-    # Idempotency: check if already seeded
+    # Upsert: update top-level fields and metadata on existing workflows; don't
+    # touch the step graph (may have run history referencing it).
     existing = await Workflow.find_one({"resource_config.seed_id": seed_id})
     if existing:
-        # Patch existing workflows whose Extraction tasks lack a SearchSet
-        patched = await _patch_inline_extractions(existing, data["items"][0])
+        patched = await _patch_inline_extractions(existing, item)
         if patched:
             print(f"    (patched {patched} extraction task(s))")
-        return False
 
-    item = data["items"][0]
+        changed = False
+        new_name = item["name"]
+        if existing.name != new_name:
+            existing.name = new_name
+            changed = True
+        new_desc = item.get("description")
+        if existing.description != new_desc:
+            existing.description = new_desc
+            changed = True
+        if "input_config" in item and existing.input_config != item["input_config"]:
+            existing.input_config = item["input_config"]
+            changed = True
+        if "output_config" in item and existing.output_config != item["output_config"]:
+            existing.output_config = item["output_config"]
+            changed = True
+        if "validation_plan" in item and existing.validation_plan != item["validation_plan"]:
+            existing.validation_plan = item["validation_plan"]
+            changed = True
+        if "validation_inputs" in item and existing.validation_inputs != item["validation_inputs"]:
+            existing.validation_inputs = item["validation_inputs"]
+            changed = True
+        if changed:
+            existing.updated_at = datetime.datetime.now(datetime.timezone.utc)
+            await existing.save()
+
+        await ensure_library_item(verified_lib, existing.id, LibraryItemKind.WORKFLOW)
+        await upsert_verified_metadata(
+            "workflow", str(existing.id),
+            meta.get("display_name", item["name"]),
+            meta.get("description", item.get("description", "")),
+            quality_tier=meta.get("quality_tier"),
+            quality_score=meta.get("quality_score"),
+            quality_grade=meta.get("quality_grade"),
+        )
+        for slug in meta.get("collections", []):
+            col = slug_to_collection.get(slug)
+            if col:
+                await add_to_collection(col, str(existing.id))
+        return "updated"
+
     now = datetime.datetime.now(datetime.timezone.utc)
 
     # Create workflow steps and tasks
@@ -285,7 +401,7 @@ async def seed_workflow(
         if col:
             await add_to_collection(col, str(wf.id))
 
-    return True
+    return "created"
 
 
 # ---------------------------------------------------------------------------
@@ -321,46 +437,90 @@ async def _seed_test_cases(search_set_uuid: str, test_cases: list[dict]) -> int:
 # Search set seeding
 # ---------------------------------------------------------------------------
 
+async def _refresh_search_set(
+    ss: SearchSet, item: dict, meta: dict, seed_id: str,
+    verified_lib: Library, slug_to_collection: dict[str, VerifiedCollection],
+) -> None:
+    """Apply updates to an existing SearchSet: refresh top-level fields, add any
+    missing items from the seed (matched by searchphrase), add missing test cases,
+    and refresh metadata/library/collections."""
+    changed = False
+    if ss.title != item["title"]:
+        ss.title = item["title"]
+        changed = True
+    new_domain = meta.get("domain")
+    if new_domain is not None and ss.domain != new_domain:
+        ss.domain = new_domain
+        changed = True
+    seed_cfg = {**item.get("extraction_config", {}), "seed_id": seed_id}
+    merged_cfg = {**ss.extraction_config, **seed_cfg}
+    if ss.extraction_config != merged_cfg:
+        ss.extraction_config = merged_cfg
+        changed = True
+
+    # Add any items from the seed that don't already exist on this search set.
+    existing_items = await SearchSetItem.find(
+        SearchSetItem.searchset == ss.uuid,
+    ).to_list()
+    existing_phrases = {i.searchphrase for i in existing_items}
+    item_order = list(ss.item_order or [])
+    for field in item.get("items", []):
+        phrase = field["searchphrase"]
+        if phrase in existing_phrases:
+            continue
+        ssi = SearchSetItem(
+            searchphrase=phrase,
+            searchset=ss.uuid,
+            searchtype=field.get("searchtype", "extraction"),
+            is_optional=field.get("is_optional", False),
+            enum_values=field.get("enum_values", []),
+        )
+        await ssi.insert()
+        item_order.append(str(ssi.id))
+        changed = True
+    if changed:
+        ss.item_order = item_order
+        await ss.save()
+
+    tc_count = await _seed_test_cases(ss.uuid, item.get("test_cases", []))
+    if tc_count:
+        print(f"    + {tc_count} test case(s)")
+
+    await ensure_library_item(verified_lib, ss.id, LibraryItemKind.SEARCH_SET)
+    await upsert_verified_metadata(
+        "search_set", str(ss.id),
+        meta.get("display_name", item["title"]),
+        meta.get("description", ""),
+        quality_tier=meta.get("quality_tier"),
+        quality_score=meta.get("quality_score"),
+        quality_grade=meta.get("quality_grade"),
+    )
+    for slug in meta.get("collections", []):
+        col = slug_to_collection.get(slug)
+        if col:
+            await add_to_collection(col, str(ss.id))
+
+
 async def seed_search_set(
     data: dict, meta: dict, verified_lib: Library, slug_to_collection: dict[str, VerifiedCollection],
-) -> bool:
-    """Seed a single search set. Returns True if created, False if skipped."""
+) -> SeedResult:
+    """Seed a single search set. Returns "created", "updated", or "skipped"."""
     seed_id = meta["seed_id"]
+    item = data["items"][0]
 
-    # Idempotency: check if already seeded
     existing = await SearchSet.find_one({"extraction_config.seed_id": seed_id})
     if existing:
-        return False
+        await _refresh_search_set(existing, item, meta, seed_id, verified_lib, slug_to_collection)
+        return "updated"
 
-    # Also skip if the old seed_domain_templates.py already created a matching template
-    item = data["items"][0]
+    # Adopt legacy templates seeded by seed_domain_templates.py (matched by title).
     old_template = await SearchSet.find_one(
         SearchSet.title == item["title"],
         SearchSet.verified == True,  # noqa: E712
     )
     if old_template:
-        # Adopt the existing template: add metadata and collection membership
-        await create_verified_metadata(
-            "search_set", str(old_template.id),
-            meta.get("display_name", item["title"]),
-            meta.get("description", ""),
-            quality_tier=meta.get("quality_tier"),
-            quality_score=meta.get("quality_score"),
-            quality_grade=meta.get("quality_grade"),
-        )
-        await create_library_item(verified_lib, old_template.id, LibraryItemKind.SEARCH_SET)
-        for slug in meta.get("collections", []):
-            col = slug_to_collection.get(slug)
-            if col:
-                await add_to_collection(col, str(old_template.id))
-        # Seed test cases for adopted template
-        tc_count = await _seed_test_cases(old_template.uuid, item.get("test_cases", []))
-        if tc_count:
-            print(f"    + {tc_count} test case(s)")
-        # Mark as seeded for future runs
-        old_template.extraction_config = {**old_template.extraction_config, "seed_id": seed_id}
-        await old_template.save()
-        return True
+        await _refresh_search_set(old_template, item, meta, seed_id, verified_lib, slug_to_collection)
+        return "updated"
 
     # Create new search set
     ss_uuid = str(uuid_mod.uuid4())
@@ -417,28 +577,97 @@ async def seed_search_set(
         if col:
             await add_to_collection(col, str(ss.id))
 
-    return True
+    return "created"
 
 
 # ---------------------------------------------------------------------------
 # Knowledge base seeding
 # ---------------------------------------------------------------------------
 
+async def _recalc_kb_stats(kb: KnowledgeBase) -> None:
+    """Recompute KB aggregates (total_sources, sources_ready, etc.) from its sources."""
+    sources = await KnowledgeBaseSource.find(
+        KnowledgeBaseSource.knowledge_base_uuid == kb.uuid,
+    ).to_list()
+    kb.total_sources = len(sources)
+    kb.sources_ready = sum(1 for s in sources if s.status == "ready")
+    kb.sources_failed = sum(1 for s in sources if s.status == "error")
+    kb.total_chunks = sum(s.chunk_count for s in sources)
+    if kb.sources_ready > 0:
+        kb.status = "ready"
+    elif kb.total_sources > 0 and kb.sources_failed == kb.total_sources:
+        kb.status = "error"
+    else:
+        kb.status = "empty"
+    await kb.save()
+
+
 async def seed_knowledge_base(
     data: dict, meta: dict, verified_lib: Library, slug_to_collection: dict[str, VerifiedCollection],
-) -> bool:
-    """Seed a single knowledge base. Returns True if created, False if skipped."""
-    seed_id = meta["seed_id"]
+) -> SeedResult:
+    """Seed a single knowledge base. Returns "created", "updated", or "skipped"."""
+    item = data["items"][0]
 
-    # Idempotency: check if already seeded via title match
     existing = await KnowledgeBase.find_one(
-        KnowledgeBase.title == data["items"][0]["title"],
+        KnowledgeBase.title == item["title"],
         KnowledgeBase.verified == True,  # noqa: E712
     )
     if existing:
-        return False
+        from app.services.knowledge_service import _ingest_url_source
 
-    item = data["items"][0]
+        changed = False
+        new_desc = item.get("description")
+        if new_desc is not None and existing.description != new_desc:
+            existing.description = new_desc
+            changed = True
+        if changed:
+            existing.updated_at = datetime.datetime.now(datetime.timezone.utc)
+            await existing.save()
+
+        # Add any URL sources from the seed that aren't already present, and
+        # ingest just those new ones. Existing sources are left alone.
+        current_sources = await KnowledgeBaseSource.find(
+            KnowledgeBaseSource.knowledge_base_uuid == existing.uuid,
+        ).to_list()
+        existing_urls = {s.url for s in current_sources if s.url}
+        new_sources_ingested = 0
+        for src_data in item.get("sources", []):
+            url = src_data.get("url")
+            if not url or url in existing_urls:
+                continue
+            src = KnowledgeBaseSource(
+                knowledge_base_uuid=existing.uuid,
+                source_type=src_data.get("source_type", "url"),
+                url=url,
+                url_title=src_data.get("url_title"),
+                status="pending",
+            )
+            await src.insert()
+            if src.source_type == "url":
+                try:
+                    await _ingest_url_source(src, existing)
+                    new_sources_ingested += 1
+                except Exception as e:
+                    logger.warning("Failed to ingest seed URL %s: %s", src.url, e)
+        if new_sources_ingested:
+            print(f"    + {new_sources_ingested} new source(s)")
+            await _recalc_kb_stats(existing)
+
+        await ensure_library_item(verified_lib, existing.id, LibraryItemKind.KNOWLEDGE_BASE)
+        await upsert_verified_metadata(
+            "knowledge_base", str(existing.id),
+            meta.get("display_name", item["title"]),
+            meta.get("description", item.get("description", "")),
+            quality_tier=meta.get("quality_tier"),
+            quality_score=meta.get("quality_score"),
+            quality_grade=meta.get("quality_grade"),
+        )
+        for slug in meta.get("collections", []):
+            col = slug_to_collection.get(slug)
+            if col:
+                await add_to_collection(col, str(existing.id))
+        return "updated"
+
     now = datetime.datetime.now(datetime.timezone.utc)
 
     kb = KnowledgeBase(
@@ -456,7 +685,6 @@ async def seed_knowledge_base(
     # Create source records and ingest URL sources
     from app.services.knowledge_service import _ingest_url_source
 
-    source_count = 0
     for src_data in item.get("sources", []):
         src = KnowledgeBaseSource(
             knowledge_base_uuid=kb.uuid,
@@ -466,7 +694,6 @@ async def seed_knowledge_base(
             status="pending",
         )
         await src.insert()
-        source_count += 1
 
         # Ingest URL sources inline so KBs have chunks on first run
         if src.source_type == "url" and src.url:
@@ -475,20 +702,11 @@ async def seed_knowledge_base(
             except Exception as e:
                 logger.warning("Failed to ingest seed URL %s: %s", src.url, e)
 
-    # Recalculate stats from ingested sources
-    sources = await KnowledgeBaseSource.find(
-        KnowledgeBaseSource.knowledge_base_uuid == kb.uuid,
-    ).to_list()
-    kb.total_sources = len(sources)
-    kb.sources_ready = sum(1 for s in sources if s.status == "ready")
-    kb.sources_failed = sum(1 for s in sources if s.status == "error")
-    kb.total_chunks = sum(s.chunk_count for s in sources)
-    kb.status = "ready" if kb.sources_ready > 0 else ("error" if kb.sources_failed == kb.total_sources else "empty")
-    await kb.save()
+    await _recalc_kb_stats(kb)
 
     # Library item + metadata
-    await create_library_item(verified_lib, kb.id, LibraryItemKind.KNOWLEDGE_BASE)
-    await create_verified_metadata(
+    await ensure_library_item(verified_lib, kb.id, LibraryItemKind.KNOWLEDGE_BASE)
+    await upsert_verified_metadata(
         "knowledge_base", str(kb.id),
         meta.get("display_name", item["title"]),
         meta.get("description", item.get("description", "")),
@@ -503,20 +721,31 @@ async def seed_knowledge_base(
         if col:
             await add_to_collection(col, str(kb.id))
 
-    return True
+    return "created"
 
 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
-async def seed_catalog():
-    """Seed the verified catalog. Expects Beanie to be already initialized."""
-    print("Seeding verified catalog...")
+async def seed_catalog(types: set[str] | None = None):
+    """Seed the verified catalog. Expects Beanie to be already initialized.
+
+    Args:
+        types: Subset of {"workflows", "extractions", "knowledge_bases"} controlling
+               which resource types to seed. ``None`` (default) seeds all three.
+               Collections are always ensured because the other types reference them.
+    """
+    selected = set(types) if types else set(ALL_TYPES)
+    unknown = selected - ALL_TYPES
+    if unknown:
+        raise ValueError(f"Unknown seed types: {sorted(unknown)}")
+
+    print(f"Seeding verified catalog (types: {', '.join(sorted(selected))})...")
 
     verified_lib = await get_or_create_verified_library()
 
-    # --- Phase 1: Collections ---
+    # --- Phase 1: Collections (always run — referenced by all other types) ---
     print("\n--- Collections ---")
     collections_path = SEEDS_DIR / "collections.json"
     collections_data = json.loads(collections_path.read_text())
@@ -526,80 +755,113 @@ async def seed_catalog():
         slug_to_collection[coll["slug"]] = col
         print(f"  {coll['title']}{' [featured]' if coll.get('featured') else ''}")
 
+    def _tally(counts: dict[str, int], result: SeedResult, label: str, name: str):
+        counts[result] = counts.get(result, 0) + 1
+        if result == "created":
+            print(f"  + {name}")
+        elif result == "updated":
+            print(f"  ~ {name} (updated)")
+        else:
+            print(f"  = {name} (skipped)")
+
+    summary: list[str] = []
+
     # --- Phase 2: Workflows ---
-    print("\n--- Workflows ---")
-    wf_dir = SEEDS_DIR / "workflows"
-    wf_created = 0
-    wf_skipped = 0
-    for wf_file in sorted(wf_dir.glob("*.json")):
-        data = json.loads(wf_file.read_text())
-        meta = data.get("_seed_meta", {})
-        if not meta.get("seed_id"):
-            print(f"  SKIP {wf_file.name}: missing _seed_meta.seed_id")
-            continue
-        created = await seed_workflow(data, meta, verified_lib, slug_to_collection)
-        name = meta.get("display_name", wf_file.stem)
-        if created:
-            print(f"  + {name}")
-            wf_created += 1
-        else:
-            print(f"  = {name} (already exists)")
-            wf_skipped += 1
-
-    # --- Phase 3: Search Sets ---
-    print("\n--- Search Sets ---")
-    ss_dir = SEEDS_DIR / "search_sets"
-    ss_created = 0
-    ss_skipped = 0
-    for ss_file in sorted(ss_dir.glob("*.json")):
-        data = json.loads(ss_file.read_text())
-        meta = data.get("_seed_meta", {})
-        if not meta.get("seed_id"):
-            print(f"  SKIP {ss_file.name}: missing _seed_meta.seed_id")
-            continue
-        created = await seed_search_set(data, meta, verified_lib, slug_to_collection)
-        name = meta.get("display_name", ss_file.stem)
-        if created:
-            print(f"  + {name}")
-            ss_created += 1
-        else:
-            print(f"  = {name} (already exists)")
-            ss_skipped += 1
-
-    # --- Phase 4: Knowledge Bases ---
-    print("\n--- Knowledge Bases ---")
-    kb_dir = SEEDS_DIR / "knowledge_bases"
-    kb_created = 0
-    kb_skipped = 0
-    if kb_dir.exists():
-        for kb_file in sorted(kb_dir.glob("*.json")):
-            data = json.loads(kb_file.read_text())
+    if TYPE_WORKFLOWS in selected:
+        print("\n--- Workflows ---")
+        wf_dir = SEEDS_DIR / "workflows"
+        wf_counts: dict[str, int] = {}
+        for wf_file in sorted(wf_dir.glob("*.json")):
+            data = json.loads(wf_file.read_text())
             meta = data.get("_seed_meta", {})
             if not meta.get("seed_id"):
-                print(f"  SKIP {kb_file.name}: missing _seed_meta.seed_id")
+                print(f"  SKIP {wf_file.name}: missing _seed_meta.seed_id")
                 continue
-            created = await seed_knowledge_base(data, meta, verified_lib, slug_to_collection)
-            name = meta.get("display_name", kb_file.stem)
-            if created:
-                print(f"  + {name}")
-                kb_created += 1
-            else:
-                print(f"  = {name} (already exists)")
-                kb_skipped += 1
+            result = await seed_workflow(data, meta, verified_lib, slug_to_collection)
+            _tally(wf_counts, result, "workflow", meta.get("display_name", wf_file.stem))
+        summary.append(
+            f"Workflows: {wf_counts.get('created', 0)} created, "
+            f"{wf_counts.get('updated', 0)} updated, "
+            f"{wf_counts.get('skipped', 0)} skipped"
+        )
+
+    # --- Phase 3: Search Sets (extractions) ---
+    if TYPE_EXTRACTIONS in selected:
+        print("\n--- Extractions (search sets) ---")
+        ss_dir = SEEDS_DIR / "search_sets"
+        ss_counts: dict[str, int] = {}
+        for ss_file in sorted(ss_dir.glob("*.json")):
+            data = json.loads(ss_file.read_text())
+            meta = data.get("_seed_meta", {})
+            if not meta.get("seed_id"):
+                print(f"  SKIP {ss_file.name}: missing _seed_meta.seed_id")
+                continue
+            result = await seed_search_set(data, meta, verified_lib, slug_to_collection)
+            _tally(ss_counts, result, "search set", meta.get("display_name", ss_file.stem))
+        summary.append(
+            f"Extractions: {ss_counts.get('created', 0)} created, "
+            f"{ss_counts.get('updated', 0)} updated, "
+            f"{ss_counts.get('skipped', 0)} skipped"
+        )
+
+    # --- Phase 4: Knowledge Bases ---
+    if TYPE_KNOWLEDGE_BASES in selected:
+        print("\n--- Knowledge Bases ---")
+        kb_dir = SEEDS_DIR / "knowledge_bases"
+        kb_counts: dict[str, int] = {}
+        if kb_dir.exists():
+            for kb_file in sorted(kb_dir.glob("*.json")):
+                data = json.loads(kb_file.read_text())
+                meta = data.get("_seed_meta", {})
+                if not meta.get("seed_id"):
+                    print(f"  SKIP {kb_file.name}: missing _seed_meta.seed_id")
+                    continue
+                result = await seed_knowledge_base(data, meta, verified_lib, slug_to_collection)
+                _tally(kb_counts, result, "knowledge base", meta.get("display_name", kb_file.stem))
+        summary.append(
+            f"Knowledge bases: {kb_counts.get('created', 0)} created, "
+            f"{kb_counts.get('updated', 0)} updated, "
+            f"{kb_counts.get('skipped', 0)} skipped"
+        )
 
     # --- Save verified library ---
     await verified_lib.save()
 
     # --- Summary ---
-    print(f"\nDone! Workflows: {wf_created} created, {wf_skipped} skipped. "
-          f"Search sets: {ss_created} created, {ss_skipped} skipped. "
-          f"Knowledge bases: {kb_created} created, {kb_skipped} skipped.")
+    print("\nDone! " + " | ".join(summary))
 
 
 async def main():
+    parser = argparse.ArgumentParser(
+        description="Seed the verified catalog with research admin templates.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Examples:\n"
+            "  python -m scripts.seed_catalog\n"
+            "  python -m scripts.seed_catalog --only workflows\n"
+            "  python -m scripts.seed_catalog --only extractions,knowledge-bases\n"
+            "  python -m scripts.seed_catalog --only kbs\n\n"
+            "Seeds are upserted: existing items keep their nested data and have\n"
+            "top-level fields refreshed from the seed file; any new nested items\n"
+            "(search set fields, KB sources, test cases) are added."
+        ),
+    )
+    parser.add_argument(
+        "--only",
+        type=str,
+        default=None,
+        help=(
+            "Comma-separated list of resource types to seed. "
+            "Valid: workflows, extractions, knowledge-bases (alias: kbs). "
+            "Default: seed everything."
+        ),
+    )
+    args = parser.parse_args()
+    types = _parse_types(args.only)
+
     settings = Settings()
     await init_db(settings)
-    await seed_catalog()
+    await seed_catalog(types=types)
 
 
 if __name__ == "__main__":

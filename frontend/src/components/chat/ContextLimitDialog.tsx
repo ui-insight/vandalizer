@@ -75,10 +75,14 @@ export function ContextLimitDialog({
         >
           <div>
             <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>
-              Context Window {percent >= 100 ? 'Full' : 'Nearly Full'}
+              {percent >= 100
+                ? 'Context Window Full'
+                : percent >= 90
+                  ? 'Context Window Nearly Full'
+                  : 'Manage Context Window'}
             </h3>
             <p style={{ margin: '4px 0 0', fontSize: 13, color: '#6b7280' }}>
-              {percent}% of context used. Choose how to manage it.
+              {percent}% of context used.{percent >= 90 ? ' Choose how to manage it.' : ''}
             </p>
           </div>
           <button

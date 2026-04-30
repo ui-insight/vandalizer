@@ -28,12 +28,17 @@ from app.models.document import SmartDocument
 from app.models.system_config import SystemConfig
 from app.models.user import User
 from app.services.access_control import TeamAccessContext
-from app.services.config_service import get_user_model_name
+from app.services.config_service import get_llm_model_by_name, get_user_model_name
+from app.services.context_budget import (
+    DocumentSegment,
+    plan_and_compact_context,
+)
 from app.services.llm_service import (
     AGENTIC_CHAT_SYSTEM_PROMPT,
     create_agentic_chat_agent,
     create_chat_agent,
     DOCUMENT_CHAT_SYSTEM_PROMPT,
+    FIRST_SESSION_SYSTEM_PROMPT,
     HELP_CHAT_SYSTEM_PROMPT,
     VANDALIZER_CONTEXT,
 )
@@ -457,15 +462,18 @@ async def chat_stream(
         if doc:
             documents.append(doc)
 
-    # Build attachment context
-    attachment_context = ""
+    # Build attachment segments (each can be independently trimmed by the budget planner)
+    attachment_segments: list[DocumentSegment] = []
     url_attachments = await conversation.get_url_attachments()
     for att in url_attachments:
         if att.content:
-            attachment_context += (
-                f"\n\n## Web Content: {att.title}\nSource: {att.url}\n\n"
-                f"{att.content[:10000]}\n"
-            )
+            attachment_segments.append(DocumentSegment(
+                label=f"web:{att.title or att.url}",
+                text=(
+                    f"\n\n## Web Content: {att.title}\nSource: {att.url}\n\n"
+                    f"{att.content[:10000]}\n"
+                ),
+            ))
 
     file_attachments = await conversation.get_file_attachments()
     logger.info(
@@ -475,9 +483,10 @@ async def chat_stream(
     )
     for att in file_attachments:
         if att.content:
-            attachment_context += (
-                f"\n\n## Document: {att.filename}\n\n{att.content[:10000]}\n"
-            )
+            attachment_segments.append(DocumentSegment(
+                label=f"file:{att.filename}",
+                text=f"\n\n## Document: {att.filename}\n\n{att.content[:10000]}\n",
+            ))
 
     # If the conversation was created during first-session onboarding, honour
     # that flag even when the frontend doesn't pass it (e.g. after a remount).
@@ -492,20 +501,48 @@ async def chat_stream(
     if previous_messages:
         previous_messages = previous_messages[:-1]
 
-    # Build prompt and select appropriate system prompt
-    full_text = _get_full_text(documents)
+    # Document segments — one entry per SmartDocument so each can be trimmed
+    # independently by the budget planner.
+    doc_segments: list[DocumentSegment] = []
+    skipped_no_text: list[str] = []
+    for doc in documents:
+        if doc.raw_text:
+            doc_segments.append(DocumentSegment(
+                label=f"doc:{doc.title or doc.uuid}",
+                text=f"\n\n## Document: {doc.title}\n{doc.raw_text}",
+            ))
+        else:
+            skipped_no_text.append(doc.title or doc.uuid)
+
+    # Warn the caller about any selected document that the model won't see
+    # because text extraction hasn't finished (or produced no text).
+    missing_uuids = [u for u in document_uuids if u not in {d.uuid for d in documents}]
+    if skipped_no_text or missing_uuids:
+        names = list(skipped_no_text) + missing_uuids
+        joined = ", ".join(names[:5]) + ("…" if len(names) > 5 else "")
+        yield json.dumps({
+            "kind": "context_notice",
+            "content": (
+                f"{len(names)} selected document(s) had no extracted text yet "
+                f"and were not sent to the model: {joined}. "
+                "Wait for processing to finish, then re-send."
+            ),
+            "action": "documents_not_ready",
+            "tokens_dropped": 0,
+        }) + "\n"
+
+    total_text_len = sum(len(s.text) for s in doc_segments)
     if document_uuids:
         logger.info(
-            "Chat doc context: requested=%d found=%d with_text=%d text_len=%d",
+            "Chat doc context: requested=%d found=%d with_text=%d text_len=%d skipped_no_text=%d",
             len(document_uuids),
             len(documents),
             sum(1 for d in documents if d.raw_text),
-            len(full_text),
+            total_text_len,
+            len(skipped_no_text),
         )
 
-    parts: list[str] = []
-
-    # KB context: query ChromaDB for relevant chunks
+    # KB context: query ChromaDB for relevant chunks and add as a segment.
     if kb_uuid:
         try:
             import asyncio
@@ -517,22 +554,17 @@ async def chat_stream(
                 for r in kb_results:
                     src = r.get("metadata", {}).get("source_name", "Unknown")
                     kb_text += f"\n**Source: {src}**\n{r['content']}\n"
-                parts.append(kb_text)
+                doc_segments.insert(0, DocumentSegment(label="kb", text=kb_text))
             else:
                 logger.warning("KB query returned no results for kb_uuid=%s", kb_uuid)
         except Exception as e:
             logger.error("KB context retrieval failed for kb_uuid=%s: %s", kb_uuid, e)
 
-    if full_text:
-        parts.append(full_text)
-    if attachment_context:
-        parts.append(attachment_context)
-
     # Build workspace inventory for all non-demo, non-help paths.
     # run_demo returns early (scripted demo path); help path uses its own context.
     team_id = str(user.current_team) if user and user.current_team else None
     inventory = ""
-    if user and not run_demo and not include_onboarding_context:
+    if user and not run_demo and not include_onboarding_context and not is_first_session:
         try:
             inventory = await _build_workspace_inventory(user_id, team_id)
         except Exception as e:
@@ -540,31 +572,31 @@ async def chat_stream(
 
     # Select system prompt based on whether we have document context.
     # Note: run_demo is handled via scripted demo and returns early above, so
-    # it never reaches this block. First-session non-demo messages fall through
-    # to normal agentic chat (no special "pitch the demo" prompt).
-    if parts:
-        context_block = "\n\n".join(parts)
-        prompt = (
-            f"{message}\n\n"
-            "--- BEGIN REFERENCE DOCUMENTS (provided for context only) ---\n"
-            f"{context_block}\n"
-            "--- END REFERENCE DOCUMENTS ---"
-        )
-        system_prompt = DOCUMENT_CHAT_SYSTEM_PROMPT
+    # it never reaches this block.
+    have_context = bool(doc_segments or attachment_segments)
+    if have_context:
+        system_prompt: Optional[str] = DOCUMENT_CHAT_SYSTEM_PROMPT
         if inventory:
             system_prompt = system_prompt + "\n\n" + inventory
+    elif is_first_session:
+        # First-session onboarding: conversational value discovery.
+        # Do NOT inject VANDALIZER_CONTEXT here — it's a technical how-to dump
+        # that causes the LLM to skip the conversation and spit out directions.
+        # The FIRST_SESSION_SYSTEM_PROMPT already has everything it needs.
+        system_prompt = FIRST_SESSION_SYSTEM_PROMPT
     elif include_onboarding_context:
         # Inject Vandalizer help context only when explicitly requested
         # (triggered by the placeholder pills in the chat UI).
-        prompt = (
-            "--- BEGIN ONBOARDING CONTEXT ---\n"
-            f"{VANDALIZER_CONTEXT}\n"
-            "--- END ONBOARDING CONTEXT ---\n\n"
-            f"User question: {message}"
-        )
+        doc_segments.append(DocumentSegment(
+            label="onboarding",
+            text=(
+                "--- BEGIN ONBOARDING CONTEXT ---\n"
+                f"{VANDALIZER_CONTEXT}\n"
+                "--- END ONBOARDING CONTEXT ---"
+            ),
+        ))
         system_prompt = HELP_CHAT_SYSTEM_PROMPT
     else:
-        prompt = message
         if inventory:
             system_prompt = AGENTIC_CHAT_SYSTEM_PROMPT + "\n\n" + inventory
         else:
@@ -579,6 +611,75 @@ async def chat_stream(
         if open_docs_block:
             base = system_prompt if system_prompt is not None else AGENTIC_CHAT_SYSTEM_PROMPT
             system_prompt = base + "\n\n" + open_docs_block
+
+    # Resolve the model's context window and compact oversize components.
+    model_config = await get_llm_model_by_name(model_name)
+    compacted = plan_and_compact_context(
+        model_name=model_name,
+        model_config=model_config,
+        system_prompt=system_prompt or "",
+        user_message=message,
+        history=previous_messages,
+        documents=doc_segments,
+        attachments=attachment_segments,
+    )
+
+    # Tell the client what we planned (and whether we had to compact).
+    yield json.dumps({
+        "kind": "context_budget",
+        "content": "",
+        "plan": compacted.plan.to_dict(),
+    }) + "\n"
+    for action in compacted.actions:
+        yield json.dumps({
+            "kind": "context_notice",
+            "content": action.detail,
+            "action": action.kind,
+            "tokens_dropped": action.tokens_dropped,
+        }) + "\n"
+
+    if compacted.fatal:
+        logger.warning(
+            "Chat context over budget for model=%s: plan=%s actions=%s",
+            model_name, compacted.plan.to_dict(),
+            [a.to_dict() for a in compacted.actions],
+        )
+        yield json.dumps({
+            "kind": "error",
+            "content": (
+                "This request is too large for the selected model "
+                f"(~{compacted.plan.total_input_tokens} tokens vs "
+                f"{compacted.plan.input_budget} token input budget). "
+                "Remove some documents or switch to a larger model."
+            ),
+        }) + "\n"
+        if activity_id:
+            ev = await ActivityEvent.get(activity_id)
+            if ev:
+                ev.status = ActivityStatus.FAILED.value
+                ev.error = "context over budget"
+                await ev.save()
+        return
+
+    previous_messages = compacted.history
+
+    # Rebuild the final prompt from compacted segments.
+    if have_context or include_onboarding_context:
+        context_pieces: list[str] = [s.text for s in compacted.documents]
+        context_pieces.extend(s.text for s in compacted.attachments)
+        context_block = "\n\n".join(context_pieces)
+        if include_onboarding_context and not have_context:
+            # Preserve the original onboarding wording when that's the only context.
+            prompt = f"{context_block}\n\nUser question: {message}"
+        else:
+            prompt = (
+                f"{message}\n\n"
+                "--- BEGIN REFERENCE DOCUMENTS (provided for context only) ---\n"
+                f"{context_block}\n"
+                "--- END REFERENCE DOCUMENTS ---"
+            )
+    else:
+        prompt = message
 
     # Select agent — agentic (with tools) when user context is available.
     # Agents are cached by model; per-request system prompts (including

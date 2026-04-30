@@ -71,11 +71,15 @@ async def evaluate_eligible_prompt(
         if not _check_rules(prompt.trigger_rules, trial_day, onboarding_status, last_shown_at, now):
             continue
 
+        # Create ticket + record exposure on first eligibility so the admin
+        # stats reflect what users actually saw (not just what they clicked).
+        shown = await show_prompt(user, prompt.slug)
         return {
             "slug": prompt.slug,
             "question_text": prompt.question_text,
             "subject": prompt.subject,
             "stage": prompt.stage,
+            "ticket_uuid": shown["ticket_uuid"] if shown else None,
         }
 
     return None
@@ -154,9 +158,12 @@ async def show_prompt(user: User, slug: str) -> Optional[dict]:
 
     # Create or update the response record
     if existing:
-        existing.status = "shown"
+        # Only promote from "pending"; don't clobber a later "responded" state.
+        if existing.status == "pending":
+            existing.status = "shown"
         existing.ticket_uuid = ticket.uuid
-        existing.shown_at = now
+        if existing.shown_at is None:
+            existing.shown_at = now
         await existing.save()
         response_uuid = existing.uuid
     else:
@@ -382,16 +389,49 @@ DEFAULT_PROMPTS = [
 ]
 
 
+async def _dedupe_prompts_by_slug() -> int:
+    """Delete duplicate FeedbackPrompt docs by slug, keeping the oldest.
+
+    Protects against races in earlier seed runs across multiple workers.
+    """
+    coll = FeedbackPrompt.get_motor_collection()
+    pipeline = [
+        {"$sort": {"created_at": 1}},
+        {"$group": {
+            "_id": "$slug",
+            "keep_id": {"$first": "$_id"},
+            "all_ids": {"$push": "$_id"},
+        }},
+    ]
+    deleted = 0
+    async for group in coll.aggregate(pipeline):
+        extras = [oid for oid in group["all_ids"] if oid != group["keep_id"]]
+        if extras:
+            result = await coll.delete_many({"_id": {"$in": extras}})
+            deleted += result.deleted_count
+    if deleted:
+        logger.info("Deduped %d duplicate feedback prompt docs", deleted)
+    return deleted
+
+
 async def seed_default_prompts() -> int:
-    """Insert default prompts that don't already exist. Returns count inserted."""
+    """Upsert default prompts atomically. Returns count newly inserted.
+
+    Uses $setOnInsert so concurrent workers don't race-insert duplicates.
+    """
+    await _dedupe_prompts_by_slug()
+
+    coll = FeedbackPrompt.get_motor_collection()
     inserted = 0
     for defn in DEFAULT_PROMPTS:
-        existing = await FeedbackPrompt.find_one(FeedbackPrompt.slug == defn["slug"])
-        if existing:
-            continue
-        prompt = FeedbackPrompt(**defn)
-        await prompt.insert()
-        inserted += 1
+        doc = FeedbackPrompt(**defn).model_dump(exclude={"id"})
+        result = await coll.update_one(
+            {"slug": defn["slug"]},
+            {"$setOnInsert": doc},
+            upsert=True,
+        )
+        if result.upserted_id is not None:
+            inserted += 1
 
     if inserted:
         logger.info("Seeded %d default feedback prompts", inserted)

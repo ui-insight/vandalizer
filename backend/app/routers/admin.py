@@ -2025,7 +2025,7 @@ async def test_model(index: int, user: User = Depends(get_current_user)):
     try:
         from pydantic_ai import Agent
 
-        model = get_agent_model(model_name)
+        model = get_agent_model(model_name, system_config_doc=cfg.model_dump())
         agent = Agent(model, system_prompt="Reply with exactly: ok")
         result = await agent.run("Say ok")
         return {
@@ -2266,3 +2266,141 @@ async def backfill_agentic_drip(
     from app.services.engagement_service import backfill_agentic_chat_drip
     enrolled = await backfill_agentic_chat_drip(batch_size=body.batch_size)
     return AgenticDripBackfillResponse(enrolled=enrolled, eligible=eligible, dry_run=False)
+
+
+# ---------------------------------------------------------------------------
+# Certifications — admin view of user progress through Vandal Workflow Architect
+# ---------------------------------------------------------------------------
+
+
+class CertificationProgressItem(BaseModel):
+    user_id: str
+    name: Optional[str] = None
+    email: Optional[str] = None
+    level: str
+    total_xp: int
+    modules_completed: int
+    modules_total: int
+    certified: bool
+    certified_at: Optional[datetime.datetime] = None
+    streak_days: int
+    last_activity_date: Optional[str] = None
+    unlocked: bool = False
+    updated_at: Optional[datetime.datetime] = None
+
+
+class CertificationProgressDetail(CertificationProgressItem):
+    modules: dict
+
+
+@router.get("/certifications", response_model=list[CertificationProgressItem])
+async def list_certification_progress(user: User = Depends(get_current_user)):
+    """List all users who have started the certification program with progress summary."""
+    await _require_admin(user)
+
+    from app.models.certification import CertificationProgress
+    from app.services import certification_service as cert_svc
+
+    progresses = await CertificationProgress.find().to_list()
+    if not progresses:
+        return []
+
+    user_ids = [p.user_id for p in progresses]
+    users = await User.find({"user_id": {"$in": user_ids}}).to_list()
+    user_map = {u.user_id: u for u in users}
+
+    total_modules = len(cert_svc.MODULE_ORDER)
+    items: list[CertificationProgressItem] = []
+    for p in progresses:
+        u = user_map.get(p.user_id)
+        completed = sum(1 for m in p.modules.values() if isinstance(m, dict) and m.get("completed"))
+        items.append(
+            CertificationProgressItem(
+                user_id=p.user_id,
+                name=u.name if u else None,
+                email=u.email if u else None,
+                level=p.level,
+                total_xp=p.total_xp,
+                modules_completed=completed,
+                modules_total=total_modules,
+                certified=p.certified,
+                certified_at=p.certified_at,
+                streak_days=p.streak_days,
+                last_activity_date=p.last_activity_date,
+                unlocked=p.unlocked,
+                updated_at=p.updated_at,
+            )
+        )
+
+    items.sort(key=lambda i: (i.modules_completed, i.total_xp), reverse=True)
+    return items
+
+
+@router.get("/certifications/{user_id}", response_model=CertificationProgressDetail)
+async def get_certification_progress_detail(
+    user_id: str,
+    user: User = Depends(get_current_user),
+):
+    """Get a single user's full certification progress including per-module state."""
+    await _require_admin(user)
+
+    from app.models.certification import CertificationProgress
+    from app.services import certification_service as cert_svc
+
+    p = await CertificationProgress.find_one(CertificationProgress.user_id == user_id)
+    if not p:
+        raise HTTPException(status_code=404, detail="No certification progress for this user")
+
+    target = await User.find_one(User.user_id == user_id)
+    completed = sum(1 for m in p.modules.values() if isinstance(m, dict) and m.get("completed"))
+
+    return CertificationProgressDetail(
+        user_id=p.user_id,
+        name=target.name if target else None,
+        email=target.email if target else None,
+        level=p.level,
+        total_xp=p.total_xp,
+        modules_completed=completed,
+        modules_total=len(cert_svc.MODULE_ORDER),
+        certified=p.certified,
+        certified_at=p.certified_at,
+        streak_days=p.streak_days,
+        last_activity_date=p.last_activity_date,
+        unlocked=p.unlocked,
+        updated_at=p.updated_at,
+        modules=p.modules,
+    )
+
+
+class CertificationUnlockRequest(BaseModel):
+    unlocked: bool
+
+
+@router.put("/certifications/{user_id}/unlock")
+async def set_certification_unlock(
+    user_id: str,
+    payload: CertificationUnlockRequest,
+    user: User = Depends(get_current_user),
+):
+    """Debug toggle — when unlocked, the user can pick any module without prerequisites."""
+    await _require_admin(user)
+
+    from app.models.certification import CertificationProgress
+
+    prog = await CertificationProgress.find_one(CertificationProgress.user_id == user_id)
+    if not prog:
+        prog = CertificationProgress(user_id=user_id)
+        await prog.insert()
+
+    prog.unlocked = payload.unlocked
+    prog.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
+    await prog.save()
+
+    await _audit(
+        user,
+        "certification.unlock" if payload.unlocked else "certification.lock",
+        f"{'Unlocked' if payload.unlocked else 'Locked'} certification for user {user_id}",
+        {"user_id": user_id, "unlocked": payload.unlocked},
+    )
+
+    return {"user_id": user_id, "unlocked": prog.unlocked}

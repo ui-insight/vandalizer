@@ -130,7 +130,7 @@ def build_daily_digest_card(work_items: list[dict], stats: dict) -> dict:
     today = datetime.now(timezone.utc).strftime("%B %d, %Y")
 
     body = [
-        {"type": "TextBlock", "text": f"Daily Digest — {today}", "weight": "Bolder", "size": "Medium"},
+        {"type": "TextBlock", "text": f"Daily Digest - {today}", "weight": "Bolder", "size": "Medium"},
         {
             "type": "ColumnSet",
             "columns": [
@@ -155,7 +155,7 @@ def build_daily_digest_card(work_items: list[dict], stats: dict) -> dict:
             category = wi.get("triage_category") or wi.get("source", "")
             body.append({
                 "type": "TextBlock",
-                "text": f"{status_icon} **{subject}** — {category}",
+                "text": f"{status_icon} **{subject}** - {category}",
                 "wrap": True,
                 "spacing": "Small",
             })

@@ -72,16 +72,20 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
       }}
     >
       {/* Checkbox */}
-      <td style={{ padding: '12px 0 12px 15px', width: 32 }}>
+      <td style={{ padding: 0, width: 32 }} onClick={(e) => e.stopPropagation()}>
         {onToggleSelect && (
-          <input
-            type="checkbox"
-            checked={!!selected}
-            onChange={() => onToggleSelect(folder.uuid)}
-            onClick={(e) => e.stopPropagation()}
-            aria-label={`Select ${folder.title}`}
-            className="h-4 w-4 cursor-pointer accent-[var(--highlight-color)]"
-          />
+          <label
+            className="flex items-center cursor-pointer"
+            style={{ padding: '12px 4px 12px 15px' }}
+          >
+            <input
+              type="checkbox"
+              checked={!!selected}
+              onChange={() => onToggleSelect(folder.uuid)}
+              aria-label={`Select ${folder.title}`}
+              className="h-4 w-4 cursor-pointer accent-[var(--highlight-color)]"
+            />
+          </label>
         )}
       </td>
 

@@ -27,6 +27,19 @@ logger = logging.getLogger(__name__)
 _EMAIL_COOLDOWN_SECONDS = 600  # 10 minutes
 
 
+def _iso_utc(dt: datetime.datetime | None) -> str | None:
+    """Serialize a datetime as an ISO string with a timezone suffix.
+
+    Why: MongoDB returns BSON Dates as naive UTC datetimes, so a plain
+    .isoformat() emits no offset and browsers parse it as local time.
+    """
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
+    return dt.isoformat()
+
+
 async def _check_email_cooldown(ticket_uuid: str, recipient: str) -> bool:
     """Return True if we should send (cooldown expired), False if throttled."""
     settings = Settings()
@@ -64,7 +77,7 @@ def _ticket_to_dict(t: SupportTicket) -> dict:
                 "user_name": m.user_name,
                 "content": m.content,
                 "is_support_reply": m.is_support_reply,
-                "created_at": m.created_at.isoformat() if m.created_at else None,
+                "created_at": _iso_utc(m.created_at),
             }
             for m in t.messages
         ],
@@ -75,14 +88,14 @@ def _ticket_to_dict(t: SupportTicket) -> dict:
                 "file_type": a.file_type,
                 "uploaded_by": a.uploaded_by,
                 "message_uuid": a.message_uuid,
-                "created_at": a.created_at.isoformat() if a.created_at else None,
+                "created_at": _iso_utc(a.created_at),
             }
             for a in t.attachments
         ],
         "message_count": len(t.messages),
-        "created_at": t.created_at.isoformat() if t.created_at else None,
-        "updated_at": t.updated_at.isoformat() if t.updated_at else None,
-        "closed_at": t.closed_at.isoformat() if t.closed_at else None,
+        "created_at": _iso_utc(t.created_at),
+        "updated_at": _iso_utc(t.updated_at),
+        "closed_at": _iso_utc(t.closed_at),
         "category": t.category,
     }
 
@@ -102,9 +115,7 @@ def _ticket_summary(t: SupportTicket) -> dict:
         "last_message_preview": (
             last_message.content[:120] if last_message else None
         ),
-        "last_message_at": (
-            last_message.created_at.isoformat() if last_message and last_message.created_at else None
-        ),
+        "last_message_at": _iso_utc(last_message.created_at) if last_message else None,
         "last_message_is_support_reply": (
             last_message.is_support_reply if last_message else None
         ),
@@ -113,9 +124,9 @@ def _ticket_summary(t: SupportTicket) -> dict:
         ),
         "read_by": t.read_by,
         "category": t.category,
-        "created_at": t.created_at.isoformat() if t.created_at else None,
-        "updated_at": t.updated_at.isoformat() if t.updated_at else None,
-        "closed_at": t.closed_at.isoformat() if t.closed_at else None,
+        "created_at": _iso_utc(t.created_at),
+        "updated_at": _iso_utc(t.updated_at),
+        "closed_at": _iso_utc(t.closed_at),
     }
 
 

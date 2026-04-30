@@ -15,7 +15,7 @@ const STAGES = [
     label: 'Step 3: Report',
     color: 'bg-green-50 border-green-200',
     labelColor: 'text-green-700',
-    output: 'Compliance checklist generated — ready for download.',
+    output: 'Compliance checklist generated. Ready for download.',
   },
 ]
 

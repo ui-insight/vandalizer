@@ -2,12 +2,13 @@ import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useAuth } from '../../hooks/useAuth'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
+import { useToast } from '../../contexts/ToastContext'
 import { useLibraries, useLibraryItems } from '../../hooks/useLibrary'
 import { LibraryItemRow } from '../library/LibraryItemRow'
 import { ExploreTab } from '../library/ExploreTab'
 import { cloneToPersonal, shareToTeam, addItem as addItemToLibrary, touchItem, listCollections } from '../../api/library'
 import { createWorkflow } from '../../api/workflows'
-import { createSearchSet, listItems as listSearchSetItems, updateSearchSet, updateItem as updateSearchSetItem } from '../../api/extractions'
+import { createSearchSet, listItems as listSearchSetItems, updateSearchSet, updateItem as updateSearchSetItem, addItem as addSearchSetItem } from '../../api/extractions'
 import {
   Search,
   Layers,
@@ -35,7 +36,8 @@ type KindFilter = 'all' | 'workflow' | 'search_set'
 type SortOption = 'recent' | 'az'
 
 export function LibraryTab() {
-  const { openWorkflow, openExtraction, sendChatMessage } = useWorkspace()
+  const { openWorkflow, openExtraction, sendChatMessage, selectedDocUuids, selectedFolderUuids } = useWorkspace()
+  const { toast } = useToast()
   const { user } = useAuth()
   const teamId = user?.current_team ?? undefined
   const { libraries, loading: libLoading, error, refresh } = useLibraries(teamId)
@@ -238,6 +240,14 @@ export function LibraryTab() {
       await updateSearchSet(editingItem.item_uuid, { title: editTitle.trim() })
       if (editItemId) {
         await updateSearchSetItem(editItemId, { searchphrase: editContent, title: editTitle.trim() })
+      } else {
+        // Prompts created via the create modal don't have a SearchSetItem yet —
+        // their body lives only in extraction_config.content. Materialize one so
+        // the body persists through edits and is readable everywhere.
+        await addSearchSetItem(editingItem.item_uuid, {
+          searchphrase: editContent,
+          title: editTitle.trim(),
+        })
       }
       closeEditModal()
       refreshItems()
@@ -979,13 +989,51 @@ export function LibraryTab() {
                   folders={folders}
                   qualityTier={item.quality_tier}
                   qualityScore={item.quality_score}
-                  onOpen={(it) => {
+                  onOpen={async (it) => {
                     touchItem(it.id).then(() => refreshItems()).catch(() => {})
                     if (it.kind === 'workflow') {
                       openWorkflow(it.item_id)
                     } else if (it.set_type === 'prompt' || it.set_type === 'formatter') {
-                      const content = it.description || it.name
-                      sendChatMessage(content)
+                      // Capture selection synchronously so an awaited fetch
+                      // below can't lose it to a tab-swap remount.
+                      const docs = selectedDocUuids
+                      const folders = selectedFolderUuids
+                      // Edited prompts store their body on SearchSetItem.searchphrase;
+                      // freshly created ones store it in extraction_config.content
+                      // (surfaced as `description`). Try searchphrase first.
+                      let content = ''
+                      let source = 'none'
+                      if (it.item_uuid) {
+                        try {
+                          const items = await listSearchSetItems(it.item_uuid)
+                          if (items.length > 0 && items[0].searchphrase?.trim()) {
+                            content = items[0].searchphrase.trim()
+                            source = 'searchphrase'
+                          }
+                        } catch { /* ignore */ }
+                      }
+                      if (!content && (it.description || '').trim()) {
+                        content = (it.description || '').trim()
+                        source = 'description'
+                      }
+                      console.debug('[Library] launching prompt', {
+                        name: it.name,
+                        item_uuid: it.item_uuid,
+                        set_type: it.set_type,
+                        source,
+                        contentLength: content.length,
+                      })
+                      if (!content) {
+                        toast(
+                          `"${it.name}" has no prompt body — open it from the menu and add one.`,
+                          'error',
+                        )
+                        return
+                      }
+                      sendChatMessage(content, {
+                        documentUuids: docs,
+                        folderUuids: folders,
+                      })
                     } else if (it.set_type === 'extraction' && it.item_uuid) {
                       openExtraction(it.item_uuid)
                     }

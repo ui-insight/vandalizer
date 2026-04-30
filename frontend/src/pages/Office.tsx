@@ -393,7 +393,7 @@ export default function Office() {
                                 {item.triage_category}
                               </span>
                             ) : (
-                              <span className="text-xs text-gray-400">—</span>
+                              <span className="text-xs text-gray-400">-</span>
                             )}
                           </td>
                           <td className="px-4 py-3 text-xs text-gray-500">
@@ -401,7 +401,7 @@ export default function Office() {
                               ? new Date(item.received_at).toLocaleDateString()
                               : item.created_at
                                 ? new Date(item.created_at).toLocaleDateString()
-                                : '—'}
+                                : '-'}
                           </td>
                           <td className="px-4 py-3">
                             {item.status === 'awaiting_review' && (

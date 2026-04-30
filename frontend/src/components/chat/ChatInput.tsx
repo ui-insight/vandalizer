@@ -36,6 +36,15 @@ export function ChatInput({
   const addMenuRef = useRef<HTMLDivElement>(null)
   const modelMenuRef = useRef<HTMLDivElement>(null)
   const exportMenuRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Auto-grow the textarea to fit its content, capped by max-height (CSS).
+  useEffect(() => {
+    const ta = textareaRef.current
+    if (!ta) return
+    ta.style.height = 'auto'
+    ta.style.height = `${ta.scrollHeight}px`
+  }, [message])
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -130,18 +139,20 @@ export function ChatInput({
       >
         {/* Text input area */}
         <div
-          className="overflow-y-auto cursor-text"
-          style={{ maxHeight: '25vh', padding: '8px 6px 12px 6px' }}
+          className="cursor-text"
+          style={{ padding: '8px 6px 12px 6px' }}
+          onClick={() => textareaRef.current?.focus()}
         >
           <textarea
+            ref={textareaRef}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={hasDocuments ? "Ask anything about this document..." : "Ask Vandalizer anything..."}
             aria-label="Message input"
             rows={1}
-            className="w-full resize-none border-0 bg-transparent text-base font-medium placeholder:text-[#8a8f98] placeholder:font-medium focus:outline-none"
-            style={{ fontSize: 16 }}
+            className="block w-full resize-none border-0 bg-transparent text-base font-medium caret-highlight placeholder:text-[#8a8f98] placeholder:font-medium focus:outline-none focus-visible:outline-none overflow-y-auto"
+            style={{ fontSize: 16, maxHeight: '25vh' }}
             disabled={disabled}
           />
         </div>

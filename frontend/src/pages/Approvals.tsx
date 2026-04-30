@@ -11,7 +11,7 @@ const STATUS_STYLES: Record<string, { icon: typeof Clock; color: string }> = {
 }
 
 function formatTime(ts: string | null): string {
-  if (!ts) return '—'
+  if (!ts) return '-'
   const d = new Date(ts)
   return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }

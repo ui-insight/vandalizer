@@ -331,7 +331,7 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
             </div>
           ) : results.length === 0 ? (
             <div style={{ textAlign: 'center', padding: 30, color: '#888', fontSize: 13 }}>
-              {query ? 'No documents found' : folderFilter ? 'No documents in this folder' : 'No documents available — upload some above'}
+              {query ? 'No documents found' : folderFilter ? 'No documents in this folder' : 'No documents available. Upload some above.'}
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>

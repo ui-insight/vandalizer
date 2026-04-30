@@ -90,7 +90,7 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
     """
     from bson import ObjectId
 
-    from app.services.workflow_engine import build_workflow_engine
+    from app.services.workflow_engine import build_workflow_engine, sanitize_step_name
 
     db = _get_db()
 
@@ -107,10 +107,16 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
     # Build steps data from workflow steps
     steps_data = [{"name": "Document", "data": trigger_step_data, "tasks": []}]
 
+    # Track which steps the user designated as deliverables.
+    output_step_names: list[str] = []
+
     for step_id in workflow_doc.get("steps", []):
         step_doc = db.workflow_step.find_one({"_id": step_id})
         if not step_doc:
             continue
+
+        if step_doc.get("is_output"):
+            output_step_names.append(sanitize_step_name(step_doc.get("name", "")))
 
         tasks = []
         for task_id in step_doc.get("tasks", []):
@@ -183,6 +189,7 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
             "num_steps_completed": 0,
             "num_steps_total": len(steps_data) - 1,
             "steps_output": {},
+            "output_step_names": output_step_names,
         }},
     )
 

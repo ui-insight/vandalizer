@@ -6,10 +6,12 @@ import csv
 import io
 import json
 import re
+import zipfile
 
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from app.dependencies import get_api_key_user, get_current_user
 from app.models.user import User
@@ -46,6 +48,59 @@ def _csv_cell(value) -> str:
     if isinstance(value, (dict, list)):
         return json.dumps(value, default=str)
     return str(value)
+
+
+def _parse_structured_string(text: str):
+    """Best-effort extraction of structured data from a free-form string output.
+
+    Tries, in order: fenced JSON blocks, raw JSON, and GitHub-flavored markdown
+    tables. Returns the parsed value (list/dict) or None if nothing matched.
+    """
+    if not isinstance(text, str):
+        return None
+    stripped = text.strip()
+    if not stripped:
+        return None
+
+    # 1. Fenced code blocks (```json ... ``` or plain ``` ... ```)
+    for match in re.finditer(r"```(?:json|JSON)?\s*\n?(.*?)```", text, re.DOTALL):
+        candidate = match.group(1).strip()
+        if not candidate:
+            continue
+        try:
+            return json.loads(candidate)
+        except (json.JSONDecodeError, ValueError):
+            continue
+
+    # 2. Raw JSON (already attempted upstream, but safe to retry)
+    try:
+        return json.loads(stripped)
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    # 3. Markdown tables: a header row, a separator row of dashes, then body rows.
+    lines = [ln.rstrip() for ln in text.splitlines()]
+    for i in range(len(lines) - 1):
+        header = lines[i].strip()
+        sep = lines[i + 1].strip()
+        if not (header.startswith("|") and sep.startswith("|")):
+            continue
+        if not re.fullmatch(r"\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?", sep):
+            continue
+        headers = [c.strip() for c in header.strip("|").split("|")]
+        rows: list[dict] = []
+        for body in lines[i + 2:]:
+            body = body.strip()
+            if not body.startswith("|"):
+                break
+            cells = [c.strip() for c in body.strip("|").split("|")]
+            if len(cells) < len(headers):
+                cells += [""] * (len(headers) - len(cells))
+            rows.append({headers[j]: cells[j] for j in range(len(headers))})
+        if rows:
+            return rows
+
+    return None
 
 
 def _strip_markdown(text: str) -> str:
@@ -185,19 +240,81 @@ async def poll_step_test(task_id: str, user: User = Depends(get_current_user)):
     return svc.get_test_status(task_id)
 
 
+def _step_output_value(step_payload):
+    """Extract the displayable value from a stored step output payload.
+
+    Each entry in WorkflowResult.steps_output is the full node return dict
+    ({"output": ..., "input": ..., "step_name": ..., "formatted_output": ...}).
+    """
+    if not isinstance(step_payload, dict):
+        return step_payload
+    return step_payload.get("formatted_output") or step_payload.get("output")
+
+
+def _zip_member_for_step(step_name: str, value):
+    """Return (filename, bytes) for one step's output, for inclusion in a multi-output zip."""
+    safe_name = re.sub(r"[^A-Za-z0-9_\-]+", "_", step_name).strip("_") or "step"
+
+    if isinstance(value, dict) and value.get("type") == "file_download":
+        filename = value.get("filename") or f"{safe_name}.bin"
+        return filename, base64.b64decode(value.get("data_b64", ""))
+
+    if isinstance(value, (dict, list)):
+        return f"{safe_name}.json", json.dumps(value, indent=2, default=str).encode()
+
+    if value is None:
+        return f"{safe_name}.txt", b""
+
+    return f"{safe_name}.txt", str(value).encode()
+
+
 @router.get("/download")
 async def download_results(
     session_id: str,
     format: str = "json",
+    parse_structured: bool = False,
     user: User = Depends(get_current_user),
 ):
-    """Download workflow results in specified format."""
+    """Download workflow results in specified format.
+
+    If the workflow has multiple steps marked as deliverables (is_output), the
+    response is a ZIP bundle containing one file per marked step. With 0 or 1
+    marked steps the single-output formatting paths below apply.
+    """
     status = await svc.get_workflow_status(session_id, user=user)
     if not status:
         raise HTTPException(status_code=404, detail="Workflow result not found")
 
     final_output = status.get("final_output", {})
-    output_data = final_output.get("output", "") if isinstance(final_output, dict) else final_output
+    steps_output = status.get("steps_output", {}) or {}
+    output_step_names = [n for n in (status.get("output_step_names") or []) if n in steps_output]
+
+    if len(output_step_names) >= 2:
+        zip_buf = io.BytesIO()
+        with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            seen: dict[str, int] = {}
+            for name in output_step_names:
+                value = _step_output_value(steps_output.get(name))
+                filename, payload = _zip_member_for_step(name, value)
+                # Disambiguate duplicate filenames.
+                if filename in seen:
+                    seen[filename] += 1
+                    stem, _, ext = filename.rpartition(".")
+                    filename = f"{stem}_{seen[filename]}.{ext}" if ext else f"{filename}_{seen[filename]}"
+                else:
+                    seen[filename] = 0
+                zf.writestr(filename, payload)
+        zip_buf.seek(0)
+        return StreamingResponse(
+            zip_buf,
+            media_type="application/zip",
+            headers={"Content-Disposition": 'attachment; filename="deliverables.zip"'},
+        )
+
+    if len(output_step_names) == 1:
+        output_data = _step_output_value(steps_output.get(output_step_names[0]))
+    else:
+        output_data = final_output.get("output", "") if isinstance(final_output, dict) else final_output
 
     # Check for file_download type (e.g., from DataExport or DocumentRenderer)
     if isinstance(output_data, dict) and output_data.get("type") == "file_download":
@@ -219,7 +336,10 @@ async def download_results(
             try:
                 data = json.loads(data)
             except (json.JSONDecodeError, ValueError):
-                pass
+                if parse_structured:
+                    parsed = _parse_structured_string(data)
+                    if parsed is not None:
+                        data = parsed
         if isinstance(data, list):
             if data and isinstance(data[0], dict):
                 # Collect keys from ALL items so no columns are missing
@@ -405,6 +525,38 @@ async def import_workflow(
     return WorkflowResponse(**wf)
 
 
+@router.post("/{workflow_id}/import", response_model=WorkflowResponse)
+async def import_into_workflow(
+    workflow_id: str,
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+):
+    """Replace the contents of an existing workflow with imported JSON data.
+
+    The workflow's id, name, and description are preserved; steps, tasks,
+    and configs are replaced.
+    """
+    from app.services import export_import_service as eis
+
+    target = await get_authorized_workflow(workflow_id, user, manage=True)
+    if not target:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    content = await file.read()
+    try:
+        data = json.loads(content)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON file")
+
+    try:
+        team_id = str(user.current_team) if user.current_team else None
+        wf = await eis.import_into_workflow(workflow_id, data, user.user_id, team_id=team_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return WorkflowResponse(**wf)
+
+
 @router.get("/{workflow_id}", response_model=WorkflowResponse)
 async def get_workflow(workflow_id: str, user: User = Depends(get_current_user)):
     wf = await svc.get_workflow(workflow_id, user=user)
@@ -488,8 +640,33 @@ async def delete_step(step_id: str, user: User = Depends(get_current_user)):
 async def add_task(step_id: str, req: AddTaskRequest, user: User = Depends(get_current_user)):
     task = await svc.add_task(step_id, req.name, user=user, data=req.data)
     if not task:
-        raise HTTPException(status_code=404, detail="Step not found")
+        status_code, detail = await _diagnose_step_mutation_failure(step_id, user)
+        raise HTTPException(status_code=status_code, detail=detail)
     return task
+
+
+async def _diagnose_step_mutation_failure(step_id: str, user: User) -> tuple[int, str]:
+    """Why did a step-scoped mutation return None?
+
+    The service collapses "step missing", "orphan workflow", and "user lacks
+    permission" into the same `None` return. This walks the same lookups to
+    pick a clearer status + detail for the client.
+    """
+    from app.models.workflow import WorkflowStep
+
+    try:
+        step = await WorkflowStep.get(PydanticObjectId(step_id))
+    except Exception:
+        return 404, "Step not found"
+    if not step:
+        return 404, "Step not found"
+    parent = await svc._get_workflow_for_step(step.id)
+    if not parent:
+        return 404, "Step's workflow not found"
+    team_access = await access_control.get_team_access_context(user)
+    if not access_control.can_manage_workflow(parent, user, team_access):
+        return 403, "You don't have permission to edit this workflow"
+    return 500, "Failed to update step"
 
 
 @router.patch("/tasks/{task_id}")
@@ -674,6 +851,35 @@ async def get_workflow_suggestions(
     result_snapshot = latest.get("result_snapshot", latest)
     suggestions = await generate_improvement_suggestions("workflow", workflow_id, result_snapshot)
     return {"suggestions": suggestions}
+
+
+class ImprovePromptRequest(BaseModel):
+    prompt: str
+    input_source: str | None = None
+    prev_step_name: str | None = None
+    sample_input: str | None = None
+
+
+@router.post("/improve-prompt")
+@limiter.limit("10/minute")
+async def improve_prompt_endpoint(
+    request: Request,
+    body: ImprovePromptRequest,
+    user: User = Depends(get_current_user),
+):
+    """LLM-suggested rewrite of a Prompt task's prompt, with rationale."""
+    if not body.prompt.strip():
+        raise HTTPException(status_code=400, detail="Prompt is required")
+    from app.services.prompt_improvement_service import improve_prompt
+    try:
+        return await improve_prompt(
+            prompt=body.prompt,
+            input_source=body.input_source,
+            prev_step_name=body.prev_step_name,
+            sample_input=body.sample_input,
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Failed to generate suggestion: {exc}")
 
 
 @router.get("/{workflow_id}/quality-status")

@@ -4,6 +4,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { TeamsDropdown } from './TeamsDropdown'
 import { NotificationBell } from './NotificationBell'
 import { SupportChatPanel } from '../support/SupportChatPanel'
+import { FeedbackPromptCard } from '../support/FeedbackPromptCard'
 import { useOptionalWorkspace } from '../../contexts/WorkspaceContext'
 import { useFeedbackPrompt } from '../../hooks/useFeedbackPrompt'
 
@@ -12,6 +13,7 @@ export function Header() {
   const workspace = useOptionalWorkspace()
   const [supportOpen, setSupportOpen] = useState(false)
   const [supportTicket, setSupportTicket] = useState<string | undefined>()
+  const [promptCardHidden, setPromptCardHidden] = useState(false)
   const feedbackPrompt = useFeedbackPrompt()
 
   const handleLogoClick = () => {
@@ -41,19 +43,34 @@ export function Header() {
     return () => window.removeEventListener('open-support-panel', handleSupportEvent)
   }, [handleSupportEvent])
 
-  // When opening with a pending feedback prompt, create the ticket and navigate to it
+  // When opening with a pending feedback prompt, jump straight to its ticket.
+  // The ticket is now created server-side on /pending so we just use it.
   const handleSupportClick = async () => {
-    if (!supportOpen && feedbackPrompt.pendingPrompt) {
-      const result = await feedbackPrompt.showPrompt()
-      if (result) {
-        setSupportTicket(result.ticket_uuid)
-        setSupportOpen(true)
-        return
-      }
+    if (!supportOpen && feedbackPrompt.pendingPrompt?.ticket_uuid) {
+      setSupportTicket(feedbackPrompt.pendingPrompt.ticket_uuid)
+      setSupportOpen(true)
+      feedbackPrompt.clearPending()
+      return
     }
     setSupportTicket(undefined)
     setSupportOpen(!supportOpen)
   }
+
+  const handlePromptRespond = () => {
+    const ticketUuid = feedbackPrompt.pendingPrompt?.ticket_uuid
+    if (!ticketUuid) return
+    setSupportTicket(ticketUuid)
+    setSupportOpen(true)
+    feedbackPrompt.clearPending()
+  }
+
+  const handlePromptDismiss = async () => {
+    await feedbackPrompt.dismissPrompt()
+    setPromptCardHidden(true)
+  }
+
+  const showPromptCard =
+    !!feedbackPrompt.pendingPrompt && !supportOpen && !promptCardHidden
 
   return (
     <>
@@ -100,6 +117,15 @@ export function Header() {
         initialTicket={supportTicket}
         onDismissPrompt={feedbackPrompt.dismissPrompt}
       />
+
+      {showPromptCard && feedbackPrompt.pendingPrompt && (
+        <FeedbackPromptCard
+          prompt={feedbackPrompt.pendingPrompt}
+          onRespond={handlePromptRespond}
+          onDismiss={handlePromptDismiss}
+          onClose={() => setPromptCardHidden(true)}
+        />
+      )}
     </>
   )
 }

@@ -45,13 +45,22 @@ const NavigationContext = createContext<NavigationContextValue | null>(null)
 // 2. Chat State Context — conversation, KB, messages, signals
 // ---------------------------------------------------------------------------
 
+export interface PendingChatMessage {
+  message: string
+  documentUuids?: string[]
+  folderUuids?: string[]
+}
+
 interface ChatStateContextValue {
   loadConversationId: string | null
   setLoadConversationId: (id: string | null) => void
   newChatSignal: number
   triggerNewChat: () => void
-  pendingChatMessage: string | null
-  sendChatMessage: (message: string) => void
+  pendingChatMessage: PendingChatMessage | null
+  sendChatMessage: (
+    message: string,
+    options?: { documentUuids?: string[]; folderUuids?: string[] },
+  ) => void
   clearPendingChatMessage: () => void
   activeKBUuid: string | null
   activeKBTitle: string | null
@@ -174,7 +183,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [panelSplit, _setPanelSplit] = useState(() => getStoredNumber('workspace:panelSplit', 60))
   const [loadConversationId, setLoadConversationId] = useState<string | null>(null)
   const [newChatSignal, setNewChatSignal] = useState(0)
-  const [pendingChatMessage, setPendingChatMessage] = useState<string | null>(null)
+  const [pendingChatMessage, setPendingChatMessage] = useState<PendingChatMessage | null>(null)
   const [highlightTerms, setHighlightTerms] = useState<string[]>([])
   const [activitySignal, setActivitySignal] = useState(0)
   const [processingDoc, setProcessingDoc] = useState<{ title: string; status: string | null } | null>(null)
@@ -264,9 +273,16 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     updateSearch((prev) => ({ ...prev, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined }))
   }, [updateSearch])
 
-  const sendChatMessage = useCallback((message: string) => {
+  const sendChatMessage = useCallback((
+    message: string,
+    options?: { documentUuids?: string[]; folderUuids?: string[] },
+  ) => {
     updateSearch((prev) => ({ ...prev, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined }))
-    setPendingChatMessage(message)
+    setPendingChatMessage({
+      message,
+      documentUuids: options?.documentUuids,
+      folderUuids: options?.folderUuids,
+    })
   }, [updateSearch])
 
   const clearPendingChatMessage = useCallback(() => {

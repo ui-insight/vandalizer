@@ -49,7 +49,7 @@ export const MODULES: ModuleDefinition[] = [
       {
         title: 'What is an LLM, really?',
         objective: 'After this lesson, you\'ll be able to explain why LLMs make mistakes and why they\'re still useful.',
-        content: 'A Large Language Model (LLM) is not thinking. It is not sentient. It does not understand your documents the way you do.\n\nAn LLM is a sophisticated pattern-completion engine trained on vast amounts of text. When you give it a prompt, it predicts the most likely next words based on patterns it learned during training. This is both why it\'s capable and why it makes mistakes.\n\nIt\'s capable because human language follows patterns. A grant proposal has a predictable structure: PI name, institution, budget, aims. The LLM has seen thousands of similar documents and can reliably identify these patterns.\n\nIt makes mistakes because pattern-matching is not understanding. The LLM doesn\'t know what a budget is — it knows that numbers near the word "budget" are likely dollar amounts. When the pattern breaks (unusual formatting, ambiguous language), the LLM may confidently produce wrong answers.',
+        content: 'A Large Language Model (LLM) is not thinking. It is not sentient. It does not understand your documents the way you do.\n\nAn LLM is a sophisticated pattern-completion engine trained on vast amounts of text. When you give it a prompt, it predicts the most likely next words based on patterns it learned during training. This is both why it\'s capable and why it makes mistakes.\n\nIt\'s capable because human language follows patterns. A grant proposal has a predictable structure: PI name, institution, budget, aims. The LLM has seen thousands of similar documents and can reliably identify these patterns.\n\nIt makes mistakes because pattern-matching is not understanding. The LLM doesn\'t know what a budget is. It knows that numbers near the word "budget" are likely dollar amounts. When the pattern breaks (unusual formatting, ambiguous language), the LLM may confidently produce wrong answers.',
         variant: 'concept',
         diagram: 'how-llm-works',
         knowledgeCheck: {
@@ -554,7 +554,7 @@ export const MODULES: ModuleDefinition[] = [
       },
       {
         title: 'Glossary & Review',
-        content: 'Document Renderer \u2014 You\'ve now generated downloadable files from workflow output. Document Renderer takes the previous step\'s text and wraps it into a file. Best for reports, summaries, and compliance checklists that people will read.\n\nData Export \u2014 Converts structured JSON data into CSV or JSON files. When using CSV, each extracted key becomes a column header. Best for data that will be loaded into spreadsheets, databases, or other systems.\n\nPackage Builder \u2014 Collects outputs from multiple steps and bundles them into a single ZIP file. Use it when your workflow produces several distinct deliverables that should be distributed together.\n\nForm Filler \u2014 Takes a template string with placeholder syntax and produces a filled-in version using your extracted data. Best when the output must follow a fixed format (like a standard institutional form).\n\nIs Output \u2014 A flag on steps that marks them as output steps. Only steps marked "is_output" contribute to the final downloadable result. Use it to control which steps are deliverables vs. intermediate processing steps.',
+        content: 'Document Renderer \u2014 You\'ve now generated downloadable files from workflow output. Document Renderer takes the previous step\'s text and wraps it into a file. Best for reports, summaries, and compliance checklists that people will read.\n\nData Export \u2014 Converts structured JSON data into CSV or JSON files. When using CSV, each extracted key becomes a column header. Best for data that will be loaded into spreadsheets, databases, or other systems.\n\nPackage Builder \u2014 Collects outputs from multiple steps and bundles them into a single ZIP file. Use it when your workflow produces several distinct deliverables that should be distributed together.\n\nForm Filler \u2014 Takes a template string with placeholder syntax and produces a filled-in version using your extracted data. Best when the output must follow a fixed format (like a standard institutional form).\n\nInclude in deliverables \u2014 A per-step toggle that marks the step\'s output as part of the downloadable result. Mark multiple steps to bundle their outputs as a ZIP. If no step is marked, the last step is used by default. Use it to control which steps are deliverables vs. intermediate processing steps.',
         variant: 'key-terms',
       },
     ],
@@ -915,7 +915,7 @@ function ValidationResults({ result, onDismiss }: { result: ValidationResult; on
               : <X size={14} className="text-red-500 shrink-0" />
             }
             <span className={check.passed ? 'text-green-800' : 'text-red-700'}>{check.name}</span>
-            <span className="text-gray-500 text-xs">&mdash; {check.detail}</span>
+            <span className="text-gray-500 text-xs">{check.detail}</span>
           </div>
         ))}
       </div>
@@ -988,6 +988,7 @@ export default function Certification() {
     const module = MODULES.find(m => m.id === moduleId)
     if (!module) return true
     if (module.number === 0) return false // Module 0 always unlocked
+    if (progress?.unlocked) return false // Admin debug unlock — bypass prerequisites
     const prevModule = MODULES.find(m => m.number === module.number - 1)
     if (!prevModule) return false
     return !progress?.modules[prevModule.id]?.completed

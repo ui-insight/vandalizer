@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
-import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload } from 'lucide-react'
 import { useKnowledgeBases, useScopedKnowledgeBases } from '../../hooks/useKnowledgeBases'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useAuth } from '../../hooks/useAuth'
@@ -244,6 +244,50 @@ export function KnowledgePanel() {
     }
   }
 
+  // Export / Import state
+  const [exporting, setExporting] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const importInputRef = useRef<HTMLInputElement | null>(null)
+
+  const handleExport = async () => {
+    if (!selectedKB) return
+    setExporting(true)
+    try {
+      await api.downloadKBExport(selectedKB.uuid, selectedKB.title)
+    } catch (err) {
+      console.error('Failed to export KB:', err)
+      toast(err instanceof Error ? err.message : 'Failed to export knowledge base', 'error')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const handleImportFile = async (file: File) => {
+    setImporting(true)
+    try {
+      const text = await file.text()
+      let payload: api.KBExportPayload
+      try {
+        payload = JSON.parse(text) as api.KBExportPayload
+      } catch {
+        throw new Error('Invalid JSON file')
+      }
+      if (!payload || typeof payload !== 'object' || !Array.isArray(payload.sources)) {
+        throw new Error('File is not a valid knowledge base export')
+      }
+      const result = await api.importKnowledgeBase(payload)
+      toast(`Imported "${result.title}" with ${result.imported_sources} source${result.imported_sources === 1 ? '' : 's'}`, 'success')
+      refresh()
+      loadDetail(result.uuid)
+    } catch (err) {
+      console.error('Failed to import KB:', err)
+      toast(err instanceof Error ? err.message : 'Failed to import knowledge base', 'error')
+    } finally {
+      setImporting(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
   // Verification modal state
   const [showVerifyModal, setShowVerifyModal] = useState(false)
   const [verifySummary, setVerifySummary] = useState('')
@@ -479,6 +523,22 @@ export function KnowledgePanel() {
               >
                 <Users size={13} />
                 {selectedKB.shared_with_team ? 'Shared with Team' : 'Share with Team'}
+              </button>
+              <button
+                onClick={handleExport}
+                disabled={exporting}
+                title="Download this knowledge base as a JSON file"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                  color: '#e5e5e5', backgroundColor: '#2a2a2a',
+                  border: '1px solid #3a3a3a', borderRadius: 6,
+                  cursor: exporting ? 'default' : 'pointer',
+                  opacity: exporting ? 0.5 : 1,
+                }}
+              >
+                {exporting ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Download size={13} />}
+                {exporting ? 'Exporting...' : 'Export'}
               </button>
               {selectedKB.status === 'ready' && !selectedKB.verified && (
                 verificationSubmitted ? (
@@ -805,28 +865,63 @@ export function KnowledgePanel() {
       >
         <span style={{ fontSize: 18, fontWeight: 600, color: '#fff' }}>Knowledge Bases</span>
         {activeTab === 'mine' && (
-          <button
-            onClick={handleCreate}
-            disabled={creating}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '6px 14px',
-              fontSize: 13,
-              fontWeight: 600,
-              fontFamily: 'inherit',
-              color: 'var(--highlight-text-color, #000)',
-              backgroundColor: 'var(--highlight-color, #eab308)',
-              border: 'none',
-              borderRadius: 6,
-              cursor: creating ? 'default' : 'pointer',
-              opacity: creating ? 0.6 : 1,
-            }}
-          >
-            {creating ? <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} /> : <Plus style={{ width: 14, height: 14 }} />}
-            New
-          </button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".json,application/json"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) handleImportFile(f)
+              }}
+            />
+            <button
+              onClick={() => importInputRef.current?.click()}
+              disabled={importing}
+              title="Import a knowledge base from a .kb.json file"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '6px 12px',
+                fontSize: 13,
+                fontWeight: 600,
+                fontFamily: 'inherit',
+                color: '#e5e5e5',
+                backgroundColor: '#2a2a2a',
+                border: '1px solid #3a3a3a',
+                borderRadius: 6,
+                cursor: importing ? 'default' : 'pointer',
+                opacity: importing ? 0.6 : 1,
+              }}
+            >
+              {importing ? <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} /> : <Upload style={{ width: 14, height: 14 }} />}
+              {importing ? 'Importing...' : 'Import'}
+            </button>
+            <button
+              onClick={handleCreate}
+              disabled={creating}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '6px 14px',
+                fontSize: 13,
+                fontWeight: 600,
+                fontFamily: 'inherit',
+                color: 'var(--highlight-text-color, #000)',
+                backgroundColor: 'var(--highlight-color, #eab308)',
+                border: 'none',
+                borderRadius: 6,
+                cursor: creating ? 'default' : 'pointer',
+                opacity: creating ? 0.6 : 1,
+              }}
+            >
+              {creating ? <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} /> : <Plus style={{ width: 14, height: 14 }} />}
+              New
+            </button>
+          </div>
         )}
       </div>
 

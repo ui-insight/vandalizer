@@ -48,7 +48,10 @@ export function deleteStep(stepId: string) {
 // Tasks
 
 export function addTask(stepId: string, data: { name: string; data?: Record<string, unknown> }) {
-  return apiFetch(`/api/workflows/steps/${stepId}/tasks`, { method: 'POST', body: JSON.stringify(data) })
+  return apiFetch<{ id: string; name: string; data: Record<string, unknown> }>(
+    `/api/workflows/steps/${stepId}/tasks`,
+    { method: 'POST', body: JSON.stringify(data) },
+  )
 }
 
 export function updateTask(taskId: string, data: { name?: string; data?: Record<string, unknown> }) {
@@ -60,6 +63,26 @@ export function updateTask(taskId: string, data: { name?: string; data?: Record<
 
 export function deleteTask(taskId: string) {
   return apiFetch<{ ok: boolean }>(`/api/workflows/tasks/${taskId}`, { method: 'DELETE' })
+}
+
+// Prompt improvement
+
+export interface PromptImprovement {
+  improved_prompt: string
+  rationale: string[]
+}
+
+export function improvePrompt(data: {
+  prompt: string
+  input_source?: string
+  prev_step_name?: string
+  sample_input?: string
+}) {
+  return apiFetch<PromptImprovement>('/api/workflows/improve-prompt', {
+    method: 'POST',
+    body: JSON.stringify(data),
+    timeoutMs: 90_000,
+  })
 }
 
 // Execution
@@ -170,8 +193,10 @@ export function getTestStepStatus(taskId: string) {
   return apiFetch<{ status: string; result?: unknown }>(`/api/workflows/steps/test/${taskId}`)
 }
 
-export function downloadResults(sessionId: string, format: string = 'json') {
-  return `/api/workflows/download?session_id=${encodeURIComponent(sessionId)}&format=${format}`
+export function downloadResults(sessionId: string, format: string = 'json', opts?: { parseStructured?: boolean }) {
+  const params = new URLSearchParams({ session_id: sessionId, format })
+  if (opts?.parseStructured) params.set('parse_structured', 'true')
+  return `/api/workflows/download?${params.toString()}`
 }
 
 // Export / Import
@@ -184,6 +209,22 @@ export async function importWorkflow(file: File): Promise<Workflow> {
   const form = new FormData()
   form.append('file', file)
   const res = await fetch('/api/workflows/import', {
+    method: 'POST',
+    credentials: 'include',
+    headers: csrfHeaders(),
+    body: form,
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ detail: 'Import failed' }))
+    throw new Error(body.detail || 'Import failed')
+  }
+  return res.json()
+}
+
+export async function importIntoWorkflow(workflowId: string, file: File): Promise<Workflow> {
+  const form = new FormData()
+  form.append('file', file)
+  const res = await fetch(`/api/workflows/${workflowId}/import`, {
     method: 'POST',
     credentials: 'include',
     headers: csrfHeaders(),

@@ -97,7 +97,7 @@ export const POST_SURVEY_FIELDS: SurveyField[] = [
     type: 'textarea',
     required: false,
     section: 'Feedback',
-    placeholder: 'We welcome all feedback — what could we improve?',
+    placeholder: 'We welcome all feedback. What could we improve?',
   },
   {
     key: 'what_worked_well',

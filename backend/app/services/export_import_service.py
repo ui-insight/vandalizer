@@ -308,6 +308,78 @@ async def import_workflow(
     return await workflow_service.get_workflow(str(new_wf.id))
 
 
+async def import_into_workflow(
+    target_workflow_id: str,
+    data: dict,
+    user_id: str,
+    team_id: str | None = None,
+) -> dict:
+    """Replace the contents of an existing workflow with imported export data.
+
+    Steps and tasks are rebuilt from *data*; the workflow's id, name, and
+    description are preserved. Old steps and tasks are deleted after the new
+    ones are successfully constructed.
+    """
+    err = validate_export_data(data)
+    if err:
+        raise ValueError(err)
+    if data["export_type"] != "workflow":
+        raise ValueError("Expected a workflow export file")
+
+    target = await Workflow.get(PydanticObjectId(target_workflow_id))
+    if not target:
+        raise ValueError("Target workflow not found")
+
+    item = data["items"][0]
+
+    # Build new steps and tasks first, so we don't destroy the existing
+    # workflow if reconstruction fails partway through.
+    new_step_ids: list[PydanticObjectId] = []
+    for step_data in item.get("steps", []):
+        new_task_ids: list[PydanticObjectId] = []
+        for task_data in step_data.get("tasks", []):
+            resolved_data = await _reconstruct_task_references(
+                task_data.get("data", {}), task_data["name"], user_id, team_id,
+            )
+            new_task = WorkflowStepTask(
+                name=task_data["name"],
+                data=resolved_data,
+            )
+            await new_task.insert()
+            new_task_ids.append(new_task.id)
+
+        new_step = WorkflowStep(
+            name=step_data["name"],
+            tasks=new_task_ids,
+            data=step_data.get("data", {}),
+            is_output=step_data.get("is_output", False),
+        )
+        await new_step.insert()
+        new_step_ids.append(new_step.id)
+
+    old_step_ids = list(target.steps)
+
+    target.steps = new_step_ids
+    target.input_config = item.get("input_config", {})
+    target.output_config = item.get("output_config", {})
+    target.resource_config = item.get("resource_config", {})
+    target.validation_plan = item.get("validation_plan", [])
+    target.validation_inputs = item.get("validation_inputs", [])
+    target.updated_at = datetime.datetime.now(datetime.timezone.utc)
+    await target.save()
+
+    for step_id in old_step_ids:
+        step = await WorkflowStep.get(step_id)
+        if step:
+            for task_id in step.tasks:
+                task = await WorkflowStepTask.get(task_id)
+                if task:
+                    await task.delete()
+            await step.delete()
+
+    return await workflow_service.get_workflow(str(target.id))
+
+
 # ---------------------------------------------------------------------------
 # Search set export / import
 # ---------------------------------------------------------------------------

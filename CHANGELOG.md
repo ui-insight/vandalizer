@@ -85,6 +85,7 @@ The biggest change since launch: chat now drives the entire platform. Documents,
 - Updated stale backend config/auth tests to match the production `openai_api_key` requirement
 - Split backend release-gating tests from the current backend static-analysis backlog via `make backend-ci` and `make backend-static`
 - The canonical `bootstrap_install.py` entrypoint is now covered directly in the backend test suite, not only through helper-level script tests
+- Fix broken 'Test model' button in Admin Config UI
 
 ### Security
 - JWT secret validation: app refuses to start with the default `change-me` secret in non-development environments

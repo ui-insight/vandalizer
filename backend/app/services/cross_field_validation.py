@@ -165,7 +165,7 @@ class CrossFieldValidator:
             "rule": rule,
             "passed": passed,
             "message": f"'{field}' = {num}, range [{min_val}, {max_val}]"
-            + ("" if passed else " — out of range"),
+            + ("" if passed else " - out of range"),
         }
 
     def _validate_cross_reference(self, data: dict, rule: dict) -> dict:

@@ -520,3 +520,46 @@ export function backfillAgenticChatDrip(batch_size: number, dry_run: boolean) {
     body: JSON.stringify({ batch_size, dry_run }),
   })
 }
+
+// Certifications
+
+export interface CertificationProgressItem {
+  user_id: string
+  name: string | null
+  email: string | null
+  level: string
+  total_xp: number
+  modules_completed: number
+  modules_total: number
+  certified: boolean
+  certified_at: string | null
+  streak_days: number
+  last_activity_date: string | null
+  unlocked: boolean
+  updated_at: string | null
+}
+
+export interface CertificationProgressDetail extends CertificationProgressItem {
+  modules: Record<string, {
+    completed?: boolean
+    stars?: number
+    completed_at?: string | null
+    attempts?: number
+    xp_earned?: number
+  }>
+}
+
+export function getCertificationProgressList() {
+  return apiFetch<CertificationProgressItem[]>('/api/admin/certifications')
+}
+
+export function getCertificationProgressDetail(userId: string) {
+  return apiFetch<CertificationProgressDetail>(`/api/admin/certifications/${userId}`)
+}
+
+export function setCertificationUnlock(userId: string, unlocked: boolean) {
+  return apiFetch<{ user_id: string; unlocked: boolean }>(
+    `/api/admin/certifications/${userId}/unlock`,
+    { method: 'PUT', body: JSON.stringify({ unlocked }) },
+  )
+}
