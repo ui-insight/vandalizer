@@ -40,8 +40,6 @@ import {
   adminAddDemoUser,
 } from '../api/demo'
 import { getAdminPromptOverview, adminUpdatePrompt, type PromptOverview } from '../api/feedbackPrompt'
-import * as supportApi from '../api/support'
-import type { SupportTicket, SupportTicketSummary } from '../types/support'
 import type { DemoAdminStats, DemoApplication as DemoApp, PostExperienceResponseAdmin } from '../types/demo'
 import { POST_SURVEY_FIELDS } from '../components/survey/postSurveyFields'
 import { PRE_SURVEY_FIELDS } from './Demo'
@@ -72,7 +70,7 @@ function applyThemeToDOM(theme: ThemeConfig) {
   root.style.setProperty('--ui-radius', theme.ui_radius)
 }
 
-type Tab = 'usage' | 'users' | 'teams' | 'organizations' | 'workflows' | 'quality' | 'approvals' | 'support' | 'audit' | 'demo' | 'email' | 'certifications' | 'debugging' | 'config'
+type Tab = 'usage' | 'users' | 'teams' | 'organizations' | 'workflows' | 'quality' | 'approvals' | 'audit' | 'demo' | 'email' | 'certifications' | 'debugging' | 'config'
 
 const TABS: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'usage', label: 'Usage', icon: BarChart3 },
@@ -82,7 +80,6 @@ const TABS: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'workflows', label: 'Workflows', icon: Workflow },
   { key: 'quality', label: 'Quality', icon: ShieldCheck },
   { key: 'approvals', label: 'Approvals', icon: CheckCircle2 },
-  { key: 'support', label: 'Support Center', icon: MessageSquare },
   { key: 'audit', label: 'Audit Log', icon: FileText },
   { key: 'demo', label: 'Demo', icon: Zap },
   { key: 'email', label: 'Email', icon: Mail },
@@ -5128,282 +5125,6 @@ function OrganizationsTab() {
 }
 
 // ---------------------------------------------------------------------------
-// Support Center Tab
-// ---------------------------------------------------------------------------
-
-function timeAgo(dateStr: string | null): string {
-  if (!dateStr) return ''
-  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000)
-  if (diff < 60) return 'just now'
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
-  return `${Math.floor(diff / 86400)}d ago`
-}
-
-function SupportTab() {
-  const [stats, setStats] = useState<{ total: number; open: number; in_progress: number; closed: number } | null>(null)
-  const [tickets, setTickets] = useState<SupportTicketSummary[]>([])
-  const [loading, setLoading] = useState(true)
-  const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null)
-  const [replyText, setReplyText] = useState('')
-  const [replying, setReplying] = useState(false)
-  const { user } = useAuth()
-
-  const load = useCallback(() => {
-    setLoading(true)
-    const statusParam = statusFilter === 'all' ? undefined : statusFilter
-    Promise.all([supportApi.getTicketStats(), supportApi.listTickets(statusParam, 200)])
-      .then(([s, t]) => { setStats(s); setTickets(t.tickets) })
-      .finally(() => setLoading(false))
-  }, [statusFilter])
-
-  useEffect(() => { load() }, [load])
-
-  const openThread = async (uuid: string) => {
-    const t = await supportApi.getTicket(uuid)
-    setSelectedTicket(t)
-    await supportApi.markTicketRead(uuid)
-  }
-
-  const handleReply = async () => {
-    if (!selectedTicket || !replyText.trim()) return
-    setReplying(true)
-    try {
-      const updated = await supportApi.addMessage(selectedTicket.uuid, replyText.trim())
-      setSelectedTicket(updated)
-      setReplyText('')
-      load()
-    } finally {
-      setReplying(false)
-    }
-  }
-
-  const handleStatusChange = async (uuid: string, newStatus: string) => {
-    try {
-      const updated = await supportApi.updateTicket(uuid, { status: newStatus })
-      setSelectedTicket(updated)
-      load()
-    } catch { /* ignore */ }
-  }
-
-  const statCardStyle = (color: string) => ({
-    flex: 1, padding: '16px 20px', background: '#fff', borderRadius: 'var(--ui-radius, 12px)',
-    border: '1px solid #e5e7eb', borderLeft: `4px solid ${color}`,
-  })
-
-  if (loading && !stats) return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading support data...</div>
-
-  // Thread detail view
-  if (selectedTicket) {
-    const t = selectedTicket
-    const statusColors: Record<string, string> = { open: '#f59e0b', in_progress: '#3b82f6', closed: '#9ca3af' }
-    const priorityColors: Record<string, string> = { low: '#9ca3af', normal: '#3b82f6', high: '#ef4444' }
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <button
-          onClick={() => { setSelectedTicket(null); load() }}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px',
-            border: '1px solid #d1d5db', borderRadius: 'var(--ui-radius, 12px)', background: '#fff',
-            fontSize: 13, cursor: 'pointer', alignSelf: 'flex-start',
-          }}
-        >
-          <ArrowLeft size={14} /> Back to tickets
-        </button>
-
-        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
-          {/* Header */}
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-            <div>
-              <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>{t.subject}</h3>
-              <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>
-                {t.user_name || t.user_id} {t.user_email ? `(${t.user_email})` : ''} &middot; {timeAgo(t.created_at)}
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: `${priorityColors[t.priority] || '#3b82f6'}20`, color: priorityColors[t.priority] || '#3b82f6', fontWeight: 600, textTransform: 'uppercase' }}>
-                {t.priority}
-              </span>
-              <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 9999, background: `${statusColors[t.status] || '#9ca3af'}20`, color: statusColors[t.status] || '#9ca3af', fontWeight: 600, textTransform: 'uppercase' }}>
-                {t.status.replace('_', ' ')}
-              </span>
-              {t.status !== 'closed' && (
-                <select
-                  value={t.status}
-                  onChange={e => handleStatusChange(t.uuid, e.target.value)}
-                  style={{ fontSize: 12, padding: '4px 8px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db' }}
-                >
-                  <option value="open">Open</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="closed">Closed</option>
-                </select>
-              )}
-              {t.status === 'closed' && (
-                <button
-                  onClick={() => handleStatusChange(t.uuid, 'open')}
-                  style={{ fontSize: 12, padding: '4px 10px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer' }}
-                >
-                  Reopen
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Messages */}
-          <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 500, overflowY: 'auto' }}>
-            {t.messages.map((m, i) => {
-              const isSupport = m.is_support_reply
-              return (
-                <div key={i} style={{
-                  padding: '10px 14px', borderRadius: 'var(--ui-radius, 12px)',
-                  background: isSupport ? '#eff6ff' : '#f9fafb',
-                  border: `1px solid ${isSupport ? '#bfdbfe' : '#e5e7eb'}`,
-                  maxWidth: '85%', alignSelf: isSupport ? 'flex-end' : 'flex-start',
-                }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: isSupport ? '#1e40af' : '#374151', marginBottom: 4 }}>
-                    {m.user_name || m.user_id}
-                    {isSupport && <span style={{ marginLeft: 6, fontSize: 10, color: '#3b82f6', fontWeight: 500 }}>Support</span>}
-                    <span style={{ marginLeft: 8, fontWeight: 400, color: '#9ca3af' }}>{timeAgo(m.created_at)}</span>
-                  </div>
-                  <div style={{ fontSize: 14, color: '#374151', whiteSpace: 'pre-wrap' }}>{m.content}</div>
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Reply */}
-          {t.status !== 'closed' && (
-            <div style={{ padding: '12px 20px', borderTop: '1px solid #e5e7eb', display: 'flex', gap: 8 }}>
-              <input
-                value={replyText}
-                onChange={e => setReplyText(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleReply() } }}
-                placeholder="Type a reply..."
-                style={{ flex: 1, padding: '8px 12px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db', fontSize: 14, outline: 'none' }}
-              />
-              <button
-                onClick={handleReply}
-                disabled={replying || !replyText.trim()}
-                style={{
-                  padding: '8px 16px', borderRadius: 'var(--ui-radius, 12px)', border: 'none',
-                  background: 'var(--highlight-color, #eab308)', color: 'var(--highlight-text-color, #000)',
-                  fontSize: 13, fontWeight: 600, cursor: replyText.trim() ? 'pointer' : 'not-allowed',
-                  opacity: replying ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: 6,
-                }}
-              >
-                <Send size={14} /> {replying ? 'Sending...' : 'Reply'}
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  // Stats + list view
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Stats cards */}
-      {stats && (
-        <div style={{ display: 'flex', gap: 12 }}>
-          <div style={statCardStyle('#6b7280')}>
-            <div style={{ fontSize: 24, fontWeight: 700 }}>{stats.total}</div>
-            <div style={{ fontSize: 13, color: '#6b7280' }}>Total Tickets</div>
-          </div>
-          <div style={statCardStyle('#f59e0b')}>
-            <div style={{ fontSize: 24, fontWeight: 700, color: '#f59e0b' }}>{stats.open}</div>
-            <div style={{ fontSize: 13, color: '#6b7280' }}>Open</div>
-          </div>
-          <div style={statCardStyle('#3b82f6')}>
-            <div style={{ fontSize: 24, fontWeight: 700, color: '#3b82f6' }}>{stats.in_progress}</div>
-            <div style={{ fontSize: 13, color: '#6b7280' }}>In Progress</div>
-          </div>
-          <div style={statCardStyle('#22c55e')}>
-            <div style={{ fontSize: 24, fontWeight: 700, color: '#22c55e' }}>{stats.closed}</div>
-            <div style={{ fontSize: 13, color: '#6b7280' }}>Closed</div>
-          </div>
-        </div>
-      )}
-
-      {/* Ticket list */}
-      <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
-        <div style={{ padding: '14px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: 15, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 10 }}>
-            <MessageSquare size={18} color="#6b7280" /> Tickets
-          </div>
-          <div style={{ display: 'flex', gap: 4 }}>
-            {['all', 'open', 'in_progress', 'closed'].map(s => (
-              <button
-                key={s}
-                onClick={() => setStatusFilter(s)}
-                style={{
-                  padding: '4px 12px', fontSize: 12, fontWeight: statusFilter === s ? 600 : 400,
-                  borderRadius: 9999, border: '1px solid #e5e7eb', cursor: 'pointer',
-                  background: statusFilter === s ? '#111827' : '#fff',
-                  color: statusFilter === s ? '#fff' : '#6b7280',
-                }}
-              >
-                {s === 'in_progress' ? 'In Progress' : s.charAt(0).toUpperCase() + s.slice(1)}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {loading ? (
-          <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>Loading...</div>
-        ) : tickets.length === 0 ? (
-          <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>No tickets found.</div>
-        ) : (
-          <div>
-            {tickets.map(t => {
-              const statusColors: Record<string, string> = { open: '#f59e0b', in_progress: '#3b82f6', closed: '#9ca3af' }
-              const priorityColors: Record<string, string> = { low: '#9ca3af', normal: '#3b82f6', high: '#ef4444' }
-              const needsAttention = t.status !== 'closed' && t.last_message_user_id && !t.last_message_is_support_reply && user && !t.read_by?.includes(user.user_id)
-              return (
-                <div
-                  key={t.uuid}
-                  onClick={() => openThread(t.uuid)}
-                  style={{
-                    padding: '12px 20px', borderBottom: '1px solid #f3f4f6', cursor: 'pointer',
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    background: needsAttention ? '#fffbeb' : '#fff',
-                    transition: 'background 0.1s',
-                  }}
-                  onMouseEnter={e => { if (!needsAttention) (e.currentTarget as HTMLDivElement).style.background = '#f9fafb' }}
-                  onMouseLeave={e => { if (!needsAttention) (e.currentTarget as HTMLDivElement).style.background = '#fff' }}
-                >
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      {needsAttention && <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3b82f6', flexShrink: 0 }} />}
-                      <span style={{ fontSize: 14, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.subject}</span>
-                      <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 9999, background: `${statusColors[t.status]}20`, color: statusColors[t.status], fontWeight: 600 }}>
-                        {t.status.replace('_', ' ')}
-                      </span>
-                      <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 9999, background: `${priorityColors[t.priority]}20`, color: priorityColors[t.priority], fontWeight: 600 }}>
-                        {t.priority}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {t.user_name || t.user_id} &middot; {t.message_count} message{t.message_count !== 1 ? 's' : ''}
-                      {t.last_message_preview ? ` \u2014 ${t.last_message_preview}` : ''}
-                    </div>
-                  </div>
-                  <div style={{ fontSize: 12, color: '#9ca3af', flexShrink: 0, marginLeft: 16 }}>
-                    {timeAgo(t.updated_at || t.created_at)}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
-
-// ---------------------------------------------------------------------------
 // Approvals Tab
 // ---------------------------------------------------------------------------
 
@@ -5841,7 +5562,7 @@ export default function Admin() {
   const hasAccess = isGlobalAdmin || isStaff || isExaminer || isTeamAdmin
 
   // Staff see everything except config; examiners see analytics tabs only
-  const hiddenForNonAdmin = ['config', 'quality', 'demo', 'debugging', 'organizations', 'approvals', 'support', 'audit', 'certifications']
+  const hiddenForNonAdmin = ['config', 'quality', 'demo', 'debugging', 'organizations', 'approvals', 'audit', 'certifications']
   let visibleTabs = isGlobalAdmin
     ? TABS
     : isStaff
@@ -5921,7 +5642,6 @@ export default function Admin() {
           {activeTab === 'workflows' && <WorkflowsTab />}
           {activeTab === 'quality' && <QualityTab />}
           {activeTab === 'approvals' && (isGlobalAdmin || isStaff) && <ApprovalsTab />}
-          {activeTab === 'support' && (isGlobalAdmin || isStaff) && <SupportTab />}
           {activeTab === 'audit' && (isGlobalAdmin || isStaff) && <AuditTab />}
           {activeTab === 'demo' && (isGlobalAdmin || isStaff) && <DemoTab />}
           {activeTab === 'email' && (isGlobalAdmin || isStaff) && <EmailAnalyticsTab />}
