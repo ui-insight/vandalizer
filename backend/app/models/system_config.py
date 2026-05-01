@@ -148,6 +148,12 @@ class SystemConfig(Document):
     # Default team for new user auto-assignment
     default_team_id: Optional[str] = None
 
+    # Verified-catalog version applied to this DB by scripts/seed_catalog.py.
+    # Mirrored to a host-side .vandalizer_catalog_version file so setup.sh can
+    # compare without execing into the API container.
+    catalog_version: Optional[str] = None
+    catalog_version_applied_at: Optional[datetime.datetime] = None
+
     # Metadata
     updated_at: Optional[datetime.datetime] = None
     updated_by: Optional[str] = None

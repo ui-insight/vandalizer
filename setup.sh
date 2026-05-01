@@ -6,7 +6,7 @@
 #  Run from the project root:
 #    ./setup.sh             First-time setup (or re-run detects existing deployment)
 #    ./setup.sh --repair    Diagnose and fix a broken deployment
-#    ./setup.sh --upgrade   Pull latest code, backup, rebuild, and redeploy
+#    ./setup.sh --upgrade   Scan origin for new code & catalog, apply what's outdated
 #    ./setup.sh --redeploy  Rebuild and restart from current code (no git pull)
 #    ./setup.sh --seed      Update verified catalog (add new seed data)
 #    ./setup.sh --reingest  Re-ingest all knowledge base content into ChromaDB
@@ -52,6 +52,15 @@ ENV_EXAMPLE="backend/.env.example"
 COMPOSE_CMD="docker compose"
 SETUP_LOG=".setup.log"
 ERRORS=()
+
+# Version state — populated by show_versions(), reused by scan_and_upgrade().
+CODE_VERSION_LOCAL=""
+CODE_VERSION_LATEST=""
+CATALOG_VERSION_LOCAL=""
+CATALOG_VERSION_LATEST=""
+SEEDS_VERSION_FILE="backend/seeds/VERSION"
+CODE_VERSION_FILE=".vandalizer_version"          # written by upgrade.sh (image deploys)
+CATALOG_VERSION_HOST_FILE=".vandalizer_catalog_version"  # written after a successful seed
 # Use only compose.yaml — skip compose.override.yaml (dev port overrides).
 # This keeps infrastructure ports off the host so Vandalizer can co-exist
 # with other services (Mongo, Redis, etc.) on the same server.
@@ -186,6 +195,102 @@ BANNER
   typewriter "Initializing deployment sequence..." 0.03
   echo ""
   sleep 0.5
+
+  show_versions
+}
+
+# ---------------------------------------------------------------------------
+# Version detection — code (release tag) and information set (seed catalog)
+# ---------------------------------------------------------------------------
+
+# Strip a leading 'v' so sort -V can compare across mixed schemes.
+_norm_ver() { echo "${1#v}"; }
+
+# is_newer A B → 0 if A is strictly newer than B, 1 otherwise.
+# Treats "" or "unknown" as oldest. Uses sort -V (handles semver and CalVer).
+is_newer() {
+  local a="${1:-}" b="${2:-}"
+  [[ -z "$a" || "$a" == "unknown" ]] && return 1
+  [[ -z "$b" || "$b" == "unknown" ]] && return 0
+  [[ "$a" == "$b" ]] && return 1
+  local na nb top
+  na=$(_norm_ver "$a"); nb=$(_norm_ver "$b")
+  top=$(printf '%s\n%s\n' "$na" "$nb" | sort -V | tail -1)
+  [[ "$top" == "$na" ]]
+}
+
+# Code version installed locally.
+# Prefers .vandalizer_version (written by upgrade.sh on image deploys),
+# falls back to the most recent reachable git tag, then to a short SHA.
+code_version_local() {
+  if [[ -f "$CODE_VERSION_FILE" ]]; then
+    tr -d '[:space:]' < "$CODE_VERSION_FILE"
+    return
+  fi
+  local tag sha
+  tag=$(git describe --tags --abbrev=0 2>/dev/null || true)
+  if [[ -n "$tag" ]]; then echo "$tag"; return; fi
+  sha=$(git rev-parse --short HEAD 2>/dev/null || true)
+  echo "${sha:-unknown}"
+}
+
+# Latest code version published as a git tag on origin.
+# Empty on network failure — caller decides how to render.
+code_version_latest() {
+  local tags
+  tags=$(git ls-remote --tags --refs origin 'v*' 2>/dev/null \
+           | awk '{print $2}' | sed 's|^refs/tags/||' | sort -V | tail -1 || true)
+  echo "$tags"
+}
+
+# Catalog version installed locally — written by setup.sh after a successful seed.
+catalog_version_local() {
+  [[ -f "$CATALOG_VERSION_HOST_FILE" ]] || { echo "unknown"; return; }
+  tr -d '[:space:]' < "$CATALOG_VERSION_HOST_FILE"
+}
+
+# Latest catalog version on origin's default branch.
+# Uses a cached git fetch; empty on network failure.
+catalog_version_latest() {
+  if [[ -d .git ]]; then
+    git fetch --quiet origin 2>/dev/null || true
+    # Try common default-branch refs in order.
+    for ref in origin/HEAD origin/main origin/master; do
+      local v
+      v=$(git show "$ref:$SEEDS_VERSION_FILE" 2>/dev/null | head -1 | tr -d '[:space:]' || true)
+      if [[ -n "$v" ]]; then echo "$v"; return; fi
+    done
+  fi
+  echo ""
+}
+
+# Render one version row with a status marker.
+_render_version_row() {
+  local label="$1" current="$2" latest="$3"
+  local status
+  if [[ -z "$latest" ]]; then
+    status="${DIM}? could not check remote${RESET}"
+  elif is_newer "$latest" "$current"; then
+    status="${ORANGE}⟐ update available — ${latest}${RESET}"
+  else
+    status="${GREEN}✓ up to date${RESET}"
+  fi
+  printf "  ${SYM_NEURAL}  ${BOLD}%-8s${RESET} ${CYAN}%-14s${RESET}  %b\n" \
+    "$label" "$current" "$status"
+}
+
+# Print code + catalog versions. Caches results in module-level vars so
+# scan_and_upgrade() can reuse them without re-fetching.
+show_versions() {
+  CODE_VERSION_LOCAL=$(code_version_local)
+  CODE_VERSION_LATEST=$(code_version_latest)
+  CATALOG_VERSION_LOCAL=$(catalog_version_local)
+  CATALOG_VERSION_LATEST=$(catalog_version_latest)
+
+  echo ""
+  _render_version_row "Code"    "$CODE_VERSION_LOCAL"    "$CODE_VERSION_LATEST"
+  _render_version_row "Catalog" "$CATALOG_VERSION_LOCAL" "$CATALOG_VERSION_LATEST"
+  echo ""
 }
 
 # ---------------------------------------------------------------------------
@@ -1587,6 +1692,83 @@ do_redeploy() {
 }
 
 # ---------------------------------------------------------------------------
+# Scan & upgrade: compare local vs origin for both code and information set,
+# then offer to apply whichever is outdated. Replaces the old "Upgrade" mode.
+# ---------------------------------------------------------------------------
+scan_and_upgrade() {
+  section "U" "Scan & Upgrade"
+
+  # show_banner already populated CODE_VERSION_* / CATALOG_VERSION_*; if a
+  # caller invoked us without a banner (defensive), re-scan now.
+  if [[ -z "${CODE_VERSION_LOCAL:-}" ]]; then
+    show_versions
+  fi
+
+  local code_outdated=0 cat_outdated=0
+  is_newer "$CODE_VERSION_LATEST"    "$CODE_VERSION_LOCAL"    && code_outdated=1
+  is_newer "$CATALOG_VERSION_LATEST" "$CATALOG_VERSION_LOCAL" && cat_outdated=1
+
+  if [[ $code_outdated -eq 0 && $cat_outdated -eq 0 ]]; then
+    echo -e "  ${SYM_CHECK}  ${BRIGHT_GREEN}${BOLD}Everything is up to date.${RESET}"
+    echo -e "  ${DIM}     Nothing to upgrade.${RESET}"
+    return 0
+  fi
+
+  echo -e "  ${SYM_NEURAL}  ${BOLD}Updates available${RESET}"
+  [[ $code_outdated -eq 1 ]] && echo -e "  ${DIM}     Code:    ${RESET}${CODE_VERSION_LOCAL} ${DIM}→${RESET} ${ORANGE}${CODE_VERSION_LATEST}${RESET}"
+  [[ $cat_outdated  -eq 1 ]] && echo -e "  ${DIM}     Catalog: ${RESET}${CATALOG_VERSION_LOCAL} ${DIM}→${RESET} ${ORANGE}${CATALOG_VERSION_LATEST}${RESET}"
+  echo ""
+
+  # Build the menu dynamically — only offer what's actually outdated.
+  local options=() actions=()
+  if [[ $code_outdated -eq 1 && $cat_outdated -eq 1 ]]; then
+    options+=("Upgrade both"); actions+=("both")
+    options+=("Upgrade code only"); actions+=("code")
+    options+=("Upgrade catalog only"); actions+=("catalog")
+  elif [[ $code_outdated -eq 1 ]]; then
+    options+=("Upgrade code"); actions+=("code")
+  elif [[ $cat_outdated -eq 1 ]]; then
+    options+=("Upgrade catalog"); actions+=("catalog")
+  fi
+  options+=("Skip"); actions+=("skip")
+
+  local i=1
+  for opt in "${options[@]}"; do
+    echo -e "  ${DIM}  ${i})${RESET} ${CYAN}${opt}${RESET}"
+    ((i++))
+  done
+  echo ""
+  echo -ne "  ${SYM_ARROW}  Select ${DIM}[1]${RESET}: "
+  local choice
+  read -r choice
+  choice="${choice:-1}"
+
+  local idx=$((choice - 1))
+  if [[ $idx -lt 0 || $idx -ge ${#actions[@]} ]]; then
+    echo -e "  ${SYM_WARN}  ${YELLOW}Invalid selection — skipping.${RESET}"
+    return 0
+  fi
+  local action="${actions[$idx]}"
+
+  case "$action" in
+    skip)
+      echo -e "  ${DIM}     No changes made.${RESET}"
+      ;;
+    code)
+      upgrade
+      ;;
+    catalog)
+      update_catalog
+      ;;
+    both)
+      # Code first — a code upgrade may ship new seed files that the catalog
+      # step then applies.
+      upgrade && update_catalog
+      ;;
+  esac
+}
+
+# ---------------------------------------------------------------------------
 # Update verified catalog: re-run seed script against running deployment
 # ---------------------------------------------------------------------------
 update_catalog() {
@@ -1616,7 +1798,17 @@ update_catalog() {
       echo -e "  ${DIM}     ${line}${RESET}"
     done <<< "$seed_output"
     echo ""
-    echo -e "  ${SYM_CHECK}  ${BRIGHT_GREEN}${BOLD}Verified catalog updated.${RESET}"
+    # Capture the applied version from the seeder's first line for host-side
+    # version tracking (so scan_and_upgrade can compare without exec'ing into
+    # the container or hitting Mongo).
+    local applied
+    applied=$(echo "$seed_output" | grep -E '^Catalog version: ' | head -1 | sed 's/^Catalog version: //' | tr -d '[:space:]')
+    if [[ -n "$applied" ]]; then
+      echo "$applied" > "$CATALOG_VERSION_HOST_FILE"
+      echo -e "  ${SYM_CHECK}  ${BRIGHT_GREEN}${BOLD}Verified catalog updated to ${applied}.${RESET}"
+    else
+      echo -e "  ${SYM_CHECK}  ${BRIGHT_GREEN}${BOLD}Verified catalog updated.${RESET}"
+    fi
   else
     while IFS= read -r line; do
       echo -e "  ${DIM}     ${line}${RESET}"
@@ -1697,7 +1889,7 @@ main() {
     --upgrade|-u|upgrade)
       show_banner
       preflight
-      upgrade
+      scan_and_upgrade
       echo ""
       exit 0
       ;;
@@ -1735,7 +1927,7 @@ main() {
       echo -e "  ${BOLD}Commands:${RESET}"
       echo -e "    ${CYAN}(none)${RESET}       Interactive setup — first-time install or repair existing"
       echo -e "    ${CYAN}--repair${RESET}     Diagnose and fix a broken deployment"
-      echo -e "    ${CYAN}--upgrade${RESET}    Pull new code, backup, rebuild, and redeploy"
+      echo -e "    ${CYAN}--upgrade${RESET}    Scan origin for new code & catalog, apply what's outdated"
       echo -e "    ${CYAN}--redeploy${RESET}   Rebuild and restart from current code (no git pull)"
       echo -e "    ${CYAN}--seed${RESET}       Update verified catalog with new seed data"
       echo -e "    ${CYAN}--reingest${RESET}   Re-ingest all knowledge base content into ChromaDB"
@@ -1754,11 +1946,11 @@ main() {
     echo ""
     echo -e "  ${SYM_NEURAL}  ${BOLD}Existing deployment detected.${RESET}"
     echo ""
-    echo -e "  ${DIM}  1)${RESET} ${CYAN}Repair${RESET}       ${DIM}— diagnose and fix what's broken${RESET}"
-    echo -e "  ${DIM}  2)${RESET} ${CYAN}Upgrade${RESET}      ${DIM}— pull new code, backup, rebuild, redeploy${RESET}"
-    echo -e "  ${DIM}  3)${RESET} ${CYAN}Redeploy${RESET}     ${DIM}— rebuild and restart from current code${RESET}"
-    echo -e "  ${DIM}  4)${RESET} ${CYAN}Full setup${RESET}   ${DIM}— reconfigure everything from scratch${RESET}"
-    echo -e "  ${DIM}  5)${RESET} ${CYAN}Seed catalog${RESET} ${DIM}— update verified catalog with new seed data${RESET}"
+    echo -e "  ${DIM}  1)${RESET} ${CYAN}Repair${RESET}        ${DIM}— diagnose and fix what's broken${RESET}"
+    echo -e "  ${DIM}  2)${RESET} ${CYAN}Scan & upgrade${RESET} ${DIM}— check origin for new code & catalog, apply what's outdated${RESET}"
+    echo -e "  ${DIM}  3)${RESET} ${CYAN}Redeploy${RESET}      ${DIM}— rebuild and restart from current code${RESET}"
+    echo -e "  ${DIM}  4)${RESET} ${CYAN}Full setup${RESET}    ${DIM}— reconfigure everything from scratch${RESET}"
+    echo -e "  ${DIM}  5)${RESET} ${CYAN}Seed catalog${RESET}  ${DIM}— update verified catalog with new seed data${RESET}"
     echo -e "  ${DIM}  6)${RESET} ${CYAN}Re-ingest KBs${RESET} ${DIM}— rebuild knowledge base content in ChromaDB${RESET}"
     echo ""
     echo -ne "  ${SYM_ARROW}  Select mode ${DIM}[1]${RESET}: "
@@ -1767,7 +1959,7 @@ main() {
     mode_choice="${mode_choice:-1}"
 
     case "$mode_choice" in
-      2) upgrade; echo ""; exit 0 ;;
+      2) scan_and_upgrade; echo ""; exit 0 ;;
       3) redeploy; echo ""; exit 0 ;;
       4) ;; # fall through to full setup
       5) update_catalog; echo ""; exit 0 ;;

@@ -36,7 +36,22 @@ from app.models.workflow import Workflow, WorkflowStep, WorkflowStepTask
 logger = logging.getLogger(__name__)
 
 SEEDS_DIR = pathlib.Path(__file__).resolve().parent.parent / "seeds"
+VERSION_FILE = SEEDS_DIR / "VERSION"
 SYSTEM_USER = "system"
+
+
+def _read_seed_version() -> str:
+    """Read the current catalog version from backend/seeds/VERSION.
+
+    Treated as required: the file is checked in and CI gates seed-data PRs
+    on a matching VERSION bump, so an absent or empty file is a packaging bug.
+    """
+    if not VERSION_FILE.exists():
+        raise RuntimeError(f"missing seed version file: {VERSION_FILE}")
+    text = VERSION_FILE.read_text().strip()
+    if not text:
+        raise RuntimeError(f"seed version file is empty: {VERSION_FILE}")
+    return text
 
 SeedResult = Literal["created", "updated", "skipped"]
 
@@ -741,6 +756,9 @@ async def seed_catalog(types: set[str] | None = None):
     if unknown:
         raise ValueError(f"Unknown seed types: {sorted(unknown)}")
 
+    seed_version = _read_seed_version()
+    # Machine-readable line that setup.sh greps for to learn the applied version.
+    print(f"Catalog version: {seed_version}")
     print(f"Seeding verified catalog (types: {', '.join(sorted(selected))})...")
 
     verified_lib = await get_or_create_verified_library()
@@ -826,6 +844,17 @@ async def seed_catalog(types: set[str] | None = None):
 
     # --- Save verified library ---
     await verified_lib.save()
+
+    # --- Record the applied catalog version on the singleton config ---
+    # Only when seeding everything; partial seeds (--only) shouldn't claim the
+    # full catalog is at this version because some types were skipped.
+    if selected == ALL_TYPES:
+        from app.models.system_config import SystemConfig
+        cfg = await SystemConfig.get_config()
+        cfg.catalog_version = seed_version
+        cfg.catalog_version_applied_at = datetime.datetime.now(datetime.timezone.utc)
+        await cfg.save()
+        print(f"Recorded catalog_version={seed_version} on SystemConfig.")
 
     # --- Summary ---
     print("\nDone! " + " | ".join(summary))
