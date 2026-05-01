@@ -3491,6 +3491,7 @@ function WorkflowOutputCard({ status, sessionId, running, runElapsed, showDownlo
                   { fmt: 'csv', label: 'CSV', desc: 'Spreadsheet format', parseStructured: false },
                   { fmt: 'csv', label: 'CSV (parse structured)', desc: 'Detect JSON/tables in prompt output', parseStructured: true },
                   { fmt: 'pdf', label: 'PDF', desc: 'Printable report', parseStructured: false },
+                  { fmt: 'docx', label: 'Word (.docx)', desc: 'Editable document', parseStructured: false },
                   { fmt: 'text', label: 'Plain Text', desc: 'Raw text output', parseStructured: false },
                 ] as const).map(({ fmt, label, desc, parseStructured }) => (
                   <a
