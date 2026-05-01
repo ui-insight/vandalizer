@@ -1,19 +1,23 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { Plus, Copy, Trash2, Search, ArrowUpDown } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
 import { useWorkflows } from '../hooks/useWorkflows'
+import { useToast } from '../contexts/ToastContext'
 
 type SortKey = 'name' | 'runs' | 'steps'
 
 export default function Workflows() {
   const navigate = useNavigate()
-  const { workflows, loading, create, remove, duplicate } = useWorkflows()
+  const { workflows, loading, create, remove, duplicate, importFromFile } = useWorkflows()
+  const { toast } = useToast()
   const [newName, setNewName] = useState('')
   const [creating, setCreating] = useState(false)
+  const [importing, setImporting] = useState(false)
   const [search, setSearch] = useState('')
   const [sortBy, setSortBy] = useState<SortKey>('name')
   const [sortAsc, setSortAsc] = useState(true)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const filtered = useMemo(() => {
     let list = workflows
@@ -45,6 +49,19 @@ export default function Workflows() {
     }
   }
 
+  const handleImportFile = async (file: File) => {
+    setImporting(true)
+    try {
+      const wf = await importFromFile(file)
+      toast(`Imported "${wf.name}"`, 'success')
+      navigate({ to: '/workflows/$id', params: { id: wf.id } })
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Import failed', 'error')
+    } finally {
+      setImporting(false)
+    }
+  }
+
   const toggleSort = (key: SortKey) => {
     if (sortBy === key) setSortAsc(!sortAsc)
     else { setSortBy(key); setSortAsc(true) }
@@ -59,23 +76,45 @@ export default function Workflows() {
         </div>
 
         {/* Create new */}
-        <div className="flex gap-2 mb-4">
-          <input
-            type="text"
-            value={newName}
-            onChange={e => setNewName(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleCreate()}
-            placeholder="New workflow name..."
-            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-highlight"
-          />
-          <button
-            onClick={handleCreate}
-            disabled={creating || !newName.trim()}
-            className="flex items-center gap-1 px-4 py-2 bg-highlight text-highlight-text rounded-lg text-sm font-bold hover:brightness-90 disabled:opacity-50"
-          >
-            <Plus size={16} />
-            Create
-          </button>
+        <div className="mb-4">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleCreate()}
+              placeholder="New workflow name..."
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-highlight"
+            />
+            <button
+              onClick={handleCreate}
+              disabled={creating || !newName.trim()}
+              className="flex items-center gap-1 px-4 py-2 bg-highlight text-highlight-text rounded-lg text-sm font-bold hover:brightness-90 disabled:opacity-50"
+            >
+              <Plus size={16} />
+              Create
+            </button>
+          </div>
+          <div className="mt-1.5 text-xs text-gray-400">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing}
+              className="hover:text-gray-600 hover:underline disabled:opacity-50"
+            >
+              {importing ? 'Importing...' : 'or import from JSON'}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".json,application/json"
+              className="hidden"
+              onChange={e => {
+                const f = e.target.files?.[0]
+                if (f) handleImportFile(f)
+                e.target.value = ''
+              }}
+            />
+          </div>
         </div>
 
         {/* Search & Sort */}
