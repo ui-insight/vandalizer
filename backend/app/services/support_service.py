@@ -97,6 +97,7 @@ def _ticket_to_dict(t: SupportTicket) -> dict:
         "updated_at": _iso_utc(t.updated_at),
         "closed_at": _iso_utc(t.closed_at),
         "category": t.category,
+        "tags": list(getattr(t, "tags", []) or []),
     }
 
 
@@ -124,6 +125,7 @@ def _ticket_summary(t: SupportTicket) -> dict:
         ),
         "read_by": t.read_by,
         "category": t.category,
+        "tags": list(getattr(t, "tags", []) or []),
         "created_at": _iso_utc(t.created_at),
         "updated_at": _iso_utc(t.updated_at),
         "closed_at": _iso_utc(t.closed_at),
@@ -178,6 +180,7 @@ async def list_tickets(
     user_id: str | None = None,
     status: str | None = None,
     assigned_to: str | None = None,
+    tag: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> list[dict]:
@@ -188,6 +191,8 @@ async def list_tickets(
         query["status"] = status
     if assigned_to:
         query["assigned_to"] = assigned_to
+    if tag:
+        query["tags"] = tag
 
     tickets = (
         await SupportTicket.find(query)
@@ -201,12 +206,15 @@ async def list_tickets(
 
 async def list_all_tickets(
     status: str | None = None,
+    tag: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> list[dict]:
     query: dict = {}
     if status:
         query["status"] = status
+    if tag:
+        query["tags"] = tag
     tickets = (
         await SupportTicket.find(query)
         .sort("-updated_at")
@@ -215,6 +223,12 @@ async def list_all_tickets(
         .to_list()
     )
     return [_ticket_summary(t) for t in tickets]
+
+
+async def list_all_tags() -> list[str]:
+    """Return every distinct tag in use across tickets, sorted."""
+    raw = await SupportTicket.get_motor_collection().distinct("tags")
+    return sorted({str(t) for t in raw if t})
 
 
 async def get_ticket(ticket_uuid: str) -> dict | None:
@@ -360,6 +374,7 @@ async def update_ticket(
     status: str | None = None,
     priority: str | None = None,
     assigned_to: str | None = None,
+    tags: list[str] | None = None,
 ) -> dict | None:
     ticket = await SupportTicket.find_one(SupportTicket.uuid == ticket_uuid)
     if not ticket:
@@ -375,6 +390,16 @@ async def update_ticket(
         ticket.priority = TicketPriority(priority)
     if assigned_to is not None:
         ticket.assigned_to = assigned_to or None
+    if tags is not None:
+        # Normalize: strip whitespace, drop empties, dedupe (preserve order)
+        seen: set[str] = set()
+        cleaned: list[str] = []
+        for raw in tags:
+            t = raw.strip()
+            if t and t not in seen:
+                seen.add(t)
+                cleaned.append(t)
+        ticket.tags = cleaned
 
     ticket.updated_at = datetime.datetime.now(datetime.timezone.utc)
     await ticket.save()

@@ -74,6 +74,7 @@ def _ticket(messages=None, attachments=None) -> SimpleNamespace:
         attachments=attachments or [],
         read_by=["alice"],
         category="bug",
+        tags=[],
         created_at=datetime.datetime(2026, 3, 5, 9, 0, 0),
         updated_at=datetime.datetime(2026, 3, 5, 11, 0, 0),
         closed_at=None,
