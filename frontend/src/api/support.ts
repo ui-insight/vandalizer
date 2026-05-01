@@ -31,12 +31,14 @@ export function listTickets(
   limit = 50,
   offset = 0,
   scope?: 'mine',
+  tag?: string,
 ) {
   const params = new URLSearchParams()
   if (status) params.set('status', status)
   params.set('limit', String(limit))
   params.set('offset', String(offset))
   if (scope) params.set('scope', scope)
+  if (tag) params.set('tag', tag)
   return apiFetch<{ tickets: SupportTicketSummary[] }>(
     `/api/support/tickets?${params}`,
   )
@@ -75,7 +77,7 @@ export async function addAttachment(
 
 export function updateTicket(
   ticketUuid: string,
-  updates: { status?: string; priority?: string; assigned_to?: string },
+  updates: { status?: string; priority?: string; assigned_to?: string; tags?: string[] },
 ) {
   return apiFetch<SupportTicket>(`/api/support/tickets/${ticketUuid}`, {
     method: 'PATCH',
@@ -95,4 +97,8 @@ export function getTicketStats() {
 
 export function getSupportContacts() {
   return apiFetch<{ contacts: SupportContact[] }>('/api/support/contacts')
+}
+
+export function listAllTags() {
+  return apiFetch<{ tags: string[] }>('/api/support/tags')
 }

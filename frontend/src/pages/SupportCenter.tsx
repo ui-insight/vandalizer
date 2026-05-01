@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { Navigate, useNavigate, useSearch } from '@tanstack/react-router'
 import {
-  ArrowLeft, MessageSquare, Send, Plus, Paperclip, X, Loader2, Link2,
+  ArrowLeft, MessageSquare, Send, Plus, Paperclip, X, Loader2, Link2, Tag,
 } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
 import { useAuth } from '../hooks/useAuth'
@@ -47,7 +47,10 @@ export default function SupportCenter() {
   const [view, setView] = useState<View>('list')
   const [tickets, setTickets] = useState<SupportTicketSummary[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  // Default to "open" — agents care about the active queue, not the archive.
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('open')
+  const [tagFilter, setTagFilter] = useState<string>('')
+  const [allTags, setAllTags] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTicketUuid, setActiveTicketUuid] = useState<string | null>(null)
 
@@ -55,18 +58,21 @@ export default function SupportCenter() {
     setLoading(true)
     try {
       const statusParam = statusFilter === 'all' ? undefined : statusFilter
-      const [s, t] = await Promise.all([
+      const tagParam = tagFilter || undefined
+      const [s, t, tagList] = await Promise.all([
         supportApi.getTicketStats(),
-        supportApi.listTickets(statusParam, 200),
+        supportApi.listTickets(statusParam, 200, 0, undefined, tagParam),
+        supportApi.listAllTags(),
       ])
       setStats(s)
       setTickets(t.tickets)
+      setAllTags(tagList.tags)
     } catch {
       toast('Failed to load tickets', 'error')
     } finally {
       setLoading(false)
     }
-  }, [toast, statusFilter])
+  }, [toast, statusFilter, tagFilter])
 
   useEffect(() => { load() }, [load])
 
@@ -108,6 +114,9 @@ export default function SupportCenter() {
           loading={loading}
           statusFilter={statusFilter}
           onStatusFilterChange={setStatusFilter}
+          tagFilter={tagFilter}
+          onTagFilterChange={setTagFilter}
+          allTags={allTags}
           currentUserId={user.user_id}
           onNew={() => setView('new')}
           onSelect={openTicket}
@@ -138,13 +147,18 @@ export default function SupportCenter() {
 // ---------------------------------------------------------------------------
 
 function ListView({
-  tickets, stats, loading, statusFilter, onStatusFilterChange, currentUserId, onNew, onSelect,
+  tickets, stats, loading, statusFilter, onStatusFilterChange,
+  tagFilter, onTagFilterChange, allTags,
+  currentUserId, onNew, onSelect,
 }: {
   tickets: SupportTicketSummary[]
   stats: Stats | null
   loading: boolean
   statusFilter: StatusFilter
   onStatusFilterChange: (s: StatusFilter) => void
+  tagFilter: string
+  onTagFilterChange: (t: string) => void
+  allTags: string[]
   currentUserId: string
   onNew: () => void
   onSelect: (uuid: string) => void
@@ -203,24 +217,43 @@ function ListView({
 
       {/* Ticket list */}
       <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
-        <div style={{ padding: '14px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ padding: '14px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <div style={{ fontSize: 15, fontWeight: 600 }}>Tickets</div>
-          <div style={{ display: 'flex', gap: 4 }}>
-            {(['all', 'open', 'in_progress', 'closed'] as StatusFilter[]).map(s => (
-              <button
-                key={s}
-                onClick={() => onStatusFilterChange(s)}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {(['all', 'open', 'in_progress', 'closed'] as StatusFilter[]).map(s => (
+                <button
+                  key={s}
+                  onClick={() => onStatusFilterChange(s)}
+                  style={{
+                    padding: '4px 12px', fontSize: 12, fontWeight: statusFilter === s ? 600 : 400,
+                    borderRadius: 9999, border: '1px solid #e5e7eb', cursor: 'pointer',
+                    background: statusFilter === s ? '#111827' : '#fff',
+                    color: statusFilter === s ? '#fff' : '#6b7280',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {s === 'in_progress' ? 'In Progress' : s.charAt(0).toUpperCase() + s.slice(1)}
+                </button>
+              ))}
+            </div>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <Tag size={12} color="#6b7280" />
+              <select
+                value={tagFilter}
+                onChange={(e) => onTagFilterChange(e.target.value)}
                 style={{
-                  padding: '4px 12px', fontSize: 12, fontWeight: statusFilter === s ? 600 : 400,
-                  borderRadius: 9999, border: '1px solid #e5e7eb', cursor: 'pointer',
-                  background: statusFilter === s ? '#111827' : '#fff',
-                  color: statusFilter === s ? '#fff' : '#6b7280',
-                  fontFamily: 'inherit',
+                  padding: '4px 8px', fontSize: 12, border: '1px solid #e5e7eb',
+                  borderRadius: 9999, background: '#fff', color: tagFilter ? '#111827' : '#6b7280',
+                  cursor: 'pointer', fontFamily: 'inherit',
                 }}
               >
-                {s === 'in_progress' ? 'In Progress' : s.charAt(0).toUpperCase() + s.slice(1)}
-              </button>
-            ))}
+                <option value="">All tags</option>
+                {allTags.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
@@ -275,6 +308,17 @@ function ListView({
                       }}>
                         {t.priority}
                       </span>
+                      {(t.tags ?? []).map((tag) => (
+                        <span
+                          key={tag}
+                          style={{
+                            fontSize: 11, padding: '1px 6px', borderRadius: 9999,
+                            background: '#eef2ff', color: '#4338ca', fontWeight: 500,
+                          }}
+                        >
+                          {tag}
+                        </span>
+                      ))}
                     </div>
                     <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {t.user_name || t.user_id} &middot; {t.message_count} message{t.message_count !== 1 ? 's' : ''}
@@ -663,6 +707,19 @@ function ChatView({
           </div>
         </div>
 
+        {/* Tag editor — internal-only; ticket owner never sees these */}
+        <TagEditor
+          tags={ticket.tags ?? []}
+          onChange={async (next) => {
+            try {
+              const updated = await supportApi.updateTicket(ticketUuid, { tags: next })
+              setTicket(updated)
+            } catch {
+              toast('Failed to update tags', 'error')
+            }
+          }}
+        />
+
         {/* Messages — agent on right (blue, "Support" label), customer on left */}
         <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 520, overflowY: 'auto' }}>
           {ticket.messages.map((m) => {
@@ -824,5 +881,101 @@ function AttachmentChip({
       <Paperclip size={12} />
       {a.filename}
     </a>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Tag editor — agent-only chips with add/remove
+// ---------------------------------------------------------------------------
+
+function TagEditor({
+  tags, onChange,
+}: {
+  tags: string[]
+  onChange: (next: string[]) => void
+}) {
+  const [draft, setDraft] = useState('')
+  const [adding, setAdding] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const commit = () => {
+    const t = draft.trim()
+    if (!t) { setDraft(''); setAdding(false); return }
+    if (tags.includes(t)) { setDraft(''); setAdding(false); return }
+    onChange([...tags, t])
+    setDraft('')
+    setAdding(false)
+  }
+
+  const remove = (t: string) => {
+    onChange(tags.filter((x) => x !== t))
+  }
+
+  return (
+    <div style={{
+      padding: '8px 20px', borderBottom: '1px solid #e5e7eb', background: '#fafafa',
+      display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
+    }}>
+      <Tag size={12} color="#6b7280" />
+      <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, marginRight: 4 }}>
+        Tags
+      </span>
+      {tags.length === 0 && !adding && (
+        <span style={{ fontSize: 12, color: '#9ca3af' }}>None</span>
+      )}
+      {tags.map((t) => (
+        <span
+          key={t}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            fontSize: 12, padding: '2px 4px 2px 8px', borderRadius: 9999,
+            background: '#eef2ff', color: '#4338ca', fontWeight: 500,
+          }}
+        >
+          {t}
+          <button
+            onClick={() => remove(t)}
+            title={`Remove ${t}`}
+            style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: 16, height: 16, padding: 0, border: 'none', background: 'none',
+              color: '#4338ca', cursor: 'pointer', borderRadius: 9999,
+            }}
+          >
+            <X size={10} />
+          </button>
+        </span>
+      ))}
+      {adding ? (
+        <input
+          ref={inputRef}
+          value={draft}
+          autoFocus
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { e.preventDefault(); commit() }
+            if (e.key === 'Escape') { setDraft(''); setAdding(false) }
+          }}
+          placeholder="tag…"
+          style={{
+            fontSize: 12, padding: '2px 8px', border: '1px solid #d1d5db',
+            borderRadius: 9999, outline: 'none', minWidth: 80, fontFamily: 'inherit',
+          }}
+        />
+      ) : (
+        <button
+          onClick={() => setAdding(true)}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 3,
+            fontSize: 12, padding: '2px 8px', borderRadius: 9999,
+            border: '1px dashed #d1d5db', background: 'transparent', color: '#6b7280',
+            cursor: 'pointer', fontFamily: 'inherit',
+          }}
+        >
+          <Plus size={10} /> Add tag
+        </button>
+      )}
+    </div>
   )
 }
