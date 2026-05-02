@@ -481,6 +481,21 @@ class TestResearchNode:
         assert any("Pass 1" in str(p) for p in progress)
         assert any("Pass 2" in str(p) for p in progress)
 
+    @patch("app.services.workflow_engine.llm_chat_model")
+    def test_document_trigger_uses_doc_texts_not_uuids(self, mock_llm):
+        mock_llm.side_effect = ["findings", "report"]
+        node = ResearchNode({
+            "question": "What's the RFA about?",
+            "model": "gpt-4o",
+            "doc_texts": ["The RFA seeks proposals for AI safety research."],
+        })
+        node.process({
+            "step_name": "Document",
+            "output": ["d41d8cd98f00b204e9800998ecf8427e"],
+        })
+        for call in mock_llm.call_args_list:
+            assert call.kwargs["data"] == "The RFA seeks proposals for AI safety research."
+
 
 # ---------------------------------------------------------------------------
 # APICallNode
@@ -669,6 +684,20 @@ class TestFormFillerNode:
         node.progress_reporter = lambda d=None, p=None: progress.append(d)
         node.process({"output": {}})
         assert any("Filling" in str(p) for p in progress)
+
+    @patch("app.services.workflow_engine.llm_chat_model")
+    def test_document_trigger_uses_doc_texts_not_uuids(self, mock_llm):
+        mock_llm.return_value = "filled"
+        node = FormFillerNode({
+            "template": "Project: {{title}}",
+            "model": "gpt-4o",
+            "doc_texts": ["Project title: AI Safety Initiative."],
+        })
+        node.process({
+            "step_name": "Document",
+            "output": ["d41d8cd98f00b204e9800998ecf8427e"],
+        })
+        assert mock_llm.call_args.kwargs["data"] == "Project title: AI Safety Initiative."
 
 
 # ---------------------------------------------------------------------------
