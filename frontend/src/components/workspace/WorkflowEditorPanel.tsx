@@ -786,6 +786,12 @@ export function WorkflowEditorPanel() {
             </label>
           )
         )}
+        {!isTextInput && selectedDocUuids.length === 0 && (
+          <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <FileText style={{ width: 12, height: 12 }} />
+            Select a document to run this workflow
+          </div>
+        )}
         <button
           onClick={handleRun}
           disabled={runner.running || (isTextInput ? !textInput.trim() : selectedDocUuids.length === 0)}
