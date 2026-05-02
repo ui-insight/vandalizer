@@ -153,14 +153,19 @@ def _get_model_endpoint_sync(model_name: str, system_config_doc: dict | None = N
     return ""
 
 
+SUPPORTED_PROTOCOLS = ("openai", "ollama", "vllm", "anthropic", "openrouter")
+
+
 def detect_api_protocol(model_name: str, model_config: Optional[dict] = None) -> str:
     """Detect API protocol based on model name and configuration."""
     if model_config and model_config.get("api_protocol"):
         protocol = model_config.get("api_protocol", "").strip().lower()
-        if protocol in ["openai", "ollama", "vllm"]:
+        if protocol in SUPPORTED_PROTOCOLS:
             return protocol
 
     model_lower = model_name.lower()
+    if model_name.startswith("openrouter/"):
+        return "openrouter"
     if "openai/" in model_name or model_name.startswith("gpt-") or "claude" in model_lower:
         return "openai"
     if "/" not in model_name and not model_name.startswith("http"):
@@ -220,6 +225,13 @@ def build_thinking_model_settings(
     extra_body: dict = {}
     if raw_protocol == "ollama":
         extra_body["think"] = thinking_enabled
+    elif raw_protocol in ("anthropic", "openrouter"):
+        # Anthropic exposes thinking natively via pydantic-ai's unified setting
+        # (the AnthropicModel profile honors it). OpenRouter routes to whatever
+        # backend the model lives on, which has its own thinking mechanism;
+        # passing vLLM-style chat_template_kwargs through OpenRouter is unsafe
+        # because OpenRouter validates extra fields more strictly.
+        pass
     elif not (raw_protocol == "openai" and is_external):
         # vllm, openai-internal (e.g. InsightAI), or auto-detect internal:
         # all are OpenAI-compatible servers that may be serving Qwen/DeepSeek/
@@ -237,7 +249,7 @@ def get_agent_model(
     agent_model: str,
     thinking_override: Optional[bool] = None,
     system_config_doc: dict | None = None,
-) -> OpenAIModel:
+):
     """Get the appropriate model instance. Sync  - safe for Celery workers."""
     model_config = _get_model_config_sync(agent_model, system_config_doc)
 
@@ -247,6 +259,35 @@ def get_agent_model(
 
     endpoint = _get_model_endpoint_sync(agent_model, system_config_doc)
     api_protocol = detect_api_protocol(agent_model, model_config)
+
+    # Anthropic — native pydantic-ai integration (Messages API, native thinking,
+    # tool use). Strips a leading "anthropic/" prefix from the model name so
+    # admins can disambiguate identical model labels across providers.
+    if api_protocol == "anthropic":
+        from pydantic_ai.models.anthropic import AnthropicModel
+        from pydantic_ai.providers.anthropic import AnthropicProvider
+        model_name = agent_model.split("/", 1)[1] if agent_model.startswith("anthropic/") else agent_model
+        provider_kwargs: dict = {"api_key": api_key}
+        if endpoint:
+            provider_kwargs["base_url"] = endpoint
+        return AnthropicModel(model_name=model_name, provider=AnthropicProvider(**provider_kwargs))
+
+    # OpenRouter — pydantic-ai ships a first-class provider with a fixed
+    # https://openrouter.ai/api/v1 base URL. If an admin configures a custom
+    # endpoint (self-hosted OpenRouter-compatible gateway), we wrap an
+    # AsyncOpenAI client with that base URL inside the OpenRouterProvider so
+    # model_profile and attribution semantics still apply. The "openrouter/"
+    # prefix on the model name is stripped (OpenRouter expects bare provider/
+    # model slugs like "anthropic/claude-haiku-4-5").
+    if api_protocol == "openrouter":
+        model_name = agent_model.split("/", 1)[1] if agent_model.startswith("openrouter/") else agent_model
+        if endpoint:
+            from openai import AsyncOpenAI
+            client = AsyncOpenAI(api_key=api_key, base_url=endpoint, timeout=120.0)
+            provider = OpenRouterProvider(openai_client=client, app_title="Vandalizer")
+        else:
+            provider = OpenRouterProvider(api_key=api_key, app_title="Vandalizer")
+        return OpenAIModel(model_name=model_name, provider=provider)
 
     # Handle external models with OpenAI protocol (use OpenAI SDK directly)
     if model_config and model_config.get("external", False) and api_protocol == "openai":

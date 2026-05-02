@@ -2696,6 +2696,8 @@ function ConfigTab() {
                   <select value={newModel.api_protocol} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, api_protocol: v })) }} style={inputStyle}>
                     <option value="">Auto-detect</option>
                     <option value="openai">OpenAI</option>
+                    <option value="anthropic">Anthropic</option>
+                    <option value="openrouter">OpenRouter</option>
                     <option value="ollama">Ollama</option>
                     <option value="vllm">VLLM</option>
                   </select>

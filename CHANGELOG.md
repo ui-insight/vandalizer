@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Native `anthropic` and `openrouter` protocol options in System Config → Models. Anthropic uses pydantic-ai's `AnthropicModel` for first-class Messages API / native thinking / tool use. OpenRouter uses `OpenRouterProvider` with default `https://openrouter.ai/api/v1` and `Vandalizer` app attribution; honors a custom endpoint for self-hosted gateways. `claude-*` model names still auto-detect to `openai` for back-compat — opt in to native Anthropic by selecting it explicitly in the dropdown.
 - Docker Compose stack with healthchecks for all services (Redis, MongoDB, ChromaDB, API, Celery, frontend)
 - `backend/Dockerfile` — multi-stage build with non-root user and healthcheck
 - `frontend/Dockerfile` — Node build stage with nginx runtime
