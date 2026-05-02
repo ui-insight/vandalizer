@@ -409,6 +409,37 @@ def support_new_message_email(
     return subject, html
 
 
+def support_tag_added_email(
+    support_name: str,
+    ticket_subject: str,
+    ticket_user: str,
+    added_tags: list[str],
+    actor_name: str,
+    ticket_uuid: str,
+    frontend_url: str,
+) -> tuple[str, str]:
+    """Returns (subject, html_body) when a support agent adds tag(s) to a ticket."""
+    tag_list = ", ".join(added_tags)
+    plural = "s" if len(added_tags) != 1 else ""
+    subject = f"Tag{plural} added to ticket: {ticket_subject}"
+    tag_pills = "".join(
+        f'<span style="display:inline-block;background:#f1b300;color:#000;'
+        f'font-weight:600;font-size:13px;padding:3px 10px;border-radius:12px;'
+        f'margin:0 6px 6px 0;">{t}</span>'
+        for t in added_tags
+    )
+    html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
+    <div class="container"><div class="card">
+      <div class="logo">Vandalizer Support</div>
+      <h1>Tag{plural} added to a ticket</h1>
+      <p>Hi {support_name}, <span class="highlight">{actor_name}</span> added tag{plural} <strong style="color:#fff">{tag_list}</strong> to ticket <strong style="color:#fff">{ticket_subject}</strong> (from {ticket_user}).</p>
+      <div style="margin:16px 0;">{tag_pills}</div>
+      <p style="margin-top:24px"><a class="btn" href="{frontend_url}/support?ticket={ticket_uuid}">View Ticket</a></p>
+      <div class="footer">Vandalizer Support System</div>
+    </div></div></body></html>"""
+    return subject, html
+
+
 # ---------------------------------------------------------------------------
 # Approval request emails
 # ---------------------------------------------------------------------------

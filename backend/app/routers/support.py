@@ -273,6 +273,7 @@ async def update_ticket(
         priority=body.priority,
         assigned_to=body.assigned_to,
         tags=body.tags,
+        actor=user,
     )
     if not result:
         raise HTTPException(status_code=404, detail="Ticket not found")

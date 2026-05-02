@@ -375,6 +375,7 @@ async def update_ticket(
     priority: str | None = None,
     assigned_to: str | None = None,
     tags: list[str] | None = None,
+    actor: User | None = None,
 ) -> dict | None:
     ticket = await SupportTicket.find_one(SupportTicket.uuid == ticket_uuid)
     if not ticket:
@@ -390,6 +391,7 @@ async def update_ticket(
         ticket.priority = TicketPriority(priority)
     if assigned_to is not None:
         ticket.assigned_to = assigned_to or None
+    added_tags: list[str] = []
     if tags is not None:
         # Normalize: strip whitespace, drop empties, dedupe (preserve order)
         seen: set[str] = set()
@@ -399,6 +401,8 @@ async def update_ticket(
             if t and t not in seen:
                 seen.add(t)
                 cleaned.append(t)
+        prev = set(ticket.tags or [])
+        added_tags = [t for t in cleaned if t not in prev]
         ticket.tags = cleaned
 
     ticket.updated_at = datetime.datetime.now(datetime.timezone.utc)
@@ -418,6 +422,10 @@ async def update_ticket(
         )
         # Email the ticket owner about status change
         await _email_ticket_owner_status(ticket, status)
+
+    # Email the other support agents when tags are added.
+    if added_tags:
+        await _notify_support_contacts_tag_added(ticket, added_tags, actor)
 
     return _ticket_to_dict(ticket)
 
@@ -509,6 +517,39 @@ async def _notify_support_contacts_new_message(
                     frontend_url=settings.frontend_url,
                 )
                 await send_email(email, subject, html, settings, email_type="support_new_message")
+
+
+async def _notify_support_contacts_tag_added(
+    ticket: SupportTicket,
+    added_tags: list[str],
+    actor: User | None,
+) -> None:
+    """Email the other support agents when a tag is added to a ticket."""
+    contacts = await _get_all_support_user_ids()
+    settings = Settings()
+    actor_user_id = actor.user_id if actor else None
+    actor_name = (actor.name or actor.user_id) if actor else "A support agent"
+
+    for contact in contacts:
+        user_id = contact.get("user_id")
+        email = contact.get("email")
+        name = contact.get("name", "Support")
+        # Don't email the agent who just added the tag.
+        if user_id and user_id == actor_user_id:
+            continue
+        if not email:
+            continue
+        from app.services.email_service import support_tag_added_email
+        subject, html = support_tag_added_email(
+            support_name=name,
+            ticket_subject=ticket.subject,
+            ticket_user=ticket.user_name or ticket.user_id,
+            added_tags=added_tags,
+            actor_name=actor_name,
+            ticket_uuid=ticket.uuid,
+            frontend_url=settings.frontend_url,
+        )
+        await send_email(email, subject, html, settings, email_type="support_tag_added")
 
 
 async def _email_ticket_owner_reply(
