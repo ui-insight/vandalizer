@@ -3911,19 +3911,55 @@ function InputTab({ workflow, openWorkflowId, onRefresh }: {
   openWorkflowId: string | null
   onRefresh: () => void
 }) {
-  const [triggerType, setTriggerType] = useState(workflow.input_config?.trigger_type || 'manual')
+  const inputCfg = (workflow as unknown as Record<string, unknown>)?.input_config as Record<string, unknown> | undefined
+  const [triggerType, setTriggerType] = useState((inputCfg?.trigger_type as string) || 'manual')
   const [saving, setSaving] = useState(false)
+  const [fixedDocs, setFixedDocs] = useState<{ uuid: string; title: string }[]>(
+    () => ((inputCfg?.fixed_documents as { uuid: string; title: string }[]) || [])
+  )
+
+  // Keep fixedDocs in sync when workflow refreshes from outside
+  useEffect(() => {
+    const cfg = (workflow as unknown as Record<string, unknown>)?.input_config as Record<string, unknown> | undefined
+    setFixedDocs((cfg?.fixed_documents as { uuid: string; title: string }[]) || [])
+  }, [workflow])
+
+  const persistInputConfig = async (patch: Record<string, unknown>) => {
+    if (!openWorkflowId) return
+    const current = (workflow as unknown as Record<string, unknown>)?.input_config as Record<string, unknown> | undefined
+    await updateWorkflow(openWorkflowId, { input_config: { ...(current || {}), ...patch } })
+    onRefresh()
+  }
 
   const handleTriggerChange = async (value: string) => {
     setTriggerType(value)
-    if (!openWorkflowId) return
     setSaving(true)
     try {
-      await updateWorkflow(openWorkflowId, { input_config: { trigger_type: value } })
-      onRefresh()
+      await persistInputConfig({ trigger_type: value })
     } finally {
       setSaving(false)
     }
+  }
+
+  const saveFixedDocs = async (docs: { uuid: string; title: string }[]) => {
+    setFixedDocs(docs)
+    await persistInputConfig({ fixed_documents: docs })
+  }
+
+  const addFixedDocs = async (docs: { uuid: string; title: string }[]) => {
+    const existing = new Set(fixedDocs.map(d => d.uuid))
+    const merged = [...fixedDocs]
+    for (const d of docs) {
+      if (!existing.has(d.uuid)) {
+        merged.push(d)
+        existing.add(d.uuid)
+      }
+    }
+    if (merged.length !== fixedDocs.length) await saveFixedDocs(merged)
+  }
+
+  const removeFixedDoc = (uuid: string) => {
+    saveFixedDocs(fixedDocs.filter(d => d.uuid !== uuid))
   }
 
   return (
@@ -3961,12 +3997,11 @@ function InputTab({ workflow, openWorkflowId, onRefresh }: {
             <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
               Pre-assign documents that will always be included when this workflow runs.
             </div>
-            <div style={{
-              border: '2px dashed #d1d5db', borderRadius: 8, padding: '24px 16px',
-              textAlign: 'center', color: '#9ca3af', fontSize: 13,
-            }}>
-              Drag documents here or click to browse
-            </div>
+            <FixedDocumentsZone
+              fixedDocs={fixedDocs}
+              onAddDocs={addFixedDocs}
+              onRemoveDoc={removeFixedDoc}
+            />
           </div>
         )}
 
@@ -3993,18 +4028,159 @@ function InputTab({ workflow, openWorkflowId, onRefresh }: {
               <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
                 Pre-assign documents to always include alongside the text input.
               </div>
-              <div style={{
-                border: '2px dashed #d1d5db', borderRadius: 8, padding: '24px 16px',
-                textAlign: 'center', color: '#9ca3af', fontSize: 13,
-              }}>
-                Drag documents here or click to browse
-              </div>
+              <FixedDocumentsZone
+                fixedDocs={fixedDocs}
+                onAddDocs={addFixedDocs}
+                onRemoveDoc={removeFixedDoc}
+              />
             </div>
           </>
         )}
 
       </div>
     </div>
+  )
+}
+
+// Drag-and-drop / click-to-browse zone for the workflow's fixed documents.
+// Accepts: (1) document rows dragged from the file browser (text/plain = uuid),
+// (2) files dropped from the OS (uploaded as new documents), (3) click → picker.
+function FixedDocumentsZone({
+  fixedDocs,
+  onAddDocs,
+  onRemoveDoc,
+}: {
+  fixedDocs: { uuid: string; title: string }[]
+  onAddDocs: (docs: { uuid: string; title: string }[]) => Promise<void> | void
+  onRemoveDoc: (uuid: string) => void
+}) {
+  const [dragOver, setDragOver] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [showPicker, setShowPicker] = useState(false)
+
+  const handleFileUpload = async (file: File) => {
+    setUploading(true)
+    try {
+      const reader = new FileReader()
+      const base64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => {
+          const result = reader.result as string
+          resolve(result.split(',')[1] || result)
+        }
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+      const ext = file.name.split('.').pop() || ''
+      const { uuid } = await uploadFile({
+        contentAsBase64String: base64,
+        fileName: file.name,
+        extension: ext,
+      })
+      if (uuid) await onAddDocs([{ uuid, title: file.name }])
+    } catch { /* ignore upload errors */ }
+    finally { setUploading(false) }
+  }
+
+  const handleDroppedUuid = async (uuid: string) => {
+    // Look up title via search; fall back to a stub if lookup fails.
+    let title = `Document ${uuid.slice(0, 8)}`
+    try {
+      const res = await searchDocuments('', 100)
+      const match = res.items.find(d => d.uuid === uuid)
+      if (match) title = match.title
+    } catch { /* keep stub title */ }
+    await onAddDocs([{ uuid, title }])
+  }
+
+  return (
+    <>
+      {fixedDocs.length > 0 && (
+        <div style={{
+          border: '1px solid #e5e7eb', borderRadius: 6, overflow: 'hidden',
+          backgroundColor: '#fff', marginBottom: 8,
+        }}>
+          {fixedDocs.map((doc, idx) => (
+            <div
+              key={doc.uuid}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+                borderBottom: idx < fixedDocs.length - 1 ? '1px solid #f3f4f6' : 'none',
+                fontSize: 13,
+              }}
+            >
+              <FileText style={{ width: 13, height: 13, color: '#6b7280', flexShrink: 0 }} />
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {doc.title}
+              </span>
+              <button
+                onClick={() => onRemoveDoc(doc.uuid)}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer', padding: 2,
+                  color: '#9ca3af', display: 'flex',
+                }}
+                aria-label={`Remove ${doc.title}`}
+              >
+                <X style={{ width: 14, height: 14 }} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div
+        onDragOver={e => {
+          e.preventDefault()
+          e.stopPropagation()
+          if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
+          setDragOver(true)
+        }}
+        onDragLeave={e => { e.preventDefault(); e.stopPropagation(); setDragOver(false) }}
+        onDrop={async e => {
+          e.preventDefault()
+          e.stopPropagation()
+          setDragOver(false)
+          // Internal drag from FileBrowser: text/plain = doc uuid
+          const uuid = e.dataTransfer.getData('text/plain')
+          if (uuid && !e.dataTransfer.files.length) {
+            await handleDroppedUuid(uuid)
+            return
+          }
+          // OS file drop: upload each as a new document
+          const files = Array.from(e.dataTransfer.files)
+          for (const file of files) {
+            await handleFileUpload(file)
+          }
+        }}
+        onClick={() => { if (!uploading) setShowPicker(true) }}
+        style={{
+          border: `2px dashed ${dragOver ? 'var(--highlight-color, #eab308)' : '#d1d5db'}`,
+          borderRadius: 8, padding: '24px 16px', textAlign: 'center',
+          color: '#6b7280', fontSize: 13, cursor: uploading ? 'wait' : 'pointer',
+          backgroundColor: dragOver ? '#fefce8' : '#fff',
+          transition: 'all 0.15s ease',
+        }}
+      >
+        {uploading ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />
+            Uploading...
+          </div>
+        ) : (
+          <>
+            <Upload style={{ width: 18, height: 18, color: '#9ca3af', margin: '0 auto 6px' }} />
+            <div>Drag documents here or click to browse</div>
+          </>
+        )}
+      </div>
+
+      {showPicker && (
+        <DocumentPickerDialog
+          onSelect={async docs => { await onAddDocs(docs) }}
+          onClose={() => setShowPicker(false)}
+          excludeUuids={fixedDocs.map(d => d.uuid)}
+        />
+      )}
+    </>
   )
 }
 
