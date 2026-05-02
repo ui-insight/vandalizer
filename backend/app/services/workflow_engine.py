@@ -615,7 +615,21 @@ class ResearchNode(Node):
 
     def process(self, inputs):
         question = self.data.get("question", "")
-        input_data = inputs.get("output")
+        prev_step_name = inputs.get("step_name")
+        input_source = self.data.get("input_source", "step_input")
+
+        if input_source == "select_document" and self.data.get("selected_doc_text"):
+            input_data = self.data["selected_doc_text"]
+        elif input_source == "workflow_documents" or prev_step_name == "Document":
+            doc_texts = self.data.get("doc_texts", [])
+            if len(doc_texts) > 1:
+                sections = [f"=== Document {i} ===\n{dt}" for i, dt in enumerate(doc_texts, 1)]
+                input_data = "\n\n".join(sections)
+            else:
+                input_data = doc_texts[0] if doc_texts else ""
+        else:
+            input_data = inputs.get("output")
+
         self.report_progress("Pass 1: Analyzing data")
 
         analysis_prompt = (
@@ -726,7 +740,21 @@ class FormFillerNode(Node):
 
     def process(self, inputs):
         template = self.data.get("template", "")
-        input_data = inputs.get("output")
+        prev_step_name = inputs.get("step_name")
+        input_source = self.data.get("input_source", "step_input")
+
+        if input_source == "select_document" and self.data.get("selected_doc_text"):
+            input_data = self.data["selected_doc_text"]
+        elif input_source == "workflow_documents" or prev_step_name == "Document":
+            doc_texts = self.data.get("doc_texts", [])
+            if len(doc_texts) > 1:
+                sections = [f"=== Document {i} ===\n{dt}" for i, dt in enumerate(doc_texts, 1)]
+                input_data = "\n\n".join(sections)
+            else:
+                input_data = doc_texts[0] if doc_texts else ""
+        else:
+            input_data = inputs.get("output")
+
         self.report_progress("Filling template")
 
         prompt = (
