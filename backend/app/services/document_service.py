@@ -90,6 +90,7 @@ async def list_contents(
                 "extension": d.extension,
                 "processing": d.processing,
                 "valid": d.valid,
+                "validation_feedback": d.validation_feedback,
                 "task_status": d.task_status,
                 "folder": d.folder,
                 "created_at": d.created_at.isoformat() if d.created_at else "",

@@ -70,7 +70,22 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
           {doc.processing ? (
             <Loader2 className="h-4 w-4 animate-spin shrink-0 mr-2.5" style={{ color: 'var(--highlight-color)' }} />
           ) : !doc.valid ? (
-            <AlertTriangle className="h-4 w-4 shrink-0 mr-2.5 text-red-500" />
+            <span
+              className="shrink-0 mr-2.5 inline-flex items-center"
+              role="img"
+              aria-label={
+                doc.validation_feedback
+                  ? `Failed validation: ${doc.validation_feedback}`
+                  : 'This document did not pass automated upload validation.'
+              }
+              title={
+                doc.validation_feedback
+                  ? `Failed validation: ${doc.validation_feedback}`
+                  : 'This document did not pass automated upload validation.'
+              }
+            >
+              <AlertTriangle className="h-4 w-4 text-red-500" />
+            </span>
           ) : null}
           <div style={{ minWidth: 0, flex: 1 }}>
             <span className="flex items-center gap-1.5">
