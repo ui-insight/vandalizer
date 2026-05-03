@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useState, type ReactNode } from
 import { useCertification } from '../hooks/useCertification'
 import type { CertificationProgress, ValidationResult, CompletionResult, CertExercise } from '../types/certification'
 
-export type PanelMode = 'floating' | 'docked-left' | 'docked-right' | 'docked-bottom'
+export type PanelMode = 'floating' | 'fullscreen' | 'docked-left' | 'docked-right' | 'docked-bottom'
 
 interface CertificationPanelContextValue {
   // Panel UI state
@@ -30,7 +30,7 @@ const STORAGE_KEY = 'cert-panel-mode'
 function getStoredMode(): PanelMode {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored && ['floating', 'docked-left', 'docked-right', 'docked-bottom'].includes(stored)) {
+    if (stored && ['floating', 'fullscreen', 'docked-left', 'docked-right', 'docked-bottom'].includes(stored)) {
       return stored as PanelMode
     }
   } catch {}
