@@ -503,6 +503,17 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
     setZoom(2)
   }, [])
 
+  // The /api/files/download endpoint always sets Content-Disposition: attachment,
+  // so opening it in a new tab triggers a download. For inline viewing we open
+  // a blob URL instead — no disposition header means the browser renders it.
+  const openPdfInNewTab = useCallback(() => {
+    if (!pdfDataRef.current) return
+    const blob = new Blob([pdfDataRef.current.slice(0)], { type: 'application/pdf' })
+    const inlineUrl = URL.createObjectURL(blob)
+    window.open(inlineUrl, '_blank')
+    setTimeout(() => URL.revokeObjectURL(inlineUrl), 60_000)
+  }, [])
+
   const btnStyle: React.CSSProperties = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     width: 32, height: 32, borderRadius: 6, border: '1px solid #d1d5db',
@@ -666,7 +677,12 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
             <ZoomIn size={16} />
           </button>
           <div style={{ width: 1, height: 20, backgroundColor: '#d1d5db', margin: '0 4px' }} />
-          <button onClick={() => window.open(url, '_blank')} style={btnStyle} title="Open in new tab">
+          <button
+            onClick={() => { if (blobUrl) window.open(blobUrl, '_blank') }}
+            style={btnStyle}
+            title="Open in new tab"
+            disabled={!blobUrl}
+          >
             <Maximize2 size={16} />
           </button>
         </div>
@@ -718,7 +734,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
           <ZoomIn size={16} />
         </button>
         <div style={{ width: 1, height: 20, backgroundColor: '#d1d5db', margin: '0 4px' }} />
-        <button onClick={() => window.open(url, '_blank')} style={btnStyle} title="Open in new tab">
+        <button onClick={openPdfInNewTab} style={btnStyle} title="Open in new tab" aria-label="Open in new tab">
           <Maximize2 size={16} />
         </button>
       </div>
