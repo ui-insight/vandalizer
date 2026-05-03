@@ -83,4 +83,28 @@ describe('FileRow', () => {
     renderFileRow({ onToggleSelect: undefined })
     expect(screen.queryByRole('checkbox')).toBeNull()
   })
+
+  it('shows validation_feedback in tooltip when doc.valid=false', () => {
+    renderFileRow({
+      doc: makeDoc({
+        valid: false,
+        validation_feedback: 'Document appears to be empty or unreadable.',
+      }),
+    })
+    expect(
+      screen.getByTitle('Failed validation: Document appears to be empty or unreadable.'),
+    ).toBeTruthy()
+  })
+
+  it('shows generic explanation when doc.valid=false and feedback is missing', () => {
+    renderFileRow({ doc: makeDoc({ valid: false, validation_feedback: null }) })
+    expect(
+      screen.getByTitle('This document did not pass automated upload validation.'),
+    ).toBeTruthy()
+  })
+
+  it('does not show validation warning when doc.valid=true', () => {
+    renderFileRow({ doc: makeDoc({ valid: true }) })
+    expect(screen.queryByTitle(/validation/i)).toBeNull()
+  })
 })

@@ -5,6 +5,7 @@ export interface Document {
   extension: string
   processing: boolean
   valid: boolean
+  validation_feedback?: string | null
   task_status: string | null
   folder: string | null
   created_at: string
