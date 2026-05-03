@@ -68,6 +68,7 @@ markers = [
     "integration_tier1: Integration tests needing no external services",
     "integration_tier2: Integration tests requiring MongoDB",
     "integration_tier3: Integration tests requiring LLM API key",
+    "integration_tier4: Integration tests exercising ChromaDB (PersistentClient or HttpClient)",
 ]
 
 [tool.mypy]
