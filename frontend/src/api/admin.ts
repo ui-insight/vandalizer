@@ -71,8 +71,9 @@ export interface UserLeaderboardItem {
   last_active: string | null
 }
 
-export function getUserLeaderboard() {
-  return apiFetch<UserLeaderboardItem[]>('/api/admin/users')
+export function getUserLeaderboard(days?: number) {
+  const url = days ? `/api/admin/users?days=${days}` : '/api/admin/users'
+  return apiFetch<UserLeaderboardItem[]>(url)
 }
 
 // Teams
@@ -88,8 +89,9 @@ export interface TeamLeaderboardItem {
   avg_latency_ms: number | null
 }
 
-export function getTeamLeaderboard() {
-  return apiFetch<TeamLeaderboardItem[]>('/api/admin/teams')
+export function getTeamLeaderboard(days?: number) {
+  const url = days ? `/api/admin/teams?days=${days}` : '/api/admin/teams'
+  return apiFetch<TeamLeaderboardItem[]>(url)
 }
 
 // Team Detail
