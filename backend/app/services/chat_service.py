@@ -1,5 +1,6 @@
 """Chat service  - streaming chat with full document context."""
 
+import asyncio
 import json
 import logging
 import re
@@ -260,7 +261,6 @@ async def chat_stream(
     # KB context: query ChromaDB for relevant chunks and add as a segment.
     if kb_uuid:
         try:
-            import asyncio
             from app.services.document_manager import DocumentManager
             dm = DocumentManager()
             kb_results = await asyncio.to_thread(dm.query_kb, kb_uuid, message, 8)
@@ -341,12 +341,12 @@ async def chat_stream(
                 "Remove some documents or switch to a larger model."
             ),
         }) + "\n"
-        if activity_id:
-            ev = await ActivityEvent.get(activity_id)
-            if ev:
-                ev.status = ActivityStatus.FAILED.value
-                ev.error = "context over budget"
-                await ev.save()
+        await _save_failed_assistant_turn(
+            conversation,
+            "_(no response — request exceeded the model's context budget)_",
+            activity_id,
+            "context over budget",
+        )
         return
 
     previous_messages = compacted.history
@@ -464,17 +464,82 @@ async def chat_stream(
                     "total_tokens": input_toks + output_toks,
                 }) + "\n"
 
+    except asyncio.CancelledError:
+        # Client disconnected mid-stream. Persist any partial response so the
+        # user message isn't orphaned (would leave consecutive user turns in
+        # history, which pydantic-ai rejects on the next request).
+        try:
+            await asyncio.shield(_save_failed_assistant_turn(
+                conversation,
+                _build_interrupted_body(full_response, "connection closed before completion"),
+                activity_id,
+                "client disconnected",
+                thinking="".join(full_thinking) or None,
+                thinking_duration=thinking_duration,
+            ))
+        except Exception as save_err:
+            logger.error("Failed to persist interrupted chat on cancel: %s", save_err)
+        raise
+
     except Exception as e:
         logger.error(f"Chat stream error: {e}")
         yield json.dumps({"kind": "error", "content": str(e)}) + "\n"
-        # Mark activity as failed
-        if activity_id:
-            ev = await ActivityEvent.get(activity_id)
-            if ev:
-                ev.status = ActivityStatus.FAILED.value
-                ev.error = str(e)[:2000]
-                await ev.save()
+        try:
+            await _save_failed_assistant_turn(
+                conversation,
+                _build_interrupted_body(full_response, str(e)[:200]),
+                activity_id,
+                str(e),
+                thinking="".join(full_thinking) or None,
+                thinking_duration=thinking_duration,
+            )
+        except Exception as save_err:
+            logger.error("Failed to persist interrupted chat: %s", save_err)
 
+
+
+def _build_interrupted_body(full_response: list[str], reason: str) -> str:
+    """Compose an assistant-turn body from any partial stream content + a reason."""
+    partial = _THINK_BLOCK_RE.sub("", "".join(full_response)).strip()
+    if partial:
+        return f"{partial}\n\n_(response interrupted — {reason})_"
+    return f"_(no response — {reason})_"
+
+
+async def _save_failed_assistant_turn(
+    conversation: ChatConversation,
+    body: str,
+    activity_id: Optional[str],
+    reason: str,
+    thinking: Optional[str] = None,
+    thinking_duration: Optional[float] = None,
+) -> None:
+    """Persist a placeholder assistant turn after a failure or cancellation.
+
+    Why: chat.py saves the user message before streaming; if the LLM call
+    fails or is cancelled, the conversation would otherwise be left with an
+    orphan user turn. pydantic-ai's message_history rejects consecutive user
+    turns, so the *next* request would error or silently drop messages.
+    """
+    await conversation.add_message(
+        ChatRole.ASSISTANT,
+        body,
+        thinking=thinking,
+        thinking_duration=thinking_duration,
+    )
+    if not activity_id:
+        return
+    ev = await ActivityEvent.get(activity_id)
+    if not ev:
+        return
+    ev.status = ActivityStatus.FAILED.value
+    ev.error = reason[:2000]
+    from datetime import datetime, timezone
+    ev.finished_at = datetime.now(timezone.utc)
+    ev.last_updated_at = datetime.now(timezone.utc)
+    reloaded = await ChatConversation.get(conversation.id)
+    ev.message_count = len(reloaded.messages) if reloaded else 0
+    await ev.save()
 
 
 async def _finalize(
