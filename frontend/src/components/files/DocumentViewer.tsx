@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ZoomIn, ZoomOut, Maximize2, ChevronLeft, ChevronRight, Loader2, X } from 'lucide-react'
+import { ZoomIn, ZoomOut, Maximize2, ChevronLeft, ChevronRight, Loader2, X, Search } from 'lucide-react'
 import { downloadFileUrl } from '../../api/files'
 import { pollStatus } from '../../api/documents'
 import { SpreadsheetViewer } from './SpreadsheetViewer'
+import { DocumentSearchBar, useFindInDocumentHotkey } from './DocumentSearchBar'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs'
@@ -41,6 +42,75 @@ async function readTextItems(page: pdfjsLib.PDFPageProxy): Promise<unknown[]> {
   return items
 }
 
+// Walk text nodes under `root`, wrap occurrences of `query` (case-insensitive,
+// whole-text-node only — no cross-node matching) in <mark.doc-search-hl>.
+// Returns the number of matches inserted. Idempotent: prior marks from this
+// helper are unwrapped first.
+function highlightHtmlSearch(root: HTMLElement, query: string): number {
+  // Unwrap prior marks
+  const prior = root.querySelectorAll('mark.doc-search-hl')
+  prior.forEach(mark => {
+    const parent = mark.parentNode
+    if (!parent) return
+    while (mark.firstChild) parent.insertBefore(mark.firstChild, mark)
+    parent.removeChild(mark)
+  })
+  // Coalesce adjacent text nodes left behind by the unwrap
+  prior.forEach(mark => {
+    const p = mark.parentNode as Element | null
+    if (p && typeof p.normalize === 'function') p.normalize()
+  })
+
+  const trimmed = query.trim()
+  if (!trimmed) return 0
+  const needle = trimmed.toLowerCase()
+  const needleLen = needle.length
+
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode: (node) => {
+      const parent = node.parentElement
+      if (!parent) return NodeFilter.FILTER_REJECT
+      const tag = parent.tagName
+      if (tag === 'SCRIPT' || tag === 'STYLE') return NodeFilter.FILTER_REJECT
+      return NodeFilter.FILTER_ACCEPT
+    },
+  })
+  const nodes: Text[] = []
+  let n: Node | null
+  while ((n = walker.nextNode())) nodes.push(n as Text)
+
+  let count = 0
+  for (const node of nodes) {
+    const text = node.nodeValue || ''
+    const lower = text.toLowerCase()
+    if (!lower.includes(needle)) continue
+
+    const frag = document.createDocumentFragment()
+    let cursor = 0
+    let from = 0
+    while (from < lower.length) {
+      const idx = lower.indexOf(needle, from)
+      if (idx === -1) break
+      if (idx > cursor) frag.appendChild(document.createTextNode(text.slice(cursor, idx)))
+      const mark = document.createElement('mark')
+      mark.className = 'doc-search-hl'
+      mark.dataset.searchIdx = String(count)
+      mark.style.backgroundColor = '#fde68a'
+      mark.style.color = 'inherit'
+      mark.style.padding = '0'
+      mark.style.borderRadius = '2px'
+      mark.appendChild(document.createTextNode(text.slice(idx, idx + needleLen)))
+      frag.appendChild(mark)
+      cursor = idx + needleLen
+      from = cursor
+      count++
+    }
+    if (cursor < text.length) frag.appendChild(document.createTextNode(text.slice(cursor)))
+    node.parentNode?.replaceChild(frag, node)
+  }
+  return count
+}
+
 const STATUS_MESSAGES: Record<string, { title: string; message: string }> = {
   layout: {
     title: 'Converting & Preparing Your Document...',
@@ -74,8 +144,34 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
   const [totalHighlights, setTotalHighlights] = useState(0)
   const [currentHighlight, setCurrentHighlight] = useState(0)
 
+  // In-document find (Cmd/Ctrl+F)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const docxContentRef = useRef<HTMLDivElement>(null)
+  const [docxMatchCount, setDocxMatchCount] = useState(0)
+  const [docxCurrentMatch, setDocxCurrentMatch] = useState(0)
+
   const zoomLevel = ZOOM_LEVELS[zoom]
   const url = downloadFileUrl(docUuid)
+
+  const openSearch = useCallback(() => setSearchOpen(true), [])
+  const closeSearch = useCallback(() => {
+    setSearchOpen(false)
+    setSearchQuery('')
+  }, [])
+
+  useFindInDocumentHotkey(rootRef, searchOpen, openSearch, closeSearch)
+
+  // When the user types into the find bar, the typed query takes priority
+  // over extraction-driven highlights. Closing the bar restores them.
+  const effectiveTerms = useMemo(() => {
+    if (searchOpen) {
+      const q = searchQuery.trim()
+      return q ? [q] : []
+    }
+    return highlightTerms
+  }, [searchOpen, searchQuery, highlightTerms])
 
   // Fetch file data with credentials and detect content type
   useEffect(() => {
@@ -184,11 +280,11 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
   // Re-apply highlights when terms change
   useEffect(() => {
     if (isPdf !== true || !pdfDocRef.current) return
-    applyHighlights(pdfDocRef.current, highlightTerms).catch(err => {
+    applyHighlights(pdfDocRef.current, effectiveTerms).catch(err => {
       console.error('[DocumentViewer] applyHighlights failed:', err)
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [highlightTerms])
+  }, [effectiveTerms])
 
   const renderAllPages = useCallback(async (doc: pdfjsLib.PDFDocumentProxy) => {
     if (renderingRef.current) return
@@ -249,12 +345,12 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
     renderingRef.current = false
 
     // Apply highlights after rendering
-    if (highlightTerms.length > 0) {
-      applyHighlights(doc, highlightTerms).catch(err => {
+    if (effectiveTerms.length > 0) {
+      applyHighlights(doc, effectiveTerms).catch(err => {
         console.error('[DocumentViewer] applyHighlights failed:', err)
       })
     }
-  }, [zoomLevel, highlightTerms])
+  }, [zoomLevel, effectiveTerms])
 
   const applyHighlights = useCallback(async (doc: pdfjsLib.PDFDocumentProxy, terms: string[]) => {
     const container = containerRef.current
@@ -491,6 +587,48 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
     })
   }, [totalHighlights])
 
+  // ----- DOCX/HTML search wiring -----
+
+  const scrollDocxMatch = useCallback((index: number) => {
+    const root = docxContentRef.current
+    if (!root) return
+    root.querySelectorAll<HTMLElement>('mark.doc-search-hl').forEach((el) => {
+      const idx = Number(el.dataset.searchIdx)
+      el.style.backgroundColor = idx === index ? '#fbbf24' : '#fde68a'
+      el.style.outline = idx === index ? '2px solid #f59e0b' : 'none'
+    })
+    const target = root.querySelector<HTMLElement>(
+      `mark.doc-search-hl[data-search-idx="${index}"]`,
+    )
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [])
+
+  // Re-apply DOCX highlights when the query changes or the rendered HTML
+  // is replaced (e.g. text re-poll after processing).
+  useEffect(() => {
+    if (!isDocx) return
+    const root = docxContentRef.current
+    if (!root) return
+    const q = searchOpen ? searchQuery : ''
+    const count = highlightHtmlSearch(root, q)
+    setDocxMatchCount(count)
+    setDocxCurrentMatch(0)
+    if (count > 0) {
+      requestAnimationFrame(() => scrollDocxMatch(0))
+    }
+  }, [isDocx, searchOpen, searchQuery, docxText, scrollDocxMatch])
+
+  const goToDocxMatch = useCallback((direction: 'next' | 'prev') => {
+    if (docxMatchCount === 0) return
+    setDocxCurrentMatch(prev => {
+      const next = direction === 'next'
+        ? (prev + 1 >= docxMatchCount ? 0 : prev + 1)
+        : (prev - 1 < 0 ? docxMatchCount - 1 : prev - 1)
+      requestAnimationFrame(() => scrollDocxMatch(next))
+      return next
+    })
+  }, [docxMatchCount, scrollDocxMatch])
+
   const zoomIn = useCallback(() => {
     setZoom(prev => Math.min(prev + 1, ZOOM_LEVELS.length - 1))
   }, [])
@@ -597,7 +735,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
   // DOCX rendered markdown viewer
   if (isDocx) {
     return (
-      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+      <div ref={rootRef} style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
         {processingOverlay}
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
@@ -614,13 +752,28 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
             <ZoomIn size={16} />
           </button>
           <div style={{ width: 1, height: 20, backgroundColor: '#d1d5db', margin: '0 4px' }} />
+          <button onClick={openSearch} style={btnStyle} title="Find in document (⌘F / Ctrl+F)" aria-label="Find in document">
+            <Search size={16} />
+          </button>
           <button onClick={() => window.open(url, '_blank')} style={btnStyle} title="Download original">
             <Maximize2 size={16} />
           </button>
         </div>
         <div style={{
-          flex: 1, overflow: 'auto', backgroundColor: '#fff',
+          flex: 1, overflow: 'auto', backgroundColor: '#fff', position: 'relative',
         }}>
+          {searchOpen && (
+            <DocumentSearchBar
+              query={searchQuery}
+              onQueryChange={setSearchQuery}
+              currentMatch={docxMatchCount === 0 ? 0 : docxCurrentMatch + 1}
+              totalMatches={docxMatchCount}
+              onPrev={() => goToDocxMatch('prev')}
+              onNext={() => goToDocxMatch('next')}
+              onClose={closeSearch}
+              autoFocus
+            />
+          )}
           {docxText === null ? (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
               <Loader2 style={{ width: 32, height: 32, color: 'var(--highlight-color)', animation: 'spin 1s linear infinite' }} />
@@ -635,6 +788,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
               color: '#333',
             }}>
               <div
+                ref={docxContentRef}
                 className="chat-markdown"
                 dangerouslySetInnerHTML={{ __html: docxHtml }}
               />
@@ -715,7 +869,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
   }
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+    <div ref={rootRef} style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
       {processingOverlay}
 
       {/* Toolbar */}
@@ -734,6 +888,9 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
           <ZoomIn size={16} />
         </button>
         <div style={{ width: 1, height: 20, backgroundColor: '#d1d5db', margin: '0 4px' }} />
+        <button onClick={openSearch} style={btnStyle} title="Find in document (⌘F / Ctrl+F)" aria-label="Find in document">
+          <Search size={16} />
+        </button>
         <button onClick={openPdfInNewTab} style={btnStyle} title="Open in new tab" aria-label="Open in new tab">
           <Maximize2 size={16} />
         </button>
@@ -744,10 +901,22 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
         flex: 1, overflow: 'auto', backgroundColor: '#525659',
         position: 'relative',
       }}>
+        {searchOpen && (
+          <DocumentSearchBar
+            query={searchQuery}
+            onQueryChange={setSearchQuery}
+            currentMatch={totalHighlights === 0 ? 0 : currentHighlight + 1}
+            totalMatches={totalHighlights}
+            onPrev={() => goToHighlight('prev')}
+            onNext={() => goToHighlight('next')}
+            onClose={closeSearch}
+            autoFocus
+          />
+        )}
         <div ref={containerRef} style={{ paddingBottom: 20 }} />
 
         {/* Highlight navigation bar */}
-        {totalHighlights > 0 && (
+        {!searchOpen && totalHighlights > 0 && (
           <div style={{
             position: 'sticky',
             bottom: 12,
@@ -789,7 +958,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
               textOverflow: 'ellipsis',
             }}>
               <span style={{ fontWeight: 700 }}>
-                &ldquo;{highlightTerms[0]}&rdquo;
+                &ldquo;{effectiveTerms[0]}&rdquo;
               </span>
               <span style={{ marginLeft: 6, color: '#9ca3af', fontWeight: 400 }}>
                 {currentHighlight + 1} of {totalHighlights}

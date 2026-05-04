@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
-import { ZoomIn, ZoomOut, Maximize2 } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ZoomIn, ZoomOut, Maximize2, Search } from 'lucide-react'
 import { downloadFileUrl } from '../../api/files'
 import * as XLSX from 'xlsx'
+import { DocumentSearchBar, useFindInDocumentHotkey } from './DocumentSearchBar'
 
 interface SpreadsheetViewerProps {
   docUuid: string
@@ -20,6 +21,69 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
   const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+
+  // Find-in-document state
+  const rootRef = useRef<HTMLDivElement>(null)
+  const tableScrollRef = useRef<HTMLDivElement>(null)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [currentMatchIdx, setCurrentMatchIdx] = useState(0)
+
+  const openSearch = useCallback(() => setSearchOpen(true), [])
+  const closeSearch = useCallback(() => {
+    setSearchOpen(false)
+    setSearchQuery('')
+  }, [])
+  useFindInDocumentHotkey(rootRef, searchOpen, openSearch, closeSearch)
+
+  // Compute matches across the active sheet (header row uses r = -1).
+  const matches = useMemo(() => {
+    if (!searchOpen) return [] as Array<{ r: number; c: number }>
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return [] as Array<{ r: number; c: number }>
+    const out: Array<{ r: number; c: number }> = []
+    headers.forEach((h, c) => {
+      if (h.toLowerCase().includes(q)) out.push({ r: -1, c })
+    })
+    rows.forEach((row, r) => {
+      row.forEach((cell, c) => {
+        if (cell.toLowerCase().includes(q)) out.push({ r, c })
+      })
+    })
+    return out
+  }, [searchOpen, searchQuery, headers, rows])
+
+  // Reset cursor when match set changes.
+  useEffect(() => {
+    setCurrentMatchIdx(0)
+  }, [matches])
+
+  // Map (r,c) → match index for fast cell lookup during render.
+  const matchIndexByKey = useMemo(() => {
+    const m = new Map<string, number>()
+    matches.forEach((pos, i) => m.set(`${pos.r}:${pos.c}`, i))
+    return m
+  }, [matches])
+
+  // Scroll the active match into view.
+  useEffect(() => {
+    if (matches.length === 0) return
+    const target = matches[currentMatchIdx]
+    if (!target) return
+    const container = tableScrollRef.current
+    if (!container) return
+    const sel = `[data-cell-r="${target.r}"][data-cell-c="${target.c}"]`
+    const el = container.querySelector<HTMLElement>(sel)
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' })
+  }, [currentMatchIdx, matches])
+
+  const goToMatch = useCallback((direction: 'next' | 'prev') => {
+    if (matches.length === 0) return
+    setCurrentMatchIdx(prev => {
+      if (direction === 'next') return prev + 1 >= matches.length ? 0 : prev + 1
+      return prev - 1 < 0 ? matches.length - 1 : prev - 1
+    })
+  }, [matches.length])
 
   const url = downloadFileUrl(docUuid)
   const zoomLevel = ZOOM_LEVELS[zoom]
@@ -103,7 +167,7 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
   }
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+    <div ref={rootRef} style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
       {/* Processing overlay */}
       {processing && (
         <div style={{
@@ -142,6 +206,9 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
           <ZoomIn size={16} />
         </button>
         <div style={{ width: 1, height: 20, backgroundColor: '#d1d5db', margin: '0 4px' }} />
+        <button onClick={openSearch} style={btnStyle} title="Find in document (⌘F / Ctrl+F)" aria-label="Find in document">
+          <Search size={16} />
+        </button>
         <button onClick={() => window.open(url, '_blank')} style={btnStyle} title="Open in new tab">
           <Maximize2 size={16} />
         </button>
@@ -173,7 +240,19 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
       )}
 
       {/* Table */}
-      <div style={{ flex: 1, overflow: 'auto', backgroundColor: '#fff' }}>
+      <div ref={tableScrollRef} style={{ flex: 1, overflow: 'auto', backgroundColor: '#fff', position: 'relative' }}>
+        {searchOpen && (
+          <DocumentSearchBar
+            query={searchQuery}
+            onQueryChange={setSearchQuery}
+            currentMatch={matches.length === 0 ? 0 : currentMatchIdx + 1}
+            totalMatches={matches.length}
+            onPrev={() => goToMatch('prev')}
+            onNext={() => goToMatch('next')}
+            onClose={closeSearch}
+            autoFocus
+          />
+        )}
         <div style={{
           transform: `scale(${zoomLevel})`,
           transformOrigin: 'top left',
@@ -198,17 +277,29 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
                     }}>
                       #
                     </th>
-                    {headers.map((h, i) => (
-                      <th key={i} style={{
-                        padding: '8px 12px', textAlign: 'left', fontWeight: 600,
-                        color: '#374151', backgroundColor: '#f9fafb',
-                        borderBottom: '2px solid #e5e7eb', borderRight: '1px solid #f3f4f6',
-                        position: 'sticky', top: 0, zIndex: 2,
-                        whiteSpace: 'nowrap',
-                      }}>
-                        {h}
-                      </th>
-                    ))}
+                    {headers.map((h, i) => {
+                      const matchIdx = matchIndexByKey.get(`-1:${i}`) ?? -1
+                      const isMatch = matchIdx >= 0
+                      const isCurrent = matchIdx === currentMatchIdx
+                      return (
+                        <th key={i}
+                          data-cell-r={-1}
+                          data-cell-c={i}
+                          style={{
+                            padding: '8px 12px', textAlign: 'left', fontWeight: 600,
+                            color: '#374151',
+                            backgroundColor: isCurrent ? '#fbbf24' : isMatch ? '#fde68a' : '#f9fafb',
+                            outline: isCurrent ? '2px solid #f59e0b' : 'none',
+                            outlineOffset: '-2px',
+                            borderBottom: '2px solid #e5e7eb', borderRight: '1px solid #f3f4f6',
+                            position: 'sticky', top: 0, zIndex: 2,
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {h}
+                        </th>
+                      )
+                    })}
                   </tr>
                 </thead>
               )}
@@ -222,16 +313,29 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
                     }}>
                       {ri + 1}
                     </td>
-                    {headers.map((_, ci) => (
-                      <td key={ci} style={{
-                        padding: '6px 12px', color: '#374151',
-                        borderBottom: '1px solid #f3f4f6',
-                        borderRight: '1px solid #f3f4f6',
-                        whiteSpace: 'nowrap', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis',
-                      }}>
-                        {row[ci] ?? ''}
-                      </td>
-                    ))}
+                    {headers.map((_, ci) => {
+                      const matchIdx = matchIndexByKey.get(`${ri}:${ci}`) ?? -1
+                      const isMatch = matchIdx >= 0
+                      const isCurrent = matchIdx === currentMatchIdx
+                      const baseBg = ri % 2 === 0 ? '#fff' : '#fafafa'
+                      return (
+                        <td key={ci}
+                          data-cell-r={ri}
+                          data-cell-c={ci}
+                          style={{
+                            padding: '6px 12px', color: '#374151',
+                            backgroundColor: isCurrent ? '#fbbf24' : isMatch ? '#fde68a' : baseBg,
+                            outline: isCurrent ? '2px solid #f59e0b' : 'none',
+                            outlineOffset: '-2px',
+                            borderBottom: '1px solid #f3f4f6',
+                            borderRight: '1px solid #f3f4f6',
+                            whiteSpace: 'nowrap', maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis',
+                          }}
+                        >
+                          {row[ci] ?? ''}
+                        </td>
+                      )
+                    })}
                   </tr>
                 ))}
               </tbody>
