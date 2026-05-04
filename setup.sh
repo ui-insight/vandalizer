@@ -11,6 +11,9 @@
 #    ./setup.sh --seed      Update verified catalog (add new seed data)
 #    ./setup.sh --reingest  Re-ingest all knowledge base content into ChromaDB
 #    ./setup.sh --reset-email  Reconfigure email provider (SMTP or Resend)
+#    ./setup.sh --cron-setup   Schedule automated upgrades via crontab
+#    ./setup.sh --cron-remove  Remove the scheduled auto-update entry
+#    ./setup.sh --auto-update  Non-interactive upgrade for cron (logs to .auto_update.log)
 # ============================================================================
 
 set -uo pipefail
@@ -1053,6 +1056,7 @@ finale() {
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}./setup.sh --upgrade${RESET}       ${DIM}Pull, backup, rebuild${RESET}      ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}./setup.sh --redeploy${RESET}      ${DIM}Rebuild current code${RESET}       ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}./setup.sh --seed${RESET}          ${DIM}Update verified catalog${RESET}    ${MAGENTA}${BOLD}║${RESET}"
+  echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}./setup.sh --cron-setup${RESET}    ${DIM}Schedule auto-updates${RESET}      ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}./setup.sh --reset-email${RESET}   ${DIM}Reconfigure email${RESET}        ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}./status.sh${RESET}                ${DIM}Full system status${RESET}          ${MAGENTA}${BOLD}║${RESET}"
   echo -e "  ${MAGENTA}${BOLD}║${RESET}   ${GRAY}docker compose logs -f api${RESET} ${DIM}Stream API logs${RESET}            ${MAGENTA}${BOLD}║${RESET}"
@@ -1861,6 +1865,230 @@ reingest_knowledge_bases() {
 }
 
 # ---------------------------------------------------------------------------
+# Auto-update: non-interactive scan + upgrade + catalog refresh, suitable
+# for cron. Skips if nothing is outdated; logs every run to .auto_update.log.
+# ---------------------------------------------------------------------------
+AUTO_UPDATE_LOG=".auto_update.log"
+CRON_MARKER="# vandalizer-auto-update"
+
+auto_update() {
+  local stamp
+  stamp=$(date '+%Y-%m-%d %H:%M:%S')
+
+  {
+    echo ""
+    echo "=========================================="
+    echo "[${stamp}] Auto-update run"
+    echo "=========================================="
+  } >> "$AUTO_UPDATE_LOG"
+
+  if ! command -v docker &>/dev/null; then
+    echo "[${stamp}] ERROR: docker not found in PATH" >> "$AUTO_UPDATE_LOG"
+    return 1
+  fi
+
+  CODE_VERSION_LOCAL=$(code_version_local)
+  CODE_VERSION_LATEST=$(code_version_latest)
+  CATALOG_VERSION_LOCAL=$(catalog_version_local)
+  CATALOG_VERSION_LATEST=$(catalog_version_latest)
+
+  {
+    echo "Code:    ${CODE_VERSION_LOCAL} -> ${CODE_VERSION_LATEST:-(unreachable)}"
+    echo "Catalog: ${CATALOG_VERSION_LOCAL} -> ${CATALOG_VERSION_LATEST:-(unreachable)}"
+  } >> "$AUTO_UPDATE_LOG"
+
+  local code_outdated=0 cat_outdated=0
+  is_newer "$CODE_VERSION_LATEST"    "$CODE_VERSION_LOCAL"    && code_outdated=1
+  is_newer "$CATALOG_VERSION_LATEST" "$CATALOG_VERSION_LOCAL" && cat_outdated=1
+
+  if [[ $code_outdated -eq 0 && $cat_outdated -eq 0 ]]; then
+    echo "[${stamp}] Already up to date." >> "$AUTO_UPDATE_LOG"
+    return 0
+  fi
+
+  if [[ $code_outdated -eq 1 ]]; then
+    echo "[${stamp}] Pulling latest code on $(git branch --show-current 2>/dev/null)..." >> "$AUTO_UPDATE_LOG"
+    git fetch --tags --quiet >> "$AUTO_UPDATE_LOG" 2>&1 || true
+    if ! git pull --ff-only >> "$AUTO_UPDATE_LOG" 2>&1; then
+      echo "[${stamp}] ERROR: git pull --ff-only failed (manual merge needed). Aborting." >> "$AUTO_UPDATE_LOG"
+      return 1
+    fi
+    echo "[${stamp}] Backing up..." >> "$AUTO_UPDATE_LOG"
+    take_backup >> "$AUTO_UPDATE_LOG" 2>&1 || true
+    echo "[${stamp}] Rebuilding and restarting services..." >> "$AUTO_UPDATE_LOG"
+    if ! do_redeploy >> "$AUTO_UPDATE_LOG" 2>&1; then
+      echo "[${stamp}] ERROR: rebuild/restart failed." >> "$AUTO_UPDATE_LOG"
+      return 1
+    fi
+    echo "[${stamp}] Code upgrade complete." >> "$AUTO_UPDATE_LOG"
+  fi
+
+  if [[ $cat_outdated -eq 1 ]]; then
+    echo "[${stamp}] Updating verified catalog..." >> "$AUTO_UPDATE_LOG"
+    if ! update_catalog >> "$AUTO_UPDATE_LOG" 2>&1; then
+      echo "[${stamp}] ERROR: catalog update failed." >> "$AUTO_UPDATE_LOG"
+      return 1
+    fi
+    echo "[${stamp}] Catalog update complete." >> "$AUTO_UPDATE_LOG"
+  fi
+
+  echo "[${stamp}] Auto-update finished successfully." >> "$AUTO_UPDATE_LOG"
+  return 0
+}
+
+# ---------------------------------------------------------------------------
+# Cron management: schedule (or remove) periodic auto-updates
+# ---------------------------------------------------------------------------
+_cron_project_dir() {
+  cd "$(dirname "${BASH_SOURCE[0]}")" && pwd
+}
+
+setup_cron() {
+  section "C" "Schedule Automated Updates"
+
+  if ! command -v crontab &>/dev/null; then
+    echo -e "  ${SYM_CROSS}  ${RED}'crontab' command not available on this system.${RESET}"
+    echo -e "  ${DIM}     Install cron (e.g. 'apt install cron') and try again.${RESET}"
+    return 1
+  fi
+
+  echo -e "  ${DIM}     A cron job will check origin for new code & catalog,${RESET}"
+  echo -e "  ${DIM}     pull updates, take a backup, rebuild, and restart services.${RESET}"
+  echo -e "  ${DIM}     If nothing is outdated the run is a no-op.${RESET}"
+  echo ""
+
+  local project_dir script_path
+  project_dir=$(_cron_project_dir)
+  script_path="${project_dir}/setup.sh"
+
+  if crontab -l 2>/dev/null | grep -Fq "$CRON_MARKER"; then
+    local existing
+    existing=$(crontab -l 2>/dev/null | grep -F "$CRON_MARKER" | head -1)
+    echo -e "  ${SYM_WARN}  ${YELLOW}An auto-update schedule already exists:${RESET}"
+    echo -e "  ${DIM}     ${existing}${RESET}"
+    echo ""
+    if ! confirm "Replace it?" "y"; then
+      echo -e "  ${DIM}     Keeping existing schedule.${RESET}"
+      return 0
+    fi
+    echo ""
+  fi
+
+  echo -e "  ${DIM}  1)${RESET} ${CYAN}Daily${RESET}      ${DIM}— every day at a chosen time${RESET}"
+  echo -e "  ${DIM}  2)${RESET} ${CYAN}Weekly${RESET}     ${DIM}— once a week on a chosen day${RESET}"
+  echo -e "  ${DIM}  3)${RESET} ${CYAN}Monthly${RESET}    ${DIM}— once a month on day 1${RESET}"
+  echo -e "  ${DIM}  4)${RESET} ${CYAN}Custom${RESET}     ${DIM}— enter your own cron expression${RESET}"
+  echo ""
+  echo -ne "  ${SYM_ARROW}  Select ${DIM}[1]${RESET}: "
+  local sched_choice
+  read -r sched_choice
+  sched_choice="${sched_choice:-1}"
+
+  local cron_expr=""
+  local sched_time hh mm sched_dow
+
+  case "$sched_choice" in
+    1)
+      prompt "Time of day (HH:MM, 24-hour)" "02:00" sched_time
+      hh=${sched_time%:*}; mm=${sched_time#*:}
+      hh=$((10#${hh:-2})); mm=$((10#${mm:-0}))
+      cron_expr="${mm} ${hh} * * *"
+      ;;
+    2)
+      echo ""
+      echo -e "  ${DIM}     0=Sun  1=Mon  2=Tue  3=Wed  4=Thu  5=Fri  6=Sat${RESET}"
+      prompt "Day of week (0-6)" "0" sched_dow
+      prompt "Time of day (HH:MM, 24-hour)" "02:00" sched_time
+      hh=${sched_time%:*}; mm=${sched_time#*:}
+      hh=$((10#${hh:-2})); mm=$((10#${mm:-0}))
+      cron_expr="${mm} ${hh} * * ${sched_dow}"
+      ;;
+    3)
+      prompt "Time of day (HH:MM, 24-hour)" "02:00" sched_time
+      hh=${sched_time%:*}; mm=${sched_time#*:}
+      hh=$((10#${hh:-2})); mm=$((10#${mm:-0}))
+      cron_expr="${mm} ${hh} 1 * *"
+      ;;
+    4)
+      echo ""
+      echo -e "  ${DIM}     Format: minute hour day_of_month month day_of_week${RESET}"
+      echo -e "  ${DIM}     Example: 0 3 * * 0  (every Sunday at 3:00 AM)${RESET}"
+      prompt "Cron expression" "0 2 * * *" cron_expr
+      ;;
+    *)
+      echo -e "  ${SYM_WARN}  ${YELLOW}Invalid selection — aborting.${RESET}"
+      return 1
+      ;;
+  esac
+
+  local cron_line="${cron_expr} cd ${project_dir} && ${script_path} --auto-update >> ${project_dir}/${AUTO_UPDATE_LOG} 2>&1 ${CRON_MARKER}"
+
+  echo ""
+  echo -e "  ${SYM_NEURAL}  ${BOLD}New cron entry:${RESET}"
+  echo -e "  ${DIM}     ${cron_line}${RESET}"
+  echo ""
+
+  if ! confirm "Install this schedule?" "y"; then
+    echo -e "  ${DIM}     Cancelled — no changes made.${RESET}"
+    return 0
+  fi
+
+  local tmp
+  tmp=$(mktemp)
+  crontab -l 2>/dev/null | grep -Fv "$CRON_MARKER" > "$tmp" || true
+  echo "$cron_line" >> "$tmp"
+  if crontab "$tmp"; then
+    rm -f "$tmp"
+    echo ""
+    echo -e "  ${SYM_CHECK}  ${BRIGHT_GREEN}${BOLD}Auto-update scheduled.${RESET}"
+    echo -e "  ${DIM}     Logs:   ${project_dir}/${AUTO_UPDATE_LOG}${RESET}"
+    echo -e "  ${DIM}     Verify: crontab -l | grep vandalizer-auto-update${RESET}"
+    echo -e "  ${DIM}     Remove: ./setup.sh --cron-remove${RESET}"
+  else
+    rm -f "$tmp"
+    echo -e "  ${SYM_CROSS}  ${RED}Failed to install crontab. Check permissions.${RESET}"
+    return 1
+  fi
+}
+
+remove_cron() {
+  section "C" "Remove Auto-Update Schedule"
+
+  if ! command -v crontab &>/dev/null; then
+    echo -e "  ${SYM_CROSS}  ${RED}'crontab' command not available on this system.${RESET}"
+    return 1
+  fi
+
+  if ! crontab -l 2>/dev/null | grep -Fq "$CRON_MARKER"; then
+    echo -e "  ${SYM_CHECK}  No auto-update schedule found — nothing to remove."
+    return 0
+  fi
+
+  local existing
+  existing=$(crontab -l 2>/dev/null | grep -F "$CRON_MARKER" | head -1)
+  echo -e "  ${SYM_NEURAL}  ${BOLD}Existing entry:${RESET}"
+  echo -e "  ${DIM}     ${existing}${RESET}"
+  echo ""
+
+  if ! confirm "Remove it?" "y"; then
+    echo -e "  ${DIM}     Cancelled — schedule kept.${RESET}"
+    return 0
+  fi
+
+  local tmp
+  tmp=$(mktemp)
+  crontab -l 2>/dev/null | grep -Fv "$CRON_MARKER" > "$tmp" || true
+  if crontab "$tmp"; then
+    rm -f "$tmp"
+    echo -e "  ${SYM_CHECK}  ${BRIGHT_GREEN}${BOLD}Auto-update schedule removed.${RESET}"
+  else
+    rm -f "$tmp"
+    echo -e "  ${SYM_CROSS}  ${RED}Failed to update crontab.${RESET}"
+    return 1
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # Detect existing deployment
 # ---------------------------------------------------------------------------
 detect_deployment() {
@@ -1920,6 +2148,24 @@ main() {
       echo ""
       exit 0
       ;;
+    --cron-setup|cron-setup)
+      show_banner
+      preflight
+      setup_cron
+      echo ""
+      exit 0
+      ;;
+    --cron-remove|cron-remove)
+      show_banner
+      remove_cron
+      echo ""
+      exit 0
+      ;;
+    --auto-update|auto-update)
+      # Non-interactive: no banner, no preflight section noise — log-only.
+      auto_update
+      exit $?
+      ;;
     --help|-h|help)
       echo ""
       echo -e "  ${BOLD}Usage:${RESET} ./setup.sh [command]"
@@ -1932,6 +2178,9 @@ main() {
       echo -e "    ${CYAN}--seed${RESET}       Update verified catalog with new seed data"
       echo -e "    ${CYAN}--reingest${RESET}   Re-ingest all knowledge base content into ChromaDB"
       echo -e "    ${CYAN}--reset-email${RESET} Reconfigure email provider (SMTP or Resend)"
+      echo -e "    ${CYAN}--cron-setup${RESET}  Schedule automated upgrades via crontab"
+      echo -e "    ${CYAN}--cron-remove${RESET} Remove the scheduled auto-update entry"
+      echo -e "    ${CYAN}--auto-update${RESET} Non-interactive upgrade (used by cron, logs to .auto_update.log)"
       echo -e "    ${CYAN}--help${RESET}       Show this help"
       echo ""
       exit 0
@@ -1952,6 +2201,8 @@ main() {
     echo -e "  ${DIM}  4)${RESET} ${CYAN}Full setup${RESET}    ${DIM}— reconfigure everything from scratch${RESET}"
     echo -e "  ${DIM}  5)${RESET} ${CYAN}Seed catalog${RESET}  ${DIM}— update verified catalog with new seed data${RESET}"
     echo -e "  ${DIM}  6)${RESET} ${CYAN}Re-ingest KBs${RESET} ${DIM}— rebuild knowledge base content in ChromaDB${RESET}"
+    echo -e "  ${DIM}  7)${RESET} ${CYAN}Schedule auto-updates${RESET} ${DIM}— install/replace a cron entry for upgrades${RESET}"
+    echo -e "  ${DIM}  8)${RESET} ${CYAN}Remove auto-updates${RESET}   ${DIM}— delete the scheduled cron entry${RESET}"
     echo ""
     echo -ne "  ${SYM_ARROW}  Select mode ${DIM}[1]${RESET}: "
     local mode_choice
@@ -1964,6 +2215,8 @@ main() {
       4) ;; # fall through to full setup
       5) update_catalog; echo ""; exit 0 ;;
       6) reingest_knowledge_bases; echo ""; exit 0 ;;
+      7) setup_cron; echo ""; exit 0 ;;
+      8) remove_cron; echo ""; exit 0 ;;
       *) repair; echo ""; exit 0 ;;
     esac
   fi
