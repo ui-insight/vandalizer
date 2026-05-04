@@ -168,9 +168,14 @@ class TestAdminConfigEndpoint:
             {"name": "gpt-4o", "api_key": "sk-real-key-abcdef"},
         ]
         mock_config.ocr_endpoint = ""
+        mock_config.ocr_api_key = ""
         mock_config.llm_endpoint = ""
+        mock_config.default_model = ""
+        mock_config.default_team_id = ""
+        mock_config.support_contacts = []
         mock_config.highlight_color = "#eab308"
         mock_config.ui_radius = "12px"
+        mock_config.get_m365_config.return_value = {}
 
         with patch("app.dependencies.decode_token", return_value={"sub": "admin1", "type": "access"}), \
              patch("app.dependencies.User") as MockUser, \

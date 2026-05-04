@@ -1,0 +1,36 @@
+# CODEOWNERS — review enforcement for stability-critical paths.
+# Adjust the team handle below if @ui-insight/maintainers is not the right group.
+
+* @ui-insight/maintainers
+
+# Workflow execution and LLM service — silent breakage here corrupts every job.
+/backend/app/services/workflow_engine.py        @ui-insight/maintainers
+/backend/app/services/extraction_engine.py      @ui-insight/maintainers
+/backend/app/services/llm_service.py            @ui-insight/maintainers
+/backend/app/services/document_manager.py       @ui-insight/maintainers
+/backend/app/services/document_readers.py       @ui-insight/maintainers
+/backend/app/services/chat_service.py           @ui-insight/maintainers
+/backend/app/services/knowledge_service.py      @ui-insight/maintainers
+
+# Auth and access control — security-sensitive.
+/backend/app/services/auth_service.py           @ui-insight/maintainers
+/backend/app/services/access_control.py         @ui-insight/maintainers
+/backend/app/services/saml_service.py           @ui-insight/maintainers
+/backend/app/services/config_service.py         @ui-insight/maintainers
+/backend/app/services/storage.py                @ui-insight/maintainers
+
+# Celery task surface — async jobs that touch the DB.
+/backend/app/tasks/                             @ui-insight/maintainers
+
+# Beanie data models — schema changes need eyes on migrations.
+/backend/app/models/                            @ui-insight/maintainers
+
+# Seed catalog — versioned, distributed to existing installs via setup.sh.
+/backend/seeds/                                 @ui-insight/maintainers
+
+# CI/CD and release automation — broken pipelines hide regressions.
+/.github/workflows/                             @ui-insight/maintainers
+/Makefile                                       @ui-insight/maintainers
+/backend/Dockerfile                             @ui-insight/maintainers
+/frontend/Dockerfile                            @ui-insight/maintainers
+/scripts/                                       @ui-insight/maintainers
