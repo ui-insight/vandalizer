@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { X, Pencil, Trash2, FolderOpen, Globe, Copy, Check, ChevronRight } from 'lucide-react'
+import { X, Pencil, Trash2, FolderOpen, Globe, Copy, Check, ChevronRight, HelpCircle } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { getAutomation, updateAutomation, deleteAutomation } from '../../api/automations'
 import { apiFetch } from '../../api/client'
 import { useWorkflows } from '../../hooks/useWorkflows'
 import { useSearchSets } from '../../hooks/useExtractions'
 import { ItemPickerModal } from './ItemPickerModal'
+import { AutomationsExplainer } from './AutomationsExplainer'
 import type { Automation, TriggerType, ActionType } from '../../types/automation'
 
 const TRIGGER_OPTIONS: { value: TriggerType; label: string; icon: typeof FolderOpen; description: string }[] = [
@@ -26,6 +27,7 @@ export function AutomationEditorPanel() {
   const [automation, setAutomation] = useState<Automation | null>(null)
   const [loading, setLoading] = useState(true)
   const [showActionPicker, setShowActionPicker] = useState(false)
+  const [showExplainer, setShowExplainer] = useState(false)
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleValue, setTitleValue] = useState('')
   const titleInputRef = useRef<HTMLInputElement>(null)
@@ -129,7 +131,7 @@ export function AutomationEditorPanel() {
   }
 
   return (
-    <div className="flex h-full flex-col" style={{ backgroundColor: '#fff' }}>
+    <div className="flex h-full flex-col" style={{ backgroundColor: '#fff', position: 'relative' }}>
       {/* Header */}
       <div style={{ padding: '16px 24px', borderBottom: '1px solid #e5e7eb', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -395,7 +397,38 @@ export function AutomationEditorPanel() {
         <SectionLabel>Post-Action Output</SectionLabel>
         <OutputStorageCard automation={automation} onSave={debouncedSave} />
         <OutputNotificationCard automation={automation} onSave={debouncedSave} />
+
+        {/* "What are automations?" pill */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 24, marginBottom: 4 }}>
+          <button
+            onClick={() => setShowExplainer(true)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '6px 14px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
+              color: '#6b7280',
+              backgroundColor: '#f9fafb',
+              border: '1px solid #e5e7eb',
+              borderRadius: 999, cursor: 'pointer',
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.backgroundColor = '#f3f4f6'
+              e.currentTarget.style.color = '#374151'
+              e.currentTarget.style.borderColor = '#d1d5db'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.backgroundColor = '#f9fafb'
+              e.currentTarget.style.color = '#6b7280'
+              e.currentTarget.style.borderColor = '#e5e7eb'
+            }}
+          >
+            <HelpCircle size={13} />
+            What are automations?
+          </button>
+        </div>
       </div>
+
+      {showExplainer && <AutomationsExplainer onClose={() => setShowExplainer(false)} />}
     </div>
   )
 }
