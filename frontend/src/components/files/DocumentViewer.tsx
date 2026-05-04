@@ -759,21 +759,21 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
             <Maximize2 size={16} />
           </button>
         </div>
+        {searchOpen && (
+          <DocumentSearchBar
+            query={searchQuery}
+            onQueryChange={setSearchQuery}
+            currentMatch={docxMatchCount === 0 ? 0 : docxCurrentMatch + 1}
+            totalMatches={docxMatchCount}
+            onPrev={() => goToDocxMatch('prev')}
+            onNext={() => goToDocxMatch('next')}
+            onClose={closeSearch}
+            autoFocus
+          />
+        )}
         <div style={{
           flex: 1, overflow: 'auto', backgroundColor: '#fff', position: 'relative',
         }}>
-          {searchOpen && (
-            <DocumentSearchBar
-              query={searchQuery}
-              onQueryChange={setSearchQuery}
-              currentMatch={docxMatchCount === 0 ? 0 : docxCurrentMatch + 1}
-              totalMatches={docxMatchCount}
-              onPrev={() => goToDocxMatch('prev')}
-              onNext={() => goToDocxMatch('next')}
-              onClose={closeSearch}
-              autoFocus
-            />
-          )}
           {docxText === null ? (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
               <Loader2 style={{ width: 32, height: 32, color: 'var(--highlight-color)', animation: 'spin 1s linear infinite' }} />
@@ -896,23 +896,24 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
         </button>
       </div>
 
+      {searchOpen && (
+        <DocumentSearchBar
+          query={searchQuery}
+          onQueryChange={setSearchQuery}
+          currentMatch={totalHighlights === 0 ? 0 : currentHighlight + 1}
+          totalMatches={totalHighlights}
+          onPrev={() => goToHighlight('prev')}
+          onNext={() => goToHighlight('next')}
+          onClose={closeSearch}
+          autoFocus
+        />
+      )}
+
       {/* PDF pages container */}
       <div style={{
         flex: 1, overflow: 'auto', backgroundColor: '#525659',
         position: 'relative',
       }}>
-        {searchOpen && (
-          <DocumentSearchBar
-            query={searchQuery}
-            onQueryChange={setSearchQuery}
-            currentMatch={totalHighlights === 0 ? 0 : currentHighlight + 1}
-            totalMatches={totalHighlights}
-            onPrev={() => goToHighlight('prev')}
-            onNext={() => goToHighlight('next')}
-            onClose={closeSearch}
-            autoFocus
-          />
-        )}
         <div ref={containerRef} style={{ paddingBottom: 20 }} />
 
         {/* Highlight navigation bar */}

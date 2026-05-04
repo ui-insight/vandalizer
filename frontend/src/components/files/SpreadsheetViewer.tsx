@@ -239,20 +239,21 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
         </div>
       )}
 
+      {searchOpen && (
+        <DocumentSearchBar
+          query={searchQuery}
+          onQueryChange={setSearchQuery}
+          currentMatch={matches.length === 0 ? 0 : currentMatchIdx + 1}
+          totalMatches={matches.length}
+          onPrev={() => goToMatch('prev')}
+          onNext={() => goToMatch('next')}
+          onClose={closeSearch}
+          autoFocus
+        />
+      )}
+
       {/* Table */}
       <div ref={tableScrollRef} style={{ flex: 1, overflow: 'auto', backgroundColor: '#fff', position: 'relative' }}>
-        {searchOpen && (
-          <DocumentSearchBar
-            query={searchQuery}
-            onQueryChange={setSearchQuery}
-            currentMatch={matches.length === 0 ? 0 : currentMatchIdx + 1}
-            totalMatches={matches.length}
-            onPrev={() => goToMatch('prev')}
-            onNext={() => goToMatch('next')}
-            onClose={closeSearch}
-            autoFocus
-          />
-        )}
         <div style={{
           transform: `scale(${zoomLevel})`,
           transformOrigin: 'top left',

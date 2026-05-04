@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import {
   Shield, ShieldCheck, BarChart3, Users, Building2, Workflow, Settings,
   Palette, Cpu, Lock, Globe, Plus, Trash2, Pencil, ChevronLeft,
-  ChevronRight, RefreshCw, MessageSquare, Search, Zap, Bug,
+  ChevronRight, RefreshCw, MessageSquare, Search, Zap,
   CheckCircle2, XCircle, Clock, Download, TrendingUp, TrendingDown,
   ChevronDown, ChevronUp, ArrowUpDown, Play, Minus, AlertCircle,
   ArrowLeft, FileText, FolderTree, X, Eye, Check, CheckCircle,
@@ -70,7 +70,7 @@ function applyThemeToDOM(theme: ThemeConfig) {
   root.style.setProperty('--ui-radius', theme.ui_radius)
 }
 
-type Tab = 'usage' | 'users' | 'teams' | 'organizations' | 'workflows' | 'quality' | 'approvals' | 'audit' | 'demo' | 'email' | 'certifications' | 'debugging' | 'config'
+type Tab = 'usage' | 'users' | 'teams' | 'organizations' | 'workflows' | 'quality' | 'approvals' | 'audit' | 'demo' | 'email' | 'certifications' | 'config'
 
 const TABS: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'usage', label: 'Usage', icon: BarChart3 },
@@ -84,7 +84,6 @@ const TABS: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'demo', label: 'Demo', icon: Zap },
   { key: 'email', label: 'Email', icon: Mail },
   { key: 'certifications', label: 'Certifications', icon: Award },
-  { key: 'debugging', label: 'Debugging', icon: Bug },
   { key: 'config', label: 'Config', icon: Settings },
 ]
 
@@ -3691,6 +3690,7 @@ function DemoResponseDetail({ responses }: { responses: Record<string, unknown> 
 }
 
 function DemoTab() {
+  const [subTab, setSubTab] = useState<'applications' | 'surveys'>('applications')
   const [stats, setStats] = useState<DemoAdminStats | null>(null)
   const [apps, setApps] = useState<DemoApp[]>([])
   const [statusFilter, setStatusFilter] = useState<string>('')
@@ -3756,7 +3756,8 @@ function DemoTab() {
 
       const headers = [
         'Name', 'Title', 'Email', 'Organization', 'Status',
-        'Applied', 'Activated', 'Expires', 'Post-Survey Completed',
+        'Applied', 'Activated', 'Credentials Sent', 'First Login',
+        'Expires', 'Post-Survey Completed',
         ...preCols.map(c => c.label),
         ...postCols.map(c => c.label),
       ]
@@ -3776,6 +3777,8 @@ function DemoTab() {
           app.status,
           app.created_at ? formatDate(app.created_at) : null,
           app.activated_at ? formatDate(app.activated_at) : null,
+          app.credentials_sent_at ? formatDate(app.credentials_sent_at) : null,
+          app.last_login_at ? formatDate(app.last_login_at) : 'Never',
           app.expires_at ? formatDate(app.expires_at) : null,
           app.post_questionnaire_completed ? 'Yes' : 'No',
           ...preCols.map(c => fmt(pre[c.key])),
@@ -3883,45 +3886,81 @@ function DemoTab() {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Demo Program</h2>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            onClick={() => setShowAddUser(!showAddUser)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '8px 16px', border: '1px solid #16a34a', borderRadius: 8,
-              background: showAddUser ? '#f0fdf4' : '#fff', color: '#16a34a',
-              cursor: 'pointer', fontSize: 13, fontFamily: 'inherit', fontWeight: 600,
-            }}
-          >
-            <UserPlus size={14} /> Add User
-          </button>
-          <button
-            onClick={handleExport}
-            disabled={actionLoading === 'export'}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '8px 16px', border: '1px solid #e5e7eb', borderRadius: 8,
-              background: '#fff', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
-              opacity: actionLoading === 'export' ? 0.5 : 1,
-            }}
-          >
-            <Download size={14} /> {actionLoading === 'export' ? 'Exporting...' : 'Export CSV'}
-          </button>
-          <button
-            onClick={loadData}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '8px 16px', border: '1px solid #e5e7eb', borderRadius: 8,
-              background: '#fff', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
-            }}
-          >
-            <RefreshCw size={14} /> Refresh
-          </button>
-        </div>
+        {subTab === 'applications' && (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => setShowAddUser(!showAddUser)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '8px 16px', border: '1px solid #16a34a', borderRadius: 8,
+                background: showAddUser ? '#f0fdf4' : '#fff', color: '#16a34a',
+                cursor: 'pointer', fontSize: 13, fontFamily: 'inherit', fontWeight: 600,
+              }}
+            >
+              <UserPlus size={14} /> Add User
+            </button>
+            <button
+              onClick={handleExport}
+              disabled={actionLoading === 'export'}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '8px 16px', border: '1px solid #e5e7eb', borderRadius: 8,
+                background: '#fff', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
+                opacity: actionLoading === 'export' ? 0.5 : 1,
+              }}
+            >
+              <Download size={14} /> {actionLoading === 'export' ? 'Exporting...' : 'Export CSV'}
+            </button>
+            <button
+              onClick={loadData}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '8px 16px', border: '1px solid #e5e7eb', borderRadius: 8,
+                background: '#fff', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
+              }}
+            >
+              <RefreshCw size={14} /> Refresh
+            </button>
+          </div>
+        )}
       </div>
 
+      {/* Sub-tab bar */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 4,
+        background: '#f9fafb', borderRadius: 10, padding: 4,
+        width: 'fit-content', marginBottom: 20,
+      }}>
+        <button
+          onClick={() => setSubTab('applications')}
+          style={{
+            padding: '6px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+            cursor: 'pointer', border: 'none', fontFamily: 'inherit',
+            background: subTab === 'applications' ? 'var(--highlight-color, #eab308)' : 'transparent',
+            color: subTab === 'applications' ? '#000' : '#6b7280',
+          }}
+        >
+          Applications
+        </button>
+        <button
+          onClick={() => setSubTab('surveys')}
+          style={{
+            padding: '6px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+            cursor: 'pointer', border: 'none', fontFamily: 'inherit',
+            background: subTab === 'surveys' ? 'var(--highlight-color, #eab308)' : 'transparent',
+            color: subTab === 'surveys' ? '#000' : '#6b7280',
+          }}
+        >
+          Survey Responses
+        </button>
+      </div>
+
+      {subTab === 'surveys' && <SurveyResponsesSection />}
+
+      {subTab === 'applications' && (
+      <>
       {/* Add user form */}
       {showAddUser && (
         <form onSubmit={handleAddUser} style={{
@@ -4054,6 +4093,8 @@ function DemoTab() {
                 <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Organization</th>
                 <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Status</th>
                 <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Applied</th>
+                <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Credentials Sent</th>
+                <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>First Login</th>
                 <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Expires</th>
                 <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Actions</th>
               </tr>
@@ -4085,6 +4126,16 @@ function DemoTab() {
                       </td>
                       <td style={{ padding: '12px 16px', color: '#6b7280', fontSize: 13 }}>
                         {formatDate(app.created_at)}
+                      </td>
+                      <td style={{ padding: '12px 16px', color: '#6b7280', fontSize: 13 }}>
+                        {app.credentials_sent_at ? formatDate(app.credentials_sent_at) : '-'}
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: 13 }}>
+                        {app.last_login_at ? (
+                          <span style={{ color: '#6b7280' }}>{formatDate(app.last_login_at)}</span>
+                        ) : (
+                          <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>Never</span>
+                        )}
                       </td>
                       <td style={{ padding: '12px 16px', color: '#6b7280', fontSize: 13 }}>
                         {app.expires_at ? formatDate(app.expires_at) : '-'}
@@ -4187,7 +4238,7 @@ function DemoTab() {
                     </tr>
                     {isExpanded && (
                       <tr style={{ borderBottom: '1px solid #f3f4f6' }}>
-                        <td colSpan={7} style={{ padding: '0 16px 20px', background: '#fafafa' }}>
+                        <td colSpan={9} style={{ padding: '0 16px 20px', background: '#fafafa' }}>
                           <DemoResponseDetail responses={app.questionnaire_responses} />
                         </td>
                       </tr>
@@ -4197,7 +4248,7 @@ function DemoTab() {
               })}
               {apps.length === 0 && (
                 <tr>
-                  <td colSpan={6} style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>
+                  <td colSpan={9} style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>
                     No applications found
                   </td>
                 </tr>
@@ -4209,6 +4260,8 @@ function DemoTab() {
 
       {/* Trial Check-ins */}
       <TrialCheckinsSection />
+      </>
+      )}
     </div>
   )
 }
@@ -4500,7 +4553,7 @@ function EmailAnalyticsTab() {
   )
 }
 
-function DebuggingTab() {
+function SurveyResponsesSection() {
   const [responses, setResponses] = useState<PostExperienceResponseAdmin[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedUuid, setExpandedUuid] = useState<string | null>(null)
@@ -5706,7 +5759,7 @@ export default function Admin() {
   const hasAccess = isGlobalAdmin || isStaff || isExaminer || isTeamAdmin
 
   // Staff see everything except config; examiners see analytics tabs only
-  const hiddenForNonAdmin = ['config', 'quality', 'demo', 'debugging', 'organizations', 'approvals', 'audit', 'certifications']
+  const hiddenForNonAdmin = ['config', 'quality', 'demo', 'organizations', 'approvals', 'audit', 'certifications']
   let visibleTabs = isGlobalAdmin
     ? TABS
     : isStaff
@@ -5790,7 +5843,6 @@ export default function Admin() {
           {activeTab === 'demo' && (isGlobalAdmin || isStaff) && <DemoTab />}
           {activeTab === 'email' && (isGlobalAdmin || isStaff) && <EmailAnalyticsTab />}
           {activeTab === 'certifications' && (isGlobalAdmin || isStaff) && <CertificationsTab />}
-          {activeTab === 'debugging' && (isGlobalAdmin || isStaff) && <DebuggingTab />}
           {activeTab === 'config' && isGlobalAdmin && <ConfigTab />}
         </div>
       </div>
