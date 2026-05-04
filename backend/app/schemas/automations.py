@@ -74,6 +74,7 @@ class AutomationResponse(BaseModel):
     output_config: dict = {}
     created_at: str
     updated_at: str
+    can_manage: bool = True
 
 
 class TriggerEventStatusResponse(BaseModel):
