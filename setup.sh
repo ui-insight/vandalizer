@@ -2192,17 +2192,44 @@ main() {
 
   # If there's an existing deployment, offer mode selection
   if detect_deployment; then
+    # show_banner already populated CODE_VERSION_* / CATALOG_VERSION_*. If
+    # anything's outdated, prompt right here so the user doesn't have to
+    # navigate a menu to discover what they already saw at the top.
+    local code_outdated=0 cat_outdated=0
+    is_newer "$CODE_VERSION_LATEST"    "$CODE_VERSION_LOCAL"    && code_outdated=1
+    is_newer "$CATALOG_VERSION_LATEST" "$CATALOG_VERSION_LOCAL" && cat_outdated=1
+
+    if [[ $code_outdated -eq 1 || $cat_outdated -eq 1 ]]; then
+      echo ""
+      local what
+      if [[ $code_outdated -eq 1 && $cat_outdated -eq 1 ]]; then
+        what="Code and catalog are out of date"
+      elif [[ $code_outdated -eq 1 ]]; then
+        what="Code is out of date"
+      else
+        what="Catalog is out of date"
+      fi
+      echo -e "  ${SYM_NEURAL}  ${BOLD}${what}.${RESET}"
+      echo -ne "  ${SYM_ARROW}  Upgrade now? ${DIM}[Y/n]${RESET}: "
+      local upgrade_ans
+      read -r upgrade_ans
+      if [[ ! "$upgrade_ans" =~ ^[Nn] ]]; then
+        scan_and_upgrade
+        echo ""
+        exit 0
+      fi
+    fi
+
     echo ""
     echo -e "  ${SYM_NEURAL}  ${BOLD}Existing deployment detected.${RESET}"
     echo ""
     echo -e "  ${DIM}  1)${RESET} ${CYAN}Repair${RESET}        ${DIM}— diagnose and fix what's broken${RESET}"
-    echo -e "  ${DIM}  2)${RESET} ${CYAN}Scan & upgrade${RESET} ${DIM}— check origin for new code & catalog, apply what's outdated${RESET}"
-    echo -e "  ${DIM}  3)${RESET} ${CYAN}Redeploy${RESET}      ${DIM}— rebuild and restart from current code${RESET}"
-    echo -e "  ${DIM}  4)${RESET} ${CYAN}Full setup${RESET}    ${DIM}— reconfigure everything from scratch${RESET}"
-    echo -e "  ${DIM}  5)${RESET} ${CYAN}Seed catalog${RESET}  ${DIM}— update verified catalog with new seed data${RESET}"
-    echo -e "  ${DIM}  6)${RESET} ${CYAN}Re-ingest KBs${RESET} ${DIM}— rebuild knowledge base content in ChromaDB${RESET}"
-    echo -e "  ${DIM}  7)${RESET} ${CYAN}Schedule auto-updates${RESET} ${DIM}— install/replace a cron entry for upgrades${RESET}"
-    echo -e "  ${DIM}  8)${RESET} ${CYAN}Remove auto-updates${RESET}   ${DIM}— delete the scheduled cron entry${RESET}"
+    echo -e "  ${DIM}  2)${RESET} ${CYAN}Redeploy${RESET}      ${DIM}— rebuild and restart from current code${RESET}"
+    echo -e "  ${DIM}  3)${RESET} ${CYAN}Full setup${RESET}    ${DIM}— reconfigure everything from scratch${RESET}"
+    echo -e "  ${DIM}  4)${RESET} ${CYAN}Seed catalog${RESET}  ${DIM}— update verified catalog with new seed data${RESET}"
+    echo -e "  ${DIM}  5)${RESET} ${CYAN}Re-ingest KBs${RESET} ${DIM}— rebuild knowledge base content in ChromaDB${RESET}"
+    echo -e "  ${DIM}  6)${RESET} ${CYAN}Schedule auto-updates${RESET} ${DIM}— install/replace a cron entry for upgrades${RESET}"
+    echo -e "  ${DIM}  7)${RESET} ${CYAN}Remove auto-updates${RESET}   ${DIM}— delete the scheduled cron entry${RESET}"
     echo ""
     echo -ne "  ${SYM_ARROW}  Select mode ${DIM}[1]${RESET}: "
     local mode_choice
@@ -2210,13 +2237,12 @@ main() {
     mode_choice="${mode_choice:-1}"
 
     case "$mode_choice" in
-      2) scan_and_upgrade; echo ""; exit 0 ;;
-      3) redeploy; echo ""; exit 0 ;;
-      4) ;; # fall through to full setup
-      5) update_catalog; echo ""; exit 0 ;;
-      6) reingest_knowledge_bases; echo ""; exit 0 ;;
-      7) setup_cron; echo ""; exit 0 ;;
-      8) remove_cron; echo ""; exit 0 ;;
+      2) redeploy; echo ""; exit 0 ;;
+      3) ;; # fall through to full setup
+      4) update_catalog; echo ""; exit 0 ;;
+      5) reingest_knowledge_bases; echo ""; exit 0 ;;
+      6) setup_cron; echo ""; exit 0 ;;
+      7) remove_cron; echo ""; exit 0 ;;
       *) repair; echo ""; exit 0 ;;
     esac
   fi
