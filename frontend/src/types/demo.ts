@@ -56,6 +56,8 @@ export interface DemoApplication {
   admin_released: boolean
   created_at: string
   questionnaire_responses: Record<string, unknown>
+  credentials_sent_at: string | null
+  last_login_at: string | null
 }
 
 export interface DemoAdminStats {
