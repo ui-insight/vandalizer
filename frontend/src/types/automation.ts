@@ -17,4 +17,5 @@ export interface Automation {
   output_config: Record<string, unknown>
   created_at: string
   updated_at: string
+  can_manage: boolean
 }

@@ -23,6 +23,11 @@ from app.models.document import SmartDocument
 
 router = APIRouter()
 
+# Maximum lookback window for analytics endpoints. ~2 years covers any
+# realistic ad-hoc reporting need without letting callers ask for wildly
+# unbounded scans.
+MAX_ANALYTICS_DAYS = 730
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -352,7 +357,7 @@ class UserDetailResponse(BaseModel):
 
 @router.get("/usage", response_model=UsageStatsResponse)
 async def usage_stats(
-    days: int = Query(default=30, ge=1),
+    days: int = Query(default=30, ge=1, le=MAX_ANALYTICS_DAYS),
     user: User = Depends(get_current_user),
 ):
     _, team_scope = await _require_admin_or_team_admin(user)
@@ -411,7 +416,7 @@ async def usage_stats(
 
 @router.get("/usage/timeseries", response_model=TimeseriesResponse)
 async def usage_timeseries(
-    days: int = Query(default=30, ge=1),
+    days: int = Query(default=30, ge=1, le=MAX_ANALYTICS_DAYS),
     user: User = Depends(get_current_user),
 ):
     _, team_scope = await _require_admin_or_team_admin(user)
@@ -519,12 +524,16 @@ async def usage_timeseries(
 
 @router.get("/users", response_model=list[UserLeaderboardItem])
 async def user_leaderboard(
+    days: int | None = Query(default=None, ge=1, le=MAX_ANALYTICS_DAYS),
     user: User = Depends(get_current_user),
 ):
     _, team_scope = await _require_admin_or_team_admin(user)
     show_platform_role_flags = _can_view_platform_role_flags(team_scope)
 
     query_filter: dict = {}
+    if days is not None:
+        cutoff = datetime.datetime.utcnow() - datetime.timedelta(days=days)
+        query_filter["started_at"] = {"$gte": cutoff}
     scoped_team: Team | None = None
     if team_scope:
         scoped_team, team_scope_ids = await _resolve_team_scope(team_scope)
@@ -622,11 +631,15 @@ async def user_leaderboard(
 
 @router.get("/teams", response_model=list[TeamLeaderboardItem])
 async def team_leaderboard(
+    days: int | None = Query(default=None, ge=1, le=MAX_ANALYTICS_DAYS),
     user: User = Depends(get_current_user),
 ):
     _, team_scope = await _require_admin_or_team_admin(user)
 
     query_filter: dict = {}
+    if days is not None:
+        cutoff = datetime.datetime.utcnow() - datetime.timedelta(days=days)
+        query_filter["started_at"] = {"$gte": cutoff}
     if team_scope:
         _, team_scope_ids = await _resolve_team_scope(team_scope)
         query_filter["team_id"] = {"$in": team_scope_ids}
@@ -703,7 +716,7 @@ async def team_leaderboard(
 @router.get("/teams/{team_id}/detail", response_model=TeamDetailResponse)
 async def team_detail(
     team_id: str,
-    days: int = Query(default=30, ge=1),
+    days: int = Query(default=30, ge=1, le=MAX_ANALYTICS_DAYS),
     user: User = Depends(get_current_user),
 ):
     _, team_scope = await _require_admin_or_team_admin(user)
@@ -893,7 +906,7 @@ async def team_detail(
 @router.get("/users/{user_id}/detail", response_model=UserDetailResponse)
 async def user_detail(
     user_id: str,
-    days: int = Query(default=30, ge=1),
+    days: int = Query(default=30, ge=1, le=MAX_ANALYTICS_DAYS),
     user: User = Depends(get_current_user),
 ):
     _, team_scope = await _require_admin_or_team_admin(user)
@@ -1596,7 +1609,7 @@ async def quality_summary(user: User = Depends(get_current_user)):
 
 @router.get("/quality/timeline")
 async def quality_timeline(
-    days: int = 90,
+    days: int = Query(default=90, ge=1, le=MAX_ANALYTICS_DAYS),
     item_kind: str | None = None,
     user: User = Depends(get_current_user),
 ):
@@ -2089,7 +2102,7 @@ class EmailAnalyticsResponse(BaseModel):
 
 @router.get("/email-analytics", response_model=EmailAnalyticsResponse)
 async def email_analytics(
-    days: int = Query(default=30, ge=1, le=365),
+    days: int = Query(default=30, ge=1, le=MAX_ANALYTICS_DAYS),
     user: User = Depends(get_current_user),
 ) -> EmailAnalyticsResponse:
     """Deliverability stats over the last `days` days.

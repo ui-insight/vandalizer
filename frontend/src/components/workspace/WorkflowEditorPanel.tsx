@@ -491,8 +491,9 @@ export function WorkflowEditorPanel() {
                 await importIntoWorkflow(workflow.id, f)
                 await queryClient.invalidateQueries({ queryKey: ['workflows'] })
                 await refresh()
+                toast('Workflow imported successfully', 'success')
               } catch (err: unknown) {
-                alert(err instanceof Error ? err.message : 'Import failed')
+                toast(err instanceof Error ? err.message : 'Import failed', 'error')
               }
             }}
           />

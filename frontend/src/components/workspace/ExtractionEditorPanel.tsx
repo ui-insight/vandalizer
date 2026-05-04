@@ -560,8 +560,9 @@ export function ExtractionEditorPanel() {
             } else {
               openExtraction(result.uuid)
             }
+            toast('Extraction imported successfully', 'success')
           } catch (err: unknown) {
-            alert(err instanceof Error ? err.message : 'Import failed')
+            toast(err instanceof Error ? err.message : 'Import failed', 'error')
           }
         }}
       />
