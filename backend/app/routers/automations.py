@@ -89,7 +89,7 @@ async def _resolve_action_name(action_type: str | None, action_id: str | None) -
     return None
 
 
-async def _to_response(auto) -> AutomationResponse:
+async def _to_response(auto, *, can_manage: bool = True) -> AutomationResponse:
     action_name = await _resolve_action_name(auto.action_type, auto.action_id)
     return AutomationResponse(
         id=str(auto.id),
@@ -107,7 +107,39 @@ async def _to_response(auto) -> AutomationResponse:
         output_config=auto.output_config,
         created_at=auto.created_at.isoformat(),
         updated_at=auto.updated_at.isoformat(),
+        can_manage=can_manage,
     )
+
+
+async def _load_authorized_automation(
+    automation_id: str,
+    user: User,
+    *,
+    manage: bool = False,
+) -> tuple[Automation, access_control.TeamAccessContext]:
+    """Load an automation by id, returning (automation, team_access).
+
+    Raises 404 if the automation doesn't exist; 403 if the caller lacks the
+    requested permission. Distinguishing these statuses lets the frontend show
+    a meaningful error instead of "not found" for permission failures.
+    """
+    try:
+        auto = await Automation.get(PydanticObjectId(automation_id))
+    except Exception:
+        raise HTTPException(status_code=404, detail="Automation not found")
+    if not auto:
+        raise HTTPException(status_code=404, detail="Automation not found")
+
+    team_access = await access_control.get_team_access_context(user)
+    if manage:
+        allowed = access_control.can_manage_automation(auto, user, team_access)
+        forbidden_msg = "You don't have permission to manage this automation"
+    else:
+        allowed = access_control.can_view_automation(auto, user, team_access)
+        forbidden_msg = "You don't have permission to view this automation"
+    if not allowed:
+        raise HTTPException(status_code=403, detail=forbidden_msg)
+    return auto, team_access
 
 
 @router.post("", response_model=AutomationResponse)
@@ -130,7 +162,14 @@ async def list_automations(user: User = Depends(get_current_user)):
     automations = await svc.list_automations(
         user_id=user.user_id, team_id=team_id,
     )
-    return [await _to_response(a) for a in automations]
+    team_access = await access_control.get_team_access_context(user)
+    return [
+        await _to_response(
+            a,
+            can_manage=access_control.can_manage_automation(a, user, team_access),
+        )
+        for a in automations
+    ]
 
 
 @router.get("/active")
@@ -313,25 +352,21 @@ async def get_trigger_event_status(
 
 @router.get("/{automation_id}", response_model=AutomationResponse)
 async def get_automation(automation_id: str, user: User = Depends(get_current_user)):
-    auto = await svc.get_automation(automation_id, user=user)
-    if not auto:
-        raise HTTPException(status_code=404, detail="Automation not found")
-    return await _to_response(auto)
+    auto, team_access = await _load_authorized_automation(automation_id, user)
+    can_manage = access_control.can_manage_automation(auto, user, team_access)
+    return await _to_response(auto, can_manage=can_manage)
 
 
 @router.patch("/{automation_id}", response_model=AutomationResponse)
 async def update_automation(automation_id: str, req: UpdateAutomationRequest, user: User = Depends(get_current_user)):
-    current = await svc.get_automation(automation_id, user=user, manage=True)
-    if not current:
-        raise HTTPException(status_code=404, detail="Automation not found")
+    current, _ = await _load_authorized_automation(automation_id, user, manage=True)
 
     action_type = req.action_type if req.action_type is not None else current.action_type
     action_id = req.action_id if req.action_id is not None else current.action_id
     await _validate_action_target(action_type, action_id, user)
 
-    auto = await svc.update_automation(
-        automation_id,
-        user=user,
+    auto = await svc.apply_automation_update(
+        current,
         name=req.name,
         description=req.description,
         enabled=req.enabled,
@@ -342,16 +377,13 @@ async def update_automation(automation_id: str, req: UpdateAutomationRequest, us
         shared_with_team=req.shared_with_team,
         output_config=req.output_config,
     )
-    if not auto:
-        raise HTTPException(status_code=404, detail="Automation not found")
-    return await _to_response(auto)
+    return await _to_response(auto, can_manage=True)
 
 
 @router.delete("/{automation_id}")
 async def delete_automation(automation_id: str, user: User = Depends(get_current_user)):
-    ok = await svc.delete_automation(automation_id, user=user)
-    if not ok:
-        raise HTTPException(status_code=404, detail="Automation not found")
+    auto, _ = await _load_authorized_automation(automation_id, user, manage=True)
+    await auto.delete()
     return {"ok": True}
 
 

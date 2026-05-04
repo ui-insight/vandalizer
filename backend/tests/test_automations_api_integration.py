@@ -15,6 +15,7 @@ from bson import ObjectId
 from httpx import ASGITransport, AsyncClient
 
 from app.config import Settings
+from app.services.access_control import TeamAccessContext
 from app.utils.security import create_access_token, hash_api_token
 
 _TEST_SETTINGS = Settings(jwt_secret_key="test-secret-key", environment="development")
@@ -74,6 +75,7 @@ def _make_automation(
     auto.output_config = output_config or {}
     auto.created_at = datetime.datetime.now(datetime.timezone.utc)
     auto.updated_at = datetime.datetime.now(datetime.timezone.utc)
+    auto.delete = AsyncMock()
     return auto
 
 
@@ -949,7 +951,9 @@ class TestAutomationCRUD:
 
         with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
              patch("app.dependencies.User") as MockUser, \
-             patch("app.routers.automations.svc.list_automations", new_callable=AsyncMock, return_value=[auto]):
+             patch("app.routers.automations.svc.list_automations", new_callable=AsyncMock, return_value=[auto]), \
+             patch("app.routers.automations.access_control.get_team_access_context", new_callable=AsyncMock, return_value=TeamAccessContext()), \
+             patch("app.routers.automations.access_control.can_manage_automation", return_value=True):
             MockUser.find_one = AsyncMock(return_value=user)
 
             resp = await client.get(
@@ -962,15 +966,22 @@ class TestAutomationCRUD:
         body = resp.json()
         assert len(body) == 1
         assert body[0]["name"] == "Test Automation"
+        assert body[0]["can_manage"] is True
 
     @pytest.mark.asyncio
     async def test_get_automation_not_found(self, client):
         user = _make_user()
         cookies, headers = _auth_cookies()
 
+        from fastapi import HTTPException
+
         with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
              patch("app.dependencies.User") as MockUser, \
-             patch("app.routers.automations.svc.get_automation", new_callable=AsyncMock, return_value=None):
+             patch(
+                 "app.routers.automations._load_authorized_automation",
+                 new_callable=AsyncMock,
+                 side_effect=HTTPException(status_code=404, detail="Automation not found"),
+             ):
             MockUser.find_one = AsyncMock(return_value=user)
 
             resp = await client.get(
@@ -980,6 +991,30 @@ class TestAutomationCRUD:
             )
 
         assert resp.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_get_automation_forbidden_returns_403(self, client):
+        user = _make_user()
+        cookies, headers = _auth_cookies()
+
+        from fastapi import HTTPException
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch(
+                 "app.routers.automations._load_authorized_automation",
+                 new_callable=AsyncMock,
+                 side_effect=HTTPException(status_code=403, detail="You don't have permission to view this automation"),
+             ):
+            MockUser.find_one = AsyncMock(return_value=user)
+
+            resp = await client.get(
+                "/api/automations/auto-1",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 403
 
     @pytest.mark.asyncio
     async def test_update_automation(self, client):
@@ -992,9 +1027,9 @@ class TestAutomationCRUD:
 
         with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
              patch("app.dependencies.User") as MockUser, \
-             patch("app.routers.automations.svc.get_automation", new_callable=AsyncMock, return_value=auto), \
+             patch("app.routers.automations._load_authorized_automation", new_callable=AsyncMock, return_value=(auto, TeamAccessContext())), \
              patch("app.routers.automations._validate_action_target", new_callable=AsyncMock), \
-             patch("app.routers.automations.svc.update_automation", new_callable=AsyncMock, return_value=auto):
+             patch("app.routers.automations.svc.apply_automation_update", new_callable=AsyncMock, return_value=auto):
             MockUser.find_one = AsyncMock(return_value=user)
 
             resp = await client.patch(
@@ -1005,15 +1040,22 @@ class TestAutomationCRUD:
             )
 
         assert resp.status_code == 200
+        assert resp.json()["can_manage"] is True
 
     @pytest.mark.asyncio
     async def test_update_nonexistent_returns_404(self, client):
         user = _make_user()
         cookies, headers = _auth_cookies()
 
+        from fastapi import HTTPException
+
         with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
              patch("app.dependencies.User") as MockUser, \
-             patch("app.routers.automations.svc.get_automation", new_callable=AsyncMock, return_value=None):
+             patch(
+                 "app.routers.automations._load_authorized_automation",
+                 new_callable=AsyncMock,
+                 side_effect=HTTPException(status_code=404, detail="Automation not found"),
+             ):
             MockUser.find_one = AsyncMock(return_value=user)
 
             resp = await client.patch(
@@ -1026,13 +1068,39 @@ class TestAutomationCRUD:
         assert resp.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_delete_automation(self, client):
+    async def test_update_forbidden_returns_403(self, client):
         user = _make_user()
         cookies, headers = _auth_cookies()
 
+        from fastapi import HTTPException
+
         with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
              patch("app.dependencies.User") as MockUser, \
-             patch("app.routers.automations.svc.delete_automation", new_callable=AsyncMock, return_value=True):
+             patch(
+                 "app.routers.automations._load_authorized_automation",
+                 new_callable=AsyncMock,
+                 side_effect=HTTPException(status_code=403, detail="You don't have permission to manage this automation"),
+             ):
+            MockUser.find_one = AsyncMock(return_value=user)
+
+            resp = await client.patch(
+                "/api/automations/auto-1",
+                json={"enabled": False},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_delete_automation(self, client):
+        user = _make_user()
+        cookies, headers = _auth_cookies()
+        auto = _make_automation()
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.automations._load_authorized_automation", new_callable=AsyncMock, return_value=(auto, TeamAccessContext())):
             MockUser.find_one = AsyncMock(return_value=user)
 
             resp = await client.delete(
@@ -1043,15 +1111,22 @@ class TestAutomationCRUD:
 
         assert resp.status_code == 200
         assert resp.json()["ok"] is True
+        auto.delete.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_delete_nonexistent_returns_404(self, client):
         user = _make_user()
         cookies, headers = _auth_cookies()
 
+        from fastapi import HTTPException
+
         with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
              patch("app.dependencies.User") as MockUser, \
-             patch("app.routers.automations.svc.delete_automation", new_callable=AsyncMock, return_value=False):
+             patch(
+                 "app.routers.automations._load_authorized_automation",
+                 new_callable=AsyncMock,
+                 side_effect=HTTPException(status_code=404, detail="Automation not found"),
+             ):
             MockUser.find_one = AsyncMock(return_value=user)
 
             resp = await client.delete(
@@ -1061,6 +1136,30 @@ class TestAutomationCRUD:
             )
 
         assert resp.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_delete_forbidden_returns_403(self, client):
+        user = _make_user()
+        cookies, headers = _auth_cookies()
+
+        from fastapi import HTTPException
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch(
+                 "app.routers.automations._load_authorized_automation",
+                 new_callable=AsyncMock,
+                 side_effect=HTTPException(status_code=403, detail="You don't have permission to manage this automation"),
+             ):
+            MockUser.find_one = AsyncMock(return_value=user)
+
+            resp = await client.delete(
+                "/api/automations/auto-1",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 403
 
     @pytest.mark.asyncio
     async def test_unauthenticated_crud_returns_401(self, client):
