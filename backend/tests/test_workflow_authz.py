@@ -85,7 +85,8 @@ class TestWorkflowListScoping:
 
         with patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}), \
              patch("app.dependencies.User") as MockUser, \
-             patch("app.routers.workflows.svc") as mock_svc:
+             patch("app.routers.workflows.svc") as mock_svc, \
+             patch("app.routers.workflows.resolve_authors", new_callable=AsyncMock, return_value={}):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_svc.list_workflows = AsyncMock(return_value=[wf])
 
@@ -113,7 +114,8 @@ class TestWorkflowGetAuthz:
 
         with patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}), \
              patch("app.dependencies.User") as MockUser, \
-             patch("app.routers.workflows.svc") as mock_svc:
+             patch("app.routers.workflows.svc") as mock_svc, \
+             patch("app.routers.workflows.resolve_author", new_callable=AsyncMock, return_value=None):
             MockUser.find_one = AsyncMock(return_value=user)
             # Service returns a dict for WorkflowResponse
             mock_svc.get_workflow = AsyncMock(return_value={
@@ -160,7 +162,8 @@ class TestWorkflowUpdateAuthz:
         with patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}), \
              patch("app.dependencies.User") as MockUser, \
              patch("app.routers.workflows.svc") as mock_svc, \
-             patch("app.services.verification_service.check_and_flag_stale_verification", new_callable=AsyncMock, return_value=False):
+             patch("app.services.verification_service.check_and_flag_stale_verification", new_callable=AsyncMock, return_value=False), \
+             patch("app.routers.workflows.resolve_author", new_callable=AsyncMock, return_value=None):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_svc.update_workflow = AsyncMock(return_value=updated_wf)
 
@@ -399,7 +402,8 @@ class TestWorkflowDuplicateAuthz:
 
         with patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}), \
              patch("app.dependencies.User") as MockUser, \
-             patch("app.routers.workflows.svc") as mock_svc:
+             patch("app.routers.workflows.svc") as mock_svc, \
+             patch("app.routers.workflows.resolve_author", new_callable=AsyncMock, return_value=None):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_svc.duplicate_workflow = AsyncMock(return_value={
                 "id": "wf-2", "name": "Test Workflow (copy)",

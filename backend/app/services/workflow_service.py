@@ -149,6 +149,7 @@ async def get_workflow(workflow_id: str, user: User | None = None) -> dict | Non
         "validation_plan": _sanitize_for_json(wf.validation_plan),
         "validation_inputs": _sanitize_for_json(wf.validation_inputs),
         "can_manage": can_manage,
+        "created_by_user_id": wf.created_by_user_id or wf.user_id,
     }
 
 

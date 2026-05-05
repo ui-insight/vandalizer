@@ -39,8 +39,16 @@ from app.schemas.workflows import (
 )
 from app.rate_limit import limiter
 from app.services import workflow_service as svc
+from app.services.user_lookup import resolve_author, resolve_authors
 
 router = APIRouter()
+
+
+async def _workflow_response_from_dict(wf: dict) -> WorkflowResponse:
+    """Build a WorkflowResponse from a workflow dict, resolving the author."""
+    creator_id = wf.get("created_by_user_id") or wf.get("user_id")
+    created_by = await resolve_author(creator_id)
+    return WorkflowResponse(**{**wf, "created_by": created_by})
 
 
 def _csv_cell(value) -> str:
@@ -304,9 +312,11 @@ async def _authorize_documents(document_uuids: list[str], user: User) -> list[st
 async def create_workflow(req: CreateWorkflowRequest, user: User = Depends(get_current_user)):
     team_id = str(user.current_team) if user.current_team else None
     wf = await svc.create_workflow(req.name, user.user_id, req.description, team_id=team_id)
+    created_by = await resolve_author(wf.created_by_user_id or wf.user_id)
     return WorkflowResponse(
         id=str(wf.id), name=wf.name, description=wf.description,
         user_id=wf.user_id, num_executions=wf.num_executions,
+        created_by=created_by,
     )
 
 
@@ -319,10 +329,14 @@ async def list_workflows(
     user: User = Depends(get_current_user),
 ):
     workflows = await svc.list_workflows(user=user, skip=skip, limit=limit, scope=scope, search=search)
+    author_map = await resolve_authors(
+        (wf.created_by_user_id or wf.user_id) for wf in workflows
+    )
     return [
         WorkflowResponse(
             id=str(wf.id), name=wf.name, description=wf.description,
             user_id=wf.user_id, num_executions=wf.num_executions,
+            created_by=author_map.get(wf.created_by_user_id or wf.user_id),
         )
         for wf in workflows
     ]
@@ -682,7 +696,7 @@ async def import_workflow(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    return WorkflowResponse(**wf)
+    return await _workflow_response_from_dict(wf)
 
 
 @router.post("/{workflow_id}/import", response_model=WorkflowResponse)
@@ -714,7 +728,7 @@ async def import_into_workflow(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    return WorkflowResponse(**wf)
+    return await _workflow_response_from_dict(wf)
 
 
 @router.get("/{workflow_id}", response_model=WorkflowResponse)
@@ -722,7 +736,7 @@ async def get_workflow(workflow_id: str, user: User = Depends(get_current_user))
     wf = await svc.get_workflow(workflow_id, user=user)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
-    return WorkflowResponse(**wf)
+    return await _workflow_response_from_dict(wf)
 
 
 @router.patch("/{workflow_id}", response_model=WorkflowResponse)
@@ -735,10 +749,12 @@ async def update_workflow(workflow_id: str, req: UpdateWorkflowRequest, user: Us
     # Flag stale verification if this workflow was verified
     from app.services.verification_service import check_and_flag_stale_verification
     await check_and_flag_stale_verification("workflow", str(wf.id))
+    created_by = await resolve_author(wf.created_by_user_id or wf.user_id)
     return WorkflowResponse(
         id=str(wf.id), name=wf.name, description=wf.description,
         user_id=wf.user_id, num_executions=wf.num_executions,
         input_config=wf.input_config,
+        created_by=created_by,
     )
 
 
@@ -756,7 +772,7 @@ async def duplicate_workflow(workflow_id: str, user: User = Depends(get_current_
     wf = await svc.duplicate_workflow(workflow_id, user=user, user_id=user.user_id, team_id=team_id)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
-    return WorkflowResponse(**wf)
+    return await _workflow_response_from_dict(wf)
 
 
 # ---------------------------------------------------------------------------

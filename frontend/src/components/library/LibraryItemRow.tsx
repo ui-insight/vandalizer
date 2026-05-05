@@ -14,6 +14,8 @@ import {
 } from 'lucide-react'
 import { QualityBadge } from './QualityBadge'
 import { VerificationSubmitModal } from './VerificationSubmitModal'
+import { AuthorChip } from '../shared/AuthorChip'
+import { useAuth } from '../../hooks/useAuth'
 import { relativeTime } from '../../utils/time'
 import type { LibraryItem, LibraryFolder } from '../../types/library'
 
@@ -34,6 +36,7 @@ interface Props {
 }
 
 export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShare, onRemove, onOpen, onEdit, onMoveToFolder, folders, qualityTier, qualityScore }: Props) {
+  const { user } = useAuth()
   const [hovered, setHovered] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [folderSubmenuOpen, setFolderSubmenuOpen] = useState(false)
@@ -121,7 +124,12 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
             <Pin size={12} style={{ color: 'var(--library-highlight, #eab308)', flexShrink: 0 }} />
           )}
         </div>
-        <div style={{ fontSize: 12, color: '#70757a', marginTop: 4 }}>{kindLabel}</div>
+        <div style={{ fontSize: 12, color: '#70757a', marginTop: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>{kindLabel}</span>
+          {item.created_by && item.created_by.user_id !== user?.user_id && (
+            <AuthorChip author={item.created_by} />
+          )}
+        </div>
         {item.tags.length > 0 && (
           <div style={{ marginTop: 4, display: 'flex', gap: 4 }}>
             {item.tags.slice(0, 3).map((tag) => (
