@@ -307,7 +307,7 @@ export const MODULES: ModuleDefinition[] = [
     ],
     tips: [
       'The NIH R01 has clearly structured sections: budget, key personnel, specific aims, vertebrate animals',
-      'Use enum_values to constrain fields like Human Subjects (Yes/No) and Clinical Trial (Yes/No)',
+      'Use the Allowed values setting on a field to constrain answers to a list (e.g., Human Subjects: Yes/No, Clinical Trial: Yes/No)',
       'Mark fields like Co-Investigator as optional since there may be multiple',
     ],
     lessons: [
@@ -330,7 +330,7 @@ export const MODULES: ModuleDefinition[] = [
       {
         title: 'Configuring fields for accuracy',
         objective: 'After this lesson, you\'ll be able to configure extraction fields that minimize hallucinations and missed values.',
-        content: 'The way you configure your Extraction fields directly impacts extraction quality:\n\n**Field names** should be specific and unambiguous. "PI Name" is better than "Name". "Total Budget (USD)" is better than "Budget".\n\n**Enum values** constrain a field to a set of allowed options. For a field like "Document Type", you might set enum values to ["Grant Proposal", "Progress Report", "Budget Justification"]. This prevents the LLM from inventing categories.\n\n**Optional fields** should be marked as such. If a field like "Co-PI" won\'t appear in every document, marking it optional tells the extraction engine not to hallucinate a value when one doesn\'t exist.\n\n**Field descriptions** (in the title/searchphrase) give the LLM additional context about what to look for.',
+        content: 'The way you configure your Extraction fields directly impacts extraction quality:\n\n**Field names** should be specific and unambiguous. "PI Name" is better than "Name". "Total Budget (USD)" is better than "Budget".\n\n**Allowed values** (the field setting labeled "Allowed values" in the Extraction editor — sometimes called *enum values* in technical docs) constrain a field to a fixed list of options. For a field like "Document Type", you might set Allowed values to "Grant Proposal, Progress Report, Budget Justification". The LLM must pick one of those — it can\'t invent a new category. Use this any time the answer should be one of a known set: Yes/No, a status, a document type, a funding mechanism, etc.\n\n**Optional fields** should be marked as such. If a field like "Co-PI" won\'t appear in every document, marking it optional tells the extraction engine not to hallucinate a value when one doesn\'t exist.\n\n**Field descriptions** (in the title/searchphrase) give the LLM additional context about what to look for.',
         variant: 'concept',
         knowledgeCheck: {
           question: 'When should you mark an Extraction field as optional?',
@@ -344,7 +344,7 @@ export const MODULES: ModuleDefinition[] = [
       },
       {
         title: 'Build a comprehensive extraction',
-        content: '1. Create a new Extraction or expand an existing one to 15+ fields.\n2. Group related fields logically \u2014 e.g., personnel fields together, budget fields together.\n3. Use enum_values for any categorical field (status, type, category).\n4. Mark fields that may not always be present as optional.\n5. Add descriptive titles to help the LLM understand ambiguous fields.\n6. Run the extraction on a test document and review the results.\n7. Iterate: adjust field names and add enum constraints for any fields that extracted poorly.',
+        content: '1. Create a new Extraction or expand an existing one to 15+ fields.\n2. Group related fields logically \u2014 e.g., personnel fields together, budget fields together.\n3. For any categorical field (status, type, category), open the field and fill in the **Allowed values** setting with the list of valid options.\n4. Mark fields that may not always be present as optional.\n5. Add descriptive titles to help the LLM understand ambiguous fields.\n6. Run the extraction on a test document and review the results.\n7. Iterate: adjust field names and add Allowed values for any fields that extracted poorly.',
         variant: 'walkthrough',
       },
       {

@@ -1,6 +1,12 @@
 export type LibraryScope = 'personal' | 'team' | 'verified'
 export type LibraryItemKind = 'workflow' | 'search_set' | 'knowledge_base'
 
+export interface AuthorRef {
+  user_id: string
+  name: string | null
+  email: string | null
+}
+
 export interface Library {
   id: string
   scope: LibraryScope
@@ -33,6 +39,7 @@ export interface LibraryItem {
   quality_tier?: string | null
   quality_score?: number | null
   last_validated_at?: string | null
+  created_by?: AuthorRef | null
 }
 
 export interface LibraryFolder {
@@ -118,6 +125,7 @@ export interface VerifiedCatalogItem {
   sources_ready?: number
   kb_status?: string
   source_uuid?: string
+  created_by?: AuthorRef | null
 }
 
 export interface VerifiedCollection {

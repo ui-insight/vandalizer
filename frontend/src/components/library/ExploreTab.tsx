@@ -10,6 +10,7 @@ import {
 import { useNavigate } from '@tanstack/react-router'
 import { QualityBadge } from './QualityBadge'
 import { AddToLibraryDialog } from './AddToLibraryDialog'
+import { AuthorChip } from '../shared/AuthorChip'
 import {
   listVerifiedItems, browseCollections, listFeaturedCollections,
   listLibraries,
@@ -148,6 +149,9 @@ export function ItemDetailModal({
             )}
             {item.kind === 'knowledge_base' && item.total_chunks != null && (
               <span className="text-white/70">{item.total_chunks.toLocaleString()} chunks</span>
+            )}
+            {item.created_by && (
+              <AuthorChip author={item.created_by} size="md" label="by" />
             )}
           </div>
         </div>
@@ -299,6 +303,12 @@ function CatalogCard({
 
       {item.description && (
         <p className="text-xs text-gray-600 mb-2">{item.description}</p>
+      )}
+
+      {item.created_by && (
+        <div className="mb-2">
+          <AuthorChip author={item.created_by} />
+        </div>
       )}
 
       {item.kind === 'knowledge_base' && (item.total_sources != null || item.total_chunks != null) && (

@@ -101,7 +101,7 @@
     "star_criteria": {
       "1": "Extract 15+ fields from the NIH proposal",
       "2": "Extract 20+ fields including all budget categories",
-      "3": "Extract 25+ fields with enum values and optional field configuration"
+      "3": "Extract 25+ fields, using Allowed values to constrain categorical fields and marking situational fields as optional"
     }
   },
   "multi_step": {

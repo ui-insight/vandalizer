@@ -251,7 +251,7 @@ async def add_item(
     lib.updated_at = now
     await lib.save()
 
-    return await _dereference_item(li)
+    return await _attach_author(await _dereference_item(li))
 
 
 async def remove_item(library_id: str, item_id: str, user: User) -> bool:
@@ -297,7 +297,7 @@ async def update_item(
         item.favorited = favorited
     if updates:
         await item.set(updates)
-    return await _dereference_item(item)
+    return await _attach_author(await _dereference_item(item))
 
 
 async def touch_item(item_id: str, user: User) -> bool:
@@ -374,6 +374,7 @@ async def get_library_items(
 
             results.append(deref)
 
+    await _attach_authors(results)
     return results
 
 
@@ -629,12 +630,18 @@ def _item_created_at(item: LibraryItem) -> str | None:
 
 
 async def _dereference_item(item: LibraryItem) -> dict | None:
-    """Load the actual Workflow or SearchSet and return combined dict."""
+    """Load the actual Workflow or SearchSet and return combined dict.
+
+    Sets ``creator_user_id`` for workflow items (falling back to the workflow
+    owner when the dedicated field is missing). Use :func:`_attach_authors` to
+    expand it into a full ``created_by`` AuthorRef for response payloads.
+    """
     name = ""
     description = None
 
     set_type = None
     item_uuid = None
+    creator_user_id: str | None = None
 
     if item.kind == LibraryItemKind.WORKFLOW:
         wf = await Workflow.get(item.item_id)
@@ -642,6 +649,7 @@ async def _dereference_item(item: LibraryItem) -> dict | None:
             return None
         name = wf.name
         description = wf.description
+        creator_user_id = wf.created_by_user_id or wf.user_id
     elif item.kind == LibraryItemKind.SEARCH_SET:
         ss = await SearchSet.get(item.item_id)
         if not ss:
@@ -668,7 +676,33 @@ async def _dereference_item(item: LibraryItem) -> dict | None:
         "added_by_user_id": item.added_by_user_id,
         "created_at": _item_created_at(item),
         "last_used_at": _iso_utc(item.last_used_at),
+        "creator_user_id": creator_user_id,
     }
+
+
+async def _attach_authors(items: list[dict]) -> list[dict]:
+    """Batch-resolve creator_user_id → created_by AuthorRef for a list of dereffed items.
+
+    Mutates each dict to add ``created_by`` and remove the transient
+    ``creator_user_id`` key. Safe on items without a creator.
+    """
+    from app.services.user_lookup import resolve_authors
+
+    creator_ids = [i.get("creator_user_id") for i in items if i.get("creator_user_id")]
+    author_map = await resolve_authors(creator_ids) if creator_ids else {}
+    for entry in items:
+        cid = entry.pop("creator_user_id", None)
+        ref = author_map.get(cid) if cid else None
+        entry["created_by"] = ref.model_dump() if ref else None
+    return items
+
+
+async def _attach_author(item: dict | None) -> dict | None:
+    """Single-item variant of :func:`_attach_authors`."""
+    if not item:
+        return item
+    await _attach_authors([item])
+    return item
 
 
 async def _clone_underlying_object(item: LibraryItem, user_id: str, *, team_id: str | None = None) -> PydanticObjectId | None:

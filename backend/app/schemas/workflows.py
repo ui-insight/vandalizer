@@ -3,6 +3,8 @@
 from typing import Any, Optional
 from pydantic import BaseModel
 
+from app.schemas.user import AuthorRef
+
 
 # ---------------------------------------------------------------------------
 # Workflow
@@ -28,6 +30,7 @@ class WorkflowResponse(BaseModel):
     steps: list[dict] = []  # Dereferenced step objects
     input_config: dict = {}
     can_manage: bool = True
+    created_by: Optional[AuthorRef] = None
 
 
 # ---------------------------------------------------------------------------

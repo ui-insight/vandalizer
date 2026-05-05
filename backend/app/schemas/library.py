@@ -3,6 +3,8 @@
 from typing import Optional
 from pydantic import BaseModel
 
+from app.schemas.user import AuthorRef
+
 
 # ---------------------------------------------------------------------------
 # Library
@@ -50,6 +52,7 @@ class LibraryItemResponse(BaseModel):
     last_used_at: Optional[str] = None
     quality_tier: Optional[str] = None
     quality_score: Optional[float] = None
+    created_by: Optional[AuthorRef] = None
 
 
 class AddItemRequest(BaseModel):

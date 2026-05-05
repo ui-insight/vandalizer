@@ -64,7 +64,8 @@ class TestListWorkflows:
 
         with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
              patch("app.dependencies.User") as MockUser, \
-             patch("app.routers.workflows.svc") as mock_svc:
+             patch("app.routers.workflows.svc") as mock_svc, \
+             patch("app.routers.workflows.resolve_authors", AsyncMock(return_value={})):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_svc.list_workflows = AsyncMock(return_value=[mock_wf])
 
@@ -104,7 +105,8 @@ class TestCreateWorkflow:
 
         with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
              patch("app.dependencies.User") as MockUser, \
-             patch("app.routers.workflows.svc") as mock_svc:
+             patch("app.routers.workflows.svc") as mock_svc, \
+             patch("app.routers.workflows.resolve_author", AsyncMock(return_value=None)):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_svc.create_workflow = AsyncMock(return_value=mock_wf)
 

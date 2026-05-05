@@ -7,6 +7,15 @@ vi.mock('../../api/library', () => ({
   submitForVerification: vi.fn(),
 }))
 
+vi.mock('../../hooks/useAuth', () => ({
+  useAuth: () => ({
+    user: { id: '1', user_id: 'viewer', email: 'viewer@example.com', name: 'Viewer', is_admin: false },
+    loading: false,
+    login: vi.fn(),
+    logout: vi.fn(),
+  }),
+}))
+
 function makeItem(overrides: Partial<LibraryItem> = {}): LibraryItem {
   return {
     id: 'item-1',
