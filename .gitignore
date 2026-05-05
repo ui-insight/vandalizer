@@ -54,6 +54,9 @@ risk-plan.md
 
 # Setup wizard runtime log and backups
 .setup.log
+.auto_update.log
+.vandalizer_version
+.vandalizer_catalog_version
 backups/
 
 # Claude Code local settings

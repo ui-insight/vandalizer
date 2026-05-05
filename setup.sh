@@ -4,16 +4,23 @@
 #  AI-powered document intelligence for research administration
 #
 #  Run from the project root:
-#    ./setup.sh             First-time setup (or re-run detects existing deployment)
-#    ./setup.sh --repair    Diagnose and fix a broken deployment
-#    ./setup.sh --upgrade   Scan origin for new code & catalog, apply what's outdated
-#    ./setup.sh --redeploy  Rebuild and restart from current code (no git pull)
-#    ./setup.sh --seed      Update verified catalog (add new seed data)
-#    ./setup.sh --reingest  Re-ingest all knowledge base content into ChromaDB
+#    ./setup.sh                First-time setup (or re-run shows the main menu)
+#    ./setup.sh --repair       Diagnose and fix a broken deployment
+#    ./setup.sh --upgrade      Scan origin for new code & catalog, apply what's outdated
+#    ./setup.sh --redeploy     Rebuild and restart from current code (no git pull)
+#    ./setup.sh --seed         Update verified catalog (add new seed data)
+#    ./setup.sh --reset-catalog  Wipe catalog metadata and re-seed from current version
+#    ./setup.sh --reingest     Re-ingest all knowledge base content into ChromaDB
 #    ./setup.sh --reset-email  Reconfigure email provider (SMTP or Resend)
 #    ./setup.sh --cron-setup   Schedule automated upgrades via crontab
 #    ./setup.sh --cron-remove  Remove the scheduled auto-update entry
 #    ./setup.sh --auto-update  Non-interactive upgrade for cron (logs to .auto_update.log)
+#
+#  Re-running with no flags on an existing deployment opens a 4-section menu:
+#    Monitor   — system status, log tailing, version check, full diagnostics
+#    Deploy    — repair, redeploy, upgrade, full setup, email reconfigure
+#    Catalog   — update / reset / re-ingest knowledge bases
+#    Auto update — schedule, remove, run-now, view log
 # ============================================================================
 
 set -uo pipefail
@@ -246,8 +253,41 @@ code_version_latest() {
   echo "$tags"
 }
 
-# Catalog version installed locally — written by setup.sh after a successful seed.
+# Query the running deployment for the applied catalog version. Returns 0
+# and prints the version on success; returns 1 (no output) if Mongo is not
+# reachable or no catalog_version is recorded.
+_catalog_version_from_db() {
+  local container
+  container=$($COMPOSE_CMD ps --format '{{.Service}} {{.Name}}' 2>/dev/null \
+    | awk '$1=="mongo"{print $2}' || true)
+  [[ -z "$container" ]] && return 1
+
+  local db="vandalizer"
+  if [[ -f "$ENV_FILE" ]]; then
+    local env_db
+    env_db=$(grep -E "^MONGO_DB=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d'=' -f2-)
+    [[ -n "$env_db" ]] && db="$env_db"
+  fi
+
+  local v
+  v=$(docker exec "$container" mongosh --quiet --eval \
+    "var c = db.getSiblingDB('${db}').system_config.findOne({}, {catalog_version: 1}); print(c && c.catalog_version ? c.catalog_version : '');" \
+    2>/dev/null | tr -d '[:space:]')
+
+  [[ -n "$v" ]] || return 1
+  echo "$v"
+}
+
+# Catalog version installed locally. Source of truth is SystemConfig in Mongo
+# (written by scripts/seed_catalog.py on every successful seed); the host-side
+# file is just a cache so non-Mongo paths (cron pre-flight, etc.) still work.
 catalog_version_local() {
+  local from_db
+  if from_db=$(_catalog_version_from_db) && [[ -n "$from_db" ]]; then
+    echo "$from_db" > "$CATALOG_VERSION_HOST_FILE" 2>/dev/null || true
+    echo "$from_db"
+    return
+  fi
   [[ -f "$CATALOG_VERSION_HOST_FILE" ]] || { echo "unknown"; return; }
   tr -d '[:space:]' < "$CATALOG_VERSION_HOST_FILE"
 }
@@ -2089,6 +2129,357 @@ remove_cron() {
 }
 
 # ---------------------------------------------------------------------------
+# Reset verified catalog: wipe catalog metadata (preserving underlying
+# Workflow/SearchSet/KnowledgeBase rows), then re-seed from current version.
+# ---------------------------------------------------------------------------
+reset_catalog() {
+  section "X" "Reset Verified Catalog"
+
+  local current_version
+  current_version=$(catalog_version_local)
+  [[ -z "$current_version" || "$current_version" == "unknown" ]] && current_version="(seed files in working tree)"
+
+  echo -e "  ${SYM_WARN}  ${YELLOW}${BOLD}This is a destructive operation.${RESET}"
+  echo ""
+  echo -e "  ${DIM}     Removes from MongoDB:${RESET}"
+  echo -e "  ${DIM}       •  All verified collections${RESET}"
+  echo -e "  ${DIM}       •  All verified item metadata (display names, quality scores)${RESET}"
+  echo -e "  ${DIM}       •  All verified library items${RESET}"
+  echo -e "  ${DIM}       •  The verified library container${RESET}"
+  echo ""
+  echo -e "  ${DIM}     Preserves:${RESET}"
+  echo -e "  ${DIM}       •  Underlying workflows, search sets, knowledge bases${RESET}"
+  echo -e "  ${DIM}       •  User bookmarks (personal/team library items)${RESET}"
+  echo -e "  ${DIM}       •  Workflow run history${RESET}"
+  echo ""
+  echo -e "  ${DIM}     After reset, the catalog is re-seeded from version ${BOLD}${current_version}${RESET}."
+  echo ""
+
+  echo -ne "  ${SYM_ARROW}  Type ${BOLD}RESET${RESET} to confirm (anything else cancels): "
+  local confirm
+  read -r confirm
+  if [[ "$confirm" != "RESET" ]]; then
+    echo ""
+    echo -e "  ${DIM}     Cancelled — no changes made.${RESET}"
+    return 0
+  fi
+
+  # Backup first — gives the user a rollback path.
+  echo ""
+  echo -e "  ${SYM_NEURAL}  ${BOLD}Taking safety backup...${RESET}"
+  echo ""
+  take_backup
+
+  # Locate API container.
+  local container_name
+  container_name=$(_find_api_container)
+  if [[ -z "$container_name" ]]; then
+    echo ""
+    echo -e "  ${SYM_CROSS}  ${RED}API container is not running.${RESET}"
+    echo -e "  ${DIM}     Start services first: docker compose up -d${RESET}"
+    return 1
+  fi
+
+  echo ""
+  echo -e "  ${SYM_NEURAL}  ${BOLD}Resetting and re-seeding catalog...${RESET}"
+  echo -e "  ${DIM}     Using container: ${container_name}${RESET}"
+  echo ""
+
+  local seed_output
+  if seed_output=$(docker exec "$container_name" python -m scripts.seed_catalog --reset 2>&1); then
+    while IFS= read -r line; do
+      echo -e "  ${DIM}     ${line}${RESET}"
+    done <<< "$seed_output"
+    echo ""
+    local applied
+    applied=$(echo "$seed_output" | grep -E '^Catalog version: ' | head -1 | sed 's/^Catalog version: //' | tr -d '[:space:]')
+    if [[ -n "$applied" ]]; then
+      echo "$applied" > "$CATALOG_VERSION_HOST_FILE"
+      echo -e "  ${SYM_CHECK}  ${BRIGHT_GREEN}${BOLD}Verified catalog reset to ${applied}.${RESET}"
+    else
+      echo -e "  ${SYM_CHECK}  ${BRIGHT_GREEN}${BOLD}Verified catalog reset.${RESET}"
+    fi
+    echo -e "  ${DIM}     Backup at: ${LAST_BACKUP_DIR:-backups/}${RESET}"
+  else
+    while IFS= read -r line; do
+      echo -e "  ${DIM}     ${line}${RESET}"
+    done <<< "$seed_output"
+    echo ""
+    echo -e "  ${SYM_CROSS}  ${RED}Reset failed. Restore from backup if needed:${RESET}"
+    echo -e "  ${DIM}     ${LAST_BACKUP_DIR:-backups/}${RESET}"
+    return 1
+  fi
+}
+
+# Helper — locate the running api container by service name.
+_find_api_container() {
+  $COMPOSE_CMD ps --format '{{.Service}} {{.Name}}' 2>/dev/null \
+    | awk '$1=="api"{print $2}' | head -1
+}
+
+# ---------------------------------------------------------------------------
+# Monitor helpers
+# ---------------------------------------------------------------------------
+show_status() {
+  section "M" "System Status"
+
+  if [[ -x "./status.sh" ]]; then
+    ./status.sh
+  else
+    echo -e "  ${SYM_WARN}  ${YELLOW}./status.sh not found or not executable — falling back to compose ps.${RESET}"
+    echo ""
+    $COMPOSE_CMD ps
+  fi
+}
+
+tail_logs_menu() {
+  section "L" "Tail Service Logs"
+
+  echo -e "  ${DIM}     Press Ctrl-C to stop tailing and return to the menu.${RESET}"
+  echo ""
+  echo -e "  ${DIM}  1)${RESET} ${CYAN}api${RESET}        ${DIM}— FastAPI backend${RESET}"
+  echo -e "  ${DIM}  2)${RESET} ${CYAN}celery${RESET}     ${DIM}— task workers${RESET}"
+  echo -e "  ${DIM}  3)${RESET} ${CYAN}frontend${RESET}   ${DIM}— React/Nginx${RESET}"
+  echo -e "  ${DIM}  4)${RESET} ${CYAN}mongo${RESET}      ${DIM}— MongoDB${RESET}"
+  echo -e "  ${DIM}  5)${RESET} ${CYAN}redis${RESET}      ${DIM}— Redis${RESET}"
+  echo -e "  ${DIM}  6)${RESET} ${CYAN}chromadb${RESET}   ${DIM}— ChromaDB${RESET}"
+  echo -e "  ${DIM}  7)${RESET} ${CYAN}all${RESET}        ${DIM}— every service${RESET}"
+  echo -e "  ${DIM}  0)${RESET} ${CYAN}Back${RESET}"
+  echo ""
+  echo -ne "  ${SYM_ARROW}  Select ${DIM}[1]${RESET}: "
+  local svc_choice
+  read -r svc_choice
+  svc_choice="${svc_choice:-1}"
+
+  local svc=""
+  case "$svc_choice" in
+    1) svc="api" ;;
+    2) svc="celery" ;;
+    3) svc="frontend" ;;
+    4) svc="mongo" ;;
+    5) svc="redis" ;;
+    6) svc="chromadb" ;;
+    7) svc="" ;;  # all
+    0) return 0 ;;
+    *) echo -e "  ${SYM_WARN}  ${YELLOW}Invalid selection.${RESET}"; return 0 ;;
+  esac
+
+  echo ""
+  if [[ -z "$svc" ]]; then
+    $COMPOSE_CMD logs -f --tail=50
+  else
+    $COMPOSE_CMD logs -f --tail=100 "$svc"
+  fi
+}
+
+check_for_updates() {
+  section "V" "Version Check"
+  show_versions
+
+  local code_outdated=0 cat_outdated=0
+  is_newer "$CODE_VERSION_LATEST"    "$CODE_VERSION_LOCAL"    && code_outdated=1
+  is_newer "$CATALOG_VERSION_LATEST" "$CATALOG_VERSION_LOCAL" && cat_outdated=1
+
+  if [[ $code_outdated -eq 0 && $cat_outdated -eq 0 ]]; then
+    echo -e "  ${BRIGHT_GREEN}${BOLD}Everything is up to date.${RESET}"
+  else
+    echo -e "  ${ORANGE}${BOLD}Updates are available.${RESET}"
+    echo -e "  ${DIM}     Use ${BOLD}Deploy → Upgrade${RESET}${DIM} (or ${BOLD}./setup.sh --upgrade${RESET}${DIM}) to apply.${RESET}"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Auto-update helpers
+# ---------------------------------------------------------------------------
+view_auto_update_log() {
+  section "L" "Auto-Update Log"
+
+  if [[ ! -f "$AUTO_UPDATE_LOG" ]]; then
+    echo -e "  ${DIM}     No auto-update log yet (${AUTO_UPDATE_LOG} not found).${RESET}"
+    echo -e "  ${DIM}     Schedule auto-updates from the Auto Update menu first.${RESET}"
+    return 0
+  fi
+
+  local lines
+  lines=$(wc -l < "$AUTO_UPDATE_LOG" | tr -d '[:space:]')
+  echo -e "  ${DIM}     Showing last 80 lines of ${AUTO_UPDATE_LOG} (${lines} lines total).${RESET}"
+  echo ""
+  tail -80 "$AUTO_UPDATE_LOG" | while IFS= read -r line; do
+    echo -e "  ${DIM}${line}${RESET}"
+  done
+}
+
+run_auto_update_now() {
+  section "A" "Run Auto-Update Now"
+
+  echo -e "  ${DIM}     Runs the same non-interactive flow that cron uses.${RESET}"
+  echo -e "  ${DIM}     Output is appended to ${AUTO_UPDATE_LOG}.${RESET}"
+  echo ""
+
+  if auto_update; then
+    echo -e "  ${SYM_CHECK}  ${BRIGHT_GREEN}${BOLD}Auto-update finished.${RESET}"
+  else
+    echo -e "  ${SYM_CROSS}  ${RED}Auto-update reported errors.${RESET}"
+  fi
+
+  if [[ -f "$AUTO_UPDATE_LOG" ]]; then
+    echo ""
+    echo -e "  ${DIM}     Last 20 lines of ${AUTO_UPDATE_LOG}:${RESET}"
+    echo ""
+    tail -20 "$AUTO_UPDATE_LOG" | while IFS= read -r line; do
+      echo -e "  ${DIM}${line}${RESET}"
+    done
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Submenus
+# ---------------------------------------------------------------------------
+_submenu_prompt() {
+  echo ""
+  echo -ne "  ${SYM_ARROW}  Select ${DIM}[0]${RESET}: "
+}
+
+monitor_menu() {
+  while true; do
+    echo ""
+    echo -e "  ${VIOLET}┌─${RESET} ${BOLD}${WHITE}MONITOR${RESET} ${DIM}─────────────────────────────────────────${RESET}"
+    echo -e "  ${VIOLET}└──────────────────────────────────────────────${RESET}"
+    echo ""
+    echo -e "  ${DIM}  1)${RESET} ${CYAN}System status${RESET}        ${DIM}— containers, health, disk usage${RESET}"
+    echo -e "  ${DIM}  2)${RESET} ${CYAN}Tail logs${RESET}            ${DIM}— stream a service's log output${RESET}"
+    echo -e "  ${DIM}  3)${RESET} ${CYAN}Check for updates${RESET}    ${DIM}— compare local vs origin versions${RESET}"
+    echo -e "  ${DIM}  4)${RESET} ${CYAN}Run diagnostics${RESET}      ${DIM}— full health/integrity sweep${RESET}"
+    echo -e "  ${DIM}  0)${RESET} ${CYAN}Back${RESET}"
+    _submenu_prompt
+    local c; read -r c; c="${c:-0}"
+    case "$c" in
+      1) show_status ;;
+      2) tail_logs_menu ;;
+      3) check_for_updates ;;
+      4) verify ;;
+      0) return 0 ;;
+      *) echo -e "  ${SYM_WARN}  ${YELLOW}Invalid selection.${RESET}" ;;
+    esac
+  done
+}
+
+deploy_menu() {
+  while true; do
+    echo ""
+    echo -e "  ${VIOLET}┌─${RESET} ${BOLD}${WHITE}DEPLOY${RESET} ${DIM}──────────────────────────────────────────${RESET}"
+    echo -e "  ${VIOLET}└──────────────────────────────────────────────${RESET}"
+    echo ""
+    echo -e "  ${DIM}  1)${RESET} ${CYAN}Repair${RESET}              ${DIM}— diagnose and fix what's broken${RESET}"
+    echo -e "  ${DIM}  2)${RESET} ${CYAN}Redeploy${RESET}            ${DIM}— rebuild and restart from current code${RESET}"
+    echo -e "  ${DIM}  3)${RESET} ${CYAN}Upgrade${RESET}             ${DIM}— scan origin for new code & apply${RESET}"
+    echo -e "  ${DIM}  4)${RESET} ${CYAN}Full setup${RESET}          ${DIM}— reconfigure environment from scratch${RESET}"
+    echo -e "  ${DIM}  5)${RESET} ${CYAN}Reconfigure email${RESET}   ${DIM}— change SMTP / Resend settings${RESET}"
+    echo -e "  ${DIM}  0)${RESET} ${CYAN}Back${RESET}"
+    _submenu_prompt
+    local c; read -r c; c="${c:-0}"
+    case "$c" in
+      1) repair ;;
+      2) redeploy ;;
+      3) scan_and_upgrade ;;
+      4)
+        # Full setup is a multi-phase flow that exits the menu loop on completion.
+        configure_env
+        launch_services
+        bootstrap
+        verify
+        finale
+        return 0
+        ;;
+      5) reset_email ;;
+      0) return 0 ;;
+      *) echo -e "  ${SYM_WARN}  ${YELLOW}Invalid selection.${RESET}" ;;
+    esac
+  done
+}
+
+catalog_menu() {
+  while true; do
+    echo ""
+    echo -e "  ${VIOLET}┌─${RESET} ${BOLD}${WHITE}CATALOG${RESET} ${DIM}─────────────────────────────────────────${RESET}"
+    echo -e "  ${VIOLET}└──────────────────────────────────────────────${RESET}"
+    echo ""
+    echo -e "  ${DIM}  1)${RESET} ${CYAN}Update verified catalog${RESET}    ${DIM}— additive seed, keeps modifications${RESET}"
+    echo -e "  ${DIM}  2)${RESET} ${CYAN}Reset verified catalog${RESET}     ${YELLOW}⚠ destructive${RESET} ${DIM}— wipe catalog & re-seed${RESET}"
+    echo -e "  ${DIM}  3)${RESET} ${CYAN}Re-ingest knowledge bases${RESET}  ${DIM}— rebuild ChromaDB chunks${RESET}"
+    echo -e "  ${DIM}  0)${RESET} ${CYAN}Back${RESET}"
+    _submenu_prompt
+    local c; read -r c; c="${c:-0}"
+    case "$c" in
+      1) update_catalog ;;
+      2) reset_catalog ;;
+      3) reingest_knowledge_bases ;;
+      0) return 0 ;;
+      *) echo -e "  ${SYM_WARN}  ${YELLOW}Invalid selection.${RESET}" ;;
+    esac
+  done
+}
+
+auto_update_menu() {
+  while true; do
+    echo ""
+    echo -e "  ${VIOLET}┌─${RESET} ${BOLD}${WHITE}AUTO UPDATE${RESET} ${DIM}─────────────────────────────────────${RESET}"
+    echo -e "  ${VIOLET}└──────────────────────────────────────────────${RESET}"
+    echo ""
+
+    # Show current schedule inline so the user knows what's installed.
+    if command -v crontab &>/dev/null && crontab -l 2>/dev/null | grep -Fq "$CRON_MARKER"; then
+      local entry
+      entry=$(crontab -l 2>/dev/null | grep -F "$CRON_MARKER" | head -1 | awk '{print $1, $2, $3, $4, $5}')
+      echo -e "  ${SYM_CHECK}  ${DIM}Active schedule:${RESET} ${CYAN}${entry}${RESET}"
+    else
+      echo -e "  ${DIM}     No auto-update schedule installed.${RESET}"
+    fi
+    echo ""
+
+    echo -e "  ${DIM}  1)${RESET} ${CYAN}Schedule auto-updates${RESET}   ${DIM}— install/replace cron entry${RESET}"
+    echo -e "  ${DIM}  2)${RESET} ${CYAN}Remove schedule${RESET}         ${DIM}— delete the cron entry${RESET}"
+    echo -e "  ${DIM}  3)${RESET} ${CYAN}Run auto-update now${RESET}     ${DIM}— execute the cron flow once${RESET}"
+    echo -e "  ${DIM}  4)${RESET} ${CYAN}View auto-update log${RESET}    ${DIM}— last 80 lines of ${AUTO_UPDATE_LOG}${RESET}"
+    echo -e "  ${DIM}  0)${RESET} ${CYAN}Back${RESET}"
+    _submenu_prompt
+    local c; read -r c; c="${c:-0}"
+    case "$c" in
+      1) setup_cron ;;
+      2) remove_cron ;;
+      3) run_auto_update_now ;;
+      4) view_auto_update_log ;;
+      0) return 0 ;;
+      *) echo -e "  ${SYM_WARN}  ${YELLOW}Invalid selection.${RESET}" ;;
+    esac
+  done
+}
+
+main_menu() {
+  while true; do
+    echo ""
+    echo -e "  ${SYM_NEURAL}  ${BOLD}${WHITE}Main Menu${RESET}"
+    echo ""
+    echo -e "  ${DIM}  1)${RESET} ${CYAN}Monitor${RESET}       ${DIM}— status, logs, diagnostics${RESET}"
+    echo -e "  ${DIM}  2)${RESET} ${CYAN}Deploy${RESET}        ${DIM}— repair, redeploy, upgrade, setup${RESET}"
+    echo -e "  ${DIM}  3)${RESET} ${CYAN}Catalog${RESET}       ${DIM}— update, reset, re-ingest${RESET}"
+    echo -e "  ${DIM}  4)${RESET} ${CYAN}Auto update${RESET}   ${DIM}— schedule and run cron updates${RESET}"
+    echo -e "  ${DIM}  0)${RESET} ${CYAN}Exit${RESET}"
+    echo ""
+    echo -ne "  ${SYM_ARROW}  Select ${DIM}[0]${RESET}: "
+    local c; read -r c; c="${c:-0}"
+    case "$c" in
+      1) monitor_menu ;;
+      2) deploy_menu ;;
+      3) catalog_menu ;;
+      4) auto_update_menu ;;
+      0) echo ""; return 0 ;;
+      *) echo -e "  ${SYM_WARN}  ${YELLOW}Invalid selection.${RESET}" ;;
+    esac
+  done
+}
+
+# ---------------------------------------------------------------------------
 # Detect existing deployment
 # ---------------------------------------------------------------------------
 detect_deployment() {
@@ -2135,6 +2526,13 @@ main() {
       echo ""
       exit 0
       ;;
+    --reset-catalog|reset-catalog)
+      show_banner
+      preflight
+      reset_catalog
+      echo ""
+      exit 0
+      ;;
     --reingest|reingest)
       show_banner
       preflight
@@ -2170,18 +2568,23 @@ main() {
       echo ""
       echo -e "  ${BOLD}Usage:${RESET} ./setup.sh [command]"
       echo ""
-      echo -e "  ${BOLD}Commands:${RESET}"
-      echo -e "    ${CYAN}(none)${RESET}       Interactive setup — first-time install or repair existing"
-      echo -e "    ${CYAN}--repair${RESET}     Diagnose and fix a broken deployment"
-      echo -e "    ${CYAN}--upgrade${RESET}    Scan origin for new code & catalog, apply what's outdated"
-      echo -e "    ${CYAN}--redeploy${RESET}   Rebuild and restart from current code (no git pull)"
-      echo -e "    ${CYAN}--seed${RESET}       Update verified catalog with new seed data"
-      echo -e "    ${CYAN}--reingest${RESET}   Re-ingest all knowledge base content into ChromaDB"
-      echo -e "    ${CYAN}--reset-email${RESET} Reconfigure email provider (SMTP or Resend)"
-      echo -e "    ${CYAN}--cron-setup${RESET}  Schedule automated upgrades via crontab"
-      echo -e "    ${CYAN}--cron-remove${RESET} Remove the scheduled auto-update entry"
-      echo -e "    ${CYAN}--auto-update${RESET} Non-interactive upgrade (used by cron, logs to .auto_update.log)"
-      echo -e "    ${CYAN}--help${RESET}       Show this help"
+      echo -e "  ${BOLD}With no arguments:${RESET}"
+      echo -e "    First run launches interactive setup. On an existing deployment,"
+      echo -e "    re-running opens a menu with 4 sections — Monitor, Deploy,"
+      echo -e "    Catalog, Auto update."
+      echo ""
+      echo -e "  ${BOLD}Direct shortcuts (skip the menu):${RESET}"
+      echo -e "    ${CYAN}--repair${RESET}         Diagnose and fix a broken deployment"
+      echo -e "    ${CYAN}--upgrade${RESET}        Scan origin for new code & catalog, apply what's outdated"
+      echo -e "    ${CYAN}--redeploy${RESET}       Rebuild and restart from current code (no git pull)"
+      echo -e "    ${CYAN}--seed${RESET}           Update verified catalog with new seed data"
+      echo -e "    ${CYAN}--reset-catalog${RESET}  Wipe catalog metadata and re-seed (preserves underlying entities)"
+      echo -e "    ${CYAN}--reingest${RESET}       Re-ingest all knowledge base content into ChromaDB"
+      echo -e "    ${CYAN}--reset-email${RESET}    Reconfigure email provider (SMTP or Resend)"
+      echo -e "    ${CYAN}--cron-setup${RESET}     Schedule automated upgrades via crontab"
+      echo -e "    ${CYAN}--cron-remove${RESET}    Remove the scheduled auto-update entry"
+      echo -e "    ${CYAN}--auto-update${RESET}    Non-interactive upgrade (used by cron, logs to .auto_update.log)"
+      echo -e "    ${CYAN}--help${RESET}           Show this help"
       echo ""
       exit 0
       ;;
@@ -2222,29 +2625,8 @@ main() {
 
     echo ""
     echo -e "  ${SYM_NEURAL}  ${BOLD}Existing deployment detected.${RESET}"
-    echo ""
-    echo -e "  ${DIM}  1)${RESET} ${CYAN}Repair${RESET}        ${DIM}— diagnose and fix what's broken${RESET}"
-    echo -e "  ${DIM}  2)${RESET} ${CYAN}Redeploy${RESET}      ${DIM}— rebuild and restart from current code${RESET}"
-    echo -e "  ${DIM}  3)${RESET} ${CYAN}Full setup${RESET}    ${DIM}— reconfigure everything from scratch${RESET}"
-    echo -e "  ${DIM}  4)${RESET} ${CYAN}Seed catalog${RESET}  ${DIM}— update verified catalog with new seed data${RESET}"
-    echo -e "  ${DIM}  5)${RESET} ${CYAN}Re-ingest KBs${RESET} ${DIM}— rebuild knowledge base content in ChromaDB${RESET}"
-    echo -e "  ${DIM}  6)${RESET} ${CYAN}Schedule auto-updates${RESET} ${DIM}— install/replace a cron entry for upgrades${RESET}"
-    echo -e "  ${DIM}  7)${RESET} ${CYAN}Remove auto-updates${RESET}   ${DIM}— delete the scheduled cron entry${RESET}"
-    echo ""
-    echo -ne "  ${SYM_ARROW}  Select mode ${DIM}[1]${RESET}: "
-    local mode_choice
-    read -r mode_choice
-    mode_choice="${mode_choice:-1}"
-
-    case "$mode_choice" in
-      2) redeploy; echo ""; exit 0 ;;
-      3) ;; # fall through to full setup
-      4) update_catalog; echo ""; exit 0 ;;
-      5) reingest_knowledge_bases; echo ""; exit 0 ;;
-      6) setup_cron; echo ""; exit 0 ;;
-      7) remove_cron; echo ""; exit 0 ;;
-      *) repair; echo ""; exit 0 ;;
-    esac
+    main_menu
+    exit 0
   fi
 
   configure_env
