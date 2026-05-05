@@ -40,6 +40,12 @@ class SmartDocument(Document):
     soft_deleted: bool = False
     soft_deleted_at: Optional[datetime.datetime] = None
 
+    # Provenance for documents created by a workflow's "save output" config.
+    # Used to skip own-origin docs when re-running the same workflow.
+    origin_workflow_id: Optional[str] = None
+    origin_workflow_run_id: Optional[str] = None
+    origin_run_at: Optional[datetime.datetime] = None
+
     class Settings:
         name = "smart_document"
         indexes = [
@@ -49,4 +55,5 @@ class SmartDocument(Document):
             [("user_id", 1), ("folder", 1)],
             [("team_id", 1), ("folder", 1)],
             "created_at",
+            "origin_workflow_id",
         ]

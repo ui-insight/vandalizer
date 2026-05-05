@@ -408,6 +408,141 @@ class TestSaveResultsToFolder:
             with pytest.raises(ValueError, match="not found"):
                 save_results_to_folder({}, {"destination_folder": "bad-id"})
 
+    def test_populates_raw_text_for_chainability(self, tmp_path):
+        """Saved doc must carry raw_text so a chained workflow can consume it as input."""
+        mock_db = MagicMock()
+        mock_db.smart_folder.find_one.return_value = {"uuid": "folder-1"}
+        mock_db.workflow.find_one.return_value = {
+            "name": "Upstream WF", "user_id": "user1", "team_id": "team-42",
+        }
+
+        result_doc = {
+            "workflow": "wf-1",
+            "_id": "res-1",
+            "final_output": {"output": [{"key": "PI", "value": "Alice"}]},
+        }
+        storage_config = {
+            "destination_folder": "folder-1", "format": "markdown",
+            "skip_semantic_ingestion": True,
+        }
+
+        mock_settings = MagicMock()
+        mock_settings.upload_dir = str(tmp_path)
+
+        with (
+            patch("app.services.output_handlers.get_sync_db", return_value=mock_db),
+            patch("app.config.Settings", return_value=mock_settings),
+        ):
+            from app.services.output_handlers import save_results_to_folder
+
+            save_results_to_folder(result_doc, storage_config)
+
+            mock_db.smart_document.insert_one.assert_called_once()
+            saved = mock_db.smart_document.insert_one.call_args[0][0]
+            assert saved["raw_text"], "raw_text must be populated for downstream chaining"
+            assert "PI" in saved["raw_text"] or "Alice" in saved["raw_text"]
+            assert saved["team_id"] == "team-42"
+            assert saved["origin_workflow_id"] == "wf-1"
+            assert saved["origin_workflow_run_id"] == "res-1"
+            assert saved["origin_run_at"] is not None
+
+    def test_skip_semantic_ingestion_short_circuits_dispatch(self, tmp_path):
+        mock_db = MagicMock()
+        mock_db.smart_folder.find_one.return_value = {"uuid": "folder-1"}
+        mock_db.workflow.find_one.return_value = {"name": "WF", "user_id": "user1"}
+
+        mock_settings = MagicMock()
+        mock_settings.upload_dir = str(tmp_path)
+
+        with (
+            patch("app.services.output_handlers.get_sync_db", return_value=mock_db),
+            patch("app.config.Settings", return_value=mock_settings),
+            patch("app.celery_app.celery_app") as mock_celery,
+        ):
+            from app.services.output_handlers import save_results_to_folder
+
+            save_results_to_folder(
+                {"workflow": "wf-1", "_id": "res-1", "final_output": {"output": "hi"}},
+                {"destination_folder": "folder-1", "format": "markdown",
+                 "skip_semantic_ingestion": True},
+            )
+            mock_celery.send_task.assert_not_called()
+
+    def test_dispatches_semantic_ingestion_by_default(self, tmp_path):
+        mock_db = MagicMock()
+        mock_db.smart_folder.find_one.return_value = {"uuid": "folder-1"}
+        mock_db.workflow.find_one.return_value = {"name": "WF", "user_id": "user1"}
+
+        mock_settings = MagicMock()
+        mock_settings.upload_dir = str(tmp_path)
+
+        with (
+            patch("app.services.output_handlers.get_sync_db", return_value=mock_db),
+            patch("app.config.Settings", return_value=mock_settings),
+            patch("app.celery_app.celery_app") as mock_celery,
+        ):
+            from app.services.output_handlers import save_results_to_folder
+
+            save_results_to_folder(
+                {"workflow": "wf-1", "_id": "res-1", "final_output": {"output": "hi"}},
+                {"destination_folder": "folder-1", "format": "markdown"},
+            )
+            mock_celery.send_task.assert_called_once()
+            args, kwargs = mock_celery.send_task.call_args
+            assert args[0] == "tasks.document.semantic_ingestion"
+            assert kwargs["kwargs"]["user_id"] == "user1"
+            assert kwargs["kwargs"]["raw_text"]
+
+    def test_on_rerun_overwrite_updates_existing(self, tmp_path):
+        mock_db = MagicMock()
+        mock_db.smart_folder.find_one.return_value = {"uuid": "folder-1"}
+        mock_db.workflow.find_one.return_value = {"name": "WF", "user_id": "user1"}
+        existing_doc = {"_id": "doc-objid", "uuid": "existing-uuid"}
+        mock_db.smart_document.find_one.return_value = existing_doc
+
+        mock_settings = MagicMock()
+        mock_settings.upload_dir = str(tmp_path)
+
+        with (
+            patch("app.services.output_handlers.get_sync_db", return_value=mock_db),
+            patch("app.config.Settings", return_value=mock_settings),
+            patch("app.celery_app.celery_app"),
+        ):
+            from app.services.output_handlers import save_results_to_folder
+
+            save_results_to_folder(
+                {"workflow": "wf-1", "_id": "res-1", "final_output": {"output": "v2"}},
+                {"destination_folder": "folder-1", "format": "markdown",
+                 "on_rerun": "overwrite", "skip_semantic_ingestion": True},
+            )
+            mock_db.smart_document.update_one.assert_called_once()
+            mock_db.smart_document.insert_one.assert_not_called()
+
+    def test_on_rerun_new_inserts_each_time(self, tmp_path):
+        mock_db = MagicMock()
+        mock_db.smart_folder.find_one.return_value = {"uuid": "folder-1"}
+        mock_db.workflow.find_one.return_value = {"name": "WF", "user_id": "user1"}
+        # Even if a prior doc exists, "new" mode must insert a fresh one.
+        mock_db.smart_document.find_one.return_value = {"_id": "doc-objid", "uuid": "existing"}
+
+        mock_settings = MagicMock()
+        mock_settings.upload_dir = str(tmp_path)
+
+        with (
+            patch("app.services.output_handlers.get_sync_db", return_value=mock_db),
+            patch("app.config.Settings", return_value=mock_settings),
+            patch("app.celery_app.celery_app"),
+        ):
+            from app.services.output_handlers import save_results_to_folder
+
+            save_results_to_folder(
+                {"workflow": "wf-1", "_id": "res-1", "final_output": {"output": "x"}},
+                {"destination_folder": "folder-1", "format": "markdown",
+                 "on_rerun": "new", "skip_semantic_ingestion": True},
+            )
+            mock_db.smart_document.insert_one.assert_called_once()
+            mock_db.smart_document.update_one.assert_not_called()
+
 
 # ---------------------------------------------------------------------------
 # save_extraction_results_to_folder

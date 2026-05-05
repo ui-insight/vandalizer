@@ -990,7 +990,7 @@ export function LibraryTab() {
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: '4fr 2fr 150px',
+              gridTemplateColumns: '1fr 100px',
               padding: '10px 24px',
               backgroundColor: '#fff',
               borderBottom: '1px solid #f0f0f0',
@@ -1002,8 +1002,7 @@ export function LibraryTab() {
             }}
           >
             <div>Name</div>
-            <div>Last Used</div>
-            <div style={{ textAlign: 'right' }}>Actions</div>
+            <div style={{ textAlign: 'right' }}>Last Used</div>
           </div>
 
           {/* Items list */}

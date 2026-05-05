@@ -19,7 +19,15 @@ export function getWorkflow(id: string) {
   return apiFetch<Workflow>(`/api/workflows/${id}`)
 }
 
-export function updateWorkflow(id: string, data: { name?: string; description?: string; input_config?: Record<string, unknown> }) {
+export function updateWorkflow(
+  id: string,
+  data: {
+    name?: string;
+    description?: string;
+    input_config?: Record<string, unknown>;
+    output_config?: Record<string, unknown>;
+  },
+) {
   return apiFetch<Workflow>(`/api/workflows/${id}`, { method: 'PATCH', body: JSON.stringify(data) })
 }
 

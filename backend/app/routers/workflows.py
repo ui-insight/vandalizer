@@ -742,7 +742,8 @@ async def get_workflow(workflow_id: str, user: User = Depends(get_current_user))
 @router.patch("/{workflow_id}", response_model=WorkflowResponse)
 async def update_workflow(workflow_id: str, req: UpdateWorkflowRequest, user: User = Depends(get_current_user)):
     wf = await svc.update_workflow(
-        workflow_id, user=user, name=req.name, description=req.description, input_config=req.input_config,
+        workflow_id, user=user, name=req.name, description=req.description,
+        input_config=req.input_config, output_config=req.output_config,
     )
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
@@ -754,6 +755,7 @@ async def update_workflow(workflow_id: str, req: UpdateWorkflowRequest, user: Us
         id=str(wf.id), name=wf.name, description=wf.description,
         user_id=wf.user_id, num_executions=wf.num_executions,
         input_config=wf.input_config,
+        output_config=wf.output_config,
         created_by=created_by,
     )
 

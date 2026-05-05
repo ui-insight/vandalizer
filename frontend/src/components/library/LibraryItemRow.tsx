@@ -90,7 +90,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
       onClick={() => onOpen?.(item)}
       style={{
         display: 'grid',
-        gridTemplateColumns: '4fr 2fr 150px',
+        gridTemplateColumns: '1fr 100px',
         padding: '12px 24px',
         borderBottom: '1px solid #f0f0f0',
         alignItems: 'center',
@@ -140,6 +140,9 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
           {item.created_by && item.created_by.user_id !== user?.user_id && (
             <AuthorChip author={item.created_by} />
           )}
+          {(qualityTier != null || qualityScore != null) && item.set_type !== 'prompt' && item.set_type !== 'formatter' && (
+            <QualityBadge tier={qualityTier ?? null} score={qualityScore ?? null} />
+          )}
         </div>
         {item.tags.length > 0 && (
           <div style={{ marginTop: 4, display: 'flex', gap: 4 }}>
@@ -166,17 +169,31 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
         )}
       </div>
 
-      {/* Last used column */}
-      <div style={{ fontSize: 12, color: '#9aa0a6', whiteSpace: 'nowrap' }}>
+      {/* Last used column — right-aligned */}
+      <div style={{ fontSize: 12, color: '#9aa0a6', whiteSpace: 'nowrap', textAlign: 'right' }}>
         {item.last_used_at ? relativeTime(item.last_used_at) : 'Never'}
       </div>
 
-      {/* Actions column */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, flexShrink: 0 }}>
-        {(hovered || menuOpen) && (
-          <>
-            {/* Top row: action buttons */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      {/* Hover actions overlay — floats over last-used date */}
+      {(hovered || menuOpen) && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute',
+            right: 16,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+            background: '#fff',
+            border: '1px solid #e5e7eb',
+            borderRadius: 999,
+            padding: '2px 4px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+            zIndex: 1,
+          }}
+        >
             {/* Favorite */}
             <button
               onClick={(e) => {
@@ -460,14 +477,8 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                 document.body,
               )}
             </div>
-            </div>
-            {/* Bottom row: quality badge (workflows and extraction tasks only) */}
-            {(qualityTier != null || qualityScore != null) && item.set_type !== 'prompt' && item.set_type !== 'formatter' && (
-              <QualityBadge tier={qualityTier ?? null} score={qualityScore ?? null} />
-            )}
-          </>
-        )}
-      </div>
+        </div>
+      )}
       {showVerifyModal && (
         <VerificationSubmitModal
           item={item}
