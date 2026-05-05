@@ -16,6 +16,8 @@ import {
   listLibraries,
 } from '../../api/library'
 import { adoptKnowledgeBase } from '../../api/knowledge'
+import { duplicateWorkflow } from '../../api/workflows'
+import { cloneSearchSet } from '../../api/extractions'
 import type { VerifiedCatalogItem, VerifiedCollection, Library, LibraryItemKind } from '../../types/library'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../contexts/ToastContext'
@@ -401,6 +403,7 @@ export function ExploreTab() {
   // Detail + dialogs
   const [detailItem, setDetailItem] = useState<VerifiedCatalogItem | null>(null)
   const [addToLibraryItem, setAddToLibraryItem] = useState<VerifiedCatalogItem | null>(null)
+  const [cloning, setCloning] = useState(false)
 
   // Debounced search
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -496,6 +499,38 @@ export function ExploreTab() {
   const showHero = !hasActiveFilters && !loading
 
   const navigate = useNavigate()
+
+  // Saving a workflow/extraction from Explore makes a copy that the user's
+  // team owns, so they can edit it immediately without hitting the read-only
+  // banner in the workflow editor.
+  const handleAddToLibrary = async (item: VerifiedCatalogItem) => {
+    if (cloning) return
+    if (item.kind !== 'workflow' && item.kind !== 'search_set') {
+      setAddToLibraryItem(item)
+      return
+    }
+    setCloning(true)
+    try {
+      let clonedItemId: string
+      if (item.kind === 'workflow') {
+        const w = await duplicateWorkflow(item.item_id)
+        clonedItemId = w.id
+      } else {
+        if (!item.source_uuid) {
+          toast('Cannot copy this item — missing reference', 'error')
+          return
+        }
+        const ss = await cloneSearchSet(item.source_uuid)
+        clonedItemId = ss.id
+      }
+      setAddToLibraryItem({ ...item, item_id: clonedItemId })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to make a copy'
+      toast(msg, 'error')
+    } finally {
+      setCloning(false)
+    }
+  }
 
   const handleAdoptKB = async (kbUuid: string) => {
     try {
@@ -834,10 +869,20 @@ export function ExploreTab() {
         <ItemDetailModal
           item={detailItem}
           onClose={() => setDetailItem(null)}
-          onAddToLibrary={(itm) => { setDetailItem(null); setAddToLibraryItem(itm) }}
+          onAddToLibrary={(itm) => { setDetailItem(null); handleAddToLibrary(itm) }}
           onAdoptKB={handleAdoptKB}
           onTryIt={handleTryIt}
         />
+      )}
+
+      {/* Cloning indicator */}
+      {cloning && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black/40" style={{ zIndex: 700 }}>
+          <div className="bg-white rounded-lg shadow-xl px-6 py-4 flex items-center gap-3">
+            <Loader2 className="h-5 w-5 animate-spin text-gray-600" />
+            <span className="text-sm text-gray-700">Making an editable copy for your team…</span>
+          </div>
+        </div>
       )}
 
       {/* Add to library dialog */}
@@ -847,7 +892,11 @@ export function ExploreTab() {
           itemId={addToLibraryItem.item_id}
           kind={addToLibraryItem.kind as LibraryItemKind}
           onClose={() => setAddToLibraryItem(null)}
-          onAdded={() => { setAddToLibraryItem(null); toast('Saved to library', 'success') }}
+          onAdded={() => {
+            const wasCopy = addToLibraryItem.kind === 'workflow' || addToLibraryItem.kind === 'search_set'
+            setAddToLibraryItem(null)
+            toast(wasCopy ? 'Saved an editable copy to your library' : 'Saved to library', 'success')
+          }}
         />
       )}
     </>

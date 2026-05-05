@@ -32,8 +32,9 @@ import type { Credential } from '../../types/credential'
 import { uploadFile } from '../../api/files'
 import { listKnowledgeBases } from '../../api/knowledge'
 import type { KnowledgeBase } from '../../types/knowledge'
+import { listItems as listSearchSetItems } from '../../api/extractions'
 import { useWorkflowRunner } from '../../hooks/useWorkflowRunner'
-import type { Workflow, WorkflowStep, WorkflowTask, WorkflowStatus, ModelInfo } from '../../types/workflow'
+import type { Workflow, WorkflowStep, WorkflowTask, WorkflowStatus, ModelInfo, SearchSetItem } from '../../types/workflow'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
@@ -1892,6 +1893,25 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
   // Extraction set picker
   const [showSetPicker, setShowSetPicker] = useState(false)
 
+  // Items from the linked SearchSet — fetched so the editor can show fields
+  // without forcing the user to run the workflow first.
+  const linkedSearchSetUuid = (taskData.search_set_uuid as string | undefined) || null
+  const [linkedSetItems, setLinkedSetItems] = useState<SearchSetItem[]>([])
+  const [linkedSetLoading, setLinkedSetLoading] = useState(false)
+  useEffect(() => {
+    if (task.name !== 'Extraction' || !linkedSearchSetUuid) {
+      setLinkedSetItems([])
+      return
+    }
+    let cancelled = false
+    setLinkedSetLoading(true)
+    listSearchSetItems(linkedSearchSetUuid)
+      .then(items => { if (!cancelled) setLinkedSetItems(items) })
+      .catch(() => { if (!cancelled) setLinkedSetItems([]) })
+      .finally(() => { if (!cancelled) setLinkedSetLoading(false) })
+    return () => { cancelled = true }
+  }, [task.name, linkedSearchSetUuid])
+
   // Model override for LLM tasks
   const LLM_TASKS = ['Extraction', 'Prompt', 'Formatter', 'DescribeImage', 'ResearchNode', 'FormFiller', 'Browser']
   const [models, setModels] = useState<ModelInfo[]>([])
@@ -1909,7 +1929,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
   const testMsgRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const color = getTaskColor(task.name)
-  const Icon = getTaskIcon(task.name)
+  const taskIcon = getTaskIcon(task.name)
 
   // Load models for LLM task types
   useEffect(() => {
@@ -2096,7 +2116,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
               backgroundColor: color + '18',
               display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
             }}>
-              <Icon style={{ width: 16, height: 16, color }} />
+              {React.createElement(taskIcon, { style: { width: 16, height: 16, color } })}
             </div>
             <div>
               <div style={{ fontSize: 16, fontWeight: 600, color: '#202124' }}>{task.name}</div>
@@ -2185,22 +2205,54 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                   )}
                 </div>
 
-                <div style={{ marginBottom: 16 }}>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
-                    Extraction fields
-                  </label>
-                  <ExtractionTagInput
-                    tags={Array.isArray(taskData.extractions) ? (taskData.extractions as string[]) : []}
-                    onChange={(tags) => setTaskData(prev => ({ ...prev, extractions: tags }))}
-                  />
-                </div>
-
-                {Boolean(taskData.search_set_uuid) && (
-                  <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
-                    <span style={{ fontWeight: 600 }}>Linked extraction:</span>{' '}
-                    <span style={{ fontFamily: 'monospace', fontSize: 11 }}>
-                      {String(taskData.search_set_uuid)}
-                    </span>
+                {linkedSearchSetUuid ? (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6, gap: 8 }}>
+                      <label style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
+                        Extraction fields
+                      </label>
+                      <span style={{ fontSize: 11, color: '#6b7280' }}>
+                        From saved set — edit in the Extractions library
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex', flexWrap: 'wrap', gap: 4, padding: '6px 8px',
+                        border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#f9fafb',
+                        minHeight: 38, alignItems: 'center', boxSizing: 'border-box',
+                      }}
+                    >
+                      {linkedSetLoading && linkedSetItems.length === 0 && (
+                        <span style={{ fontSize: 12, color: '#9ca3af', padding: '4px 6px' }}>Loading fields…</span>
+                      )}
+                      {!linkedSetLoading && linkedSetItems.length === 0 && (
+                        <span style={{ fontSize: 12, color: '#9ca3af', padding: '4px 6px' }}>No fields in this saved set</span>
+                      )}
+                      {linkedSetItems.map(item => (
+                        <span
+                          key={item.id}
+                          title={item.searchphrase}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 4,
+                            backgroundColor: '#f3f4f6', border: '1px solid #e5e7eb',
+                            borderRadius: 4, padding: '2px 8px', fontSize: 13,
+                            color: '#374151', lineHeight: '22px',
+                          }}
+                        >
+                          {item.title || item.searchphrase}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                      Extraction fields
+                    </label>
+                    <ExtractionTagInput
+                      tags={Array.isArray(taskData.extractions) ? (taskData.extractions as string[]) : []}
+                      onChange={(tags) => setTaskData(prev => ({ ...prev, extractions: tags }))}
+                    />
                   </div>
                 )}
 
