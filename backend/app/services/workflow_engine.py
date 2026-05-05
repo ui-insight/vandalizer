@@ -965,7 +965,20 @@ class PackageBuilderNode(Node):
 
 
 class ApprovalNode(Node):
-    """Workflow step that pauses execution for human review."""
+    """Workflow step that pauses execution for human review.
+
+    Configuration (`data`):
+      review_instructions: str — text shown to the reviewer.
+      assignee_role: "specific_users" | "workflow_owner" | "team_admins"
+      assigned_to_user_ids: list[str] — used when assignee_role == specific_users.
+      sla_days: int | None — days from pause until the timeout_action fires.
+      timeout_action: "none" | "approve" | "reject" | "escalate"
+      escalation_user_ids: list[str] — used when timeout_action == escalate.
+
+    The node emits a sentinel dict with `_approval_pause: True`. The engine's
+    execute() loop returns early when it sees that, and the workflow Celery
+    task persists an ApprovalRequest from the sentinel payload.
+    """
 
     def __init__(self, data: dict) -> None:
         super().__init__("Approval")
@@ -973,15 +986,17 @@ class ApprovalNode(Node):
 
     def process(self, inputs):
         review_instructions = self.data.get("review_instructions", "Please review the workflow output.")
-        assigned_to = self.data.get("assigned_to_user_ids", [])
-
         return {
             "output": inputs.get("output"),
             "input": inputs.get("output"),
             "step_name": self.name,
             "_approval_pause": True,
             "_review_instructions": review_instructions,
-            "_assigned_to_user_ids": assigned_to,
+            "_assignee_role": self.data.get("assignee_role", "specific_users"),
+            "_assigned_to_user_ids": self.data.get("assigned_to_user_ids", []),
+            "_sla_days": self.data.get("sla_days"),
+            "_timeout_action": self.data.get("timeout_action", "none"),
+            "_escalation_user_ids": self.data.get("escalation_user_ids", []),
             "_data_for_review": inputs.get("output"),
         }
 

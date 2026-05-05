@@ -5,7 +5,7 @@ import {
   ChevronRight, RefreshCw, MessageSquare, Search, Zap,
   CheckCircle2, XCircle, Clock, Download, TrendingUp, TrendingDown,
   ChevronDown, ChevronUp, ArrowUpDown, Play, Minus, AlertCircle,
-  ArrowLeft, FileText, FolderTree, X, Eye, Check, CheckCircle,
+  ArrowLeft, FileText, FolderTree, X, Check,
   Mail, Send, Link, UserPlus, Star, Award, Unlock, KeyRound,
 } from 'lucide-react'
 import {
@@ -59,8 +59,6 @@ import type {
 import { relativeTime } from '../utils/time'
 import { ModelCharacterBars } from '../components/ModelEffortPicker'
 import type { ModelInfo } from '../types/workflow'
-import * as approvalsApi from '../api/approvals'
-import type { ApprovalRequest } from '../api/approvals'
 import * as auditApi from '../api/audit'
 import type { AuditLogEntry } from '../api/audit'
 import { getAuthConfig } from '../api/auth'
@@ -73,7 +71,7 @@ function applyThemeToDOM(theme: ThemeConfig) {
   root.style.setProperty('--ui-radius', theme.ui_radius)
 }
 
-type Tab = 'usage' | 'users' | 'teams' | 'organizations' | 'workflows' | 'quality' | 'approvals' | 'audit' | 'demo' | 'email' | 'certifications' | 'apikeys' | 'config'
+type Tab = 'usage' | 'users' | 'teams' | 'organizations' | 'workflows' | 'quality' | 'audit' | 'demo' | 'email' | 'certifications' | 'apikeys' | 'config'
 
 const TABS: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'usage', label: 'Usage', icon: BarChart3 },
@@ -82,7 +80,6 @@ const TABS: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'organizations', label: 'Organizations', icon: FolderTree },
   { key: 'workflows', label: 'Workflows', icon: Workflow },
   { key: 'quality', label: 'Quality', icon: ShieldCheck },
-  { key: 'approvals', label: 'Approvals', icon: CheckCircle2 },
   { key: 'audit', label: 'Audit Log', icon: FileText },
   { key: 'demo', label: 'Demo', icon: Zap },
   { key: 'email', label: 'Email', icon: Mail },
@@ -5615,132 +5612,6 @@ function OrganizationsTab() {
 }
 
 // ---------------------------------------------------------------------------
-// Approvals Tab
-// ---------------------------------------------------------------------------
-
-function ApprovalsTab() {
-  const [approvals, setApprovals] = useState<ApprovalRequest[]>([])
-  const [loading, setLoading] = useState(true)
-  const [statusFilter, setStatusFilter] = useState('pending')
-  const [selected, setSelected] = useState<ApprovalRequest | null>(null)
-  const [comments, setComments] = useState('')
-  const [processing, setProcessing] = useState(false)
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      const data = await approvalsApi.listApprovals(statusFilter || undefined)
-      setApprovals(data.approvals)
-    } catch { /* ignore */ } finally {
-      setLoading(false)
-    }
-  }, [statusFilter])
-
-  useEffect(() => { load() }, [load])
-
-  const handleDecision = async (approve: boolean) => {
-    if (!selected) return
-    setProcessing(true)
-    try {
-      if (approve) await approvalsApi.approveRequest(selected.uuid, comments)
-      else await approvalsApi.rejectRequest(selected.uuid, comments)
-      setSelected(null)
-      setComments('')
-      load()
-    } catch { /* ignore */ } finally { setProcessing(false) }
-  }
-
-  const STATUS_COLOR: Record<string, string> = { pending: '#f59e0b', approved: '#16a34a', rejected: '#dc2626' }
-
-  return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Approval Queue</h2>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {(['pending', 'approved', 'rejected', ''] as const).map(s => (
-            <button key={s} onClick={() => setStatusFilter(s)} style={{
-              padding: '5px 12px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13,
-              fontWeight: statusFilter === s ? 600 : 400, cursor: 'pointer', fontFamily: 'inherit',
-              backgroundColor: statusFilter === s ? '#f3f4f6' : '#fff', color: '#374151',
-            }}>{s || 'All'}</button>
-          ))}
-        </div>
-      </div>
-
-      {selected && (
-        <div style={{ marginBottom: 16, padding: 16, border: '1px solid #e5e7eb', borderRadius: 8, backgroundColor: '#fff' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-            <div style={{ fontWeight: 600, fontSize: 15 }}>Review: {selected.step_name}</div>
-            <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}><X size={16} /></button>
-          </div>
-          {selected.review_instructions && (
-            <div style={{ padding: '8px 12px', borderRadius: 6, backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', fontSize: 13, color: '#1e40af', marginBottom: 12 }}>
-              {selected.review_instructions}
-            </div>
-          )}
-          {Object.keys(selected.data_for_review).length > 0 && (
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 4 }}>Data for Review</div>
-              <pre style={{ backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6, padding: '8px 12px', fontSize: 12, overflowX: 'auto', maxHeight: 200, overflowY: 'auto' }}>
-                {JSON.stringify(selected.data_for_review, null, 2)}
-              </pre>
-            </div>
-          )}
-          {selected.status === 'pending' ? (
-            <>
-              <div style={{ marginBottom: 10 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>Comments</label>
-                <textarea value={comments} onChange={e => setComments(e.target.value)} rows={2}
-                  placeholder="Optional reviewer comments..." style={{ width: '100%', fontSize: 13, border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 10px', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }} />
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => handleDecision(true)} disabled={processing} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 16px', borderRadius: 6, border: 'none', backgroundColor: '#16a34a', color: '#fff', fontSize: 13, fontWeight: 600, cursor: processing ? 'not-allowed' : 'pointer', opacity: processing ? 0.6 : 1, fontFamily: 'inherit' }}>
-                  <CheckCircle size={14} /> Approve
-                </button>
-                <button onClick={() => handleDecision(false)} disabled={processing} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 16px', borderRadius: 6, border: 'none', backgroundColor: '#dc2626', color: '#fff', fontSize: 13, fontWeight: 600, cursor: processing ? 'not-allowed' : 'pointer', opacity: processing ? 0.6 : 1, fontFamily: 'inherit' }}>
-                  <XCircle size={14} /> Reject
-                </button>
-              </div>
-            </>
-          ) : (
-            <div style={{ fontSize: 13, color: '#374151', backgroundColor: '#f9fafb', borderRadius: 6, padding: '8px 12px' }}>
-              <span style={{ fontWeight: 600 }}>Decision:</span> {selected.status} by {selected.reviewer_user_id || 'unknown'}
-              {selected.reviewer_comments && <p style={{ marginTop: 4, color: '#6b7280' }}>"{selected.reviewer_comments}"</p>}
-            </div>
-          )}
-        </div>
-      )}
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {loading ? (
-          <div style={{ padding: 32, textAlign: 'center', color: '#9ca3af' }}>Loading…</div>
-        ) : approvals.length === 0 ? (
-          <div style={{ padding: 32, textAlign: 'center', color: '#9ca3af', border: '1px solid #e5e7eb', borderRadius: 8, backgroundColor: '#fff' }}>
-            No {statusFilter || ''} approvals found
-          </div>
-        ) : approvals.map(a => (
-          <div key={a.uuid} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', border: '1px solid #e5e7eb', borderRadius: 8, backgroundColor: '#fff' }}>
-            <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: STATUS_COLOR[a.status] ?? '#9ca3af', flexShrink: 0 }} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 500, fontSize: 14 }}>{a.step_name}</div>
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                {a.review_instructions ? a.review_instructions.slice(0, 80) : 'No instructions'}
-              </div>
-            </div>
-            <div style={{ fontSize: 12, color: '#9ca3af', flexShrink: 0 }}>
-              {a.created_at ? new Date(a.created_at).toLocaleDateString() : '-'}
-            </div>
-            <button onClick={() => { setSelected(a); setComments('') }} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#fff', fontSize: 13, cursor: 'pointer', color: '#374151', fontFamily: 'inherit' }}>
-              <Eye size={14} /> Review
-            </button>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
 // Audit Log Tab
 // ---------------------------------------------------------------------------
 
@@ -6131,7 +6002,6 @@ export default function Admin() {
           {activeTab === 'organizations' && (isGlobalAdmin || isStaff) && <OrganizationsTab />}
           {activeTab === 'workflows' && <WorkflowsTab />}
           {activeTab === 'quality' && <QualityTab />}
-          {activeTab === 'approvals' && (isGlobalAdmin || isStaff) && <ApprovalsTab />}
           {activeTab === 'audit' && (isGlobalAdmin || isStaff) && <AuditTab />}
           {activeTab === 'demo' && (isGlobalAdmin || isStaff) && <DemoTab />}
           {activeTab === 'email' && (isGlobalAdmin || isStaff) && <EmailAnalyticsTab />}

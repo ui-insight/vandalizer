@@ -27,6 +27,7 @@ celery.conf.task_routes = {
     "tasks.activity.*": {"queue": "default"},
     "tasks.demo.*": {"queue": "default"},
     "tasks.retention.*": {"queue": "default"},
+    "tasks.approvals.*": {"queue": "default"},
 }
 
 celery.conf.beat_schedule = {
@@ -87,6 +88,11 @@ celery.conf.beat_schedule = {
     "retention-cleanup-ancillary": {
         "task": "tasks.retention.cleanup_ancillary",
         "schedule": crontab(hour=5, minute=0),  # daily at 5am
+    },
+    # Approval timeouts
+    "approvals-expire-overdue": {
+        "task": "tasks.approvals.expire_overdue",
+        "schedule": 300.0,  # every 5 minutes
     },
     # User engagement
     "engagement-onboarding-drips": {

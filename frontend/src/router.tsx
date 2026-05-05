@@ -26,6 +26,8 @@ const DemoFeedback = lazy(() => import('./pages/DemoFeedback'))
 const InviteAccept = lazy(() => import('./pages/InviteAccept'))
 const Organizations = lazy(() => import('./pages/Organizations'))
 const Credentials = lazy(() => import('./pages/Credentials'))
+const Reviews = lazy(() => import('./pages/Reviews'))
+const ReviewDetail = lazy(() => import('./pages/ReviewDetail'))
 const Login = lazy(() => import('./pages/Login'))
 const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 
@@ -283,17 +285,38 @@ const credentialsRoute = createRoute({
   ),
 })
 
-// /audit and /approvals are now tabs in the Admin panel
+// /audit is a tab in the Admin panel
 const auditLogRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/audit',
   component: () => <Navigate to="/admin" search={{}} />,
 })
 
+const reviewsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/reviews',
+  component: () => (
+    <ProtectedRoute>
+      <Reviews />
+    </ProtectedRoute>
+  ),
+})
+
+const reviewDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/reviews/$uuid',
+  component: () => (
+    <ProtectedRoute>
+      <ReviewDetail />
+    </ProtectedRoute>
+  ),
+})
+
+// Redirect legacy bookmarks/email links from /approvals to /reviews
 const approvalsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/approvals',
-  component: () => <Navigate to="/admin" search={{}} />,
+  component: () => <Navigate to="/reviews" />,
 })
 
 // /office and /browser-automation are unlinked shadow routes — removed
@@ -342,6 +365,8 @@ const routeTree = rootRoute.addChildren([
   organizationsRoute,
   credentialsRoute,
   auditLogRoute,
+  reviewsRoute,
+  reviewDetailRoute,
   approvalsRoute,
 ])
 

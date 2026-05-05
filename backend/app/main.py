@@ -14,7 +14,7 @@ from app.database import init_db
 from app.exceptions import AppError
 from app.middleware.csrf import CSRFMiddleware
 from app.rate_limit import limiter
-from app.routers import activity, admin, approvals, audit, auth, automations, browser_automation, certification, chat, config, credentials, demo, documents, extractions, feedback, feedback_prompt, files, folders, graph_webhooks, knowledge, library, mgmt, notifications, office, organizations, spaces, support, teams, verification, workflows
+from app.routers import activity, admin, audit, auth, automations, browser_automation, certification, chat, config, credentials, demo, documents, extractions, feedback, feedback_prompt, files, folders, graph_webhooks, knowledge, library, mgmt, notifications, office, organizations, reviews, spaces, support, teams, verification, workflows
 
 
 @lru_cache
@@ -207,7 +207,7 @@ app.include_router(browser_automation.router, prefix="/api/browser-automation", 
 app.include_router(certification.router, prefix="/api/certification", tags=["certification"])
 app.include_router(organizations.router, prefix="/api/organizations", tags=["organizations"])
 app.include_router(audit.router, prefix="/api/audit", tags=["audit"])
-app.include_router(approvals.router, prefix="/api/approvals", tags=["approvals"])
+app.include_router(reviews.router, prefix="/api/reviews", tags=["reviews"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
 app.include_router(spaces.router, prefix="/api/spaces", tags=["spaces"])
 app.include_router(support.router, prefix="/api/support", tags=["support"])

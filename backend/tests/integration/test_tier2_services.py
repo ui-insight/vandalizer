@@ -340,9 +340,9 @@ class TestApprovalRoutesWithRealDB:
         cookies, headers = _route_auth("reviewer1")
 
         with patch.object(celery, "send_task") as mock_send, \
-             patch("app.routers.approvals._notify_approval_resolved", new_callable=AsyncMock):
+             patch("app.routers.reviews._notify_owner", new_callable=AsyncMock):
             resp = await t2_client.post(
-                f"/api/approvals/{approval.uuid}/approve",
+                f"/api/reviews/{approval.uuid}/approve",
                 json={"comments": "Looks good"},
                 cookies=cookies,
                 headers=headers,
@@ -362,9 +362,9 @@ class TestApprovalRoutesWithRealDB:
         _user, _wf, wfr, approval = await self._seed()
         cookies, headers = _route_auth("reviewer1")
 
-        with patch("app.routers.approvals._notify_approval_resolved", new_callable=AsyncMock):
+        with patch("app.routers.reviews._notify_owner", new_callable=AsyncMock):
             resp = await t2_client.post(
-                f"/api/approvals/{approval.uuid}/reject",
+                f"/api/reviews/{approval.uuid}/reject",
                 json={"comments": "Not acceptable"},
                 cookies=cookies,
                 headers=headers,
@@ -381,7 +381,7 @@ class TestApprovalRoutesWithRealDB:
         cookies, headers = _route_auth("reviewer1")
 
         resp = await t2_client.post(
-            f"/api/approvals/{approval.uuid}/approve",
+            f"/api/reviews/{approval.uuid}/approve",
             json={"comments": "x"},
             cookies=cookies,
             headers=headers,

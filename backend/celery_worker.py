@@ -26,3 +26,4 @@ from app.tasks import m365_tasks  # noqa: F401  — tasks.passive.ingest_*, tria
 from app.tasks import passive_tasks  # noqa: F401  — tasks.passive.process_*, execute_*, cleanup
 from app.tasks import classification_tasks  # noqa: F401  — tasks.document.classify
 from app.tasks import demo_tasks  # noqa: F401  — tasks.demo.*
+from app.tasks import approval_tasks  # noqa: F401  — tasks.approvals.*

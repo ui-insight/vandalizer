@@ -463,7 +463,7 @@ def approval_request_email(
       <h1>Approval Required</h1>
       <p>Hi {reviewer_name}, the workflow <span class="highlight">{workflow_name}</span> is paused at step <strong style="color:#fff">{step_name}</strong> and needs your review.</p>
       {instructions_block}
-      <p style="margin-top:24px"><a class="btn" href="{frontend_url}/approvals?id={approval_uuid}">Review Now</a></p>
+      <p style="margin-top:24px"><a class="btn" href="{frontend_url}/reviews/{approval_uuid}">Review Now</a></p>
       <div class="footer">Vandalizer</div>
     </div></div></body></html>"""
     return subject, html

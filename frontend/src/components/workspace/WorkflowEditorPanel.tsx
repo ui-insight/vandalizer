@@ -32,6 +32,7 @@ import { listCredentials } from '../../api/credentials'
 import type { Credential } from '../../types/credential'
 import { uploadFile } from '../../api/files'
 import { listKnowledgeBases } from '../../api/knowledge'
+import { listAllFolders } from '../../api/folders'
 import type { KnowledgeBase } from '../../types/knowledge'
 import { listItems as listSearchSetItems } from '../../api/extractions'
 import { useWorkflowRunner } from '../../hooks/useWorkflowRunner'
@@ -45,8 +46,8 @@ import { QualitySparkline } from '../library/QualitySparkline'
 import { useQualitySparkline } from '../../hooks/useQualitySparkline'
 import { relativeTime } from '../../utils/time'
 import { VerificationSubmitDialog } from '../shared/VerificationSubmitDialog'
-import { getApproval, approveRequest, rejectRequest } from '../../api/approvals'
-import type { ApprovalRequest } from '../../api/approvals'
+import { getReview, approveReview, rejectReview } from '../../api/reviews'
+import type { ReviewDetail } from '../../api/reviews'
 
 // ---------------------------------------------------------------------------
 // Types & constants
@@ -83,6 +84,7 @@ const TASK_TYPES: TaskTypeDef[] = [
   { name: 'FormFiller', label: 'Form Filler', icon: MousePointerClick, color: '#e11d48', categories: ['all', 'output'], enabled: true },
   { name: 'DataExport', label: 'Data Export', icon: Download, color: '#059669', categories: ['all', 'output'], enabled: true },
   { name: 'PackageBuilder', label: 'Package Builder', icon: Package, color: '#6366f1', categories: ['all', 'output'], enabled: false },
+  { name: 'Approval', label: 'Approval Gate', icon: Hand, color: '#a855f7', categories: ['all', 'output'], enabled: true },
 ]
 
 const CATEGORIES: { key: TaskCategory; label: string }[] = [
@@ -1459,6 +1461,7 @@ function EditStepOverlay({
                       : task.name === 'FormFiller' ? 'Fill template'
                       : task.name === 'DataExport' ? 'Export data'
                       : task.name === 'PackageBuilder' ? 'Build zip package'
+                      : task.name === 'Approval' ? 'Approval gate'
                       : task.name}
                   </div>
                 </div>
@@ -1851,6 +1854,21 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
     return () => { cancelled = true }
   }, [task.name])
 
+  // Team members (Approval Gate assignee picker)
+  const [approvalTeamMembers, setApprovalTeamMembers] = useState<{ user_id: string; name: string | null; email: string | null; role: string }[]>([])
+  useEffect(() => {
+    if (task.name !== 'Approval') return
+    const teamUuid = user?.current_team_uuid
+    if (!teamUuid) { setApprovalTeamMembers([]); return }
+    let cancelled = false
+    import('../../api/teams').then(({ getTeamMembers }) =>
+      getTeamMembers(teamUuid)
+        .then(list => { if (!cancelled) setApprovalTeamMembers(list) })
+        .catch(() => { if (!cancelled) setApprovalTeamMembers([]) })
+    )
+    return () => { cancelled = true }
+  }, [task.name, user?.current_team_uuid])
+
   // Save fixed documents to workflow input_config
   const saveFixedDocs = async (docs: { uuid: string; title: string }[]) => {
     setFixedDocs(docs)
@@ -2175,6 +2193,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                   : task.name === 'FormFiller' ? 'Fill a template with data'
                   : task.name === 'DataExport' ? 'Export structured data as a file'
                   : task.name === 'PackageBuilder' ? 'Bundle outputs into a zip'
+                  : task.name === 'Approval' ? 'Pause for human review before continuing'
                   : 'Configure this task'}
               </div>
             </div>
@@ -2984,6 +3003,162 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
               </div>
             )}
 
+            {task.name === 'Approval' && (() => {
+              const assigneeRole = (taskData.assignee_role as string) || 'specific_users'
+              const assignedIds = (taskData.assigned_to_user_ids as string[] | undefined) || []
+              const slaDays = (taskData.sla_days as number | undefined) ?? 0
+              const timeoutAction = (taskData.timeout_action as string) || 'none'
+              const escalationIds = (taskData.escalation_user_ids as string[] | undefined) || []
+
+              const toggleAssigned = (uid: string) => {
+                const next = assignedIds.includes(uid)
+                  ? assignedIds.filter(x => x !== uid)
+                  : [...assignedIds, uid]
+                setTaskData(prev => ({ ...prev, assigned_to_user_ids: next }))
+              }
+              const toggleEscalation = (uid: string) => {
+                const next = escalationIds.includes(uid)
+                  ? escalationIds.filter(x => x !== uid)
+                  : [...escalationIds, uid]
+                setTaskData(prev => ({ ...prev, escalation_user_ids: next }))
+              }
+
+              const memberLabel = (m: { user_id: string; name: string | null; email: string | null; role: string }) =>
+                `${m.name || m.user_id}${m.email ? ` (${m.email})` : ''}${m.role !== 'member' ? ` — ${m.role}` : ''}`
+
+              return (
+                <div>
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                      Review instructions
+                    </label>
+                    <textarea
+                      value={getTextValue('review_instructions')}
+                      onChange={e => setTextValue('review_instructions', e.target.value)}
+                      rows={4}
+                      placeholder="What should the reviewer check?"
+                      style={{
+                        width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
+                        border: '1px solid #d1d5db', borderRadius: 6, resize: 'vertical', boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                      Who reviews?
+                    </label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {[
+                        { v: 'specific_users', l: 'Specific people' },
+                        { v: 'workflow_owner', l: 'Workflow owner' },
+                        { v: 'team_admins', l: 'Team admins' },
+                      ].map(opt => (
+                        <label key={opt.v} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151', cursor: 'pointer' }}>
+                          <input
+                            type="radio"
+                            name="approval_assignee_role"
+                            checked={assigneeRole === opt.v}
+                            onChange={() => setTaskData(prev => ({ ...prev, assignee_role: opt.v }))}
+                          />
+                          {opt.l}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {assigneeRole === 'specific_users' && (
+                    <div style={{ marginBottom: 16 }}>
+                      <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                        Reviewers
+                      </label>
+                      {approvalTeamMembers.length === 0 ? (
+                        <div style={{ fontSize: 12, color: '#6b7280' }}>
+                          No team members available. Use Workflow owner or Team admins, or add members in Team Settings.
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, border: '1px solid #e5e7eb', borderRadius: 6, padding: 8, maxHeight: 200, overflowY: 'auto' }}>
+                          {approvalTeamMembers.map(m => (
+                            <label key={m.user_id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151', cursor: 'pointer' }}>
+                              <input
+                                type="checkbox"
+                                checked={assignedIds.includes(m.user_id)}
+                                onChange={() => toggleAssigned(m.user_id)}
+                              />
+                              {memberLabel(m)}
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                      Deadline (days)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={slaDays}
+                      onChange={e => setTaskData(prev => ({ ...prev, sla_days: Number(e.target.value) || 0 }))}
+                      style={{
+                        width: 120, padding: '6px 10px', fontSize: 13,
+                        border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box',
+                      }}
+                    />
+                    <div style={{ fontSize: 11, color: '#6b7280', marginTop: 6 }}>
+                      0 = no deadline. The timeout action below fires once this many days elapse.
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                      If the deadline passes
+                    </label>
+                    <select
+                      value={timeoutAction}
+                      onChange={e => setTaskData(prev => ({ ...prev, timeout_action: e.target.value }))}
+                      style={{
+                        width: '100%', padding: '8px 12px', fontSize: 13,
+                        border: '1px solid #d1d5db', borderRadius: 6, background: '#fff', color: '#374151',
+                      }}
+                    >
+                      <option value="none">Mark expired (workflow stays paused)</option>
+                      <option value="approve">Auto-approve and continue</option>
+                      <option value="reject">Auto-reject and fail the workflow</option>
+                      <option value="escalate">Escalate to additional reviewers</option>
+                    </select>
+                  </div>
+
+                  {timeoutAction === 'escalate' && (
+                    <div style={{ marginBottom: 16 }}>
+                      <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                        Escalate to
+                      </label>
+                      {approvalTeamMembers.length === 0 ? (
+                        <div style={{ fontSize: 12, color: '#6b7280' }}>No team members available.</div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, border: '1px solid #e5e7eb', borderRadius: 6, padding: 8, maxHeight: 200, overflowY: 'auto' }}>
+                          {approvalTeamMembers.map(m => (
+                            <label key={m.user_id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151', cursor: 'pointer' }}>
+                              <input
+                                type="checkbox"
+                                checked={escalationIds.includes(m.user_id)}
+                                onChange={() => toggleEscalation(m.user_id)}
+                              />
+                              {memberLabel(m)}
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
+
             {/* Model override for LLM tasks */}
             {LLM_TASKS.includes(task.name) && models.length > 0 && (
               <div style={{ marginTop: 16 }}>
@@ -3453,14 +3628,14 @@ function WorkflowOutputCard({ status, sessionId, running, runElapsed, showDownlo
   const isPendingApproval = status?.status === 'pending_approval'
   const isDone = isCompleted || isError
 
-  const [approval, setApproval] = useState<ApprovalRequest | null>(null)
+  const [approval, setApproval] = useState<ReviewDetail | null>(null)
   const [approvalComments, setApprovalComments] = useState('')
   const [approvalProcessing, setApprovalProcessing] = useState(false)
   const [approvalError, setApprovalError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isPendingApproval || !status?.approval_request_id) return
-    getApproval(status.approval_request_id).then(setApproval).catch(() => {})
+    getReview(status.approval_request_id).then(setApproval).catch(() => {})
   }, [isPendingApproval, status?.approval_request_id])
 
   const handleApprove = async () => {
@@ -3468,7 +3643,7 @@ function WorkflowOutputCard({ status, sessionId, running, runElapsed, showDownlo
     setApprovalProcessing(true)
     setApprovalError(null)
     try {
-      await approveRequest(approval.uuid, approvalComments)
+      await approveReview(approval.uuid, { comments: approvalComments })
       setApproval({ ...approval, status: 'approved' })
     } catch (e) {
       setApprovalError(e instanceof Error ? e.message : 'Failed to approve')
@@ -3482,7 +3657,7 @@ function WorkflowOutputCard({ status, sessionId, running, runElapsed, showDownlo
     setApprovalProcessing(true)
     setApprovalError(null)
     try {
-      await rejectRequest(approval.uuid, approvalComments)
+      await rejectReview(approval.uuid, approvalComments)
       setApproval({ ...approval, status: 'rejected' })
     } catch (e) {
       setApprovalError(e instanceof Error ? e.message : 'Failed to reject')
@@ -3514,8 +3689,18 @@ function WorkflowOutputCard({ status, sessionId, running, runElapsed, showDownlo
         : isPendingApproval ? '2px solid #fbbf24'
         : '2px solid #e5e7eb',
     }}>
-      <div style={{ fontWeight: 600, fontSize: 14, color: '#202124', marginBottom: 8 }}>
-        {running ? 'Workflow Running' : isCompleted ? 'Output' : isError ? 'Error' : isPendingApproval ? 'Awaiting Approval' : 'View Output'}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 8 }}>
+        <div style={{ fontWeight: 600, fontSize: 14, color: '#202124' }}>
+          {running ? 'Workflow Running' : isCompleted ? 'Output' : isError ? 'Error' : isPendingApproval ? 'Awaiting Approval' : 'View Output'}
+        </div>
+        {isPendingApproval && status?.approval_request_id && (
+          <a
+            href={`/reviews/${status.approval_request_id}`}
+            style={{ fontSize: 12, color: '#0ea5e9', textDecoration: 'none' }}
+          >
+            Open full review →
+          </a>
+        )}
       </div>
 
       {/* Pending approval state */}
@@ -4222,6 +4407,183 @@ function InputTab({ workflow, openWorkflowId, onRefresh }: {
         )}
 
       </div>
+
+      <div style={{ fontSize: 14, fontWeight: 600, color: '#202124', margin: '32px 0 16px' }}>
+        Output Configuration
+      </div>
+      <OutputConfigCard
+        workflow={workflow}
+        openWorkflowId={openWorkflowId}
+        onRefresh={onRefresh}
+      />
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Output config card — saves workflow result to the library so chained
+// workflows can consume it as input.
+// ---------------------------------------------------------------------------
+
+function OutputConfigCard({
+  workflow,
+  openWorkflowId,
+  onRefresh,
+}: {
+  workflow: Workflow
+  openWorkflowId: string | null
+  onRefresh: () => void
+}) {
+  const oc = (workflow as unknown as Record<string, unknown>)?.output_config as Record<string, unknown> | undefined
+  const storage = (oc?.storage || {}) as Record<string, unknown>
+  const enabled = (storage.enabled as boolean) || false
+  const destinationFolder = (storage.destination_folder as string) || ''
+  const format = (storage.format as string) || 'markdown'
+  const fileNaming = (storage.file_naming as string) || '{workflow_name}_{date}_{time}'
+  const onRerun = (storage.on_rerun as string) || 'new'
+  const skipIngest = (storage.skip_semantic_ingestion as boolean) || false
+
+  const [folders, setFolders] = useState<{ uuid: string; path: string }[]>([])
+
+  useEffect(() => {
+    listAllFolders()
+      .then(list => setFolders(list.map(f => ({ uuid: f.uuid, path: f.path }))))
+      .catch(() => {})
+  }, [])
+
+  const persistStorage = async (patch: Record<string, unknown>) => {
+    if (!openWorkflowId) return
+    const current = (workflow as unknown as Record<string, unknown>)?.output_config as Record<string, unknown> | undefined
+    const nextStorage = { ...storage, ...patch }
+    await updateWorkflow(openWorkflowId, {
+      output_config: { ...(current || {}), storage: nextStorage },
+    })
+    onRefresh()
+  }
+
+  return (
+    <div style={{ padding: 16, backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: enabled ? 12 : 0 }}>
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={e => persistStorage({ enabled: e.target.checked })}
+          style={{ width: 16, height: 16, accentColor: '#3b82f6' }}
+        />
+        <span style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
+          Save workflow output as a document
+        </span>
+      </label>
+      <div style={{ fontSize: 12, color: '#6b7280', marginLeft: 24, marginTop: -4, marginBottom: enabled ? 12 : 0 }}>
+        Each run writes the output to the chosen folder so downstream workflows can pick it up as input.
+      </div>
+
+      {enabled && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 24 }}>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
+              Destination Folder
+            </label>
+            <select
+              value={destinationFolder}
+              onChange={e => persistStorage({ destination_folder: e.target.value })}
+              style={{
+                width: '100%', padding: '8px 12px', fontSize: 13,
+                border: '1px solid #d1d5db', borderRadius: 6, fontFamily: 'inherit',
+                backgroundColor: '#fff', color: '#202124', outline: 'none',
+              }}
+            >
+              <option value="">Select folder</option>
+              {folders.map(f => (
+                <option key={f.uuid} value={f.uuid}>{f.path}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
+              Format
+            </label>
+            <select
+              value={format}
+              onChange={e => persistStorage({ format: e.target.value })}
+              style={{
+                width: '100%', padding: '8px 12px', fontSize: 13,
+                border: '1px solid #d1d5db', borderRadius: 6, fontFamily: 'inherit',
+                backgroundColor: '#fff', color: '#202124', outline: 'none',
+              }}
+            >
+              <option value="markdown">Markdown</option>
+              <option value="text">Plain Text</option>
+              <option value="json">JSON</option>
+              <option value="csv">CSV</option>
+              <option value="pdf">PDF</option>
+            </select>
+            <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
+              Markdown is the most chainable format. PDFs and CSVs are saved as files but their text content is rendered as Markdown for downstream workflows.
+            </div>
+          </div>
+
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
+              File Naming Pattern
+            </label>
+            <input
+              type="text"
+              defaultValue={fileNaming}
+              onBlur={e => persistStorage({ file_naming: e.target.value })}
+              placeholder="{workflow_name}_{date}_{time}"
+              style={{
+                width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
+                border: '1px solid #d1d5db', borderRadius: 6, outline: 'none', boxSizing: 'border-box',
+              }}
+            />
+            <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
+              Variables: {'{workflow_name}'}, {'{date}'}, {'{time}'}, {'{workflow_id}'}, {'{run_id}'}
+            </div>
+          </div>
+
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 6 }}>
+              On Re-run
+            </label>
+            <div style={{ display: 'flex', gap: 16 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#374151', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="on_rerun"
+                  value="new"
+                  checked={onRerun === 'new'}
+                  onChange={() => persistStorage({ on_rerun: 'new' })}
+                />
+                Save as new document
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#374151', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="on_rerun"
+                  value="overwrite"
+                  checked={onRerun === 'overwrite'}
+                  onChange={() => persistStorage({ on_rerun: 'overwrite' })}
+                />
+                Overwrite previous output
+              </label>
+            </div>
+          </div>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={skipIngest}
+              onChange={e => persistStorage({ skip_semantic_ingestion: e.target.checked })}
+              style={{ width: 14, height: 14, accentColor: '#3b82f6' }}
+            />
+            <span style={{ fontSize: 12, color: '#374151' }}>
+              Skip semantic ingestion (saved doc won&apos;t appear in chat search)
+            </span>
+          </label>
+        </div>
+      )}
     </div>
   )
 }
