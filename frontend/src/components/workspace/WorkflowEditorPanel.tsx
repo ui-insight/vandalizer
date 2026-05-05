@@ -65,26 +65,44 @@ interface TaskTypeDef {
   color: string
   categories: TaskCategory[]
   enabled: boolean
+  description: string
 }
 
 const TASK_TYPES: TaskTypeDef[] = [
-  { name: 'Extraction', label: 'Extractions', icon: Filter, color: '#dc2626', categories: ['all', 'text'], enabled: true },
-  { name: 'Prompt', label: 'Prompts', icon: MousePointerClick, color: '#2563eb', categories: ['all', 'text'], enabled: true },
-  { name: 'Formatter', label: 'Format', icon: Outdent, color: '#16a34a', categories: ['all', 'text'], enabled: true },
-  { name: 'Browser', label: 'Browser Automation', icon: Globe, color: '#2563eb', categories: ['all', 'web'], enabled: false },
-  { name: 'AddDocument', label: 'Add Document', icon: FileText, color: '#7c3aed', categories: ['all', 'files'], enabled: true },
-  { name: 'AddWebsite', label: 'Add Website', icon: Globe, color: '#0891b2', categories: ['all', 'web'], enabled: true },
-  { name: 'DescribeImage', label: 'Describe Image', icon: Image, color: '#ec4899', categories: ['all', 'web'], enabled: false },
-  { name: 'CodeNode', label: 'Code Node', icon: Code, color: '#f59e0b', categories: ['all', 'web'], enabled: false },
-  { name: 'CrawlerNode', label: 'Crawler Node', icon: Bug, color: '#84cc16', categories: ['all', 'web'], enabled: true },
-  { name: 'ResearchNode', label: 'Research Node', icon: Search, color: '#8b5cf6', categories: ['all', 'web'], enabled: true },
-  { name: 'KnowledgeBaseQuery', label: 'Knowledge Base Query', icon: Sparkles, color: '#0ea5e9', categories: ['all', 'text'], enabled: true },
-  { name: 'APINode', label: 'API Node', icon: Zap, color: '#f97316', categories: ['all', 'web'], enabled: true },
-  { name: 'DocumentRenderer', label: 'Document Renderer', icon: FileText, color: '#0d9488', categories: ['all', 'output'], enabled: true },
-  { name: 'FormFiller', label: 'Form Filler', icon: MousePointerClick, color: '#e11d48', categories: ['all', 'output'], enabled: true },
-  { name: 'DataExport', label: 'Data Export', icon: Download, color: '#059669', categories: ['all', 'output'], enabled: true },
-  { name: 'PackageBuilder', label: 'Package Builder', icon: Package, color: '#6366f1', categories: ['all', 'output'], enabled: false },
-  { name: 'Approval', label: 'Approval Gate', icon: Hand, color: '#a855f7', categories: ['all', 'output'], enabled: true },
+  { name: 'Extraction', label: 'Extractions', icon: Filter, color: '#dc2626', categories: ['all', 'text'], enabled: true,
+    description: 'Pulls structured fields out of the step input — names, dates, amounts, etc. — using prompts you define per field.' },
+  { name: 'Prompt', label: 'Prompts', icon: MousePointerClick, color: '#2563eb', categories: ['all', 'text'], enabled: true,
+    description: 'Sends free-form instructions to the LLM and captures the response as text. Use for summaries, rewrites, or open-ended analysis.' },
+  { name: 'Formatter', label: 'Format', icon: Outdent, color: '#16a34a', categories: ['all', 'text'], enabled: true,
+    description: 'Reformats the step input into a target shape — markdown, JSON, table, etc. — without further analysis.' },
+  { name: 'Browser', label: 'Browser Automation', icon: Globe, color: '#2563eb', categories: ['all', 'web'], enabled: false,
+    description: 'Drives a real browser to interact with web pages: click, type, scroll, capture results.' },
+  { name: 'AddDocument', label: 'Add Document', icon: FileText, color: '#7c3aed', categories: ['all', 'files'], enabled: true,
+    description: 'Pulls a document from your library or files into the workflow as input for later steps.' },
+  { name: 'AddWebsite', label: 'Add Website', icon: Globe, color: '#0891b2', categories: ['all', 'web'], enabled: true,
+    description: 'Fetches a single web page and adds its contents as input for later steps.' },
+  { name: 'DescribeImage', label: 'Describe Image', icon: Image, color: '#ec4899', categories: ['all', 'web'], enabled: false,
+    description: 'Sends an image to a vision model and returns a written description of what it shows.' },
+  { name: 'CodeNode', label: 'Code Node', icon: Code, color: '#f59e0b', categories: ['all', 'web'], enabled: false,
+    description: 'Runs a small block of code against the step input for custom transforms.' },
+  { name: 'CrawlerNode', label: 'Crawler Node', icon: Bug, color: '#84cc16', categories: ['all', 'web'], enabled: true,
+    description: 'Recursively follows links from a starting URL and collects page contents for downstream steps.' },
+  { name: 'ResearchNode', label: 'Research Node', icon: Search, color: '#8b5cf6', categories: ['all', 'web'], enabled: true,
+    description: 'Runs an LLM-driven web search and synthesizes the findings into a written report.' },
+  { name: 'KnowledgeBaseQuery', label: 'Knowledge Base Query', icon: Sparkles, color: '#0ea5e9', categories: ['all', 'text'], enabled: true,
+    description: 'Queries a connected knowledge base via RAG and returns the matching passages.' },
+  { name: 'APINode', label: 'API Node', icon: Zap, color: '#f97316', categories: ['all', 'web'], enabled: true,
+    description: 'Calls an external HTTP API and returns the parsed response for downstream steps to use.' },
+  { name: 'DocumentRenderer', label: 'Document Renderer', icon: FileText, color: '#0d9488', categories: ['all', 'output'], enabled: true,
+    description: 'Renders the step output into a downloadable file (DOCX, PDF, etc.) and saves it to the workflow result.' },
+  { name: 'FormFiller', label: 'Form Filler', icon: MousePointerClick, color: '#e11d48', categories: ['all', 'output'], enabled: true,
+    description: 'Maps the step output into the fields of a target form template and produces the filled form.' },
+  { name: 'DataExport', label: 'Data Export', icon: Download, color: '#059669', categories: ['all', 'output'], enabled: true,
+    description: 'Exports tabular step output to CSV or XLSX so it can be downloaded or sent to an external sink.' },
+  { name: 'PackageBuilder', label: 'Package Builder', icon: Package, color: '#6366f1', categories: ['all', 'output'], enabled: false,
+    description: 'Bundles multiple workflow outputs together into a single zip package.' },
+  { name: 'Approval', label: 'Approval Gate', icon: Hand, color: '#a855f7', categories: ['all', 'output'], enabled: true,
+    description: 'Pauses the workflow until a designated reviewer approves or rejects the result so far.' },
 ]
 
 const CATEGORIES: { key: TaskCategory; label: string }[] = [
@@ -1552,6 +1570,25 @@ function TaskTypePicker({ category, setCategory, onSelect, onClose }: {
     category === 'all' ? true : t.categories.includes(category)
   )
 
+  const [tooltip, setTooltip] = useState<{
+    task: TaskTypeDef
+    x: number
+    y: number
+    placement: 'top' | 'bottom'
+  } | null>(null)
+
+  const showTooltip = (taskType: TaskTypeDef, target: HTMLElement) => {
+    const rect = target.getBoundingClientRect()
+    const placeAbove = rect.top > 140
+    setTooltip({
+      task: taskType,
+      x: rect.left + rect.width / 2,
+      y: placeAbove ? rect.top - 8 : rect.bottom + 8,
+      placement: placeAbove ? 'top' : 'bottom',
+    })
+  }
+  const hideTooltip = () => setTooltip(null)
+
   return (
     <div style={{
       position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1001,
@@ -1623,10 +1660,14 @@ function TaskTypePicker({ category, setCategory, onSelect, onClose }: {
                   }}
                   onMouseEnter={e => {
                     (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'
+                    showTooltip(taskType, e.currentTarget)
                   }}
                   onMouseLeave={e => {
                     (e.currentTarget as HTMLElement).style.boxShadow = 'none'
+                    hideTooltip()
                   }}
+                  onFocus={e => showTooltip(taskType, e.currentTarget)}
+                  onBlur={hideTooltip}
                 >
                   <div style={{
                     width: 40, height: 40, borderRadius: 8,
@@ -1675,6 +1716,8 @@ function TaskTypePicker({ category, setCategory, onSelect, onClose }: {
                         opacity: 0.4,
                         fontFamily: 'inherit',
                       }}
+                      onMouseEnter={e => showTooltip(taskType, e.currentTarget)}
+                      onMouseLeave={hideTooltip}
                     >
                       <div style={{
                         width: 40, height: 40, borderRadius: 8,
@@ -1697,6 +1740,34 @@ function TaskTypePicker({ category, setCategory, onSelect, onClose }: {
           )}
         </div>
       </div>
+
+      {/* Hover tooltip — fixed position so it escapes the scrollable grid */}
+      {tooltip && (
+        <div
+          style={{
+            position: 'fixed',
+            left: tooltip.x,
+            top: tooltip.y,
+            transform: tooltip.placement === 'top'
+              ? 'translate(-50%, -100%)'
+              : 'translate(-50%, 0)',
+            maxWidth: 280,
+            background: '#1f2937',
+            color: '#fff',
+            padding: '8px 12px',
+            borderRadius: 8,
+            fontSize: 12,
+            lineHeight: 1.4,
+            pointerEvents: 'none',
+            zIndex: 1100,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+          }}
+          role="tooltip"
+        >
+          <div style={{ fontWeight: 600, marginBottom: 2 }}>{tooltip.task.label}</div>
+          <div style={{ opacity: 0.9 }}>{tooltip.task.description}</div>
+        </div>
+      )}
     </div>
   )
 }
