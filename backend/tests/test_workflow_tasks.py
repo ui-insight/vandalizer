@@ -313,7 +313,6 @@ class TestExecuteWorkflowTask:
                 if t.get("name") == "Prompt":
                     assert t["data"]["doc_texts"] == ["Document content here"]
 
-
 # ---------------------------------------------------------------------------
 # execute_task_step_test
 # ---------------------------------------------------------------------------

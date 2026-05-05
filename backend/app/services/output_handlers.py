@@ -18,10 +18,34 @@ from app.tasks import get_sync_db
 logger = logging.getLogger(__name__)
 
 
-def save_results_to_folder(result_doc: dict, storage_config: dict) -> str:
-    """Save workflow results to a local folder in the configured format.
+def _render_chainable_text(output_data, workflow_name: str) -> str:
+    """Render workflow output as markdown so the saved doc is chainable as text."""
+    import io
+    buf = io.StringIO()
+    if isinstance(output_data, list) and output_data and isinstance(output_data[0], dict):
+        headers = list(dict.fromkeys(k for row in output_data for k in row.keys()))
+        buf.write(f"# {workflow_name.replace('_', ' ')}\n\n")
+        buf.write("| " + " | ".join(headers) + " |\n")
+        buf.write("| " + " | ".join("---" for _ in headers) + " |\n")
+        for row in output_data:
+            vals = [str(row.get(h, "")).replace("|", "\\|") for h in headers]
+            buf.write("| " + " | ".join(vals) + " |\n")
+    elif isinstance(output_data, dict):
+        buf.write(f"# {workflow_name.replace('_', ' ')}\n\n")
+        for k, v in output_data.items():
+            buf.write(f"**{k}:** {v}\n\n")
+    else:
+        buf.write(str(output_data) if output_data is not None else "")
+    return buf.getvalue()
 
-    Returns the file path string.
+
+def save_results_to_folder(result_doc: dict, storage_config: dict) -> str:
+    """Save workflow results to a local folder and create a chainable SmartDocument.
+
+    Returns the file path string. The created SmartDocument carries `raw_text`
+    populated from the markdown rendition, the workflow's team_id, and origin
+    metadata identifying this run, so that downstream workflows can consume it
+    as input and own-origin docs can be skipped to prevent loops.
     """
     db = get_sync_db()
     folder_id = storage_config.get("destination_folder")
@@ -53,6 +77,7 @@ def save_results_to_folder(result_doc: dict, storage_config: dict) -> str:
     output_data = final_output.get("output")
 
     user_id = workflow.get("user_id", "system")
+    team_id = workflow.get("team_id")
     from app.config import Settings as _Settings
     upload_dir = _Settings().upload_dir
     dir_path = Path(upload_dir) / user_id
@@ -73,21 +98,67 @@ def save_results_to_folder(result_doc: dict, storage_config: dict) -> str:
         with open(file_path, "w") as f:
             f.write(str(output_data))
 
-    # Create SmartDocument for the output file
-    doc_uuid = uuid4().hex
-    db.smart_document.insert_one({
+    # Render markdown for raw_text regardless of file format. PDF/CSV/JSON files
+    # aren't useful as text input to the next workflow; the markdown rendition is.
+    raw_text = _render_chainable_text(output_data, workflow_name)
+
+    on_rerun = storage_config.get("on_rerun", "new")
+    workflow_id_str = str(result_doc.get("workflow", "")) or None
+    run_id_str = str(result_doc.get("_id", "")) or None
+    now = datetime.now(timezone.utc)
+
+    doc_payload = {
         "title": filename,
         "path": f"{user_id}/{filename}",
         "downloadpath": f"{user_id}/{filename}",
         "extension": file_ext,
-        "uuid": doc_uuid,
         "user_id": user_id,
+        "team_id": team_id,
         "folder": folder.get("uuid", ""),
-        "raw_text": "",
+        "raw_text": raw_text,
+        "token_count": len(raw_text) // 4,
         "processing": False,
-        "created_at": datetime.now(timezone.utc),
-        "updated_at": datetime.now(timezone.utc),
-    })
+        "origin_workflow_id": workflow_id_str,
+        "origin_workflow_run_id": run_id_str,
+        "origin_run_at": now,
+        "updated_at": now,
+    }
+
+    doc_uuid = None
+    if on_rerun == "overwrite" and workflow_id_str:
+        existing = db.smart_document.find_one({
+            "origin_workflow_id": workflow_id_str,
+            "folder": folder.get("uuid", ""),
+        })
+        if existing:
+            doc_uuid = existing.get("uuid")
+            db.smart_document.update_one(
+                {"_id": existing["_id"]},
+                {"$set": doc_payload},
+            )
+
+    if doc_uuid is None:
+        doc_uuid = uuid4().hex
+        doc_payload["uuid"] = doc_uuid
+        doc_payload["created_at"] = now
+        db.smart_document.insert_one(doc_payload)
+
+    # Trigger semantic ingestion so the new doc is chat-searchable. Skip the
+    # extraction round-trip — we already have raw_text.
+    if not storage_config.get("skip_semantic_ingestion") and user_id and user_id != "system":
+        try:
+            from app.celery_app import celery_app
+            celery_app.send_task(
+                "tasks.document.semantic_ingestion",
+                kwargs={
+                    "raw_text": raw_text,
+                    "document_uuid": doc_uuid,
+                    "user_id": user_id,
+                },
+                queue="documents",
+            )
+        except Exception:
+            logger.exception("Failed to dispatch semantic ingestion for %s", doc_uuid)
 
     return str(file_path)
 
