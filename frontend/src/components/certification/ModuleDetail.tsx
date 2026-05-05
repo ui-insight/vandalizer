@@ -268,6 +268,10 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
               onAllLessonsRead={handleAllLessonsRead}
               onGoToChallenge={() => hasDocuments && !isProvisioned ? undefined : setTab('challenge')}
               onStepChange={onTabChange}
+              onProvision={onProvision}
+              provisioning={provisioning}
+              isProvisioned={isProvisioned}
+              hasDocuments={hasDocuments}
             />
           </div>
         ) : (

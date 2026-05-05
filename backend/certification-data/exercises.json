@@ -48,7 +48,7 @@
     }
   },
   "foundations": {
-    "overview": "Build your first extraction workflow using a sample NSF proposal. Click **Set Up Lab** below to add the PDF to your workspace, then follow the steps to create a workflow, extract data from it, and verify the results. When you click **Check Progress**, the system validates that your workflow extracted the correct values from the document.",
+    "overview": "Build your first extraction workflow using a sample NSF proposal. Click **Set Up Lab** above to add the PDF to your workspace, then follow the steps to create a workflow, extract data from it, and verify the results. When you click **Check Progress**, the system validates that your workflow extracted the correct values from the document.",
     "documents": ["nsf-proposal-alpine-ecology.pdf"],
     "instructions": [
       "Click **Set Up Lab** to add the sample NSF proposal to your workspace.",

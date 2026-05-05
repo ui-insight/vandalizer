@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { ChevronDown, ChevronLeft, ChevronRight, Clock, Target } from 'lucide-react'
+import { Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Clock, Loader2, Target, Upload } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import { useToast } from '../../contexts/ToastContext'
 import { useAuth } from '../../hooks/useAuth'
@@ -18,6 +18,10 @@ export function LessonStepper({
   onAllLessonsRead,
   onGoToChallenge,
   onStepChange,
+  onProvision,
+  provisioning,
+  isProvisioned,
+  hasDocuments,
 }: {
   lessons: LessonSection[]
   moduleId: string
@@ -25,6 +29,10 @@ export function LessonStepper({
   onAllLessonsRead?: () => void
   onGoToChallenge: () => void
   onStepChange?: () => void
+  onProvision?: () => void
+  provisioning?: boolean
+  isProvisioned?: boolean
+  hasDocuments?: boolean
 }) {
   const { user } = useAuth()
   // Resume from localStorage, scoped by user
@@ -106,6 +114,8 @@ export function LessonStepper({
 
   const isLastLesson = safeIndex === lessons.length - 1
   const readTime = estimateReadTime(lessons[safeIndex].content)
+  const lessonMentionsLab = /set up lab/i.test(lessons[safeIndex].content)
+  const showInlineLabCta = hasDocuments && lessonMentionsLab && onProvision
 
   return (
     <div className="space-y-4">
@@ -147,6 +157,56 @@ export function LessonStepper({
       <div className="cert-slide-in" key={safeIndex}>
         <LessonContent section={lessons[safeIndex]} />
       </div>
+
+      {/* Inline Set Up Lab CTA — shown when the lesson references the button */}
+      {showInlineLabCta && (
+        <div
+          className={cn(
+            'p-3 border-2 flex items-center justify-between gap-3',
+            isProvisioned ? 'border-green-200 bg-green-50/50' : 'border-blue-200 bg-blue-50/50',
+          )}
+          style={{ borderRadius: 'var(--ui-radius, 12px)' }}
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            {isProvisioned ? (
+              <CheckCircle2 size={16} className="text-green-600 shrink-0" />
+            ) : (
+              <Upload size={16} className="text-blue-600 shrink-0" />
+            )}
+            <span className={cn('text-sm font-semibold', isProvisioned ? 'text-green-800' : 'text-blue-800')}>
+              {isProvisioned ? 'Lab documents are ready' : 'Set up your lab to load the sample document'}
+            </span>
+          </div>
+          <button
+            onClick={onProvision}
+            disabled={provisioning || isProvisioned}
+            className={cn(
+              'flex items-center gap-2 px-3 py-1.5 text-sm font-semibold transition-all disabled:opacity-50 shrink-0',
+              isProvisioned
+                ? 'bg-green-100 text-green-700'
+                : 'bg-blue-600 text-white hover:bg-blue-700',
+            )}
+            style={{ borderRadius: 'var(--ui-radius, 12px)' }}
+          >
+            {provisioning ? (
+              <>
+                <Loader2 size={14} className="animate-spin" />
+                Setting up...
+              </>
+            ) : isProvisioned ? (
+              <>
+                <Check size={14} />
+                Ready
+              </>
+            ) : (
+              <>
+                <Upload size={14} />
+                Set Up Lab
+              </>
+            )}
+          </button>
+        </div>
+      )}
 
       {/* Challenge preview — shown on last lesson when exercise exists */}
       {isLastLesson && exercise && (
