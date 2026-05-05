@@ -66,6 +66,7 @@ def _mock_workflow(wf_id="wf-1", user_id="user1", name="Test Workflow"):
     wf.space = "default"
     wf.num_executions = 0
     wf.input_config = {}
+    wf.output_config = {}
     wf.steps = []
     return wf
 
