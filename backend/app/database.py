@@ -40,6 +40,7 @@ from app.models.notification import Notification
 from app.models.support import SupportTicket
 from app.models.feedback_prompt import FeedbackPrompt, FeedbackPromptResponse
 from app.models.email_log import EmailLog
+from app.models.api_key import ApiKey
 from app.models.credential import Credential
 
 ALL_MODELS = [
@@ -99,6 +100,7 @@ ALL_MODELS = [
     FeedbackPrompt,
     FeedbackPromptResponse,
     EmailLog,
+    ApiKey,
     Credential,
 ]
 

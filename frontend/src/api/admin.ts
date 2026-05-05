@@ -539,3 +539,71 @@ export function setCertificationUnlock(userId: string, unlocked: boolean) {
     { method: 'PUT', body: JSON.stringify({ unlocked }) },
   )
 }
+
+// Management API keys (/api/admin/api-keys)
+
+export interface ApiKeyListItem {
+  id: string
+  name: string
+  prefix: string
+  scopes: string[]
+  description: string | null
+  created_by: string
+  created_at: string
+  expires_at: string | null
+  revoked_at: string | null
+  last_used_at: string | null
+  last_used_ip: string | null
+}
+
+export interface CreateApiKeyResponse {
+  id: string
+  name: string
+  prefix: string
+  scopes: string[]
+  expires_at: string | null
+  created_at: string
+  token: string
+}
+
+export interface CreateApiKeyRequest {
+  name: string
+  scopes: string[]
+  description?: string
+  expires_at?: string | null
+}
+
+export const MGMT_SCOPE_OPTIONS = [
+  'metrics:read',
+  'users:read',
+  'teams:read',
+  'workflows:read',
+  'documents:read',
+  'activity:read',
+  'audit:read',
+  'config:read',
+  'validation:read',
+  'validation:write',
+  'validation:run',
+  'workflows:run',
+  'extractions:run',
+] as const
+
+export function listApiKeys(includeRevoked = false) {
+  const qs = includeRevoked ? '?include_revoked=true' : ''
+  return apiFetch<ApiKeyListItem[]>(`/api/admin/api-keys${qs}`)
+}
+
+export function createApiKey(req: CreateApiKeyRequest) {
+  return apiFetch<CreateApiKeyResponse>('/api/admin/api-keys', {
+    method: 'POST',
+    body: JSON.stringify(req),
+  })
+}
+
+export function revokeApiKey(keyId: string) {
+  return apiFetch<{ id: string; revoked: boolean }>(
+    `/api/admin/api-keys/${keyId}`,
+    { method: 'DELETE' },
+  )
+}
