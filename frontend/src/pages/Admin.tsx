@@ -40,6 +40,8 @@ import {
   adminAddDemoUser,
 } from '../api/demo'
 import { getAdminPromptOverview, adminUpdatePrompt, type PromptOverview } from '../api/feedbackPrompt'
+import * as supportApi from '../api/support'
+import type { SupportTicket, SupportTicketSummary } from '../types/support'
 import type { DemoAdminStats, DemoApplication as DemoApp, PostExperienceResponseAdmin } from '../types/demo'
 import { POST_SURVEY_FIELDS } from '../components/survey/postSurveyFields'
 import { PRE_SURVEY_FIELDS } from './Demo'
@@ -4259,8 +4261,297 @@ function DemoTab() {
       )}
 
       {/* Trial Check-ins */}
+      <CheckInConversationsSection />
       <TrialCheckinsSection />
       </>
+      )}
+    </div>
+  )
+}
+
+function CheckInConversationsSection() {
+  const [tickets, setTickets] = useState<SupportTicketSummary[]>([])
+  const [loading, setLoading] = useState(true)
+  const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'in_progress' | 'closed'>('all')
+  const [activeUuid, setActiveUuid] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const status = statusFilter === 'all' ? undefined : statusFilter
+      const res = await supportApi.listTickets(status, 200, 0, undefined, undefined, 'feedback_prompt')
+      setTickets(res.tickets)
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false)
+    }
+  }, [statusFilter])
+
+  useEffect(() => { load() }, [load])
+
+  const statusColors: Record<string, string> = {
+    open: '#f59e0b',
+    in_progress: '#3b82f6',
+    closed: '#9ca3af',
+  }
+
+  const fmtTime = (iso: string | null) => {
+    if (!iso) return ''
+    const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
+    if (diff < 60) return 'just now'
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
+    return `${Math.floor(diff / 86400)}d ago`
+  }
+
+  return (
+    <div style={{ marginTop: 32 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Check-ins</h3>
+          <p style={{ fontSize: 13, color: '#6b7280', margin: '4px 0 0' }}>
+            Conversations from trial check-in prompts. These do not appear in the Support Center.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {(['all', 'open', 'in_progress', 'closed'] as const).map(s => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              style={{
+                padding: '4px 12px', fontSize: 12, fontWeight: statusFilter === s ? 600 : 400,
+                borderRadius: 9999, border: '1px solid #e5e7eb', cursor: 'pointer',
+                background: statusFilter === s ? '#111827' : '#fff',
+                color: statusFilter === s ? '#fff' : '#6b7280',
+                fontFamily: 'inherit',
+              }}
+            >
+              {s === 'in_progress' ? 'In Progress' : s.charAt(0).toUpperCase() + s.slice(1)}
+            </button>
+          ))}
+          <button
+            onClick={load}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '6px 12px', border: '1px solid #e5e7eb', borderRadius: 8,
+              background: '#fff', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit',
+            }}
+          >
+            <RefreshCw size={12} /> Refresh
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div style={{ padding: 24, textAlign: 'center', color: '#9ca3af' }}>Loading...</div>
+      ) : tickets.length === 0 ? (
+        <div style={{ padding: 24, textAlign: 'center', color: '#9ca3af', border: '1px solid #e5e7eb', borderRadius: 12 }}>
+          No check-in conversations yet.
+        </div>
+      ) : (
+        <div style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid #e5e7eb' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 600 }}>Subject</th>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 600 }}>User</th>
+                <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600 }}>Status</th>
+                <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600 }}>Messages</th>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 600 }}>Last activity</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tickets.map((t) => {
+                const isExpanded = activeUuid === t.uuid
+                const subject = t.subject.replace(/^\[Check-in\]\s*/, '')
+                return (
+                  <React.Fragment key={t.uuid}>
+                    <tr
+                      onClick={() => setActiveUuid(isExpanded ? null : t.uuid)}
+                      style={{ borderBottom: isExpanded ? 'none' : '1px solid #f3f4f6', cursor: 'pointer' }}
+                    >
+                      <td style={{ padding: '10px 16px', fontWeight: 500 }}>
+                        <span style={{ marginRight: 6, color: '#9ca3af', fontSize: 11 }}>{isExpanded ? '▼' : '▶'}</span>
+                        {subject}
+                      </td>
+                      <td style={{ padding: '10px 16px', color: '#6b7280' }}>{t.user_name || t.user_id}</td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                        <span style={{
+                          fontSize: 11, padding: '2px 8px', borderRadius: 9999,
+                          background: `${statusColors[t.status]}20`, color: statusColors[t.status], fontWeight: 600,
+                        }}>
+                          {t.status.replace('_', ' ')}
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', color: '#6b7280' }}>{t.message_count}</td>
+                      <td style={{ padding: '10px 16px', color: '#6b7280' }}>
+                        {fmtTime(t.last_message_at || t.updated_at)}
+                      </td>
+                    </tr>
+                    {isExpanded && (
+                      <tr style={{ borderBottom: '1px solid #f3f4f6' }}>
+                        <td colSpan={5} style={{ padding: '0 16px 20px', background: '#fafafa' }}>
+                          <CheckInConversation
+                            ticketUuid={t.uuid}
+                            onUpdate={load}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CheckInConversation({ ticketUuid, onUpdate }: { ticketUuid: string; onUpdate: () => void }) {
+  const [ticket, setTicket] = useState<SupportTicket | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [reply, setReply] = useState('')
+  const [sending, setSending] = useState(false)
+
+  const loadTicket = useCallback(async () => {
+    try {
+      const data = await supportApi.getTicket(ticketUuid)
+      setTicket(data)
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false)
+    }
+  }, [ticketUuid])
+
+  useEffect(() => {
+    loadTicket()
+    supportApi.markTicketRead(ticketUuid).catch(() => {})
+  }, [loadTicket, ticketUuid])
+
+  const handleSend = async () => {
+    if (!reply.trim() || sending) return
+    setSending(true)
+    try {
+      const updated = await supportApi.addMessage(ticketUuid, reply.trim())
+      setTicket(updated)
+      setReply('')
+      onUpdate()
+    } catch {
+      // ignore
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const handleStatusChange = async (next: string) => {
+    try {
+      const updated = await supportApi.updateTicket(ticketUuid, { status: next })
+      setTicket(updated)
+      onUpdate()
+    } catch {
+      // ignore
+    }
+  }
+
+  if (loading) {
+    return <div style={{ padding: 16, color: '#9ca3af', fontSize: 13 }}>Loading conversation...</div>
+  }
+
+  if (!ticket) {
+    return <div style={{ padding: 16, color: '#9ca3af', fontSize: 13 }}>Failed to load ticket.</div>
+  }
+
+  return (
+    <div style={{ paddingTop: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <div style={{ fontSize: 12, color: '#6b7280' }}>
+          {ticket.user_email && <span>{ticket.user_email} · </span>}
+          opened {ticket.created_at ? new Date(ticket.created_at).toLocaleString() : ''}
+        </div>
+        {ticket.status !== 'closed' ? (
+          <select
+            value={ticket.status}
+            onChange={(e) => handleStatusChange(e.target.value)}
+            style={{ fontSize: 12, padding: '4px 8px', borderRadius: 8, border: '1px solid #d1d5db', fontFamily: 'inherit' }}
+          >
+            <option value="open">Open</option>
+            <option value="in_progress">In Progress</option>
+            <option value="closed">Closed</option>
+          </select>
+        ) : (
+          <button
+            onClick={() => handleStatusChange('open')}
+            style={{
+              fontSize: 12, padding: '4px 10px', borderRadius: 8,
+              border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer', fontFamily: 'inherit',
+            }}
+          >
+            Reopen
+          </button>
+        )}
+      </div>
+
+      <div style={{
+        background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8,
+        padding: 12, display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 360, overflowY: 'auto',
+      }}>
+        {ticket.messages.map((m) => {
+          const isSupport = m.is_support_reply
+          return (
+            <div key={m.uuid} style={{ display: 'flex', flexDirection: 'column', alignItems: isSupport ? 'flex-end' : 'flex-start' }}>
+              <div style={{
+                maxWidth: '85%', padding: '8px 12px', borderRadius: 10,
+                background: isSupport ? '#2563eb' : '#f3f4f6',
+                color: isSupport ? '#fff' : '#111827',
+              }}>
+                <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 2, color: isSupport ? 'rgba(255,255,255,0.85)' : '#6b7280' }}>
+                  {m.user_name || m.user_id}
+                  {isSupport && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 500, opacity: 0.85 }}>Team</span>}
+                </div>
+                <div style={{ fontSize: 13, whiteSpace: 'pre-wrap' }}>{m.content}</div>
+                <div style={{ fontSize: 10, marginTop: 2, color: isSupport ? 'rgba(255,255,255,0.75)' : '#9ca3af' }}>
+                  {m.created_at ? new Date(m.created_at).toLocaleString() : ''}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {ticket.status !== 'closed' ? (
+        <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center' }}>
+          <input
+            value={reply}
+            onChange={(e) => setReply(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
+            placeholder="Reply to this check-in..."
+            style={{
+              flex: 1, padding: '8px 12px', fontSize: 13,
+              border: '1px solid #d1d5db', borderRadius: 8, outline: 'none', fontFamily: 'inherit',
+            }}
+          />
+          <button
+            onClick={handleSend}
+            disabled={sending || !reply.trim()}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              padding: '8px 14px', borderRadius: 8, border: 'none',
+              background: '#2563eb', color: '#fff', fontSize: 13, fontWeight: 600,
+              cursor: reply.trim() && !sending ? 'pointer' : 'not-allowed',
+              opacity: sending ? 0.6 : 1, fontFamily: 'inherit',
+            }}
+          >
+            <Send size={14} /> {sending ? 'Sending...' : 'Reply'}
+          </button>
+        </div>
+      ) : (
+        <div style={{ marginTop: 10, padding: '8px 12px', fontSize: 12, color: '#6b7280', textAlign: 'center' }}>
+          This conversation is closed. Reopen to send a reply.
+        </div>
       )}
     </div>
   )
