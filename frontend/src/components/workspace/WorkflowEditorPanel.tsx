@@ -1097,7 +1097,7 @@ function DesignCanvas({
       })()}
 
       {/* +ADD STEP */}
-      {canManage && (
+      {canManage && !runnerRunning && (
         <>
           <ConnectionLine />
           <div style={{ display: 'flex', justifyContent: 'center' }}>

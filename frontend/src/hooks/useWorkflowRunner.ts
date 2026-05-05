@@ -76,14 +76,19 @@ export function useWorkflowRunner() {
     setSessionId(sid)
     setBatchId(null)
     setBatchStatus(null)
-    setRunning(false)
     try {
       const s = await getWorkflowStatus(sid)
       setStatus(s)
+      const isTerminal = s.status === 'completed' || s.status === 'error' || s.status === 'failed'
+      setRunning(!isTerminal)
+      if (!isTerminal) {
+        intervalRef.current = setInterval(() => poll(sid), 2000)
+      }
     } catch {
       setStatus(null)
+      setRunning(false)
     }
-  }, [stopPolling])
+  }, [poll, stopPolling])
 
   const reset = useCallback(() => {
     setSessionId(null)
