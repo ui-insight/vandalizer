@@ -162,11 +162,19 @@ async def create_ticket(
     return _ticket_to_dict(ticket)
 
 
+# Trial check-in prompts are stored as support tickets with this category.
+# They are surfaced in the admin Demo tab, not the Support Center, so the
+# default list/stats queries exclude them.
+_CHECK_IN_CATEGORY = "feedback_prompt"
+_EXCLUDE_CHECK_INS = {"$ne": _CHECK_IN_CATEGORY}
+
+
 async def get_ticket_stats() -> dict:
-    """Return aggregate ticket counts by status."""
-    open_count = await SupportTicket.find({"status": "open"}).count()
-    in_progress_count = await SupportTicket.find({"status": "in_progress"}).count()
-    closed_count = await SupportTicket.find({"status": "closed"}).count()
+    """Return aggregate ticket counts by status (excludes trial check-ins)."""
+    base = {"category": _EXCLUDE_CHECK_INS}
+    open_count = await SupportTicket.find({**base, "status": "open"}).count()
+    in_progress_count = await SupportTicket.find({**base, "status": "in_progress"}).count()
+    closed_count = await SupportTicket.find({**base, "status": "closed"}).count()
     total = open_count + in_progress_count + closed_count
     return {
         "total": total,
@@ -181,6 +189,7 @@ async def list_tickets(
     status: str | None = None,
     assigned_to: str | None = None,
     tag: str | None = None,
+    category: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> list[dict]:
@@ -193,6 +202,8 @@ async def list_tickets(
         query["assigned_to"] = assigned_to
     if tag:
         query["tags"] = tag
+    if category is not None:
+        query["category"] = category
 
     tickets = (
         await SupportTicket.find(query)
@@ -207,14 +218,22 @@ async def list_tickets(
 async def list_all_tickets(
     status: str | None = None,
     tag: str | None = None,
+    category: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> list[dict]:
+    """List every ticket in the system. Defaults to regular tickets only —
+    pass ``category="feedback_prompt"`` to fetch trial check-ins instead.
+    """
     query: dict = {}
     if status:
         query["status"] = status
     if tag:
         query["tags"] = tag
+    if category is not None:
+        query["category"] = category
+    else:
+        query["category"] = _EXCLUDE_CHECK_INS
     tickets = (
         await SupportTicket.find(query)
         .sort("-updated_at")
