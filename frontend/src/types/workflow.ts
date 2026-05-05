@@ -42,6 +42,12 @@ export interface WorkflowStep {
   tasks: WorkflowTask[];
 }
 
+export interface AuthorRef {
+  user_id: string;
+  name: string | null;
+  email: string | null;
+}
+
 export interface Workflow {
   id: string;
   uuid: string;
@@ -52,6 +58,7 @@ export interface Workflow {
   steps: WorkflowStep[];
   input_config?: { trigger_type?: string };
   can_manage?: boolean;
+  created_by?: AuthorRef | null;
 }
 
 export interface WorkflowStatus {

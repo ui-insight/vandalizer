@@ -4,6 +4,8 @@ import { Plus, Copy, Trash2, Search, ArrowUpDown } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
 import { useWorkflows } from '../hooks/useWorkflows'
 import { useToast } from '../contexts/ToastContext'
+import { useAuth } from '../hooks/useAuth'
+import { AuthorChip } from '../components/shared/AuthorChip'
 
 type SortKey = 'name' | 'runs' | 'steps'
 
@@ -11,6 +13,7 @@ export default function Workflows() {
   const navigate = useNavigate()
   const { workflows, loading, create, remove, duplicate, importFromFile } = useWorkflows()
   const { toast } = useToast()
+  const { user } = useAuth()
   const [newName, setNewName] = useState('')
   const [creating, setCreating] = useState(false)
   const [importing, setImporting] = useState(false)
@@ -167,8 +170,13 @@ export default function Workflows() {
                   {wf.description && (
                     <div className="text-sm text-gray-500 truncate">{wf.description}</div>
                   )}
-                  <div className="text-xs text-gray-400 mt-1">
-                    {wf.steps?.length || 0} steps &middot; {wf.num_executions} runs
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs text-gray-400">
+                      {wf.steps?.length || 0} steps &middot; {wf.num_executions} runs
+                    </span>
+                    {wf.created_by && wf.created_by.user_id !== user?.user_id && (
+                      <AuthorChip author={wf.created_by} />
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-1 ml-4 shrink-0">
