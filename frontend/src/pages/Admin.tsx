@@ -6,7 +6,7 @@ import {
   CheckCircle2, XCircle, Clock, Download, TrendingUp, TrendingDown,
   ChevronDown, ChevronUp, ArrowUpDown, Play, Minus, AlertCircle,
   ArrowLeft, FileText, FolderTree, X, Eye, Check, CheckCircle,
-  Mail, Send, Link, UserPlus, Star, Award, Unlock,
+  Mail, Send, Link, UserPlus, Star, Award, Unlock, KeyRound,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -63,6 +63,7 @@ import * as auditApi from '../api/audit'
 import type { AuditLogEntry } from '../api/audit'
 import { getAuthConfig } from '../api/auth'
 import { UpdateBanner } from '../components/admin/UpdateBanner'
+import { ApiKeysTab } from '../components/admin/ApiKeysTab'
 
 function applyThemeToDOM(theme: ThemeConfig) {
   const root = document.documentElement
@@ -70,7 +71,7 @@ function applyThemeToDOM(theme: ThemeConfig) {
   root.style.setProperty('--ui-radius', theme.ui_radius)
 }
 
-type Tab = 'usage' | 'users' | 'teams' | 'organizations' | 'workflows' | 'quality' | 'approvals' | 'audit' | 'demo' | 'email' | 'certifications' | 'config'
+type Tab = 'usage' | 'users' | 'teams' | 'organizations' | 'workflows' | 'quality' | 'approvals' | 'audit' | 'demo' | 'email' | 'certifications' | 'apikeys' | 'config'
 
 const TABS: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'usage', label: 'Usage', icon: BarChart3 },
@@ -84,6 +85,7 @@ const TABS: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'demo', label: 'Demo', icon: Zap },
   { key: 'email', label: 'Email', icon: Mail },
   { key: 'certifications', label: 'Certifications', icon: Award },
+  { key: 'apikeys', label: 'API Keys', icon: KeyRound },
   { key: 'config', label: 'Config', icon: Settings },
 ]
 
@@ -5843,6 +5845,7 @@ export default function Admin() {
           {activeTab === 'demo' && (isGlobalAdmin || isStaff) && <DemoTab />}
           {activeTab === 'email' && (isGlobalAdmin || isStaff) && <EmailAnalyticsTab />}
           {activeTab === 'certifications' && (isGlobalAdmin || isStaff) && <CertificationsTab />}
+          {activeTab === 'apikeys' && isGlobalAdmin && <ApiKeysTab />}
           {activeTab === 'config' && isGlobalAdmin && <ConfigTab />}
         </div>
       </div>

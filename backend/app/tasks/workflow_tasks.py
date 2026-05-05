@@ -12,6 +12,18 @@ from app.tasks import TRANSIENT_EXCEPTIONS
 logger = logging.getLogger(__name__)
 
 
+def _wants_selected_document(task_data: dict) -> bool:
+    """Whether the task expects `selected_doc_text` to be pre-loaded.
+
+    True if `select_document` appears in the new `input_sources` list, or
+    in the legacy single `input_source` field.
+    """
+    sources = task_data.get("input_sources")
+    if isinstance(sources, list) and "select_document" in sources:
+        return True
+    return task_data.get("input_source") == "select_document"
+
+
 def _notify_approval_reviewers_sync(
     db, assigned_user_ids: list[str], workflow_name: str,
     step_name: str, instructions: str, approval_uuid: str,
@@ -161,8 +173,8 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
                         )
                     task_data["doc_texts"] = doc_texts
 
-                # Pre-load specific document text when input_source is "select_document"
-                if task_data.get("input_source") == "select_document" and task_data.get("selected_document_uuid"):
+                # Pre-load specific document text when select_document is selected
+                if _wants_selected_document(task_data) and task_data.get("selected_document_uuid"):
                     sel_doc = db.smart_document.find_one({"uuid": task_data["selected_document_uuid"]})
                     if sel_doc and sel_doc.get("raw_text"):
                         task_data["selected_doc_text"] = sel_doc["raw_text"]
@@ -399,8 +411,8 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
             doc_texts.append(doc["raw_text"])
     task_data["doc_texts"] = doc_texts
 
-    # Pre-load specific document text when input_source is "select_document"
-    if task_data.get("input_source") == "select_document" and task_data.get("selected_document_uuid"):
+    # Pre-load specific document text when select_document is selected
+    if _wants_selected_document(task_data) and task_data.get("selected_document_uuid"):
         sel_doc = db.smart_document.find_one({"uuid": task_data["selected_document_uuid"]})
         if sel_doc and sel_doc.get("raw_text"):
             task_data["selected_doc_text"] = sel_doc["raw_text"]
@@ -531,7 +543,7 @@ def resume_workflow_after_approval(self, approval_uuid):
                             len(doc_uuids),
                         )
                     task_data["doc_texts"] = doc_texts
-                if task_data.get("input_source") == "select_document" and task_data.get("selected_document_uuid"):
+                if _wants_selected_document(task_data) and task_data.get("selected_document_uuid"):
                     sel_doc = db.smart_document.find_one({"uuid": task_data["selected_document_uuid"]})
                     if sel_doc and sel_doc.get("raw_text"):
                         task_data["selected_doc_text"] = sel_doc["raw_text"]

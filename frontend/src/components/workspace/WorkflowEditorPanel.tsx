@@ -1761,10 +1761,24 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
   const [saving, setSaving] = useState(false)
   const [subTab, setSubTab] = useState<TaskSubTab>('design')
 
-  // Input source config
-  const [inputSource, setInputSource] = useState<TaskInputSource>(
-    (task.data.input_source as TaskInputSource) || 'step_input'
-  )
+  // Input source config — multi-select. Migrate legacy single `input_source`
+  // when the new `input_sources` list is absent.
+  const [inputSources, setInputSources] = useState<TaskInputSource[]>(() => {
+    const list = task.data.input_sources as TaskInputSource[] | undefined
+    if (Array.isArray(list) && list.length > 0) return list
+    const legacy = (task.data.input_source as TaskInputSource) || 'step_input'
+    return [legacy]
+  })
+  const inputSource: TaskInputSource = inputSources[0] || 'step_input'
+  const toggleInputSource = (src: TaskInputSource) => {
+    setInputSources(prev => {
+      if (prev.includes(src)) {
+        const next = prev.filter(s => s !== src)
+        return next.length > 0 ? next : [src]  // never empty
+      }
+      return [...prev, src]
+    })
+  }
   const [selectedDocUuid, setSelectedDocUuid] = useState<string>(
     (task.data.selected_document_uuid as string) || ''
   )
@@ -1832,8 +1846,10 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
   // Fixed doc search debounce — empty query loads recent docs so the field
   // doubles as a browsable picker.
   const fixedSearchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const wantsWorkflowDocs = inputSources.includes('workflow_documents')
+  const wantsSelectDocument = inputSources.includes('select_document')
   useEffect(() => {
-    if (inputSource !== 'workflow_documents') return
+    if (!wantsWorkflowDocs) return
     if (fixedSearchTimeoutRef.current) clearTimeout(fixedSearchTimeoutRef.current)
     const query = fixedDocSearch.trim()
     fixedSearchTimeoutRef.current = setTimeout(async () => {
@@ -1850,7 +1866,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
       }
     }, query ? 250 : 0)
     return () => { if (fixedSearchTimeoutRef.current) clearTimeout(fixedSearchTimeoutRef.current) }
-  }, [fixedDocSearch, fixedDocs, inputSource])
+  }, [fixedDocSearch, fixedDocs, wantsWorkflowDocs])
 
   // Output post-process
   const [postProcessEnabled, setPostProcessEnabled] = useState(
@@ -1901,7 +1917,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
   // Empty query loads recent docs so the field doubles as a browsable picker.
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
-    if (inputSource !== 'select_document') return
+    if (!wantsSelectDocument) return
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
     const query = docSearchQuery.trim()
     searchTimeoutRef.current = setTimeout(async () => {
@@ -1914,7 +1930,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
       }
     }, query ? 250 : 0)
     return () => { if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current) }
-  }, [docSearchQuery, inputSource])
+  }, [docSearchQuery, wantsSelectDocument])
 
   // Cleanup test intervals on unmount
   useEffect(() => {
@@ -1929,8 +1945,11 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
     try {
       const finalData = {
         ...taskData,
-        input_source: inputSource,
-        ...(inputSource === 'select_document' ? { selected_document_uuid: selectedDocUuid } : {}),
+        input_sources: inputSources,
+        // Keep `input_source` for backward compatibility — set to the first
+        // selected source so older code paths still see something sensible.
+        input_source: inputSources[0] || 'step_input',
+        ...(inputSources.includes('select_document') ? { selected_document_uuid: selectedDocUuid } : {}),
         ...(postProcessEnabled ? { post_process_prompt: postProcessPrompt } : { post_process_prompt: undefined }),
       }
       onSave(task.id, finalData)
@@ -2862,21 +2881,23 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
         {/* ===== INPUT SUB-TAB ===== */}
         {subTab === 'input' && (
           <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 12 }}>
-              Data Source
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
+              Data Sources
+            </div>
+            <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
+              Pick one or more. When multiple are selected, the LLM sees each in a labeled section.
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {/* Step Input */}
               <label style={{
                 display: 'flex', alignItems: 'flex-start', gap: 10, padding: 12,
-                border: inputSource === 'step_input' ? '2px solid var(--highlight-color, #eab308)' : '1px solid #e5e7eb',
+                border: inputSources.includes('step_input') ? '2px solid var(--highlight-color, #eab308)' : '1px solid #e5e7eb',
                 borderRadius: 8, cursor: 'pointer', backgroundColor: '#fff',
               }}>
                 <input
-                  type="radio"
-                  name="input_source"
-                  checked={inputSource === 'step_input'}
-                  onChange={() => setInputSource('step_input')}
+                  type="checkbox"
+                  checked={inputSources.includes('step_input')}
+                  onChange={() => toggleInputSource('step_input')}
                   style={{ marginTop: 2 }}
                 />
                 <div>
@@ -2890,14 +2911,13 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
               {/* Select a Document */}
               <label style={{
                 display: 'flex', alignItems: 'flex-start', gap: 10, padding: 12,
-                border: inputSource === 'select_document' ? '2px solid var(--highlight-color, #eab308)' : '1px solid #e5e7eb',
+                border: wantsSelectDocument ? '2px solid var(--highlight-color, #eab308)' : '1px solid #e5e7eb',
                 borderRadius: 8, cursor: 'pointer', backgroundColor: '#fff',
               }}>
                 <input
-                  type="radio"
-                  name="input_source"
-                  checked={inputSource === 'select_document'}
-                  onChange={() => setInputSource('select_document')}
+                  type="checkbox"
+                  checked={wantsSelectDocument}
+                  onChange={() => toggleInputSource('select_document')}
                   style={{ marginTop: 2 }}
                 />
                 <div style={{ flex: 1 }}>
@@ -2905,7 +2925,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                   <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
                     Choose a specific document to use as input.
                   </div>
-                  {inputSource === 'select_document' && (
+                  {wantsSelectDocument && (
                     <div style={{ marginTop: 8, position: 'relative' }}>
                       <input
                         type="text"
@@ -2978,14 +2998,13 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
               {/* Workflow Documents */}
               <label style={{
                 display: 'flex', alignItems: 'flex-start', gap: 10, padding: 12,
-                border: inputSource === 'workflow_documents' ? '2px solid var(--highlight-color, #eab308)' : '1px solid #e5e7eb',
+                border: wantsWorkflowDocs ? '2px solid var(--highlight-color, #eab308)' : '1px solid #e5e7eb',
                 borderRadius: 8, cursor: 'pointer', backgroundColor: '#fff',
               }}>
                 <input
-                  type="radio"
-                  name="input_source"
-                  checked={inputSource === 'workflow_documents'}
-                  onChange={() => setInputSource('workflow_documents')}
+                  type="checkbox"
+                  checked={wantsWorkflowDocs}
+                  onChange={() => toggleInputSource('workflow_documents')}
                   style={{ marginTop: 2 }}
                 />
                 <div style={{ flex: 1 }}>
@@ -2994,7 +3013,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                     Use the documents selected when the workflow runs, plus any fixed documents.
                   </div>
 
-                  {inputSource === 'workflow_documents' && (
+                  {wantsWorkflowDocs && (
                     <div style={{ marginTop: 10 }} onClick={e => e.stopPropagation()}>
                       {/* Fixed documents list */}
                       {fixedDocs.length > 0 && (

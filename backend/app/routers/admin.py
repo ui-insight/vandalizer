@@ -2331,3 +2331,149 @@ async def set_certification_unlock(
     )
 
     return {"user_id": user_id, "unlocked": prog.unlocked}
+
+
+# ---------------------------------------------------------------------------
+# Management API keys (/api/mgmt/v1)
+# ---------------------------------------------------------------------------
+
+class CreateApiKeyRequest(BaseModel):
+    name: str
+    scopes: list[str]
+    description: Optional[str] = None
+    expires_at: Optional[datetime.datetime] = None
+
+
+class CreateApiKeyResponse(BaseModel):
+    id: str
+    name: str
+    prefix: str
+    scopes: list[str]
+    expires_at: Optional[datetime.datetime] = None
+    created_at: datetime.datetime
+    token: str = Field(..., description="Full token — shown once, never recoverable.")
+
+
+class ApiKeyListItem(BaseModel):
+    id: str
+    name: str
+    prefix: str
+    scopes: list[str]
+    description: Optional[str] = None
+    created_by: str
+    created_at: datetime.datetime
+    expires_at: Optional[datetime.datetime] = None
+    revoked_at: Optional[datetime.datetime] = None
+    last_used_at: Optional[datetime.datetime] = None
+    last_used_ip: Optional[str] = None
+
+
+@router.post("/api-keys", response_model=CreateApiKeyResponse)
+async def create_api_key(
+    body: CreateApiKeyRequest,
+    user: User = Depends(get_current_user),
+):
+    """Issue a new management API key. Returns the full token once."""
+    await _require_superadmin(user)
+
+    from app.dependencies import MGMT_SCOPES
+    from app.models.api_key import ApiKey
+    from app.utils.security import generate_mgmt_api_key
+
+    unknown = [s for s in body.scopes if s not in MGMT_SCOPES and s != "*"]
+    if unknown:
+        raise HTTPException(status_code=400, detail=f"Unknown scopes: {unknown}")
+    if not body.scopes:
+        raise HTTPException(status_code=400, detail="At least one scope is required")
+
+    full_token, prefix, key_hash = generate_mgmt_api_key()
+    key = ApiKey(
+        key_hash=key_hash,
+        prefix=prefix,
+        name=body.name,
+        description=body.description,
+        created_by=user.user_id,
+        scopes=body.scopes,
+        expires_at=body.expires_at,
+    )
+    await key.insert()
+
+    await _audit(
+        user,
+        "api_key.create",
+        f"Created mgmt API key '{body.name}' with scopes {body.scopes}",
+        {"key_id": str(key.id), "name": body.name, "scopes": body.scopes},
+    )
+
+    return CreateApiKeyResponse(
+        id=str(key.id),
+        name=key.name,
+        prefix=key.prefix,
+        scopes=key.scopes,
+        expires_at=key.expires_at,
+        created_at=key.created_at,
+        token=full_token,
+    )
+
+
+@router.get("/api-keys", response_model=list[ApiKeyListItem])
+async def list_api_keys(
+    include_revoked: bool = False,
+    user: User = Depends(get_current_user),
+):
+    await _require_superadmin(user)
+
+    from app.models.api_key import ApiKey
+
+    query = ApiKey.find_all()
+    keys = await query.sort(-ApiKey.created_at).to_list()
+    if not include_revoked:
+        keys = [k for k in keys if k.revoked_at is None]
+    return [
+        ApiKeyListItem(
+            id=str(k.id),
+            name=k.name,
+            prefix=k.prefix,
+            scopes=k.scopes,
+            description=k.description,
+            created_by=k.created_by,
+            created_at=k.created_at,
+            expires_at=k.expires_at,
+            revoked_at=k.revoked_at,
+            last_used_at=k.last_used_at,
+            last_used_ip=k.last_used_ip,
+        )
+        for k in keys
+    ]
+
+
+@router.delete("/api-keys/{key_id}")
+async def revoke_api_key(
+    key_id: str,
+    user: User = Depends(get_current_user),
+):
+    await _require_superadmin(user)
+
+    from app.models.api_key import ApiKey
+
+    try:
+        oid = BsonObjectId(key_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid key id")
+
+    key = await ApiKey.get(oid)
+    if not key:
+        raise HTTPException(status_code=404, detail="API key not found")
+    if key.revoked_at is not None:
+        return {"id": key_id, "revoked": True}
+
+    key.revoked_at = datetime.datetime.now(tz=datetime.timezone.utc)
+    await key.save()
+
+    await _audit(
+        user,
+        "api_key.revoke",
+        f"Revoked mgmt API key '{key.name}'",
+        {"key_id": key_id, "name": key.name},
+    )
+    return {"id": key_id, "revoked": True}

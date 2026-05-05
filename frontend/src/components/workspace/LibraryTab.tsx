@@ -7,8 +7,8 @@ import { useLibraries, useLibraryItems } from '../../hooks/useLibrary'
 import { LibraryItemRow } from '../library/LibraryItemRow'
 import { ExploreTab } from '../library/ExploreTab'
 import { cloneToPersonal, shareToTeam, addItem as addItemToLibrary, touchItem, listCollections } from '../../api/library'
-import { createWorkflow } from '../../api/workflows'
-import { createSearchSet, listItems as listSearchSetItems, updateSearchSet, updateItem as updateSearchSetItem, addItem as addSearchSetItem } from '../../api/extractions'
+import { createWorkflow, importWorkflow } from '../../api/workflows'
+import { createSearchSet, importSearchSet, listItems as listSearchSetItems, updateSearchSet, updateItem as updateSearchSetItem, addItem as addSearchSetItem } from '../../api/extractions'
 import {
   Search,
   Layers,
@@ -25,6 +25,7 @@ import {
   MoreHorizontal,
   Pencil,
   Trash2,
+  Upload,
   X,
 } from 'lucide-react'
 import type { VerifiedCollection } from '../../types/library'
@@ -196,6 +197,44 @@ export function LibraryTab() {
     setCreateName('')
     setCreateDesc('')
     setCreateError(null)
+  }
+
+  // Upload-from-JSON support inside the creation modal
+  const uploadInputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+
+  const handleUploadDefinition = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file || !createModalType) return
+    setUploading(true)
+    setCreateError(null)
+    const personalLib = libraries.find((l) => l.scope === 'personal')
+    try {
+      if (createModalType === 'workflow') {
+        const wf = await importWorkflow(file)
+        if (personalLib) {
+          await addItemToLibrary(personalLib.id, { item_id: wf.id, kind: 'workflow' })
+        }
+        closeCreateModal()
+        refreshItems()
+        openWorkflow(wf.id)
+      } else {
+        const ss = await importSearchSet(file)
+        if (personalLib) {
+          await addItemToLibrary(personalLib.id, { item_id: ss.id, kind: 'search_set' })
+        }
+        closeCreateModal()
+        refreshItems()
+        if (createModalType === 'extraction') {
+          openExtraction(ss.uuid)
+        }
+      }
+    } catch (err) {
+      setCreateError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setUploading(false)
+    }
   }
 
   // Edit modal state (prompts / formatters)
@@ -1121,10 +1160,10 @@ export function LibraryTab() {
                 {createError}
               </div>
             )}
-            <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
               <button
                 onClick={handleCreate}
-                disabled={creating || !createName.trim()}
+                disabled={creating || uploading || !createName.trim()}
                 style={{
                   padding: '10px 20px',
                   fontSize: 14,
@@ -1134,8 +1173,8 @@ export function LibraryTab() {
                   border: 'none',
                   backgroundColor: 'var(--highlight-color, #eab308)',
                   color: 'var(--highlight-text-color, #000)',
-                  cursor: creating || !createName.trim() ? 'not-allowed' : 'pointer',
-                  opacity: creating || !createName.trim() ? 0.5 : 1,
+                  cursor: creating || uploading || !createName.trim() ? 'not-allowed' : 'pointer',
+                  opacity: creating || uploading || !createName.trim() ? 0.5 : 1,
                 }}
               >
                 {creating ? 'Creating...' : createModalType === 'workflow' ? 'Create Workflow' : 'Create Task'}
@@ -1155,6 +1194,40 @@ export function LibraryTab() {
               >
                 Close
               </button>
+              {(createModalType === 'workflow' || createModalType === 'extraction') && (
+                <>
+                  <button
+                    onClick={() => uploadInputRef.current?.click()}
+                    disabled={creating || uploading}
+                    title={`Upload a ${createModalType === 'workflow' ? 'workflow' : 'extraction'} JSON definition`}
+                    style={{
+                      marginLeft: 'auto',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '6px 10px',
+                      fontSize: 12,
+                      fontFamily: 'inherit',
+                      borderRadius: 6,
+                      border: '1px solid #dadce0',
+                      backgroundColor: '#fff',
+                      color: '#5f6368',
+                      cursor: creating || uploading ? 'not-allowed' : 'pointer',
+                      opacity: creating || uploading ? 0.5 : 1,
+                    }}
+                  >
+                    <Upload style={{ width: 14, height: 14 }} />
+                    {uploading ? 'Uploading…' : 'Upload JSON'}
+                  </button>
+                  <input
+                    ref={uploadInputRef}
+                    type="file"
+                    accept=".json,application/json"
+                    style={{ display: 'none' }}
+                    onChange={handleUploadDefinition}
+                  />
+                </>
+              )}
             </div>
           </div>
         </div>
