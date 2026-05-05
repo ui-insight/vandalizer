@@ -2,8 +2,9 @@ import { useEffect } from 'react'
 import { X, Layers, Search, BookOpen, Sparkles, type LucideIcon } from 'lucide-react'
 import { KnowledgeTutorial } from './KnowledgeTutorial'
 
-export function KnowledgeExplainer({ onClose }: { onClose: () => void }) {
+export function KnowledgeExplainer({ onClose }: { onClose?: () => void }) {
   useEffect(() => {
+    if (!onClose) return
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
     }
@@ -56,20 +57,22 @@ export function KnowledgeExplainer({ onClose }: { onClose: () => void }) {
         />
 
         {/* Close button */}
-        <button
-          onClick={onClose}
-          style={{
-            position: 'absolute', top: 14, right: 14, zIndex: 10,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            width: 32, height: 32, borderRadius: 8,
-            background: 'rgba(255,255,255,0.06)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            color: '#c0c7d6', cursor: 'pointer',
-          }}
-          aria-label="Close"
-        >
-          <X size={16} />
-        </button>
+        {onClose && (
+          <button
+            onClick={onClose}
+            style={{
+              position: 'absolute', top: 14, right: 14, zIndex: 10,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 32, height: 32, borderRadius: 8,
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              color: '#c0c7d6', cursor: 'pointer',
+            }}
+            aria-label="Close"
+          >
+            <X size={16} />
+          </button>
+        )}
 
         <div className="kb-explainer-content" style={{ padding: '48px 32px 56px', maxWidth: 720, margin: '0 auto', position: 'relative' }}>
           {/* Hero */}
@@ -160,20 +163,22 @@ export function KnowledgeExplainer({ onClose }: { onClose: () => void }) {
           </Section>
 
           {/* CTA */}
-          <div className="kb-explainer-section" style={{ animationDelay: '580ms', textAlign: 'center', marginTop: 36 }}>
-            <button
-              onClick={onClose}
-              style={{
-                padding: '11px 26px', fontSize: 14, fontWeight: 600,
-                color: '#0c1020',
-                background: 'linear-gradient(135deg, #93c5fd 0%, #60a5fa 100%)',
-                border: 'none', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
-                boxShadow: '0 6px 20px -6px rgba(96, 165, 250, 0.5)',
-              }}
-            >
-              Got it — back to the knowledge base
-            </button>
-          </div>
+          {onClose && (
+            <div className="kb-explainer-section" style={{ animationDelay: '580ms', textAlign: 'center', marginTop: 36 }}>
+              <button
+                onClick={onClose}
+                style={{
+                  padding: '11px 26px', fontSize: 14, fontWeight: 600,
+                  color: '#0c1020',
+                  background: 'linear-gradient(135deg, #93c5fd 0%, #60a5fa 100%)',
+                  border: 'none', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
+                  boxShadow: '0 6px 20px -6px rgba(96, 165, 250, 0.5)',
+                }}
+              >
+                Got it — back to the knowledge base
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </>

@@ -14,7 +14,6 @@ import { AddUrlsModal } from '../knowledge/AddUrlsModal'
 import { DocumentPickerModal } from '../knowledge/DocumentPickerModal'
 import { KBSearchBar } from '../knowledge/KBSearchBar'
 import { KBListView } from '../knowledge/KBListView'
-import { KnowledgeTutorial } from './KnowledgeTutorial'
 import { KnowledgeExplainer } from './KnowledgeExplainer'
 import { useToast } from '../../contexts/ToastContext'
 
@@ -1007,7 +1006,7 @@ export function KnowledgePanel() {
       )}
 
       {/* List */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px', position: 'relative' }}>
         <KBListView
           scope={listScope}
           search={search}
@@ -1026,7 +1025,7 @@ export function KnowledgePanel() {
             ? async (uuid) => { await api.cloneKnowledgeBase(uuid); refresh() }
             : undefined}
           onExplore={activeTab === 'explore' ? handleExploreKBClick : undefined}
-          emptyComponent={activeTab === 'mine' && !search ? <KnowledgeTutorial /> : undefined}
+          emptyComponent={activeTab === 'mine' && !search ? <KnowledgeExplainer /> : undefined}
           emptyMessage={
             activeTab === 'team'
               ? 'No knowledge bases shared with your team yet.'
