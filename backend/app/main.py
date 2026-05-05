@@ -14,7 +14,7 @@ from app.database import init_db
 from app.exceptions import AppError
 from app.middleware.csrf import CSRFMiddleware
 from app.rate_limit import limiter
-from app.routers import activity, admin, approvals, audit, auth, automations, browser_automation, certification, chat, config, demo, documents, extractions, feedback, feedback_prompt, files, folders, graph_webhooks, knowledge, library, notifications, office, organizations, spaces, support, teams, verification, workflows
+from app.routers import activity, admin, approvals, audit, auth, automations, browser_automation, certification, chat, config, credentials, demo, documents, extractions, feedback, feedback_prompt, files, folders, graph_webhooks, knowledge, library, notifications, office, organizations, spaces, support, teams, verification, workflows
 
 
 @lru_cache
@@ -198,6 +198,7 @@ app.include_router(feedback.router, prefix="/api/feedback", tags=["feedback"])
 app.include_router(verification.router, prefix="/api/verification", tags=["verification"])
 app.include_router(office.router, prefix="/api/office", tags=["office"])
 app.include_router(automations.router, prefix="/api/automations", tags=["automations"])
+app.include_router(credentials.router, prefix="/api/credentials", tags=["credentials"])
 app.include_router(knowledge.router, prefix="/api/knowledge", tags=["knowledge"])
 if _boot_settings.enable_trial_system:
     app.include_router(demo.router, prefix="/api/demo", tags=["demo"])

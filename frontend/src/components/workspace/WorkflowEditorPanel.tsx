@@ -27,6 +27,8 @@ import type { ValidationCheck, ValidationCheckDefinition, ValidationInputDefinit
 import { ItemPickerModal } from './ItemPickerModal'
 import { getModels } from '../../api/config'
 import { searchDocuments } from '../../api/documents'
+import { listCredentials } from '../../api/credentials'
+import type { Credential } from '../../types/credential'
 import { uploadFile } from '../../api/files'
 import { listKnowledgeBases } from '../../api/knowledge'
 import type { KnowledgeBase } from '../../types/knowledge'
@@ -1784,6 +1786,17 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Credentials (API Node auth_strategy picker)
+  const [credentials, setCredentials] = useState<Credential[] | null>(null)
+  useEffect(() => {
+    if (task.name !== 'APINode') return
+    let cancelled = false
+    listCredentials()
+      .then(list => { if (!cancelled) setCredentials(list) })
+      .catch(() => { if (!cancelled) setCredentials([]) })
+    return () => { cancelled = true }
+  }, [task.name])
+
   // Save fixed documents to workflow input_config
   const saveFixedDocs = async (docs: { uuid: string; title: string }[]) => {
     setFixedDocs(docs)
@@ -2635,12 +2648,72 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                 </div>
                 <div style={{ marginBottom: 16 }}>
                   <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+                    Authentication
+                  </label>
+                  <div style={{ position: 'relative', marginBottom: 8 }}>
+                    <select
+                      value={(getTextValue('auth_strategy') || 'none')}
+                      onChange={e => {
+                        const strategy = e.target.value
+                        setTaskData(prev => ({
+                          ...prev,
+                          auth_strategy: strategy,
+                          ...(strategy === 'none' ? { credential_id: '' } : {}),
+                        }))
+                      }}
+                      style={{
+                        width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
+                        border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#fff',
+                        color: '#374151', appearance: 'none', paddingRight: 32,
+                      }}
+                    >
+                      <option value="none">None / inline headers</option>
+                      <option value="static_header">Static header (from credentials)</option>
+                      <option value="oauth_client_credentials">OAuth client_credentials (JWT)</option>
+                    </select>
+                    <ChevronDown style={{
+                      position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                      width: 14, height: 14, color: '#9ca3af', pointerEvents: 'none',
+                    }} />
+                  </div>
+                  {getTextValue('auth_strategy') && getTextValue('auth_strategy') !== 'none' && (
+                    <div style={{ position: 'relative' }}>
+                      <select
+                        value={getTextValue('credential_id') || ''}
+                        onChange={e => setTextValue('credential_id', e.target.value)}
+                        style={{
+                          width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
+                          border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#fff',
+                          color: '#374151', appearance: 'none', paddingRight: 32,
+                        }}
+                      >
+                        <option value="">Select a credential...</option>
+                        {(credentials || [])
+                          .filter(c => c.type === getTextValue('auth_strategy'))
+                          .map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                      </select>
+                      <ChevronDown style={{
+                        position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                        width: 14, height: 14, color: '#9ca3af', pointerEvents: 'none',
+                      }} />
+                      {credentials && credentials.filter(c => c.type === getTextValue('auth_strategy')).length === 0 && (
+                        <p style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
+                          No matching credentials. Create one in Credentials.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
                     Headers (JSON)
                   </label>
                   <textarea
                     value={getTextValue('headers')}
                     onChange={e => setTextValue('headers', e.target.value)}
-                    placeholder={'{"Authorization": "Bearer ...", "Content-Type": "application/json"}'}
+                    placeholder={'{"Content-Type": "application/json"}'}
                     rows={3}
                     style={{
                       width: '100%', padding: '10px 12px', fontSize: 13,

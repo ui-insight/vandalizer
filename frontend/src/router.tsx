@@ -25,6 +25,7 @@ const Demo = lazy(() => import('./pages/Demo'))
 const DemoFeedback = lazy(() => import('./pages/DemoFeedback'))
 const InviteAccept = lazy(() => import('./pages/InviteAccept'))
 const Organizations = lazy(() => import('./pages/Organizations'))
+const Credentials = lazy(() => import('./pages/Credentials'))
 const Login = lazy(() => import('./pages/Login'))
 const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 
@@ -272,6 +273,16 @@ const organizationsRoute = createRoute({
   ),
 })
 
+const credentialsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/credentials',
+  component: () => (
+    <ProtectedRoute>
+      <Credentials />
+    </ProtectedRoute>
+  ),
+})
+
 // /audit and /approvals are now tabs in the Admin panel
 const auditLogRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -329,6 +340,7 @@ const routeTree = rootRoute.addChildren([
   demoFeedbackRoute,
   demoStatusRoute,
   organizationsRoute,
+  credentialsRoute,
   auditLogRoute,
   approvalsRoute,
 ])

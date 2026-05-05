@@ -659,6 +659,142 @@ class TestAPICallNode:
         result = node.process({"output": "prev"})
         assert "HTTP error" in result["output"]
 
+    # -----------------------------------------------------------------------
+    # auth_strategy
+    # -----------------------------------------------------------------------
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    def test_auth_strategy_requires_credential_id(self, _mock_validate):
+        node = APICallNode({
+            "url": "https://api.example.com",
+            "method": "GET",
+            "auth_strategy": "static_header",
+        })
+        result = node.process({"output": "prev"})
+        assert "requires credential_id" in result["output"]
+
+    @patch("app.utils.url_validation.validate_outbound_url")
+    @patch("app.services.workflow_engine._open_sync_db")
+    def test_auth_strategy_credential_not_found(self, mock_open_db, mock_validate):
+        mock_validate.return_value = "ok"
+        db = MagicMock()
+        db.credential.find_one.return_value = None
+        mock_open_db.return_value = db
+
+        node = APICallNode({
+            "url": "https://api.example.com",
+            "auth_strategy": "static_header",
+            "credential_id": "507f1f77bcf86cd799439011",
+        })
+        result = node.process({"output": "prev"})
+        assert "not found" in result["output"]
+
+    @patch("app.utils.url_validation.validate_outbound_url")
+    @patch("app.services.workflow_engine._open_sync_db")
+    def test_auth_strategy_type_mismatch(self, mock_open_db, mock_validate):
+        mock_validate.return_value = "ok"
+        db = MagicMock()
+        db.credential.find_one.return_value = {
+            "_id": "507f1f77bcf86cd799439011",
+            "type": "static_header",
+            "payload": {"header_name": "X", "header_value": "y"},
+        }
+        mock_open_db.return_value = db
+
+        node = APICallNode({
+            "url": "https://api.example.com",
+            "auth_strategy": "oauth_client_credentials",
+            "credential_id": "507f1f77bcf86cd799439011",
+        })
+        result = node.process({"output": "prev"})
+        assert "does not match" in result["output"]
+
+    @patch("app.services.credentials_service.decrypt_value", side_effect=lambda v: v)
+    @patch("app.utils.url_validation.validate_outbound_url")
+    @patch("app.services.workflow_engine._open_sync_db")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_static_header_strategy_attaches_header(
+        self, mock_client_cls, mock_open_db, mock_validate, _mock_decrypt
+    ):
+        mock_validate.return_value = "ok"
+        db = MagicMock()
+        db.credential.find_one.return_value = {
+            "_id": "507f1f77bcf86cd799439011",
+            "type": "static_header",
+            "payload": {"header_name": "X-Api-Key", "header_value": "secret-value"},
+        }
+        mock_open_db.return_value = db
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"ok": True}
+        mock_response.raise_for_status = MagicMock()
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client.request.return_value = mock_response
+        mock_client_cls.return_value = mock_client
+
+        node = APICallNode({
+            "url": "https://api.example.com",
+            "method": "GET",
+            "auth_strategy": "static_header",
+            "credential_id": "507f1f77bcf86cd799439011",
+        })
+        result = node.process({"output": "prev"})
+
+        sent_headers = mock_client.request.call_args[1]["headers"]
+        assert sent_headers["X-Api-Key"] == "secret-value"
+        assert result["output"] == {"ok": True}
+
+    @patch("app.services.credentials_service.get_bearer_token", return_value="bearer-xyz")
+    @patch("app.services.credentials_service.validate_outbound_url", return_value="ok")
+    @patch("app.services.credentials_service.decrypt_value", side_effect=lambda v: v)
+    @patch("app.utils.url_validation.validate_outbound_url")
+    @patch("app.services.workflow_engine._open_sync_db")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_oauth_strategy_attaches_bearer(
+        self,
+        mock_client_cls,
+        mock_open_db,
+        mock_validate,
+        _mock_decrypt,
+        _mock_inner_validate,
+        _mock_token,
+    ):
+        mock_validate.return_value = "ok"
+        db = MagicMock()
+        db.credential.find_one.return_value = {
+            "_id": "507f1f77bcf86cd799439011",
+            "type": "oauth_client_credentials",
+            "payload": {
+                "client_id": "c",
+                "token_endpoint": "https://issuer/token",
+                "private_key": "-----BEGIN-----",
+            },
+        }
+        mock_open_db.return_value = db
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"ok": True}
+        mock_response.raise_for_status = MagicMock()
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client.request.return_value = mock_response
+        mock_client_cls.return_value = mock_client
+
+        node = APICallNode({
+            "url": "https://api.example.com/data",
+            "method": "GET",
+            "auth_strategy": "oauth_client_credentials",
+            "credential_id": "507f1f77bcf86cd799439011",
+        })
+        result = node.process({"output": "prev"})
+
+        sent_headers = mock_client.request.call_args[1]["headers"]
+        assert sent_headers["Authorization"] == "Bearer bearer-xyz"
+        assert result["output"] == {"ok": True}
+
 
 # ---------------------------------------------------------------------------
 # FormFillerNode

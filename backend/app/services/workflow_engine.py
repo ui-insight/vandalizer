@@ -657,6 +657,16 @@ class ResearchNode(Node):
         return {"output": report, "input": inputs.get("output"), "step_name": self.name}
 
 
+def _open_sync_db():
+    """Open a pymongo handle for in-node credential lookups (sync context)."""
+    from pymongo import MongoClient
+
+    from app.config import Settings
+    settings = Settings()
+    client = MongoClient(settings.mongo_host)
+    return client[settings.mongo_db]
+
+
 class APICallNode(Node):
     def __init__(self, data: dict) -> None:
         super().__init__("APINode")
@@ -667,6 +677,8 @@ class APICallNode(Node):
         method = self.data.get("method", "GET").upper()
         headers_raw = self.data.get("headers", "")
         body_raw = self.data.get("body", "")
+        auth_strategy = (self.data.get("auth_strategy") or "none").lower()
+        credential_id = self.data.get("credential_id") or ""
         if not url:
             return {"output": "", "input": inputs.get("output"), "step_name": self.name}
 
@@ -678,12 +690,56 @@ class APICallNode(Node):
             return {"output": f"Blocked URL: {e}", "input": inputs.get("output"), "step_name": self.name}
 
         self.report_progress(f"{method} {url}")
-        headers = {}
+        headers: dict[str, str] = {}
         if headers_raw:
             try:
                 headers = json.loads(headers_raw)
             except json.JSONDecodeError:
                 pass
+
+        # Apply credential-based auth (overrides any conflicting header).
+        if auth_strategy != "none":
+            if not credential_id:
+                return {
+                    "output": f"API Node auth_strategy {auth_strategy!r} requires credential_id",
+                    "input": inputs.get("output"),
+                    "step_name": self.name,
+                }
+            from app.services import credentials_service
+
+            try:
+                db = _open_sync_db()
+                cred_doc = credentials_service.fetch_credential_sync(db, credential_id)
+            except Exception as e:
+                logger.exception("Credential lookup failed")
+                return {
+                    "output": f"Credential lookup failed: {e}",
+                    "input": inputs.get("output"),
+                    "step_name": self.name,
+                }
+            if not cred_doc:
+                return {
+                    "output": f"Credential {credential_id!r} not found",
+                    "input": inputs.get("output"),
+                    "step_name": self.name,
+                }
+            if cred_doc.get("type") != auth_strategy:
+                return {
+                    "output": (
+                        f"Credential type {cred_doc.get('type')!r} does not match "
+                        f"auth_strategy {auth_strategy!r}"
+                    ),
+                    "input": inputs.get("output"),
+                    "step_name": self.name,
+                }
+            try:
+                credentials_service.apply_auth(credential_doc=cred_doc, headers=headers)
+            except credentials_service.CredentialError as e:
+                return {
+                    "output": f"Auth setup failed: {e}",
+                    "input": inputs.get("output"),
+                    "step_name": self.name,
+                }
 
         body = None
         if body_raw and method in ("POST", "PUT", "PATCH"):
