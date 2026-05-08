@@ -21,6 +21,9 @@ export interface KnowledgeBase {
   is_reference?: boolean
   source_kb_uuid?: string
   reference_uuid?: string
+  // Set by KB Autovalidate's apply path
+  has_optimized_config?: boolean
+  optimized_config_set_at?: string | null
 }
 
 export interface KnowledgeBaseSource {

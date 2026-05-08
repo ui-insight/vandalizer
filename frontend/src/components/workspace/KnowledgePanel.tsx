@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload } from 'lucide-react'
+import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload, Sparkles } from 'lucide-react'
 import { useKnowledgeBases, useScopedKnowledgeBases } from '../../hooks/useKnowledgeBases'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useAuth } from '../../hooks/useAuth'
@@ -14,6 +14,7 @@ import { AddUrlsModal } from '../knowledge/AddUrlsModal'
 import { DocumentPickerModal } from '../knowledge/DocumentPickerModal'
 import { KBSearchBar } from '../knowledge/KBSearchBar'
 import { KBListView } from '../knowledge/KBListView'
+import { KBValidationPanel } from '../knowledge/KBValidationPanel'
 import { KnowledgeTutorial } from './KnowledgeTutorial'
 import { useToast } from '../../contexts/ToastContext'
 
@@ -412,6 +413,24 @@ export function KnowledgePanel() {
               Verified
             </span>
           )}
+          {selectedKB.has_optimized_config && (
+            <span
+              title={
+                selectedKB.optimized_config_set_at
+                  ? `Optimized settings applied ${new Date(selectedKB.optimized_config_set_at).toLocaleString()}`
+                  : 'Optimized settings applied'
+              }
+              style={{
+                fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
+                color: '#a78bfa', backgroundColor: 'rgba(124, 58, 237, 0.12)',
+                border: '1px solid rgba(124, 58, 237, 0.3)',
+                display: 'flex', alignItems: 'center', gap: 3,
+              }}
+            >
+              <Sparkles size={10} />
+              Optimized
+            </span>
+          )}
           <span
             style={{
               fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10,
@@ -660,6 +679,13 @@ export function KnowledgePanel() {
                 })}
               </div>
             )}
+
+            {/* Validation panel — gates on ready KB and management permission */}
+            <KBValidationPanel
+              kbUuid={selectedKB.uuid}
+              kbReady={selectedKB.status === 'ready'}
+              canManage={!!user && (selectedKB.user_id === user.user_id || isExaminerOrAdmin)}
+            />
           </div>
         )}
 

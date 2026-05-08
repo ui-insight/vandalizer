@@ -17,6 +17,10 @@ class ModelInfo(BaseModel):
     multimodal: bool = False
     supports_pdf: bool = False
     context_window: int = 128000
+    # USD per 1M tokens, optional. Used by KB Autovalidate to render dollar
+    # estimates next to token budgets when admins have populated these fields.
+    cost_per_1m_input: Optional[float] = None
+    cost_per_1m_output: Optional[float] = None
 
 
 class UserConfigResponse(BaseModel):

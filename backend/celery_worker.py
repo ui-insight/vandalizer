@@ -22,6 +22,7 @@ from app.tasks import activity_tasks  # noqa: F401  — tasks.activity.*
 from app.tasks import evaluation_tasks  # noqa: F401  — tasks.evaluation.*
 from app.tasks import workflow_tasks  # noqa: F401  — tasks.workflow_next.*
 from app.tasks import quality_tasks  # noqa: F401  — tasks.workflow_next.quality_*
+from app.tasks import kb_validation_tasks  # noqa: F401  — tasks.kb.*
 from app.tasks import m365_tasks  # noqa: F401  — tasks.passive.ingest_*, triage, renew, digest
 from app.tasks import passive_tasks  # noqa: F401  — tasks.passive.process_*, execute_*, cleanup
 from app.tasks import classification_tasks  # noqa: F401  — tasks.document.classify

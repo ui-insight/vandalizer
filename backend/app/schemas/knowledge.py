@@ -60,6 +60,10 @@ class KBResponse(BaseModel):
     is_reference: bool = False
     source_kb_uuid: Optional[str] = None  # set when is_reference=True
     reference_uuid: Optional[str] = None  # the reference's own uuid
+    # Set by KB Autovalidate's apply path. Presence (not value) is what the UI
+    # surfaces as a small "Optimized" chip.
+    has_optimized_config: bool = False
+    optimized_config_set_at: Optional[str] = None
 
 
 class KBListResponse(BaseModel):

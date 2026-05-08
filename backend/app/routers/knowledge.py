@@ -55,6 +55,15 @@ async def _get_kb_suggestion_or_404(kb_uuid: str, suggestion_uuid: str):
 
 
 def _kb_response(kb, *, scope: str | None = None) -> KBResponse:
+    import datetime as _dt
+    override = getattr(kb, "rag_config_override", None)
+    # Only consider this a real applied override if the value is dict-shaped.
+    # Mocks/legacy KBs without the field shouldn't masquerade as optimized.
+    has_override = isinstance(override, dict) and bool(override)
+    override_at = getattr(kb, "rag_config_override_set_at", None)
+    override_at_str = (
+        override_at.isoformat() if isinstance(override_at, _dt.datetime) else None
+    )
     return KBResponse(
         uuid=kb.uuid,
         title=kb.title,
@@ -71,6 +80,8 @@ def _kb_response(kb, *, scope: str | None = None) -> KBResponse:
         updated_at=kb.updated_at.isoformat() if kb.updated_at else None,
         user_id=kb.user_id,
         scope=scope,
+        has_optimized_config=has_override,
+        optimized_config_set_at=override_at_str,
     )
 
 
@@ -340,15 +351,45 @@ async def remove_source(uuid: str, source_uuid: str, user: User = Depends(get_cu
 
 
 @router.post("/{uuid}/validate")
-async def validate_knowledge_base(uuid: str, user: User = Depends(get_current_user)):
+async def validate_knowledge_base(
+    uuid: str,
+    request: Request,
+    user: User = Depends(get_current_user),
+):
+    """Run validation on a KB.
+
+    Optional JSON body:
+      - mode: "judge" (default) or "judge+baseline" (analysis mode with lift).
+      - skip_judge: bool — skip the LLM judge entirely (cheap re-run).
+      - async: bool — enqueue a Celery task and return {task_id} instead of running inline.
+    """
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
     kb = await svc.get_knowledge_base(
         uuid, user, user_org_ancestry=user_org_ancestry, allow_admin=True,
     )
     if not kb:
         raise HTTPException(status_code=404, detail="Knowledge base not found")
+
+    body: dict = {}
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    mode = (body.get("mode") or "judge").strip()
+    if mode not in ("judge", "judge+baseline"):
+        mode = "judge"
+    skip_judge = bool(body.get("skip_judge", False))
+    async_run = bool(body.get("async", False))
+
+    if async_run:
+        from app.tasks.kb_validation_tasks import validate_kb_task
+        task = validate_kb_task.delay(kb.uuid, user.user_id, mode, skip_judge)
+        return {"task_id": task.id, "status": "queued"}
+
     from app.services import kb_validation_service
-    result = await kb_validation_service.run_kb_validation(kb.uuid, user.user_id)
+    result = await kb_validation_service.run_kb_validation(
+        kb.uuid, user.user_id, mode=mode, skip_judge=skip_judge,
+    )
     return result
 
 
@@ -383,6 +424,22 @@ async def get_kb_quality(uuid: str, user: User = Depends(get_current_user)):
 # ---------------------------------------------------------------------------
 
 
+def _serialize_test_query(q) -> dict:
+    return {
+        "uuid": q.uuid,
+        "query": q.query,
+        "expected_source_labels": q.expected_source_labels,
+        "expected_answer_contains": q.expected_answer_contains,
+        "expected_answer": q.expected_answer,
+        "category": q.category,
+        "auto_generated": q.auto_generated,
+        "source_chunk_ids": q.source_chunk_ids,
+        "last_judged_score": q.last_judged_score,
+        "last_judged_at": q.last_judged_at.isoformat() if q.last_judged_at else None,
+        "created_at": q.created_at.isoformat() if q.created_at else None,
+    }
+
+
 @router.get("/{uuid}/test-queries")
 async def list_test_queries(uuid: str, user: User = Depends(get_current_user)):
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
@@ -395,16 +452,7 @@ async def list_test_queries(uuid: str, user: User = Depends(get_current_user)):
     queries = await KBTestQuery.find(
         KBTestQuery.knowledge_base_uuid == kb.uuid,
     ).sort("-created_at").to_list()
-    return {"test_queries": [
-        {
-            "uuid": q.uuid,
-            "query": q.query,
-            "expected_source_labels": q.expected_source_labels,
-            "expected_answer_contains": q.expected_answer_contains,
-            "created_at": q.created_at.isoformat() if q.created_at else None,
-        }
-        for q in queries
-    ]}
+    return {"test_queries": [_serialize_test_query(q) for q in queries]}
 
 
 @router.post("/{uuid}/test-queries")
@@ -425,15 +473,58 @@ async def create_test_query(uuid: str, request: Request, user: User = Depends(ge
         query=query,
         expected_source_labels=body.get("expected_source_labels", []),
         expected_answer_contains=body.get("expected_answer_contains"),
+        expected_answer=body.get("expected_answer"),
+        category=body.get("category"),
         user_id=user.user_id,
     )
     await tq.insert()
+    return _serialize_test_query(tq)
+
+
+@router.post("/{uuid}/test-queries/generate")
+async def generate_test_queries(
+    uuid: str,
+    request: Request,
+    user: User = Depends(get_current_user),
+):
+    """Auto-generate KBTestQuery records from KB content using an LLM.
+
+    Body:
+      - coverage: "quick" | "standard" | "exhaustive" (default "standard").
+      - async: bool — if true, enqueue Celery task and return {task_id}.
+    """
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(
+        uuid, user, manage=True, user_org_ancestry=user_org_ancestry, allow_admin=True,
+    )
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+
+    body: dict = {}
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    coverage = (body.get("coverage") or "standard").strip()
+    if coverage not in ("quick", "standard", "exhaustive"):
+        coverage = "standard"
+    async_run = bool(body.get("async", False))
+
+    if async_run:
+        from app.tasks.kb_validation_tasks import generate_test_queries_task
+        task = generate_test_queries_task.delay(kb.uuid, user.user_id, coverage)
+        return {"task_id": task.id, "status": "queued"}
+
+    from app.services.kb_question_generator import KBQuestionGenerator
+    try:
+        created = await KBQuestionGenerator().generate(
+            kb.uuid, user.user_id, coverage=coverage, persist=True,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return {
-        "uuid": tq.uuid,
-        "query": tq.query,
-        "expected_source_labels": tq.expected_source_labels,
-        "expected_answer_contains": tq.expected_answer_contains,
-        "created_at": tq.created_at.isoformat() if tq.created_at else None,
+        "created": len(created),
+        "test_queries": [_serialize_test_query(q) for q in created],
     }
 
 
@@ -454,6 +545,259 @@ async def delete_test_query(uuid: str, query_uuid: str, user: User = Depends(get
         raise HTTPException(status_code=404, detail="Test query not found")
     await tq.delete()
     return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Autovalidate (optimizer)
+# ---------------------------------------------------------------------------
+
+
+def _serialize_optimization_run(run) -> dict:
+    return {
+        "uuid": run.uuid,
+        "kb_uuid": run.kb_uuid,
+        "status": run.status,
+        "phase": run.phase,
+        "progress_message": run.progress_message,
+        "current_trial_index": run.current_trial_index,
+        "total_trials_planned": run.total_trials_planned,
+        "best_score_so_far": run.best_score_so_far,
+        "best_config_so_far": run.best_config_so_far,
+        "token_budget": run.token_budget,
+        "tokens_used": run.tokens_used,
+        "estimated_cost_usd": run.estimated_cost_usd,
+        "actual_cost_usd": run.actual_cost_usd,
+        "baseline_no_kb_score": run.baseline_no_kb_score,
+        "baseline_default_score": run.baseline_default_score,
+        "optimized_score": run.optimized_score,
+        "judge_variance": run.judge_variance,
+        "judge_model": run.judge_model,
+        "best_config": run.best_config,
+        "trials": run.trials,
+        "data_source_suggestions": run.data_source_suggestions,
+        "options": run.options,
+        "error_message": run.error_message,
+        "started_at": run.started_at.isoformat() if run.started_at else None,
+        "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+        "cancel_requested": run.cancel_requested,
+    }
+
+
+@router.post("/{uuid}/optimize")
+async def start_kb_optimization(uuid: str, request: Request, user: User = Depends(get_current_user)):
+    """Kick off a KB Autovalidate optimization run.
+
+    Body:
+      - token_budget: int (required)
+      - include_indexing_track: bool (v1 ignores this — cheap track only)
+      - apply_on_finish: bool
+      - autogen_coverage: "quick" | "standard" | "exhaustive" (used only when KB has no test queries)
+    """
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(
+        uuid, user, manage=True, user_org_ancestry=user_org_ancestry, allow_admin=True,
+    )
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+
+    body = await request.json()
+    try:
+        token_budget = int(body.get("token_budget", 0))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="token_budget must be an integer")
+    if token_budget <= 0:
+        raise HTTPException(status_code=400, detail="token_budget must be > 0")
+
+    include_indexing_track = bool(body.get("include_indexing_track", False))
+    apply_on_finish = bool(body.get("apply_on_finish", False))
+    autogen_coverage = (body.get("autogen_coverage") or "standard").strip()
+    if autogen_coverage not in ("quick", "standard", "exhaustive"):
+        autogen_coverage = "standard"
+
+    # Reject if a non-terminal run already exists for this KB.
+    from app.models.kb_optimization_run import KBOptimizationRun
+    active = await KBOptimizationRun.find_one(
+        KBOptimizationRun.kb_uuid == kb.uuid,
+        {"status": {"$in": ["queued", "running"]}},
+    )
+    if active:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Optimization already in progress for this KB (run {active.uuid})",
+        )
+
+    run = KBOptimizationRun(
+        kb_uuid=kb.uuid,
+        user_id=user.user_id,
+        status="queued",
+        token_budget=token_budget,
+        options={
+            "include_indexing_track": include_indexing_track,
+            "apply_on_finish": apply_on_finish,
+            "autogen_coverage": autogen_coverage,
+        },
+    )
+    await run.insert()
+
+    from app.tasks.kb_validation_tasks import optimize_kb_task
+    optimize_kb_task.delay(
+        kb.uuid, user.user_id, run.uuid, token_budget,
+        include_indexing_track, apply_on_finish,
+    )
+    return {"run_uuid": run.uuid, "status": "queued"}
+
+
+@router.get("/{uuid}/optimize/active")
+async def get_active_kb_optimization(uuid: str, user: User = Depends(get_current_user)):
+    """Return the active (queued/running) optimization run for this KB, or null."""
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(
+        uuid, user, user_org_ancestry=user_org_ancestry, allow_admin=True,
+    )
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    from app.models.kb_optimization_run import KBOptimizationRun
+    run = await KBOptimizationRun.find_one(
+        KBOptimizationRun.kb_uuid == kb.uuid,
+        {"status": {"$in": ["queued", "running"]}},
+    )
+    return {"run": _serialize_optimization_run(run) if run else None}
+
+
+def _summarise_optimization_run(run) -> dict:
+    """Compact projection of a run for list views — drops trial detail and per-query
+    judge bodies that bloat the response and aren't needed for a history list."""
+    return {
+        "uuid": run.uuid,
+        "kb_uuid": run.kb_uuid,
+        "status": run.status,
+        "started_at": run.started_at.isoformat() if run.started_at else None,
+        "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+        "token_budget": run.token_budget,
+        "tokens_used": run.tokens_used,
+        "baseline_no_kb_score": run.baseline_no_kb_score,
+        "baseline_default_score": run.baseline_default_score,
+        "optimized_score": run.optimized_score,
+        "judge_model": run.judge_model,
+        "num_trials": len(run.trials or []),
+        "best_config": run.best_config,
+        "options": run.options,
+        "error_message": run.error_message,
+    }
+
+
+@router.get("/{uuid}/optimize")
+async def list_kb_optimization_history(
+    uuid: str,
+    limit: int = Query(20, ge=1, le=100),
+    skip: int = Query(0, ge=0),
+    user: User = Depends(get_current_user),
+):
+    """List past optimization runs for this KB, newest first.
+
+    Returns compact summaries (without per-trial detail) so a long history
+    doesn't blow up response size. Use ``GET /{uuid}/optimize/{run_uuid}``
+    to fetch the full payload for a specific run.
+    """
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(
+        uuid, user, user_org_ancestry=user_org_ancestry, allow_admin=True,
+    )
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    from app.models.kb_optimization_run import KBOptimizationRun
+    runs = await (
+        KBOptimizationRun.find(KBOptimizationRun.kb_uuid == kb.uuid)
+        .sort("-started_at")
+        .skip(skip)
+        .limit(limit)
+        .to_list()
+    )
+    return {
+        "items": [_summarise_optimization_run(r) for r in runs],
+        "skip": skip,
+        "limit": limit,
+        "count": len(runs),
+    }
+
+
+@router.get("/{uuid}/optimize/{run_uuid}")
+async def get_kb_optimization(uuid: str, run_uuid: str, user: User = Depends(get_current_user)):
+    """Return the full state of an optimization run (for polling)."""
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(
+        uuid, user, user_org_ancestry=user_org_ancestry, allow_admin=True,
+    )
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    from app.models.kb_optimization_run import KBOptimizationRun
+    run = await KBOptimizationRun.find_one(
+        KBOptimizationRun.uuid == run_uuid,
+        KBOptimizationRun.kb_uuid == kb.uuid,
+    )
+    if not run:
+        raise HTTPException(status_code=404, detail="Optimization run not found")
+    return _serialize_optimization_run(run)
+
+
+@router.post("/{uuid}/optimize/{run_uuid}/cancel")
+async def cancel_kb_optimization(uuid: str, run_uuid: str, user: User = Depends(get_current_user)):
+    """Request cancellation. The worker checks this flag between trials and
+    transitions the run to status='cancelled' on its next loop iteration."""
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(
+        uuid, user, manage=True, user_org_ancestry=user_org_ancestry, allow_admin=True,
+    )
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    from app.models.kb_optimization_run import KBOptimizationRun
+    run = await KBOptimizationRun.find_one(
+        KBOptimizationRun.uuid == run_uuid,
+        KBOptimizationRun.kb_uuid == kb.uuid,
+    )
+    if not run:
+        raise HTTPException(status_code=404, detail="Optimization run not found")
+    if run.status not in ("queued", "running"):
+        return {"ok": True, "status": run.status, "note": "not running"}
+    run.cancel_requested = True
+    await run.save()
+    return {"ok": True, "status": "cancel_requested"}
+
+
+@router.post("/{uuid}/optimize/{run_uuid}/apply")
+async def apply_kb_optimization(uuid: str, run_uuid: str, user: User = Depends(get_current_user)):
+    """Apply a completed optimization's best config to the KB's rag_config_override.
+
+    This is for users who want to review trial results before applying. Runs
+    started with apply_on_finish=True don't need to call this.
+    """
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(
+        uuid, user, manage=True, user_org_ancestry=user_org_ancestry, allow_admin=True,
+    )
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    from app.models.kb_optimization_run import KBOptimizationRun
+    run = await KBOptimizationRun.find_one(
+        KBOptimizationRun.uuid == run_uuid,
+        KBOptimizationRun.kb_uuid == kb.uuid,
+    )
+    if not run:
+        raise HTTPException(status_code=404, detail="Optimization run not found")
+    if run.status != "completed":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot apply — run status is '{run.status}', expected 'completed'",
+        )
+    if not run.best_config:
+        raise HTTPException(status_code=400, detail="Run has no best_config to apply")
+
+    import datetime as _dt
+    kb.rag_config_override = dict(run.best_config)
+    kb.rag_config_override_set_at = _dt.datetime.now(tz=_dt.timezone.utc)
+    kb.rag_config_override_run_uuid = run.uuid
+    await kb.save()
+    return {"ok": True, "applied_config": kb.rag_config_override}
 
 
 # ---------------------------------------------------------------------------

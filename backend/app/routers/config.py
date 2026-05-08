@@ -50,6 +50,8 @@ async def get_models(user: User = Depends(get_current_user)):
             privacy=m.get("privacy", ""),
             supports_structured=m.get("supports_structured", True),
             context_window=m.get("context_window", 128000),
+            cost_per_1m_input=m.get("cost_per_1m_input"),
+            cost_per_1m_output=m.get("cost_per_1m_output"),
         )
         for m in models
         if isinstance(m, dict)
@@ -72,6 +74,8 @@ async def get_user_config(user: User = Depends(get_current_user)):
             privacy=m.get("privacy", ""),
             supports_structured=m.get("supports_structured", True),
             context_window=m.get("context_window", 128000),
+            cost_per_1m_input=m.get("cost_per_1m_input"),
+            cost_per_1m_output=m.get("cost_per_1m_output"),
         )
         for m in models
         if isinstance(m, dict)
@@ -121,6 +125,8 @@ async def update_user_config(req: UpdateUserConfigRequest, user: User = Depends(
             privacy=m.get("privacy", ""),
             supports_structured=m.get("supports_structured", True),
             context_window=m.get("context_window", 128000),
+            cost_per_1m_input=m.get("cost_per_1m_input"),
+            cost_per_1m_output=m.get("cost_per_1m_output"),
         )
         for m in models
         if isinstance(m, dict)

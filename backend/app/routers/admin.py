@@ -260,6 +260,11 @@ class ModelAddRequest(BaseModel):
     multimodal: bool = False
     supports_pdf: bool = False
     context_window: int = 128000
+    # Cost rates in USD per 1M tokens. Populated for external paid providers
+    # so KB Autovalidate can show dollar cost estimates in its budget modal.
+    # None = not declared; UI falls back to tokens-only display.
+    cost_per_1m_input: Optional[float] = None
+    cost_per_1m_output: Optional[float] = None
 
 
 class OAuthProviderRequest(BaseModel):
@@ -1301,6 +1306,8 @@ async def add_model(
             "multimodal": body.multimodal,
             "supports_pdf": body.supports_pdf,
             "context_window": body.context_window,
+            "cost_per_1m_input": body.cost_per_1m_input,
+            "cost_per_1m_output": body.cost_per_1m_output,
         }
     )
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
@@ -1351,6 +1358,8 @@ async def update_model(
         "multimodal": body.multimodal,
         "supports_pdf": body.supports_pdf,
         "context_window": body.context_window,
+        "cost_per_1m_input": body.cost_per_1m_input,
+        "cost_per_1m_output": body.cost_per_1m_output,
     }
     # Keep default_model pointer stable when the default is renamed.
     if cfg.default_model and cfg.default_model == prev_name and body.name != prev_name:

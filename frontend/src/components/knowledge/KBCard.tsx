@@ -1,4 +1,4 @@
-import { ShieldCheck, Tag, Pencil, Trash2, Bookmark, BookmarkCheck, Copy, MessageSquare } from 'lucide-react'
+import { ShieldCheck, Tag, Pencil, Trash2, Bookmark, BookmarkCheck, Copy, MessageSquare, Sparkles } from 'lucide-react'
 import type { KnowledgeBase } from '../../types/knowledge'
 import type { Organization } from '../../api/organizations'
 
@@ -70,6 +70,24 @@ export function KBCard({
           }}>
             <ShieldCheck size={10} />
             Verified
+          </span>
+        )}
+        {kb.has_optimized_config && (
+          <span
+            title={
+              kb.optimized_config_set_at
+                ? `Optimized settings applied ${new Date(kb.optimized_config_set_at).toLocaleDateString()}`
+                : 'Optimized settings applied'
+            }
+            style={{
+              fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
+              color: '#a78bfa', backgroundColor: 'rgba(124, 58, 237, 0.12)',
+              border: '1px solid rgba(124, 58, 237, 0.3)',
+              display: 'flex', alignItems: 'center', gap: 3, whiteSpace: 'nowrap',
+            }}
+          >
+            <Sparkles size={10} />
+            Optimized
           </span>
         )}
         <span style={{

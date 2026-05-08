@@ -23,6 +23,7 @@ celery.conf.task_routes = {
     "tasks.upload.*": {"queue": "uploads"},
     "tasks.extraction.*": {"queue": "workflows"},
     "tasks.evaluation.*": {"queue": "workflows"},
+    "tasks.kb.*": {"queue": "workflows"},
     "tasks.passive.*": {"queue": "passive"},
     "tasks.activity.*": {"queue": "default"},
     "tasks.demo.*": {"queue": "default"},
@@ -96,6 +97,11 @@ celery.conf.beat_schedule = {
     "engagement-inactivity-nudges": {
         "task": "tasks.engagement.process_inactivity_nudges",
         "schedule": crontab(hour=10, minute=30),  # daily at 10:30am
+    },
+    # KB Autovalidate orphan-run reaper
+    "kb-optimization-janitor": {
+        "task": "tasks.passive.kb_optimization_janitor",
+        "schedule": crontab(minute=0),  # hourly
     },
 }
 
