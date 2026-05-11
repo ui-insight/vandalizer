@@ -6,8 +6,10 @@ from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.dependencies import get_current_user
+from app.models.system_config import SystemConfig
 from app.models.user import User
 from app.services import access_control, activity_service
+from app.tasks.activity_tasks import STALE_ACTIVITY_THRESHOLD_MINUTES_DEFAULT
 
 logger = logging.getLogger(__name__)
 
@@ -57,4 +59,26 @@ async def activity_streams(
     """List recent activity events for the current user and their teams."""
     team_ids = await _team_ids_for_user(user)
     events = await activity_service.list_activities(user.user_id, limit=limit, team_ids=team_ids)
-    return {"events": [ev.to_dict() for ev in events]}
+
+    # Frontend uses this to flip stuck rail items to a "timed out" state without
+    # waiting on the reaper. Keep it in sync with the backend reaper threshold.
+    try:
+        config = await SystemConfig.get_config()
+        retention = config.get_retention_config()
+        threshold = retention.get(
+            "activity_stale_threshold_minutes",
+            STALE_ACTIVITY_THRESHOLD_MINUTES_DEFAULT,
+        )
+        stale_threshold_minutes = (
+            int(threshold)
+            if isinstance(threshold, (int, float)) and threshold > 0
+            else STALE_ACTIVITY_THRESHOLD_MINUTES_DEFAULT
+        )
+    except Exception:
+        logger.exception("Failed to resolve stale-activity threshold")
+        stale_threshold_minutes = STALE_ACTIVITY_THRESHOLD_MINUTES_DEFAULT
+
+    return {
+        "events": [ev.to_dict() for ev in events],
+        "stale_threshold_minutes": stale_threshold_minutes,
+    }

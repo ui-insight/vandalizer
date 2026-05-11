@@ -65,9 +65,20 @@ function statusMetaClass(status: ActivityEvent['status']) {
   }
 }
 
+// Threshold mirrors SystemConfig.retention_config.activity_stale_threshold_minutes
+// (default 30 min) so the UI flips to "timed out" the instant the threshold
+// passes, instead of waiting for the next backend reap cycle.
+function isStale(activity: ActivityEvent, thresholdMinutes: number): boolean {
+  if (activity.status !== 'running' && activity.status !== 'queued') return false
+  const ts = activity.last_updated_at || activity.started_at
+  if (!ts) return false
+  const age = Date.now() - new Date(ts).getTime()
+  return age > thresholdMinutes * 60 * 1000
+}
+
 export function ActivityRail() {
   const { railDocked, toggleRailDocked, setActiveRightTab, setLoadConversationId, triggerNewChat, openWorkflow, openExtraction, closeWorkflow, closeExtraction, closeAutomation, activitySignal } = useWorkspace()
-  const { activities, refresh, freshTitleIds, markTitleShimmered } = useActivities(activitySignal)
+  const { activities, refresh, freshTitleIds, markTitleShimmered, staleThresholdMinutes } = useActivities(activitySignal)
   const { toast } = useToast()
   const { togglePanel, progress } = useCertificationPanel()
 
@@ -163,8 +174,13 @@ export function ActivityRail() {
 
           {activities.map((activity) => {
             const Icon = activityIcon(activity.type)
-            const running = isRunning(activity.status)
+            const stale = isStale(activity, staleThresholdMinutes)
+            const running = isRunning(activity.status) && !stale
             const titleFresh = freshTitleIds.has(activity.id)
+            const effectiveStatus: ActivityEvent['status'] = stale ? 'failed' : activity.status
+            const staleTooltip = stale
+              ? `Timed out — no progress for over ${staleThresholdMinutes} minutes.`
+              : undefined
 
             return (
               <div
@@ -211,13 +227,13 @@ export function ActivityRail() {
 
                     {/* Status icon */}
                     <div
-                      className={cn('shrink-0 opacity-90', running ? 'text-white' : statusMetaClass(activity.status))}
-                      title={activity.status === 'failed' && activity.error ? activity.error : undefined}
+                      className={cn('shrink-0 opacity-90', running ? 'text-white' : statusMetaClass(effectiveStatus))}
+                      title={staleTooltip ?? (activity.status === 'failed' && activity.error ? activity.error : undefined)}
                     >
-                      <StatusIcon status={activity.status} />
+                      <StatusIcon status={effectiveStatus} />
                     </div>
 
-                    {/* Delete button - always visible for failed/canceled, hover for others */}
+                    {/* Delete button - always visible for failed/canceled/stale, hover for others */}
                     <button
                       onClick={(e) => handleDelete(e, activity.id)}
                       className={cn(
@@ -225,7 +241,7 @@ export function ActivityRail() {
                         'flex items-center justify-center',
                         'rounded p-1',
                         'transition-[opacity,color,background-color] duration-200',
-                        activity.status === 'failed' || activity.status === 'canceled'
+                        stale || activity.status === 'failed' || activity.status === 'canceled'
                           ? 'opacity-70 pointer-events-auto hover:opacity-100'
                           : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto',
                         'text-[#7a7f87] hover:text-[#444]',
@@ -233,9 +249,11 @@ export function ActivityRail() {
                           ? 'bg-white/30 backdrop-blur-sm hover:bg-white/50'
                           : 'bg-white/90 backdrop-blur-sm shadow-[0_1px_3px_rgba(0,0,0,0.1)] hover:bg-white/95',
                       )}
-                      title={activity.status === 'failed' && activity.error
-                        ? `Delete - Error: ${activity.error}`
-                        : 'Delete'}
+                      title={staleTooltip
+                        ? `Delete - ${staleTooltip}`
+                        : activity.status === 'failed' && activity.error
+                          ? `Delete - Error: ${activity.error}`
+                          : 'Delete'}
                     >
                       <Trash2 className="h-3 w-3" />
                     </button>

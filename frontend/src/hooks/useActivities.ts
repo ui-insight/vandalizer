@@ -3,11 +3,15 @@ import { listActivities } from '../api/activity'
 import type { ActivityEvent } from '../types/chat'
 
 const POLL_INTERVAL = 3000
+const DEFAULT_STALE_THRESHOLD_MINUTES = 30
 
 export function useActivities(externalSignal?: number) {
   const [activities, setActivities] = useState<ActivityEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [freshTitleIds, setFreshTitleIds] = useState<Set<string>>(new Set())
+  const [staleThresholdMinutes, setStaleThresholdMinutes] = useState<number>(
+    DEFAULT_STALE_THRESHOLD_MINUTES,
+  )
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const prevRef = useRef<Map<string, string | null>>(new Map())
   const lastActiveAtRef = useRef<number>(0)
@@ -43,6 +47,10 @@ export function useActivities(externalSignal?: number) {
 
       prevRef.current = new Map(newActivities.map((a) => [a.id, a.title]))
       setActivities(newActivities)
+
+      if (typeof data.stale_threshold_minutes === 'number' && data.stale_threshold_minutes > 0) {
+        setStaleThresholdMinutes(data.stale_threshold_minutes)
+      }
 
       if (changedIds.length > 0) {
         setFreshTitleIds((prev) => {
@@ -103,5 +111,12 @@ export function useActivities(externalSignal?: number) {
     }
   }, [activities, refresh])
 
-  return { activities, loading, refresh, freshTitleIds, markTitleShimmered }
+  return {
+    activities,
+    loading,
+    refresh,
+    freshTitleIds,
+    markTitleShimmered,
+    staleThresholdMinutes,
+  }
 }

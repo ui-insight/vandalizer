@@ -90,6 +90,7 @@ class ActivityEvent(Document):
             "workflow_session_id": self.workflow_session_id,
             "started_at": self.started_at.isoformat() if self.started_at else None,
             "finished_at": self.finished_at.isoformat() if self.finished_at else None,
+            "last_updated_at": self.last_updated_at.isoformat() if self.last_updated_at else None,
             "error": self.error or "",
             "tokens_input": self.tokens_input,
             "tokens_output": self.tokens_output,
