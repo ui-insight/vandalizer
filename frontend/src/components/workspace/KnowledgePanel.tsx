@@ -15,6 +15,7 @@ import { DocumentPickerModal } from '../knowledge/DocumentPickerModal'
 import { KBSearchBar } from '../knowledge/KBSearchBar'
 import { KBListView } from '../knowledge/KBListView'
 import { KnowledgeExplainer } from './KnowledgeExplainer'
+import { ShareWithTeamDialog } from '../library/ShareWithTeamDialog'
 import { useToast } from '../../contexts/ToastContext'
 
 type TabKey = 'mine' | 'team' | 'explore'
@@ -213,14 +214,36 @@ export function KnowledgePanel() {
     activateKB(selectedKB.uuid, selectedKB.title)
   }
 
+  const [shareKBDialogOpen, setShareKBDialogOpen] = useState(false)
+
   const handleToggleShare = async () => {
     if (!selectedKB) return
+    // Sharing for the first time → prompt for a note. Unsharing is silent.
+    if (!selectedKB.shared_with_team) {
+      setShareKBDialogOpen(true)
+      return
+    }
     try {
       await api.shareKnowledgeBase(selectedKB.uuid)
       loadDetail(selectedKB.uuid)
       refresh()
     } catch (err) {
       console.error('Failed to toggle sharing:', err)
+    }
+  }
+
+  const confirmShareKB = async (comment: string) => {
+    if (!selectedKB) return
+    try {
+      await api.shareKnowledgeBase(selectedKB.uuid, comment || undefined)
+      toast('Shared with team', 'success')
+      loadDetail(selectedKB.uuid)
+      refresh()
+    } catch (err) {
+      console.error('Failed to share KB:', err)
+      toast('Failed to share knowledge base', 'error')
+    } finally {
+      setShareKBDialogOpen(false)
     }
   }
 
@@ -325,6 +348,7 @@ export function KnowledgePanel() {
   if (selectedKB) {
     const badge = STATUS_BADGE[selectedKB.status] || STATUS_BADGE.empty
     return (
+      <>
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#1e1e1e', position: 'relative' }}>
         {/* Header */}
         <div
@@ -870,6 +894,15 @@ export function KnowledgePanel() {
           </div>
         )}
       </div>
+
+      {shareKBDialogOpen && (
+        <ShareWithTeamDialog
+          itemName={selectedKB.title}
+          onCancel={() => setShareKBDialogOpen(false)}
+          onConfirm={confirmShareKB}
+        />
+      )}
+      </>
     )
   }
 

@@ -6,6 +6,7 @@ import { useToast } from '../../contexts/ToastContext'
 import { useLibraries, useLibraryItems } from '../../hooks/useLibrary'
 import { LibraryItemRow } from '../library/LibraryItemRow'
 import { ExploreTab } from '../library/ExploreTab'
+import { ShareWithTeamDialog } from '../library/ShareWithTeamDialog'
 import { cloneToPersonal, shareToTeam, addItem as addItemToLibrary, touchItem, listCollections } from '../../api/library'
 import { ApiError } from '../../api/client'
 import { createWorkflow, importWorkflow } from '../../api/workflows'
@@ -139,18 +140,26 @@ export function LibraryTab() {
     await cloneToPersonal(itemId)
     refreshItems()
   }
-  const handleShare = async (itemId: string) => {
+  const [shareDialogItem, setShareDialogItem] = useState<{ id: string; name: string } | null>(null)
+  const handleShare = (itemId: string) => {
     if (!teamId) {
       toast('Switch to a team before sharing items.', 'info')
       return
     }
+    const item = items.find((i) => i.id === itemId)
+    setShareDialogItem({ id: itemId, name: item?.name ?? 'this item' })
+  }
+  const confirmShare = async (comment: string) => {
+    if (!shareDialogItem || !teamId) return
     try {
-      await shareToTeam(itemId, teamId)
+      await shareToTeam(shareDialogItem.id, teamId, comment || undefined)
       toast('Shared to team library', 'success')
       refreshItems()
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : 'Failed to share to team'
       toast(msg, 'error')
+    } finally {
+      setShareDialogItem(null)
     }
   }
   const handleRemove = async (itemId: string) => {
@@ -1351,6 +1360,14 @@ export function LibraryTab() {
             </div>
           </div>
         </div>
+      )}
+
+      {shareDialogItem && (
+        <ShareWithTeamDialog
+          itemName={shareDialogItem.name}
+          onCancel={() => setShareDialogItem(null)}
+          onConfirm={confirmShare}
+        />
       )}
     </div>
   )

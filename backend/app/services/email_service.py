@@ -498,6 +498,55 @@ def approval_resolved_email(
 # ---------------------------------------------------------------------------
 
 
+_KIND_LABELS = {
+    "workflow": "workflow",
+    "extraction": "extraction",
+    "search_set": "search set",
+    "knowledge_base": "knowledge base",
+}
+
+
+def team_share_email(
+    sharer_name: str,
+    item_kind: str,
+    item_name: str,
+    team_name: str,
+    comment: str | None,
+    view_url: str,
+) -> tuple[str, str]:
+    """Returns (subject, html_body) when a teammate shares an item with the team."""
+    import html as html_lib
+
+    kind_label = _KIND_LABELS.get(item_kind, item_kind.replace("_", " "))
+    safe_sharer = html_lib.escape(sharer_name)
+    safe_item = html_lib.escape(item_name)
+    safe_team = html_lib.escape(team_name)
+    safe_kind = html_lib.escape(kind_label)
+
+    subject = f'{sharer_name} shared "{item_name}" with {team_name}'
+
+    comment_block = ""
+    if comment:
+        safe_comment = html_lib.escape(comment).replace("\n", "<br/>")
+        comment_block = f"""
+      <div style="margin:16px 0;padding:12px 16px;background:rgba(255,255,255,0.05);border-left:3px solid #f1b300;border-radius:4px;">
+        <p style="margin:0;font-size:14px;color:#d1d5db;"><strong style="color:#fff;">Note from {safe_sharer}:</strong><br/>{safe_comment}</p>
+      </div>"""
+
+    html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
+    <div class="container"><div class="card">
+      <div class="logo">Vandalizer</div>
+      <h1>New {safe_kind} shared with your team</h1>
+      <p><span class="highlight">{safe_sharer}</span> shared the {safe_kind}
+         <span class="highlight">{safe_item}</span> with
+         <strong style="color:#fff">{safe_team}</strong>.</p>
+      {comment_block}
+      <p style="margin-top:24px"><a class="btn" href="{view_url}">Open in Vandalizer</a></p>
+      <div class="footer">Vandalizer</div>
+    </div></div></body></html>"""
+    return subject, html
+
+
 def team_member_joined_email(
     inviter_name: str, member_name: str, team_name: str, frontend_url: str,
 ) -> tuple[str, str]:

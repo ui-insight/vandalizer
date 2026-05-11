@@ -21,6 +21,10 @@ class AddDocumentsRequest(BaseModel):
     document_uuids: list[str]
 
 
+class ShareKBRequest(BaseModel):
+    comment: Optional[str] = None
+
+
 class AddUrlsRequest(BaseModel):
     urls: list[str]
     crawl_enabled: bool = False

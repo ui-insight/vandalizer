@@ -22,6 +22,7 @@ from app.schemas.knowledge import (
     KBResponse,
     KBSourceResponse,
     KBStatusResponse,
+    ShareKBRequest,
     UpdateKBRequest,
 )
 from app.services import knowledge_service as svc
@@ -250,9 +251,19 @@ async def update_knowledge_base(uuid: str, req: UpdateKBRequest, user: User = De
 
 
 @router.post("/{uuid}/share")
-async def share_knowledge_base(uuid: str, user: User = Depends(get_current_user)):
+async def share_knowledge_base(
+    uuid: str,
+    req: ShareKBRequest | None = None,
+    user: User = Depends(get_current_user),
+):
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
-    kb = await svc.share_with_team(uuid, user, user_org_ancestry=user_org_ancestry)
+    comment = req.comment if req else None
+    kb = await svc.share_with_team(
+        uuid,
+        user,
+        user_org_ancestry=user_org_ancestry,
+        comment=comment,
+    )
     if not kb:
         raise HTTPException(status_code=404, detail="Knowledge base not found")
     return {"ok": True, "shared_with_team": kb.shared_with_team}
