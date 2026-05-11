@@ -103,6 +103,7 @@ class CloneRequest(BaseModel):
 class ShareToTeamRequest(BaseModel):
     item_id: str
     team_id: str
+    comment: Optional[str] = None
 
 
 # ---------------------------------------------------------------------------

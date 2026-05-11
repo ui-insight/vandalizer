@@ -57,8 +57,11 @@ export function cloneToPersonal(itemId: string) {
   return apiFetch<LibraryItem>('/api/library/clone', { method: 'POST', body: JSON.stringify({ item_id: itemId }) })
 }
 
-export function shareToTeam(itemId: string, teamId: string) {
-  return apiFetch<LibraryItem>('/api/library/share', { method: 'POST', body: JSON.stringify({ item_id: itemId, team_id: teamId }) })
+export function shareToTeam(itemId: string, teamId: string, comment?: string) {
+  return apiFetch<LibraryItem>('/api/library/share', {
+    method: 'POST',
+    body: JSON.stringify({ item_id: itemId, team_id: teamId, comment: comment || undefined }),
+  })
 }
 
 // Folders

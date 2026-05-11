@@ -421,7 +421,13 @@ async def clone_to_personal(item_id: str, user: User) -> dict | None:
     )
 
 
-async def share_to_team(item_id: str, user: User, team_id: str) -> dict:
+async def share_to_team(
+    item_id: str,
+    user: User,
+    team_id: str,
+    *,
+    comment: str | None = None,
+) -> dict:
     item = await access_control.get_authorized_library_item(item_id, user)
     if not item:
         raise ShareError("item_not_found", 404)
@@ -447,6 +453,26 @@ async def share_to_team(item_id: str, user: User, team_id: str) -> dict:
     )
     if not result:
         raise ShareError("clone_failed", 500)
+
+    try:
+        from app.services.team_service import notify_team_share
+
+        team = await Team.get(team_oid)
+        if team:
+            await notify_team_share(
+                sharer=user,
+                team=team,
+                item_kind=result.get("kind") or item.kind.value,
+                item_name=result.get("name") or "Untitled",
+                item_id=result.get("id") or str(new_obj_id),
+                link="/library",
+                comment=comment,
+            )
+    except Exception:
+        # Notification failure should never break the share itself.
+        import logging
+        logging.getLogger(__name__).exception("Failed to notify team of library share")
+
     return result
 
 

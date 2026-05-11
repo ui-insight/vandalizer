@@ -289,6 +289,74 @@ async def _notify_invite_accepted(
         await send_email(inviter.email, subject, html, settings, email_type="team_member_joined")
 
 
+async def notify_team_share(
+    *,
+    sharer: User,
+    team: Team,
+    item_kind: str,
+    item_name: str,
+    item_id: str,
+    link: str,
+    comment: str | None = None,
+) -> None:
+    """Fan out a bell notification + email to every team member (except the sharer).
+
+    `item_kind` should match values used elsewhere: "workflow", "extraction",
+    "search_set", "knowledge_base". `link` is a frontend path (e.g. "/library").
+    """
+    from app.config import Settings
+    from app.services.email_service import send_email, team_share_email
+    from app.services.notification_service import create_notification
+
+    sharer_name = sharer.name or sharer.user_id
+    kind_labels = {
+        "workflow": "workflow",
+        "extraction": "extraction",
+        "search_set": "search set",
+        "knowledge_base": "knowledge base",
+    }
+    kind_label = kind_labels.get(item_kind, item_kind.replace("_", " "))
+    title = f'{sharer_name} shared a {kind_label} with {team.name}'
+    body = f'"{item_name}"'
+    if comment:
+        # Keep notification body compact for the bell dropdown
+        snippet = comment.strip().replace("\n", " ")
+        body = f'"{item_name}" — {snippet[:160]}'
+
+    members = await get_team_members(team.id)
+    settings: Settings | None = None
+    for m in members:
+        recipient_id = m.get("user_id")
+        if not recipient_id or recipient_id == sharer.user_id:
+            continue
+
+        await create_notification(
+            user_id=recipient_id,
+            kind="team_share",
+            title=title,
+            body=body,
+            link=link,
+            item_kind=item_kind,
+            item_id=item_id,
+            item_name=item_name,
+        )
+
+        email = m.get("email")
+        if email:
+            if settings is None:
+                settings = Settings()
+            view_url = f"{settings.frontend_url}{link}"
+            subject, html = team_share_email(
+                sharer_name=sharer_name,
+                item_kind=item_kind,
+                item_name=item_name,
+                team_name=team.name,
+                comment=comment,
+                view_url=view_url,
+            )
+            await send_email(email, subject, html, settings, email_type="team_share")
+
+
 async def switch_team(team_uuid: str, user: User) -> Team:
     """Switch the user's current team."""
     team = await Team.find_one(Team.uuid == team_uuid)
