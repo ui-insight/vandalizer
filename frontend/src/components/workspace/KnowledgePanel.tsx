@@ -348,6 +348,7 @@ export function KnowledgePanel() {
   if (selectedKB) {
     const badge = STATUS_BADGE[selectedKB.status] || STATUS_BADGE.empty
     return (
+      <>
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#1e1e1e', position: 'relative' }}>
         {/* Header */}
         <div
@@ -893,6 +894,15 @@ export function KnowledgePanel() {
           </div>
         )}
       </div>
+
+      {shareKBDialogOpen && (
+        <ShareWithTeamDialog
+          itemName={selectedKB.title}
+          onCancel={() => setShareKBDialogOpen(false)}
+          onConfirm={confirmShareKB}
+        />
+      )}
+      </>
     )
   }
 
@@ -1080,14 +1090,6 @@ export function KnowledgePanel() {
           setExploreDetail(null)
           activateKB(item.source_uuid, item.display_name || item.name)
         }}
-      />
-    )}
-
-    {shareKBDialogOpen && selectedKB && (
-      <ShareWithTeamDialog
-        itemName={selectedKB.title}
-        onCancel={() => setShareKBDialogOpen(false)}
-        onConfirm={confirmShareKB}
       />
     )}
     </>
