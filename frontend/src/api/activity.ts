@@ -12,5 +12,7 @@ export function deleteActivity(activityId: string) {
 }
 
 export function listActivities(limit: number = 50) {
-  return apiFetch<{ events: ActivityEvent[] }>(`/api/activity/streams/?limit=${limit}`)
+  return apiFetch<{ events: ActivityEvent[]; stale_threshold_minutes: number }>(
+    `/api/activity/streams/?limit=${limit}`,
+  )
 }

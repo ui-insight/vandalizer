@@ -60,6 +60,9 @@ DEFAULT_RETENTION_CONFIG = {
     "activity_retention_days": 180,
     "chat_retention_days": 365,
     "workflow_result_retention_days": 365,
+    # Activity rail items in running/queued status get auto-failed when their
+    # last_updated_at hasn't advanced in this long (dead workers, dropped streams).
+    "activity_stale_threshold_minutes": 30,
 }
 
 DEFAULT_EXTRACTION_CONFIG = {

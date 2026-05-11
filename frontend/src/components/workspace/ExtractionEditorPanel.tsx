@@ -71,7 +71,7 @@ interface ExtractionConfig {
 
 export function ExtractionEditorPanel() {
   const queryClient = useQueryClient()
-  const { openExtractionId, openExtraction, closeExtraction, selectedDocUuids, setHighlightTerms, bumpActivitySignal, consumeExtractionResults } = useWorkspace()
+  const { openExtractionId, openExtraction, closeExtraction, selectedDocUuids, selectedDocNames, setHighlightTerms, bumpActivitySignal, consumeExtractionResults } = useWorkspace()
   const { toast } = useToast()
   const { user } = useAuth()
   const [searchSet, setSearchSet] = useState<SearchSet | null>(null)
@@ -82,6 +82,7 @@ export function ExtractionEditorPanel() {
   const [newTerm, setNewTerm] = useState('')
   const [running, setRunning] = useState(false)
   const [resultSets, setResultSets] = useState<Record<string, string>[]>([])
+  const [resultDocNames, setResultDocNames] = useState<string[]>([])
   const [activeResultIdx, setActiveResultIdx] = useState(0)
   const [combinedContext, setCombinedContext] = useState(false)
 
@@ -132,6 +133,7 @@ export function ExtractionEditorPanel() {
     setLoading(true)
     const pending = consumeExtractionResults()
     setResultSets(pending ? [pending] : [])
+    setResultDocNames([])
     setActiveResultIdx(0)
     setActiveTab('design')
     getSearchSet(openExtractionId)
@@ -209,7 +211,14 @@ export function ExtractionEditorPanel() {
           }
         }
       }
-      setResultSets(sets.length > 0 ? sets : [{}])
+      const finalSets = sets.length > 0 ? sets : [{}]
+      // Snapshot doc names at run time so exports stay correct if the user
+      // changes selection afterward.
+      const runDocNames: string[] = combinedContext && selectedDocUuids.length > 1
+        ? [`Combined (${selectedDocUuids.length} docs)`]
+        : selectedDocUuids.map(uuid => selectedDocNames[uuid] ?? uuid)
+      setResultSets(finalSets)
+      setResultDocNames(finalSets.map((_, i) => runDocNames[i] ?? `Result ${i + 1}`))
       setActiveResultIdx(0)
     } finally {
       setRunning(false)
@@ -218,14 +227,21 @@ export function ExtractionEditorPanel() {
   }
 
   // --- Export ---
+  const buildBatchPayload = () =>
+    resultSets.map((set, i) => ({
+      document: resultDocNames[i] ?? `Result ${i + 1}`,
+      values: set,
+    }))
+
   const handleExportCopy = () => {
-    navigator.clipboard.writeText(JSON.stringify(results, null, 2))
+    const payload = resultSets.length > 1 ? buildBatchPayload() : results
+    navigator.clipboard.writeText(JSON.stringify(payload, null, 2))
       .then(() => toast('Results copied to clipboard', 'success'))
       .catch(() => toast('Failed to copy to clipboard', 'error'))
   }
 
   const handleExportJSON = () => {
-    const exportData = resultSets.length > 1 ? resultSets : results
+    const exportData = resultSets.length > 1 ? buildBatchPayload() : results
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -239,15 +255,20 @@ export function ExtractionEditorPanel() {
   const handleExportCSV = () => {
     const escape = (v: string) => `"${v.replace(/"/g, '""')}"`
     const allSets = resultSets.length > 0 ? resultSets : [results]
-    const keys = Object.keys(allSets[0] ?? {})
-    // Transpose: fields as rows, documents/results as columns
-    const header = [
-      escape('Field'),
-      ...allSets.map((_, i) => escape(allSets.length === 1 ? 'Value' : `Result ${i + 1}`)),
-    ].join(',')
-    const rows = keys.map(k =>
-      [escape(k), ...allSets.map(set => escape(String(set[k] ?? '')))].join(','),
-    )
+    // Union of keys across all sets, preserving the first set's order.
+    const seen = new Set<string>()
+    const keys: string[] = []
+    for (const set of allSets) {
+      for (const k of Object.keys(set)) {
+        if (!seen.has(k)) { seen.add(k); keys.push(k) }
+      }
+    }
+    // One row per document, fields as columns, with a leading Document column.
+    const header = [escape('Document'), ...keys.map(escape)].join(',')
+    const rows = allSets.map((set, i) => {
+      const docName = resultDocNames[i] ?? (allSets.length === 1 ? '' : `Result ${i + 1}`)
+      return [escape(docName), ...keys.map(k => escape(String(set[k] ?? '')))].join(',')
+    })
     const csv = header + '\n' + rows.join('\n') + '\n'
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)

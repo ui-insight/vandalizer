@@ -4,12 +4,34 @@ Ported from Flask app/utilities/activity_description.py.
 Uses pymongo (sync) for DB access.
 """
 
+import datetime
 import logging
 
 from app.celery_app import celery_app
 from app.tasks import TRANSIENT_EXCEPTIONS
 
 logger = logging.getLogger(__name__)
+
+# Fallback when SystemConfig.retention_config doesn't override it. Activity is
+# considered stuck if its last_updated_at hasn't advanced in this long — workflow
+# and extraction steps refresh last_updated_at as they make progress.
+STALE_ACTIVITY_THRESHOLD_MINUTES_DEFAULT = 30
+
+
+def _resolve_stale_threshold_minutes(db) -> int:
+    """Read the stale-activity threshold from SystemConfig, falling back to default.
+
+    Uses sync pymongo so it's safe to call from the Celery beat task.
+    """
+    try:
+        sys_cfg = db.system_config.find_one() or {}
+        retention = sys_cfg.get("retention_config") or {}
+        value = retention.get("activity_stale_threshold_minutes")
+        if isinstance(value, (int, float)) and value > 0:
+            return int(value)
+    except Exception:
+        logger.exception("Failed to resolve stale threshold from SystemConfig")
+    return STALE_ACTIVITY_THRESHOLD_MINUTES_DEFAULT
 
 
 def _get_db():
@@ -179,3 +201,44 @@ def generate_activity_description_task(
 
     except Exception as e:
         logger.error("Error generating description for activity %s: %s", activity_id, e, exc_info=True)
+
+
+@celery_app.task(bind=True, name="tasks.activity.reap_stale_running")
+def reap_stale_running_task(self) -> None:
+    """Mark activity events stuck in running/queued as failed.
+
+    Catches orphans from crashed workers, dropped chat streams, and Celery soft
+    time limits that killed a task before its exception handler could update the
+    activity record. Without this, the activity rail spins forever and the user
+    has to delete the item manually.
+    """
+    db = _get_db()
+    threshold_minutes = _resolve_stale_threshold_minutes(db)
+    cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(
+        minutes=threshold_minutes,
+    )
+    now = datetime.datetime.now(datetime.timezone.utc)
+
+    result = db.activity_event.update_many(
+        {
+            "status": {"$in": ["running", "queued"]},
+            "last_updated_at": {"$lt": cutoff},
+        },
+        {
+            "$set": {
+                "status": "failed",
+                "finished_at": now,
+                "last_updated_at": now,
+                "error": (
+                    f"Timed out — no progress reported for over "
+                    f"{threshold_minutes} minutes."
+                ),
+            },
+        },
+    )
+
+    if result.modified_count:
+        logger.info(
+            "Reaped %d stale activity events (threshold=%d min)",
+            result.modified_count, threshold_minutes,
+        )

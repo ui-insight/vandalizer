@@ -94,6 +94,11 @@ celery.conf.beat_schedule = {
         "task": "tasks.approvals.expire_overdue",
         "schedule": 300.0,  # every 5 minutes
     },
+    # Reap activity rail items stuck in running/queued (dead workers, dropped streams)
+    "activity-reap-stale-running": {
+        "task": "tasks.activity.reap_stale_running",
+        "schedule": 120.0,  # every 2 minutes
+    },
     # User engagement
     "engagement-onboarding-drips": {
         "task": "tasks.engagement.process_onboarding_drips",
