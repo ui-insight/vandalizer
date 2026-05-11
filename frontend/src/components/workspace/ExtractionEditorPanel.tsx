@@ -747,11 +747,14 @@ export function ExtractionEditorPanel() {
             </button>
           </div>
           {selectedDocUuids.length > 1 && (
-            <label style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              fontSize: 12, color: '#374151', cursor: 'pointer', userSelect: 'none',
-              whiteSpace: 'nowrap', flexShrink: 0,
-            }}>
+            <label
+              title="Merge all selected documents into a single context and run one extraction over the combined text. Off: run a separate extraction on each document and show results as numbered tabs."
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                fontSize: 12, color: '#374151', cursor: 'pointer', userSelect: 'none',
+                whiteSpace: 'nowrap', flexShrink: 0,
+              }}
+            >
               <input
                 type="checkbox"
                 checked={combinedContext}
@@ -764,6 +767,15 @@ export function ExtractionEditorPanel() {
           <button
             onClick={handleRun}
             disabled={running || selectedDocUuids.length === 0}
+            title={
+              selectedDocUuids.length === 0
+                ? 'Select one or more documents to run an extraction'
+                : selectedDocUuids.length === 1
+                  ? 'Run this extraction on the selected document'
+                  : combinedContext
+                    ? `Merge all ${selectedDocUuids.length} selected documents into one context and run a single extraction over the combined text`
+                    : `Run this extraction once per document (${selectedDocUuids.length} separate runs). Results appear as numbered tabs.`
+            }
             className="bg-highlight text-highlight-text font-bold hover:brightness-90 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               display: 'inline-flex',
