@@ -3,7 +3,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 from app.config import Settings
 from app.models.user import User
-from app.models.team import Team, TeamMembership, TeamInvite
+from app.models.team import Team, TeamMembership, TeamInvite, TeamJoinLink
 from app.models.document import SmartDocument
 from app.models.folder import SmartFolder
 from app.models.search_set import SearchSet, SearchSetItem
@@ -48,6 +48,7 @@ ALL_MODELS = [
     Team,
     TeamMembership,
     TeamInvite,
+    TeamJoinLink,
     SmartDocument,
     SmartFolder,
     SearchSet,

@@ -164,6 +164,19 @@ async def register(
                     user.user_id,
                 )
 
+    # Public join link — no email match required.
+    if body.join_link_token:
+        from app.services import team_service
+
+        try:
+            await team_service.accept_join_link(body.join_link_token, user)
+        except ValueError:
+            logger.warning(
+                "Auto-accept of join link %s failed for new user %s",
+                body.join_link_token[:8],
+                user.user_id,
+            )
+
     _set_tokens(response, user, settings)
     return await _user_response(user)
 

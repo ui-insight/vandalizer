@@ -24,6 +24,7 @@ const Docs = lazy(() => import('./pages/Docs'))
 const Demo = lazy(() => import('./pages/Demo'))
 const DemoFeedback = lazy(() => import('./pages/DemoFeedback'))
 const InviteAccept = lazy(() => import('./pages/InviteAccept'))
+const JoinLinkAccept = lazy(() => import('./pages/JoinLinkAccept'))
 const Organizations = lazy(() => import('./pages/Organizations'))
 const Credentials = lazy(() => import('./pages/Credentials'))
 const Reviews = lazy(() => import('./pages/Reviews'))
@@ -111,6 +112,15 @@ const inviteRoute = createRoute({
     token: (search.token as string) || undefined,
   }),
   component: InviteAccept,
+})
+
+const joinRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/join',
+  validateSearch: (search: Record<string, unknown>) => ({
+    token: (search.token as string) || undefined,
+  }),
+  component: JoinLinkAccept,
 })
 
 const indexRoute = createRoute({
@@ -344,6 +354,7 @@ const routeTree = rootRoute.addChildren([
   registerRoute,
   resetPasswordRoute,
   inviteRoute,
+  joinRoute,
   indexRoute,
   teamsRoute,
   workflowsRoute,

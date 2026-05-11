@@ -1,6 +1,9 @@
 import { Navigate } from '@tanstack/react-router'
 import { useAuth } from '../../hooks/useAuth'
-import { consumePendingInviteToken } from '../../lib/pendingInvite'
+import {
+  consumePendingInviteToken,
+  consumePendingJoinLinkToken,
+} from '../../lib/pendingInvite'
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, demoExpired, demoFeedbackToken } = useAuth()
@@ -19,11 +22,15 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/demo/feedback" search={{ token: demoFeedbackToken }} />
   }
 
-  // Resume invite flow if the user just completed OAuth/SAML from /invite —
-  // those callbacks land on `/` and lose the token from the URL.
+  // Resume invite/join flow if the user just completed OAuth/SAML from
+  // /invite or /join — those callbacks land on `/` and lose the token.
   const pendingInvite = consumePendingInviteToken()
   if (pendingInvite) {
     return <Navigate to="/invite" search={{ token: pendingInvite }} />
+  }
+  const pendingJoin = consumePendingJoinLinkToken()
+  if (pendingJoin) {
+    return <Navigate to="/join" search={{ token: pendingJoin }} />
   }
 
   return <>{children}</>
