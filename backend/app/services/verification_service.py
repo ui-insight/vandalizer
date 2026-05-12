@@ -1226,21 +1226,21 @@ async def check_and_flag_stale_verification(item_kind: str, item_id: str) -> boo
     else:
         return False
 
-    # Create a quality alert for the stale verification
-    from app.models.quality_alert import QualityAlert
+    # Create a quality alert for the stale verification + notify the item owner.
+    from app.tasks.quality_tasks import _create_alert_and_notify
 
     item_name = await _get_item_name(item_kind, obj_id)
 
     alert_message = f'Verified item "{item_name}" was modified. Re-validation recommended.'
 
-    await QualityAlert(
+    await _create_alert_and_notify(
         alert_type="config_changed",
         item_kind=item_kind,
         item_id=str(obj_id),
         item_name=item_name,
         severity="warning",
         message=alert_message,
-    ).insert()
+    )
 
     # Mark verified item metadata as stale by clearing last_validated_at
     meta = await VerifiedItemMetadata.find_one(

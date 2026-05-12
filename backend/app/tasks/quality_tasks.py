@@ -19,6 +19,91 @@ def _run_async(coro):
         loop.close()
 
 
+async def _resolve_item_owner(item_kind: str, item_id: str) -> str | None:
+    """Resolve the user_id of the owner of a workflow / search_set / KB.
+
+    Returns None for system-scoped items, for items where the owner is the
+    "system" user (auto-revalidation submitter), or when the item can't be
+    found. Callers should treat None as "skip notification."
+    """
+    if not item_kind or not item_id or item_kind == "system":
+        return None
+    try:
+        from beanie import PydanticObjectId
+
+        if item_kind == "workflow":
+            from app.models.workflow import Workflow
+
+            wf = await Workflow.get(PydanticObjectId(item_id))
+            owner = (wf and (wf.created_by_user_id or wf.user_id)) or None
+        elif item_kind == "search_set":
+            from app.models.search_set import SearchSet
+
+            ss = await SearchSet.find_one(SearchSet.uuid == item_id)
+            if not ss:
+                try:
+                    ss = await SearchSet.get(PydanticObjectId(item_id))
+                except Exception:
+                    ss = None
+            owner = (ss and (ss.user_id or ss.created_by_user_id)) if ss else None
+        elif item_kind == "knowledge_base":
+            from app.models.knowledge import KnowledgeBase
+
+            kb = await KnowledgeBase.find_one(KnowledgeBase.uuid == item_id)
+            if not kb:
+                try:
+                    kb = await KnowledgeBase.get(PydanticObjectId(item_id))
+                except Exception:
+                    kb = None
+            owner = (kb and (kb.user_id or kb.created_by_user_id)) if kb else None
+        else:
+            owner = None
+    except Exception as exc:
+        logger.debug("Failed to resolve owner for %s/%s: %s", item_kind, item_id, exc)
+        owner = None
+
+    if owner == "system":
+        return None
+    return owner
+
+
+_SEVERITY_LABEL = {
+    "critical": "Quality alert",
+    "warning": "Quality warning",
+    "info": "Quality notice",
+}
+
+
+async def _create_alert_and_notify(**alert_kwargs) -> "QualityAlert":  # noqa: F821
+    """Create a QualityAlert and fire a bell notification to the item owner.
+
+    Centralizes the dual-write: previously each of the 4 alert-creation sites
+    in this file just called `await QualityAlert(...).insert()`. Wrapping
+    those calls here keeps the notification side-effect out of the
+    business-logic branches.
+    """
+    from app.models.quality_alert import QualityAlert
+    from app.services.notification_service import create_notification
+
+    alert = QualityAlert(**alert_kwargs)
+    await alert.insert()
+
+    owner = await _resolve_item_owner(alert.item_kind, alert.item_id)
+    if owner:
+        label = _SEVERITY_LABEL.get(alert.severity, "Quality alert")
+        await create_notification(
+            user_id=owner,
+            kind="quality_alert",
+            title=f"{label}: {alert.item_name or alert.item_id}",
+            body=alert.message or None,
+            link=f"/library?tab=catalog&item={alert.item_id}",
+            item_kind=alert.item_kind,
+            item_id=alert.item_id,
+            item_name=alert.item_name or None,
+        )
+    return alert
+
+
 @celery.task(
     bind=True,
     name="tasks.passive.quality_monitor",
@@ -73,7 +158,7 @@ async def _quality_monitor_async():
             QualityAlert.acknowledged == False,  # noqa: E712
         )
         if not existing:
-            await QualityAlert(
+            await _create_alert_and_notify(
                 alert_type="config_changed",
                 item_kind="system",
                 item_id="extraction_config",
@@ -81,7 +166,7 @@ async def _quality_monitor_async():
                 severity="warning",
                 message="System extraction config has changed since the last validation run. Consider re-validating affected items.",
                 created_at=now,
-            ).insert()
+            )
 
     # 2. Detect stale items
     stale_items = await detect_stale_items(stale_days)
@@ -93,7 +178,7 @@ async def _quality_monitor_async():
             QualityAlert.acknowledged == False,  # noqa: E712
         )
         if not existing:
-            await QualityAlert(
+            await _create_alert_and_notify(
                 alert_type="stale",
                 item_kind=item["item_kind"],
                 item_id=item["item_id"],
@@ -103,7 +188,7 @@ async def _quality_monitor_async():
                 current_score=item["quality_score"],
                 current_tier=item["quality_tier"],
                 created_at=now,
-            ).insert()
+            )
 
     # 3. Auto-revalidate verified items if enabled
     if auto_revalidate:
@@ -138,7 +223,7 @@ async def _quality_monitor_async():
                     if prev_score is not None and meta.quality_score is not None:
                         delta = prev_score - meta.quality_score
                         if delta >= degradation_threshold:
-                            await QualityAlert(
+                            await _create_alert_and_notify(
                                 alert_type="regression",
                                 item_kind=meta.item_kind,
                                 item_id=meta.item_id,
@@ -150,7 +235,7 @@ async def _quality_monitor_async():
                                 previous_tier=prev_tier,
                                 current_tier=meta.quality_tier,
                                 created_at=now,
-                            ).insert()
+                            )
                 except Exception as e:
                     logger.warning(
                         "Auto-revalidation failed for knowledge_base %s: %s",
@@ -181,7 +266,7 @@ async def _quality_monitor_async():
                     if prev_score is not None and meta.quality_score is not None:
                         delta = prev_score - meta.quality_score
                         if delta >= degradation_threshold:
-                            await QualityAlert(
+                            await _create_alert_and_notify(
                                 alert_type="regression",
                                 item_kind=meta.item_kind,
                                 item_id=meta.item_id,
@@ -193,7 +278,7 @@ async def _quality_monitor_async():
                                 previous_tier=prev_tier,
                                 current_tier=meta.quality_tier,
                                 created_at=now,
-                            ).insert()
+                            )
 
                             if monitoring.get("auto_review_on_degradation", False):
                                 from app.models.verification import VerificationRequest
@@ -234,7 +319,7 @@ async def _quality_monitor_async():
                 if prev_score is not None and meta.quality_score is not None:
                     delta = prev_score - meta.quality_score
                     if delta >= degradation_threshold:
-                        await QualityAlert(
+                        await _create_alert_and_notify(
                             alert_type="regression",
                             item_kind=meta.item_kind,
                             item_id=meta.item_id,
@@ -246,7 +331,7 @@ async def _quality_monitor_async():
                             previous_tier=prev_tier,
                             current_tier=meta.quality_tier,
                             created_at=now,
-                        ).insert()
+                        )
 
                         # Auto-create verification request if configured
                         if monitoring.get("auto_review_on_degradation", False):

@@ -24,6 +24,51 @@ def _wants_selected_document(task_data: dict) -> bool:
     return task_data.get("input_source") == "select_document"
 
 
+def _notify_workflow_completed_sync(
+    db,
+    workflow_doc: dict,
+    workflow_result_id: str,
+    num_steps_completed: int,
+    num_steps_total: int,
+    duration_seconds: float | None,
+) -> None:
+    """Bell-notify the workflow owner when an async run completes.
+
+    Skip for trivial runs (<30s) so quick extractions don't spam the bell.
+    Skip when we can't resolve an owner_user_id.
+    """
+    if duration_seconds is not None and duration_seconds < 30:
+        return
+    owner_user_id = workflow_doc.get("created_by_user_id") or workflow_doc.get("user_id")
+    if not owner_user_id or owner_user_id == "system":
+        return
+
+    import secrets
+    from datetime import datetime, timezone
+
+    workflow_name = workflow_doc.get("name") or "Workflow"
+    body_parts: list[str] = []
+    if num_steps_completed and num_steps_total:
+        body_parts.append(f"{num_steps_completed}/{num_steps_total} steps")
+    if duration_seconds is not None:
+        body_parts.append(f"{int(duration_seconds)}s")
+    body = " • ".join(body_parts) if body_parts else "Open it to see the result."
+
+    db.notification.insert_one({
+        "uuid": secrets.token_urlsafe(12),
+        "user_id": owner_user_id,
+        "kind": "workflow_completed",
+        "title": f"Workflow completed: {workflow_name}",
+        "body": body,
+        "link": f"/workflows/results/{workflow_result_id}",
+        "item_kind": "workflow",
+        "item_id": str(workflow_doc.get("_id")) if workflow_doc.get("_id") else None,
+        "item_name": workflow_name,
+        "read": False,
+        "created_at": datetime.now(timezone.utc),
+    })
+
+
 def _notify_approval_reviewers_sync(
     db, assigned_user_ids: list[str], workflow_name: str,
     step_name: str, instructions: str, approval_uuid: str,
@@ -377,6 +422,7 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
     )
 
     # Update activity and generate AI title
+    activity_started_at = None
     if activity_id:
         try:
             from datetime import datetime, timezone
@@ -386,6 +432,13 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
                 {"_id": ObjectId(workflow_result_id)},
                 {"num_steps_completed": 1, "num_steps_total": 1},
             )
+            # Read started_at from the existing activity so we can compute duration
+            # for the notification's "skip-if-trivial" gate below.
+            activity_doc = db.activity_event.find_one(
+                {"_id": ObjectId(activity_id)},
+                {"started_at": 1},
+            )
+            activity_started_at = (activity_doc or {}).get("started_at")
             usage_update = {
                 "status": "completed",
                 "finished_at": datetime.now(timezone.utc),
@@ -405,6 +458,31 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
             generate_activity_description_task.delay(activity_id, "workflow_run", doc_uuids)
         except Exception as e:
             logger.warning("Could not finalize activity for workflow %s: %s", workflow_id, e)
+
+    # Bell-notify the workflow owner that their long-running workflow finished.
+    # Skips trivially-short runs (<30s) so quick extractions don't spam the bell.
+    try:
+        from datetime import datetime, timezone
+        duration_seconds: float | None = None
+        if activity_started_at:
+            started = activity_started_at
+            if getattr(started, "tzinfo", None) is None:
+                started = started.replace(tzinfo=timezone.utc)
+            duration_seconds = (datetime.now(timezone.utc) - started).total_seconds()
+        wr_doc = db.workflow_result.find_one(
+            {"_id": ObjectId(workflow_result_id)},
+            {"num_steps_completed": 1, "num_steps_total": 1},
+        ) or {}
+        _notify_workflow_completed_sync(
+            db,
+            workflow_doc,
+            workflow_result_id,
+            num_steps_completed=wr_doc.get("num_steps_completed", 0),
+            num_steps_total=wr_doc.get("num_steps_total", 0),
+            duration_seconds=duration_seconds,
+        )
+    except Exception as e:
+        logger.warning("Could not fire workflow-completed notification for %s: %s", workflow_id, e)
 
     # Fire-and-forget auto-validation if validation plan exists
     from app.tasks.quality_tasks import auto_validate_workflow

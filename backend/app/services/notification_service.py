@@ -12,6 +12,10 @@ _COALESCE_KINDS = frozenset({
     "support_reply",
     "support_new_message",
     "support_new_ticket",
+    # Quality alerts on the same item: a single regression / stale warning
+    # may fire on subsequent monitor passes; coalesce so the bell shows one
+    # entry per (item, kind), not one per pass.
+    "quality_alert",
 })
 
 

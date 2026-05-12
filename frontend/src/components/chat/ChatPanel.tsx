@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, type DragEvent } from 'react'
-import { Loader2, BookOpen, X, ArrowDown, ChevronRight, Shield, CheckCircle2, Upload, History, ArrowRight } from 'lucide-react'
+import { Loader2, BookOpen, X, ArrowDown, ChevronRight, Upload, History, ArrowRight } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
@@ -11,6 +11,7 @@ import { useOnboarding } from '../../hooks/useOnboarding'
 import { useWorkspace, type PendingChatMessage } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
 import { addLink, removeDocument, removeLink, truncateContext, compactContext, clearContext, getContinuity, type ContinuityCandidate } from '../../api/chat'
+import { ValueWelcome } from './WelcomeExperience'
 import { uploadFile } from '../../api/files'
 import { getUserConfig, updateUserConfig, markFirstSessionComplete } from '../../api/config'
 import type { FileAttachment, UrlAttachment } from '../../types/chat'
@@ -531,77 +532,15 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
               </div>
             </div>
 
-            {/* Value proposition cards */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
-              <div style={{
-                display: 'flex', gap: 12, padding: '14px 16px',
-                borderRadius: 'var(--ui-radius, 12px)',
-                backgroundColor: '#fff', border: '1px solid #e5e7eb',
-              }}>
-                <div style={{
-                  flexShrink: 0, width: 36, height: 36, borderRadius: 8,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 10%, white)',
-                  color: 'var(--highlight-color, #eab308)',
-                }}>
-                  <Shield size={18} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#111827', lineHeight: 1.3 }}>
-                    Your documents stay private
-                  </div>
-                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 3, lineHeight: 1.5 }}>
-                    Unlike ChatGPT and Claude, your files never leave your institution's control. You choose the model. If it's a private endpoint, your data never touches a third party.
-                  </div>
-                </div>
-              </div>
-
-              <div style={{
-                display: 'flex', gap: 12, padding: '14px 16px',
-                borderRadius: 'var(--ui-radius, 12px)',
-                backgroundColor: '#fff', border: '1px solid #e5e7eb',
-              }}>
-                <div style={{
-                  flexShrink: 0, width: 36, height: 36, borderRadius: 8,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 10%, white)',
-                  color: 'var(--highlight-color, #eab308)',
-                }}>
-                  <CheckCircle2 size={18} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#111827', lineHeight: 1.3 }}>
-                    Workflows you can trust
-                  </div>
-                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 3, lineHeight: 1.5 }}>
-                    Every extraction workflow has documented quality metrics. Accuracy, consistency, and edge cases are tested and maintained, so you see exactly how well it performs before you trust it.
-                  </div>
-                </div>
-              </div>
-
-              <div style={{
-                display: 'flex', gap: 12, padding: '14px 16px',
-                borderRadius: 'var(--ui-radius, 12px)',
-                backgroundColor: '#fff', border: '1px solid #e5e7eb',
-              }}>
-                <div style={{
-                  flexShrink: 0, width: 36, height: 36, borderRadius: 8,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 10%, white)',
-                  color: 'var(--highlight-color, #eab308)',
-                }}>
-                  <Upload size={18} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#111827', lineHeight: 1.3 }}>
-                    Built for research administration
-                  </div>
-                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 3, lineHeight: 1.5 }}>
-                    Purpose-built for grants, compliance, and institutional documents. Multi-format support, automatic OCR, and team collaboration, not a generic chatbot with a file upload bolted on.
-                  </div>
-                </div>
-              </div>
-            </div>
+            {/* Value cards + role-tailored pills + verified-for-your-role cards.
+                Lives in WelcomeExperience.tsx so the welcome surface is composable.
+                onSwitchToFiles: there is no dedicated files tab here; route the
+                "Upload a document" CTA to a help message instead so the agent
+                explains how to attach via the input's + menu. */}
+            <ValueWelcome
+              onSwitchToFiles={() => handleSend('How do I upload a document?', true)}
+              onSendMessage={(message, includeOnboardingContext) => handleSend(message, includeOnboardingContext)}
+            />
           </div>
         )}
 

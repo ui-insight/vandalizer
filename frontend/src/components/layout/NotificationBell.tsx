@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Bell, CheckCheck, Headphones, MessageSquare, ShieldCheck, ShieldX, RotateCcw, Eye, Share2 } from 'lucide-react'
+import { Bell, CheckCheck, Headphones, MessageSquare, ShieldCheck, ShieldX, RotateCcw, Eye, Share2, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
 import { listNotifications, markRead, markAllRead, getUnreadCount } from '../../api/notifications'
 import type { Notification } from '../../api/notifications'
@@ -16,6 +16,8 @@ const kindIcons: Record<string, typeof ShieldCheck> = {
   support_reply: MessageSquare,
   support_status: Headphones,
   team_share: Share2,
+  quality_alert: AlertTriangle,
+  workflow_completed: CheckCircle2,
 }
 
 const kindColors: Record<string, string> = {
@@ -28,6 +30,8 @@ const kindColors: Record<string, string> = {
   support_reply: '#2563eb',
   support_status: '#059669',
   team_share: '#f1b300',
+  quality_alert: '#dc2626',
+  workflow_completed: '#15803d',
 }
 
 const SUPPORT_KINDS = new Set([
