@@ -205,6 +205,132 @@ html {
 .chat-markdown th { background: #f9fafb; font-weight: 600; }
 .chat-markdown hr { border: none; border-top: 1px solid #e5e7eb; margin: 1em 0; }
 
+/* ===== Management API docs modal ===== */
+.mgmt-docs {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #1f2937;
+}
+.mgmt-docs > *:first-child { margin-top: 0; }
+.mgmt-docs > *:last-child  { margin-bottom: 0; }
+
+.mgmt-docs h1, .mgmt-docs h2, .mgmt-docs h3, .mgmt-docs h4 {
+  font-weight: 700;
+  line-height: 1.25;
+  color: #111827;
+  scroll-margin-top: 16px;
+}
+.mgmt-docs h1 {
+  font-size: 22px;
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+.mgmt-docs h2 {
+  font-size: 17px;
+  margin: 28px 0 10px;
+  padding-top: 4px;
+}
+.mgmt-docs h3 {
+  font-size: 14.5px;
+  margin: 20px 0 8px;
+  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.mgmt-docs h4 { font-size: 13.5px; margin: 16px 0 6px; }
+
+.mgmt-docs p { margin: 0 0 12px; }
+.mgmt-docs strong { font-weight: 600; color: #111827; }
+.mgmt-docs em { color: #374151; }
+
+.mgmt-docs ul, .mgmt-docs ol { margin: 0 0 12px; padding-left: 22px; }
+.mgmt-docs li { margin: 4px 0; }
+.mgmt-docs li > p { margin-bottom: 4px; }
+
+.mgmt-docs a {
+  color: var(--highlight-complement, #2563eb);
+  text-decoration: none;
+  border-bottom: 1px dotted currentColor;
+}
+.mgmt-docs a:hover { border-bottom-style: solid; }
+
+.mgmt-docs code {
+  font-family: "SF Mono", ui-monospace, "Fira Code", Menlo, monospace;
+  font-size: 12.5px;
+  background: #f3f4f6;
+  color: #b91c1c;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid #e5e7eb;
+}
+.mgmt-docs pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 14px 16px;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 0 0 14px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  border: 1px solid #1e293b;
+}
+.mgmt-docs pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  border: none;
+  font-size: inherit;
+}
+
+.mgmt-docs blockquote {
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border-left: 3px solid var(--highlight-color, #eab308);
+  background: color-mix(in srgb, var(--highlight-color, #eab308) 8%, white);
+  border-radius: 0 6px 6px 0;
+  color: #374151;
+}
+.mgmt-docs blockquote p { margin: 0; }
+.mgmt-docs blockquote p + p { margin-top: 6px; }
+
+.mgmt-docs table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0 0 16px;
+  font-size: 13px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.mgmt-docs th, .mgmt-docs td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+  vertical-align: top;
+}
+.mgmt-docs th {
+  background: #f9fafb;
+  font-weight: 600;
+  color: #111827;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.mgmt-docs tr:last-child td { border-bottom: none; }
+.mgmt-docs tbody tr:nth-child(even) { background: #fafafa; }
+.mgmt-docs td code, .mgmt-docs th code {
+  font-size: 12px;
+  background: #ffffff;
+  border-color: #e5e7eb;
+}
+
+.mgmt-docs hr {
+  border: none;
+  border-top: 1px solid #e5e7eb;
+  margin: 20px 0;
+}
+
 /* Action buttons rendered from [ACTION:...] markers in chat responses */
 .chat-action-btn {
   display: inline-flex;

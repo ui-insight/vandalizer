@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { BookOpen, Copy, KeyRound, Plus, Trash2, X } from 'lucide-react'
+import { BookOpen, Copy, Download, KeyRound, Plus, Sparkles, Trash2, X } from 'lucide-react'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 
 import {
+  API_KEY_SKILL_DOWNLOAD_URL,
   createApiKey,
   getApiKeyDocs,
   listApiKeys,
@@ -106,6 +107,20 @@ export function ApiKeysTab() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
+          <a
+            href={API_KEY_SKILL_DOWNLOAD_URL}
+            download="SKILL.md"
+            title="Download a Claude Code skill that drives this API from any terminal"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '8px 14px', borderRadius: 6,
+              backgroundColor: 'transparent', color: '#374151',
+              border: '1px solid #d1d5db', fontWeight: 600,
+              cursor: 'pointer', textDecoration: 'none',
+            }}
+          >
+            <Download size={16} /> Claude Code skill
+          </a>
           <button
             onClick={() => setShowDocs(true)}
             style={{
@@ -270,30 +285,50 @@ function DocsModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)',
+      position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       zIndex: 1000,
     }}>
       <div style={{
-        backgroundColor: 'white', borderRadius: 8, padding: 24,
-        maxWidth: 900, width: '92%', maxHeight: '90vh',
+        backgroundColor: 'white', borderRadius: 10,
+        maxWidth: 1080, width: '94%', maxHeight: '92vh',
         display: 'flex', flexDirection: 'column',
+        boxShadow: '0 20px 50px rgba(0,0,0,0.25)',
+        overflow: 'hidden',
       }}>
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          marginBottom: 16, flexShrink: 0,
+          padding: '16px 24px', borderBottom: '1px solid #e5e7eb',
+          flexShrink: 0, backgroundColor: '#fafafa',
         }}>
-          <h3 style={{ fontSize: 18, fontWeight: 700 }}>Management API documentation</h3>
-          <button onClick={onClose} style={{
-            padding: 4, border: 'none', background: 'transparent', cursor: 'pointer',
-          }}>
-            <X size={18} />
+          <div>
+            <h3 style={{ fontSize: 18, fontWeight: 700, color: '#111827' }}>
+              Management API documentation
+            </h3>
+            <p style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+              Mounted at <code style={{
+                fontFamily: 'ui-monospace, monospace', fontSize: 12,
+                backgroundColor: '#fff', padding: '1px 6px', borderRadius: 4,
+                border: '1px solid #e5e7eb',
+              }}>/api/mgmt/v1</code> · scoped, named keys · audited
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close documentation"
+            style={{
+              padding: 6, border: 'none', background: 'transparent',
+              cursor: 'pointer', color: '#6b7280', borderRadius: 4,
+            }}
+          >
+            <X size={20} />
           </button>
         </div>
-        <div
-          className="markdown-body"
-          style={{ overflowY: 'auto', fontSize: 14, lineHeight: 1.55, paddingRight: 8 }}
-        >
+
+        <div style={{
+          overflowY: 'auto', padding: '20px 28px',
+        }}>
+          <SkillCallout />
           {err ? (
             <div style={{
               padding: 12, borderRadius: 6,
@@ -302,9 +337,61 @@ function DocsModal({ onClose }: { onClose: () => void }) {
           ) : html === null ? (
             <p style={{ color: '#6b7280' }}>Loading…</p>
           ) : (
-            <div dangerouslySetInnerHTML={{ __html: html }} />
+            <div className="mgmt-docs" dangerouslySetInnerHTML={{ __html: html }} />
           )}
         </div>
+      </div>
+    </div>
+  )
+}
+
+function SkillCallout() {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'flex-start', gap: 14,
+      padding: 16, marginBottom: 22,
+      borderRadius: 8,
+      background: 'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)',
+      border: '1px solid #fde68a',
+    }}>
+      <div style={{
+        flexShrink: 0, width: 36, height: 36, borderRadius: 8,
+        backgroundColor: '#fde68a', color: '#92400e',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <Sparkles size={18} />
+      </div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontWeight: 700, fontSize: 14, color: '#78350f', marginBottom: 4 }}>
+          Use this API from Claude Code in one command
+        </div>
+        <div style={{ fontSize: 13, color: '#92400e', lineHeight: 1.5, marginBottom: 10 }}>
+          Download the bundled skill, drop it in <code style={{
+            fontFamily: 'ui-monospace, monospace', fontSize: 12,
+            backgroundColor: '#ffffff', padding: '1px 5px', borderRadius: 3,
+            border: '1px solid #fde68a',
+          }}>~/.claude/skills/vandalizer-api/SKILL.md</code>, then type{' '}
+          <code style={{
+            fontFamily: 'ui-monospace, monospace', fontSize: 12,
+            backgroundColor: '#ffffff', padding: '1px 5px', borderRadius: 3,
+            border: '1px solid #fde68a',
+          }}>/vandalizer-api</code> in any session. It prompts you for a server
+          and key, saves them locally, and translates plain-English asks into
+          calls against this API.
+        </div>
+        <a
+          href={API_KEY_SKILL_DOWNLOAD_URL}
+          download="SKILL.md"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '6px 12px', borderRadius: 6,
+            backgroundColor: '#92400e', color: '#fffbeb',
+            fontWeight: 600, fontSize: 13,
+            textDecoration: 'none',
+          }}
+        >
+          <Download size={14} /> Download SKILL.md
+        </a>
       </div>
     </div>
   )

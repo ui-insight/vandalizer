@@ -2490,3 +2490,22 @@ async def get_api_key_docs(user: User = Depends(get_current_user)):
     if not docs_path.is_file():
         raise HTTPException(status_code=404, detail="Documentation not found")
     return {"markdown": docs_path.read_text(encoding="utf-8")}
+
+
+@router.get("/api-keys/skill")
+async def get_api_key_skill(user: User = Depends(get_current_user)):
+    """Download the Claude Code skill file for the Management API."""
+    from pathlib import Path
+
+    from fastapi.responses import FileResponse
+
+    await _require_admin(user)
+
+    skill_path = Path(__file__).resolve().parent.parent / "docs" / "vandalizer-api-skill.md"
+    if not skill_path.is_file():
+        raise HTTPException(status_code=404, detail="Skill file not found")
+    return FileResponse(
+        path=skill_path,
+        media_type="text/markdown; charset=utf-8",
+        filename="SKILL.md",
+    )

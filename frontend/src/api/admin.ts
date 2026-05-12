@@ -674,3 +674,6 @@ export function revokeApiKey(keyId: string) {
 export function getApiKeyDocs() {
   return apiFetch<{ markdown: string }>('/api/admin/api-keys/docs')
 }
+
+/** URL for the downloadable Claude Code skill file (admin-gated, cookie auth). */
+export const API_KEY_SKILL_DOWNLOAD_URL = '/api/admin/api-keys/skill'
