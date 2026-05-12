@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, type DragEvent } from 'react'
-import { Loader2, BookOpen, X, ArrowDown, ChevronRight, Shield, CheckCircle2, Upload } from 'lucide-react'
+import { Loader2, BookOpen, X, ArrowDown, ChevronRight, Shield, CheckCircle2, Upload, History, ArrowRight } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
@@ -10,7 +10,7 @@ import { useChat } from '../../hooks/useChat'
 import { useOnboarding } from '../../hooks/useOnboarding'
 import { useWorkspace, type PendingChatMessage } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
-import { addLink, removeDocument, removeLink, truncateContext, compactContext, clearContext } from '../../api/chat'
+import { addLink, removeDocument, removeLink, truncateContext, compactContext, clearContext, getContinuity, type ContinuityCandidate } from '../../api/chat'
 import { uploadFile } from '../../api/files'
 import { getUserConfig, updateUserConfig, markFirstSessionComplete } from '../../api/config'
 import type { FileAttachment, UrlAttachment } from '../../types/chat'
@@ -77,7 +77,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     setActivity,
   } = useChat()
 
-  const { bumpActivitySignal, processingDoc, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, activeKBUuid, activeKBTitle, deactivateKB } = useWorkspace()
+  const { bumpActivitySignal, processingDoc, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, activeKBUuid, activeKBTitle, deactivateKB, setLoadConversationId } = useWorkspace()
   const { toast } = useToast()
   const { pills: onboardingPills, isFirstSession, loading: onboardingLoading } = useOnboarding()
   // Lock the first-session flag once it's set so remounts/refetches can't
@@ -103,6 +103,25 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const prevScrollInfo = useRef({ scrollHeight: 0, scrollTop: 0, clientHeight: 0 })
   const [dragOver, setDragOver] = useState(false)
   const dragCounter = useRef(0)
+
+  // Continuity memory: surface a "resume your last conversation" card in the
+  // returning-user empty state when there's an idle prior conversation to
+  // pick up. Fetched once on mount; null while loading; { has_recent: false }
+  // when nothing qualifies.
+  const [continuity, setContinuity] = useState<ContinuityCandidate | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    getContinuity()
+      .then(resp => {
+        if (!cancelled && resp.has_recent) setContinuity(resp)
+      })
+      .catch(() => {
+        // Graceful: card stays suppressed on failure.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
 
   // Load saved model preference on mount
@@ -589,6 +608,63 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         {/* Empty state: banner + contextual pills (non-first-session users) */}
         {!effectiveFirstSession && messages.length === 0 && !isStreaming && !onboardingLoading && (
           <div style={{ maxWidth: 640, margin: '0 auto' }}>
+            {/* Continuity card: resume an idle prior conversation, if any */}
+            {continuity && (
+              <button
+                onClick={() => setLoadConversationId(continuity.conversation_uuid)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 12,
+                  width: '100%',
+                  marginBottom: 12,
+                  padding: '14px 16px',
+                  borderRadius: 'var(--ui-radius, 12px)',
+                  backgroundColor: '#fff',
+                  border: '1px solid #e5e7eb',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  textAlign: 'left',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.borderColor = 'var(--highlight-color, #eab308)'
+                  e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--highlight-color, #eab308) 4%, white)'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.borderColor = '#e5e7eb'
+                  e.currentTarget.style.backgroundColor = '#fff'
+                }}
+              >
+                <div
+                  style={{
+                    flexShrink: 0,
+                    width: 36,
+                    height: 36,
+                    borderRadius: 8,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 10%, white)',
+                    color: 'var(--highlight-color, #eab308)',
+                  }}
+                >
+                  <History size={18} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>
+                    Pick up where you left off · {continuity.hours_ago < 24 ? `${continuity.hours_ago}h ago` : `${Math.round(continuity.hours_ago / 24)}d ago`}
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#111827', lineHeight: 1.3 }}>
+                    {continuity.title}
+                  </div>
+                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4, lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                    {continuity.last_message_role === 'assistant' ? '' : 'You asked: '}{continuity.last_message_snippet}
+                  </div>
+                </div>
+                <ArrowRight size={16} style={{ flexShrink: 0, color: '#9ca3af', marginTop: 10 }} />
+              </button>
+            )}
             <div
               className="relative overflow-hidden text-white"
               style={{

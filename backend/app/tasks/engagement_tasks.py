@@ -46,6 +46,15 @@ async def _init_and_run_morning_briefings():
     return await _run(settings)
 
 
+async def _init_and_run_demo_silent_nudges():
+    from app.database import init_db
+    from app.services.engagement_service import process_demo_silent_nudges as _run
+
+    settings = Settings()
+    await init_db(settings)
+    return await _run(settings)
+
+
 @celery_app.task(
     bind=True,
     name="tasks.engagement.process_onboarding_drips",
@@ -82,4 +91,17 @@ def process_inactivity_nudges(self):
 def send_morning_briefings(self):
     """Compute + email the daily Morning Briefing to eligible users."""
     count = _run_async(_init_and_run_morning_briefings())
+    return {"sent": count}
+
+
+@celery_app.task(
+    bind=True,
+    name="tasks.engagement.process_demo_silent_nudges",
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
+    max_retries=2,
+)
+def process_demo_silent_nudges(self):
+    """Send day-3 / day-7 silent nudges to trial users who've gone quiet."""
+    count = _run_async(_init_and_run_demo_silent_nudges())
     return {"sent": count}

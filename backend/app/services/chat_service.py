@@ -19,7 +19,7 @@ from pydantic_ai.messages import (
 )
 
 from app.models.activity import ActivityEvent, ActivityStatus
-from app.models.chat import ChatConversation, ChatRole
+from app.models.chat import ChatConversation, ChatMessage, ChatRole
 from app.models.document import SmartDocument
 from app.models.system_config import SystemConfig
 from app.models.user import User
@@ -708,3 +708,87 @@ async def _finalize(
                     )
                 except Exception as _e:
                     logger.warning("Could not queue activity title generation: %s", _e)
+
+
+# ---------------------------------------------------------------------------
+# Continuity: resume an idle prior conversation
+# ---------------------------------------------------------------------------
+
+# Hours-ago window for a conversation to qualify as "continuity material".
+# Lower bound excludes still-active sessions ("this morning"). Upper bound
+# excludes ancient threads the user has likely moved on from.
+CONTINUITY_MIN_IDLE_HOURS = 6
+CONTINUITY_MAX_IDLE_DAYS = 30
+_SNIPPET_MAX_CHARS = 160
+
+
+async def find_continuity_candidate(user_id: str) -> Optional[dict]:
+    """Find the most recent idle conversation worth resuming, if any.
+
+    Selection: most-recently-updated conversation where:
+      - user_id matches
+      - updated_at is at least CONTINUITY_MIN_IDLE_HOURS ago
+      - updated_at is no older than CONTINUITY_MAX_IDLE_DAYS
+      - at least one assistant message exists (filters abandoned-after-prompt)
+
+    Returns a dict ready for the API response, or None if nothing qualifies.
+    """
+    from datetime import datetime, timezone, timedelta
+
+    now = datetime.now(timezone.utc)
+    idle_threshold = now - timedelta(hours=CONTINUITY_MIN_IDLE_HOURS)
+    too_old = now - timedelta(days=CONTINUITY_MAX_IDLE_DAYS)
+
+    # Pull recent candidates; we'll filter for an assistant message below.
+    # Limit to 10 — typically the first match qualifies; this caps the scan.
+    candidates = await ChatConversation.find(
+        ChatConversation.user_id == user_id,
+        ChatConversation.updated_at <= idle_threshold,
+        ChatConversation.updated_at >= too_old,
+    ).sort(-ChatConversation.updated_at).limit(10).to_list()
+
+    for conv in candidates:
+        if not conv.messages:
+            continue
+
+        # Fetch the last message in the conversation (by insertion order).
+        last_msg_id = conv.messages[-1]
+        last_msg = await ChatMessage.get(last_msg_id)
+        if not last_msg:
+            continue
+
+        # Verify the conversation has at least one assistant message anywhere —
+        # not just the tail. A conversation that ended with a user message
+        # (e.g., LLM error mid-stream) still qualifies if the user got at
+        # least one reply earlier.
+        has_assistant_message = last_msg.role == ChatRole.ASSISTANT
+        if not has_assistant_message:
+            # Cheap check on the rest of the messages.
+            other_msgs = await ChatMessage.find(
+                {"_id": {"$in": list(conv.messages)}, "role": ChatRole.ASSISTANT.value}
+            ).limit(1).to_list()
+            has_assistant_message = bool(other_msgs)
+
+        if not has_assistant_message:
+            continue
+
+        # Last-modified naive datetime → aware for math
+        last_updated = conv.updated_at
+        if last_updated.tzinfo is None:
+            last_updated = last_updated.replace(tzinfo=timezone.utc)
+        hours_ago = max(1, int((now - last_updated).total_seconds() // 3600))
+
+        snippet = (last_msg.message or "").strip()
+        if len(snippet) > _SNIPPET_MAX_CHARS:
+            snippet = snippet[: _SNIPPET_MAX_CHARS - 1].rstrip() + "…"
+
+        return {
+            "has_recent": True,
+            "conversation_uuid": conv.uuid,
+            "title": conv.title,
+            "last_message_role": last_msg.role.value,
+            "last_message_snippet": snippet,
+            "hours_ago": hours_ago,
+        }
+
+    return None

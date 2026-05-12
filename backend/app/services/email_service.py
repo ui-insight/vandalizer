@@ -734,6 +734,63 @@ def morning_briefing_email(
     return subject, html
 
 
+def demo_silent_nudge_email(
+    name: str,
+    briefing_items: list[dict],
+    days_silent: int,
+    days_remaining: int,
+    stage: int,
+    frontend_url: str,
+) -> tuple[str, str]:
+    """Returns (subject, html_body) for a demo-aware silent nudge.
+
+    Renders the user's missed Morning Briefing content inside a stage-specific
+    framing — the nudge IS the briefing, not a generic "we miss you."
+    """
+    if stage == 1:
+        subject = "Your morning briefing has been waiting · 3 days"
+        intro = (
+            f"Hi {name}, your Vandalizer briefing has been queueing up since you were "
+            f"last here {days_silent} days ago. {days_remaining} days remain in your trial. "
+            f"Here's what's been waiting for you:"
+        )
+    else:
+        subject = "Halfway through your trial — here's what's piled up"
+        intro = (
+            f"Hi {name}, you're past the midpoint of your 14-day trial — {days_remaining} days remain "
+            f"and your briefing has been waiting for {days_silent} days. The window for seeing what "
+            f"Vandalizer can do with your real work is closing. Here's what's queued:"
+        )
+
+    rows = []
+    for item in briefing_items:
+        icon = _URGENCY_ICON.get(int(item.get("urgency") or 0), "•")
+        link = item.get("deep_link") or "/chat"
+        href = f"{frontend_url}{link}" if link.startswith("/") else link
+        rows.append(
+            f'<li style="margin-bottom:14px;list-style:none;padding-left:0">'
+            f'<span style="font-size:16px;margin-right:6px">{icon}</span>'
+            f'<a href="{href}" style="color:#fff;text-decoration:none;font-weight:600">'
+            f'{item["headline"]}</a>'
+            f'<div style="color:#9ca3af;font-size:14px;margin-top:4px;margin-left:24px">'
+            f'{item["body"]}</div>'
+            f'</li>'
+        )
+    body_html = f'<ul style="padding-left:0;margin:16px 0">{"".join(rows)}</ul>' if rows else ""
+
+    html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
+    <div class="container"><div class="card">
+      <div class="logo">Vandalizer</div>
+      <h1>Pick up where you left off</h1>
+      <p>{intro}</p>
+      {body_html}
+      <p style="margin-top:24px"><a class="btn" href="{frontend_url}/chat">Open Vandalizer</a></p>
+      <p style="font-size:13px;color:#6b7280;margin-top:16px">You're seeing this because you're in your Vandalizer trial. Adjust delivery in your account settings.</p>
+      <div class="footer">Vandalizer</div>
+    </div></div></body></html>"""
+    return subject, html
+
+
 def inactivity_nudge_email(
     name: str, days_inactive: int, new_items: list[dict], frontend_url: str,
 ) -> tuple[str, str]:

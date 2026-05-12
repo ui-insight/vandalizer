@@ -10,6 +10,7 @@ from app.services.email_service import (
     send_email,
     onboarding_drip_email,
     inactivity_nudge_email,
+    demo_silent_nudge_email,
 )
 
 logger = logging.getLogger(__name__)
@@ -163,6 +164,109 @@ async def process_inactivity_nudges(settings: Settings | None = None) -> int:
 
     if sent:
         logger.info("Sent %d inactivity nudge emails", sent)
+    return sent
+
+
+# ---------------------------------------------------------------------------
+# Demo-aware silent nudges — for trial users who go quiet inside their 14-day window.
+# Distinct from the 30-day inactivity nudge above (which doesn't fire inside trials)
+# and from the recapture drip in demo_service (which targets activated demos who
+# never log in at all).
+# ---------------------------------------------------------------------------
+
+_SILENT_NUDGE_STAGES = {
+    1: 3,   # stage 1 fires when user has been silent for >= 3 days
+    2: 7,   # stage 2 fires when user has been silent for >= 7 days
+}
+_SILENT_NUDGE_COOLDOWN_HOURS = 48
+
+
+async def process_demo_silent_nudges(settings: Settings | None = None) -> int:
+    """Send day-3 / day-7 silent nudges to in-trial users who've gone quiet.
+
+    Each user gets at most two silent nudges in their lifetime (one per stage).
+    Content is the user's current Morning Briefing, rendered inside a
+    stage-specific framing.
+
+    Returns count sent.
+    """
+    if settings is None:
+        settings = Settings()
+
+    from app.services.briefing_service import compute_daily_briefing
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    sent = 0
+
+    # Trial users with at least one prior login (so we know what "silent" means).
+    candidates = await User.find(
+        User.demo_status == "active",
+        User.last_login_at != None,  # noqa: E711
+    ).to_list()
+
+    for user in candidates:
+        if not user.email:
+            continue
+        prefs = user.email_preferences or {}
+        if prefs.get("nudges") is False:
+            continue
+        if user.silent_nudge_step >= 2:
+            continue  # both stages already fired
+
+        # Cooldown — defensive guard against double-fire from clock jitter / re-runs.
+        if user.last_silent_nudge_sent_at:
+            cooldown_until = user.last_silent_nudge_sent_at + datetime.timedelta(
+                hours=_SILENT_NUDGE_COOLDOWN_HOURS
+            )
+            if cooldown_until > now:
+                continue
+
+        # Resolve days-silent. last_login_at may be naive (legacy data); coerce.
+        last_login = user.last_login_at
+        if last_login.tzinfo is None:
+            last_login = last_login.replace(tzinfo=datetime.timezone.utc)
+        days_silent = (now - last_login).days
+
+        # Determine the next eligible stage for this user.
+        next_stage = user.silent_nudge_step + 1
+        threshold_days = _SILENT_NUDGE_STAGES.get(next_stage)
+        if threshold_days is None or days_silent < threshold_days:
+            continue
+
+        # Days remaining in trial — defensively cap at 0.
+        days_remaining = 0
+        if user.demo_expires_at:
+            expires = user.demo_expires_at
+            if expires.tzinfo is None:
+                expires = expires.replace(tzinfo=datetime.timezone.utc)
+            days_remaining = max(0, (expires - now).days)
+
+        # Compute (or fetch) today's Morning Briefing for this user. Trial
+        # users get primer-padded briefings → never empty in practice.
+        briefing = await compute_daily_briefing(user)
+        if not briefing.items:
+            # Defensive: should not happen for trial users, but don't send hollow.
+            continue
+
+        subject, html = demo_silent_nudge_email(
+            name=user.name or user.user_id,
+            briefing_items=[it.model_dump() for it in briefing.items],
+            days_silent=days_silent,
+            days_remaining=days_remaining,
+            stage=next_stage,
+            frontend_url=settings.frontend_url,
+        )
+        success = await send_email(
+            user.email, subject, html, settings, email_type="demo_silent_nudge"
+        )
+        if success:
+            user.silent_nudge_step = next_stage
+            user.last_silent_nudge_sent_at = now
+            await user.save()
+            sent += 1
+
+    if sent:
+        logger.info("Sent %d demo silent nudges", sent)
     return sent
 
 

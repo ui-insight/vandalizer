@@ -497,6 +497,22 @@ async def remove_link(
     return {"success": True}
 
 
+@router.get("/continuity")
+async def get_continuity(user: User = Depends(get_current_user)):
+    """Return the most recent idle conversation worth resuming, if any.
+
+    Powers the empty-chat 'continue where you left off' card. Returns
+    {has_recent: false} when nothing qualifies — frontend should hide
+    the card in that case.
+    """
+    from app.services.chat_service import find_continuity_candidate
+
+    candidate = await find_continuity_candidate(user.user_id)
+    if candidate is None:
+        return {"has_recent": False}
+    return candidate
+
+
 @router.get("/suggested-tasks")
 async def get_suggested_tasks(
     count: int = 3,

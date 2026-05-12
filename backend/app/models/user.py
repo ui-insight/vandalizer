@@ -42,6 +42,11 @@ class User(Document):
     briefing_items_shown_ids: list[str] = Field(default_factory=list)
     briefing_primer_shown_ids: list[str] = Field(default_factory=list)
 
+    # Demo-aware silent-nudge track (separate from the 30-day inactivity nudge,
+    # which doesn't fire inside a 14-day trial window).
+    silent_nudge_step: int = 0  # 0=none sent, 1=day-3 sent, 2=day-7 sent
+    last_silent_nudge_sent_at: Optional[datetime.datetime] = None
+
     class Settings:
         name = "user"
         indexes = [

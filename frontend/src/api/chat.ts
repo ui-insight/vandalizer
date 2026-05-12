@@ -155,6 +155,23 @@ export function getSuggestedTasks(count: number = 3) {
   )
 }
 
+export interface ContinuityCandidate {
+  has_recent: true
+  conversation_uuid: string
+  title: string
+  last_message_role: 'user' | 'assistant' | 'system'
+  last_message_snippet: string
+  hours_ago: number
+}
+
+export interface NoContinuity {
+  has_recent: false
+}
+
+export function getContinuity() {
+  return apiFetch<ContinuityCandidate | NoContinuity>(`/api/chat/continuity`)
+}
+
 export function getHistory(conversationUuid: string) {
   return apiFetch<{
     messages: ChatMessage[]

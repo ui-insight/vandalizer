@@ -112,6 +112,10 @@ celery.conf.beat_schedule = {
         "task": "tasks.engagement.send_morning_briefings",
         "schedule": crontab(hour=8, minute=0),  # daily at 8am — the daily-ritual cue
     },
+    "engagement-demo-silent-nudges": {
+        "task": "tasks.engagement.process_demo_silent_nudges",
+        "schedule": crontab(hour=9, minute=30),  # daily at 09:30 — trial-only silent re-engagement
+    },
 }
 
 if not settings.enable_trial_system:
