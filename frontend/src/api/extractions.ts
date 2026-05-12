@@ -115,6 +115,7 @@ export interface TestCase {
   source_type: string
   source_text?: string | null
   document_uuid?: string | null
+  document_exists?: boolean | null
   expected_values: Record<string, string>
   user_id: string
   created_at: string

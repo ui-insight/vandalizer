@@ -765,6 +765,8 @@ async def _clone_underlying_object(item: LibraryItem, user_id: str, *, team_id: 
             input_config=original.input_config,
             output_config=original.output_config,
             resource_config=original.resource_config,
+            validation_plan=list(original.validation_plan or []),
+            validation_inputs=list(original.validation_inputs or []),
         )
         await new_wf.insert()
 
@@ -795,6 +797,8 @@ async def _clone_underlying_object(item: LibraryItem, user_id: str, *, team_id: 
         return new_wf.id
 
     elif item.kind == LibraryItemKind.SEARCH_SET:
+        from app.models.extraction_test_case import ExtractionTestCase
+
         original = await SearchSet.get(item.item_id)
         if not original:
             return None
@@ -805,22 +809,51 @@ async def _clone_underlying_object(item: LibraryItem, user_id: str, *, team_id: 
             status=original.status,
             set_type=original.set_type,
             user_id=user_id,
+            team_id=team_id,
             extraction_config=dict(original.extraction_config),
+            cross_field_rules=[dict(r) for r in (original.cross_field_rules or [])],
+            tuning_result=dict(original.tuning_result) if original.tuning_result else None,
+            domain=original.domain,
+            item_order=list(original.item_order or []),
             created_by_user_id=user_id,
         )
         await new_ss.insert()
 
-        # Clone items
+        # Clone items, preserving identifiers so the cloned extraction_config
+        # (which references field IDs) stays consistent.
         orig_items = await original.get_items()
         for oi in orig_items:
             new_item = SearchSetItem(
                 searchphrase=oi.searchphrase,
                 searchset=new_uuid,
                 searchtype=oi.searchtype,
+                text_blocks=list(oi.text_blocks or []),
+                pdf_binding=oi.pdf_binding,
                 title=oi.title,
+                is_optional=oi.is_optional,
+                enum_values=list(oi.enum_values or []),
                 user_id=user_id,
             )
             await new_item.insert()
+
+        # Clone test cases. source_text is snapshotted at creation, so
+        # document-bound cases stay runnable for the new owner even without
+        # access to the original document; document_uuid is preserved as a
+        # back-reference for UI previews.
+        orig_test_cases = await ExtractionTestCase.find(
+            ExtractionTestCase.search_set_uuid == original.uuid,
+        ).to_list()
+        for tc in orig_test_cases:
+            new_tc = ExtractionTestCase(
+                search_set_uuid=new_uuid,
+                label=tc.label,
+                source_type=tc.source_type,
+                source_text=tc.source_text,
+                document_uuid=tc.document_uuid,
+                expected_values=dict(tc.expected_values or {}),
+                user_id=user_id,
+            )
+            await new_tc.insert()
 
         return new_ss.id
 

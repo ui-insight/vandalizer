@@ -28,6 +28,14 @@ async def create_test_case(
     document_uuid: Optional[str] = None,
     expected_values: Optional[dict[str, str]] = None,
 ) -> ExtractionTestCase:
+    # Snapshot doc text at creation so the test case is reproducible even if
+    # the source document is later edited or deleted. document_uuid is kept
+    # only as a back-reference for UI previews.
+    if not source_text and source_type == "document" and document_uuid:
+        doc = await SmartDocument.find_one(SmartDocument.uuid == document_uuid)
+        if doc and doc.raw_text:
+            source_text = doc.raw_text
+
     tc = ExtractionTestCase(
         search_set_uuid=search_set_uuid,
         label=label,
@@ -55,9 +63,22 @@ async def update_test_case(uuid: str, **fields) -> Optional[ExtractionTestCase]:
     tc = await get_test_case(uuid)
     if not tc:
         return None
+    prev_document_uuid = tc.document_uuid
+    explicit_source_text = "source_text" in fields and fields["source_text"] is not None
     for key, val in fields.items():
         if val is not None:
             setattr(tc, key, val)
+    # If the caller pointed the test case at a new document and didn't
+    # supply source_text explicitly, refresh the snapshot from the new doc.
+    if (
+        not explicit_source_text
+        and tc.source_type == "document"
+        and tc.document_uuid
+        and tc.document_uuid != prev_document_uuid
+    ):
+        doc = await SmartDocument.find_one(SmartDocument.uuid == tc.document_uuid)
+        if doc and doc.raw_text:
+            tc.source_text = doc.raw_text
     await tc.save()
     return tc
 
@@ -68,6 +89,33 @@ async def delete_test_case(uuid: str) -> bool:
         return False
     await tc.delete()
     return True
+
+
+async def portability_summary(search_set_uuid: str) -> dict:
+    """Summarize how portable a SearchSet's test cases are across owners.
+
+    A case is "portable" if it can run for a user who doesn't own the
+    referenced document — true when ``source_text`` was snapshotted at
+    creation. Document-bound cases without a snapshot need the original
+    document to be accessible.
+    """
+    cases = await list_test_cases(search_set_uuid)
+    text_count = 0
+    document_count = 0
+    missing_snapshot_count = 0
+    for tc in cases:
+        if tc.source_type == "document":
+            document_count += 1
+            if not tc.source_text:
+                missing_snapshot_count += 1
+        else:
+            text_count += 1
+    return {
+        "test_case_count": len(cases),
+        "text_count": text_count,
+        "document_count": document_count,
+        "missing_snapshot_count": missing_snapshot_count,
+    }
 
 
 async def create_test_cases_from_extraction(
@@ -126,6 +174,7 @@ async def create_test_cases_from_extraction(
             label=doc.title or doc_uuid,
             source_type="document",
             user_id=user_id,
+            source_text=doc.raw_text,
             document_uuid=doc_uuid,
             expected_values=expected_values,
         )
@@ -322,12 +371,17 @@ async def _validate_test_case(
     meta_map: dict[str, dict] | None = None,
 ) -> dict:
     """Run extraction N times against a test case and compute metrics."""
-    # Resolve source text
+    # Validation runs off the stored snapshot — document_uuid is only a
+    # back-reference for UI previews. For legacy rows created before the
+    # snapshot-on-write change, lazily backfill from the document if it
+    # still exists so this is the last run that touches SmartDocument.
     source_text = tc.source_text
-    if tc.source_type == "document" and tc.document_uuid:
+    if not source_text and tc.source_type == "document" and tc.document_uuid:
         doc = await SmartDocument.find_one(SmartDocument.uuid == tc.document_uuid)
         if doc and doc.raw_text:
             source_text = doc.raw_text
+            tc.source_text = source_text
+            await tc.save()
 
     if not source_text:
         return {
@@ -887,14 +941,16 @@ async def run_validation_v2(
     field_metadata = await get_extraction_field_metadata(search_set_uuid)
     meta_map = {m["key"]: m for m in field_metadata}
 
-    # Resolve document texts
+    # Validation runs off the stored snapshot — document_uuid is only a
+    # back-reference for UI previews. Legacy rows without a snapshot fall
+    # back to live-loading the document if it still exists.
     resolved_sources: list[dict] = []
     for i, src in enumerate(sources):
         source_text = src.get("source_text")
         source_type = src.get("source_type", "text")
         label = src.get("label") or f"Source {i + 1}"
 
-        if source_type == "document" and src.get("document_uuid"):
+        if not source_text and source_type == "document" and src.get("document_uuid"):
             doc = await SmartDocument.find_one(
                 SmartDocument.uuid == src["document_uuid"]
             )

@@ -44,6 +44,26 @@ from app.services.user_lookup import resolve_author, resolve_authors
 router = APIRouter()
 
 
+async def _check_validation_input_documents_exist(uuids: list[str]) -> dict[str, bool]:
+    """Return {uuid: exists} for the supplied document UUIDs.
+
+    A soft-deleted doc is treated as gone — the UI should warn the user
+    before they try to run the workflow with it.
+    """
+    from app.models.document import SmartDocument
+
+    if not uuids:
+        return {}
+    unique = list({u for u in uuids if u})
+    if not unique:
+        return {}
+    found = await SmartDocument.find(
+        {"uuid": {"$in": unique}, "soft_deleted": {"$ne": True}}
+    ).to_list()
+    present = {d.uuid for d in found}
+    return {u: (u in present) for u in unique}
+
+
 async def _workflow_response_from_dict(wf: dict) -> WorkflowResponse:
     """Build a WorkflowResponse from a workflow dict, resolving the author."""
     creator_id = wf.get("created_by_user_id") or wf.get("user_id")
@@ -1161,6 +1181,11 @@ async def generate_validation_plan(request: Request, workflow_id: str, user: Use
 async def get_validation_inputs(workflow_id: str, user: User = Depends(get_current_user)):
     try:
         inputs = await svc.get_validation_inputs(workflow_id, user=user)
+        doc_uuids = [inp.get("document_uuid") for inp in inputs if inp.get("document_uuid")]
+        exists_map = await _check_validation_input_documents_exist(doc_uuids)
+        for inp in inputs:
+            if inp.get("document_uuid"):
+                inp["document_exists"] = exists_map.get(inp["document_uuid"], False)
         return ValidationInputsResponse(inputs=inputs)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

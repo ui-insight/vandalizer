@@ -291,6 +291,7 @@ export interface ValidationInputDefinition {
   type: 'document' | 'text'
   document_uuid?: string
   document_title?: string
+  document_exists?: boolean
   text?: string
   label?: string
 }

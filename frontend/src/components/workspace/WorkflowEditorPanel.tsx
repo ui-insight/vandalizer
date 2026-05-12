@@ -5128,9 +5128,10 @@ function ValidateTab({
     setRunProgress('Preparing inputs...')
 
     try {
-      // Collect document UUIDs from document inputs
+      // Collect document UUIDs from document inputs, skipping any whose
+      // source document was deleted (those would 404 the run).
       const docUuids: string[] = inputs
-        .filter(i => i.type === 'document' && i.document_uuid)
+        .filter(i => i.type === 'document' && i.document_uuid && i.document_exists !== false)
         .map(i => i.document_uuid!)
 
       // Create temp documents from text inputs
@@ -5423,6 +5424,18 @@ function ValidateTab({
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {input.document_title || input.document_uuid}
                         </span>
+                        {input.document_exists === false && (
+                          <span
+                            style={{
+                              fontSize: 10, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase',
+                              padding: '1px 6px', borderRadius: 4,
+                              backgroundColor: '#fee2e2', color: '#b91c1c', flexShrink: 0,
+                            }}
+                            title="The source document was deleted. Remove this input or re-add the document before running the workflow."
+                          >
+                            Deleted
+                          </span>
+                        )}
                       </div>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>

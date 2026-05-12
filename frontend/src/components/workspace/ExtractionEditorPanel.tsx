@@ -659,6 +659,7 @@ export function ExtractionEditorPanel() {
             onUpdateItem={update}
             onValidationComplete={refresh}
             onSaveConfig={saveConfig}
+            portability={searchSet?.validation_portability ?? null}
           />
         </div>
       )}
@@ -2388,6 +2389,7 @@ interface SourceLocal {
   source_type: 'document' | 'text'
   document_uuid?: string
   document_title?: string
+  document_exists?: boolean | null
   source_text?: string
   expected_values: Record<string, string>
   expanded: boolean
@@ -2401,6 +2403,7 @@ function ValidateTab({
   onUpdateItem,
   onValidationComplete,
   onSaveConfig,
+  portability,
 }: {
   searchSetUuid: string
   itemTitle?: string
@@ -2409,6 +2412,7 @@ function ValidateTab({
   onUpdateItem: (id: string, data: { is_optional?: boolean; enum_values?: string[] }) => void
   onValidationComplete?: () => void
   onSaveConfig?: (config: ExtractionConfig) => Promise<void>
+  portability?: { test_case_count: number; text_count: number; document_count: number; missing_snapshot_count: number } | null
 }) {
   const { toast } = useToast()
   const { selectedDocUuids, viewDocument } = useWorkspace()
@@ -2451,6 +2455,7 @@ function ValidateTab({
           source_type: tc.source_type as 'document' | 'text',
           document_uuid: tc.document_uuid ?? undefined,
           document_title: tc.label || undefined,
+          document_exists: tc.document_exists ?? undefined,
           source_text: tc.source_text ?? undefined,
           expected_values: tc.expected_values,
           expanded: false,
@@ -2516,6 +2521,7 @@ function ValidateTab({
       source_type: 'document' as const,
       document_uuid: docs[i].uuid,
       document_title: docs[i].title,
+      document_exists: tc.document_exists ?? true,
       expected_values: {},
       expanded: false,
     }))
@@ -2705,6 +2711,34 @@ function ValidateTab({
           )}
         </div>
 
+        {/* Portability note — surfaces when test cases reference documents. */}
+        {portability && portability.document_count > 0 && (
+          portability.missing_snapshot_count > 0 ? (
+            <div style={{
+              display: 'flex', alignItems: 'flex-start', gap: 10,
+              padding: '10px 14px', borderRadius: 8, marginBottom: 12,
+              backgroundColor: '#fef2f2', border: '1px solid #fecaca',
+            }}>
+              <AlertTriangle style={{ width: 16, height: 16, color: '#dc2626', flexShrink: 0, marginTop: 1 }} />
+              <div style={{ flex: 1, fontSize: 12, color: '#7f1d1d', lineHeight: 1.5 }}>
+                <strong>{portability.missing_snapshot_count} of {portability.document_count} document-bound test case{portability.document_count !== 1 ? 's' : ''} {portability.missing_snapshot_count === 1 ? 'has' : 'have'} no saved text snapshot.</strong>
+                {' '}They will only run for users with access to the original document.
+              </div>
+            </div>
+          ) : (
+            <div style={{
+              display: 'flex', alignItems: 'flex-start', gap: 10,
+              padding: '8px 14px', borderRadius: 8, marginBottom: 12,
+              backgroundColor: '#f0f9ff', border: '1px solid #bae6fd',
+            }}>
+              <Shield style={{ width: 14, height: 14, color: '#0369a1', flexShrink: 0, marginTop: 2 }} />
+              <div style={{ flex: 1, fontSize: 12, color: '#075985', lineHeight: 1.5 }}>
+                {portability.document_count} test case{portability.document_count !== 1 ? 's' : ''} reference{portability.document_count === 1 ? 's' : ''} a document. Validation runs from the saved text snapshot, so anyone who copies this extraction can re-run validation — they won't need the original documents.
+              </div>
+            </div>
+          )
+        )}
+
         {/* Sample size penalty alert — always visible, even when collapsed */}
         {qualityHistory.length > 0 && qualityHistory[0].score_breakdown && qualityHistory[0].score_breakdown.sample_size_penalty > 0 && (() => {
           const bd = qualityHistory[0].score_breakdown!
@@ -2795,6 +2829,7 @@ function ValidateTab({
             {sources.map((src, i) => {
               const isUuidLike = src.document_title && /^[0-9a-f-]{20,}$/i.test(src.document_title)
               const label = (!isUuidLike && src.document_title) || (src.source_type === 'text' ? `Text Chunk ${i + 1}` : `Document ${i + 1}`)
+              const docMissing = src.source_type === 'document' && src.document_uuid && src.document_exists === false
               return (
                 <div key={src.id} style={{ padding: '10px 0', borderBottom: '1px solid #f0f0f0' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -2802,6 +2837,14 @@ function ValidateTab({
                     <span style={{ fontSize: 13, color: '#202124', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {label}
                     </span>
+                    {docMissing && (
+                      <span
+                        style={{ fontSize: 11, color: '#9ca3af', fontStyle: 'italic', flexShrink: 0 }}
+                        title="The source document was deleted. Validation still runs against the saved snapshot."
+                      >
+                        source deleted
+                      </span>
+                    )}
                     <span style={{
                       fontSize: 11, padding: '2px 8px', borderRadius: 4,
                       backgroundColor: src.source_type === 'text' ? '#eff6ff' : '#fef3c7',
@@ -2809,7 +2852,7 @@ function ValidateTab({
                     }}>
                       {src.source_type}
                     </span>
-                    {src.source_type === 'document' && src.document_uuid && (
+                    {src.source_type === 'document' && src.document_uuid && src.document_exists !== false && (
                       <button
                         onClick={() => viewDocument(src.document_uuid!, src.document_title || label)}
                         style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#9ca3af', display: 'flex' }}
@@ -2858,7 +2901,7 @@ function ValidateTab({
                         <div style={{ fontSize: 11, fontWeight: 600, color: '#5f6368' }}>
                           Expected Values (optional)
                         </div>
-                        {src.source_type === 'document' && src.document_uuid && (
+                        {src.source_type === 'document' && src.document_uuid && src.document_exists !== false && (
                           <button
                             onClick={() => fillFromExtraction(src)}
                             disabled={fillingSourceId === src.id}

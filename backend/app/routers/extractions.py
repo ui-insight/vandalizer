@@ -81,12 +81,14 @@ async def _ss_response(ss) -> SearchSetResponse:
     """Build a SearchSetResponse with quality data attached."""
     count = await ss.item_count()
     quality = await _attach_quality(ss)
+    portability = await val_svc.portability_summary(ss.uuid)
     return SearchSetResponse(
         id=str(ss.id), title=ss.title, uuid=ss.uuid,
         status=ss.status, set_type=ss.set_type, user_id=ss.user_id,
         team_id=ss.team_id, is_global=ss.is_global, verified=ss.verified, item_count=count,
         extraction_config=ss.extraction_config,
         fillable_pdf_url=ss.fillable_pdf_url,
+        validation_portability=portability,
         **quality,
     )
 
@@ -856,7 +858,10 @@ async def get_extraction_status(
 # Extraction test cases & validation
 # ---------------------------------------------------------------------------
 
-def _tc_response(tc: "ExtractionTestCase") -> TestCaseResponse:
+def _tc_response(
+    tc: "ExtractionTestCase",
+    document_exists: Optional[bool] = None,
+) -> TestCaseResponse:
     return TestCaseResponse(
         id=str(tc.id),
         uuid=tc.uuid,
@@ -865,10 +870,32 @@ def _tc_response(tc: "ExtractionTestCase") -> TestCaseResponse:
         source_type=tc.source_type,
         source_text=tc.source_text,
         document_uuid=tc.document_uuid,
+        document_exists=document_exists,
         expected_values=tc.expected_values,
         user_id=tc.user_id,
         created_at=tc.created_at.isoformat(),
     )
+
+
+async def _check_documents_exist(uuids: list[str]) -> dict[str, bool]:
+    """Return {uuid: exists} for the supplied document UUIDs.
+
+    A document counts as 'existing' if it's present and not soft-deleted —
+    a soft-deleted doc is on its way out and the UI should treat it the
+    same as gone.
+    """
+    from app.models.document import SmartDocument
+
+    if not uuids:
+        return {}
+    unique = list({u for u in uuids if u})
+    if not unique:
+        return {}
+    found = await SmartDocument.find(
+        {"uuid": {"$in": unique}, "soft_deleted": {"$ne": True}}
+    ).to_list()
+    present = {d.uuid for d in found}
+    return {u: (u in present) for u in unique}
 
 
 @router.post("/test-cases", response_model=TestCaseResponse)
@@ -885,14 +912,19 @@ async def create_test_case(req: CreateTestCaseRequest, user: User = Depends(get_
         document_uuid=req.document_uuid,
         expected_values=req.expected_values,
     )
-    return _tc_response(tc)
+    exists_map = await _check_documents_exist([tc.document_uuid] if tc.document_uuid else [])
+    return _tc_response(tc, document_exists=exists_map.get(tc.document_uuid) if tc.document_uuid else None)
 
 
 @router.get("/test-cases", response_model=list[TestCaseResponse])
 async def list_test_cases(search_set_uuid: str, user: User = Depends(get_current_user)) -> list[TestCaseResponse]:
     await _get_search_set_or_404(search_set_uuid, user, manage=True)
     tcs = await val_svc.list_test_cases(search_set_uuid)
-    return [_tc_response(tc) for tc in tcs]
+    exists_map = await _check_documents_exist([tc.document_uuid for tc in tcs if tc.document_uuid])
+    return [
+        _tc_response(tc, document_exists=exists_map.get(tc.document_uuid) if tc.document_uuid else None)
+        for tc in tcs
+    ]
 
 
 @router.patch("/test-cases/{uuid}", response_model=TestCaseResponse)
@@ -913,7 +945,8 @@ async def update_test_case(uuid: str, req: UpdateTestCaseRequest, user: User = D
     )
     if not tc:
         raise HTTPException(status_code=404, detail="Test case not found")
-    return _tc_response(tc)
+    exists_map = await _check_documents_exist([tc.document_uuid] if tc.document_uuid else [])
+    return _tc_response(tc, document_exists=exists_map.get(tc.document_uuid) if tc.document_uuid else None)
 
 
 @router.delete("/test-cases/{uuid}")
@@ -956,7 +989,14 @@ async def create_test_cases_from_extraction(request: Request, user: User = Depen
             user_id=user.user_id,
             model=model,
         )
-        return {"test_cases": [_tc_response(tc) for tc in test_cases], "count": len(test_cases)}
+        exists_map = await _check_documents_exist([tc.document_uuid for tc in test_cases if tc.document_uuid])
+        return {
+            "test_cases": [
+                _tc_response(tc, document_exists=exists_map.get(tc.document_uuid) if tc.document_uuid else None)
+                for tc in test_cases
+            ],
+            "count": len(test_cases),
+        }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
