@@ -159,6 +159,31 @@ const TEST_MESSAGES = [
   'Almost there...',
 ]
 
+// Task types where Test Step is meaningful and safe. Excludes:
+//   - Approval, KnowledgeBaseQuery: backend test handler doesn't support them
+//   - APINode, BrowserAutomation, CodeNode: real side effects make "test" misleading
+const TEST_STEP_SUPPORTED_TYPES = new Set([
+  'Extraction', 'Prompt', 'Formatter', 'Format', 'AddWebsite', 'AddDocument',
+  'DescribeImage', 'CrawlerNode', 'ResearchNode', 'DocumentRenderer',
+  'FormFiller', 'DataExport', 'PackageBuilder',
+])
+
+const TEST_STEP_TOOLTIP = [
+  'Tests this step in isolation — prior steps are NOT run.',
+  'If this step references earlier step output, that input will be empty.',
+  '',
+  'What it does:',
+  '• Runs only this step with its current configuration',
+  '• Uses the first selected document as input',
+  '• Makes real LLM / network calls (spends real tokens)',
+  '• Shows the raw output below',
+  '',
+  "What it doesn't do:",
+  '• Run upstream steps to build context',
+  '• Iterate over all selected documents (only the first is used)',
+  '• Persist the result — close the panel and it’s gone',
+].join('\n')
+
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
@@ -2154,7 +2179,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
             if (res.status === 'completed') {
               setTestResult(res.result)
             } else {
-              setTestError('Test failed. Please check your configuration.')
+              setTestError(res.error || 'Test failed. Please check your configuration.')
             }
           } else {
             setTestProgress(prev => Math.min(prev + 8, 90))
@@ -3651,19 +3676,22 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
         padding: '12px 20px', borderTop: '1px solid #e5e7eb', flexShrink: 0,
         display: 'flex', gap: 8,
       }}>
-        <button
-          onClick={handleTestStep}
-          disabled={testing || selectedDocUuids.length === 0}
-          style={{
-            flex: 1, padding: '10px 16px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
-            border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#fff',
-            cursor: testing || selectedDocUuids.length === 0 ? 'not-allowed' : 'pointer',
-            color: '#374151',
-            opacity: testing || selectedDocUuids.length === 0 ? 0.5 : 1,
-          }}
-        >
-          {testing ? 'Testing...' : 'Test Step'}
-        </button>
+        {TEST_STEP_SUPPORTED_TYPES.has(task.name) && (
+          <button
+            onClick={handleTestStep}
+            disabled={testing || selectedDocUuids.length === 0}
+            title={TEST_STEP_TOOLTIP}
+            style={{
+              flex: 1, padding: '10px 16px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+              border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#fff',
+              cursor: testing || selectedDocUuids.length === 0 ? 'not-allowed' : 'pointer',
+              color: '#374151',
+              opacity: testing || selectedDocUuids.length === 0 ? 0.5 : 1,
+            }}
+          >
+            {testing ? 'Testing...' : 'Test Step'}
+          </button>
+        )}
         <button
           onClick={handleUpdate}
           disabled={saving}

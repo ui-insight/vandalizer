@@ -198,7 +198,7 @@ export function testStep(data: { task_name: string; task_data: Record<string, un
 }
 
 export function getTestStepStatus(taskId: string) {
-  return apiFetch<{ status: string; result?: unknown }>(`/api/workflows/steps/test/${taskId}`)
+  return apiFetch<{ status: string; result?: unknown; error?: string }>(`/api/workflows/steps/test/${taskId}`)
 }
 
 export function downloadResults(sessionId: string, format: string = 'json', opts?: { parseStructured?: boolean }) {
