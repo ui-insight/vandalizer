@@ -215,6 +215,134 @@ async def export_search_set(uuid: str, user: User = Depends(get_current_user)):
     )
 
 
+@router.get("/search-sets/{uuid}/download-validation")
+async def download_validation_zip(uuid: str, user: User = Depends(get_current_user)):
+    """Download a zip with the full validation setup: setup metadata, answer key,
+    snapshotted source text for every test case, and original source documents
+    where available and accessible.
+    """
+    import datetime
+    import io
+    import zipfile
+    from app.config import Settings
+    from app.services import file_service
+
+    ss = await _get_search_set_or_404(uuid, user)
+    items = await svc.list_items(uuid)
+    if ss.item_order:
+        order_map = {oid: idx for idx, oid in enumerate(ss.item_order)}
+        items = sorted(items, key=lambda i: order_map.get(str(i.id), 9999))
+
+    test_cases = await val_svc.list_test_cases(uuid)
+
+    settings = Settings()
+
+    def _safe(name: str | None, fallback: str) -> str:
+        cleaned = "".join(c if c.isalnum() or c in " _-." else "_" for c in (name or "")).strip()
+        return cleaned or fallback
+
+    safe_title = _safe(ss.title, "extraction")
+
+    buf = io.BytesIO()
+    case_entries: list[dict] = []
+    answer_key: dict[str, dict] = {}
+
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for tc in test_cases:
+            short = tc.uuid[:8]
+            base = f"{_safe(tc.label, 'case')}__{short}"
+
+            source_text_path: str | None = None
+            if tc.source_text:
+                source_text_path = f"sources/{base}.txt"
+                zf.writestr(source_text_path, tc.source_text)
+
+            document_path: str | None = None
+            document_filename: str | None = None
+            if tc.document_uuid:
+                dl = await file_service.download_document(tc.document_uuid, settings, user=user)
+                if dl:
+                    document_filename = dl.title
+                    document_path = f"documents/{base}__{_safe(dl.title, 'document')}"
+                    zf.writestr(document_path, dl.data)
+
+            case_entries.append({
+                "uuid": tc.uuid,
+                "label": tc.label,
+                "source_type": tc.source_type,
+                "document_uuid": tc.document_uuid,
+                "document_filename": document_filename,
+                "document_path": document_path,
+                "source_text_path": source_text_path,
+                "expected_values": tc.expected_values,
+                "created_at": tc.created_at.isoformat() if tc.created_at else None,
+            })
+            answer_key[tc.uuid] = {
+                "label": tc.label,
+                "expected_values": tc.expected_values,
+            }
+
+        setup = {
+            "format": "vandalizer.validation-setup.v1",
+            "exported_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "exported_by_user_id": user.user_id,
+            "search_set": {
+                "uuid": ss.uuid,
+                "title": ss.title,
+                "set_type": ss.set_type,
+                "extraction_config": ss.extraction_config or {},
+                "items": [
+                    {
+                        "id": str(item.id),
+                        "searchphrase": item.searchphrase,
+                        "title": item.title,
+                        "is_optional": item.is_optional,
+                        "enum_values": item.enum_values or [],
+                    }
+                    for item in items
+                ],
+            },
+            "test_cases": case_entries,
+        }
+        answer_key_payload = {
+            "search_set_uuid": ss.uuid,
+            "search_set_title": ss.title,
+            "test_cases": answer_key,
+        }
+
+        zf.writestr(
+            "validation-setup.json",
+            json.dumps(setup, indent=2, default=str),
+        )
+        zf.writestr(
+            "expected-values.json",
+            json.dumps(answer_key_payload, indent=2, default=str),
+        )
+        zf.writestr(
+            "README.txt",
+            (
+                "Vandalizer validation setup export\n"
+                "==================================\n\n"
+                f"Extraction: {ss.title}\n"
+                f"Test cases: {len(test_cases)}\n\n"
+                "validation-setup.json — full setup metadata, extraction field schema,\n"
+                "  and per-test-case expected values + paths to source content.\n"
+                "expected-values.json — flat answer key keyed by test case uuid.\n"
+                "sources/ — snapshotted text content for every test case (the text\n"
+                "  validation runs against).\n"
+                "documents/ — original source files for test cases that reference a\n"
+                "  document, when the file was available and you have access.\n"
+            ),
+        )
+
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{safe_title}_validation.zip"'},
+    )
+
+
 @router.post("/search-sets/import", response_model=SearchSetResponse)
 async def import_search_set(
     file: UploadFile = File(...),

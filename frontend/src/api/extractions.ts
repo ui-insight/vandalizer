@@ -442,6 +442,30 @@ export function exportSearchSetUrl(uuid: string) {
   return `/api/extractions/search-sets/${uuid}/export`
 }
 
+export async function downloadValidationZip(uuid: string): Promise<void> {
+  const res = await fetch(`/api/extractions/search-sets/${uuid}/download-validation`, {
+    method: 'GET',
+    credentials: 'include',
+    headers: csrfHeaders(),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ detail: 'Download failed' }))
+    throw new ApiError(res.status, body.detail || 'Download failed')
+  }
+  const blob = await res.blob()
+  const disposition = res.headers.get('Content-Disposition') ?? ''
+  const match = disposition.match(/filename="([^"]+)"/)
+  const filename = match ? match[1] : `validation-${uuid}.zip`
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
 export async function importSearchSet(file: File, targetUuid?: string): Promise<SearchSet> {
   const form = new FormData()
   form.append('file', file)

@@ -24,6 +24,7 @@ import {
   exportExtractionPdf,
   generateExampleTemplate,
   exportSearchSetUrl,
+  downloadValidationZip,
   importSearchSet,
   getTuningResult,
   clearTuningResult,
@@ -2440,6 +2441,7 @@ function ValidateTab({
   const fillAbortRef = useRef<AbortController | null>(null)
   const [showSubmitDialog, setShowSubmitDialog] = useState(false)
   const [submitLibraryResult, setSubmitLibraryResult] = useState<'success' | 'error' | null>(null)
+  const [downloadingZip, setDownloadingZip] = useState(false)
   const progress = useValidationProgress(validating, sources.length, numRuns, items.length, extractionConfig)
 
   // Debounce timers keyed by source id
@@ -3105,6 +3107,35 @@ function ValidateTab({
               <><Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} /> {tuningProgress ? `Testing ${tuningProgress.index + 1}/${tuningProgress.total}` : 'Preparing...'}</>
             ) : (
               <><Sparkles style={{ width: 14, height: 14 }} /> Find Best Settings</>
+            )}
+          </button>
+          <button
+            onClick={async () => {
+              setDownloadingZip(true)
+              try {
+                await downloadValidationZip(searchSetUuid)
+                toast('Validation setup downloaded', 'success')
+              } catch (e: unknown) {
+                toast(e instanceof Error ? e.message : 'Download failed', 'error')
+              } finally {
+                setDownloadingZip(false)
+              }
+            }}
+            disabled={downloadingZip || sources.length === 0}
+            title="Download a zip with this validation's test cases, expected values, and source documents"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '8px 16px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+              borderRadius: 8, border: '1px solid #d1d5db', backgroundColor: '#fff',
+              color: '#374151',
+              cursor: downloadingZip || sources.length === 0 ? 'not-allowed' : 'pointer',
+              opacity: downloadingZip || sources.length === 0 ? 0.5 : 1,
+            }}
+          >
+            {downloadingZip ? (
+              <><Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} /> Packaging...</>
+            ) : (
+              <><Download style={{ width: 14, height: 14 }} /> Download Setup</>
             )}
           </button>
         </div>
