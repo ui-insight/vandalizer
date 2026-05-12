@@ -79,6 +79,16 @@ export function buildFromDocument(searchSetUuid: string, documentUuids: string[]
   })
 }
 
+// AI-suggest extraction fields from documents without persisting to a SearchSet.
+// Used by the workflow editor's manual-fields path.
+
+export function suggestFields(documentUuids: string[], model?: string) {
+  return apiFetch<{ entities: string[] }>(`/api/extractions/suggest-fields`, {
+    method: 'POST',
+    body: JSON.stringify({ document_uuids: documentUuids, model }),
+  })
+}
+
 // Run extraction
 
 export function runExtractionSync(data: {

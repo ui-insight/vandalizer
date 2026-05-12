@@ -30,6 +30,7 @@ from app.schemas.extractions import (
     SearchSetItemRequest,
     SearchSetItemResponse,
     SearchSetResponse,
+    SuggestFieldsRequest,
     TestCaseResponse,
     UpdateSearchSetRequest,
     UpdateSearchSetItemRequest,
@@ -540,6 +541,26 @@ async def build_from_document(request: Request, uuid: str, req: BuildFromDocumen
     try:
         entities = await svc.build_from_documents(
             search_set_uuid=uuid,
+            document_uuids=document_uuids,
+            user_id=user.user_id,
+            model=req.model,
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    return {"entities": entities}
+
+
+@router.post("/suggest-fields")
+@limiter.limit("10/minute")
+async def suggest_fields(request: Request, req: SuggestFieldsRequest, user: User = Depends(get_current_user)):
+    """AI-suggest extraction field names from documents without persisting to a SearchSet.
+
+    Used by the workflow editor's manual-fields path so users can get AI suggestions
+    without first creating a saved extraction set.
+    """
+    document_uuids = await _authorize_documents(req.document_uuids, user)
+    try:
+        entities = await svc.suggest_fields_from_documents(
             document_uuids=document_uuids,
             user_id=user.user_id,
             model=req.model,

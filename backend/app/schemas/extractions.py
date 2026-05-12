@@ -43,6 +43,11 @@ class BuildFromDocumentRequest(BaseModel):
     model: Optional[str] = None
 
 
+class SuggestFieldsRequest(BaseModel):
+    document_uuids: list[str]
+    model: Optional[str] = None
+
+
 class SearchSetResponse(BaseModel):
     id: str
     title: str

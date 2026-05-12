@@ -34,7 +34,7 @@ import { uploadFile } from '../../api/files'
 import { listKnowledgeBases } from '../../api/knowledge'
 import { listAllFolders } from '../../api/folders'
 import type { KnowledgeBase } from '../../types/knowledge'
-import { listItems as listSearchSetItems } from '../../api/extractions'
+import { listItems as listSearchSetItems, suggestFields } from '../../api/extractions'
 import { useWorkflowRunner } from '../../hooks/useWorkflowRunner'
 import type { Workflow, WorkflowStep, WorkflowTask, WorkflowStatus, ModelInfo, SearchSetItem } from '../../types/workflow'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
@@ -2244,8 +2244,56 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
   }
 
   const handleSelectSavedSet = (id: string, name: string) => {
-    setTaskData(prev => ({ ...prev, search_set_uuid: id, name: name || prev.name }))
+    // Linking a saved set must clear any manual fields the user had typed.
+    // The UI hides them once linked, and the engine ignores them at runtime
+    // (saved-set keys win) — leaving them in state silently drops the user's
+    // manual work the next time they unlink. Make state match what the UI shows.
+    setTaskData(prev => {
+      const next = { ...prev, search_set_uuid: id, name: name || prev.name }
+      delete (next as Record<string, unknown>).extractions
+      return next
+    })
     setShowSetPicker(false)
+  }
+
+  const handleUnlinkSavedSet = () => {
+    setTaskData(prev => {
+      const next = { ...prev }
+      delete (next as Record<string, unknown>).search_set_uuid
+      return next
+    })
+  }
+
+  // AI: suggest extraction fields from the workspace's selected document(s).
+  const [suggestingFields, setSuggestingFields] = useState(false)
+  const [suggestError, setSuggestError] = useState<string | null>(null)
+  const handleSuggestFields = async () => {
+    if (selectedDocUuids.length === 0 || suggestingFields) return
+    setSuggestingFields(true)
+    setSuggestError(null)
+    try {
+      const { entities } = await suggestFields(selectedDocUuids.slice(0, 1))
+      if (entities.length === 0) {
+        setSuggestError('No fields suggested — document text may be empty.')
+        return
+      }
+      setTaskData(prev => {
+        const existing = Array.isArray(prev.extractions) ? (prev.extractions as string[]) : []
+        const seen = new Set(existing.map(s => s.toLowerCase()))
+        const merged = [...existing]
+        for (const name of entities) {
+          if (!seen.has(name.toLowerCase())) {
+            merged.push(name)
+            seen.add(name.toLowerCase())
+          }
+        }
+        return { ...prev, extractions: merged }
+      })
+    } catch (err) {
+      setSuggestError(err instanceof Error ? err.message : 'Failed to suggest fields')
+    } finally {
+      setSuggestingFields(false)
+    }
   }
 
   const SUB_TABS: { key: TaskSubTab; label: string }[] = [
@@ -2366,9 +2414,23 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                       <label style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
                         Extraction fields
                       </label>
-                      <span style={{ fontSize: 11, color: '#6b7280' }}>
-                        From saved set — edit in the Extractions library
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 11, color: '#6b7280' }}>
+                          From saved set — edit in the Extractions library
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleUnlinkSavedSet}
+                          title="Unlink this saved set and enter fields manually"
+                          style={{
+                            fontSize: 11, padding: '2px 8px', border: '1px solid #d1d5db',
+                            borderRadius: 4, backgroundColor: '#fff', color: '#374151',
+                            cursor: 'pointer', fontFamily: 'inherit',
+                          }}
+                        >
+                          Unlink
+                        </button>
+                      </div>
                     </div>
                     <div
                       style={{
@@ -2401,13 +2463,49 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                   </div>
                 ) : (
                   <div style={{ marginBottom: 16 }}>
-                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
-                      Extraction fields
-                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, gap: 8 }}>
+                      <label style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
+                        Extraction fields
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleSuggestFields}
+                        disabled={suggestingFields || selectedDocUuids.length === 0}
+                        title={selectedDocUuids.length === 0
+                          ? 'Select a document in the workspace to use AI-suggested fields'
+                          : 'Use AI to suggest extraction fields from the selected document'}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                          fontSize: 11, padding: '3px 8px',
+                          border: '1px solid #d1d5db', borderRadius: 4,
+                          backgroundColor: '#fff', color: '#374151',
+                          cursor: (suggestingFields || selectedDocUuids.length === 0) ? 'not-allowed' : 'pointer',
+                          opacity: (suggestingFields || selectedDocUuids.length === 0) ? 0.6 : 1,
+                          fontFamily: 'inherit',
+                        }}
+                      >
+                        {suggestingFields ? (
+                          <Loader2 style={{ width: 11, height: 11 }} className="animate-spin" />
+                        ) : (
+                          <Sparkles style={{ width: 11, height: 11 }} />
+                        )}
+                        {suggestingFields ? 'Suggesting…' : 'Suggest from document'}
+                      </button>
+                    </div>
                     <ExtractionTagInput
                       tags={Array.isArray(taskData.extractions) ? (taskData.extractions as string[]) : []}
                       onChange={(tags) => setTaskData(prev => ({ ...prev, extractions: tags }))}
                     />
+                    {suggestError && (
+                      <div style={{ marginTop: 6, fontSize: 12, color: '#b91c1c' }}>
+                        {suggestError}
+                      </div>
+                    )}
+                    {!suggestError && selectedDocUuids.length === 0 && (
+                      <div style={{ marginTop: 6, fontSize: 11, color: '#6b7280' }}>
+                        Tip: select a document in the workspace to enable AI-suggested fields.
+                      </div>
+                    )}
                   </div>
                 )}
 

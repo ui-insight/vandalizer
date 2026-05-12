@@ -290,17 +290,20 @@ Passage:
 {doc_text}"""
 
 
-async def build_from_documents(
-    search_set_uuid: str,
+async def suggest_fields_from_documents(
     document_uuids: list[str],
     user_id: str,
     model: str | None = None,
 ) -> list[str]:
-    """Use an LLM to analyze documents and suggest extraction field names."""
+    """Use an LLM to analyze documents and return suggested extraction field names.
+
+    Pure suggestion — does not persist to any SearchSet. Use this when you need
+    AI-suggested fields without a saved set (e.g., inside the workflow editor's
+    manual-fields path).
+    """
     import json as _json
     from app.services.llm_service import create_chat_agent
 
-    # Load document texts
     doc_text = ""
     for doc_uuid in document_uuids:
         doc = await SmartDocument.find_one(SmartDocument.uuid == doc_uuid)
@@ -310,7 +313,6 @@ async def build_from_documents(
     if not doc_text.strip():
         return []
 
-    # Resolve model
     if not model:
         model = await get_user_model_name(user_id)
 
@@ -330,9 +332,7 @@ async def build_from_documents(
         raise RuntimeError(f"LLM call failed: {e}") from e
     response_text = result.output
 
-    # Parse JSON from response
     text = response_text.strip()
-    # Strip markdown code blocks if present
     if text.startswith("```"):
         text = text.split("\n", 1)[1] if "\n" in text else text[3:]
     if text.endswith("```"):
@@ -342,7 +342,6 @@ async def build_from_documents(
     try:
         parsed = _json.loads(text)
     except _json.JSONDecodeError:
-        # Try to find JSON object in the response
         start = text.find("{")
         end = text.rfind("}") + 1
         if start >= 0 and end > start:
@@ -354,15 +353,26 @@ async def build_from_documents(
     if not isinstance(entities, list):
         return []
 
-    # Add items to the search set
-    added = []
+    cleaned: list[str] = []
     for entity_name in entities:
         if not isinstance(entity_name, str) or not entity_name.strip():
             continue
-        name = entity_name.strip()
+        cleaned.append(entity_name.strip())
+    return cleaned
+
+
+async def build_from_documents(
+    search_set_uuid: str,
+    document_uuids: list[str],
+    user_id: str,
+    model: str | None = None,
+) -> list[str]:
+    """Suggest extraction fields from documents and persist them into a SearchSet."""
+    entities = await suggest_fields_from_documents(document_uuids, user_id, model)
+    added = []
+    for name in entities:
         await add_item(search_set_uuid, name, searchtype="extraction", title=name, user_id=user_id)
         added.append(name)
-
     return added
 
 
