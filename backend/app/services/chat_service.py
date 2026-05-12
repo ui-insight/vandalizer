@@ -699,6 +699,14 @@ async def _finalize(
             ev.last_updated_at = datetime.now(timezone.utc)
             await ev.save()
 
+            # Time-saved accrual: a completed chat exchange gets the chat_message
+            # rate. Failures don't accrue.
+            try:
+                from app.services.time_saved import accrue_time_saved
+                await accrue_time_saved(user_id, "chat_message")
+            except Exception as _e:
+                logger.warning("Could not accrue chat time_saved for %s: %s", user_id, _e)
+
             # Generate an AI title after the first exchange
             if ev.message_count <= 2:
                 try:

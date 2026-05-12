@@ -317,6 +317,18 @@ async def me(user: User = Depends(get_current_user)):
     return await _user_response(user)
 
 
+@router.get("/me/time-saved")
+async def me_time_saved(user: User = Depends(get_current_user)):
+    """Return the user's cumulative time-saved estimate + a formatted label."""
+    from app.services.time_saved import format_duration
+
+    total = user.time_saved_minutes_total or 0
+    return {
+        "total_minutes": total,
+        "total_label": format_duration(total),
+    }
+
+
 @router.put("/profile")
 async def update_profile(
     body: UpdateProfileRequest,

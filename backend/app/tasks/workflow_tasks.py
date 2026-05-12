@@ -459,6 +459,27 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
         except Exception as e:
             logger.warning("Could not finalize activity for workflow %s: %s", workflow_id, e)
 
+    # Time-saved accrual: a completed workflow run credits the workflow_run rate
+    # to the owner. No multiplier by step count or doc count — calibration is
+    # already an estimate. Fires only on the success path (this branch).
+    workflow_owner_user_id = workflow_doc.get("created_by_user_id") or workflow_doc.get("user_id")
+    try:
+        from app.services.time_saved import accrue_time_saved_sync
+        if workflow_owner_user_id:
+            accrue_time_saved_sync(db, workflow_owner_user_id, "workflow_run")
+    except Exception as e:
+        logger.warning("Could not accrue workflow time_saved for %s: %s", workflow_id, e)
+
+    # Discrete milestone — first completed workflow.
+    try:
+        if workflow_owner_user_id and workflow_owner_user_id != "system":
+            db.user.update_one(
+                {"user_id": workflow_owner_user_id, "achievements_unlocked": {"$ne": "first_workflow"}},
+                {"$push": {"achievements_unlocked": "first_workflow"}},
+            )
+    except Exception as e:
+        logger.warning("Could not award first_workflow for %s: %s", workflow_owner_user_id, e)
+
     # Bell-notify the workflow owner that their long-running workflow finished.
     # Skips trivially-short runs (<30s) so quick extractions don't spam the bell.
     try:

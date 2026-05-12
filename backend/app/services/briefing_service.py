@@ -11,6 +11,7 @@ The same Briefing record powers both surfaces:
 
 import datetime
 import logging
+from collections import Counter
 from typing import Optional
 
 from beanie import PydanticObjectId
@@ -76,6 +77,57 @@ async def _select_my_activity(user: User) -> list[BriefingItem]:
     return items
 
 
+TEAM_DIGEST_THRESHOLD = 3  # 3+ teammate events → collapse to one digest item
+
+
+def _render_team_digest(
+    events: list[ActivityEvent],
+    actor_info: dict[str, tuple[str, Optional[str]]],
+) -> BriefingItem:
+    """Collapse 3+ team events into a single digest item.
+
+    Frees up briefing slots for other categories while preserving the
+    "your team is active" signal. Date-keyed source_id so the digest is
+    correctly deduped within a day but doesn't collide across days.
+    """
+    type_counts: Counter = Counter()
+    for ev in events:
+        if ev.type == ActivityType.WORKFLOW_RUN.value:
+            type_counts["workflows"] += 1
+        elif ev.type == ActivityType.SEARCH_SET_RUN.value:
+            type_counts["extractions"] += 1
+        elif ev.type == ActivityType.CONVERSATION.value:
+            type_counts["chats"] += 1
+
+    if type_counts:
+        summary = ", ".join(f"{n} {label}" for label, n in type_counts.most_common())
+    else:
+        summary = f"{len(events)} actions"
+
+    distinct_actor_ids: list[str] = []
+    distinct_names: list[str] = []
+    for ev in events:
+        if ev.user_id not in distinct_actor_ids:
+            distinct_actor_ids.append(ev.user_id)
+            distinct_names.append(actor_info[ev.user_id][0])
+
+    actor_count = len(distinct_actor_ids)
+    actor_part = "Your team" if actor_count == 1 else f"{actor_count} teammates"
+
+    sample = ", ".join(distinct_names[:3])
+    if len(distinct_names) > 3:
+        sample = f"{sample} and {len(distinct_names) - 3} more"
+
+    return BriefingItem(
+        category=BriefingItemCategory.TEAM_ACTIVITY.value,
+        headline=f"{actor_part} were active: {summary}",
+        body=f"Including {sample}. Open Activity to see what they ran.",
+        deep_link="/activity",
+        source_id=f"team-digest:{_today().isoformat()}",
+        urgency=1,
+    )
+
+
 async def _select_team_activity(user: User) -> list[BriefingItem]:
     since = _utcnow() - datetime.timedelta(hours=ACTIVITY_LOOKBACK_HOURS)
 
@@ -93,23 +145,43 @@ async def _select_team_activity(user: User) -> list[BriefingItem]:
         ActivityEvent.status == ActivityStatus.COMPLETED.value,
     ).sort("-last_updated_at").limit(20).to_list()
 
-    items: list[BriefingItem] = []
-    actor_cache: dict[str, str] = {}
+    if not events:
+        return []
 
+    # Resolve actor name + role_segment per distinct actor. One DB hit each;
+    # bounded by event count (limit 20 above).
+    actor_info: dict[str, tuple[str, Optional[str]]] = {}
     for ev in events:
-        actor_name = actor_cache.get(ev.user_id)
-        if actor_name is None:
+        if ev.user_id not in actor_info:
             actor_user = await User.find_one(User.user_id == ev.user_id)
-            actor_name = (actor_user.name or actor_user.user_id) if actor_user else "A teammate"
-            actor_cache[ev.user_id] = actor_name
+            name = (actor_user.name or actor_user.user_id) if actor_user else "A teammate"
+            role = actor_user.role_segment if actor_user else None
+            actor_info[ev.user_id] = (name, role)
 
+    # Render each event to a BriefingItem; track whether the actor's role
+    # matches the viewer's role (used for ranking individual items).
+    candidates: list[tuple[BriefingItem, bool]] = []
+    for ev in events:
+        actor_name, actor_role = actor_info[ev.user_id]
         item = _activity_event_to_item(ev, is_team=True, actor_name=actor_name)
-        if item:
-            items.append(item)
-        if len(items) >= TEAM_ACTIVITY_TAKE:
-            break
+        if not item:
+            continue
+        role_matches = bool(
+            user.role_segment and actor_role and user.role_segment == actor_role
+        )
+        candidates.append((item, role_matches))
 
-    return items
+    if not candidates:
+        return []
+
+    # 3+ events → single digest item, frees other briefing slots.
+    if len(candidates) >= TEAM_DIGEST_THRESHOLD:
+        return [_render_team_digest(events, actor_info)]
+
+    # 1-2 events → individual items, sorted by role-match first (stable so
+    # recency from the DB sort survives within each match bucket).
+    candidates.sort(key=lambda c: 0 if c[1] else 1)
+    return [c[0] for c in candidates[:TEAM_ACTIVITY_TAKE]]
 
 
 async def _select_kb_news(user: User) -> list[BriefingItem]:
@@ -245,6 +317,104 @@ def _activity_event_to_item(
     return None
 
 
+async def _select_suggested_action(user: User) -> list[BriefingItem]:
+    """Return one 'try this next' item from the role-tailored seed-task pool.
+
+    Distinct from the trial primer (which fires only when real items are scarce):
+    this is a discovery-leaning item that appears for any user, picked from the
+    seed-tasks pool with dedup against previously-shown primers so the user
+    doesn't see the same suggestion repeatedly.
+    """
+    picks = select_primer_items(
+        user.role_segment,
+        user.briefing_primer_shown_ids or [],
+        count=1,
+    )
+    if not picks:
+        return []
+    p = picks[0]
+    return [BriefingItem(
+        category=BriefingItemCategory.SUGGESTED_ACTION.value,
+        headline=p["headline"],
+        body=p["body"],
+        deep_link=p.get("deep_link"),
+        source_id=f"primer:{p['id']}",
+        urgency=0,
+    )]
+
+
+_ACHIEVEMENTS_PER_BRIEFING = 2  # cap so a flurry of milestones doesn't crowd everything else
+
+
+async def _select_achievements(user: User) -> list[BriefingItem]:
+    """Surface unacknowledged first-time milestones as briefing items.
+
+    Each achievement appears in exactly one briefing — once the source_id
+    lands in `briefing_items_shown_ids` (which happens at briefing-write time),
+    it won't show again. Capped at 2 per briefing so a user who crosses
+    several thresholds at once doesn't lose the rest of the briefing's slots.
+    """
+    from app.services.achievements import milestone_def
+
+    unlocked = user.achievements_unlocked or []
+    if not unlocked:
+        return []
+
+    items_seen = set(user.briefing_items_shown_ids or [])
+    items: list[BriefingItem] = []
+    for milestone_id in unlocked:
+        source_id = f"achievement:{milestone_id}"
+        if source_id in items_seen:
+            continue
+        defn = milestone_def(milestone_id)
+        if not defn:
+            continue  # legacy / removed milestone IDs are silently skipped
+        items.append(BriefingItem(
+            category=BriefingItemCategory.ACHIEVEMENT.value,
+            headline=defn["headline"],
+            body=defn["body"],
+            deep_link=defn.get("deep_link"),
+            source_id=source_id,
+            urgency=2,  # above suggested-action (0) and kb-news (1), below quality alerts (3)
+        ))
+        if len(items) >= _ACHIEVEMENTS_PER_BRIEFING:
+            break
+    return items
+
+
+async def _select_deadlines(user: User) -> list[BriefingItem]:
+    """Reserved for future implementation.
+
+    Deadlines should ideally come from sponsor-portal scrapes or extracted
+    due-date metadata on documents. v0 has no clean data source, so this
+    returns an empty list; the category remains in the dispatch so the
+    selector slots in cleanly once a source exists.
+    """
+    return []
+
+
+async def _get_yesterday_category_set(user_id: str) -> set[str]:
+    """Return the set of categories that appeared in yesterday's briefing.
+
+    Used to deprioritize repeat-categories so consecutive briefings vary.
+    Returns empty set when there is no yesterday's briefing (first day,
+    weekend gap, etc.)."""
+    yesterday = _today() - datetime.timedelta(days=1)
+    prev = await Briefing.find_one(
+        Briefing.user_id == user_id,
+        Briefing.date == yesterday,
+    )
+    if not prev or not prev.items:
+        return set()
+    return {it.category for it in prev.items}
+
+
+_ROTATION_PENALTY = 10  # larger than the category-priority range (0-5) so a
+                        # yesterday-category sorts AFTER fresh categories at the
+                        # same urgency tier. Relative order within yesterday's
+                        # categories is preserved (they all get the same bump).
+
+
 async def _resolve_library_item_name(li: LibraryItem) -> Optional[str]:
     """Resolve the human-readable name for a LibraryItem by following its kind."""
     try:
@@ -292,8 +462,11 @@ async def compute_daily_briefing(user: User, *, force_recompute: bool = False) -
     my_items = await _select_my_activity(user)
     team_items = await _select_team_activity(user)
     kb_items = await _select_kb_news(user)
+    deadline_items = await _select_deadlines(user)
+    suggested_items = await _select_suggested_action(user)
+    achievement_items = await _select_achievements(user)
 
-    real_items = my_items + team_items + kb_items
+    real_items = my_items + team_items + kb_items + deadline_items + suggested_items + achievement_items
     primer_padded = False
 
     in_trial = user.demo_status == "active"
@@ -301,9 +474,16 @@ async def compute_daily_briefing(user: User, *, force_recompute: bool = False) -
 
     if needs_padding:
         primer_count = TRIAL_PRIMER_MIN_ITEMS - len(real_items)
+        # Exclude primer IDs already used by suggested-action this turn so we
+        # don't double-render the same seed-task as both a primer and a
+        # suggested-action.
+        seen_primer_ids: list[str] = list(user.briefing_primer_shown_ids or [])
+        for it in suggested_items:
+            if it.source_id and it.source_id.startswith("primer:"):
+                seen_primer_ids.append(it.source_id.split(":", 1)[1])
         primer_picks = select_primer_items(
             user.role_segment,
-            user.briefing_primer_shown_ids or [],
+            seen_primer_ids,
             primer_count,
         )
         for p in primer_picks:
@@ -317,16 +497,26 @@ async def compute_daily_briefing(user: User, *, force_recompute: bool = False) -
             ))
         primer_padded = bool(primer_picks)
 
-    # Order by urgency desc, then by category priority.
+    # Order by urgency desc, then by category priority, with a rotation tweak
+    # that gently deprioritizes categories that appeared yesterday — so
+    # consecutive briefings don't feel like the same dashboard.
     category_priority = {
-        BriefingItemCategory.MY_ACTIVITY.value: 1,
         BriefingItemCategory.DEADLINE.value: 0,  # reserved; sorts highest when added
-        BriefingItemCategory.TEAM_ACTIVITY.value: 2,
-        BriefingItemCategory.KB_NEWS.value: 3,
-        BriefingItemCategory.SUGGESTED_ACTION.value: 4,
-        BriefingItemCategory.PRIMER.value: 5,
+        BriefingItemCategory.MY_ACTIVITY.value: 1,
+        BriefingItemCategory.ACHIEVEMENT.value: 2,  # personal acknowledgment; above social/discovery
+        BriefingItemCategory.TEAM_ACTIVITY.value: 3,
+        BriefingItemCategory.KB_NEWS.value: 4,
+        BriefingItemCategory.SUGGESTED_ACTION.value: 5,
+        BriefingItemCategory.PRIMER.value: 6,
     }
-    real_items.sort(key=lambda it: (-it.urgency, category_priority.get(it.category, 99)))
+    yesterday_cats = await _get_yesterday_category_set(user.user_id)
+
+    def _sort_key(it: BriefingItem) -> tuple:
+        base_priority = category_priority.get(it.category, 99)
+        rotation = _ROTATION_PENALTY if it.category in yesterday_cats else 0
+        return (-it.urgency, base_priority + rotation)
+
+    real_items.sort(key=_sort_key)
     final_items = real_items[:MAX_ITEMS]
 
     briefing = Briefing(

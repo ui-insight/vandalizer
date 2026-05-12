@@ -60,6 +60,16 @@ export function register(
   })
 }
 
+export interface TimeSavedSummary {
+  total_minutes: number
+  total_label: string
+}
+
+export function getTimeSaved() {
+  return apiFetch<TimeSavedSummary>('/api/auth/me/time-saved')
+}
+
+
 export function forgotPassword(email: string) {
   return apiFetch<{ ok: boolean }>('/api/auth/forgot-password', {
     method: 'POST',

@@ -12,8 +12,9 @@ class BriefingItemCategory(str, Enum):
     MY_ACTIVITY = "my-activity"
     TEAM_ACTIVITY = "team-activity"
     KB_NEWS = "kb-news"
-    DEADLINE = "deadline"  # reserved for v1
-    SUGGESTED_ACTION = "suggested-action"  # reserved for v1
+    DEADLINE = "deadline"  # reserved — no data source yet
+    SUGGESTED_ACTION = "suggested-action"
+    ACHIEVEMENT = "achievement"  # first-time milestone acknowledgments
     PRIMER = "primer"  # curated content shown when real items are scarce
 
 

@@ -47,6 +47,14 @@ class User(Document):
     silent_nudge_step: int = 0  # 0=none sent, 1=day-3 sent, 2=day-7 sent
     last_silent_nudge_sent_at: Optional[datetime.datetime] = None
 
+    # Sprint 3: cumulative minutes-saved estimate, accrued per value-generating
+    # event (workflow run, extraction, chat query). See app.services.time_saved.
+    time_saved_minutes_total: int = 0
+
+    # Sprint 3: first-time milestone IDs already awarded (set-add semantics).
+    # See app.services.achievements.
+    achievements_unlocked: list[str] = Field(default_factory=list)
+
     class Settings:
         name = "user"
         indexes = [

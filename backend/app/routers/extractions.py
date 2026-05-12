@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
@@ -36,6 +37,8 @@ from app.schemas.extractions import (
 )
 from app.services import extraction_validation_service as val_svc
 from app.services import search_set_service as svc
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -590,6 +593,20 @@ async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, u
             },
         )
 
+        # Time-saved accrual — extraction completion at the calibrated rate.
+        try:
+            from app.services.time_saved import accrue_time_saved
+            await accrue_time_saved(user.user_id, "extraction")
+        except Exception:
+            logger.warning("Could not accrue extraction time_saved for %s", user.user_id)
+
+        # Discrete milestone — first-time extraction acknowledgment.
+        try:
+            from app.services.achievements import award_if_not_held
+            await award_if_not_held(user.user_id, "first_extraction")
+        except Exception:
+            logger.warning("Could not award first_extraction for %s", user.user_id)
+
         # Fire-and-forget auto-validation if test cases exist
         from app.tasks.quality_tasks import auto_validate_extraction
         auto_validate_extraction.delay(req.search_set_uuid, user.user_id, req.model)
@@ -734,6 +751,20 @@ async def run_extraction_integrated(
         )
         await activity_service.activity_finish(activity.id, ActivityStatus.COMPLETED)
         await activity_service.activity_update(activity.id, documents_touched=len(all_doc_uuids))
+
+        # Time-saved accrual — search-set extraction completion.
+        try:
+            from app.services.time_saved import accrue_time_saved
+            await accrue_time_saved(user.user_id, "search_set_run")
+        except Exception:
+            logger.warning("Could not accrue search-set time_saved for %s", user.user_id)
+
+        # Discrete milestone — first-time extraction acknowledgment.
+        try:
+            from app.services.achievements import award_if_not_held
+            await award_if_not_held(user.user_id, "first_extraction")
+        except Exception:
+            logger.warning("Could not award first_extraction for %s", user.user_id)
 
         # Per-document diagnostics. Empty results when uploading a file are
         # almost always one of: still-processing (extraction worker behind),
