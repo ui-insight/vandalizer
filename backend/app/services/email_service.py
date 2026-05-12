@@ -678,6 +678,62 @@ def onboarding_drip_email(
     return subject, html
 
 
+_URGENCY_ICON = {3: "⚠️", 2: "✓", 1: "◆", 0: "★"}
+
+
+def morning_briefing_email(
+    name: str,
+    briefing_items: list[dict],
+    frontend_url: str,
+    primer_padded: bool = False,
+) -> tuple[str, str]:
+    """Returns (subject, html_body) for a Morning Briefing email.
+
+    `briefing_items` is a list of BriefingItem.model_dump() dicts with keys:
+    category, headline, body, deep_link, urgency.
+    """
+    if not briefing_items:
+        # Should be filtered upstream, but defensively keep the function total.
+        subject = "Your morning briefing"
+        body_html = "<p>Nothing to report today — see you tomorrow.</p>"
+    else:
+        top_headline = briefing_items[0]["headline"]
+        subject = f"Vandalizer morning briefing: {top_headline}"
+
+        rows = []
+        for item in briefing_items:
+            icon = _URGENCY_ICON.get(int(item.get("urgency") or 0), "•")
+            link = item.get("deep_link") or "/chat"
+            href = f"{frontend_url}{link}" if link.startswith("/") else link
+            rows.append(
+                f'<li style="margin-bottom:14px;list-style:none;padding-left:0">'
+                f'<span style="font-size:16px;margin-right:6px">{icon}</span>'
+                f'<a href="{href}" style="color:#fff;text-decoration:none;font-weight:600">'
+                f'{item["headline"]}</a>'
+                f'<div style="color:#9ca3af;font-size:14px;margin-top:4px;margin-left:24px">'
+                f'{item["body"]}</div>'
+                f'</li>'
+            )
+        body_html = f'<ul style="padding-left:0;margin:16px 0">{"".join(rows)}</ul>'
+
+    footer_note = (
+        '<p style="font-size:13px;color:#6b7280;margin-top:16px">Sent each morning at 8am. '
+        'Reply with feedback or adjust delivery in your account settings.</p>'
+    )
+
+    html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
+    <div class="container"><div class="card">
+      <div class="logo">Vandalizer</div>
+      <h1>Morning briefing</h1>
+      <p>Hi {name}, here's what's worth your eyes this morning.</p>
+      {body_html}
+      <p style="margin-top:24px"><a class="btn" href="{frontend_url}/chat">Open Vandalizer</a></p>
+      {footer_note}
+      <div class="footer">Vandalizer</div>
+    </div></div></body></html>"""
+    return subject, html
+
+
 def inactivity_nudge_email(
     name: str, days_inactive: int, new_items: list[dict], frontend_url: str,
 ) -> tuple[str, str]:

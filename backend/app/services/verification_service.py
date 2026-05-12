@@ -211,13 +211,25 @@ async def update_status(
         else:
             await _mark_item_verified(req.item_id, req.item_kind)
 
-        # Assign org visibility if provided
-        if organization_ids is not None:
+        # Derive role_tags from the submitter's declared role + intended-use tags.
+        # The submitter declared who this is for; we normalize to canonical
+        # role_segment values for matching. See app.services.role_inference.
+        from app.services.role_inference import normalize_role_tags
+
+        derived_role_tags = normalize_role_tags(
+            req.submitter_role, req.intended_use_tags
+        )
+
+        # Single metadata write: org visibility + role tags. Always call when
+        # we have either signal so role_tags are persisted even if the reviewer
+        # didn't supply organization_ids.
+        if organization_ids is not None or derived_role_tags:
             await update_item_metadata(
                 item_kind=req.item_kind,
                 item_id=str(req.item_id),
                 user_id=reviewer_user_id,
                 organization_ids=organization_ids,
+                role_tags=derived_role_tags if derived_role_tags else None,
             )
 
         # Add to collections if provided
@@ -580,6 +592,116 @@ async def list_verified_items(
     return {"items": paginated, "total": total}
 
 
+async def list_role_matched_items(
+    user: User,
+    limit: int = 3,
+    user_org_ancestry: list[str] | None = None,
+) -> list[dict]:
+    """Return verified items recommended for this user's role_segment.
+
+    Used by the empty-chat "Verified for your role" surface. Distinct from
+    `list_verified_items` (which serves the catalog page with pagination,
+    sorting, faceting). This is a tight recommendation: role-matched,
+    quality-ranked, capped at a small N.
+
+    Matching rule (same as briefing kb-news):
+      - Items with empty role_tags are universal (eligible).
+      - Items with non-empty role_tags require user.role_segment ∈ role_tags.
+      - Users with no role_segment see only universal items.
+
+    Ranking: prefer role-tagged matches over universal (signal of curation),
+    then by quality_score desc, then by recency.
+    """
+    if limit <= 0:
+        return []
+
+    # Pull all verified library items (small total; dedup by (kind, item_id))
+    items = await LibraryItem.find({"verified": True}).sort("-created_at").to_list()
+    seen: set[tuple[str, str]] = set()
+    deduped: list[LibraryItem] = []
+    for it in items:
+        key = (str(it.item_id), it.kind.value)
+        if key not in seen:
+            seen.add(key)
+            deduped.append(it)
+
+    # Batch-fetch metadata
+    all_meta = await VerifiedItemMetadata.find_all().to_list()
+    meta_map: dict[tuple[str, str], VerifiedItemMetadata] = {
+        (m.item_kind, m.item_id): m for m in all_meta
+    }
+
+    # Filter + score
+    user_role = user.role_segment
+    ancestry_set: set[str] | None = None
+    if user_org_ancestry is not None:
+        ancestry_set = set(user_org_ancestry)
+
+    scored: list[tuple[float, int, LibraryItem, VerifiedItemMetadata | None]] = []
+    for it in deduped:
+        kind = it.kind.value if hasattr(it.kind, "value") else str(it.kind)
+        meta = meta_map.get((kind, str(it.item_id)))
+
+        # Org visibility (mirrors existing access_control logic)
+        if meta and meta.organization_ids and ancestry_set is not None:
+            if not (set(meta.organization_ids) & ancestry_set):
+                continue
+
+        role_tags = meta.role_tags if meta else []
+        is_role_match = False
+        if role_tags:
+            if not user_role or user_role not in role_tags:
+                continue  # role-tagged but not for this user
+            is_role_match = True
+        # else: universal item — eligible for everyone
+
+        quality_score = (meta.quality_score if meta and meta.quality_score is not None else 0.0)
+        # Sort key: role-matched first (1), then quality desc (-score), then recency stays via append order
+        match_bucket = 1 if is_role_match else 0
+        scored.append((quality_score, match_bucket, it, meta))
+
+    # Sort: role-match bucket desc, then quality desc.
+    scored.sort(key=lambda t: (t[1], t[0]), reverse=True)
+
+    # Batch-resolve names for the top-N candidates only
+    candidates = scored[: limit * 2]  # over-fetch in case of name-resolution failures
+    wf_ids = [li.item_id for _, _, li, _ in candidates if li.kind == LibraryItemKind.WORKFLOW]
+    ss_ids = [li.item_id for _, _, li, _ in candidates if li.kind == LibraryItemKind.SEARCH_SET]
+    kb_ids = [li.item_id for _, _, li, _ in candidates if li.kind == LibraryItemKind.KNOWLEDGE_BASE]
+
+    name_map: dict[str, str] = {}
+    if wf_ids:
+        for wf in await Workflow.find({"_id": {"$in": wf_ids}}).to_list():
+            name_map[str(wf.id)] = wf.name
+    if ss_ids:
+        for ss in await SearchSet.find({"_id": {"$in": ss_ids}}).to_list():
+            name_map[str(ss.id)] = ss.title
+    if kb_ids:
+        for kb in await KnowledgeBase.find({"_id": {"$in": kb_ids}}).to_list():
+            name_map[str(kb.id)] = kb.title
+
+    results: list[dict] = []
+    for quality_score, _, li, meta in candidates:
+        if len(results) >= limit:
+            break
+        name = name_map.get(str(li.item_id))
+        if not name:
+            continue  # skip items we can't name
+        kind = li.kind.value if hasattr(li.kind, "value") else str(li.kind)
+        results.append({
+            "item_id": str(li.item_id),
+            "kind": kind,
+            "name": name,
+            "description": meta.description if meta else None,
+            "quality_score": quality_score if quality_score > 0 else None,
+            "quality_tier": meta.quality_tier if meta else None,
+            "role_tags": meta.role_tags if meta else [],
+            "deep_link": f"/library?tab=catalog&item={li.item_id}",
+        })
+
+    return results
+
+
 async def get_item_metadata(item_kind: str, item_id: str) -> dict | None:
     """Get metadata for a verified item."""
     meta = await VerifiedItemMetadata.find_one(
@@ -596,6 +718,7 @@ async def get_item_metadata(item_kind: str, item_id: str) -> dict | None:
         "description": meta.description,
         "markdown": meta.markdown,
         "organization_ids": meta.organization_ids,
+        "role_tags": meta.role_tags,
         "updated_at": meta.updated_at.isoformat() if meta.updated_at else None,
         "updated_by_user_id": meta.updated_by_user_id,
         "quality_score": meta.quality_score,
@@ -614,13 +737,22 @@ async def update_item_metadata(
     description: str | None = None,
     markdown: str | None = None,
     organization_ids: list[str] | None = None,
+    role_tags: list[str] | None = None,
 ) -> dict:
-    """Upsert metadata for a verified item."""
+    """Upsert metadata for a verified item.
+
+    Pass `role_tags=[]` to explicitly clear; pass None to leave unchanged.
+    Invalid role values are silently dropped.
+    """
+    from app.services.role_inference import validate_role_tags
+
     now = datetime.datetime.now(datetime.timezone.utc)
     meta = await VerifiedItemMetadata.find_one(
         VerifiedItemMetadata.item_kind == item_kind,
         VerifiedItemMetadata.item_id == item_id,
     )
+    sanitized_role_tags = validate_role_tags(role_tags) if role_tags is not None else None
+
     if meta:
         if display_name is not None:
             meta.display_name = display_name
@@ -630,6 +762,8 @@ async def update_item_metadata(
             meta.markdown = markdown
         if organization_ids is not None:
             meta.organization_ids = organization_ids
+        if sanitized_role_tags is not None:
+            meta.role_tags = sanitized_role_tags
         meta.updated_at = now
         meta.updated_by_user_id = user_id
         await meta.save()
@@ -641,6 +775,7 @@ async def update_item_metadata(
             description=description,
             markdown=markdown,
             organization_ids=organization_ids or [],
+            role_tags=sanitized_role_tags or [],
             updated_at=now,
             updated_by_user_id=user_id,
         )
@@ -654,6 +789,7 @@ async def update_item_metadata(
         "description": meta.description,
         "markdown": meta.markdown,
         "organization_ids": meta.organization_ids,
+        "role_tags": meta.role_tags,
         "updated_at": meta.updated_at.isoformat() if meta.updated_at else None,
         "updated_by_user_id": meta.updated_by_user_id,
     }

@@ -1,3 +1,20 @@
+export type RoleSegment =
+  | 'research_admin'
+  | 'pi'
+  | 'sponsored_programs'
+  | 'compliance'
+  | 'it'
+  | 'other'
+
+export const ROLE_SEGMENT_LABELS: Record<RoleSegment, string> = {
+  research_admin: 'Research administrator',
+  pi: 'Principal investigator',
+  sponsored_programs: 'Sponsored programs',
+  compliance: 'Research compliance',
+  it: 'IT / systems',
+  other: 'Other',
+}
+
 export interface User {
   id: string
   user_id: string
@@ -10,6 +27,7 @@ export interface User {
   is_demo_user: boolean
   current_team: string | null
   current_team_uuid: string | null
+  role_segment: RoleSegment | null
 }
 
 export interface Team {

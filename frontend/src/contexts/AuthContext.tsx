@@ -8,7 +8,7 @@ interface AuthContextValue {
   demoExpired: boolean
   demoFeedbackToken: string | null
   login: (userId: string, password: string) => Promise<void>
-  register: (userId: string, email: string, password: string, name?: string, inviteToken?: string, joinLinkToken?: string) => Promise<void>
+  register: (userId: string, email: string, password: string, name?: string, inviteToken?: string, joinLinkToken?: string, roleSegment?: string | null) => Promise<void>
   logout: () => Promise<void>
   refreshUser: () => Promise<void>
 }
@@ -55,8 +55,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const register = useCallback(
-    async (userId: string, email: string, password: string, name?: string, inviteToken?: string, joinLinkToken?: string) => {
-      const u = await authApi.register(userId, email, password, name, inviteToken, joinLinkToken)
+    async (userId: string, email: string, password: string, name?: string, inviteToken?: string, joinLinkToken?: string, roleSegment?: string | null) => {
+      const u = await authApi.register(userId, email, password, name, inviteToken, joinLinkToken, roleSegment)
       localStorage.removeItem('workspace:mode')
       setUser(u)
     },

@@ -32,6 +32,10 @@ class UpdateOrgTypeRequest(BaseModel):
     org_type: str
 
 
+class UpdateOrgRoleSegmentRequest(BaseModel):
+    role_segment: Optional[str]  # None to clear
+
+
 class ImportOrgNode(BaseModel):
     name: str
     parent_name: Optional[str] = None
@@ -48,6 +52,7 @@ def _org_to_dict(org: Organization) -> dict:
         "name": org.name,
         "org_type": org.org_type,
         "parent_id": org.parent_id,
+        "role_segment": org.role_segment,
         "metadata": org.metadata,
         "created_at": org.created_at.isoformat() if org.created_at else None,
         "updated_at": org.updated_at.isoformat() if org.updated_at else None,
@@ -216,6 +221,34 @@ async def update_org_type(
         resource_type="organization",
         resource_id=org.uuid,
         detail={"new_type": body.org_type},
+    )
+    return _org_to_dict(org)
+
+
+@router.patch("/{org_uuid}/role")
+async def update_org_role_segment(
+    org_uuid: str,
+    body: UpdateOrgRoleSegmentRequest,
+    user: User = Depends(get_current_user),
+):
+    """Set or clear the role_segment for an org node. Admin only.
+
+    Users in this org (and its descendants, via walk-up resolution) will inherit
+    this role_segment when their User record doesn't have an explicit one set.
+    """
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    try:
+        org = await organization_service.update_org_role_segment(org_uuid, body.role_segment)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    await audit_service.log_event(
+        action="org.update_role_segment",
+        actor_user_id=user.user_id,
+        resource_type="organization",
+        resource_id=org.uuid,
+        detail={"role_segment": body.role_segment},
     )
     return _org_to_dict(org)
 

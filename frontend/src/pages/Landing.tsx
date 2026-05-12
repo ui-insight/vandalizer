@@ -95,6 +95,7 @@ function LandingRegisterForm({ onSwitch }: { onSwitch: () => void }) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [roleSegment, setRoleSegment] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -104,7 +105,7 @@ function LandingRegisterForm({ onSwitch }: { onSwitch: () => void }) {
     setSubmitting(true)
     try {
       // user_id = email, matching Flask behavior
-      await register(email, email, password, name || undefined)
+      await register(email, email, password, name || undefined, undefined, undefined, roleSegment || null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed')
     } finally {
@@ -142,6 +143,20 @@ function LandingRegisterForm({ onSwitch }: { onSwitch: () => void }) {
         onChange={(e) => setPassword(e.target.value)}
         className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-highlight/50 focus:outline-none focus:ring-1 focus:ring-highlight/50"
       />
+      <select
+        value={roleSegment}
+        onChange={(e) => setRoleSegment(e.target.value)}
+        className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white focus:border-highlight/50 focus:outline-none focus:ring-1 focus:ring-highlight/50"
+        aria-label="What best describes your role?"
+      >
+        <option value="" className="bg-black text-gray-400">What best describes your role? (optional)</option>
+        <option value="research_admin" className="bg-black text-white">Research administrator</option>
+        <option value="pi" className="bg-black text-white">Principal investigator</option>
+        <option value="sponsored_programs" className="bg-black text-white">Sponsored programs</option>
+        <option value="compliance" className="bg-black text-white">Research compliance</option>
+        <option value="it" className="bg-black text-white">IT / systems</option>
+        <option value="other" className="bg-black text-white">Other</option>
+      </select>
       <button
         type="submit"
         disabled={submitting}

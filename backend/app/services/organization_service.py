@@ -4,7 +4,7 @@ import datetime
 import uuid
 from typing import Optional
 
-from app.models.organization import Organization
+from app.models.organization import Organization, VALID_ROLE_SEGMENTS
 from app.models.team import Team
 from app.models.user import User
 
@@ -255,6 +255,43 @@ async def move_organization(org_uuid: str, new_parent_id: str | None) -> Organiz
     org.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
     await org.save()
     return org
+
+
+async def update_org_role_segment(org_uuid: str, role_segment: Optional[str]) -> Organization:
+    """Set or clear the role_segment on an org node. Pass None to clear."""
+    if role_segment is not None and role_segment not in VALID_ROLE_SEGMENTS:
+        raise ValueError(f"role_segment must be one of {sorted(VALID_ROLE_SEGMENTS)} or None")
+    org = await Organization.find_one(Organization.uuid == org_uuid)
+    if not org:
+        raise ValueError(f"Organization {org_uuid} not found")
+    org.role_segment = role_segment
+    org.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
+    await org.save()
+    return org
+
+
+async def resolve_role_segment_for_org(org_uuid: str) -> Optional[str]:
+    """Walk up the org tree starting at org_uuid and return the first non-None
+    role_segment encountered. Returns None if no ancestor declares one.
+
+    Uses a single bulk query to load all orgs (same pattern as get_ancestor_ids).
+    """
+    if not org_uuid:
+        return None
+    all_orgs = await Organization.find_all().to_list()
+    by_uuid = {o.uuid: o for o in all_orgs}
+
+    current_uuid: Optional[str] = org_uuid
+    seen: set[str] = set()
+    while current_uuid and current_uuid not in seen:
+        seen.add(current_uuid)
+        org = by_uuid.get(current_uuid)
+        if not org:
+            return None
+        if org.role_segment:
+            return org.role_segment
+        current_uuid = org.parent_id
+    return None
 
 
 async def update_org_type(org_uuid: str, new_type: str) -> Organization:

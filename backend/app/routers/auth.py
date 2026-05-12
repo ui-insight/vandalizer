@@ -81,6 +81,7 @@ async def _user_response(user: User) -> UserResponse:
         is_demo_user=user.is_demo_user,
         current_team=str(user.current_team) if user.current_team else None,
         current_team_uuid=current_team_uuid,
+        role_segment=user.role_segment,
     )
 
 
@@ -135,7 +136,11 @@ async def register(
 ):
     try:
         user = await auth_service.register(
-            body.user_id or body.email, body.email, body.password, body.name
+            body.user_id or body.email,
+            body.email,
+            body.password,
+            body.name,
+            role_segment=body.role_segment,
         )
     except ValueError:
         raise HTTPException(

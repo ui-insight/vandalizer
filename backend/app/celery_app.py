@@ -108,6 +108,10 @@ celery.conf.beat_schedule = {
         "task": "tasks.engagement.process_inactivity_nudges",
         "schedule": crontab(hour=10, minute=30),  # daily at 10:30am
     },
+    "engagement-morning-briefings": {
+        "task": "tasks.engagement.send_morning_briefings",
+        "schedule": crontab(hour=8, minute=0),  # daily at 8am — the daily-ritual cue
+    },
 }
 
 if not settings.enable_trial_system:

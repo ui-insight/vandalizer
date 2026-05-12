@@ -1,9 +1,23 @@
 import datetime
 import uuid
 
+from app.models.organization import VALID_ROLE_SEGMENTS
 from app.models.user import User
 from app.models.team import Team, TeamMembership
 from app.utils.security import hash_password, verify_password
+
+
+async def _derive_role_segment_from_org(user: User) -> None:
+    """If user has an org but no role_segment yet, walk up the org tree
+    and inherit the first role_segment we find. Mutates `user` in place;
+    caller is responsible for the .save()."""
+    if user.role_segment or not user.organization_id:
+        return
+    from app.services.organization_service import resolve_role_segment_for_org
+
+    inherited = await resolve_role_segment_for_org(user.organization_id)
+    if inherited:
+        user.role_segment = inherited
 
 
 async def _stamp_login(user: User) -> None:
@@ -172,6 +186,11 @@ async def resolve_saml_user(
             if org:
                 user.organization_id = org.uuid
                 changed = True
+        # Derive role_segment from org tree if user has an org but no explicit role
+        if user.organization_id and not user.role_segment:
+            await _derive_role_segment_from_org(user)
+            if user.role_segment:
+                changed = True
         if changed:
             await user.save()
         # Silently backfill default-team membership for pre-existing users
@@ -195,6 +214,9 @@ async def resolve_saml_user(
         org = await Organization.find_one(Organization.name == department)
         if org:
             user.organization_id = org.uuid
+
+    # Derive role_segment from org tree before initial insert.
+    await _derive_role_segment_from_org(user)
 
     await user.insert()
 
@@ -226,10 +248,19 @@ async def resolve_saml_user(
     return user
 
 
-async def register(user_id: str, email: str, password: str, name: str | None = None) -> User:
+async def register(
+    user_id: str,
+    email: str,
+    password: str,
+    name: str | None = None,
+    role_segment: str | None = None,
+) -> User:
     # Normalize to lowercase to match Flask behavior
     user_id = user_id.strip().lower()
     email = email.strip().lower()
+
+    if role_segment is not None and role_segment not in VALID_ROLE_SEGMENTS:
+        raise ValueError(f"role_segment must be one of {sorted(VALID_ROLE_SEGMENTS)}")
 
     existing = await User.find_one(User.user_id == user_id)
     if existing:
@@ -244,6 +275,7 @@ async def register(user_id: str, email: str, password: str, name: str | None = N
         email=email,
         password_hash=hash_password(password),
         name=name or user_id,
+        role_segment=role_segment,
     )
     await user.insert()
 

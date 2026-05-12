@@ -92,6 +92,7 @@ class MetadataUpdateRequest(BaseModel):
     description: Optional[str] = None
     markdown: Optional[str] = None
     organization_ids: Optional[list[str]] = None
+    role_tags: Optional[list[str]] = None  # canonical role_segment values; [] clears
 
 
 class CreateCollectionRequest(BaseModel):
@@ -198,6 +199,27 @@ async def list_verified_items(
     return result
 
 
+@router.get("/recommended-for-me")
+async def recommended_for_me(
+    count: int = Query(3, ge=1, le=10),
+    user: User = Depends(get_current_user),
+):
+    """Return verified items recommended for the current user's role.
+
+    Powers the empty-chat 'Verified for your role' surface. Returns top items
+    by role match + quality, respecting org visibility. Returns an empty list
+    (not an error) when no items match — the frontend should suppress the
+    whole section in that case.
+    """
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    items = await svc.list_role_matched_items(
+        user=user,
+        limit=count,
+        user_org_ancestry=user_org_ancestry,
+    )
+    return {"role_segment": user.role_segment, "items": items}
+
+
 @router.get("/verified/{item_kind}/{item_id}/metadata")
 async def get_item_metadata(
     item_kind: str,
@@ -225,6 +247,7 @@ async def update_item_metadata(
         description=req.description,
         markdown=req.markdown,
         organization_ids=req.organization_ids,
+        role_tags=req.role_tags,
     )
     return result
 

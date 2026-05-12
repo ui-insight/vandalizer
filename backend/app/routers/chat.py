@@ -497,6 +497,34 @@ async def remove_link(
     return {"success": True}
 
 
+@router.get("/suggested-tasks")
+async def get_suggested_tasks(
+    count: int = 3,
+    user: User = Depends(get_current_user),
+):
+    """Return role-tailored seed-task pills for the empty-chat WelcomeExperience.
+
+    Pulls from briefing_primer_content.select_seed_tasks. Falls back to the
+    generic pool when the user has no declared role_segment.
+    """
+    from app.services.briefing_primer_content import select_seed_tasks
+
+    count = max(1, min(count, 6))
+    items = select_seed_tasks(user.role_segment, count)
+    return {
+        "role_segment": user.role_segment,
+        "items": [
+            {
+                "id": item["id"],
+                "headline": item["headline"],
+                "body": item["body"],
+                "deep_link": item.get("deep_link"),
+            }
+            for item in items
+        ],
+    }
+
+
 @router.get("/conversations")
 async def list_conversations(
     limit: int = 50,

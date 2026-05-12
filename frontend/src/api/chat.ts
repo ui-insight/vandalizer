@@ -142,6 +142,19 @@ export function listConversations(limit: number = 50) {
   return apiFetch<ConversationSummary[]>(`/api/chat/conversations?limit=${limit}`)
 }
 
+export interface SuggestedTask {
+  id: string
+  headline: string
+  body: string
+  deep_link: string | null
+}
+
+export function getSuggestedTasks(count: number = 3) {
+  return apiFetch<{ role_segment: string | null; items: SuggestedTask[] }>(
+    `/api/chat/suggested-tasks?count=${count}`,
+  )
+}
+
 export function getHistory(conversationUuid: string) {
   return apiFetch<{
     messages: ChatMessage[]

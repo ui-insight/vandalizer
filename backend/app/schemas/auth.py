@@ -14,8 +14,20 @@ class RegisterRequest(BaseModel):
     email: str
     password: str
     name: Optional[str] = None
+    role_segment: Optional[str] = None
     invite_token: Optional[str] = None
     join_link_token: Optional[str] = None
+
+    @field_validator("role_segment")
+    @classmethod
+    def validate_role_segment(cls, v: Optional[str]) -> Optional[str]:
+        if v is None or v == "":
+            return None
+        from app.models.organization import VALID_ROLE_SEGMENTS
+
+        if v not in VALID_ROLE_SEGMENTS:
+            raise ValueError(f"role_segment must be one of {sorted(VALID_ROLE_SEGMENTS)} or empty")
+        return v
 
     @field_validator("password")
     @classmethod
@@ -87,3 +99,4 @@ class UserResponse(BaseModel):
     is_demo_user: bool = False
     current_team: Optional[str] = None
     current_team_uuid: Optional[str] = None
+    role_segment: Optional[str] = None

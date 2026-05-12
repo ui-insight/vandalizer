@@ -44,6 +44,7 @@ export function register(
   name?: string,
   invite_token?: string,
   join_link_token?: string,
+  role_segment?: string | null,
 ) {
   return apiFetch<User>('/api/auth/register', {
     method: 'POST',
@@ -52,6 +53,7 @@ export function register(
       email,
       password,
       name,
+      role_segment: role_segment || null,
       invite_token,
       join_link_token,
     }),

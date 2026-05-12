@@ -1,5 +1,8 @@
-import { Shield, CheckCircle2, Upload, GraduationCap, Check, ArrowRight } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Shield, CheckCircle2, Upload, GraduationCap, Check, ArrowRight, Sparkles } from 'lucide-react'
 import type { OnboardingStatus } from '../../api/config'
+import { getSuggestedTasks, type SuggestedTask } from '../../api/chat'
+import { getRecommendedItems, type RecommendedItem } from '../../api/library'
 
 // ---------------------------------------------------------------------------
 // Value proposition card (used in the new-user welcome)
@@ -60,6 +63,31 @@ interface ValueWelcomeProps {
 }
 
 export function ValueWelcome({ onSwitchToFiles, onSendMessage }: ValueWelcomeProps) {
+  const [suggestedTasks, setSuggestedTasks] = useState<SuggestedTask[] | null>(null)
+  const [recommendedItems, setRecommendedItems] = useState<RecommendedItem[] | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    getSuggestedTasks(3)
+      .then(resp => {
+        if (!cancelled) setSuggestedTasks(resp.items)
+      })
+      .catch(() => {
+        // Graceful fallback: leave null so the legacy "Show me how it works"
+        // button renders. Failure shouldn't block the empty-chat experience.
+      })
+    getRecommendedItems(3)
+      .then(resp => {
+        if (!cancelled) setRecommendedItems(resp.items)
+      })
+      .catch(() => {
+        // Graceful: section is suppressed when items is null/empty.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   return (
     <div style={{ maxWidth: 640, margin: '0 auto' }}>
       {/* Value proposition cards */}
@@ -126,39 +154,161 @@ export function ValueWelcome({ onSwitchToFiles, onSendMessage }: ValueWelcomePro
           >
             Upload a document <ArrowRight size={14} />
           </button>
-          <button
-            onClick={() => onSendMessage(
-              'Walk me through what Vandalizer can do and how it works.',
-              true,
-            )}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '8px 16px',
-              fontSize: 13,
-              fontWeight: 500,
-              fontFamily: 'inherit',
-              border: '1px solid #d1d5db',
-              borderRadius: 8,
-              backgroundColor: '#fff',
-              color: '#374151',
-              cursor: 'pointer',
-              transition: 'all 0.15s',
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.borderColor = 'var(--highlight-color, #eab308)'
-              e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--highlight-color, #eab308) 5%, white)'
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.borderColor = '#d1d5db'
-              e.currentTarget.style.backgroundColor = '#fff'
-            }}
-          >
-            Show me how it works
-          </button>
+          {(!suggestedTasks || suggestedTasks.length === 0) && (
+            <button
+              onClick={() => onSendMessage(
+                'Walk me through what Vandalizer can do and how it works.',
+                true,
+              )}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '8px 16px',
+                fontSize: 13,
+                fontWeight: 500,
+                fontFamily: 'inherit',
+                border: '1px solid #d1d5db',
+                borderRadius: 8,
+                backgroundColor: '#fff',
+                color: '#374151',
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.borderColor = 'var(--highlight-color, #eab308)'
+                e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--highlight-color, #eab308) 5%, white)'
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.borderColor = '#d1d5db'
+                e.currentTarget.style.backgroundColor = '#fff'
+              }}
+            >
+              Show me how it works
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Role-specific suggested tasks */}
+      {suggestedTasks && suggestedTasks.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+            Or try one of these
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {suggestedTasks.map(task => (
+              <button
+                key={task.id}
+                onClick={() => onSendMessage(task.body, false)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 10,
+                  width: '100%',
+                  padding: '12px 14px',
+                  borderRadius: 'var(--ui-radius, 12px)',
+                  backgroundColor: '#fff',
+                  border: '1px solid #e5e7eb',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  textAlign: 'left',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.borderColor = 'var(--highlight-color, #eab308)'
+                  e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--highlight-color, #eab308) 4%, white)'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.borderColor = '#e5e7eb'
+                  e.currentTarget.style.backgroundColor = '#fff'
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#111827', lineHeight: 1.3 }}>
+                    {task.headline}
+                  </div>
+                  <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4, lineHeight: 1.4 }}>
+                    {task.body}
+                  </div>
+                </div>
+                <ArrowRight size={14} style={{ flexShrink: 0, color: '#9ca3af', marginTop: 2 }} />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Verified for your role */}
+      {recommendedItems && recommendedItems.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+            <Sparkles size={12} />
+            Verified for your role
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {recommendedItems.map(item => (
+              <a
+                key={`${item.kind}:${item.item_id}`}
+                href={item.deep_link}
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 10,
+                  width: '100%',
+                  padding: '12px 14px',
+                  borderRadius: 'var(--ui-radius, 12px)',
+                  backgroundColor: '#fff',
+                  border: '1px solid #e5e7eb',
+                  textDecoration: 'none',
+                  fontFamily: 'inherit',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.borderColor = 'var(--highlight-color, #eab308)'
+                  e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--highlight-color, #eab308) 4%, white)'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.borderColor = '#e5e7eb'
+                  e.currentTarget.style.backgroundColor = '#fff'
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: '#111827', lineHeight: 1.3 }}>
+                      {item.name}
+                    </span>
+                    <span style={{ fontSize: 11, color: '#6b7280', padding: '1px 6px', borderRadius: 4, backgroundColor: '#f3f4f6' }}>
+                      {item.kind.replace('_', ' ')}
+                    </span>
+                    {item.quality_score !== null && (
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          padding: '1px 6px',
+                          borderRadius: 4,
+                          backgroundColor: item.quality_score >= 0.9 ? '#dcfce7' : item.quality_score >= 0.75 ? '#fef9c3' : '#fee2e2',
+                          color: item.quality_score >= 0.9 ? '#166534' : item.quality_score >= 0.75 ? '#854d0e' : '#991b1b',
+                        }}
+                        title="Validated quality score"
+                      >
+                        {Math.round(item.quality_score * 100)}% quality
+                      </span>
+                    )}
+                  </div>
+                  {item.description && (
+                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4, lineHeight: 1.4 }}>
+                      {item.description}
+                    </div>
+                  )}
+                </div>
+                <ArrowRight size={14} style={{ flexShrink: 0, color: '#9ca3af', marginTop: 2 }} />
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Certification link */}
       <button

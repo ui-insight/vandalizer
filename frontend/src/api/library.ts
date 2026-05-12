@@ -236,6 +236,23 @@ export function getItemMetadata(itemKind: string, itemId: string) {
   return apiFetch<VerifiedItemMetadata>(`/api/verification/verified/${itemKind}/${itemId}/metadata`)
 }
 
+export interface RecommendedItem {
+  item_id: string
+  kind: string
+  name: string
+  description: string | null
+  quality_score: number | null
+  quality_tier: string | null
+  role_tags: string[]
+  deep_link: string
+}
+
+export function getRecommendedItems(count: number = 3) {
+  return apiFetch<{ role_segment: string | null; items: RecommendedItem[] }>(
+    `/api/verification/recommended-for-me?count=${count}`,
+  )
+}
+
 export function updateItemMetadata(itemKind: string, itemId: string, data: { display_name?: string; description?: string; markdown?: string; organization_ids?: string[] }) {
   return apiFetch<VerifiedItemMetadata>(`/api/verification/verified/${itemKind}/${itemId}/metadata`, {
     method: 'PUT',

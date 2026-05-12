@@ -22,6 +22,7 @@ from app.models.activity import ActivityEvent, ActivityStatus
 from app.models.chat import ChatConversation, ChatRole
 from app.models.document import SmartDocument
 from app.models.system_config import SystemConfig
+from app.models.user import User
 from app.services.config_service import get_llm_model_by_name, get_user_model_name
 from app.services.context_budget import (
     DocumentSegment,
@@ -36,6 +37,68 @@ from app.services.llm_service import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+# Role-specific addenda appended to FIRST_SESSION_SYSTEM_PROMPT when the user
+# has declared a role. Each block specializes Phase 1 of the existing 5-phase
+# onboarding orchestration without overriding it — the agent still runs the
+# discovery → privacy → quality → action sequence, just with a role-specific
+# opening hook.
+_ROLE_FIRST_SESSION_ADDENDUM: dict[str, str] = {
+    "research_admin": (
+        "\n\n## Role context\n"
+        "This user identified themselves as a **research administrator**. "
+        "Open by acknowledging that the bulk of their day is document triage — "
+        "proposals, awards, compliance docs, subaward agreements. In Phase 1, "
+        "anchor the discovery question around their specific pain (e.g., "
+        "extracting structured data from sponsor-formatted documents, watching "
+        "for missing required elements). Keep the rest of the 5-phase flow as written."
+    ),
+    "pi": (
+        "\n\n## Role context\n"
+        "This user identified themselves as a **principal investigator / faculty**. "
+        "Open by acknowledging that their time on admin work is the problem — "
+        "they want to write grants, not format them. In Phase 1, anchor discovery "
+        "around their writing flow (proposals, biosketches, reviewer responses, "
+        "budget justifications). Mention that source-cited answers are the unlock "
+        "for trusting the output. Keep the rest of the 5-phase flow as written."
+    ),
+    "sponsored_programs": (
+        "\n\n## Role context\n"
+        "This user identified themselves as **sponsored programs / OSP staff**. "
+        "Open by acknowledging the volume problem — they review many proposals "
+        "and awards from many sponsors with many formats. In Phase 1, anchor "
+        "discovery around standardizing extraction across sponsor formats and "
+        "spotting risks consistently. Keep the rest of the 5-phase flow as written."
+    ),
+    "compliance": (
+        "\n\n## Role context\n"
+        "This user identified themselves as **research compliance staff** "
+        "(IRB, IACUC, COI, or similar). Open by acknowledging that audit-grade "
+        "answers matter more here than anywhere — every claim needs to point back "
+        "to a source. In Phase 1, anchor discovery around protocol completeness "
+        "checks and policy-conformance review. Lead with the audit-trail value "
+        "(every chat session is replayable) earlier than usual. Keep the rest of the 5-phase flow as written."
+    ),
+    "it": (
+        "\n\n## Role context\n"
+        "This user identified themselves as **IT / systems staff**. "
+        "Open differently from researchers — they likely care about how the "
+        "system works as much as what it does. In Phase 1, lead with the "
+        "private-endpoint / no-third-party-training architecture before getting "
+        "to extraction examples. Keep the rest of the 5-phase flow as written."
+    ),
+}
+
+
+def _role_first_session_addendum(role_segment: str | None) -> str:
+    """Return the role-specific addendum to append to FIRST_SESSION_SYSTEM_PROMPT.
+
+    Empty string for null role or 'other' — those get the unmodified generic prompt.
+    """
+    if not role_segment or role_segment == "other":
+        return ""
+    return _ROLE_FIRST_SESSION_ADDENDUM.get(role_segment, "")
 
 
 _THINK_OPEN_RE = re.compile(r"<think(?:ing)?>")
@@ -327,7 +390,19 @@ async def chat_stream(
         # Do NOT inject VANDALIZER_CONTEXT here — it's a technical how-to dump
         # that causes the LLM to skip the conversation and spit out directions.
         # The FIRST_SESSION_SYSTEM_PROMPT already has everything it needs.
-        system_prompt = FIRST_SESSION_SYSTEM_PROMPT
+        # Append a role-specific addendum if the user declared a role at
+        # registration / via SSO inheritance — specializes Phase 1's opening
+        # without overriding the 5-phase orchestration. Also flips the durable
+        # first_session_completed flag so future sessions can be detected
+        # server-side instead of trusting body.is_first_session.
+        first_session_user = await User.find_one(User.user_id == user_id)
+        addendum = _role_first_session_addendum(
+            first_session_user.role_segment if first_session_user else None
+        )
+        system_prompt = FIRST_SESSION_SYSTEM_PROMPT + addendum
+        if first_session_user and not first_session_user.first_session_completed:
+            first_session_user.first_session_completed = True
+            await first_session_user.save()
     elif include_onboarding_context:
         # Inject Vandalizer help context only when explicitly requested
         # (triggered by the placeholder pills in the chat UI).

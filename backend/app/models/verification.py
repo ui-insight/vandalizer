@@ -77,6 +77,7 @@ class VerifiedItemMetadata(Document):
     description: Optional[str] = None
     markdown: Optional[str] = None
     organization_ids: list[str] = Field(default_factory=list)  # Org UUIDs for visibility scoping
+    role_tags: list[str] = Field(default_factory=list)  # VALID_ROLE_SEGMENTS; empty = universal
 
     # Quality fields (populated by quality_service)
     quality_score: Optional[float] = None
