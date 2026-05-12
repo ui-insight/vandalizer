@@ -849,9 +849,9 @@ export function ExploreTab() {
       )}
 
       {/* Add to library dialog */}
-      {addToLibraryItem && libraries.length > 0 && (
+      {addToLibraryItem && libraries.some(l => l.scope !== 'verified') && (
         <AddToLibraryDialog
-          libraries={libraries}
+          libraries={libraries.filter(l => l.scope !== 'verified')}
           itemId={addToLibraryItem.item_id}
           kind={addToLibraryItem.kind as LibraryItemKind}
           onClose={() => setAddToLibraryItem(null)}
