@@ -18,6 +18,7 @@ class LibraryItemKind(str, Enum):
     WORKFLOW = "workflow"
     SEARCH_SET = "search_set"
     KNOWLEDGE_BASE = "knowledge_base"
+    WORKFLOW_RESULT = "workflow_result"
 
 
 class LibraryFolder(Document):

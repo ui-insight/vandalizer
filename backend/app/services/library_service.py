@@ -19,7 +19,7 @@ from app.models.library import (
 from app.models.search_set import SearchSet, SearchSetItem
 from app.models.system_config import SystemConfig
 from app.models.team import Team
-from app.models.workflow import Workflow, WorkflowStep, WorkflowStepTask
+from app.models.workflow import Workflow, WorkflowResult, WorkflowStep, WorkflowStepTask
 from app.services import access_control
 
 if TYPE_CHECKING:
@@ -249,6 +249,16 @@ async def add_item(
         if not search_set or not await access_control.get_authorized_search_set(search_set.uuid, user):
             return None
         is_verified = bool(getattr(search_set, "verified", False))
+    elif kind == LibraryItemKind.WORKFLOW_RESULT.value:
+        try:
+            result = await WorkflowResult.get(PydanticObjectId(item_id))
+        except Exception:
+            result = None
+        if not result or not result.workflow:
+            return None
+        wf = await access_control.get_authorized_workflow(str(result.workflow), user)
+        if not wf:
+            return None
     else:
         return None
 
@@ -688,6 +698,8 @@ async def _dereference_item(item: LibraryItem) -> dict | None:
     item_uuid = None
     creator_user_id: str | None = None
 
+    extra: dict = {}
+
     if item.kind == LibraryItemKind.WORKFLOW:
         wf = await Workflow.get(item.item_id)
         if not wf:
@@ -703,6 +715,23 @@ async def _dereference_item(item: LibraryItem) -> dict | None:
         description = ss.extraction_config.get("content") if ss.extraction_config else None
         set_type = ss.set_type
         item_uuid = ss.uuid
+    elif item.kind == LibraryItemKind.WORKFLOW_RESULT:
+        result = await WorkflowResult.get(item.item_id)
+        if not result:
+            return None
+        wf = await Workflow.get(result.workflow) if result.workflow else None
+        wf_name = wf.name if wf else "Workflow"
+        run_at = _iso_utc(result.start_time)
+        name = f"{wf_name} — run"
+        description = _workflow_result_preview(result)
+        creator_user_id = (wf.created_by_user_id or wf.user_id) if wf else None
+        extra = {
+            "session_id": result.session_id,
+            "workflow_id": str(result.workflow) if result.workflow else None,
+            "workflow_name": wf_name,
+            "result_status": result.status,
+            "run_at": run_at,
+        }
 
     return {
         "id": str(item.id),
@@ -722,7 +751,31 @@ async def _dereference_item(item: LibraryItem) -> dict | None:
         "created_at": _item_created_at(item),
         "last_used_at": _iso_utc(item.last_used_at),
         "creator_user_id": creator_user_id,
+        **extra,
     }
+
+
+def _workflow_result_preview(result: WorkflowResult) -> str | None:
+    """Short text preview of a workflow run's output for list rows."""
+    final = result.final_output
+    if isinstance(final, dict):
+        value = final.get("output", final)
+    else:
+        value = final
+    if value is None:
+        return None
+    if isinstance(value, str):
+        text = value
+    else:
+        try:
+            import json as _json
+            text = _json.dumps(value, default=str)
+        except Exception:
+            text = str(value)
+    text = text.strip()
+    if len(text) > 240:
+        text = text[:240] + "…"
+    return text or None
 
 
 async def _attach_authors(items: list[dict]) -> list[dict]:

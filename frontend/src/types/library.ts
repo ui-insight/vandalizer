@@ -1,5 +1,5 @@
 export type LibraryScope = 'personal' | 'team' | 'verified'
-export type LibraryItemKind = 'workflow' | 'search_set' | 'knowledge_base'
+export type LibraryItemKind = 'workflow' | 'search_set' | 'knowledge_base' | 'workflow_result'
 
 export interface AuthorRef {
   user_id: string
@@ -40,6 +40,12 @@ export interface LibraryItem {
   quality_score?: number | null
   last_validated_at?: string | null
   created_by?: AuthorRef | null
+  // workflow_result-only fields
+  session_id?: string | null
+  workflow_id?: string | null
+  workflow_name?: string | null
+  result_status?: string | null
+  run_at?: string | null
 }
 
 export interface LibraryFolder {

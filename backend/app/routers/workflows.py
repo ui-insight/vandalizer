@@ -673,6 +673,46 @@ async def download_results(
     )
 
 
+class SaveResultToLibraryRequest(BaseModel):
+    library_id: str
+    folder: str | None = None
+    note: str | None = None
+    tags: list[str] | None = None
+
+
+@router.post("/sessions/{session_id}/save-to-library")
+async def save_session_to_library(
+    session_id: str,
+    req: SaveResultToLibraryRequest,
+    user: User = Depends(get_current_user),
+):
+    """Save a workflow run's output as a library item in the chosen folder."""
+    from app.models.library import LibraryItemKind
+    from app.models.workflow import WorkflowResult
+    from app.schemas.library import LibraryItemResponse
+    from app.services import library_service
+
+    result = await WorkflowResult.find_one(WorkflowResult.session_id == session_id)
+    if not result or not result.workflow:
+        raise HTTPException(status_code=404, detail="Workflow result not found")
+    wf = await get_authorized_workflow(str(result.workflow), user)
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow result not found")
+
+    item = await library_service.add_item(
+        library_id=req.library_id,
+        user=user,
+        item_id=str(result.id),
+        kind=LibraryItemKind.WORKFLOW_RESULT.value,
+        note=req.note,
+        tags=req.tags,
+        folder=req.folder,
+    )
+    if not item:
+        raise HTTPException(status_code=404, detail="Library not found")
+    return LibraryItemResponse(**item)
+
+
 @router.get("/{workflow_id}/export")
 async def export_workflow(workflow_id: str, user: User = Depends(get_current_user)):
     """Download workflow definition as a shareable JSON file."""

@@ -62,11 +62,33 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
   const kindLabel =
     item.kind === 'workflow'
       ? 'Workflow'
-      : item.set_type === 'prompt'
-        ? 'Prompt'
-        : item.set_type === 'formatter'
-          ? 'Formatter'
-          : 'Extraction Task'
+      : item.kind === 'workflow_result'
+        ? 'Workflow run'
+        : item.set_type === 'prompt'
+          ? 'Prompt'
+          : item.set_type === 'formatter'
+            ? 'Formatter'
+            : 'Extraction Task'
+
+  const resultStatusChip = item.kind === 'workflow_result' && item.result_status ? (
+    <span
+      style={{
+        fontSize: 11,
+        padding: '1px 6px',
+        borderRadius: 10,
+        backgroundColor:
+          item.result_status === 'completed' ? '#dcfce7'
+          : item.result_status === 'error' || item.result_status === 'failed' ? '#fee2e2'
+          : '#f3f4f6',
+        color:
+          item.result_status === 'completed' ? '#166534'
+          : item.result_status === 'error' || item.result_status === 'failed' ? '#991b1b'
+          : '#374151',
+      }}
+    >
+      {item.result_status}
+    </span>
+  ) : null
 
   useEffect(() => {
     if (!menuOpen) return
@@ -134,13 +156,17 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
         </div>
         <div style={{ fontSize: 12, color: '#70757a', marginTop: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
           <span>{kindLabel}</span>
+          {resultStatusChip}
+          {item.kind === 'workflow_result' && item.run_at && (
+            <span title={new Date(item.run_at).toLocaleString()}>{relativeTime(item.run_at)}</span>
+          )}
           {item.verified && (
             <span style={{ color: '#b45309', fontWeight: 500 }}>Verified</span>
           )}
           {item.created_by && item.created_by.user_id !== user?.user_id && (
             <AuthorChip author={item.created_by} />
           )}
-          {(qualityTier != null || qualityScore != null) && item.set_type !== 'prompt' && item.set_type !== 'formatter' && (
+          {(qualityTier != null || qualityScore != null) && item.set_type !== 'prompt' && item.set_type !== 'formatter' && item.kind !== 'workflow_result' && (
             <QualityBadge tier={qualityTier ?? null} score={qualityScore ?? null} />
           )}
         </div>

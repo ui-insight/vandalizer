@@ -8,7 +8,7 @@ import {
   ChevronDown, ChevronRight, ArrowUp, ArrowDown,
   Circle, Hand, Keyboard, Sparkles, ShieldCheck, Type,
   ArrowRight, Pause, TrendingUp, RefreshCw,
-  Upload, Clock, Copy, Check,
+  Upload, Clock, Copy, Check, BookmarkPlus,
 } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
@@ -43,6 +43,7 @@ import { marked } from 'marked'
 import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from 'recharts'
 import { QualityBadge } from '../library/QualityBadge'
 import { QualitySparkline } from '../library/QualitySparkline'
+import { SaveWorkflowResultDialog } from '../library/SaveWorkflowResultDialog'
 import { useQualitySparkline } from '../../hooks/useQualitySparkline'
 import { relativeTime } from '../../utils/time'
 import { VerificationSubmitDialog } from '../shared/VerificationSubmitDialog'
@@ -300,14 +301,20 @@ export function WorkflowEditorPanel() {
 
   // --- handlers ---
 
-  // Block edits on verified workflows for non-examiners. Returns true if blocked.
-  const blockedByVerified = (): boolean => {
+  // Block edits on shared/verified workflows. If blocked, offer to make a copy.
+  // Returns true if the edit should not proceed on the current workflow.
+  const confirmCopyOnEdit = (): boolean => {
     const isVerified = !!(workflow as Workflow & { verified?: boolean })?.verified
-    if (isVerified && !user?.is_examiner) {
-      toast('This workflow is verified — make a copy to edit', 'error')
-      return true
+    const verifiedBlock = isVerified && !user?.is_examiner
+    const sharedBlock = workflow?.can_manage === false
+    if (!verifiedBlock && !sharedBlock) return false
+    const msg = verifiedBlock
+      ? "This workflow is verified — edits would change the verified version. Make a copy to edit?\n\nYour copy will be saved to your team."
+      : "This workflow is shared with you. Make a copy to edit?\n\nYour copy will be saved to your team."
+    if (window.confirm(msg)) {
+      void handleMakeCopy()
     }
-    return false
+    return true
   }
 
   const handleTitleSave = async () => {
@@ -315,7 +322,7 @@ export function WorkflowEditorPanel() {
       setEditingTitle(false)
       return
     }
-    if (blockedByVerified()) {
+    if (confirmCopyOnEdit()) {
       setEditingTitle(false)
       return
     }
@@ -326,12 +333,7 @@ export function WorkflowEditorPanel() {
 
   const handleAddStep = async () => {
     if (!openWorkflowId || !newStepName.trim()) return
-    if (workflow?.can_manage === false) {
-      toast('Make a copy to edit this workflow', 'error')
-      setShowNewStepModal(false)
-      return
-    }
-    if (blockedByVerified()) {
+    if (confirmCopyOnEdit()) {
       setShowNewStepModal(false)
       return
     }
@@ -357,12 +359,7 @@ export function WorkflowEditorPanel() {
 
   const handleAddTask = async (taskType: TaskTypeDef) => {
     if (!editingStepId) return
-    if (workflow?.can_manage === false) {
-      toast('Make a copy to edit this workflow', 'error')
-      setShowTaskPicker(false)
-      return
-    }
-    if (blockedByVerified()) {
+    if (confirmCopyOnEdit()) {
       setShowTaskPicker(false)
       return
     }
@@ -491,32 +488,6 @@ export function WorkflowEditorPanel() {
 
   return (
     <div className="flex h-full flex-col" style={{ backgroundColor: '#fff', position: 'relative' }}>
-      {/* ===== VERIFIED WORKFLOW NOTICE ===== */}
-      {(workflow as Workflow & { verified?: boolean }).verified && (
-        <div style={{
-          margin: '8px 24px 0', padding: '8px 12px', fontSize: 12, color: '#78350f',
-          backgroundColor: '#fef3c7', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 8,
-          border: '1px solid #fde68a',
-        }}>
-          <ShieldCheck style={{ width: 14, height: 14, flexShrink: 0, color: '#b45309' }} />
-          <span style={{ flex: 1 }}>
-            This is a verified workflow. Make a copy to edit it — your edits won't affect the verified version.
-          </span>
-          <button
-            onClick={handleMakeCopy}
-            disabled={duplicating}
-            style={{
-              padding: '4px 10px', fontSize: 11, fontWeight: 700, fontFamily: 'inherit',
-              borderRadius: 4, border: '1px solid #b45309',
-              backgroundColor: '#fff7ed', color: '#78350f', cursor: 'pointer',
-              whiteSpace: 'nowrap', opacity: duplicating ? 0.6 : 1,
-            }}
-          >
-            {duplicating ? 'Copying...' : 'Make a copy to edit'}
-          </button>
-        </div>
-      )}
-
       {/* ===== HEADER ===== */}
       <div style={{ padding: '16px 24px', borderBottom: '1px solid #e5e7eb', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -545,6 +516,19 @@ export function WorkflowEditorPanel() {
                 {workflow.name}
               </span>
               <Pencil style={{ width: 14, height: 14, color: '#9ca3af' }} />
+              {((workflow as Workflow & { verified?: boolean }).verified || !canManage) && (
+                <span
+                  title={
+                    (workflow as Workflow & { verified?: boolean }).verified
+                      ? 'Verified workflow — make a copy to edit'
+                      : 'Shared with you — make a copy to edit'
+                  }
+                  onClick={(e) => { e.stopPropagation(); void handleMakeCopy() }}
+                  style={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}
+                >
+                  <ShieldCheck style={{ width: 14, height: 14, color: '#b45309' }} />
+                </span>
+              )}
               {qualityStatus?.tier && (
                 <>
                   <QualityBadge tier={qualityStatus.tier} score={qualityStatus.score ?? null} />
@@ -595,37 +579,6 @@ export function WorkflowEditorPanel() {
           <div style={{ fontSize: 13, color: '#5f6368', marginTop: 4 }}>{workflow.description}</div>
         )}
       </div>
-
-      {/* ===== READ-ONLY BANNER (shared workflow you don't own) ===== */}
-      {!canManage && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 12,
-          padding: '10px 24px',
-          backgroundColor: '#fffbeb',
-          borderBottom: '1px solid #fde68a',
-          fontSize: 13,
-          color: '#78350f',
-          flexShrink: 0,
-        }}>
-          <ShieldCheck style={{ width: 16, height: 16, color: '#b45309', flexShrink: 0 }} />
-          <span style={{ flex: 1 }}>
-            This workflow is shared with you. Make a copy to edit it — your copy will be saved to your team.
-          </span>
-          <button
-            onClick={handleMakeCopy}
-            disabled={duplicating}
-            style={{
-              padding: '6px 14px', fontSize: 12, fontWeight: 700, fontFamily: 'inherit',
-              borderRadius: 6, border: '1px solid var(--highlight-color, #eab308)',
-              backgroundColor: 'var(--highlight-color, #eab308)',
-              color: 'var(--highlight-text-color, #000)', cursor: 'pointer',
-              whiteSpace: 'nowrap', opacity: duplicating ? 0.6 : 1,
-            }}
-          >
-            {duplicating ? 'Copying...' : 'Make a copy to edit'}
-          </button>
-        </div>
-      )}
 
       {/* ===== TAB BAR ===== */}
       <div ref={tabBarRef} style={{ display: 'flex', borderBottom: '1px solid #e5e7eb', padding: tabsCompact ? '0 8px' : '0 24px', backgroundColor: '#fff', flexShrink: 0 }}>
@@ -3830,6 +3783,9 @@ function WorkflowOutputCard({ status, sessionId, running, runElapsed, showDownlo
   const [approvalComments, setApprovalComments] = useState('')
   const [approvalProcessing, setApprovalProcessing] = useState(false)
   const [approvalError, setApprovalError] = useState<string | null>(null)
+  const [showSaveToLibrary, setShowSaveToLibrary] = useState(false)
+  const { toast } = useToast()
+  const { user } = useAuth()
 
   useEffect(() => {
     if (!isPendingApproval || !status?.approval_request_id) return
@@ -4039,7 +3995,8 @@ function WorkflowOutputCard({ status, sessionId, running, runElapsed, showDownlo
             }}
             dangerouslySetInnerHTML={{ __html: renderOutput(output) }}
           />
-          <div style={{ marginTop: 12, position: 'relative', display: 'inline-block' }}>
+          <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ position: 'relative', display: 'inline-block' }}>
             <button
               onClick={() => setShowDownloadPopup(!showDownloadPopup)}
               style={{
@@ -4087,6 +4044,31 @@ function WorkflowOutputCard({ status, sessionId, running, runElapsed, showDownlo
               </div>
             )}
           </div>
+            <button
+              onClick={() => setShowSaveToLibrary(true)}
+              disabled={!sessionId}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px',
+                fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+                border: '1px solid #d1d5db', borderRadius: 6,
+                backgroundColor: '#fff',
+                cursor: sessionId ? 'pointer' : 'not-allowed',
+                color: '#374151', opacity: sessionId ? 1 : 0.5,
+              }}
+            >
+              <BookmarkPlus style={{ width: 14, height: 14 }} />
+              Save to library
+            </button>
+          </div>
+          {showSaveToLibrary && sessionId && (
+            <SaveWorkflowResultDialog
+              sessionId={sessionId}
+              teamId={user?.current_team ?? null}
+              outputPreview={output}
+              onClose={() => setShowSaveToLibrary(false)}
+              onSaved={() => toast('Saved to library', 'success')}
+            />
+          )}
         </div>
       )}
 

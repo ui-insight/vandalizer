@@ -207,6 +207,16 @@ export function downloadResults(sessionId: string, format: string = 'json', opts
   return `/api/workflows/download?${params.toString()}`
 }
 
+export function saveResultToLibrary(
+  sessionId: string,
+  data: { library_id: string; folder?: string | null; note?: string; tags?: string[] },
+) {
+  return apiFetch<import('../types/library').LibraryItem>(
+    `/api/workflows/sessions/${encodeURIComponent(sessionId)}/save-to-library`,
+    { method: 'POST', body: JSON.stringify(data) },
+  )
+}
+
 // Export / Import
 
 export function exportWorkflowUrl(id: string) {

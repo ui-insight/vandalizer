@@ -18,11 +18,13 @@ export function LibraryItemDetails({ item, onClose, onRemove }: Props) {
   const kindLabel =
     item.kind === 'workflow'
       ? 'Workflow'
-      : item.set_type === 'prompt'
-        ? 'Prompt'
-        : item.set_type === 'formatter'
-          ? 'Formatter'
-          : 'Extraction Task'
+      : item.kind === 'workflow_result'
+        ? 'Workflow run'
+        : item.set_type === 'prompt'
+          ? 'Prompt'
+          : item.set_type === 'formatter'
+            ? 'Formatter'
+            : 'Extraction Task'
 
   const formattedDate = item.created_at
     ? new Date(item.created_at).toLocaleDateString('en-US', {
@@ -45,6 +47,18 @@ export function LibraryItemDetails({ item, onClose, onRemove }: Props) {
           kb: undefined,
         },
       })
+    } else if (item.kind === 'workflow_result' && item.workflow_id) {
+      navigate({
+        to: '/',
+        search: {
+          mode: undefined,
+          tab: undefined,
+          workflow: item.workflow_id,
+          extraction: undefined,
+          automation: undefined,
+          kb: undefined,
+        },
+      })
     } else {
       navigate({
         to: '/',
@@ -59,6 +73,10 @@ export function LibraryItemDetails({ item, onClose, onRemove }: Props) {
       })
     }
   }
+
+  const runDate = item.kind === 'workflow_result' && item.run_at
+    ? new Date(item.run_at).toLocaleString()
+    : null
 
   return (
     <>
@@ -115,6 +133,29 @@ export function LibraryItemDetails({ item, onClose, onRemove }: Props) {
           </span>
         </div>
 
+        {item.kind === 'workflow_result' && (
+          <>
+            {item.workflow_name && (
+              <div>
+                <label className="block text-xs font-medium uppercase text-gray-400 mb-1">Workflow</label>
+                <p className="text-sm text-gray-700">{item.workflow_name}</p>
+              </div>
+            )}
+            {runDate && (
+              <div>
+                <label className="block text-xs font-medium uppercase text-gray-400 mb-1">Run at</label>
+                <p className="text-sm text-gray-700">{runDate}</p>
+              </div>
+            )}
+            {item.result_status && (
+              <div>
+                <label className="block text-xs font-medium uppercase text-gray-400 mb-1">Status</label>
+                <p className="text-sm text-gray-700">{item.result_status}</p>
+              </div>
+            )}
+          </>
+        )}
+
         {/* Tags */}
         {item.tags.length > 0 && (
           <div>
@@ -147,9 +188,13 @@ export function LibraryItemDetails({ item, onClose, onRemove }: Props) {
           className="flex w-full items-center justify-center gap-1.5 rounded-md bg-highlight px-4 py-2 text-sm font-bold text-highlight-text hover:brightness-90"
         >
           <ExternalLink className="h-4 w-4" />
-          {item.kind === 'workflow' ? 'Open' : 'Use'}
+          {item.kind === 'workflow'
+            ? 'Open'
+            : item.kind === 'workflow_result'
+              ? 'Open workflow'
+              : 'Use'}
         </button>
-        {!item.verified && (
+        {!item.verified && item.kind !== 'workflow_result' && (
           <>
             {/* Show quality metrics before verification submission */}
             {item.quality_score != null && (

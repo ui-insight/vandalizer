@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { X } from 'lucide-react'
-import type { Library, LibraryItemKind } from '../../types/library'
-import { addItem } from '../../api/library'
+import type { Library, LibraryFolder, LibraryItemKind } from '../../types/library'
+import { addItem, listFolders } from '../../api/library'
 
 interface Props {
   libraries: Library[]
@@ -13,13 +13,35 @@ interface Props {
 
 export function AddToLibraryDialog({ libraries, itemId, kind, onClose, onAdded }: Props) {
   const [selectedLibraryId, setSelectedLibraryId] = useState(libraries[0]?.id ?? '')
+  const [folderUuid, setFolderUuid] = useState<string>('')
+  const [folders, setFolders] = useState<LibraryFolder[]>([])
   const [saving, setSaving] = useState(false)
+
+  const selectedLibrary = useMemo(
+    () => libraries.find(l => l.id === selectedLibraryId) ?? null,
+    [libraries, selectedLibraryId],
+  )
+
+  useEffect(() => {
+    setFolderUuid('')
+    if (!selectedLibrary || selectedLibrary.scope === 'verified') {
+      setFolders([])
+      return
+    }
+    listFolders(selectedLibrary.scope, selectedLibrary.team_id ?? undefined)
+      .then(setFolders)
+      .catch(() => setFolders([]))
+  }, [selectedLibrary])
 
   const handleSubmit = async () => {
     if (!selectedLibraryId) return
     setSaving(true)
     try {
-      await addItem(selectedLibraryId, { item_id: itemId, kind })
+      await addItem(selectedLibraryId, {
+        item_id: itemId,
+        kind,
+        folder: folderUuid || undefined,
+      })
       onAdded()
       onClose()
     } finally {
@@ -37,7 +59,7 @@ export function AddToLibraryDialog({ libraries, itemId, kind, onClose, onAdded }
           </button>
         </div>
 
-        <div>
+        <div className="mb-4">
           <label className="block text-sm font-medium text-gray-700 mb-1">Library</label>
           <select
             value={selectedLibraryId}
@@ -51,6 +73,22 @@ export function AddToLibraryDialog({ libraries, itemId, kind, onClose, onAdded }
             ))}
           </select>
         </div>
+
+        {selectedLibrary && selectedLibrary.scope !== 'verified' && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Folder</label>
+            <select
+              value={folderUuid}
+              onChange={e => setFolderUuid(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-highlight"
+            >
+              <option value="">(none — top level)</option>
+              {folders.map(f => (
+                <option key={f.uuid} value={f.uuid}>{f.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         <div className="flex justify-end gap-2 mt-6">
           <button

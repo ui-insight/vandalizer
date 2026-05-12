@@ -53,6 +53,12 @@ class LibraryItemResponse(BaseModel):
     quality_tier: Optional[str] = None
     quality_score: Optional[float] = None
     created_by: Optional[AuthorRef] = None
+    # workflow_result-only fields
+    session_id: Optional[str] = None
+    workflow_id: Optional[str] = None
+    workflow_name: Optional[str] = None
+    result_status: Optional[str] = None
+    run_at: Optional[str] = None
 
 
 class AddItemRequest(BaseModel):
