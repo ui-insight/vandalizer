@@ -2,7 +2,7 @@
 
 Read-only-ish surface designed for service consumers — dashboards, agentic coding tools (Claude Code, Cursor, etc.), and other automation. Authenticated with **scoped, named API keys** that are independent of any user's session and revocable individually.
 
-> **Not the same as the per-user `x-api-key` in [`api.md`](./api.md).** That key inherits the issuing user's full role and is meant for `POST /api/extractions/run-integrated`-style integrations. The management keys documented here have explicit scopes and are mounted under `/api/mgmt/v1`.
+> **Not the same as the per-user `x-api-key` for `POST /api/extractions/run-integrated`-style integrations.** That key inherits the issuing user's full role. The management keys documented here have explicit scopes and are mounted under `/api/mgmt/v1`.
 
 ## Issuing a key
 

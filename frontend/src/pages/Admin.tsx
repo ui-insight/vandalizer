@@ -5925,7 +5925,7 @@ export default function Admin() {
   const hasAccess = isGlobalAdmin || isStaff || isExaminer || isTeamAdmin
 
   // Staff see everything except config; examiners see analytics tabs only
-  const hiddenForNonAdmin = ['config', 'quality', 'compliance', 'demo', 'organizations', 'approvals', 'audit', 'certifications']
+  const hiddenForNonAdmin = ['config', 'quality', 'compliance', 'demo', 'organizations', 'approvals', 'audit', 'certifications', 'apikeys']
   let visibleTabs = isGlobalAdmin
     ? TABS
     : isStaff
@@ -6009,7 +6009,7 @@ export default function Admin() {
           {activeTab === 'demo' && (isGlobalAdmin || isStaff) && <DemoTab />}
           {activeTab === 'email' && (isGlobalAdmin || isStaff) && <EmailAnalyticsTab />}
           {activeTab === 'certifications' && (isGlobalAdmin || isStaff) && <CertificationsTab />}
-          {activeTab === 'apikeys' && isGlobalAdmin && <ApiKeysTab />}
+          {activeTab === 'apikeys' && (isGlobalAdmin || isStaff) && <ApiKeysTab />}
           {activeTab === 'config' && isGlobalAdmin && <ConfigTab />}
         </div>
       </div>

@@ -670,3 +670,7 @@ export function revokeApiKey(keyId: string) {
     { method: 'DELETE' },
   )
 }
+
+export function getApiKeyDocs() {
+  return apiFetch<{ markdown: string }>('/api/admin/api-keys/docs')
+}

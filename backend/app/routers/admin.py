@@ -2374,7 +2374,7 @@ async def create_api_key(
     user: User = Depends(get_current_user),
 ):
     """Issue a new management API key. Returns the full token once."""
-    await _require_superadmin(user)
+    await _require_admin(user)
 
     from app.dependencies import MGMT_SCOPES
     from app.models.api_key import ApiKey
@@ -2421,7 +2421,7 @@ async def list_api_keys(
     include_revoked: bool = False,
     user: User = Depends(get_current_user),
 ):
-    await _require_superadmin(user)
+    await _require_admin(user)
 
     from app.models.api_key import ApiKey
 
@@ -2452,7 +2452,7 @@ async def revoke_api_key(
     key_id: str,
     user: User = Depends(get_current_user),
 ):
-    await _require_superadmin(user)
+    await _require_admin(user)
 
     from app.models.api_key import ApiKey
 
@@ -2477,3 +2477,16 @@ async def revoke_api_key(
         {"key_id": key_id, "name": key.name},
     )
     return {"id": key_id, "revoked": True}
+
+
+@router.get("/api-keys/docs")
+async def get_api_key_docs(user: User = Depends(get_current_user)):
+    """Return the management-API documentation as markdown."""
+    await _require_admin(user)
+
+    from pathlib import Path
+
+    docs_path = Path(__file__).resolve().parent.parent / "docs" / "mgmt-api.md"
+    if not docs_path.is_file():
+        raise HTTPException(status_code=404, detail="Documentation not found")
+    return {"markdown": docs_path.read_text(encoding="utf-8")}

@@ -1,14 +1,19 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Copy, KeyRound, Plus, Trash2, X } from 'lucide-react'
+import { BookOpen, Copy, KeyRound, Plus, Trash2, X } from 'lucide-react'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 
 import {
   createApiKey,
+  getApiKeyDocs,
   listApiKeys,
   MGMT_SCOPE_OPTIONS,
   revokeApiKey,
   type ApiKeyListItem,
   type CreateApiKeyResponse,
 } from '../../api/admin'
+
+marked.setOptions({ breaks: true, gfm: true })
 
 function fmtDate(iso: string | null): string {
   if (!iso) return '—'
@@ -58,6 +63,7 @@ export function ApiKeysTab() {
   const [error, setError] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [createdKey, setCreatedKey] = useState<CreateApiKeyResponse | null>(null)
+  const [showDocs, setShowDocs] = useState(false)
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -96,20 +102,33 @@ export function ApiKeysTab() {
           <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Management API keys</h2>
           <p style={{ fontSize: 14, color: '#6b7280' }}>
             Scoped, named keys for service consumers (dashboards, agentic tooling).
-            See <code>/api/mgmt/v1</code> in the docs.
+            Mounted under <code>/api/mgmt/v1</code>.
           </p>
         </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            padding: '8px 14px', borderRadius: 6,
-            backgroundColor: 'var(--highlight-color, #3b82f6)', color: 'white',
-            border: 'none', fontWeight: 600, cursor: 'pointer',
-          }}
-        >
-          <Plus size={16} /> New key
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={() => setShowDocs(true)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '8px 14px', borderRadius: 6,
+              backgroundColor: 'transparent', color: '#374151',
+              border: '1px solid #d1d5db', fontWeight: 600, cursor: 'pointer',
+            }}
+          >
+            <BookOpen size={16} /> View documentation
+          </button>
+          <button
+            onClick={() => setShowCreate(true)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '8px 14px', borderRadius: 6,
+              backgroundColor: 'var(--highlight-color, #3b82f6)', color: 'white',
+              border: 'none', fontWeight: 600, cursor: 'pointer',
+            }}
+          >
+            <Plus size={16} /> New key
+          </button>
+        </div>
       </div>
 
       <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 12, fontSize: 13 }}>
@@ -222,6 +241,71 @@ export function ApiKeysTab() {
           onClose={() => setCreatedKey(null)}
         />
       )}
+
+      {showDocs && <DocsModal onClose={() => setShowDocs(false)} />}
+    </div>
+  )
+}
+
+function DocsModal({ onClose }: { onClose: () => void }) {
+  const [html, setHtml] = useState<string | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    getApiKeyDocs()
+      .then(res => {
+        if (cancelled) return
+        const rendered = DOMPurify.sanitize(marked.parse(res.markdown) as string)
+        setHtml(rendered)
+      })
+      .catch(e => {
+        if (cancelled) return
+        setErr(e instanceof Error ? e.message : 'Failed to load documentation')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 1000,
+    }}>
+      <div style={{
+        backgroundColor: 'white', borderRadius: 8, padding: 24,
+        maxWidth: 900, width: '92%', maxHeight: '90vh',
+        display: 'flex', flexDirection: 'column',
+      }}>
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          marginBottom: 16, flexShrink: 0,
+        }}>
+          <h3 style={{ fontSize: 18, fontWeight: 700 }}>Management API documentation</h3>
+          <button onClick={onClose} style={{
+            padding: 4, border: 'none', background: 'transparent', cursor: 'pointer',
+          }}>
+            <X size={18} />
+          </button>
+        </div>
+        <div
+          className="markdown-body"
+          style={{ overflowY: 'auto', fontSize: 14, lineHeight: 1.55, paddingRight: 8 }}
+        >
+          {err ? (
+            <div style={{
+              padding: 12, borderRadius: 6,
+              backgroundColor: '#fee2e2', color: '#991b1b', fontSize: 13,
+            }}>{err}</div>
+          ) : html === null ? (
+            <p style={{ color: '#6b7280' }}>Loading…</p>
+          ) : (
+            <div dangerouslySetInnerHTML={{ __html: html }} />
+          )}
+        </div>
+      </div>
     </div>
   )
 }
