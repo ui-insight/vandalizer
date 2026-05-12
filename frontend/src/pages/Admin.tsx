@@ -64,6 +64,7 @@ import type { AuditLogEntry } from '../api/audit'
 import { getAuthConfig } from '../api/auth'
 import { UpdateBanner } from '../components/admin/UpdateBanner'
 import { ApiKeysTab } from '../components/admin/ApiKeysTab'
+import { ComplianceTab } from '../components/admin/ComplianceTab'
 
 function applyThemeToDOM(theme: ThemeConfig) {
   const root = document.documentElement
@@ -71,7 +72,7 @@ function applyThemeToDOM(theme: ThemeConfig) {
   root.style.setProperty('--ui-radius', theme.ui_radius)
 }
 
-type Tab = 'usage' | 'users' | 'teams' | 'organizations' | 'workflows' | 'quality' | 'audit' | 'demo' | 'email' | 'certifications' | 'apikeys' | 'config'
+type Tab = 'usage' | 'users' | 'teams' | 'organizations' | 'workflows' | 'quality' | 'compliance' | 'audit' | 'demo' | 'email' | 'certifications' | 'apikeys' | 'config'
 
 const TABS: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'usage', label: 'Usage', icon: BarChart3 },
@@ -80,6 +81,7 @@ const TABS: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'organizations', label: 'Organizations', icon: FolderTree },
   { key: 'workflows', label: 'Workflows', icon: Workflow },
   { key: 'quality', label: 'Quality', icon: ShieldCheck },
+  { key: 'compliance', label: 'Compliance', icon: Lock },
   { key: 'audit', label: 'Audit Log', icon: FileText },
   { key: 'demo', label: 'Demo', icon: Zap },
   { key: 'email', label: 'Email', icon: Mail },
@@ -5923,7 +5925,7 @@ export default function Admin() {
   const hasAccess = isGlobalAdmin || isStaff || isExaminer || isTeamAdmin
 
   // Staff see everything except config; examiners see analytics tabs only
-  const hiddenForNonAdmin = ['config', 'quality', 'demo', 'organizations', 'approvals', 'audit', 'certifications']
+  const hiddenForNonAdmin = ['config', 'quality', 'compliance', 'demo', 'organizations', 'approvals', 'audit', 'certifications']
   let visibleTabs = isGlobalAdmin
     ? TABS
     : isStaff
@@ -6002,6 +6004,7 @@ export default function Admin() {
           {activeTab === 'organizations' && (isGlobalAdmin || isStaff) && <OrganizationsTab />}
           {activeTab === 'workflows' && <WorkflowsTab />}
           {activeTab === 'quality' && <QualityTab />}
+          {activeTab === 'compliance' && (isGlobalAdmin || isStaff) && <ComplianceTab />}
           {activeTab === 'audit' && (isGlobalAdmin || isStaff) && <AuditTab />}
           {activeTab === 'demo' && (isGlobalAdmin || isStaff) && <DemoTab />}
           {activeTab === 'email' && (isGlobalAdmin || isStaff) && <EmailAnalyticsTab />}

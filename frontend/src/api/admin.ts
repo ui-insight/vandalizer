@@ -540,6 +540,69 @@ export function setCertificationUnlock(userId: string, unlocked: boolean) {
   )
 }
 
+// Compliance: classification + retention
+
+export interface ClassificationLevel {
+  name: string
+  label: string
+  color: string
+  severity: number
+}
+
+export interface ClassificationConfig {
+  enabled: boolean
+  auto_classify_on_upload: boolean
+  default_classification: string
+  levels: ClassificationLevel[]
+}
+
+export interface RetentionPolicy {
+  retention_days?: number
+  soft_delete_grace_days?: number
+  warning_days_before?: number
+}
+
+export interface RetentionConfig {
+  enabled: boolean
+  policies: Record<string, RetentionPolicy>
+  activity_retention_days?: number
+  chat_retention_days?: number
+  workflow_result_retention_days?: number
+  activity_stale_threshold_minutes?: number
+}
+
+export interface RecentClassification {
+  uuid: string
+  title: string | null
+  classification: string | null
+  confidence: number | null
+  classified_at: string | null
+  classified_by: string | null
+}
+
+export interface ClassificationDashboard {
+  config: ClassificationConfig
+  counts: Record<string, number>
+  recent_classifications: RecentClassification[]
+}
+
+export interface RetentionDashboard {
+  retention_config: RetentionConfig
+  classification_config: ClassificationConfig
+  document_counts: Record<string, number>
+  pending_deletions: number
+  soft_deleted: number
+  retention_holds: number
+}
+
+export function getClassificationDashboard() {
+  return apiFetch<ClassificationDashboard>('/api/admin/classification/dashboard')
+}
+
+export function getRetentionDashboard() {
+  return apiFetch<RetentionDashboard>('/api/admin/retention/dashboard')
+}
+
 // Management API keys (/api/admin/api-keys)
 
 export interface ApiKeyListItem {
