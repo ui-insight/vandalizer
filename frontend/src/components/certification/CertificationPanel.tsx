@@ -340,7 +340,7 @@ export function CertificationPanel() {
   }
 
   // Panel content — two views: curriculum overview and module detail
-  const panelContent = loading ? (
+  const panelContent = loading && !progress ? (
     <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
       Loading certification progress...
     </div>
