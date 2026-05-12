@@ -219,6 +219,7 @@ class PaginatedWorkflowResponse(BaseModel):
 class ConfigUpdateRequest(BaseModel):
     extraction_config: Optional[dict] = None
     quality_config: Optional[dict] = None
+    compliance_config: Optional[dict] = None
     ocr_endpoint: Optional[str] = None
     ocr_api_key: Optional[str] = None
     llm_endpoint: Optional[str] = None
@@ -1245,7 +1246,7 @@ async def get_config(
         "ui_radius": cfg.ui_radius,
         "default_team_id": cfg.default_team_id or "",
         "support_contacts": cfg.support_contacts,
-        "m365_config": _sanitize_m365_config(cfg.get_m365_config()),
+        "compliance_config": cfg.get_compliance_config(),
     }
 
 
@@ -1266,6 +1267,8 @@ async def update_config(
         cfg.extraction_config = body.extraction_config
     if body.quality_config is not None:
         cfg.quality_config = body.quality_config
+    if body.compliance_config is not None:
+        cfg.compliance_config = body.compliance_config
     if body.ocr_endpoint is not None:
         cfg.ocr_endpoint = body.ocr_endpoint
     if body.ocr_api_key is not None and body.ocr_api_key != "***":
@@ -1543,53 +1546,56 @@ async def update_auth_methods(
 
 
 # ---------------------------------------------------------------------------
-# 12b. GET/PUT /config/m365  - M365 integration config
+# 12b. GET/PUT /config/compliance  - Document compliance check config
 # ---------------------------------------------------------------------------
 
 
-def _sanitize_m365_config(cfg: dict) -> dict:
-    """Mask the client_secret for safe display."""
-    out = {**cfg}
-    secret = out.get("client_secret", "")
-    if secret and secret != "***":
-        out["client_secret"] = "***"
-    return out
-
-
-@router.get("/config/m365")
-async def get_m365_config(
+@router.get("/config/compliance")
+async def get_compliance_config(
     user: User = Depends(get_current_user),
 ):
     await _require_superadmin(user)
     cfg = await SystemConfig.get_config()
-    return _sanitize_m365_config(cfg.get_m365_config())
+    return cfg.get_compliance_config()
 
 
-@router.put("/config/m365")
-async def update_m365_config(
+@router.put("/config/compliance")
+async def update_compliance_config(
     body: dict,
     user: User = Depends(get_current_user),
 ):
     await _require_superadmin(user)
     cfg = await SystemConfig.get_config()
-    current = cfg.get_m365_config()
+    current = cfg.get_compliance_config()
 
     if "enabled" in body:
         current["enabled"] = bool(body["enabled"])
-    if "client_id" in body:
-        current["client_id"] = body["client_id"]
-    if "tenant_id" in body:
-        current["tenant_id"] = body["tenant_id"]
-    if "client_secret" in body and body["client_secret"] != "***":
-        current["client_secret"] = encrypt_value(body["client_secret"])
+    if "check_on_upload" in body:
+        current["check_on_upload"] = bool(body["check_on_upload"])
+    if "rules" in body:
+        current["rules"] = str(body["rules"] or "")
+    if "chunk_size" in body:
+        try:
+            current["chunk_size"] = max(500, int(body["chunk_size"]))
+        except (TypeError, ValueError):
+            pass
+    if "chunk_overlap" in body:
+        try:
+            current["chunk_overlap"] = max(0, int(body["chunk_overlap"]))
+        except (TypeError, ValueError):
+            pass
 
-    cfg.m365_config = current
+    cfg.compliance_config = current
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
     cfg.updated_by = user.user_id
     await cfg.save()
-    await _audit(user, "update_m365_config", "Updated M365 integration configuration")
+    await _audit(
+        user,
+        "update_compliance_config",
+        f"Updated compliance configuration (enabled={current.get('enabled')})",
+    )
 
-    return _sanitize_m365_config(cfg.get_m365_config())
+    return cfg.get_compliance_config()
 
 
 # ---------------------------------------------------------------------------

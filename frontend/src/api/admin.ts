@@ -202,11 +202,12 @@ export function getWorkflowEvents(page: number = 1, status?: string, search?: st
 
 // Config
 
-export interface M365Config {
+export interface CompliancePolicyConfig {
   enabled: boolean
-  client_id: string
-  client_secret: string
-  tenant_id: string
+  check_on_upload: boolean
+  rules: string
+  chunk_size?: number
+  chunk_overlap?: number
 }
 
 export interface SystemConfigData {
@@ -222,7 +223,7 @@ export interface SystemConfigData {
   highlight_color: string
   ui_radius: string
   default_team_id: string
-  m365_config: M365Config
+  compliance_config: CompliancePolicyConfig
 }
 
 export function getSystemConfig() {
@@ -233,12 +234,12 @@ export function updateSystemConfig(data: { extraction_config?: Record<string, un
   return apiFetch<{ status: string }>('/api/admin/config', { method: 'PUT', body: JSON.stringify(data) })
 }
 
-export function getM365Config() {
-  return apiFetch<M365Config>('/api/admin/config/m365')
+export function getCompliancePolicyConfig() {
+  return apiFetch<CompliancePolicyConfig>('/api/admin/config/compliance')
 }
 
-export function updateM365Config(data: Partial<M365Config>) {
-  return apiFetch<M365Config>('/api/admin/config/m365', { method: 'PUT', body: JSON.stringify(data) })
+export function updateCompliancePolicyConfig(data: Partial<CompliancePolicyConfig>) {
+  return apiFetch<CompliancePolicyConfig>('/api/admin/config/compliance', { method: 'PUT', body: JSON.stringify(data) })
 }
 
 // Admin Team Management

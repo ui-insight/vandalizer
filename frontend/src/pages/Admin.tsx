@@ -21,7 +21,7 @@ import type { ThemeConfig } from '../api/config'
 import {
   getUsageStats, getUsageTimeseries, getUserLeaderboard, getTeamLeaderboard,
   getTeamDetail, getUserDetail,
-  getWorkflowEvents, getSystemConfig, updateSystemConfig, updateM365Config,
+  getWorkflowEvents, getSystemConfig, updateSystemConfig, updateCompliancePolicyConfig,
   addModel, updateModel, deleteModel, setDefaultModel, testOcr, testModel, addOAuthProvider,
   updateOAuthProvider, deleteOAuthProvider, updateAuthMethods,
   getQualitySummary, getQualityTimeline, runRegressionSuite,
@@ -2338,13 +2338,14 @@ function ConfigTab() {
   const [showAddContact, setShowAddContact] = useState(false)
   const [newContact, setNewContact] = useState({ user_id: '', email: '', name: '' })
 
-  // M365 integration
-  const [m365Enabled, setM365Enabled] = useState(false)
-  const [m365ClientId, setM365ClientId] = useState('')
-  const [m365ClientSecret, setM365ClientSecret] = useState('')
-  const [m365TenantId, setM365TenantId] = useState('')
-  const [m365Saving, setM365Saving] = useState(false)
-  const [m365Saved, setM365Saved] = useState(false)
+  // Compliance activation
+  const [complianceEnabled, setComplianceEnabled] = useState(false)
+  const [complianceCheckOnUpload, setComplianceCheckOnUpload] = useState(true)
+  const [complianceRules, setComplianceRules] = useState('')
+  const [complianceChunkSize, setComplianceChunkSize] = useState(8000)
+  const [complianceChunkOverlap, setComplianceChunkOverlap] = useState(200)
+  const [complianceSaving, setComplianceSaving] = useState(false)
+  const [complianceSaved, setComplianceSaved] = useState(false)
 
   // Add/edit provider form
   const [showAddProvider, setShowAddProvider] = useState(false)
@@ -2394,12 +2395,13 @@ function ConfigTab() {
       setExcellentThreshold((tiers.excellent?.min_score as number) ?? 90)
       setGoodThreshold((tiers.good?.min_score as number) ?? 70)
       setFairThreshold((tiers.fair?.min_score as number) ?? 50)
-      // M365 config
-      const m365 = c.m365_config || {}
-      setM365Enabled(!!m365.enabled)
-      setM365ClientId(m365.client_id || '')
-      setM365ClientSecret(m365.client_secret || '')
-      setM365TenantId(m365.tenant_id || '')
+      // Compliance config
+      const comp = c.compliance_config || ({} as Partial<typeof c.compliance_config>)
+      setComplianceEnabled(!!comp.enabled)
+      setComplianceCheckOnUpload(comp.check_on_upload !== false)
+      setComplianceRules(comp.rules || '')
+      setComplianceChunkSize(comp.chunk_size || 8000)
+      setComplianceChunkOverlap(comp.chunk_overlap ?? 200)
     }).finally(() => setLoading(false))
 
     getThemeConfig().then(t => {
@@ -3521,66 +3523,99 @@ function ConfigTab() {
         </div>
       </div>
 
-      {/* M365 Integration */}
+      {/* Compliance Activation */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          <Globe size={18} color="#6b7280" /> Microsoft 365 Integration
+          <Lock size={18} color="#6b7280" /> Document Compliance Checks
         </div>
         <div style={{ padding: '0 20px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.5 }}>
+            When enabled, every uploaded document is scanned in chunks by an LLM
+            against the policy below. Documents containing sensitive or policy-violating
+            content are flagged in the document library.
+          </div>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-            <input type="checkbox" checked={m365Enabled} onChange={e => setM365Enabled(e.target.checked)} />
-            <span style={{ fontSize: 14, fontWeight: 500 }}>Enable M365 Integration</span>
+            <input type="checkbox" checked={complianceEnabled} onChange={e => setComplianceEnabled(e.target.checked)} />
+            <span style={{ fontSize: 14, fontWeight: 500 }}>Activate compliance checks</span>
           </label>
-          {m365Enabled && (
+          {complianceEnabled && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '8px 0' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={complianceCheckOnUpload}
+                  onChange={e => setComplianceCheckOnUpload(e.target.checked)}
+                />
+                <span style={{ fontSize: 13 }}>Run checks automatically on every upload</span>
+              </label>
               <div>
-                <label style={labelStyle}>Azure Tenant ID</label>
-                <input value={m365TenantId} onChange={e => setM365TenantId(e.target.value)} placeholder="e.g. xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" style={inputStyle} />
+                <label style={labelStyle}>Compliance policy (sent to the validator LLM)</label>
+                <textarea
+                  value={complianceRules}
+                  onChange={e => setComplianceRules(e.target.value)}
+                  placeholder="Describe what content should be flagged…"
+                  rows={6}
+                  style={{ ...inputStyle, fontFamily: 'inherit', resize: 'vertical' }}
+                />
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+                  Plain English. The validator decides whether each chunk passes or fails based on this rule set.
+                </div>
               </div>
-              <div>
-                <label style={labelStyle}>Application (Client) ID</label>
-                <input value={m365ClientId} onChange={e => setM365ClientId(e.target.value)} placeholder="Azure AD app registration client ID" style={inputStyle} />
-              </div>
-              <div>
-                <label style={labelStyle}>Client Secret</label>
-                <input type="password" value={m365ClientSecret} onChange={e => setM365ClientSecret(e.target.value)} placeholder={m365ClientSecret === '***' ? '(unchanged)' : 'Azure AD client secret'} style={inputStyle} />
-              </div>
-              <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
-                Requires an Azure AD app registration with Graph API permissions (Mail.Read, Files.Read).
-                Your IT department may need to grant admin consent.
+              <div style={{ display: 'flex', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>Chunk size (chars)</label>
+                  <input
+                    type="number"
+                    min={500}
+                    value={complianceChunkSize}
+                    onChange={e => setComplianceChunkSize(Number(e.target.value) || 8000)}
+                    style={inputStyle}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>Chunk overlap (chars)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={complianceChunkOverlap}
+                    onChange={e => setComplianceChunkOverlap(Number(e.target.value) || 0)}
+                    style={inputStyle}
+                  />
+                </div>
               </div>
             </div>
           )}
           <div>
             <button
               onClick={async () => {
-                setM365Saving(true)
-                setM365Saved(false)
+                setComplianceSaving(true)
+                setComplianceSaved(false)
                 try {
-                  await updateM365Config({
-                    enabled: m365Enabled,
-                    client_id: m365ClientId,
-                    tenant_id: m365TenantId,
-                    ...(m365ClientSecret !== '***' ? { client_secret: m365ClientSecret } : {}),
+                  await updateCompliancePolicyConfig({
+                    enabled: complianceEnabled,
+                    check_on_upload: complianceCheckOnUpload,
+                    rules: complianceRules,
+                    chunk_size: complianceChunkSize,
+                    chunk_overlap: complianceChunkOverlap,
                   })
-                  setM365Saved(true)
-                  setTimeout(() => setM365Saved(false), 3000)
+                  setComplianceSaved(true)
+                  setTimeout(() => setComplianceSaved(false), 3000)
                 } catch {
-                  setError('Failed to save M365 configuration')
+                  setError('Failed to save compliance configuration')
                 } finally {
-                  setM365Saving(false)
+                  setComplianceSaving(false)
                 }
               }}
-              disabled={m365Saving}
+              disabled={complianceSaving}
               style={{
                 padding: '8px 20px', borderRadius: 'var(--ui-radius, 12px)', border: 'none',
                 background: '#111827', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                opacity: m365Saving ? 0.6 : 1,
+                opacity: complianceSaving ? 0.6 : 1,
               }}
             >
-              {m365Saving ? 'Saving...' : 'Save M365 Configuration'}
+              {complianceSaving ? 'Saving...' : 'Save Compliance Settings'}
             </button>
-            {m365Saved && <span style={{ marginLeft: 10, fontSize: 13, color: '#16a34a' }}>Saved!</span>}
+            {complianceSaved && <span style={{ marginLeft: 10, fontSize: 13, color: '#16a34a' }}>Saved!</span>}
           </div>
         </div>
       </div>

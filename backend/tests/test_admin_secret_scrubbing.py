@@ -175,7 +175,7 @@ class TestAdminConfigEndpoint:
         mock_config.support_contacts = []
         mock_config.highlight_color = "#eab308"
         mock_config.ui_radius = "12px"
-        mock_config.get_m365_config.return_value = {}
+        mock_config.get_compliance_config.return_value = {}
 
         with patch("app.dependencies.decode_token", return_value={"sub": "admin1", "type": "access"}), \
              patch("app.dependencies.User") as MockUser, \
