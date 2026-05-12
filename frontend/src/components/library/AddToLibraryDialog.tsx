@@ -13,20 +13,13 @@ interface Props {
 
 export function AddToLibraryDialog({ libraries, itemId, kind, onClose, onAdded }: Props) {
   const [selectedLibraryId, setSelectedLibraryId] = useState(libraries[0]?.id ?? '')
-  const [note, setNote] = useState('')
-  const [tags, setTags] = useState('')
   const [saving, setSaving] = useState(false)
 
   const handleSubmit = async () => {
     if (!selectedLibraryId) return
     setSaving(true)
     try {
-      await addItem(selectedLibraryId, {
-        item_id: itemId,
-        kind,
-        note: note || undefined,
-        tags: tags ? tags.split(',').map(t => t.trim()).filter(Boolean) : undefined,
-      })
+      await addItem(selectedLibraryId, { item_id: itemId, kind })
       onAdded()
       onClose()
     } finally {
@@ -44,43 +37,19 @@ export function AddToLibraryDialog({ libraries, itemId, kind, onClose, onAdded }
           </button>
         </div>
 
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Library</label>
-            <select
-              value={selectedLibraryId}
-              onChange={e => setSelectedLibraryId(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-highlight"
-            >
-              {libraries.map(lib => (
-                <option key={lib.id} value={lib.id}>
-                  {lib.title} ({lib.scope})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Note (optional)</label>
-            <input
-              type="text"
-              value={note}
-              onChange={e => setNote(e.target.value)}
-              placeholder="Add a note..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-highlight"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Tags (comma separated)</label>
-            <input
-              type="text"
-              value={tags}
-              onChange={e => setTags(e.target.value)}
-              placeholder="tag1, tag2, ..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-highlight"
-            />
-          </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Library</label>
+          <select
+            value={selectedLibraryId}
+            onChange={e => setSelectedLibraryId(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-highlight"
+          >
+            {libraries.map(lib => (
+              <option key={lib.id} value={lib.id}>
+                {lib.title} ({lib.scope})
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="flex justify-end gap-2 mt-6">

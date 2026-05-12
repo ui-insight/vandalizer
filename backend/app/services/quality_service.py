@@ -486,7 +486,7 @@ def _build_extraction_suggestion_prompt(result: dict) -> str:
             flag = ""
             if f.get("accuracy") is not None and f["accuracy"] < 0.9:
                 flag = " [LOW ACCURACY]"
-            if f.get("consistency", 1) < 0.9:
+            if f.get("consistency") is not None and f["consistency"] < 0.9:
                 flag += " [LOW CONSISTENCY]"
             lines.append(
                 f"  - {f.get('field_name')}: expected={f.get('expected', 'N/A')}, "

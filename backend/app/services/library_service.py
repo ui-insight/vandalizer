@@ -26,6 +26,19 @@ if TYPE_CHECKING:
     from app.models.user import User
 
 
+class ShareError(Exception):
+    """Raised by share_to_team to identify which step failed.
+
+    `code` distinguishes failure modes so the API surface can return
+    actionable HTTP responses instead of a single conflated 404.
+    """
+
+    def __init__(self, code: str, status: int):
+        self.code = code
+        self.status = status
+        super().__init__(code)
+
+
 async def _resolve_team_oid(team_id: str) -> PydanticObjectId:
     """Resolve a team identifier (ObjectId string or UUID) to a PydanticObjectId.
 
@@ -222,9 +235,12 @@ async def add_item(
     lib = await access_control.get_authorized_library(library_id, user, manage=True)
     if not lib:
         return None
+    is_verified = False
     if kind == LibraryItemKind.WORKFLOW.value:
-        if not await access_control.get_authorized_workflow(item_id, user):
+        wf = await access_control.get_authorized_workflow(item_id, user)
+        if not wf:
             return None
+        is_verified = bool(getattr(wf, "verified", False))
     elif kind == LibraryItemKind.SEARCH_SET.value:
         try:
             search_set = await SearchSet.get(PydanticObjectId(item_id))
@@ -232,6 +248,7 @@ async def add_item(
             search_set = None
         if not search_set or not await access_control.get_authorized_search_set(search_set.uuid, user):
             return None
+        is_verified = bool(getattr(search_set, "verified", False))
     else:
         return None
 
@@ -240,6 +257,7 @@ async def add_item(
         item_id=PydanticObjectId(item_id),
         kind=LibraryItemKind(kind),
         added_by_user_id=user.user_id,
+        verified=is_verified,
         note=note,
         tags=tags or [],
         folder=folder,
@@ -251,7 +269,7 @@ async def add_item(
     lib.updated_at = now
     await lib.save()
 
-    return await _dereference_item(li)
+    return await _attach_author(await _dereference_item(li))
 
 
 async def remove_item(library_id: str, item_id: str, user: User) -> bool:
@@ -297,7 +315,7 @@ async def update_item(
         item.favorited = favorited
     if updates:
         await item.set(updates)
-    return await _dereference_item(item)
+    return await _attach_author(await _dereference_item(item))
 
 
 async def touch_item(item_id: str, user: User) -> bool:
@@ -374,6 +392,7 @@ async def get_library_items(
 
             results.append(deref)
 
+    await _attach_authors(results)
     return results
 
 
@@ -402,32 +421,59 @@ async def clone_to_personal(item_id: str, user: User) -> dict | None:
     )
 
 
-async def share_to_team(item_id: str, user: User, team_id: str) -> dict | None:
+async def share_to_team(
+    item_id: str,
+    user: User,
+    team_id: str,
+    *,
+    comment: str | None = None,
+) -> dict:
     item = await access_control.get_authorized_library_item(item_id, user)
     if not item:
-        return None
+        raise ShareError("item_not_found", 404)
 
     team_access = await access_control.get_team_access_context(user)
     try:
         team_oid = await _resolve_team_oid(team_id)
     except ValueError:
-        return None
-    if not access_control.can_manage_team(str(team_oid), team_access):
-        return None
+        raise ShareError("team_not_found", 404)
+    if not access_control.can_view_team(str(team_oid), team_access):
+        raise ShareError("not_team_member", 403)
 
     new_obj_id = await _clone_underlying_object(item, user.user_id, team_id=team_id)
     if not new_obj_id:
-        return None
+        raise ShareError("clone_failed", 500)
 
     team_lib = await get_or_create_team_library(user.user_id, team_id)
-    return await add_item(
+    result = await add_item(
         library_id=str(team_lib.id),
         user=user,
         item_id=str(new_obj_id),
         kind=item.kind.value,
-        note="Shared to team",
-        tags=list(item.tags),
     )
+    if not result:
+        raise ShareError("clone_failed", 500)
+
+    try:
+        from app.services.team_service import notify_team_share
+
+        team = await Team.get(team_oid)
+        if team:
+            await notify_team_share(
+                sharer=user,
+                team=team,
+                item_kind=result.get("kind") or item.kind.value,
+                item_name=result.get("name") or "Untitled",
+                item_id=result.get("id") or str(new_obj_id),
+                link="/library",
+                comment=comment,
+            )
+    except Exception:
+        # Notification failure should never break the share itself.
+        import logging
+        logging.getLogger(__name__).exception("Failed to notify team of library share")
+
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -448,7 +494,7 @@ async def create_folder(
             raise ValueError("team_id is required for team folders")
         team_oid = await _resolve_team_oid(team_id)
         team_access = await access_control.get_team_access_context(user)
-        if not access_control.can_manage_team(str(team_oid), team_access):
+        if not access_control.can_view_team(str(team_oid), team_access):
             raise ValueError("Team not accessible")
 
     if parent_id:
@@ -629,12 +675,18 @@ def _item_created_at(item: LibraryItem) -> str | None:
 
 
 async def _dereference_item(item: LibraryItem) -> dict | None:
-    """Load the actual Workflow or SearchSet and return combined dict."""
+    """Load the actual Workflow or SearchSet and return combined dict.
+
+    Sets ``creator_user_id`` for workflow items (falling back to the workflow
+    owner when the dedicated field is missing). Use :func:`_attach_authors` to
+    expand it into a full ``created_by`` AuthorRef for response payloads.
+    """
     name = ""
     description = None
 
     set_type = None
     item_uuid = None
+    creator_user_id: str | None = None
 
     if item.kind == LibraryItemKind.WORKFLOW:
         wf = await Workflow.get(item.item_id)
@@ -642,6 +694,7 @@ async def _dereference_item(item: LibraryItem) -> dict | None:
             return None
         name = wf.name
         description = wf.description
+        creator_user_id = wf.created_by_user_id or wf.user_id
     elif item.kind == LibraryItemKind.SEARCH_SET:
         ss = await SearchSet.get(item.item_id)
         if not ss:
@@ -668,7 +721,33 @@ async def _dereference_item(item: LibraryItem) -> dict | None:
         "added_by_user_id": item.added_by_user_id,
         "created_at": _item_created_at(item),
         "last_used_at": _iso_utc(item.last_used_at),
+        "creator_user_id": creator_user_id,
     }
+
+
+async def _attach_authors(items: list[dict]) -> list[dict]:
+    """Batch-resolve creator_user_id → created_by AuthorRef for a list of dereffed items.
+
+    Mutates each dict to add ``created_by`` and remove the transient
+    ``creator_user_id`` key. Safe on items without a creator.
+    """
+    from app.services.user_lookup import resolve_authors
+
+    creator_ids = [i.get("creator_user_id") for i in items if i.get("creator_user_id")]
+    author_map = await resolve_authors(creator_ids) if creator_ids else {}
+    for entry in items:
+        cid = entry.pop("creator_user_id", None)
+        ref = author_map.get(cid) if cid else None
+        entry["created_by"] = ref.model_dump() if ref else None
+    return items
+
+
+async def _attach_author(item: dict | None) -> dict | None:
+    """Single-item variant of :func:`_attach_authors`."""
+    if not item:
+        return item
+    await _attach_authors([item])
+    return item
 
 
 async def _clone_underlying_object(item: LibraryItem, user_id: str, *, team_id: str | None = None) -> PydanticObjectId | None:

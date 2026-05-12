@@ -54,3 +54,9 @@ class InviteResponse(BaseModel):
     role: str
     accepted: bool
     token: str
+
+
+class CreateJoinLinkRequest(BaseModel):
+    role: str = "member"
+    expires_in_hours: int = 48
+    max_uses: Optional[int] = None

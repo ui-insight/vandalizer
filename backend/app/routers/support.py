@@ -2,6 +2,7 @@
 
 import base64
 import logging
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import Response
@@ -107,6 +108,7 @@ async def create_ticket(
 async def list_tickets(
     status: str | None = None,
     tag: str | None = None,
+    category: str | None = None,
     limit: int = 50,
     offset: int = 0,
     scope: str | None = None,
@@ -120,16 +122,22 @@ async def list_tickets(
       tickets) so they see their personal queue, not the global one.
     - ``tag``: filter to tickets carrying this tag. Tags are support-internal,
       so this filter is ignored for non-support callers.
+    - ``category``: support-only filter. Used by the admin Demo tab to fetch
+      trial check-in tickets (``category=feedback_prompt``), which the global
+      Support Center listing excludes by default.
     """
     is_support = await _is_support_user(user)
     effective_tag = tag if is_support else None
+    effective_category = category if is_support else None
     if scope == "mine" or not is_support:
         tickets = await support_service.list_tickets(
-            user_id=user.user_id, status=status, tag=effective_tag, limit=limit, offset=offset
+            user_id=user.user_id, status=status, tag=effective_tag,
+            category=effective_category, limit=limit, offset=offset,
         )
     else:
         tickets = await support_service.list_all_tickets(
-            status=status, tag=effective_tag, limit=limit, offset=offset
+            status=status, tag=effective_tag, category=effective_category,
+            limit=limit, offset=offset,
         )
     if not is_support:
         tickets = [_strip_tags(t) for t in tickets]
@@ -249,10 +257,20 @@ async def download_attachment(
     inline_types = ("image/", "application/pdf")
     disposition = "inline" if any(content_type.startswith(t) for t in inline_types) else "attachment"
 
+    # Filenames may contain non-latin-1 characters (e.g.   narrow no-break
+    # space from copy-pasted Word titles). Encode per RFC 5987 with an ASCII
+    # fallback so the latin-1 header encoding doesn't blow up.
+    ascii_fallback = filename.encode("ascii", "replace").decode("ascii").replace('"', "")
+    encoded = quote(filename, safe="")
     return Response(
         content=file_bytes,
         media_type=content_type,
-        headers={"Content-Disposition": f'{disposition}; filename="{filename}"'},
+        headers={
+            "Content-Disposition": (
+                f'{disposition}; filename="{ascii_fallback}"; '
+                f"filename*=UTF-8''{encoded}"
+            ),
+        },
     )
 
 

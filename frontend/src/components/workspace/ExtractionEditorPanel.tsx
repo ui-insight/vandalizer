@@ -4,6 +4,7 @@ import { ExtractionTutorial } from './ExtractionTutorial'
 import { X, Pencil, Loader2, Copy, Trash2, GripVertical, Plus, ChevronDown, ChevronRight, Play, TrendingUp, Sparkles, FileText, AlertTriangle, Eye, Shield, ShieldCheck, Download, Check, PenTool, Wrench, ClipboardCheck, SlidersHorizontal, Clock } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
+import { useAuth } from '../../hooks/useAuth'
 import { useSearchSetItems } from '../../hooks/useExtractions'
 import {
   getSearchSet,
@@ -70,8 +71,9 @@ interface ExtractionConfig {
 
 export function ExtractionEditorPanel() {
   const queryClient = useQueryClient()
-  const { openExtractionId, openExtraction, closeExtraction, selectedDocUuids, setHighlightTerms, bumpActivitySignal, consumeExtractionResults } = useWorkspace()
+  const { openExtractionId, openExtraction, closeExtraction, selectedDocUuids, selectedDocNames, setHighlightTerms, bumpActivitySignal, consumeExtractionResults } = useWorkspace()
   const { toast } = useToast()
+  const { user } = useAuth()
   const [searchSet, setSearchSet] = useState<SearchSet | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('design')
@@ -80,6 +82,7 @@ export function ExtractionEditorPanel() {
   const [newTerm, setNewTerm] = useState('')
   const [running, setRunning] = useState(false)
   const [resultSets, setResultSets] = useState<Record<string, string>[]>([])
+  const [resultDocNames, setResultDocNames] = useState<string[]>([])
   const [activeResultIdx, setActiveResultIdx] = useState(0)
   const [combinedContext, setCombinedContext] = useState(false)
 
@@ -130,6 +133,7 @@ export function ExtractionEditorPanel() {
     setLoading(true)
     const pending = consumeExtractionResults()
     setResultSets(pending ? [pending] : [])
+    setResultDocNames([])
     setActiveResultIdx(0)
     setActiveTab('design')
     getSearchSet(openExtractionId)
@@ -147,8 +151,18 @@ export function ExtractionEditorPanel() {
     setNudgeDismissed(!!localStorage.getItem(key))
   }, [openExtractionId])
 
+  // Block edits on verified extractions for non-examiners. Returns true if blocked.
+  const blockedByVerified = (): boolean => {
+    if (searchSet?.verified && !user?.is_examiner) {
+      toast('This extraction is verified — make a copy to edit', 'error')
+      return true
+    }
+    return false
+  }
+
   // --- Title editing ---
   const startEditTitle = () => {
+    if (blockedByVerified()) return
     setTitleDraft(searchSet?.title ?? '')
     setEditingTitle(true)
   }
@@ -156,6 +170,7 @@ export function ExtractionEditorPanel() {
   const saveTitle = async () => {
     setEditingTitle(false)
     if (!openExtractionId || titleDraft === searchSet?.title) return
+    if (blockedByVerified()) return
     await updateSearchSet(openExtractionId, { title: titleDraft.trim() || searchSet?.title })
     refresh()
   }
@@ -164,6 +179,7 @@ export function ExtractionEditorPanel() {
   const handleAddItem = async () => {
     const phrase = newTerm.trim()
     if (!phrase) return
+    if (blockedByVerified()) return
     await add(phrase)
     setNewTerm('')
   }
@@ -195,7 +211,14 @@ export function ExtractionEditorPanel() {
           }
         }
       }
-      setResultSets(sets.length > 0 ? sets : [{}])
+      const finalSets = sets.length > 0 ? sets : [{}]
+      // Snapshot doc names at run time so exports stay correct if the user
+      // changes selection afterward.
+      const runDocNames: string[] = combinedContext && selectedDocUuids.length > 1
+        ? [`Combined (${selectedDocUuids.length} docs)`]
+        : selectedDocUuids.map(uuid => selectedDocNames[uuid] ?? uuid)
+      setResultSets(finalSets)
+      setResultDocNames(finalSets.map((_, i) => runDocNames[i] ?? `Result ${i + 1}`))
       setActiveResultIdx(0)
     } finally {
       setRunning(false)
@@ -204,14 +227,21 @@ export function ExtractionEditorPanel() {
   }
 
   // --- Export ---
+  const buildBatchPayload = () =>
+    resultSets.map((set, i) => ({
+      document: resultDocNames[i] ?? `Result ${i + 1}`,
+      values: set,
+    }))
+
   const handleExportCopy = () => {
-    navigator.clipboard.writeText(JSON.stringify(results, null, 2))
+    const payload = resultSets.length > 1 ? buildBatchPayload() : results
+    navigator.clipboard.writeText(JSON.stringify(payload, null, 2))
       .then(() => toast('Results copied to clipboard', 'success'))
       .catch(() => toast('Failed to copy to clipboard', 'error'))
   }
 
   const handleExportJSON = () => {
-    const exportData = resultSets.length > 1 ? resultSets : results
+    const exportData = resultSets.length > 1 ? buildBatchPayload() : results
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -225,15 +255,20 @@ export function ExtractionEditorPanel() {
   const handleExportCSV = () => {
     const escape = (v: string) => `"${v.replace(/"/g, '""')}"`
     const allSets = resultSets.length > 0 ? resultSets : [results]
-    const keys = Object.keys(allSets[0] ?? {})
-    // Transpose: fields as rows, documents/results as columns
-    const header = [
-      escape('Field'),
-      ...allSets.map((_, i) => escape(allSets.length === 1 ? 'Value' : `Result ${i + 1}`)),
-    ].join(',')
-    const rows = keys.map(k =>
-      [escape(k), ...allSets.map(set => escape(String(set[k] ?? '')))].join(','),
-    )
+    // Union of keys across all sets, preserving the first set's order.
+    const seen = new Set<string>()
+    const keys: string[] = []
+    for (const set of allSets) {
+      for (const k of Object.keys(set)) {
+        if (!seen.has(k)) { seen.add(k); keys.push(k) }
+      }
+    }
+    // One row per document, fields as columns, with a leading Document column.
+    const header = [escape('Document'), ...keys.map(escape)].join(',')
+    const rows = allSets.map((set, i) => {
+      const docName = resultDocNames[i] ?? (allSets.length === 1 ? '' : `Result ${i + 1}`)
+      return [escape(docName), ...keys.map(k => escape(String(set[k] ?? '')))].join(',')
+    })
     const csv = header + '\n' + rows.join('\n') + '\n'
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
@@ -246,14 +281,18 @@ export function ExtractionEditorPanel() {
   }
 
   // --- Tools ---
+  const [cloning, setCloning] = useState(false)
   const handleClone = async () => {
-    if (!openExtractionId) return
+    if (!openExtractionId || cloning) return
+    setCloning(true)
     try {
       const cloned = await cloneSearchSet(openExtractionId)
       openExtraction(cloned.uuid)
       toast('Extraction cloned', 'success')
     } catch {
       toast('Failed to clone extraction', 'error')
+    } finally {
+      setCloning(false)
     }
   }
 
@@ -453,6 +492,32 @@ export function ExtractionEditorPanel() {
         </button>
       </div>
 
+      {/* Verified extraction notice */}
+      {searchSet.verified && (
+        <div style={{
+          margin: '0 24px 8px', padding: '8px 12px', fontSize: 12, color: '#78350f',
+          backgroundColor: '#fef3c7', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 8,
+          border: '1px solid #fde68a',
+        }}>
+          <ShieldCheck style={{ width: 14, height: 14, flexShrink: 0, color: '#b45309' }} />
+          <span style={{ flex: 1 }}>
+            This is a verified extraction. Make a copy to edit it — your edits won't affect the verified version.
+          </span>
+          <button
+            onClick={handleClone}
+            disabled={cloning}
+            style={{
+              padding: '4px 10px', fontSize: 11, fontWeight: 700, fontFamily: 'inherit',
+              borderRadius: 4, border: '1px solid #b45309',
+              backgroundColor: '#fff7ed', color: '#78350f', cursor: 'pointer',
+              whiteSpace: 'nowrap', opacity: cloning ? 0.6 : 1,
+            }}
+          >
+            {cloning ? 'Copying...' : 'Make a copy to edit'}
+          </button>
+        </div>
+      )}
+
       {/* Tab bar */}
       <div
         ref={tabBarRef}
@@ -560,8 +625,9 @@ export function ExtractionEditorPanel() {
             } else {
               openExtraction(result.uuid)
             }
+            toast('Extraction imported successfully', 'success')
           } catch (err: unknown) {
-            alert(err instanceof Error ? err.message : 'Import failed')
+            toast(err instanceof Error ? err.message : 'Import failed', 'error')
           }
         }}
       />
@@ -702,11 +768,14 @@ export function ExtractionEditorPanel() {
             </button>
           </div>
           {selectedDocUuids.length > 1 && (
-            <label style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              fontSize: 12, color: '#374151', cursor: 'pointer', userSelect: 'none',
-              whiteSpace: 'nowrap', flexShrink: 0,
-            }}>
+            <label
+              title="Merge all selected documents into a single context and run one extraction over the combined text. Off: run a separate extraction on each document and show results as numbered tabs."
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                fontSize: 12, color: '#374151', cursor: 'pointer', userSelect: 'none',
+                whiteSpace: 'nowrap', flexShrink: 0,
+              }}
+            >
               <input
                 type="checkbox"
                 checked={combinedContext}
@@ -719,6 +788,15 @@ export function ExtractionEditorPanel() {
           <button
             onClick={handleRun}
             disabled={running || selectedDocUuids.length === 0}
+            title={
+              selectedDocUuids.length === 0
+                ? 'Select one or more documents to run an extraction'
+                : selectedDocUuids.length === 1
+                  ? 'Run this extraction on the selected document'
+                  : combinedContext
+                    ? `Merge all ${selectedDocUuids.length} selected documents into one context and run a single extraction over the combined text`
+                    : `Run this extraction once per document (${selectedDocUuids.length} separate runs). Results appear as numbered tabs.`
+            }
             className="bg-highlight text-highlight-text font-bold hover:brightness-90 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               display: 'inline-flex',

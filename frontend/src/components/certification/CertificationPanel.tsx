@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import {
+  AppWindow,
   Award,
   ChevronLeft,
   Cog,
@@ -26,6 +27,7 @@ import { CertifiedBanner } from './CertifiedBanner'
 import { CelebrationOverlay } from './CelebrationOverlay'
 import { ModuleDetail } from './ModuleDetail'
 import { JourneyMap } from './JourneyMap'
+import { useModuleLock } from './useModuleLock'
 
 // ---------------------------------------------------------------------------
 // MODULES — inline here since they live in the page file, not in constants
@@ -136,7 +138,8 @@ function ValidationResults({ result, onDismiss }: { result: ValidationResult; on
 // ---------------------------------------------------------------------------
 
 const MODE_ICONS: { mode: PanelMode; icon: typeof Maximize2; label: string }[] = [
-  { mode: 'floating', icon: Maximize2, label: 'Float' },
+  { mode: 'floating', icon: AppWindow, label: 'Float' },
+  { mode: 'fullscreen', icon: Maximize2, label: 'Full screen' },
   { mode: 'docked-left', icon: PanelLeft, label: 'Dock left' },
   { mode: 'docked-right', icon: PanelRight, label: 'Dock right' },
   { mode: 'docked-bottom', icon: PanelBottom, label: 'Dock bottom' },
@@ -208,14 +211,7 @@ export function CertificationPanel() {
   const prevLevel = LEVEL_THRESHOLDS[currentLevelIdx] || LEVEL_THRESHOLDS[0]
   const overallPct = (totalXp / TOTAL_XP) * 100
 
-  const isModuleLocked = useCallback((moduleId: string): boolean => {
-    const module = MODULES.find(m => m.id === moduleId)
-    if (!module) return true
-    if (module.number === 0) return false
-    const prevModule = MODULES.find(m => m.number === module.number - 1)
-    if (!prevModule) return false
-    return !progress?.modules[prevModule.id]?.completed
-  }, [progress])
+  const isModuleLocked = useModuleLock(progress)
 
   // Load exercise when active module changes
   useEffect(() => {
@@ -317,6 +313,7 @@ export function CertificationPanel() {
   const containerClass = cn(
     'fixed z-[9000] bg-white flex flex-col',
     mode === 'floating' && 'shadow-2xl border border-gray-200 cert-panel-enter',
+    mode === 'fullscreen' && 'inset-0 cert-panel-enter',
     mode === 'docked-left' && 'top-[69px] left-0 bottom-0 border-r border-gray-200 cert-panel-dock-left',
     mode === 'docked-right' && 'top-[69px] right-0 bottom-0 border-l border-gray-200 cert-panel-dock-right',
     mode === 'docked-bottom' && 'left-0 right-0 bottom-0 border-t border-gray-200 cert-panel-dock-bottom',

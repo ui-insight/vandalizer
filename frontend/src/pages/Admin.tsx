@@ -2,11 +2,11 @@ import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import {
   Shield, ShieldCheck, BarChart3, Users, Building2, Workflow, Settings,
   Palette, Cpu, Lock, Globe, Plus, Trash2, Pencil, ChevronLeft,
-  ChevronRight, RefreshCw, MessageSquare, Search, Zap, Bug,
+  ChevronRight, RefreshCw, MessageSquare, Search, Zap,
   CheckCircle2, XCircle, Clock, Download, TrendingUp, TrendingDown,
   ChevronDown, ChevronUp, ArrowUpDown, Play, Minus, AlertCircle,
-  ArrowLeft, FileText, FolderTree, X, Eye, Check, CheckCircle,
-  Mail, Send, Link, UserPlus, Star, Award, Unlock,
+  ArrowLeft, FileText, FolderTree, X, Check,
+  Mail, Send, Link, UserPlus, Star, Award, Unlock, KeyRound,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -40,6 +40,8 @@ import {
   adminAddDemoUser,
 } from '../api/demo'
 import { getAdminPromptOverview, adminUpdatePrompt, type PromptOverview } from '../api/feedbackPrompt'
+import * as supportApi from '../api/support'
+import type { SupportTicket, SupportTicketSummary } from '../types/support'
 import type { DemoAdminStats, DemoApplication as DemoApp, PostExperienceResponseAdmin } from '../types/demo'
 import { POST_SURVEY_FIELDS } from '../components/survey/postSurveyFields'
 import { PRE_SURVEY_FIELDS } from './Demo'
@@ -57,12 +59,11 @@ import type {
 import { relativeTime } from '../utils/time'
 import { ModelCharacterBars } from '../components/ModelEffortPicker'
 import type { ModelInfo } from '../types/workflow'
-import * as approvalsApi from '../api/approvals'
-import type { ApprovalRequest } from '../api/approvals'
 import * as auditApi from '../api/audit'
 import type { AuditLogEntry } from '../api/audit'
 import { getAuthConfig } from '../api/auth'
 import { UpdateBanner } from '../components/admin/UpdateBanner'
+import { ApiKeysTab } from '../components/admin/ApiKeysTab'
 
 function applyThemeToDOM(theme: ThemeConfig) {
   const root = document.documentElement
@@ -70,7 +71,7 @@ function applyThemeToDOM(theme: ThemeConfig) {
   root.style.setProperty('--ui-radius', theme.ui_radius)
 }
 
-type Tab = 'usage' | 'users' | 'teams' | 'organizations' | 'workflows' | 'quality' | 'approvals' | 'audit' | 'demo' | 'email' | 'certifications' | 'debugging' | 'config'
+type Tab = 'usage' | 'users' | 'teams' | 'organizations' | 'workflows' | 'quality' | 'audit' | 'demo' | 'email' | 'certifications' | 'apikeys' | 'config'
 
 const TABS: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'usage', label: 'Usage', icon: BarChart3 },
@@ -79,12 +80,11 @@ const TABS: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'organizations', label: 'Organizations', icon: FolderTree },
   { key: 'workflows', label: 'Workflows', icon: Workflow },
   { key: 'quality', label: 'Quality', icon: ShieldCheck },
-  { key: 'approvals', label: 'Approvals', icon: CheckCircle2 },
   { key: 'audit', label: 'Audit Log', icon: FileText },
   { key: 'demo', label: 'Demo', icon: Zap },
   { key: 'email', label: 'Email', icon: Mail },
   { key: 'certifications', label: 'Certifications', icon: Award },
-  { key: 'debugging', label: 'Debugging', icon: Bug },
+  { key: 'apikeys', label: 'API Keys', icon: KeyRound },
   { key: 'config', label: 'Config', icon: Settings },
 ]
 
@@ -284,6 +284,55 @@ function ExportButton({ onClick }: { onClick: () => void }) {
   )
 }
 
+// Default day options used by every analytics tab. Backend caps at 730d
+// (MAX_ANALYTICS_DAYS) so the longest preset stays comfortably below that.
+const DAY_OPTIONS = [7, 14, 30, 90, 180, 365] as const
+type DayOption = number | 'all'
+
+function TimeRangeSelector({
+  value,
+  onChange,
+  options = DAY_OPTIONS as readonly number[],
+  includeAll = false,
+  onRefresh,
+}: {
+  value: DayOption
+  onChange: (v: DayOption) => void
+  options?: readonly number[]
+  includeAll?: boolean
+  onRefresh?: () => void
+}) {
+  const opts: DayOption[] = includeAll ? [...options, 'all'] : [...options]
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+      <span style={{ fontSize: 13, color: '#6b7280', fontWeight: 500 }}>Time Range:</span>
+      {opts.map(d => {
+        const active = value === d
+        const label = d === 'all' ? 'All time' : d >= 365 ? `${Math.round(d / 365)}y` : `${d}d`
+        return (
+          <button
+            key={String(d)}
+            onClick={() => onChange(d)}
+            style={{
+              padding: '5px 14px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #e5e7eb',
+              fontSize: 13, fontWeight: 500, cursor: 'pointer',
+              backgroundColor: active ? 'var(--highlight-color, #eab308)' : '#fff',
+              color: active ? 'var(--highlight-text-color, #000)' : '#374151',
+            }}
+          >
+            {label}
+          </button>
+        )
+      })}
+      {onRefresh && (
+        <button onClick={onRefresh} style={{ marginLeft: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4 }}>
+          <RefreshCw size={16} />
+        </button>
+      )}
+    </div>
+  )
+}
+
 // ──────────────────────────────────────────
 // Usage Tab
 // ──────────────────────────────────────────
@@ -318,30 +367,43 @@ function UsageTab() {
     { name: 'Other', value: Math.max(0, stats.workflows_started - stats.workflows_completed - stats.workflows_failed) },
   ].filter(d => d.value > 0) : []
 
+  const handleExport = () => {
+    if (!stats) return
+    const dayRows = (timeseries?.days ?? []).map(d => [
+      d.date, d.conversations, d.search_runs, d.workflows_started,
+      d.workflows_completed, d.workflows_failed, d.tokens_in, d.tokens_out, d.active_users,
+    ])
+    const summaryRows: (string | number | null)[][] = [
+      ['SUMMARY', '', '', '', '', '', '', '', ''],
+      ['Window (days)', days, '', '', '', '', '', '', ''],
+      ['Conversations', stats.conversations, '', '', '', '', '', '', ''],
+      ['Search runs', stats.search_runs, '', '', '', '', '', '', ''],
+      ['Workflows started', stats.workflows_started, '', '', '', '', '', '', ''],
+      ['Workflows completed', stats.workflows_completed, '', '', '', '', '', '', ''],
+      ['Workflows failed', stats.workflows_failed, '', '', '', '', '', '', ''],
+      ['Tokens in', stats.tokens_in, '', '', '', '', '', '', ''],
+      ['Tokens out', stats.tokens_out, '', '', '', '', '', '', ''],
+      ['Active users', stats.active_users, '', '', '', '', '', '', ''],
+      ['Active teams', stats.active_teams, '', '', '', '', '', '', ''],
+      ['', '', '', '', '', '', '', '', ''],
+      ['DAILY', '', '', '', '', '', '', '', ''],
+    ]
+    downloadCSV(
+      `usage-${days}d.csv`,
+      ['Date', 'Conversations', 'Searches', 'Workflows Started', 'Workflows Completed', 'Workflows Failed', 'Tokens In', 'Tokens Out', 'Active Users'],
+      [...summaryRows, ...dayRows],
+    )
+  }
+
   if (loading && !stats) return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading usage data...</div>
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
       {/* Time range selector */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 13, color: '#6b7280', fontWeight: 500 }}>Time Range:</span>
-        {[7, 14, 30, 90].map(d => (
-          <button
-            key={d}
-            onClick={() => setDays(d)}
-            style={{
-              padding: '5px 14px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #e5e7eb',
-              fontSize: 13, fontWeight: 500, cursor: 'pointer',
-              backgroundColor: days === d ? 'var(--highlight-color, #eab308)' : '#fff',
-              color: days === d ? 'var(--highlight-text-color, #000)' : '#374151',
-            }}
-          >
-            {d}d
-          </button>
-        ))}
-        <button onClick={load} style={{ marginLeft: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4 }}>
-          <RefreshCw size={16} />
-        </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <TimeRangeSelector value={days} onChange={v => setDays(typeof v === 'number' ? v : 30)} onRefresh={load} />
+        <div style={{ flex: 1 }} />
+        <ExportButton onClick={handleExport} />
       </div>
 
       {stats && (
@@ -559,19 +621,39 @@ function UserDrillDown({ userId, onBack }: { userId: string; onBack: () => void 
       )}
 
       {/* Time range */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 13, color: '#6b7280', fontWeight: 500 }}>Time Range:</span>
-        {[7, 14, 30, 90].map(d => (
-          <button key={d} onClick={() => setDays(d)} style={{
-            padding: '5px 14px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #e5e7eb',
-            fontSize: 13, fontWeight: 500, cursor: 'pointer',
-            backgroundColor: days === d ? 'var(--highlight-color, #eab308)' : '#fff',
-            color: days === d ? 'var(--highlight-text-color, #000)' : '#374151',
-          }}>{d}d</button>
-        ))}
-        <button onClick={load} style={{ marginLeft: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4 }}>
-          <RefreshCw size={16} />
-        </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <TimeRangeSelector value={days} onChange={v => setDays(typeof v === 'number' ? v : 30)} onRefresh={load} />
+        <div style={{ flex: 1 }} />
+        <ExportButton onClick={() => {
+          const dayRows = data.timeseries.map(d => [
+            d.date, d.conversations, d.search_runs, d.workflows_started,
+            d.workflows_completed, d.workflows_failed, d.tokens_in, d.tokens_out,
+          ])
+          const wfRows = data.recent_workflows.map(ev => [
+            ev.started_at, ev.status, ev.title, formatDuration(ev.duration_ms),
+            ev.tokens_in + ev.tokens_out,
+          ])
+          downloadCSV(
+            `user-${data.email || data.user_id}-${days}d.csv`,
+            ['Section', 'A', 'B', 'C', 'D', 'E', 'F', 'G'],
+            [
+              ['SUMMARY', '', '', '', '', '', '', ''],
+              ['Conversations', data.conversations, '', '', '', '', '', ''],
+              ['Workflows Started', data.workflows_started, '', '', '', '', '', ''],
+              ['Workflows Completed', data.workflows_completed, '', '', '', '', '', ''],
+              ['Workflows Failed', data.workflows_failed, '', '', '', '', '', ''],
+              ['Tokens In', data.tokens_in, '', '', '', '', '', ''],
+              ['Tokens Out', data.tokens_out, '', '', '', '', '', ''],
+              ['Documents', data.document_count, '', '', '', '', '', ''],
+              ['', '', '', '', '', '', '', ''],
+              ['DAILY', 'Date', 'Conversations', 'Searches', 'WF Started', 'WF Completed', 'WF Failed', 'Tokens In/Out'],
+              ...dayRows.map(r => ['', ...r]),
+              ['', '', '', '', '', '', '', ''],
+              ['RECENT WORKFLOWS', 'Started', 'Status', 'Title', 'Duration', 'Tokens', '', ''],
+              ...wfRows.map(r => ['', ...r]),
+            ],
+          )
+        }} />
       </div>
 
       {/* KPI Grid */}
@@ -642,10 +724,15 @@ function UsersTab() {
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<{ key: UserSortKey; dir: 'asc' | 'desc' }>({ key: 'tokens_total', dir: 'desc' })
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
+  const [days, setDays] = useState<DayOption>('all')
 
-  useEffect(() => {
-    getUserLeaderboard().then(setUsers).finally(() => setLoading(false))
-  }, [])
+  const load = useCallback(() => {
+    setLoading(true)
+    const arg = typeof days === 'number' ? days : undefined
+    getUserLeaderboard(arg).then(setUsers).finally(() => setLoading(false))
+  }, [days])
+
+  useEffect(() => { load() }, [load])
 
   const handleSort = (key: string) => {
     setSort(prev => ({
@@ -697,6 +784,9 @@ function UsersTab() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <TimeRangeSelector value={days} onChange={setDays} includeAll onRefresh={load} />
+      </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <SearchInput value={search} onChange={setSearch} placeholder="Search users..." />
         <div style={{ flex: 1 }} />
@@ -705,7 +795,7 @@ function UsersTab() {
 
       <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', fontSize: 15, fontWeight: 600 }}>
-          User Leaderboard ({filtered.length})
+          User Leaderboard ({filtered.length}) {days !== 'all' && <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 400 }}>· last {days} days</span>}
         </div>
         {filtered.length === 0 ? (
           <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>No users found.</div>
@@ -815,19 +905,40 @@ function TeamDrillDown({ teamId, onBack }: { teamId: string; onBack: () => void 
       </div>
 
       {/* Time range */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 13, color: '#6b7280', fontWeight: 500 }}>Time Range:</span>
-        {[7, 14, 30, 90].map(d => (
-          <button key={d} onClick={() => setDays(d)} style={{
-            padding: '5px 14px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #e5e7eb',
-            fontSize: 13, fontWeight: 500, cursor: 'pointer',
-            backgroundColor: days === d ? 'var(--highlight-color, #eab308)' : '#fff',
-            color: days === d ? 'var(--highlight-text-color, #000)' : '#374151',
-          }}>{d}d</button>
-        ))}
-        <button onClick={load} style={{ marginLeft: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4 }}>
-          <RefreshCw size={16} />
-        </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <TimeRangeSelector value={days} onChange={v => setDays(typeof v === 'number' ? v : 30)} onRefresh={load} />
+        <div style={{ flex: 1 }} />
+        <ExportButton onClick={() => {
+          const dayRows = data.timeseries.map(d => [
+            d.date, d.conversations, d.search_runs, d.workflows_started,
+            d.workflows_completed, d.workflows_failed, d.tokens_in, d.tokens_out, d.active_users,
+          ])
+          const memberRows = data.members.map(m => [
+            m.name || m.user_id, m.email || '', m.role,
+            m.tokens_total, m.workflows_run, m.conversations, m.last_active,
+          ])
+          downloadCSV(
+            `team-${data.name}-${days}d.csv`,
+            ['Section', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'],
+            [
+              ['SUMMARY', '', '', '', '', '', '', '', ''],
+              ['Conversations', data.conversations, '', '', '', '', '', '', ''],
+              ['Workflows Started', data.workflows_started, '', '', '', '', '', '', ''],
+              ['Workflows Completed', data.workflows_completed, '', '', '', '', '', '', ''],
+              ['Workflows Failed', data.workflows_failed, '', '', '', '', '', '', ''],
+              ['Tokens In', data.tokens_in, '', '', '', '', '', '', ''],
+              ['Tokens Out', data.tokens_out, '', '', '', '', '', '', ''],
+              ['Active Users', data.active_users, '', '', '', '', '', '', ''],
+              ['Documents', data.document_count, '', '', '', '', '', '', ''],
+              ['', '', '', '', '', '', '', '', ''],
+              ['DAILY', 'Date', 'Conversations', 'Searches', 'WF Started', 'WF Completed', 'WF Failed', 'Tokens In', 'Tokens Out'],
+              ...dayRows.map(r => ['', ...r]),
+              ['', '', '', '', '', '', '', '', ''],
+              ['MEMBERS', 'Name', 'Email', 'Role', 'Tokens', 'Workflows', 'Conversations', 'Last Active', ''],
+              ...memberRows.map(r => ['', ...r, '']),
+            ],
+          )
+        }} />
       </div>
 
       {/* KPI Grid */}
@@ -965,6 +1076,7 @@ function TeamsTab() {
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState<{ key: TeamSortKey; dir: 'asc' | 'desc' }>({ key: 'tokens_total', dir: 'desc' })
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null)
+  const [statsDays, setStatsDays] = useState<DayOption>('all')
 
   // ── Isolated sub-tab state ───────────────────────────────────────────────
   const [isolated, setIsolated] = useState<IsolatedUserItem[]>([])
@@ -1001,12 +1113,17 @@ function TeamsTab() {
     }).catch(() => {})
   }, [refreshAllTeams, refreshIsolated])
 
+  const refreshStats = useCallback(() => {
+    setLoadingStats(true)
+    const arg = typeof statsDays === 'number' ? statsDays : undefined
+    getTeamLeaderboard(arg).then(setStatsTeams).finally(() => setLoadingStats(false))
+  }, [statsDays])
+
   useEffect(() => {
-    if (subTab === 'stats' && statsTeams.length === 0) {
-      setLoadingStats(true)
-      getTeamLeaderboard().then(setStatsTeams).finally(() => setLoadingStats(false))
+    if (subTab === 'stats') {
+      refreshStats()
     }
-  }, [subTab, statsTeams.length])
+  }, [subTab, refreshStats])
 
   const handleCreateTeam = async () => {
     if (!newTeamName.trim()) return
@@ -1298,17 +1415,21 @@ function TeamsTab() {
       {/* ── Usage Stats ──────────────────────────────────────────── */}
       {subTab === 'stats' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <TimeRangeSelector value={statsDays} onChange={setStatsDays} includeAll onRefresh={refreshStats} />
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <SearchInput value={search} onChange={setSearch} placeholder="Search teams..." />
             <div style={{ flex: 1 }} />
-            <ExportButton onClick={() => downloadCSV('teams.csv',
+            <ExportButton onClick={() => downloadCSV(
+              `teams-${statsDays === 'all' ? 'all' : statsDays + 'd'}.csv`,
               ['Team', 'Tokens', 'Workflows', 'Active Users', 'Members', 'Avg Latency (ms)'],
               filteredStats.map(t => [t.name, t.tokens_total, t.workflows_completed, t.active_users, t.member_count, t.avg_latency_ms])
             )} />
           </div>
           <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
             <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', fontSize: 15, fontWeight: 600 }}>
-              Team Leaderboard ({filteredStats.length})
+              Team Leaderboard ({filteredStats.length}) {statsDays !== 'all' && <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 400 }}>· last {statsDays} days</span>}
             </div>
             {loadingStats ? (
               <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading...</div>
@@ -1808,18 +1929,27 @@ function QualityTab() {
 
       {/* Quality Timeline Chart */}
       <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', padding: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
           <h3 style={{ fontSize: 15, fontWeight: 600, margin: 0 }}>Quality Timeline</h3>
-          <select
-            value={days}
-            onChange={e => setDays(Number(e.target.value))}
-            style={{ padding: '4px 8px', fontSize: 12, borderRadius: 6, border: '1px solid #e5e7eb' }}
-          >
-            <option value={30}>30 days</option>
-            <option value={60}>60 days</option>
-            <option value={90}>90 days</option>
-            <option value={180}>180 days</option>
-          </select>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <select
+              value={days}
+              onChange={e => setDays(Number(e.target.value))}
+              style={{ padding: '4px 8px', fontSize: 12, borderRadius: 6, border: '1px solid #e5e7eb' }}
+            >
+              <option value={30}>30 days</option>
+              <option value={60}>60 days</option>
+              <option value={90}>90 days</option>
+              <option value={180}>180 days</option>
+              <option value={365}>1 year</option>
+              <option value={730}>2 years</option>
+            </select>
+            <ExportButton onClick={() => downloadCSV(
+              `quality-timeline-${days}d.csv`,
+              ['Date', 'Avg Score', 'Run Count', 'Items Validated'],
+              timeline.map(p => [p.date, p.avg_score, p.run_count, p.items_validated]),
+            )} />
+          </div>
         </div>
         {timeline.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '40px 0', color: '#9ca3af', fontSize: 13 }}>
@@ -3561,6 +3691,7 @@ function DemoResponseDetail({ responses }: { responses: Record<string, unknown> 
 }
 
 function DemoTab() {
+  const [subTab, setSubTab] = useState<'applications' | 'surveys'>('applications')
   const [stats, setStats] = useState<DemoAdminStats | null>(null)
   const [apps, setApps] = useState<DemoApp[]>([])
   const [statusFilter, setStatusFilter] = useState<string>('')
@@ -3626,7 +3757,8 @@ function DemoTab() {
 
       const headers = [
         'Name', 'Title', 'Email', 'Organization', 'Status',
-        'Applied', 'Activated', 'Expires', 'Post-Survey Completed',
+        'Applied', 'Activated', 'Credentials Sent', 'First Login',
+        'Expires', 'Post-Survey Completed',
         ...preCols.map(c => c.label),
         ...postCols.map(c => c.label),
       ]
@@ -3646,6 +3778,8 @@ function DemoTab() {
           app.status,
           app.created_at ? formatDate(app.created_at) : null,
           app.activated_at ? formatDate(app.activated_at) : null,
+          app.credentials_sent_at ? formatDate(app.credentials_sent_at) : null,
+          app.last_login_at ? formatDate(app.last_login_at) : 'Never',
           app.expires_at ? formatDate(app.expires_at) : null,
           app.post_questionnaire_completed ? 'Yes' : 'No',
           ...preCols.map(c => fmt(pre[c.key])),
@@ -3753,45 +3887,81 @@ function DemoTab() {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>Demo Program</h2>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            onClick={() => setShowAddUser(!showAddUser)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '8px 16px', border: '1px solid #16a34a', borderRadius: 8,
-              background: showAddUser ? '#f0fdf4' : '#fff', color: '#16a34a',
-              cursor: 'pointer', fontSize: 13, fontFamily: 'inherit', fontWeight: 600,
-            }}
-          >
-            <UserPlus size={14} /> Add User
-          </button>
-          <button
-            onClick={handleExport}
-            disabled={actionLoading === 'export'}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '8px 16px', border: '1px solid #e5e7eb', borderRadius: 8,
-              background: '#fff', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
-              opacity: actionLoading === 'export' ? 0.5 : 1,
-            }}
-          >
-            <Download size={14} /> {actionLoading === 'export' ? 'Exporting...' : 'Export CSV'}
-          </button>
-          <button
-            onClick={loadData}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '8px 16px', border: '1px solid #e5e7eb', borderRadius: 8,
-              background: '#fff', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
-            }}
-          >
-            <RefreshCw size={14} /> Refresh
-          </button>
-        </div>
+        {subTab === 'applications' && (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => setShowAddUser(!showAddUser)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '8px 16px', border: '1px solid #16a34a', borderRadius: 8,
+                background: showAddUser ? '#f0fdf4' : '#fff', color: '#16a34a',
+                cursor: 'pointer', fontSize: 13, fontFamily: 'inherit', fontWeight: 600,
+              }}
+            >
+              <UserPlus size={14} /> Add User
+            </button>
+            <button
+              onClick={handleExport}
+              disabled={actionLoading === 'export'}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '8px 16px', border: '1px solid #e5e7eb', borderRadius: 8,
+                background: '#fff', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
+                opacity: actionLoading === 'export' ? 0.5 : 1,
+              }}
+            >
+              <Download size={14} /> {actionLoading === 'export' ? 'Exporting...' : 'Export CSV'}
+            </button>
+            <button
+              onClick={loadData}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '8px 16px', border: '1px solid #e5e7eb', borderRadius: 8,
+                background: '#fff', cursor: 'pointer', fontSize: 13, fontFamily: 'inherit',
+              }}
+            >
+              <RefreshCw size={14} /> Refresh
+            </button>
+          </div>
+        )}
       </div>
 
+      {/* Sub-tab bar */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 4,
+        background: '#f9fafb', borderRadius: 10, padding: 4,
+        width: 'fit-content', marginBottom: 20,
+      }}>
+        <button
+          onClick={() => setSubTab('applications')}
+          style={{
+            padding: '6px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+            cursor: 'pointer', border: 'none', fontFamily: 'inherit',
+            background: subTab === 'applications' ? 'var(--highlight-color, #eab308)' : 'transparent',
+            color: subTab === 'applications' ? '#000' : '#6b7280',
+          }}
+        >
+          Applications
+        </button>
+        <button
+          onClick={() => setSubTab('surveys')}
+          style={{
+            padding: '6px 14px', borderRadius: 8, fontSize: 13, fontWeight: 500,
+            cursor: 'pointer', border: 'none', fontFamily: 'inherit',
+            background: subTab === 'surveys' ? 'var(--highlight-color, #eab308)' : 'transparent',
+            color: subTab === 'surveys' ? '#000' : '#6b7280',
+          }}
+        >
+          Survey Responses
+        </button>
+      </div>
+
+      {subTab === 'surveys' && <SurveyResponsesSection />}
+
+      {subTab === 'applications' && (
+      <>
       {/* Add user form */}
       {showAddUser && (
         <form onSubmit={handleAddUser} style={{
@@ -3924,6 +4094,8 @@ function DemoTab() {
                 <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Organization</th>
                 <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Status</th>
                 <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Applied</th>
+                <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Credentials Sent</th>
+                <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>First Login</th>
                 <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Expires</th>
                 <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600, borderBottom: '1px solid #e5e7eb' }}>Actions</th>
               </tr>
@@ -3955,6 +4127,16 @@ function DemoTab() {
                       </td>
                       <td style={{ padding: '12px 16px', color: '#6b7280', fontSize: 13 }}>
                         {formatDate(app.created_at)}
+                      </td>
+                      <td style={{ padding: '12px 16px', color: '#6b7280', fontSize: 13 }}>
+                        {app.credentials_sent_at ? formatDate(app.credentials_sent_at) : '-'}
+                      </td>
+                      <td style={{ padding: '12px 16px', fontSize: 13 }}>
+                        {app.last_login_at ? (
+                          <span style={{ color: '#6b7280' }}>{formatDate(app.last_login_at)}</span>
+                        ) : (
+                          <span style={{ color: '#9ca3af', fontStyle: 'italic' }}>Never</span>
+                        )}
                       </td>
                       <td style={{ padding: '12px 16px', color: '#6b7280', fontSize: 13 }}>
                         {app.expires_at ? formatDate(app.expires_at) : '-'}
@@ -4057,7 +4239,7 @@ function DemoTab() {
                     </tr>
                     {isExpanded && (
                       <tr style={{ borderBottom: '1px solid #f3f4f6' }}>
-                        <td colSpan={7} style={{ padding: '0 16px 20px', background: '#fafafa' }}>
+                        <td colSpan={9} style={{ padding: '0 16px 20px', background: '#fafafa' }}>
                           <DemoResponseDetail responses={app.questionnaire_responses} />
                         </td>
                       </tr>
@@ -4067,7 +4249,7 @@ function DemoTab() {
               })}
               {apps.length === 0 && (
                 <tr>
-                  <td colSpan={6} style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>
+                  <td colSpan={9} style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>
                     No applications found
                   </td>
                 </tr>
@@ -4078,7 +4260,298 @@ function DemoTab() {
       )}
 
       {/* Trial Check-ins */}
+      <CheckInConversationsSection />
       <TrialCheckinsSection />
+      </>
+      )}
+    </div>
+  )
+}
+
+function CheckInConversationsSection() {
+  const [tickets, setTickets] = useState<SupportTicketSummary[]>([])
+  const [loading, setLoading] = useState(true)
+  const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'in_progress' | 'closed'>('all')
+  const [activeUuid, setActiveUuid] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const status = statusFilter === 'all' ? undefined : statusFilter
+      const res = await supportApi.listTickets(status, 200, 0, undefined, undefined, 'feedback_prompt')
+      setTickets(res.tickets)
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false)
+    }
+  }, [statusFilter])
+
+  useEffect(() => { load() }, [load])
+
+  const statusColors: Record<string, string> = {
+    open: '#f59e0b',
+    in_progress: '#3b82f6',
+    closed: '#9ca3af',
+  }
+
+  const fmtTime = (iso: string | null) => {
+    if (!iso) return ''
+    const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
+    if (diff < 60) return 'just now'
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
+    return `${Math.floor(diff / 86400)}d ago`
+  }
+
+  return (
+    <div style={{ marginTop: 32 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <h3 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>Check-ins</h3>
+          <p style={{ fontSize: 13, color: '#6b7280', margin: '4px 0 0' }}>
+            Conversations from trial check-in prompts. These do not appear in the Support Center.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {(['all', 'open', 'in_progress', 'closed'] as const).map(s => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              style={{
+                padding: '4px 12px', fontSize: 12, fontWeight: statusFilter === s ? 600 : 400,
+                borderRadius: 9999, border: '1px solid #e5e7eb', cursor: 'pointer',
+                background: statusFilter === s ? '#111827' : '#fff',
+                color: statusFilter === s ? '#fff' : '#6b7280',
+                fontFamily: 'inherit',
+              }}
+            >
+              {s === 'in_progress' ? 'In Progress' : s.charAt(0).toUpperCase() + s.slice(1)}
+            </button>
+          ))}
+          <button
+            onClick={load}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '6px 12px', border: '1px solid #e5e7eb', borderRadius: 8,
+              background: '#fff', cursor: 'pointer', fontSize: 12, fontFamily: 'inherit',
+            }}
+          >
+            <RefreshCw size={12} /> Refresh
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div style={{ padding: 24, textAlign: 'center', color: '#9ca3af' }}>Loading...</div>
+      ) : tickets.length === 0 ? (
+        <div style={{ padding: 24, textAlign: 'center', color: '#9ca3af', border: '1px solid #e5e7eb', borderRadius: 12 }}>
+          No check-in conversations yet.
+        </div>
+      ) : (
+        <div style={{ overflowX: 'auto', borderRadius: 12, border: '1px solid #e5e7eb' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 600 }}>Subject</th>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 600 }}>User</th>
+                <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600 }}>Status</th>
+                <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 600 }}>Messages</th>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontWeight: 600 }}>Last activity</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tickets.map((t) => {
+                const isExpanded = activeUuid === t.uuid
+                const subject = t.subject.replace(/^\[Check-in\]\s*/, '')
+                return (
+                  <React.Fragment key={t.uuid}>
+                    <tr
+                      onClick={() => setActiveUuid(isExpanded ? null : t.uuid)}
+                      style={{ borderBottom: isExpanded ? 'none' : '1px solid #f3f4f6', cursor: 'pointer' }}
+                    >
+                      <td style={{ padding: '10px 16px', fontWeight: 500 }}>
+                        <span style={{ marginRight: 6, color: '#9ca3af', fontSize: 11 }}>{isExpanded ? '▼' : '▶'}</span>
+                        {subject}
+                      </td>
+                      <td style={{ padding: '10px 16px', color: '#6b7280' }}>{t.user_name || t.user_id}</td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                        <span style={{
+                          fontSize: 11, padding: '2px 8px', borderRadius: 9999,
+                          background: `${statusColors[t.status]}20`, color: statusColors[t.status], fontWeight: 600,
+                        }}>
+                          {t.status.replace('_', ' ')}
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', color: '#6b7280' }}>{t.message_count}</td>
+                      <td style={{ padding: '10px 16px', color: '#6b7280' }}>
+                        {fmtTime(t.last_message_at || t.updated_at)}
+                      </td>
+                    </tr>
+                    {isExpanded && (
+                      <tr style={{ borderBottom: '1px solid #f3f4f6' }}>
+                        <td colSpan={5} style={{ padding: '0 16px 20px', background: '#fafafa' }}>
+                          <CheckInConversation
+                            ticketUuid={t.uuid}
+                            onUpdate={load}
+                          />
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CheckInConversation({ ticketUuid, onUpdate }: { ticketUuid: string; onUpdate: () => void }) {
+  const [ticket, setTicket] = useState<SupportTicket | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [reply, setReply] = useState('')
+  const [sending, setSending] = useState(false)
+
+  const loadTicket = useCallback(async () => {
+    try {
+      const data = await supportApi.getTicket(ticketUuid)
+      setTicket(data)
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false)
+    }
+  }, [ticketUuid])
+
+  useEffect(() => {
+    loadTicket()
+    supportApi.markTicketRead(ticketUuid).catch(() => {})
+  }, [loadTicket, ticketUuid])
+
+  const handleSend = async () => {
+    if (!reply.trim() || sending) return
+    setSending(true)
+    try {
+      const updated = await supportApi.addMessage(ticketUuid, reply.trim())
+      setTicket(updated)
+      setReply('')
+      onUpdate()
+    } catch {
+      // ignore
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const handleStatusChange = async (next: string) => {
+    try {
+      const updated = await supportApi.updateTicket(ticketUuid, { status: next })
+      setTicket(updated)
+      onUpdate()
+    } catch {
+      // ignore
+    }
+  }
+
+  if (loading) {
+    return <div style={{ padding: 16, color: '#9ca3af', fontSize: 13 }}>Loading conversation...</div>
+  }
+
+  if (!ticket) {
+    return <div style={{ padding: 16, color: '#9ca3af', fontSize: 13 }}>Failed to load ticket.</div>
+  }
+
+  return (
+    <div style={{ paddingTop: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <div style={{ fontSize: 12, color: '#6b7280' }}>
+          {ticket.user_email && <span>{ticket.user_email} · </span>}
+          opened {ticket.created_at ? new Date(ticket.created_at).toLocaleString() : ''}
+        </div>
+        {ticket.status !== 'closed' ? (
+          <select
+            value={ticket.status}
+            onChange={(e) => handleStatusChange(e.target.value)}
+            style={{ fontSize: 12, padding: '4px 8px', borderRadius: 8, border: '1px solid #d1d5db', fontFamily: 'inherit' }}
+          >
+            <option value="open">Open</option>
+            <option value="in_progress">In Progress</option>
+            <option value="closed">Closed</option>
+          </select>
+        ) : (
+          <button
+            onClick={() => handleStatusChange('open')}
+            style={{
+              fontSize: 12, padding: '4px 10px', borderRadius: 8,
+              border: '1px solid #d1d5db', background: '#fff', cursor: 'pointer', fontFamily: 'inherit',
+            }}
+          >
+            Reopen
+          </button>
+        )}
+      </div>
+
+      <div style={{
+        background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8,
+        padding: 12, display: 'flex', flexDirection: 'column', gap: 10, maxHeight: 360, overflowY: 'auto',
+      }}>
+        {ticket.messages.map((m) => {
+          const isSupport = m.is_support_reply
+          return (
+            <div key={m.uuid} style={{ display: 'flex', flexDirection: 'column', alignItems: isSupport ? 'flex-end' : 'flex-start' }}>
+              <div style={{
+                maxWidth: '85%', padding: '8px 12px', borderRadius: 10,
+                background: isSupport ? '#2563eb' : '#f3f4f6',
+                color: isSupport ? '#fff' : '#111827',
+              }}>
+                <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 2, color: isSupport ? 'rgba(255,255,255,0.85)' : '#6b7280' }}>
+                  {m.user_name || m.user_id}
+                  {isSupport && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 500, opacity: 0.85 }}>Team</span>}
+                </div>
+                <div style={{ fontSize: 13, whiteSpace: 'pre-wrap' }}>{m.content}</div>
+                <div style={{ fontSize: 10, marginTop: 2, color: isSupport ? 'rgba(255,255,255,0.75)' : '#9ca3af' }}>
+                  {m.created_at ? new Date(m.created_at).toLocaleString() : ''}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {ticket.status !== 'closed' ? (
+        <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center' }}>
+          <input
+            value={reply}
+            onChange={(e) => setReply(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
+            placeholder="Reply to this check-in..."
+            style={{
+              flex: 1, padding: '8px 12px', fontSize: 13,
+              border: '1px solid #d1d5db', borderRadius: 8, outline: 'none', fontFamily: 'inherit',
+            }}
+          />
+          <button
+            onClick={handleSend}
+            disabled={sending || !reply.trim()}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              padding: '8px 14px', borderRadius: 8, border: 'none',
+              background: '#2563eb', color: '#fff', fontSize: 13, fontWeight: 600,
+              cursor: reply.trim() && !sending ? 'pointer' : 'not-allowed',
+              opacity: sending ? 0.6 : 1, fontFamily: 'inherit',
+            }}
+          >
+            <Send size={14} /> {sending ? 'Sending...' : 'Reply'}
+          </button>
+        </div>
+      ) : (
+        <div style={{ marginTop: 10, padding: '8px 12px', fontSize: 12, color: '#6b7280', textAlign: 'center' }}>
+          This conversation is closed. Reopen to send a reply.
+        </div>
+      )}
     </div>
   )
 }
@@ -4232,29 +4705,41 @@ function EmailAnalyticsTab() {
     : data.success_rate >= 0.99 ? '#22c55e'
     : data.success_rate >= 0.9 ? '#f59e0b' : '#ef4444'
 
+  const handleExport = () => {
+    const dailyRows = data.by_day.map(p => [p.date, p.sent, p.failed])
+    const typeRows = data.by_type.map(t => [t.email_type, t.sent, t.failed, (t.success_rate * 100).toFixed(2) + '%'])
+    const failureRows = data.recent_failures.map(f => [f.created_at, f.recipient, f.email_type, f.provider, f.subject, f.error || ''])
+    downloadCSV(
+      `email-analytics-${days}d.csv`,
+      ['Section', 'A', 'B', 'C', 'D', 'E'],
+      [
+        ['SUMMARY', '', '', '', '', ''],
+        ['Window (days)', days, '', '', '', ''],
+        ['Total Sent', data.total_sent, '', '', '', ''],
+        ['Total Failed', data.total_failed, '', '', '', ''],
+        ['Success Rate', (data.success_rate * 100).toFixed(2) + '%', '', '', '', ''],
+        ['Providers', data.providers.join('; '), '', '', '', ''],
+        ['', '', '', '', '', ''],
+        ['DAILY', 'Date', 'Sent', 'Failed', '', ''],
+        ...dailyRows.map(r => ['', ...r, '', '']),
+        ['', '', '', '', '', ''],
+        ['BY TYPE', 'Type', 'Sent', 'Failed', 'Success Rate', ''],
+        ...typeRows.map(r => ['', ...r, '']),
+        ['', '', '', '', '', ''],
+        ['RECENT FAILURES', 'When', 'Recipient', 'Type', 'Provider', 'Error'],
+        ...failureRows.map(r => ['', r[0], r[1], r[2], r[3], `${r[4]}: ${r[5]}`]),
+      ],
+    )
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 13, color: '#6b7280', fontWeight: 500 }}>Time Range:</span>
-        {[7, 14, 30, 90].map(d => (
-          <button
-            key={d}
-            onClick={() => setDays(d)}
-            style={{
-              padding: '5px 14px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #e5e7eb',
-              fontSize: 13, fontWeight: 500, cursor: 'pointer',
-              backgroundColor: days === d ? 'var(--highlight-color, #eab308)' : '#fff',
-              color: days === d ? 'var(--highlight-text-color, #000)' : '#374151',
-            }}
-          >
-            {d}d
-          </button>
-        ))}
-        <button onClick={load} style={{ marginLeft: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4 }}>
-          <RefreshCw size={16} />
-        </button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <TimeRangeSelector value={days} onChange={v => setDays(typeof v === 'number' ? v : 30)} onRefresh={load} />
+        <div style={{ flex: 1 }} />
+        <ExportButton onClick={handleExport} />
         {data.providers.length > 0 && (
-          <span style={{ marginLeft: 'auto', fontSize: 12, color: '#6b7280' }}>
+          <span style={{ fontSize: 12, color: '#6b7280', width: '100%', textAlign: 'right' }}>
             Provider{data.providers.length > 1 ? 's' : ''}: {data.providers.join(', ')}
           </span>
         )}
@@ -4358,7 +4843,7 @@ function EmailAnalyticsTab() {
   )
 }
 
-function DebuggingTab() {
+function SurveyResponsesSection() {
   const [responses, setResponses] = useState<PostExperienceResponseAdmin[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedUuid, setExpandedUuid] = useState<string | null>(null)
@@ -5127,132 +5612,6 @@ function OrganizationsTab() {
 }
 
 // ---------------------------------------------------------------------------
-// Approvals Tab
-// ---------------------------------------------------------------------------
-
-function ApprovalsTab() {
-  const [approvals, setApprovals] = useState<ApprovalRequest[]>([])
-  const [loading, setLoading] = useState(true)
-  const [statusFilter, setStatusFilter] = useState('pending')
-  const [selected, setSelected] = useState<ApprovalRequest | null>(null)
-  const [comments, setComments] = useState('')
-  const [processing, setProcessing] = useState(false)
-
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      const data = await approvalsApi.listApprovals(statusFilter || undefined)
-      setApprovals(data.approvals)
-    } catch { /* ignore */ } finally {
-      setLoading(false)
-    }
-  }, [statusFilter])
-
-  useEffect(() => { load() }, [load])
-
-  const handleDecision = async (approve: boolean) => {
-    if (!selected) return
-    setProcessing(true)
-    try {
-      if (approve) await approvalsApi.approveRequest(selected.uuid, comments)
-      else await approvalsApi.rejectRequest(selected.uuid, comments)
-      setSelected(null)
-      setComments('')
-      load()
-    } catch { /* ignore */ } finally { setProcessing(false) }
-  }
-
-  const STATUS_COLOR: Record<string, string> = { pending: '#f59e0b', approved: '#16a34a', rejected: '#dc2626' }
-
-  return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-        <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Approval Queue</h2>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {(['pending', 'approved', 'rejected', ''] as const).map(s => (
-            <button key={s} onClick={() => setStatusFilter(s)} style={{
-              padding: '5px 12px', borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13,
-              fontWeight: statusFilter === s ? 600 : 400, cursor: 'pointer', fontFamily: 'inherit',
-              backgroundColor: statusFilter === s ? '#f3f4f6' : '#fff', color: '#374151',
-            }}>{s || 'All'}</button>
-          ))}
-        </div>
-      </div>
-
-      {selected && (
-        <div style={{ marginBottom: 16, padding: 16, border: '1px solid #e5e7eb', borderRadius: 8, backgroundColor: '#fff' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
-            <div style={{ fontWeight: 600, fontSize: 15 }}>Review: {selected.step_name}</div>
-            <button onClick={() => setSelected(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280' }}><X size={16} /></button>
-          </div>
-          {selected.review_instructions && (
-            <div style={{ padding: '8px 12px', borderRadius: 6, backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', fontSize: 13, color: '#1e40af', marginBottom: 12 }}>
-              {selected.review_instructions}
-            </div>
-          )}
-          {Object.keys(selected.data_for_review).length > 0 && (
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 4 }}>Data for Review</div>
-              <pre style={{ backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6, padding: '8px 12px', fontSize: 12, overflowX: 'auto', maxHeight: 200, overflowY: 'auto' }}>
-                {JSON.stringify(selected.data_for_review, null, 2)}
-              </pre>
-            </div>
-          )}
-          {selected.status === 'pending' ? (
-            <>
-              <div style={{ marginBottom: 10 }}>
-                <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>Comments</label>
-                <textarea value={comments} onChange={e => setComments(e.target.value)} rows={2}
-                  placeholder="Optional reviewer comments..." style={{ width: '100%', fontSize: 13, border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 10px', fontFamily: 'inherit', resize: 'vertical', boxSizing: 'border-box' }} />
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={() => handleDecision(true)} disabled={processing} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 16px', borderRadius: 6, border: 'none', backgroundColor: '#16a34a', color: '#fff', fontSize: 13, fontWeight: 600, cursor: processing ? 'not-allowed' : 'pointer', opacity: processing ? 0.6 : 1, fontFamily: 'inherit' }}>
-                  <CheckCircle size={14} /> Approve
-                </button>
-                <button onClick={() => handleDecision(false)} disabled={processing} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 16px', borderRadius: 6, border: 'none', backgroundColor: '#dc2626', color: '#fff', fontSize: 13, fontWeight: 600, cursor: processing ? 'not-allowed' : 'pointer', opacity: processing ? 0.6 : 1, fontFamily: 'inherit' }}>
-                  <XCircle size={14} /> Reject
-                </button>
-              </div>
-            </>
-          ) : (
-            <div style={{ fontSize: 13, color: '#374151', backgroundColor: '#f9fafb', borderRadius: 6, padding: '8px 12px' }}>
-              <span style={{ fontWeight: 600 }}>Decision:</span> {selected.status} by {selected.reviewer_user_id || 'unknown'}
-              {selected.reviewer_comments && <p style={{ marginTop: 4, color: '#6b7280' }}>"{selected.reviewer_comments}"</p>}
-            </div>
-          )}
-        </div>
-      )}
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {loading ? (
-          <div style={{ padding: 32, textAlign: 'center', color: '#9ca3af' }}>Loading…</div>
-        ) : approvals.length === 0 ? (
-          <div style={{ padding: 32, textAlign: 'center', color: '#9ca3af', border: '1px solid #e5e7eb', borderRadius: 8, backgroundColor: '#fff' }}>
-            No {statusFilter || ''} approvals found
-          </div>
-        ) : approvals.map(a => (
-          <div key={a.uuid} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', border: '1px solid #e5e7eb', borderRadius: 8, backgroundColor: '#fff' }}>
-            <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: STATUS_COLOR[a.status] ?? '#9ca3af', flexShrink: 0 }} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 500, fontSize: 14 }}>{a.step_name}</div>
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                {a.review_instructions ? a.review_instructions.slice(0, 80) : 'No instructions'}
-              </div>
-            </div>
-            <div style={{ fontSize: 12, color: '#9ca3af', flexShrink: 0 }}>
-              {a.created_at ? new Date(a.created_at).toLocaleDateString() : '-'}
-            </div>
-            <button onClick={() => { setSelected(a); setComments('') }} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#fff', fontSize: 13, cursor: 'pointer', color: '#374151', fontFamily: 'inherit' }}>
-              <Eye size={14} /> Review
-            </button>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
 // Audit Log Tab
 // ---------------------------------------------------------------------------
 
@@ -5564,7 +5923,7 @@ export default function Admin() {
   const hasAccess = isGlobalAdmin || isStaff || isExaminer || isTeamAdmin
 
   // Staff see everything except config; examiners see analytics tabs only
-  const hiddenForNonAdmin = ['config', 'quality', 'demo', 'debugging', 'organizations', 'approvals', 'audit', 'certifications']
+  const hiddenForNonAdmin = ['config', 'quality', 'demo', 'organizations', 'approvals', 'audit', 'certifications']
   let visibleTabs = isGlobalAdmin
     ? TABS
     : isStaff
@@ -5643,12 +6002,11 @@ export default function Admin() {
           {activeTab === 'organizations' && (isGlobalAdmin || isStaff) && <OrganizationsTab />}
           {activeTab === 'workflows' && <WorkflowsTab />}
           {activeTab === 'quality' && <QualityTab />}
-          {activeTab === 'approvals' && (isGlobalAdmin || isStaff) && <ApprovalsTab />}
           {activeTab === 'audit' && (isGlobalAdmin || isStaff) && <AuditTab />}
           {activeTab === 'demo' && (isGlobalAdmin || isStaff) && <DemoTab />}
           {activeTab === 'email' && (isGlobalAdmin || isStaff) && <EmailAnalyticsTab />}
           {activeTab === 'certifications' && (isGlobalAdmin || isStaff) && <CertificationsTab />}
-          {activeTab === 'debugging' && (isGlobalAdmin || isStaff) && <DebuggingTab />}
+          {activeTab === 'apikeys' && isGlobalAdmin && <ApiKeysTab />}
           {activeTab === 'config' && isGlobalAdmin && <ConfigTab />}
         </div>
       </div>

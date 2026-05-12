@@ -143,3 +143,44 @@ class TestExtractEventContent:
         event = object()
         content, is_thinking = _extract_event_content(event)
         assert content is None
+
+
+class TestBuildInterruptedBody:
+    """Guards the user/assistant pairing invariant on stream failures.
+
+    chat.py persists the user message before streaming. If the LLM call
+    times out or is cancelled, _save_failed_assistant_turn uses this helper
+    to compose a placeholder so the conversation never has consecutive user
+    turns (which pydantic-ai rejects on the next request).
+    """
+
+    def test_partial_text_is_preserved_with_interrupted_suffix(self):
+        from app.services.chat_service import _build_interrupted_body
+
+        body = _build_interrupted_body(["Hello ", "world"], "client disconnected")
+        assert body.startswith("Hello world")
+        assert "interrupted" in body
+        assert "client disconnected" in body
+
+    def test_no_partial_yields_no_response_placeholder(self):
+        from app.services.chat_service import _build_interrupted_body
+
+        body = _build_interrupted_body([], "request timed out")
+        assert "no response" in body
+        assert "request timed out" in body
+
+    def test_strips_residual_think_tags_from_partial(self):
+        from app.services.chat_service import _build_interrupted_body
+
+        body = _build_interrupted_body(
+            ["<think>internal monologue</think>visible answer"],
+            "connection closed",
+        )
+        assert "internal monologue" not in body
+        assert "visible answer" in body
+
+    def test_whitespace_only_partial_treated_as_empty(self):
+        from app.services.chat_service import _build_interrupted_body
+
+        body = _build_interrupted_body(["   \n  "], "context over budget")
+        assert body.startswith("_(no response")

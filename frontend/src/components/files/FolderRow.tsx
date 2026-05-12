@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { Folder as FolderIcon, Users, MoreVertical, Eye } from 'lucide-react'
+import { Folder as FolderIcon, Users, MoreHorizontal, Eye } from 'lucide-react'
 import type { Folder } from '../../types/document'
 
 interface FolderRowProps {
@@ -21,7 +21,7 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
 
   return (
     <tr
-      className="cursor-pointer"
+      className="group cursor-pointer"
       tabIndex={0}
       role="row"
       aria-label={`Folder: ${folder.title}`}
@@ -134,21 +134,44 @@ export function FolderRow({ folder, onClick, onContextMenu, selected, onToggleSe
         </div>
       </td>
 
-      {/* Modified (empty for folders) */}
-      <td style={{ padding: '12px 15px' }} />
-
-      {/* Menu */}
-      <td style={{ padding: '12px 4px', width: 40 }}>
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            onContextMenu(e)
+      {/* Modified (empty for folders) — with hover-revealed action overlay */}
+      <td style={{ padding: '12px 15px', position: 'relative' }}>
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="opacity-0 group-hover:opacity-100 transition-opacity"
+          style={{
+            position: 'absolute',
+            right: 8,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            display: 'flex',
+            alignItems: 'center',
+            background: '#fff',
+            border: '1px solid #e5e7eb',
+            borderRadius: 999,
+            padding: '2px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
           }}
-          className="bg-transparent border-0 cursor-pointer p-1 text-[#191919] hover:bg-black/5 rounded"
-          aria-label="More options"
         >
-          <MoreVertical className="h-4 w-4" />
-        </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onContextMenu(e)
+            }}
+            className="bg-transparent border-0 cursor-pointer text-[#191919] hover:bg-black/5"
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 14,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            aria-label="More options"
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </button>
+        </div>
       </td>
     </tr>
   )

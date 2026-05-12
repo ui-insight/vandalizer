@@ -3,7 +3,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 from app.config import Settings
 from app.models.user import User
-from app.models.team import Team, TeamMembership, TeamInvite
+from app.models.team import Team, TeamMembership, TeamInvite, TeamJoinLink
 from app.models.document import SmartDocument
 from app.models.folder import SmartFolder
 from app.models.search_set import SearchSet, SearchSetItem
@@ -41,12 +41,15 @@ from app.models.notification import Notification
 from app.models.support import SupportTicket
 from app.models.feedback_prompt import FeedbackPrompt, FeedbackPromptResponse
 from app.models.email_log import EmailLog
+from app.models.api_key import ApiKey
+from app.models.credential import Credential
 
 ALL_MODELS = [
     User,
     Team,
     TeamMembership,
     TeamInvite,
+    TeamJoinLink,
     SmartDocument,
     SmartFolder,
     SearchSet,
@@ -100,6 +103,8 @@ ALL_MODELS = [
     FeedbackPrompt,
     FeedbackPromptResponse,
     EmailLog,
+    ApiKey,
+    Credential,
 ]
 
 

@@ -455,10 +455,14 @@ async def list_verified_items(
     kb_ids = [i.item_id for i in items if i.kind == LibraryItemKind.KNOWLEDGE_BASE]
 
     name_map: dict[str, str] = {}
+    wf_creator_map: dict[str, str] = {}
     if wf_ids:
         wfs = await Workflow.find({"_id": {"$in": wf_ids}}).to_list()
         for wf in wfs:
             name_map[str(wf.id)] = wf.name
+            creator_id = wf.created_by_user_id or wf.user_id
+            if creator_id:
+                wf_creator_map[str(wf.id)] = creator_id
     ss_map: dict[str, SearchSet] = {}
     if ss_ids:
         ssets = await SearchSet.find({"_id": {"$in": ss_ids}}).to_list()
@@ -475,6 +479,10 @@ async def list_verified_items(
     meta_map: dict[tuple[str, str], VerifiedItemMetadata] = {}
     for m in all_meta:
         meta_map[(m.item_kind, m.item_id)] = m
+
+    # --- Batch-resolve workflow authors ---
+    from app.services.user_lookup import resolve_authors
+    author_map = await resolve_authors(wf_creator_map.values())
 
     # --- Batch-fetch KB metrics ---
     kb_map: dict[str, KnowledgeBase] = {}
@@ -551,6 +559,9 @@ async def list_verified_items(
         # Workflow: use MongoDB _id as source_uuid (workspace routes by _id)
         if item.kind == LibraryItemKind.WORKFLOW:
             entry["source_uuid"] = item_id_str
+            creator_id = wf_creator_map.get(item_id_str)
+            ref = author_map.get(creator_id) if creator_id else None
+            entry["created_by"] = ref.model_dump() if ref else None
 
         results.append(entry)
 

@@ -1,5 +1,5 @@
 import { apiFetch } from './client'
-import type { Team, TeamMember, TeamInvite } from '../types/user'
+import type { Team, TeamMember, TeamInvite, TeamJoinLink } from '../types/user'
 
 export function listTeams() {
   return apiFetch<Team[]>('/api/teams/')
@@ -88,4 +88,60 @@ export function deleteTeam(teamUuid: string) {
   return apiFetch<{ ok: boolean }>(`/api/teams/${teamUuid}`, {
     method: 'DELETE',
   })
+}
+
+// ---------------------------------------------------------------------------
+// Public join links
+// ---------------------------------------------------------------------------
+
+export interface CreateJoinLinkParams {
+  role?: string
+  expires_in_hours?: number
+  max_uses?: number | null
+}
+
+export function createJoinLink(teamUuid: string, params: CreateJoinLinkParams = {}) {
+  return apiFetch<TeamJoinLink>(`/api/teams/${teamUuid}/join-link`, {
+    method: 'POST',
+    body: JSON.stringify({
+      role: params.role ?? 'member',
+      expires_in_hours: params.expires_in_hours ?? 48,
+      max_uses: params.max_uses ?? null,
+    }),
+  })
+}
+
+export function getJoinLinks(teamUuid: string) {
+  return apiFetch<TeamJoinLink[]>(`/api/teams/${teamUuid}/join-links`)
+}
+
+export function revokeJoinLink(token: string) {
+  return apiFetch<{ ok: boolean }>(
+    `/api/teams/join-link/${encodeURIComponent(token)}`,
+    { method: 'DELETE' },
+  )
+}
+
+export interface JoinLinkInfo {
+  role: string
+  team_name: string
+  team_uuid: string | null
+  inviter_name: string | null
+  expires_at: string | null
+  status: null | 'revoked' | 'expired' | 'exhausted'
+}
+
+export async function getJoinLinkInfo(token: string): Promise<JoinLinkInfo> {
+  const res = await fetch(`/api/teams/join-link/info/${encodeURIComponent(token)}`)
+  if (!res.ok) {
+    throw new Error('Invalid join link.')
+  }
+  return res.json()
+}
+
+export function acceptJoinLink(token: string) {
+  return apiFetch<{ uuid: string; name: string }>(
+    `/api/teams/join-link/accept/${encodeURIComponent(token)}`,
+    { method: 'POST' },
+  )
 }

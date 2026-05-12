@@ -121,6 +121,20 @@ class TestExtractionNode:
         node.process({"output": [], "step_name": "Document"})
         assert any("Extraction" in str(p) for p in progress)
 
+    @patch("app.services.workflow_engine.data_extraction_model")
+    def test_extraction_multi_source_step_and_documents(self, mock_extract):
+        """Combining step_input + workflow_documents extracts from each text."""
+        mock_extract.return_value = {"raw": [], "formatted": ""}
+        node = ExtractionNode({
+            "model": "gpt-4o",
+            "keys": ["X"],
+            "input_sources": ["step_input", "workflow_documents"],
+            "doc_texts": ["doc one", "doc two"],
+        })
+        node.process({"output": "step text", "step_name": "APINode"})
+        kwargs = mock_extract.call_args.kwargs
+        assert kwargs.get("doc_texts") == ["step text", "doc one", "doc two"]
+
 
 # ---------------------------------------------------------------------------
 # PromptNode
@@ -188,6 +202,69 @@ class TestPromptNode:
         args, kwargs = mock_llm.call_args
         assert kwargs.get("prompt") == "Enter prompt" or args[1] == "Enter prompt"
 
+    @patch("app.services.workflow_engine.llm_chat_model")
+    def test_prompt_multi_source_step_and_document(self, mock_llm):
+        """input_sources combining step output + a selected document yields a labeled context."""
+        mock_llm.return_value = "Response"
+        node = PromptNode({
+            "prompt": "Pick the best title",
+            "model": "gpt-4o",
+            "input_sources": ["step_input", "select_document"],
+            "selected_doc_text": "The grant proposal text.",
+        })
+        node.process({"output": {"titles": ["Title 1", "Title 2"]}, "step_name": "APINode"})
+        data = mock_llm.call_args.kwargs.get("data", "")
+        assert "Previous Step Output" in data
+        assert "Selected Document" in data
+        assert "Title 1" in data
+        assert "grant proposal text" in data
+
+    @patch("app.services.workflow_engine.llm_chat_model")
+    def test_prompt_multi_source_skips_empty(self, mock_llm):
+        """An empty source is dropped from the combined context."""
+        mock_llm.return_value = "Response"
+        node = PromptNode({
+            "prompt": "Use what's there",
+            "model": "gpt-4o",
+            "input_sources": ["step_input", "select_document"],
+            "selected_doc_text": "",  # empty
+        })
+        node.process({"output": "step output", "step_name": "Prev"})
+        data = mock_llm.call_args.kwargs.get("data", "")
+        # Single non-empty source -> raw payload, no section headers
+        assert data == "step output"
+
+    @patch("app.services.workflow_engine.llm_chat_model")
+    def test_prompt_input_sources_takes_precedence_over_legacy(self, mock_llm):
+        """When both `input_sources` and `input_source` are set, the new field wins."""
+        mock_llm.return_value = "Response"
+        node = PromptNode({
+            "prompt": "Test",
+            "model": "gpt-4o",
+            "input_source": "step_input",  # legacy
+            "input_sources": ["select_document"],  # new wins
+            "selected_doc_text": "doc body",
+        })
+        node.process({"output": "step output", "step_name": "Prev"})
+        data = mock_llm.call_args.kwargs.get("data", "")
+        assert data == "doc body"
+
+    @patch("app.services.workflow_engine.llm_chat_model")
+    def test_prompt_step_input_after_document_trigger_swaps_to_workflow_docs(self, mock_llm):
+        """When the previous step is the Document trigger, step_input is replaced
+        with workflow_documents (the trigger emits UUIDs, not text)."""
+        mock_llm.return_value = "Response"
+        node = PromptNode({
+            "prompt": "Summarize",
+            "model": "gpt-4o",
+            "input_sources": ["step_input"],
+            "doc_texts": ["doc body"],
+        })
+        node.process({"output": ["uuid-1"], "step_name": "Document"})
+        data = mock_llm.call_args.kwargs.get("data", "")
+        assert "doc body" in data
+        assert "uuid-1" not in data
+
 
 # ---------------------------------------------------------------------------
 # FormatNode
@@ -233,7 +310,9 @@ class TestFormatNode:
     def test_format_from_prompt_step(self, mock_format):
         mock_format.return_value = ("p", "formatted")
         node = FormatNode({"prompt": "Format", "model": "gpt-4o"})
-        result = node.process({"output": {"formatted_answer": "nice text"}, "step_name": "Prompt"})
+        # PromptNode now always returns a string output, so FormatNode
+        # receives that string directly.
+        result = node.process({"output": "nice text", "step_name": "Prompt"})
         args = mock_format.call_args[0]
         assert args[2] == "nice text"
 
@@ -244,6 +323,23 @@ class TestFormatNode:
         result = node.process({"output": "plain text", "step_name": "Prompt"})
         args = mock_format.call_args[0]
         assert args[2] == "plain text"
+
+    @patch("app.services.workflow_engine.format_model")
+    def test_format_multi_source(self, mock_format):
+        """input_sources combining step + selected document yields a labeled blob."""
+        mock_format.return_value = ("p", "out")
+        node = FormatNode({
+            "prompt": "Format",
+            "model": "gpt-4o",
+            "input_sources": ["step_input", "select_document"],
+            "selected_doc_text": "doc body",
+        })
+        node.process({"output": "step output", "step_name": "Prev"})
+        text = mock_format.call_args[0][2]
+        assert "Previous Step Output" in text
+        assert "Selected Document" in text
+        assert "step output" in text
+        assert "doc body" in text
 
 
 # ---------------------------------------------------------------------------
@@ -496,6 +592,24 @@ class TestResearchNode:
         for call in mock_llm.call_args_list:
             assert call.kwargs["data"] == "The RFA seeks proposals for AI safety research."
 
+    @patch("app.services.workflow_engine.llm_chat_model")
+    def test_research_multi_source(self, mock_llm):
+        """ResearchNode honors input_sources by passing combined context to both passes."""
+        mock_llm.side_effect = ["findings", "report"]
+        node = ResearchNode({
+            "question": "Q?",
+            "model": "gpt-4o",
+            "input_sources": ["step_input", "workflow_documents"],
+            "doc_texts": ["doc body"],
+        })
+        node.process({"output": "step text", "step_name": "Prev"})
+        for call in mock_llm.call_args_list:
+            data = call.kwargs["data"]
+            assert "Previous Step Output" in data
+            assert "Workflow Documents" in data
+            assert "step text" in data
+            assert "doc body" in data
+
 
 # ---------------------------------------------------------------------------
 # APICallNode
@@ -659,6 +773,142 @@ class TestAPICallNode:
         result = node.process({"output": "prev"})
         assert "HTTP error" in result["output"]
 
+    # -----------------------------------------------------------------------
+    # auth_strategy
+    # -----------------------------------------------------------------------
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    def test_auth_strategy_requires_credential_id(self, _mock_validate):
+        node = APICallNode({
+            "url": "https://api.example.com",
+            "method": "GET",
+            "auth_strategy": "static_header",
+        })
+        result = node.process({"output": "prev"})
+        assert "requires credential_id" in result["output"]
+
+    @patch("app.utils.url_validation.validate_outbound_url")
+    @patch("app.services.workflow_engine._open_sync_db")
+    def test_auth_strategy_credential_not_found(self, mock_open_db, mock_validate):
+        mock_validate.return_value = "ok"
+        db = MagicMock()
+        db.credential.find_one.return_value = None
+        mock_open_db.return_value = db
+
+        node = APICallNode({
+            "url": "https://api.example.com",
+            "auth_strategy": "static_header",
+            "credential_id": "507f1f77bcf86cd799439011",
+        })
+        result = node.process({"output": "prev"})
+        assert "not found" in result["output"]
+
+    @patch("app.utils.url_validation.validate_outbound_url")
+    @patch("app.services.workflow_engine._open_sync_db")
+    def test_auth_strategy_type_mismatch(self, mock_open_db, mock_validate):
+        mock_validate.return_value = "ok"
+        db = MagicMock()
+        db.credential.find_one.return_value = {
+            "_id": "507f1f77bcf86cd799439011",
+            "type": "static_header",
+            "payload": {"header_name": "X", "header_value": "y"},
+        }
+        mock_open_db.return_value = db
+
+        node = APICallNode({
+            "url": "https://api.example.com",
+            "auth_strategy": "oauth_client_credentials",
+            "credential_id": "507f1f77bcf86cd799439011",
+        })
+        result = node.process({"output": "prev"})
+        assert "does not match" in result["output"]
+
+    @patch("app.services.credentials_service.decrypt_value", side_effect=lambda v: v)
+    @patch("app.utils.url_validation.validate_outbound_url")
+    @patch("app.services.workflow_engine._open_sync_db")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_static_header_strategy_attaches_header(
+        self, mock_client_cls, mock_open_db, mock_validate, _mock_decrypt
+    ):
+        mock_validate.return_value = "ok"
+        db = MagicMock()
+        db.credential.find_one.return_value = {
+            "_id": "507f1f77bcf86cd799439011",
+            "type": "static_header",
+            "payload": {"header_name": "X-Api-Key", "header_value": "secret-value"},
+        }
+        mock_open_db.return_value = db
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"ok": True}
+        mock_response.raise_for_status = MagicMock()
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client.request.return_value = mock_response
+        mock_client_cls.return_value = mock_client
+
+        node = APICallNode({
+            "url": "https://api.example.com",
+            "method": "GET",
+            "auth_strategy": "static_header",
+            "credential_id": "507f1f77bcf86cd799439011",
+        })
+        result = node.process({"output": "prev"})
+
+        sent_headers = mock_client.request.call_args[1]["headers"]
+        assert sent_headers["X-Api-Key"] == "secret-value"
+        assert result["output"] == {"ok": True}
+
+    @patch("app.services.credentials_service.get_bearer_token", return_value="bearer-xyz")
+    @patch("app.services.credentials_service.validate_outbound_url", return_value="ok")
+    @patch("app.services.credentials_service.decrypt_value", side_effect=lambda v: v)
+    @patch("app.utils.url_validation.validate_outbound_url")
+    @patch("app.services.workflow_engine._open_sync_db")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_oauth_strategy_attaches_bearer(
+        self,
+        mock_client_cls,
+        mock_open_db,
+        mock_validate,
+        _mock_decrypt,
+        _mock_inner_validate,
+        _mock_token,
+    ):
+        mock_validate.return_value = "ok"
+        db = MagicMock()
+        db.credential.find_one.return_value = {
+            "_id": "507f1f77bcf86cd799439011",
+            "type": "oauth_client_credentials",
+            "payload": {
+                "client_id": "c",
+                "token_endpoint": "https://issuer/token",
+                "private_key": "-----BEGIN-----",
+            },
+        }
+        mock_open_db.return_value = db
+
+        mock_response = MagicMock()
+        mock_response.json.return_value = {"ok": True}
+        mock_response.raise_for_status = MagicMock()
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client.request.return_value = mock_response
+        mock_client_cls.return_value = mock_client
+
+        node = APICallNode({
+            "url": "https://api.example.com/data",
+            "method": "GET",
+            "auth_strategy": "oauth_client_credentials",
+            "credential_id": "507f1f77bcf86cd799439011",
+        })
+        result = node.process({"output": "prev"})
+
+        sent_headers = mock_client.request.call_args[1]["headers"]
+        assert sent_headers["Authorization"] == "Bearer bearer-xyz"
+        assert result["output"] == {"ok": True}
+
 
 # ---------------------------------------------------------------------------
 # FormFillerNode
@@ -698,6 +948,23 @@ class TestFormFillerNode:
             "output": ["d41d8cd98f00b204e9800998ecf8427e"],
         })
         assert mock_llm.call_args.kwargs["data"] == "Project title: AI Safety Initiative."
+
+    @patch("app.services.workflow_engine.llm_chat_model")
+    def test_form_filler_multi_source(self, mock_llm):
+        """FormFillerNode combines step_input and selected document into labeled context."""
+        mock_llm.return_value = "filled"
+        node = FormFillerNode({
+            "template": "{{x}}",
+            "model": "gpt-4o",
+            "input_sources": ["step_input", "select_document"],
+            "selected_doc_text": "doc body",
+        })
+        node.process({"output": "step output", "step_name": "Prev"})
+        data = mock_llm.call_args.kwargs["data"]
+        assert "Previous Step Output" in data
+        assert "Selected Document" in data
+        assert "step output" in data
+        assert "doc body" in data
 
 
 # ---------------------------------------------------------------------------

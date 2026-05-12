@@ -186,8 +186,13 @@ async def share_with_team(
     user: User,
     *,
     user_org_ancestry: list[str] | None = None,
+    comment: str | None = None,
 ) -> KnowledgeBase | None:
-    """Toggle shared_with_team for an authorized knowledge base."""
+    """Toggle shared_with_team for an authorized knowledge base.
+
+    When toggling from unshared → shared, notifies the user's current team
+    (bell + email). Untoggling is silent.
+    """
     kb = await get_knowledge_base(
         uuid,
         user,
@@ -197,9 +202,37 @@ async def share_with_team(
     )
     if not kb:
         return None
+    was_shared = bool(kb.shared_with_team)
     kb.shared_with_team = not kb.shared_with_team
     kb.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
     await kb.save()
+
+    if not was_shared and kb.shared_with_team:
+        try:
+            from app.models.team import Team
+            from app.services.team_service import notify_team_share
+
+            team = None
+            if kb.team_id:
+                try:
+                    team = await Team.get(kb.team_id)
+                except Exception:
+                    team = None
+            if team is None and user.current_team:
+                team = await Team.get(user.current_team)
+            if team:
+                await notify_team_share(
+                    sharer=user,
+                    team=team,
+                    item_kind="knowledge_base",
+                    item_name=kb.title,
+                    item_id=kb.uuid,
+                    link="/library",
+                    comment=comment,
+                )
+        except Exception:
+            logger.exception("Failed to notify team of knowledge base share")
+
     return kb
 
 

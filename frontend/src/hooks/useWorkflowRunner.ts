@@ -24,10 +24,10 @@ export function useWorkflowRunner() {
     try {
       const s = await getWorkflowStatus(sid)
       setStatus(s)
-      if (s.status === 'completed' || s.status === 'error' || s.status === 'failed') {
-        setRunning(false)
-        stopPolling()
-      }
+      const terminal = s.status === 'completed' || s.status === 'error' || s.status === 'failed'
+      const paused = s.status === 'pending_approval'
+      setRunning(!terminal && !paused)
+      if (terminal) stopPolling()
     } catch {
       // Keep polling on transient errors
     }
@@ -76,14 +76,20 @@ export function useWorkflowRunner() {
     setSessionId(sid)
     setBatchId(null)
     setBatchStatus(null)
-    setRunning(false)
     try {
       const s = await getWorkflowStatus(sid)
       setStatus(s)
+      const isTerminal = s.status === 'completed' || s.status === 'error' || s.status === 'failed'
+      const isPaused = s.status === 'pending_approval'
+      setRunning(!isTerminal && !isPaused)
+      if (!isTerminal) {
+        intervalRef.current = setInterval(() => poll(sid), 2000)
+      }
     } catch {
       setStatus(null)
+      setRunning(false)
     }
-  }, [stopPolling])
+  }, [poll, stopPolling])
 
   const reset = useCallback(() => {
     setSessionId(null)

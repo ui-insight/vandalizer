@@ -1,4 +1,5 @@
 import hashlib
+import secrets
 from datetime import datetime, timedelta, timezone
 
 import jwt
@@ -6,6 +7,9 @@ from jwt import InvalidTokenError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.config import Settings
+
+MGMT_API_KEY_PREFIX = "vk_live_"
+MGMT_API_KEY_DISPLAY_LEN = 12  # length of stored prefix shown in admin UI
 
 
 def hash_password(password: str) -> str:
@@ -21,6 +25,18 @@ def hash_api_token(token: str) -> str:
     # from secrets.token_urlsafe(32), so rainbow-table / dictionary attacks
     # are infeasible. Determinism lets us index and look up by hash.
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def generate_mgmt_api_key() -> tuple[str, str, str]:
+    """Generate a management API key.
+
+    Returns (full_token, display_prefix, sha256_hash). The full_token is
+    shown to the issuer once and never recoverable; only the prefix and
+    hash are persisted.
+    """
+    raw = secrets.token_urlsafe(32)
+    full = f"{MGMT_API_KEY_PREFIX}{raw}"
+    return full, full[:MGMT_API_KEY_DISPLAY_LEN], hash_api_token(full)
 
 
 def create_access_token(user_id: str, settings: Settings) -> str:

@@ -31,8 +31,8 @@ jobs:
       - name: Run backend release checks
         run: make backend-static
 
-  backend-backlog:
-    name: Backend Advisory Backlog
+  backend-typecheck:
+    name: Backend Mypy (advisory)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -48,12 +48,97 @@ jobs:
       - name: Install backend dependencies
         run: make backend-install
 
-      - name: Run backend backlog checks (typecheck + dependency audit)
+      # Advisory until the mypy error count reaches zero — flip continue-on-error
+      # to false once the codebase is fully typed.
+      - name: Run mypy
         continue-on-error: true
-        run: make backend-backlog
+        run: make backend-typecheck
+
+  backend-audit:
+    name: Backend Dependency Audit (advisory)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install backend dependencies
+        run: make backend-install
+
+      # Advisory until known CVEs in indirect deps are addressed — flip
+      # continue-on-error to false once pip-audit reports clean.
+      - name: Run pip-audit
+        continue-on-error: true
+        run: make backend-audit
 
   backend-test:
-    name: Backend Tests
+    name: Backend Tests (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    services:
+      mongo:
+        image: mongo:7.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.adminCommand(\"ping\")'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install backend dependencies
+        run: make backend-install
+
+      - name: Run unit tests + Tier 1
+        run: make backend-ci
+
+  backend-test-t4:
+    name: Backend Tier 4 (ChromaDB)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Install backend dependencies
+        run: make backend-install
+
+      - name: Cache ChromaDB ONNX embedder
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/chroma
+          key: chroma-onnx-${{ runner.os }}
+
+      - name: Run Tier 4 (ChromaDB)
+        run: make backend-test-integration-t4
+
+  backend-test-t2:
+    name: Backend Tier 2 (MongoDB)
     runs-on: ubuntu-latest
     services:
       mongo:
@@ -78,9 +163,6 @@ jobs:
 
       - name: Install backend dependencies
         run: make backend-install
-
-      - name: Run unit tests + Tier 1
-        run: make backend-ci
 
       - name: Run Tier 2 (MongoDB)
         run: make backend-test-integration-t2
@@ -110,7 +192,7 @@ jobs:
   docker:
     name: Docker Build
     runs-on: ubuntu-latest
-    needs: [backend-static, backend-test, frontend]
+    needs: [backend-static, backend-test, backend-test-t2, backend-test-t4, frontend]
     steps:
       - uses: actions/checkout@v6
 

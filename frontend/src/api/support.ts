@@ -32,6 +32,7 @@ export function listTickets(
   offset = 0,
   scope?: 'mine',
   tag?: string,
+  category?: string,
 ) {
   const params = new URLSearchParams()
   if (status) params.set('status', status)
@@ -39,6 +40,7 @@ export function listTickets(
   params.set('offset', String(offset))
   if (scope) params.set('scope', scope)
   if (tag) params.set('tag', tag)
+  if (category) params.set('category', category)
   return apiFetch<{ tickets: SupportTicketSummary[] }>(
     `/api/support/tickets?${params}`,
   )

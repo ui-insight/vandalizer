@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { UserPlus, Trash2, Pencil, Check, X, Copy, AlertTriangle, ArrowRightLeft, LogOut } from 'lucide-react'
+import { UserPlus, Trash2, Pencil, Check, X, Copy, AlertTriangle, ArrowRightLeft, LogOut, Link2, Link2Off } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
 import { useTeams } from '../hooks/useTeams'
 import { useAuth } from '../hooks/useAuth'
-import type { TeamMember, TeamInvite } from '../types/user'
+import type { TeamMember, TeamInvite, TeamJoinLink } from '../types/user'
 import {
   getTeamMembers,
   getTeamInvites,
@@ -15,6 +15,9 @@ import {
   updateTeamName,
   transferOwnership,
   deleteTeam,
+  createJoinLink,
+  getJoinLinks,
+  revokeJoinLink,
 } from '../api/teams'
 
 function getInviteExpiry(invite: TeamInvite): { label: string; expired: boolean } {
@@ -27,12 +30,27 @@ function getInviteExpiry(invite: TeamInvite): { label: string; expired: boolean 
   return { label: `Expires in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}`, expired: false }
 }
 
+function getJoinLinkExpiry(link: TeamJoinLink): { label: string; expired: boolean } {
+  if (!link.expires_at) return { label: '', expired: false }
+  const expiresAt = new Date(link.expires_at)
+  const now = new Date()
+  if (now >= expiresAt) return { label: 'Expired', expired: true }
+  const msLeft = expiresAt.getTime() - now.getTime()
+  const hoursLeft = Math.ceil(msLeft / (60 * 60 * 1000))
+  if (hoursLeft <= 48) {
+    return { label: `Expires in ${hoursLeft}h`, expired: false }
+  }
+  const daysLeft = Math.ceil(hoursLeft / 24)
+  return { label: `Expires in ${daysLeft}d`, expired: false }
+}
+
 export function TeamSettings() {
   const { user } = useAuth()
   const { teams, currentTeam, switchTeam, refreshTeams } = useTeams()
   const navigate = useNavigate()
   const [members, setMembers] = useState<TeamMember[]>([])
   const [invites, setInvites] = useState<TeamInvite[]>([])
+  const [joinLinks, setJoinLinks] = useState<TeamJoinLink[]>([])
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState('member')
   const [newTeamName, setNewTeamName] = useState('')
@@ -41,19 +59,24 @@ export function TeamSettings() {
   const [renameValue, setRenameValue] = useState('')
   const [transferTarget, setTransferTarget] = useState('')
   const [copiedToken, setCopiedToken] = useState<string | null>(null)
+  const [joinLinkRole, setJoinLinkRole] = useState('member')
+  const [joinLinkExpiry, setJoinLinkExpiry] = useState(48)
+  const [creatingJoinLink, setCreatingJoinLink] = useState(false)
 
   const canEdit = currentTeam?.role === 'owner' || currentTeam?.role === 'admin'
   const isOwner = currentTeam?.role === 'owner'
 
   const refreshData = useCallback(async () => {
     if (!currentTeam) return
-    const [m, i] = await Promise.all([
+    const [m, i, l] = await Promise.all([
       getTeamMembers(currentTeam.uuid),
       getTeamInvites(currentTeam.uuid),
+      canEdit ? getJoinLinks(currentTeam.uuid) : Promise.resolve([]),
     ])
     setMembers(m)
     setInvites(i)
-  }, [currentTeam])
+    setJoinLinks(l)
+  }, [currentTeam, canEdit])
 
   useEffect(() => {
     refreshData()
@@ -166,6 +189,45 @@ export function TeamSettings() {
       setCopiedToken(token)
       setTimeout(() => setCopiedToken(null), 2000)
     })
+  }
+
+  function handleCopyJoinLink(token: string) {
+    const link = `${window.location.origin}/join?token=${token}`
+    navigator.clipboard.writeText(link).then(() => {
+      setCopiedToken(token)
+      setTimeout(() => setCopiedToken(null), 2000)
+    })
+  }
+
+  async function handleCreateJoinLink() {
+    if (!currentTeam) return
+    setError('')
+    setCreatingJoinLink(true)
+    try {
+      await createJoinLink(currentTeam.uuid, {
+        role: joinLinkRole,
+        expires_in_hours: joinLinkExpiry,
+      })
+      refreshData()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create join link')
+    } finally {
+      setCreatingJoinLink(false)
+    }
+  }
+
+  async function handleRevokeJoinLink(token: string) {
+    const confirmed = window.confirm(
+      'Revoke this join link? Anyone with the link will no longer be able to use it.',
+    )
+    if (!confirmed) return
+    setError('')
+    try {
+      await revokeJoinLink(token)
+      refreshData()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to revoke join link')
+    }
   }
 
   // Members eligible for ownership transfer (non-owner members)
@@ -349,6 +411,104 @@ export function TeamSettings() {
                           <Copy className="h-3.5 w-3.5" />
                           {copiedToken === inv.token ? 'Copied!' : 'Copy Link'}
                         </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Share Join Link */}
+        {canEdit && (
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
+            <h3 className="mb-1 font-medium text-gray-900 flex items-center gap-2">
+              <Link2 className="h-4 w-4" />
+              Share Join Link
+            </h3>
+            <p className="mb-3 text-xs text-gray-500">
+              Create a public link anyone can use to join this team. Links
+              expire after a set time and can be revoked anytime.
+            </p>
+            <div className="flex items-end gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-500">Role</label>
+                <select
+                  value={joinLinkRole}
+                  onChange={(e) => setJoinLinkRole(e.target.value)}
+                  className="mt-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
+                >
+                  <option value="member">member</option>
+                  <option value="admin">admin</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500">Expires in</label>
+                <select
+                  value={joinLinkExpiry}
+                  onChange={(e) => setJoinLinkExpiry(Number(e.target.value))}
+                  className="mt-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
+                >
+                  <option value={1}>1 hour</option>
+                  <option value={24}>24 hours</option>
+                  <option value={48}>48 hours</option>
+                  <option value={168}>7 days</option>
+                  <option value={720}>30 days</option>
+                </select>
+              </div>
+              <button
+                onClick={handleCreateJoinLink}
+                disabled={creatingJoinLink}
+                className="flex items-center gap-1.5 rounded-md bg-highlight px-4 py-2 text-sm font-bold text-highlight-text hover:brightness-90 disabled:opacity-50"
+              >
+                <Link2 className="h-4 w-4" />
+                {creatingJoinLink ? 'Creating...' : 'Create Link'}
+              </button>
+            </div>
+
+            {joinLinks.length > 0 && (
+              <div className="mt-4">
+                <p className="text-xs font-medium text-gray-500">Active Join Links</p>
+                <div className="mt-2 space-y-1">
+                  {joinLinks.map((link) => {
+                    const expiry = getJoinLinkExpiry(link)
+                    return (
+                      <div
+                        key={link.id}
+                        className="flex items-center justify-between rounded-md bg-gray-50 px-3 py-2 text-sm"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-gray-400">{link.role}</span>
+                          <span className="text-xs text-gray-500">
+                            {link.use_count} {link.use_count === 1 ? 'use' : 'uses'}
+                          </span>
+                          {expiry.label && (
+                            <span
+                              className={`text-xs ${expiry.expired ? 'font-medium text-red-600' : 'text-gray-400'}`}
+                            >
+                              {expiry.label}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleCopyJoinLink(link.token)}
+                            className="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-200 hover:text-gray-700"
+                            title="Copy join link"
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                            {copiedToken === link.token ? 'Copied!' : 'Copy'}
+                          </button>
+                          <button
+                            onClick={() => handleRevokeJoinLink(link.token)}
+                            className="flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 hover:bg-red-50 hover:text-red-600"
+                            title="Revoke link"
+                          >
+                            <Link2Off className="h-3.5 w-3.5" />
+                            Revoke
+                          </button>
+                        </div>
                       </div>
                     )
                   })}

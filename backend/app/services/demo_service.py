@@ -8,6 +8,7 @@ from typing import Optional
 
 from app.config import Settings
 from app.models.demo import DemoApplication, PostExperienceResponse
+from app.models.email_log import EmailLog
 from app.models.team import Team, TeamMembership
 from app.models.user import User
 from app.services.email_service import (
@@ -519,6 +520,15 @@ async def admin_get_stats() -> dict:
     }
 
 
+# Email types that deliver login credentials to a demo user. Used to compute
+# the most recent "credentials sent" timestamp for the admin dashboard.
+_CREDENTIAL_EMAIL_TYPES = (
+    "demo_activation",
+    "credentials_resend",
+    "bulk_credentials_resend",
+)
+
+
 async def admin_list_applications(status_filter: Optional[str] = None) -> list[dict]:
     """List all demo applications, optionally filtered by status."""
     query = {}
@@ -528,6 +538,32 @@ async def admin_list_applications(status_filter: Optional[str] = None) -> list[d
         query = DemoApplication.find()
 
     apps = await query.sort("-created_at").to_list()
+
+    # Bulk-load login + credential-send timestamps so we don't issue 3 queries
+    # per row on a list that may have hundreds of entries.
+    user_ids = [a.user_id for a in apps if a.user_id]
+    last_login_by_user: dict[str, datetime.datetime] = {}
+    if user_ids:
+        users = await User.find({"user_id": {"$in": user_ids}}).to_list()
+        last_login_by_user = {
+            u.user_id: u.last_login_at for u in users if u.last_login_at
+        }
+
+    emails = [a.email for a in apps if a.email]
+    creds_sent_by_email: dict[str, datetime.datetime] = {}
+    if emails:
+        cred_logs = await EmailLog.find(
+            {
+                "recipient": {"$in": emails},
+                "email_type": {"$in": list(_CREDENTIAL_EMAIL_TYPES)},
+                "status": "sent",
+            }
+        ).sort("-created_at").to_list()
+        for log in cred_logs:
+            # First (most recent) hit per recipient wins because of the sort.
+            if log.recipient not in creds_sent_by_email:
+                creds_sent_by_email[log.recipient] = log.created_at
+
     return [
         {
             "uuid": a.uuid,
@@ -543,6 +579,16 @@ async def admin_list_applications(status_filter: Optional[str] = None) -> list[d
             "created_at": a.created_at.isoformat(),
             "title": a.title or "",
             "questionnaire_responses": a.questionnaire_responses or {},
+            "credentials_sent_at": (
+                creds_sent_by_email[a.email].isoformat()
+                if a.email in creds_sent_by_email
+                else None
+            ),
+            "last_login_at": (
+                last_login_by_user[a.user_id].isoformat()
+                if a.user_id and a.user_id in last_login_by_user
+                else None
+            ),
         }
         for a in apps
     ]
