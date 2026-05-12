@@ -62,9 +62,8 @@ async def get_automation(
     return await Automation.get(PydanticObjectId(automation_id))
 
 
-async def update_automation(
-    automation_id: str,
-    user: User,
+async def apply_automation_update(
+    auto: Automation,
     name: str | None = None,
     description: str | None = None,
     enabled: bool | None = None,
@@ -74,10 +73,7 @@ async def update_automation(
     action_id: str | None = None,
     shared_with_team: bool | None = None,
     output_config: dict | None = None,
-) -> Automation | None:
-    auto = await get_authorized_automation(automation_id, user, manage=True)
-    if not auto:
-        return None
+) -> Automation:
     if name is not None:
         auto.name = name
     if description is not None:
@@ -99,11 +95,3 @@ async def update_automation(
     auto.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
     await auto.save()
     return auto
-
-
-async def delete_automation(automation_id: str, user: User) -> bool:
-    auto = await get_authorized_automation(automation_id, user, manage=True)
-    if not auto:
-        return False
-    await auto.delete()
-    return True

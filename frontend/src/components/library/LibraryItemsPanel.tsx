@@ -2,10 +2,13 @@ import { useState } from 'react'
 import { Search } from 'lucide-react'
 import { useLibraryItems } from '../../hooks/useLibrary'
 import { cloneToPersonal, shareToTeam } from '../../api/library'
+import { ApiError } from '../../api/client'
 import type { Library } from '../../types/library'
 import type { LibraryItem } from '../../types/library'
 import { LibraryItemRow } from './LibraryItemRow'
 import { LibraryItemDetails } from './LibraryItemDetails'
+import { ShareWithTeamDialog } from './ShareWithTeamDialog'
+import { useToast } from '../../contexts/ToastContext'
 
 interface Props {
   library: Library
@@ -13,6 +16,7 @@ interface Props {
 }
 
 export function LibraryItemsPanel({ library, teamId }: Props) {
+  const { toast } = useToast()
   const [kindFilter, setKindFilter] = useState<string | undefined>()
   const [search, setSearch] = useState('')
   const [selectedItem, setSelectedItem] = useState<LibraryItem | null>(null)
@@ -34,10 +38,27 @@ export function LibraryItemsPanel({ library, teamId }: Props) {
     refresh()
   }
 
-  const handleShare = async (itemId: string) => {
-    if (!teamId) return
-    await shareToTeam(itemId, teamId)
-    refresh()
+  const [shareDialogItem, setShareDialogItem] = useState<{ id: string; name: string } | null>(null)
+  const handleShare = (itemId: string) => {
+    if (!teamId) {
+      toast('Switch to a team before sharing items.', 'info')
+      return
+    }
+    const item = items.find((i) => i.id === itemId)
+    setShareDialogItem({ id: itemId, name: item?.name ?? 'this item' })
+  }
+  const confirmShare = async (comment: string) => {
+    if (!shareDialogItem || !teamId) return
+    try {
+      await shareToTeam(shareDialogItem.id, teamId, comment || undefined)
+      toast('Shared to team library', 'success')
+      refresh()
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : 'Failed to share to team'
+      toast(msg, 'error')
+    } finally {
+      setShareDialogItem(null)
+    }
   }
 
   const handleRemove = async (itemId: string) => {
@@ -122,6 +143,14 @@ export function LibraryItemsPanel({ library, teamId }: Props) {
           item={selectedItem}
           onClose={() => setSelectedItem(null)}
           onRemove={handleRemove}
+        />
+      )}
+
+      {shareDialogItem && (
+        <ShareWithTeamDialog
+          itemName={shareDialogItem.name}
+          onCancel={() => setShareDialogItem(null)}
+          onConfirm={confirmShare}
         />
       )}
     </div>

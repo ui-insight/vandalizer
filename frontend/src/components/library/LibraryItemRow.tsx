@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import {
-  Ellipsis,
+  MoreHorizontal,
   Pin,
   Star,
   Copy,
@@ -14,6 +14,8 @@ import {
 } from 'lucide-react'
 import { QualityBadge } from './QualityBadge'
 import { VerificationSubmitModal } from './VerificationSubmitModal'
+import { AuthorChip } from '../shared/AuthorChip'
+import { useAuth } from '../../hooks/useAuth'
 import { relativeTime } from '../../utils/time'
 import type { LibraryItem, LibraryFolder } from '../../types/library'
 
@@ -34,6 +36,7 @@ interface Props {
 }
 
 export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShare, onRemove, onOpen, onEdit, onMoveToFolder, folders, qualityTier, qualityScore }: Props) {
+  const { user } = useAuth()
   const [hovered, setHovered] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [folderSubmenuOpen, setFolderSubmenuOpen] = useState(false)
@@ -87,7 +90,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
       onClick={() => onOpen?.(item)}
       style={{
         display: 'grid',
-        gridTemplateColumns: '4fr 2fr 150px',
+        gridTemplateColumns: '1fr 100px',
         padding: '12px 24px',
         borderBottom: '1px solid #f0f0f0',
         alignItems: 'center',
@@ -114,6 +117,14 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
           }}
         >
           {item.name}
+          {item.verified && (
+            <span
+              title="Verified — saved as a reference. Make a copy to edit."
+              style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}
+            >
+              <ShieldCheck size={13} style={{ color: '#b45309' }} />
+            </span>
+          )}
           {item.favorited && !hovered && (
             <Star size={12} fill="#fbbc04" style={{ color: '#fbbc04', flexShrink: 0 }} />
           )}
@@ -121,7 +132,18 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
             <Pin size={12} style={{ color: 'var(--library-highlight, #eab308)', flexShrink: 0 }} />
           )}
         </div>
-        <div style={{ fontSize: 12, color: '#70757a', marginTop: 4 }}>{kindLabel}</div>
+        <div style={{ fontSize: 12, color: '#70757a', marginTop: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span>{kindLabel}</span>
+          {item.verified && (
+            <span style={{ color: '#b45309', fontWeight: 500 }}>Verified</span>
+          )}
+          {item.created_by && item.created_by.user_id !== user?.user_id && (
+            <AuthorChip author={item.created_by} />
+          )}
+          {(qualityTier != null || qualityScore != null) && item.set_type !== 'prompt' && item.set_type !== 'formatter' && (
+            <QualityBadge tier={qualityTier ?? null} score={qualityScore ?? null} />
+          )}
+        </div>
         {item.tags.length > 0 && (
           <div style={{ marginTop: 4, display: 'flex', gap: 4 }}>
             {item.tags.slice(0, 3).map((tag) => (
@@ -147,17 +169,31 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
         )}
       </div>
 
-      {/* Last used column */}
-      <div style={{ fontSize: 12, color: '#9aa0a6', whiteSpace: 'nowrap' }}>
+      {/* Last used column — right-aligned */}
+      <div style={{ fontSize: 12, color: '#9aa0a6', whiteSpace: 'nowrap', textAlign: 'right' }}>
         {item.last_used_at ? relativeTime(item.last_used_at) : 'Never'}
       </div>
 
-      {/* Actions column */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2, flexShrink: 0 }}>
-        {(hovered || menuOpen) && (
-          <>
-            {/* Top row: action buttons */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      {/* Hover actions overlay — floats over last-used date */}
+      {(hovered || menuOpen) && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute',
+            right: 16,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+            background: '#fff',
+            border: '1px solid #e5e7eb',
+            borderRadius: 999,
+            padding: '2px 4px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+            zIndex: 1,
+          }}
+        >
             {/* Favorite */}
             <button
               onClick={(e) => {
@@ -204,7 +240,6 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
               <Pin size={14} />
             </button>
 
-            {/* Ellipsis menu */}
             <div style={{ position: 'relative', display: 'inline-block' }}>
               <button
                 ref={triggerRef}
@@ -226,7 +261,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                   color: '#9aa0a6',
                 }}
               >
-                <Ellipsis size={14} />
+                <MoreHorizontal size={16} />
               </button>
 
               {menuOpen && createPortal(
@@ -441,14 +476,8 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                 document.body,
               )}
             </div>
-            </div>
-            {/* Bottom row: quality badge (workflows and extraction tasks only) */}
-            {(qualityTier != null || qualityScore != null) && item.set_type !== 'prompt' && item.set_type !== 'formatter' && (
-              <QualityBadge tier={qualityTier ?? null} score={qualityScore ?? null} />
-            )}
-          </>
-        )}
-      </div>
+        </div>
+      )}
       {showVerifyModal && (
         <VerificationSubmitModal
           item={item}

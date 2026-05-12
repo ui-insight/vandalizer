@@ -27,6 +27,8 @@ export interface SupportTicket {
   team_id: string | null
   assigned_to: string | null
   category: string | null
+  // Only present for support agents — backend strips this for ticket owners.
+  tags?: string[]
   messages: SupportMessage[]
   attachments: SupportAttachment[]
   message_count: number
@@ -44,6 +46,8 @@ export interface SupportTicketSummary {
   user_name: string | null
   assigned_to: string | null
   category: string | null
+  // Only present for support agents — backend strips this for ticket owners.
+  tags?: string[]
   message_count: number
   last_message_preview: string | null
   last_message_at: string | null

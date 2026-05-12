@@ -23,6 +23,11 @@ from app.models.document import SmartDocument
 
 router = APIRouter()
 
+# Maximum lookback window for analytics endpoints. ~2 years covers any
+# realistic ad-hoc reporting need without letting callers ask for wildly
+# unbounded scans.
+MAX_ANALYTICS_DAYS = 730
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -352,7 +357,7 @@ class UserDetailResponse(BaseModel):
 
 @router.get("/usage", response_model=UsageStatsResponse)
 async def usage_stats(
-    days: int = Query(default=30, ge=1),
+    days: int = Query(default=30, ge=1, le=MAX_ANALYTICS_DAYS),
     user: User = Depends(get_current_user),
 ):
     _, team_scope = await _require_admin_or_team_admin(user)
@@ -411,7 +416,7 @@ async def usage_stats(
 
 @router.get("/usage/timeseries", response_model=TimeseriesResponse)
 async def usage_timeseries(
-    days: int = Query(default=30, ge=1),
+    days: int = Query(default=30, ge=1, le=MAX_ANALYTICS_DAYS),
     user: User = Depends(get_current_user),
 ):
     _, team_scope = await _require_admin_or_team_admin(user)
@@ -519,12 +524,16 @@ async def usage_timeseries(
 
 @router.get("/users", response_model=list[UserLeaderboardItem])
 async def user_leaderboard(
+    days: int | None = Query(default=None, ge=1, le=MAX_ANALYTICS_DAYS),
     user: User = Depends(get_current_user),
 ):
     _, team_scope = await _require_admin_or_team_admin(user)
     show_platform_role_flags = _can_view_platform_role_flags(team_scope)
 
     query_filter: dict = {}
+    if days is not None:
+        cutoff = datetime.datetime.utcnow() - datetime.timedelta(days=days)
+        query_filter["started_at"] = {"$gte": cutoff}
     scoped_team: Team | None = None
     if team_scope:
         scoped_team, team_scope_ids = await _resolve_team_scope(team_scope)
@@ -622,11 +631,15 @@ async def user_leaderboard(
 
 @router.get("/teams", response_model=list[TeamLeaderboardItem])
 async def team_leaderboard(
+    days: int | None = Query(default=None, ge=1, le=MAX_ANALYTICS_DAYS),
     user: User = Depends(get_current_user),
 ):
     _, team_scope = await _require_admin_or_team_admin(user)
 
     query_filter: dict = {}
+    if days is not None:
+        cutoff = datetime.datetime.utcnow() - datetime.timedelta(days=days)
+        query_filter["started_at"] = {"$gte": cutoff}
     if team_scope:
         _, team_scope_ids = await _resolve_team_scope(team_scope)
         query_filter["team_id"] = {"$in": team_scope_ids}
@@ -703,7 +716,7 @@ async def team_leaderboard(
 @router.get("/teams/{team_id}/detail", response_model=TeamDetailResponse)
 async def team_detail(
     team_id: str,
-    days: int = Query(default=30, ge=1),
+    days: int = Query(default=30, ge=1, le=MAX_ANALYTICS_DAYS),
     user: User = Depends(get_current_user),
 ):
     _, team_scope = await _require_admin_or_team_admin(user)
@@ -893,7 +906,7 @@ async def team_detail(
 @router.get("/users/{user_id}/detail", response_model=UserDetailResponse)
 async def user_detail(
     user_id: str,
-    days: int = Query(default=30, ge=1),
+    days: int = Query(default=30, ge=1, le=MAX_ANALYTICS_DAYS),
     user: User = Depends(get_current_user),
 ):
     _, team_scope = await _require_admin_or_team_admin(user)
@@ -1596,7 +1609,7 @@ async def quality_summary(user: User = Depends(get_current_user)):
 
 @router.get("/quality/timeline")
 async def quality_timeline(
-    days: int = 90,
+    days: int = Query(default=90, ge=1, le=MAX_ANALYTICS_DAYS),
     item_kind: str | None = None,
     user: User = Depends(get_current_user),
 ):
@@ -2089,7 +2102,7 @@ class EmailAnalyticsResponse(BaseModel):
 
 @router.get("/email-analytics", response_model=EmailAnalyticsResponse)
 async def email_analytics(
-    days: int = Query(default=30, ge=1, le=365),
+    days: int = Query(default=30, ge=1, le=MAX_ANALYTICS_DAYS),
     user: User = Depends(get_current_user),
 ) -> EmailAnalyticsResponse:
     """Deliverability stats over the last `days` days.
@@ -2404,3 +2417,149 @@ async def set_certification_unlock(
     )
 
     return {"user_id": user_id, "unlocked": prog.unlocked}
+
+
+# ---------------------------------------------------------------------------
+# Management API keys (/api/mgmt/v1)
+# ---------------------------------------------------------------------------
+
+class CreateApiKeyRequest(BaseModel):
+    name: str
+    scopes: list[str]
+    description: Optional[str] = None
+    expires_at: Optional[datetime.datetime] = None
+
+
+class CreateApiKeyResponse(BaseModel):
+    id: str
+    name: str
+    prefix: str
+    scopes: list[str]
+    expires_at: Optional[datetime.datetime] = None
+    created_at: datetime.datetime
+    token: str = Field(..., description="Full token — shown once, never recoverable.")
+
+
+class ApiKeyListItem(BaseModel):
+    id: str
+    name: str
+    prefix: str
+    scopes: list[str]
+    description: Optional[str] = None
+    created_by: str
+    created_at: datetime.datetime
+    expires_at: Optional[datetime.datetime] = None
+    revoked_at: Optional[datetime.datetime] = None
+    last_used_at: Optional[datetime.datetime] = None
+    last_used_ip: Optional[str] = None
+
+
+@router.post("/api-keys", response_model=CreateApiKeyResponse)
+async def create_api_key(
+    body: CreateApiKeyRequest,
+    user: User = Depends(get_current_user),
+):
+    """Issue a new management API key. Returns the full token once."""
+    await _require_superadmin(user)
+
+    from app.dependencies import MGMT_SCOPES
+    from app.models.api_key import ApiKey
+    from app.utils.security import generate_mgmt_api_key
+
+    unknown = [s for s in body.scopes if s not in MGMT_SCOPES and s != "*"]
+    if unknown:
+        raise HTTPException(status_code=400, detail=f"Unknown scopes: {unknown}")
+    if not body.scopes:
+        raise HTTPException(status_code=400, detail="At least one scope is required")
+
+    full_token, prefix, key_hash = generate_mgmt_api_key()
+    key = ApiKey(
+        key_hash=key_hash,
+        prefix=prefix,
+        name=body.name,
+        description=body.description,
+        created_by=user.user_id,
+        scopes=body.scopes,
+        expires_at=body.expires_at,
+    )
+    await key.insert()
+
+    await _audit(
+        user,
+        "api_key.create",
+        f"Created mgmt API key '{body.name}' with scopes {body.scopes}",
+        {"key_id": str(key.id), "name": body.name, "scopes": body.scopes},
+    )
+
+    return CreateApiKeyResponse(
+        id=str(key.id),
+        name=key.name,
+        prefix=key.prefix,
+        scopes=key.scopes,
+        expires_at=key.expires_at,
+        created_at=key.created_at,
+        token=full_token,
+    )
+
+
+@router.get("/api-keys", response_model=list[ApiKeyListItem])
+async def list_api_keys(
+    include_revoked: bool = False,
+    user: User = Depends(get_current_user),
+):
+    await _require_superadmin(user)
+
+    from app.models.api_key import ApiKey
+
+    query = ApiKey.find_all()
+    keys = await query.sort(-ApiKey.created_at).to_list()
+    if not include_revoked:
+        keys = [k for k in keys if k.revoked_at is None]
+    return [
+        ApiKeyListItem(
+            id=str(k.id),
+            name=k.name,
+            prefix=k.prefix,
+            scopes=k.scopes,
+            description=k.description,
+            created_by=k.created_by,
+            created_at=k.created_at,
+            expires_at=k.expires_at,
+            revoked_at=k.revoked_at,
+            last_used_at=k.last_used_at,
+            last_used_ip=k.last_used_ip,
+        )
+        for k in keys
+    ]
+
+
+@router.delete("/api-keys/{key_id}")
+async def revoke_api_key(
+    key_id: str,
+    user: User = Depends(get_current_user),
+):
+    await _require_superadmin(user)
+
+    from app.models.api_key import ApiKey
+
+    try:
+        oid = BsonObjectId(key_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid key id")
+
+    key = await ApiKey.get(oid)
+    if not key:
+        raise HTTPException(status_code=404, detail="API key not found")
+    if key.revoked_at is not None:
+        return {"id": key_id, "revoked": True}
+
+    key.revoked_at = datetime.datetime.now(tz=datetime.timezone.utc)
+    await key.save()
+
+    await _audit(
+        user,
+        "api_key.revoke",
+        f"Revoked mgmt API key '{key.name}'",
+        {"key_id": key_id, "name": key.name},
+    )
+    return {"id": key_id, "revoked": True}

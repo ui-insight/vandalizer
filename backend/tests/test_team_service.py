@@ -1026,3 +1026,413 @@ class TestGetTeamInvites:
         assert result[0]["token"] == "abc"
         assert result[0]["role"] == "member"
         assert result[0]["accepted"] is False
+
+
+# ---------------------------------------------------------------------------
+# Public join links
+# ---------------------------------------------------------------------------
+
+def _make_join_link(
+    team_id=None,
+    token="link-tok",
+    role="member",
+    revoked=False,
+    max_uses=None,
+    use_count=0,
+    expires_at=None,
+    created_by_user_id="alice",
+):
+    link = MagicMock()
+    link.id = PydanticObjectId()
+    link.team = team_id or TEAM_OID
+    link.token = token
+    link.role = role
+    link.revoked = revoked
+    link.max_uses = max_uses
+    link.use_count = use_count
+    link.expires_at = expires_at or (
+        datetime.datetime.now() + datetime.timedelta(hours=48)
+    )
+    link.created_at = datetime.datetime.now()
+    link.created_by_user_id = created_by_user_id
+    link.save = AsyncMock()
+    link.insert = AsyncMock()
+    link.delete = AsyncMock()
+    return link
+
+
+class TestCreateJoinLink:
+    @pytest.mark.asyncio
+    async def test_rejects_owner_role(self):
+        from app.services.team_service import create_join_link
+
+        with pytest.raises(ValueError, match="Role must be 'admin' or 'member'"):
+            await create_join_link("team-uuid", "alice", role="owner")
+
+    @pytest.mark.asyncio
+    async def test_rejects_negative_expiry(self):
+        from app.services.team_service import create_join_link
+
+        with pytest.raises(ValueError, match="expires_in_hours must be positive"):
+            await create_join_link("team-uuid", "alice", expires_in_hours=0)
+
+    @pytest.mark.asyncio
+    async def test_rejects_excessive_expiry(self):
+        from app.services.team_service import create_join_link
+
+        with pytest.raises(ValueError, match="cannot exceed"):
+            await create_join_link(
+                "team-uuid", "alice", expires_in_hours=24 * 365
+            )
+
+    @pytest.mark.asyncio
+    async def test_rejects_zero_max_uses(self):
+        from app.services.team_service import create_join_link
+
+        with pytest.raises(ValueError, match="max_uses must be positive"):
+            await create_join_link("team-uuid", "alice", max_uses=0)
+
+    @pytest.mark.asyncio
+    async def test_member_cannot_create(self):
+        team = _make_team()
+        m = _make_membership(role="member", user_id="alice")
+
+        with (
+            patch("app.services.team_service.Team") as MockTeam,
+            patch("app.services.team_service.TeamMembership") as MockTM,
+        ):
+            MockTeam.find_one = AsyncMock(return_value=team)
+            MockTM.find_one = AsyncMock(return_value=m)
+
+            from app.services.team_service import create_join_link
+
+            with pytest.raises(ValueError, match="Requires at least admin role"):
+                await create_join_link("team-uuid", "alice")
+
+    @pytest.mark.asyncio
+    async def test_admin_creates_link(self):
+        team = _make_team()
+        m = _make_membership(role="admin", user_id="alice")
+
+        with (
+            patch("app.services.team_service.Team") as MockTeam,
+            patch("app.services.team_service.TeamMembership") as MockTM,
+            patch("app.services.team_service.TeamJoinLink") as MockLink,
+        ):
+            MockTeam.find_one = AsyncMock(return_value=team)
+            MockTM.find_one = AsyncMock(return_value=m)
+
+            link_inst = MagicMock()
+            link_inst.insert = AsyncMock()
+            MockLink.return_value = link_inst
+
+            from app.services.team_service import create_join_link
+
+            result = await create_join_link(
+                "team-uuid", "alice", role="member", expires_in_hours=48
+            )
+
+        assert result is link_inst
+        link_inst.insert.assert_awaited_once()
+        # Verify the link was built with the right team and role
+        kwargs = MockLink.call_args.kwargs
+        assert kwargs["team"] == team.id
+        assert kwargs["role"] == "member"
+        assert kwargs["created_by_user_id"] == "alice"
+
+
+class TestRevokeJoinLink:
+    @pytest.mark.asyncio
+    async def test_raises_when_link_not_found(self):
+        with patch("app.services.team_service.TeamJoinLink") as MockLink:
+            MockLink.find_one = AsyncMock(return_value=None)
+
+            from app.services.team_service import revoke_join_link
+
+            with pytest.raises(ValueError, match="Join link not found"):
+                await revoke_join_link("missing", "alice")
+
+    @pytest.mark.asyncio
+    async def test_member_cannot_revoke(self):
+        link = _make_join_link()
+        m = _make_membership(role="member", user_id="alice")
+
+        with (
+            patch("app.services.team_service.TeamJoinLink") as MockLink,
+            patch("app.services.team_service.TeamMembership") as MockTM,
+        ):
+            MockLink.find_one = AsyncMock(return_value=link)
+            MockTM.find_one = AsyncMock(return_value=m)
+
+            from app.services.team_service import revoke_join_link
+
+            with pytest.raises(ValueError, match="Requires at least admin"):
+                await revoke_join_link("link-tok", "alice")
+
+    @pytest.mark.asyncio
+    async def test_admin_revokes(self):
+        link = _make_join_link()
+        m = _make_membership(role="admin", user_id="alice")
+
+        with (
+            patch("app.services.team_service.TeamJoinLink") as MockLink,
+            patch("app.services.team_service.TeamMembership") as MockTM,
+        ):
+            MockLink.find_one = AsyncMock(return_value=link)
+            MockTM.find_one = AsyncMock(return_value=m)
+
+            from app.services.team_service import revoke_join_link
+
+            await revoke_join_link("link-tok", "alice")
+
+        assert link.revoked is True
+        link.save.assert_awaited_once()
+
+
+class TestGetJoinLinkInfo:
+    @pytest.mark.asyncio
+    async def test_returns_none_when_missing(self):
+        with patch("app.services.team_service.TeamJoinLink") as MockLink:
+            MockLink.find_one = AsyncMock(return_value=None)
+
+            from app.services.team_service import get_join_link_info
+
+            result = await get_join_link_info("missing")
+
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_returns_status_revoked(self):
+        link = _make_join_link(revoked=True)
+        team = _make_team()
+        creator = _make_user(user_id="alice", name="Alice")
+
+        with (
+            patch("app.services.team_service.TeamJoinLink") as MockLink,
+            patch("app.services.team_service.Team") as MockTeam,
+            patch("app.services.team_service.User") as MockUser,
+        ):
+            MockLink.find_one = AsyncMock(return_value=link)
+            MockTeam.get = AsyncMock(return_value=team)
+            MockUser.find_one = AsyncMock(return_value=creator)
+
+            from app.services.team_service import get_join_link_info
+
+            result = await get_join_link_info("link-tok")
+
+        assert result is not None
+        assert result["status"] == "revoked"
+        assert result["team_name"] == "Test Team"
+        assert result["inviter_name"] == "Alice"
+
+    @pytest.mark.asyncio
+    async def test_returns_status_expired(self):
+        past = datetime.datetime.now() - datetime.timedelta(hours=1)
+        link = _make_join_link(expires_at=past)
+        team = _make_team()
+
+        with (
+            patch("app.services.team_service.TeamJoinLink") as MockLink,
+            patch("app.services.team_service.Team") as MockTeam,
+            patch("app.services.team_service.User") as MockUser,
+        ):
+            MockLink.find_one = AsyncMock(return_value=link)
+            MockTeam.get = AsyncMock(return_value=team)
+            MockUser.find_one = AsyncMock(return_value=None)
+
+            from app.services.team_service import get_join_link_info
+
+            result = await get_join_link_info("link-tok")
+
+        assert result["status"] == "expired"
+
+    @pytest.mark.asyncio
+    async def test_returns_status_exhausted(self):
+        link = _make_join_link(max_uses=5, use_count=5)
+        team = _make_team()
+
+        with (
+            patch("app.services.team_service.TeamJoinLink") as MockLink,
+            patch("app.services.team_service.Team") as MockTeam,
+            patch("app.services.team_service.User") as MockUser,
+        ):
+            MockLink.find_one = AsyncMock(return_value=link)
+            MockTeam.get = AsyncMock(return_value=team)
+            MockUser.find_one = AsyncMock(return_value=None)
+
+            from app.services.team_service import get_join_link_info
+
+            result = await get_join_link_info("link-tok")
+
+        assert result["status"] == "exhausted"
+
+    @pytest.mark.asyncio
+    async def test_returns_usable_when_valid(self):
+        link = _make_join_link()
+        team = _make_team()
+
+        with (
+            patch("app.services.team_service.TeamJoinLink") as MockLink,
+            patch("app.services.team_service.Team") as MockTeam,
+            patch("app.services.team_service.User") as MockUser,
+        ):
+            MockLink.find_one = AsyncMock(return_value=link)
+            MockTeam.get = AsyncMock(return_value=team)
+            MockUser.find_one = AsyncMock(return_value=None)
+
+            from app.services.team_service import get_join_link_info
+
+            result = await get_join_link_info("link-tok")
+
+        assert result["status"] is None
+
+
+class TestAcceptJoinLink:
+    @pytest.mark.asyncio
+    async def test_rejects_invalid_token(self):
+        user = _make_user()
+        with patch("app.services.team_service.TeamJoinLink") as MockLink:
+            MockLink.find_one = AsyncMock(return_value=None)
+
+            from app.services.team_service import accept_join_link
+
+            with pytest.raises(ValueError, match="Invalid join link"):
+                await accept_join_link("nope", user)
+
+    @pytest.mark.asyncio
+    async def test_rejects_revoked(self):
+        user = _make_user()
+        link = _make_join_link(revoked=True)
+        with patch("app.services.team_service.TeamJoinLink") as MockLink:
+            MockLink.find_one = AsyncMock(return_value=link)
+
+            from app.services.team_service import accept_join_link
+
+            with pytest.raises(ValueError, match="revoked"):
+                await accept_join_link("link-tok", user)
+
+    @pytest.mark.asyncio
+    async def test_rejects_expired(self):
+        user = _make_user()
+        past = datetime.datetime.now() - datetime.timedelta(hours=1)
+        link = _make_join_link(expires_at=past)
+        with patch("app.services.team_service.TeamJoinLink") as MockLink:
+            MockLink.find_one = AsyncMock(return_value=link)
+
+            from app.services.team_service import accept_join_link
+
+            with pytest.raises(ValueError, match="expired"):
+                await accept_join_link("link-tok", user)
+
+    @pytest.mark.asyncio
+    async def test_rejects_exhausted(self):
+        user = _make_user()
+        link = _make_join_link(max_uses=1, use_count=1)
+        with patch("app.services.team_service.TeamJoinLink") as MockLink:
+            MockLink.find_one = AsyncMock(return_value=link)
+
+            from app.services.team_service import accept_join_link
+
+            with pytest.raises(ValueError, match="use limit"):
+                await accept_join_link("link-tok", user)
+
+    @pytest.mark.asyncio
+    async def test_existing_member_does_not_bump_count(self):
+        user = _make_user(user_id="bob")
+        link = _make_join_link(use_count=3)
+        team = _make_team()
+        existing_m = _make_membership(role="member", user_id="bob")
+
+        with (
+            patch("app.services.team_service.TeamJoinLink") as MockLink,
+            patch("app.services.team_service.Team") as MockTeam,
+            patch("app.services.team_service.TeamMembership") as MockTM,
+        ):
+            MockLink.find_one = AsyncMock(return_value=link)
+            MockTeam.get = AsyncMock(return_value=team)
+            MockTM.find_one = AsyncMock(return_value=existing_m)
+
+            from app.services.team_service import accept_join_link
+
+            result = await accept_join_link("link-tok", user)
+
+        assert result is team
+        assert link.use_count == 3  # unchanged
+        link.save.assert_not_awaited()
+        assert user.current_team == team.id
+
+    @pytest.mark.asyncio
+    async def test_new_user_joins_and_count_increments(self):
+        user = _make_user(user_id="charlie")
+        link = _make_join_link(role="member", use_count=2)
+        team = _make_team()
+
+        with (
+            patch("app.services.team_service.TeamJoinLink") as MockLink,
+            patch("app.services.team_service.Team") as MockTeam,
+            patch("app.services.team_service.TeamMembership") as MockTM,
+        ):
+            MockLink.find_one = AsyncMock(return_value=link)
+            MockTeam.get = AsyncMock(return_value=team)
+            MockTM.find_one = AsyncMock(return_value=None)
+
+            membership_inst = MagicMock()
+            membership_inst.insert = AsyncMock()
+            MockTM.return_value = membership_inst
+
+            from app.services.team_service import accept_join_link
+
+            result = await accept_join_link("link-tok", user)
+
+        assert result is team
+        membership_inst.insert.assert_awaited_once()
+        MockTM.assert_called_once_with(team=team.id, user_id="charlie", role="member")
+        assert link.use_count == 3
+        link.save.assert_awaited_once()
+        assert user.current_team == team.id
+
+
+class TestGetTeamJoinLinks:
+    @pytest.mark.asyncio
+    async def test_member_cannot_list(self):
+        team = _make_team()
+        m = _make_membership(role="member", user_id="alice")
+
+        with (
+            patch("app.services.team_service.Team") as MockTeam,
+            patch("app.services.team_service.TeamMembership") as MockTM,
+        ):
+            MockTeam.find_one = AsyncMock(return_value=team)
+            MockTM.find_one = AsyncMock(return_value=m)
+
+            from app.services.team_service import get_team_join_links
+
+            with pytest.raises(ValueError, match="Requires at least admin"):
+                await get_team_join_links("team-uuid", "alice")
+
+    @pytest.mark.asyncio
+    async def test_admin_lists_active_links(self):
+        team = _make_team()
+        m = _make_membership(role="admin", user_id="alice")
+        link = _make_join_link(token="abc", use_count=1)
+
+        with (
+            patch("app.services.team_service.Team") as MockTeam,
+            patch("app.services.team_service.TeamMembership") as MockTM,
+            patch("app.services.team_service.TeamJoinLink") as MockLink,
+        ):
+            MockTeam.find_one = AsyncMock(return_value=team)
+            MockTM.find_one = AsyncMock(return_value=m)
+
+            find_mock = MagicMock()
+            find_mock.to_list = AsyncMock(return_value=[link])
+            MockLink.find = MagicMock(return_value=find_mock)
+
+            from app.services.team_service import get_team_join_links
+
+            result = await get_team_join_links("team-uuid", "alice")
+
+        assert len(result) == 1
+        assert result[0]["token"] == "abc"
+        assert result[0]["use_count"] == 1
+        assert result[0]["role"] == "member"

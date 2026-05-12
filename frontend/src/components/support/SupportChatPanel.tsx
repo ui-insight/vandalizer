@@ -722,13 +722,36 @@ export function SupportChatPanel({
     return () => clearInterval(interval)
   }, [open, loadTickets])
 
-  // Reset when opened
+  // Sync with the ticket the parent asked to open. Used by the feedback
+  // prompt and Support button flows that drive `initialTicket` via state.
   useEffect(() => {
-    if (open && !initialTicket) {
-      setView('list')
+    if (!open) return
+    if (initialTicket) {
+      setActiveTicket(initialTicket)
+      setView('chat')
+    } else {
       setActiveTicket(null)
+      setView('list')
     }
   }, [open, initialTicket])
+
+  // Also listen for `open-support-panel` events directly. The parent only
+  // sees a state change when the event's ticket uuid differs from what it
+  // was last asked to open — so re-clicking the same notification after the
+  // user has navigated back to the list would otherwise be a no-op. Reading
+  // the event ourselves lets every click jump back to the ticket.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      const ticketUuid = detail?.ticketUuid
+      if (ticketUuid) {
+        setActiveTicket(ticketUuid)
+        setView('chat')
+      }
+    }
+    window.addEventListener('open-support-panel', handler)
+    return () => window.removeEventListener('open-support-panel', handler)
+  }, [])
 
   // Close on Escape
   useEffect(() => {

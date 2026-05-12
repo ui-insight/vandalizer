@@ -6,6 +6,7 @@ from app.models.team import Team, TeamMembership
 from app.models.user import User
 from app.schemas.teams import (
     ChangeRoleRequest,
+    CreateJoinLinkRequest,
     CreateTeamRequest,
     InviteRequest,
     RemoveMemberRequest,
@@ -110,6 +111,73 @@ async def accept_invite(
 ):
     try:
         team = await team_service.accept_invite(token, user)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"uuid": team.uuid, "name": team.name}
+
+
+@router.post("/{team_uuid}/join-link")
+async def create_join_link(
+    team_uuid: str,
+    body: CreateJoinLinkRequest,
+    user: User = Depends(get_current_user),
+):
+    """Create a new public join link for the team. Admin/owner only."""
+    try:
+        link = await team_service.create_join_link(
+            team_uuid,
+            user.user_id,
+            role=body.role,
+            expires_in_hours=body.expires_in_hours,
+            max_uses=body.max_uses,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return team_service._serialize_join_link(link)
+
+
+@router.get("/{team_uuid}/join-links")
+async def list_join_links(
+    team_uuid: str,
+    user: User = Depends(get_current_user),
+):
+    """List active (non-revoked) join links for a team. Admin/owner only."""
+    try:
+        return await team_service.get_team_join_links(team_uuid, user.user_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/join-link/{token}")
+async def revoke_join_link(
+    token: str,
+    user: User = Depends(get_current_user),
+):
+    """Revoke a join link. Admin/owner of the team only."""
+    try:
+        await team_service.revoke_join_link(token, user.user_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True}
+
+
+@router.get("/join-link/info/{token}")
+async def join_link_info(token: str):
+    """Public — return team metadata for a join-link token."""
+    info = await team_service.get_join_link_info(token)
+    if not info:
+        raise HTTPException(status_code=404, detail="Invalid join link")
+    return info
+
+
+@router.post("/join-link/accept/{token}")
+async def accept_join_link(
+    token: str,
+    user: User = Depends(get_current_user),
+):
+    """Accept a join link — adds the current user to the team."""
+    try:
+        team = await team_service.accept_join_link(token, user)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return {"uuid": team.uuid, "name": team.name}

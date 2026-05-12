@@ -38,7 +38,74 @@ The biggest change since launch: chat now drives the entire platform. Documents,
 - `email_preferences` gains an `announcements` key (defaults to opted-in)
 - Inactivity-nudge copy updated to speak to chat usage instead of "extractions and knowledge bases ready to use"
 
-## [Pre-5.0 Unreleased]
+## [v4.2.0] - 2026-05-04
+
+### Added
+- Native `anthropic` and `openrouter` protocol options in System Config → Models. Anthropic uses pydantic-ai's `AnthropicModel` for first-class Messages API / native thinking / tool use. OpenRouter uses `OpenRouterProvider` with default `https://openrouter.ai/api/v1` and `Vandalizer` app attribution; honors a custom endpoint for self-hosted gateways. `claude-*` model names still auto-detect to `openai` for back-compat — opt in to native Anthropic by selecting it explicitly in the dropdown.
+- Admins can now pick the default LLM model from System Config
+- Cmd/Ctrl+F find-in-document search for PDF, DOCX, and spreadsheet viewers
+- Knowledge base export and import in the UI; file uploads and folder filtering when adding to a KB
+- Workflow JSON import on the Workflows page, with a toast on import success
+- LLM-powered "Improve" button in the Prompt task editor
+- Real Word (.docx) download for workflow results; multi-step workflow deliverables bundled as ZIP at download
+- API tab on the extraction editor with ready-to-copy curl and Python snippets; `/extractions/run-integrated` accepts raw text input
+- Context-budget planner and compaction for chat requests; auto-grow chat input textarea with highlight focus ring; uploaded documents attach to the chat context immediately
+- Admin Certifications panel showing user progress with a debug unlock; fullscreen mode in the certification panel
+- Demo program admin: Applications / Surveys subtabs, plus `credentials_sent_at` and `last_login_at` tracking in CSV export
+- Analytics: time range extended to 2 years and CSV export coverage broadened
+- Support Center promoted to a true agent workspace under the Teams dropdown — agent ticket filing, support-agent tags, default open filter, attachments on ticket creation, shareable ticket URLs, and email notifications to other agents on tag changes
+- In-app trial check-in card for users approaching trial expiration
+- `setup.sh`: cron-based auto-update option, auto-prompt for upgrade when running an outdated version, and code + catalog versions shown on setup with `Scan & upgrade` replacing `Upgrade`
+- `seed_catalog`: `--only` flag and upsert semantics for safer reseeding
+- `docs/api.md` external API reference, linked from the README
+- Backend test coverage: +11 test files in the first installment, plus tightened CI gates for stability
+
+### Changed
+- `compose.yaml`: backend and Celery services now set `nofile` ulimits to 8192 soft/hard. **Operator action: rebuild and restart the stack** (`./setup.sh --redeploy` or `docker compose up -d`) to pick up the new limits — required to avoid `EMFILE` under heavy KB ingest load
+- `DEPLOY.md`: Models section now documents the `anthropic` and `openrouter` protocols alongside `openai`/`ollama`/`vllm`
+- KB ingest pipeline shares a single ONNX embedder and Chroma client to avoid file-descriptor exhaustion
+- Compact extraction editor tabs with icons and responsive collapse; the API tab is folded into Advanced
+- PDFs open inline in a new tab instead of triggering a download
+- Document validation surfaces its reason in a tooltip on the file warning icon
+- Workflow run button shows a "Select a document to run" hint when muted; clearer errors when adding a workflow task fails
+- Folder breadcrumb navigation made more discoverable; file-browser checkbox hit target now spans the whole cell
+- Library and extraction list sidebars refresh their cache after a workflow or extraction import
+- Move Support Center to the Teams dropdown for support agents; support notifications open the ticket directly, and ticket clicks open in the chat panel
+- Removed em dashes and double em dashes from user-visible UI text and messages
+- Removed the admin "Debugging" tab from the Admin panel
+- Pass document text into `ResearchNode` and `FormFillerNode` on a Document trigger
+- Aggregate extraction fields across all tasks in certification validators
+- Send a set-password email to SSO-only users who hit "forgot password"
+- Respect `thinking=false` in LLM requests; route Qwen thinking toggles through `chat_template_kwargs`
+- Deeper XLSX, DOCX, and PDF extraction tuned for research-admin documents; CSV parser and OCR improvements
+- Sanitize PDF download text for fpdf core-font latin-1 encoding
+- Allow `.txt` / `.md` files through upload validation and the secondary picker
+- Capture selected docs when launching a prompt task from the library
+- Library: surface unprocessed chat docs; fix `last used` timezone, sorting, and highlighting; "Move to folder" label no longer opens the item
+- Stop long document titles from squeezing out the reveal-markdown button
+- Portal the verified-workflow preview modal to escape its panel stacking context
+- Make Import Definition replace the open workflow; Advanced tab UI cleanup
+- Move extraction import/export cards to the top of the Tools tab; import extraction definitions into the open SearchSet
+
+### Fixed
+- `EMFILE: too many open files` errors on KB ingest under load
+- KB collection deletion is now idempotent when the collection is already absent
+- Endless spinner and missing OAuth flow on team-invite acceptance
+- Workflow Document-trigger input handling and Input-tab drop zone
+- Automation wizard "Importing a module script failed" error
+- "Add Document" task search boxes not surfacing files
+- `500` on `GET /api/workflows/{id}` when dict fields held raw ObjectIds
+- Library share crash from an invalid `SearchSetItem.space_id` access
+- `admin.py` use of `get_agent_model`
+- Chat: persist a placeholder assistant turn when the stream fails so the conversation does not appear to silently drop
+- Several unresolved Sentry errors in `vandalizer-backend`
+- Clear the extraction-result highlight when the viewed document changes
+
+### Security
+- Gate automation editing on the `can_manage` permission so non-managers cannot mutate automation configs
+- Only notify configured support contacts on new tickets and messages, not all admins
+
+## [v4.1.0] - 2026-04-20
 
 ### Added
 - Docker Compose stack with healthchecks for all services (Redis, MongoDB, ChromaDB, API, Celery, frontend)

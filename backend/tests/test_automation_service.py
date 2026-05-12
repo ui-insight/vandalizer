@@ -15,11 +15,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.services.automation_service import (
+    apply_automation_update,
     create_automation,
-    delete_automation,
     get_automation,
     list_automations,
-    update_automation,
 )
 
 
@@ -143,32 +142,17 @@ class TestGetAutomation:
         MockA.get.assert_awaited_once()
 
 
-class TestUpdateAutomation:
-    @pytest.mark.asyncio
-    async def test_unauthorized_returns_none_without_side_effects(self):
-        user = SimpleNamespace(user_id="alice")
-        with patch(
-            "app.services.automation_service.get_authorized_automation",
-            AsyncMock(return_value=None),
-        ):
-            result = await update_automation("a-1", user, name="new")
-        assert result is None
-
+class TestApplyAutomationUpdate:
     @pytest.mark.asyncio
     async def test_selected_fields_updated_others_preserved(self):
         auto = _auto(name="Old", enabled=True, description="original")
-        user = SimpleNamespace(user_id="alice")
 
-        with patch(
-            "app.services.automation_service.get_authorized_automation",
-            AsyncMock(return_value=auto),
-        ):
-            result = await update_automation(
-                "a-1", user,
-                name="New name",
-                enabled=False,
-                trigger_config={"k": "v"},
-            )
+        result = await apply_automation_update(
+            auto,
+            name="New name",
+            enabled=False,
+            trigger_config={"k": "v"},
+        )
 
         assert result is auto
         assert auto.name == "New name"
@@ -181,45 +165,18 @@ class TestUpdateAutomation:
     @pytest.mark.asyncio
     async def test_all_optional_fields_can_be_updated(self):
         auto = _auto()
-        user = SimpleNamespace(user_id="alice")
-        with patch(
-            "app.services.automation_service.get_authorized_automation",
-            AsyncMock(return_value=auto),
-        ):
-            await update_automation(
-                "a-1", user,
-                description="new description",
-                trigger_type="m365",
-                action_type="chain",
-                action_id="wf-2",
-                shared_with_team=True,
-                output_config={"dest": "/out"},
-            )
+        await apply_automation_update(
+            auto,
+            description="new description",
+            trigger_type="m365",
+            action_type="chain",
+            action_id="wf-2",
+            shared_with_team=True,
+            output_config={"dest": "/out"},
+        )
         assert auto.description == "new description"
         assert auto.trigger_type == "m365"
         assert auto.action_type == "chain"
         assert auto.action_id == "wf-2"
         assert auto.shared_with_team is True
         assert auto.output_config == {"dest": "/out"}
-
-
-class TestDeleteAutomation:
-    @pytest.mark.asyncio
-    async def test_missing_returns_false(self):
-        user = SimpleNamespace(user_id="alice")
-        with patch(
-            "app.services.automation_service.get_authorized_automation",
-            AsyncMock(return_value=None),
-        ):
-            assert await delete_automation("a-1", user) is False
-
-    @pytest.mark.asyncio
-    async def test_deletes_and_returns_true(self):
-        auto = _auto()
-        user = SimpleNamespace(user_id="alice")
-        with patch(
-            "app.services.automation_service.get_authorized_automation",
-            AsyncMock(return_value=auto),
-        ):
-            assert await delete_automation("a-1", user) is True
-        auto.delete.assert_awaited_once()

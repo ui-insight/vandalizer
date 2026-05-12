@@ -43,11 +43,20 @@ export function register(
   password: string,
   name?: string,
   invite_token?: string,
+  join_link_token?: string,
   role_segment?: string,
 ) {
   return apiFetch<User>('/api/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ user_id, email, password, name, invite_token, role_segment }),
+    body: JSON.stringify({
+      user_id,
+      email,
+      password,
+      name,
+      invite_token,
+      join_link_token,
+      role_segment,
+    }),
   })
 }
 

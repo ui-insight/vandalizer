@@ -176,15 +176,20 @@ Each model entry includes:
 - **Name** — a display label (e.g., "GPT-4o", "Claude Sonnet")
 - **API key** — the key for that provider
 - **Endpoint URL** — the API base URL
-- **Protocol** — `openai`, `ollama`, or `vllm`
+- **Protocol** — `openai`, `anthropic`, `openrouter`, `ollama`, or `vllm` (or leave blank for auto-detect)
 
-This design supports any OpenAI-compatible API, including:
+The `anthropic` protocol uses Anthropic's native Messages API for first-class
+support of Claude models (tool use, streaming, native thinking). The
+`openrouter` protocol routes through OpenRouter's OpenAI-compatible gateway
+with automatic app attribution. The other three (`openai`, `ollama`, `vllm`)
+all speak OpenAI-compatible HTTP, so any provider that exposes that interface
+works:
 
-- OpenAI
-- Azure OpenAI
+- OpenAI / Azure OpenAI
+- Anthropic (native or via OpenAI-compat at `https://api.anthropic.com/v1/`)
+- OpenRouter
 - Ollama (local models)
 - vLLM
-- OpenRouter
 - Any other provider exposing an OpenAI-compatible endpoint
 
 Models can be added, removed, or rotated at any time without restarting the application.

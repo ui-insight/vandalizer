@@ -23,6 +23,7 @@ import { ModuleDetail } from '../components/certification/ModuleDetail'
 import { useQueryClient } from '@tanstack/react-query'
 import { JourneyMap } from '../components/certification/JourneyMap'
 import { LEVEL_CONFIG, LEVEL_THRESHOLDS, TOTAL_XP, TIERS } from '../components/certification/constants'
+import { useModuleLock } from '../components/certification/useModuleLock'
 
 // ---------------------------------------------------------------------------
 // Module definitions
@@ -144,7 +145,7 @@ export const MODULES: ModuleDefinition[] = [
       {
         title: 'Build your first workflow',
         objective: 'After this lesson, you\'ll be ready to run your first extraction workflow on a real document.',
-        content: 'When you start the lab exercise, here\'s what you\'ll do:\n\n1. Click **Set Up Lab** below to load the sample NSF proposal into your workspace.\n2. Go to the **Library** tab and click **New** to create a new workflow.\n3. Give your workflow a clear name, like "Grant Proposal Extractor", and add a description such as "Extracts key details from grant proposals".\n4. Add a step and give it a name, like "Extract Grant Details". Then add an Extraction task to that step.\n5. In the Extraction task settings, select an existing Extraction or create a new one.\n6. Add at least 3 fields to your Extraction \u2014 for example: "Principal Investigator", "Funding Amount", "Sponsoring Agency".\n7. Select the sample NSF proposal, then click Run to execute the workflow.\n8. Review the extracted results in the output panel.',
+        content: 'When you start the lab exercise, here\'s what you\'ll do:\n\n1. Click **Set Up Lab** (the button at the top of this module) to load the sample NSF proposal into your workspace.\n2. Go to the **Library** tab and click **New** to create a new workflow.\n3. Give your workflow a clear name, like "Grant Proposal Extractor", and add a description such as "Extracts key details from grant proposals".\n4. Add a step and give it a name, like "Extract Grant Details". Then add an Extraction task to that step.\n5. In the Extraction task settings, select an existing Extraction or create a new one.\n6. Add at least 3 fields to your Extraction \u2014 for example: "Principal Investigator", "Funding Amount", "Sponsoring Agency".\n7. Select the sample NSF proposal, then click Run to execute the workflow.\n8. Review the extracted results in the output panel.',
         variant: 'walkthrough',
       },
       {
@@ -312,7 +313,7 @@ export const MODULES: ModuleDefinition[] = [
     ],
     tips: [
       'The NIH R01 has clearly structured sections: budget, key personnel, specific aims, vertebrate animals',
-      'Use enum_values to constrain fields like Human Subjects (Yes/No) and Clinical Trial (Yes/No)',
+      'Use the Allowed values setting on a field to constrain answers to a list (e.g., Human Subjects: Yes/No, Clinical Trial: Yes/No)',
       'Mark fields like Co-Investigator as optional since there may be multiple',
     ],
     lessons: [
@@ -335,7 +336,7 @@ export const MODULES: ModuleDefinition[] = [
       {
         title: 'Configuring fields for accuracy',
         objective: 'After this lesson, you\'ll be able to configure extraction fields that minimize hallucinations and missed values.',
-        content: 'The way you configure your Extraction fields directly impacts extraction quality:\n\n**Field names** should be specific and unambiguous. "PI Name" is better than "Name". "Total Budget (USD)" is better than "Budget".\n\n**Enum values** constrain a field to a set of allowed options. For a field like "Document Type", you might set enum values to ["Grant Proposal", "Progress Report", "Budget Justification"]. This prevents the LLM from inventing categories.\n\n**Optional fields** should be marked as such. If a field like "Co-PI" won\'t appear in every document, marking it optional tells the extraction engine not to hallucinate a value when one doesn\'t exist.\n\n**Field descriptions** (in the title/searchphrase) give the LLM additional context about what to look for.',
+        content: 'The way you configure your Extraction fields directly impacts extraction quality:\n\n**Field names** should be specific and unambiguous. "PI Name" is better than "Name". "Total Budget (USD)" is better than "Budget".\n\n**Allowed values** (the field setting labeled "Allowed values" in the Extraction editor — sometimes called *enum values* in technical docs) constrain a field to a fixed list of options. For a field like "Document Type", you might set Allowed values to "Grant Proposal, Progress Report, Budget Justification". The LLM must pick one of those — it can\'t invent a new category. Use this any time the answer should be one of a known set: Yes/No, a status, a document type, a funding mechanism, etc.\n\n**Optional fields** should be marked as such. If a field like "Co-PI" won\'t appear in every document, marking it optional tells the extraction engine not to hallucinate a value when one doesn\'t exist.\n\n**Field descriptions** (in the title/searchphrase) give the LLM additional context about what to look for.',
         variant: 'concept',
         knowledgeCheck: {
           question: 'When should you mark an Extraction field as optional?',
@@ -349,7 +350,7 @@ export const MODULES: ModuleDefinition[] = [
       },
       {
         title: 'Build a comprehensive extraction',
-        content: '1. Create a new Extraction or expand an existing one to 15+ fields.\n2. Group related fields logically \u2014 e.g., personnel fields together, budget fields together.\n3. Use enum_values for any categorical field (status, type, category).\n4. Mark fields that may not always be present as optional.\n5. Add descriptive titles to help the LLM understand ambiguous fields.\n6. Run the extraction on a test document and review the results.\n7. Iterate: adjust field names and add enum constraints for any fields that extracted poorly.',
+        content: '1. Create a new Extraction or expand an existing one to 15+ fields.\n2. Group related fields logically \u2014 e.g., personnel fields together, budget fields together.\n3. For any categorical field (status, type, category), open the field and fill in the **Allowed values** setting with the list of valid options.\n4. Mark fields that may not always be present as optional.\n5. Add descriptive titles to help the LLM understand ambiguous fields.\n6. Run the extraction on a test document and review the results.\n7. Iterate: adjust field names and add Allowed values for any fields that extracted poorly.',
         variant: 'walkthrough',
       },
       {
@@ -984,15 +985,7 @@ export default function Certification() {
 
   const overallPct = (totalXp / TOTAL_XP) * 100
 
-  const isModuleLocked = useCallback((moduleId: string): boolean => {
-    const module = MODULES.find(m => m.id === moduleId)
-    if (!module) return true
-    if (module.number === 0) return false // Module 0 always unlocked
-    if (progress?.unlocked) return false // Admin debug unlock — bypass prerequisites
-    const prevModule = MODULES.find(m => m.number === module.number - 1)
-    if (!prevModule) return false
-    return !progress?.modules[prevModule.id]?.completed
-  }, [progress])
+  const isModuleLocked = useModuleLock(progress)
 
   // Load exercise when active module changes
   useEffect(() => {

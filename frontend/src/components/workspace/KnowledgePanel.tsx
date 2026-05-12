@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload } from 'lucide-react'
+import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload, HelpCircle } from 'lucide-react'
 import { useKnowledgeBases, useScopedKnowledgeBases } from '../../hooks/useKnowledgeBases'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useAuth } from '../../hooks/useAuth'
@@ -14,7 +14,8 @@ import { AddUrlsModal } from '../knowledge/AddUrlsModal'
 import { DocumentPickerModal } from '../knowledge/DocumentPickerModal'
 import { KBSearchBar } from '../knowledge/KBSearchBar'
 import { KBListView } from '../knowledge/KBListView'
-import { KnowledgeTutorial } from './KnowledgeTutorial'
+import { KnowledgeExplainer } from './KnowledgeExplainer'
+import { ShareWithTeamDialog } from '../library/ShareWithTeamDialog'
 import { useToast } from '../../contexts/ToastContext'
 
 type TabKey = 'mine' | 'team' | 'explore'
@@ -67,6 +68,7 @@ export function KnowledgePanel() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [showUrlModal, setShowUrlModal] = useState(false)
   const [showDocPicker, setShowDocPicker] = useState(false)
+  const [showExplainer, setShowExplainer] = useState(false)
   const [addingDocs, setAddingDocs] = useState(false)
   const [addingUrls, setAddingUrls] = useState(false)
   const [editingTitle, setEditingTitle] = useState(false)
@@ -212,14 +214,36 @@ export function KnowledgePanel() {
     activateKB(selectedKB.uuid, selectedKB.title)
   }
 
+  const [shareKBDialogOpen, setShareKBDialogOpen] = useState(false)
+
   const handleToggleShare = async () => {
     if (!selectedKB) return
+    // Sharing for the first time → prompt for a note. Unsharing is silent.
+    if (!selectedKB.shared_with_team) {
+      setShareKBDialogOpen(true)
+      return
+    }
     try {
       await api.shareKnowledgeBase(selectedKB.uuid)
       loadDetail(selectedKB.uuid)
       refresh()
     } catch (err) {
       console.error('Failed to toggle sharing:', err)
+    }
+  }
+
+  const confirmShareKB = async (comment: string) => {
+    if (!selectedKB) return
+    try {
+      await api.shareKnowledgeBase(selectedKB.uuid, comment || undefined)
+      toast('Shared with team', 'success')
+      loadDetail(selectedKB.uuid)
+      refresh()
+    } catch (err) {
+      console.error('Failed to share KB:', err)
+      toast('Failed to share knowledge base', 'error')
+    } finally {
+      setShareKBDialogOpen(false)
     }
   }
 
@@ -324,7 +348,8 @@ export function KnowledgePanel() {
   if (selectedKB) {
     const badge = STATUS_BADGE[selectedKB.status] || STATUS_BADGE.empty
     return (
-      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#1e1e1e' }}>
+      <>
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#1e1e1e', position: 'relative' }}>
         {/* Header */}
         <div
           style={{
@@ -660,8 +685,39 @@ export function KnowledgePanel() {
                 })}
               </div>
             )}
+
+            {/* "What are knowledge bases?" pill */}
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: 24, marginBottom: 4 }}>
+              <button
+                onClick={() => setShowExplainer(true)}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '6px 14px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
+                  color: '#9ca3af',
+                  backgroundColor: '#262626',
+                  border: '1px solid #3a3a3a',
+                  borderRadius: 999, cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.backgroundColor = '#2f2f2f'
+                  e.currentTarget.style.color = '#e5e7eb'
+                  e.currentTarget.style.borderColor = '#4a4a4a'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.backgroundColor = '#262626'
+                  e.currentTarget.style.color = '#9ca3af'
+                  e.currentTarget.style.borderColor = '#3a3a3a'
+                }}
+              >
+                <HelpCircle size={13} />
+                What are knowledge bases?
+              </button>
+            </div>
           </div>
         )}
+
+        {showExplainer && <KnowledgeExplainer onClose={() => setShowExplainer(false)} />}
 
         {showUrlModal && (
           <AddUrlsModal
@@ -838,6 +894,15 @@ export function KnowledgePanel() {
           </div>
         )}
       </div>
+
+      {shareKBDialogOpen && (
+        <ShareWithTeamDialog
+          itemName={selectedKB.title}
+          onCancel={() => setShareKBDialogOpen(false)}
+          onConfirm={confirmShareKB}
+        />
+      )}
+      </>
     )
   }
 
@@ -974,7 +1039,7 @@ export function KnowledgePanel() {
       )}
 
       {/* List */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px', position: 'relative' }}>
         <KBListView
           scope={listScope}
           search={search}
@@ -993,7 +1058,7 @@ export function KnowledgePanel() {
             ? async (uuid) => { await api.cloneKnowledgeBase(uuid); refresh() }
             : undefined}
           onExplore={activeTab === 'explore' ? handleExploreKBClick : undefined}
-          emptyComponent={activeTab === 'mine' && !search ? <KnowledgeTutorial /> : undefined}
+          emptyComponent={activeTab === 'mine' && !search ? <KnowledgeExplainer /> : undefined}
           emptyMessage={
             activeTab === 'team'
               ? 'No knowledge bases shared with your team yet.'

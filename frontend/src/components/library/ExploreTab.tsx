@@ -10,6 +10,7 @@ import {
 import { useNavigate } from '@tanstack/react-router'
 import { QualityBadge } from './QualityBadge'
 import { AddToLibraryDialog } from './AddToLibraryDialog'
+import { AuthorChip } from '../shared/AuthorChip'
 import {
   listVerifiedItems, browseCollections, listFeaturedCollections,
   listLibraries,
@@ -148,6 +149,9 @@ export function ItemDetailModal({
             )}
             {item.kind === 'knowledge_base' && item.total_chunks != null && (
               <span className="text-white/70">{item.total_chunks.toLocaleString()} chunks</span>
+            )}
+            {item.created_by && (
+              <AuthorChip author={item.created_by} size="md" label="by" />
             )}
           </div>
         </div>
@@ -299,6 +303,12 @@ function CatalogCard({
 
       {item.description && (
         <p className="text-xs text-gray-600 mb-2">{item.description}</p>
+      )}
+
+      {item.created_by && (
+        <div className="mb-2">
+          <AuthorChip author={item.created_by} />
+        </div>
       )}
 
       {item.kind === 'knowledge_base' && (item.total_sources != null || item.total_chunks != null) && (
@@ -486,6 +496,14 @@ export function ExploreTab() {
   const showHero = !hasActiveFilters && !loading
 
   const navigate = useNavigate()
+
+  // Saving a verified workflow/extraction from Explore creates a reference
+  // to the verified item — not a copy. The reference carries the verified
+  // mark and validation history. Editing requires making a copy from the
+  // editor banner.
+  const handleAddToLibrary = (item: VerifiedCatalogItem) => {
+    setAddToLibraryItem(item)
+  }
 
   const handleAdoptKB = async (kbUuid: string) => {
     try {
@@ -824,7 +842,7 @@ export function ExploreTab() {
         <ItemDetailModal
           item={detailItem}
           onClose={() => setDetailItem(null)}
-          onAddToLibrary={(itm) => { setDetailItem(null); setAddToLibraryItem(itm) }}
+          onAddToLibrary={(itm) => { setDetailItem(null); handleAddToLibrary(itm) }}
           onAdoptKB={handleAdoptKB}
           onTryIt={handleTryIt}
         />
@@ -837,7 +855,10 @@ export function ExploreTab() {
           itemId={addToLibraryItem.item_id}
           kind={addToLibraryItem.kind as LibraryItemKind}
           onClose={() => setAddToLibraryItem(null)}
-          onAdded={() => { setAddToLibraryItem(null); toast('Saved to library', 'success') }}
+          onAdded={() => {
+            setAddToLibraryItem(null)
+            toast('Saved to library', 'success')
+          }}
         />
       )}
     </>

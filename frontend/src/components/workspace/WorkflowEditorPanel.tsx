@@ -5,13 +5,14 @@ import {
   FileText, Filter, Outdent, Globe, Image, Code,
   Bug, Search, Zap, Download, Package, CheckCircle, XCircle,
   MousePointerClick, PenTool, ClipboardCheck, Flag,
-  AlertTriangle, ChevronDown, ChevronRight, ArrowUp, ArrowDown,
+  ChevronDown, ChevronRight, ArrowUp, ArrowDown,
   Circle, Hand, Keyboard, Sparkles, ShieldCheck, Type,
   ArrowRight, Pause, TrendingUp, RefreshCw,
   Upload, Clock, Copy, Check,
 } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
+import { useAuth } from '../../hooks/useAuth'
 import {
   getWorkflow, addStep, deleteStep, addTask, deleteTask, updateTask,
   updateWorkflow, updateStep, downloadResults, testStep, getTestStepStatus,
@@ -27,11 +28,15 @@ import type { ValidationCheck, ValidationCheckDefinition, ValidationInputDefinit
 import { ItemPickerModal } from './ItemPickerModal'
 import { getModels } from '../../api/config'
 import { searchDocuments } from '../../api/documents'
+import { listCredentials } from '../../api/credentials'
+import type { Credential } from '../../types/credential'
 import { uploadFile } from '../../api/files'
 import { listKnowledgeBases } from '../../api/knowledge'
+import { listAllFolders } from '../../api/folders'
 import type { KnowledgeBase } from '../../types/knowledge'
+import { listItems as listSearchSetItems } from '../../api/extractions'
 import { useWorkflowRunner } from '../../hooks/useWorkflowRunner'
-import type { Workflow, WorkflowStep, WorkflowTask, WorkflowStatus, ModelInfo } from '../../types/workflow'
+import type { Workflow, WorkflowStep, WorkflowTask, WorkflowStatus, ModelInfo, SearchSetItem } from '../../types/workflow'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
@@ -41,8 +46,8 @@ import { QualitySparkline } from '../library/QualitySparkline'
 import { useQualitySparkline } from '../../hooks/useQualitySparkline'
 import { relativeTime } from '../../utils/time'
 import { VerificationSubmitDialog } from '../shared/VerificationSubmitDialog'
-import { getApproval, approveRequest, rejectRequest } from '../../api/approvals'
-import type { ApprovalRequest } from '../../api/approvals'
+import { getReview, approveReview, rejectReview } from '../../api/reviews'
+import type { ReviewDetail } from '../../api/reviews'
 
 // ---------------------------------------------------------------------------
 // Types & constants
@@ -60,25 +65,44 @@ interface TaskTypeDef {
   color: string
   categories: TaskCategory[]
   enabled: boolean
+  description: string
 }
 
 const TASK_TYPES: TaskTypeDef[] = [
-  { name: 'Extraction', label: 'Extractions', icon: Filter, color: '#dc2626', categories: ['all', 'text'], enabled: true },
-  { name: 'Prompt', label: 'Prompts', icon: MousePointerClick, color: '#2563eb', categories: ['all', 'text'], enabled: true },
-  { name: 'Formatter', label: 'Format', icon: Outdent, color: '#16a34a', categories: ['all', 'text'], enabled: true },
-  { name: 'Browser', label: 'Browser Automation', icon: Globe, color: '#2563eb', categories: ['all', 'web'], enabled: false },
-  { name: 'AddDocument', label: 'Add Document', icon: FileText, color: '#7c3aed', categories: ['all', 'files'], enabled: true },
-  { name: 'AddWebsite', label: 'Add Website', icon: Globe, color: '#0891b2', categories: ['all', 'web'], enabled: true },
-  { name: 'DescribeImage', label: 'Describe Image', icon: Image, color: '#ec4899', categories: ['all', 'web'], enabled: false },
-  { name: 'CodeNode', label: 'Code Node', icon: Code, color: '#f59e0b', categories: ['all', 'web'], enabled: false },
-  { name: 'CrawlerNode', label: 'Crawler Node', icon: Bug, color: '#84cc16', categories: ['all', 'web'], enabled: true },
-  { name: 'ResearchNode', label: 'Research Node', icon: Search, color: '#8b5cf6', categories: ['all', 'web'], enabled: true },
-  { name: 'KnowledgeBaseQuery', label: 'Knowledge Base Query', icon: Sparkles, color: '#0ea5e9', categories: ['all', 'text'], enabled: true },
-  { name: 'APINode', label: 'API Node', icon: Zap, color: '#f97316', categories: ['all', 'web'], enabled: true },
-  { name: 'DocumentRenderer', label: 'Document Renderer', icon: FileText, color: '#0d9488', categories: ['all', 'output'], enabled: true },
-  { name: 'FormFiller', label: 'Form Filler', icon: MousePointerClick, color: '#e11d48', categories: ['all', 'output'], enabled: true },
-  { name: 'DataExport', label: 'Data Export', icon: Download, color: '#059669', categories: ['all', 'output'], enabled: true },
-  { name: 'PackageBuilder', label: 'Package Builder', icon: Package, color: '#6366f1', categories: ['all', 'output'], enabled: false },
+  { name: 'Extraction', label: 'Extractions', icon: Filter, color: '#dc2626', categories: ['all', 'text'], enabled: true,
+    description: 'Pulls structured fields out of the step input — names, dates, amounts, etc. — using prompts you define per field.' },
+  { name: 'Prompt', label: 'Prompts', icon: MousePointerClick, color: '#2563eb', categories: ['all', 'text'], enabled: true,
+    description: 'Sends free-form instructions to the LLM and captures the response as text. Use for summaries, rewrites, or open-ended analysis.' },
+  { name: 'Formatter', label: 'Format', icon: Outdent, color: '#16a34a', categories: ['all', 'text'], enabled: true,
+    description: 'Reformats the step input into a target shape — markdown, JSON, table, etc. — without further analysis.' },
+  { name: 'Browser', label: 'Browser Automation', icon: Globe, color: '#2563eb', categories: ['all', 'web'], enabled: false,
+    description: 'Drives a real browser to interact with web pages: click, type, scroll, capture results.' },
+  { name: 'AddDocument', label: 'Add Document', icon: FileText, color: '#7c3aed', categories: ['all', 'files'], enabled: true,
+    description: 'Pulls a document from your library or files into the workflow as input for later steps.' },
+  { name: 'AddWebsite', label: 'Add Website', icon: Globe, color: '#0891b2', categories: ['all', 'web'], enabled: true,
+    description: 'Fetches a single web page and adds its contents as input for later steps.' },
+  { name: 'DescribeImage', label: 'Describe Image', icon: Image, color: '#ec4899', categories: ['all', 'web'], enabled: false,
+    description: 'Sends an image to a vision model and returns a written description of what it shows.' },
+  { name: 'CodeNode', label: 'Code Node', icon: Code, color: '#f59e0b', categories: ['all', 'web'], enabled: false,
+    description: 'Runs a small block of code against the step input for custom transforms.' },
+  { name: 'CrawlerNode', label: 'Crawler Node', icon: Bug, color: '#84cc16', categories: ['all', 'web'], enabled: true,
+    description: 'Recursively follows links from a starting URL and collects page contents for downstream steps.' },
+  { name: 'ResearchNode', label: 'Research Node', icon: Search, color: '#8b5cf6', categories: ['all', 'web'], enabled: true,
+    description: 'Runs an LLM-driven web search and synthesizes the findings into a written report.' },
+  { name: 'KnowledgeBaseQuery', label: 'Knowledge Base Query', icon: Sparkles, color: '#0ea5e9', categories: ['all', 'text'], enabled: true,
+    description: 'Queries a connected knowledge base via RAG and returns the matching passages.' },
+  { name: 'APINode', label: 'API Node', icon: Zap, color: '#f97316', categories: ['all', 'web'], enabled: true,
+    description: 'Calls an external HTTP API and returns the parsed response for downstream steps to use.' },
+  { name: 'DocumentRenderer', label: 'Document Renderer', icon: FileText, color: '#0d9488', categories: ['all', 'output'], enabled: true,
+    description: 'Renders the step output into a downloadable file (DOCX, PDF, etc.) and saves it to the workflow result.' },
+  { name: 'FormFiller', label: 'Form Filler', icon: MousePointerClick, color: '#e11d48', categories: ['all', 'output'], enabled: true,
+    description: 'Maps the step output into the fields of a target form template and produces the filled form.' },
+  { name: 'DataExport', label: 'Data Export', icon: Download, color: '#059669', categories: ['all', 'output'], enabled: true,
+    description: 'Exports tabular step output to CSV or XLSX so it can be downloaded or sent to an external sink.' },
+  { name: 'PackageBuilder', label: 'Package Builder', icon: Package, color: '#6366f1', categories: ['all', 'output'], enabled: false,
+    description: 'Bundles multiple workflow outputs together into a single zip package.' },
+  { name: 'Approval', label: 'Approval Gate', icon: Hand, color: '#a855f7', categories: ['all', 'output'], enabled: true,
+    description: 'Pauses the workflow until a designated reviewer approves or rejects the result so far.' },
 ]
 
 const CATEGORIES: { key: TaskCategory; label: string }[] = [
@@ -142,6 +166,7 @@ const TEST_MESSAGES = [
 export function WorkflowEditorPanel() {
   const queryClient = useQueryClient()
   const { toast } = useToast()
+  const { user } = useAuth()
   const { openWorkflowId, openWorkflow, closeWorkflow, consumeWorkflowSession, selectedDocUuids, bumpActivitySignal } = useWorkspace()
   const [workflow, setWorkflow] = useState<Workflow | null>(null)
   const [loading, setLoading] = useState(true)
@@ -250,8 +275,22 @@ export function WorkflowEditorPanel() {
 
   // --- handlers ---
 
+  // Block edits on verified workflows for non-examiners. Returns true if blocked.
+  const blockedByVerified = (): boolean => {
+    const isVerified = !!(workflow as Workflow & { verified?: boolean })?.verified
+    if (isVerified && !user?.is_examiner) {
+      toast('This workflow is verified — make a copy to edit', 'error')
+      return true
+    }
+    return false
+  }
+
   const handleTitleSave = async () => {
     if (!openWorkflowId || !titleValue.trim()) {
+      setEditingTitle(false)
+      return
+    }
+    if (blockedByVerified()) {
       setEditingTitle(false)
       return
     }
@@ -264,6 +303,10 @@ export function WorkflowEditorPanel() {
     if (!openWorkflowId || !newStepName.trim()) return
     if (workflow?.can_manage === false) {
       toast('Make a copy to edit this workflow', 'error')
+      setShowNewStepModal(false)
+      return
+    }
+    if (blockedByVerified()) {
       setShowNewStepModal(false)
       return
     }
@@ -291,6 +334,10 @@ export function WorkflowEditorPanel() {
     if (!editingStepId) return
     if (workflow?.can_manage === false) {
       toast('Make a copy to edit this workflow', 'error')
+      setShowTaskPicker(false)
+      return
+    }
+    if (blockedByVerified()) {
       setShowTaskPicker(false)
       return
     }
@@ -420,13 +467,28 @@ export function WorkflowEditorPanel() {
   return (
     <div className="flex h-full flex-col" style={{ backgroundColor: '#fff', position: 'relative' }}>
       {/* ===== VERIFIED WORKFLOW NOTICE ===== */}
-      {workflow.steps.length > 0 && (workflow as Workflow & { verified?: boolean }).verified && (
+      {(workflow as Workflow & { verified?: boolean }).verified && (
         <div style={{
-          margin: '8px 24px 0', padding: '8px 12px', fontSize: 12, color: '#a16c2d',
-          backgroundColor: '#fef3c7', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 6,
+          margin: '8px 24px 0', padding: '8px 12px', fontSize: 12, color: '#78350f',
+          backgroundColor: '#fef3c7', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 8,
+          border: '1px solid #fde68a',
         }}>
-          <AlertTriangle style={{ width: 14, height: 14, flexShrink: 0 }} />
-          Verified workflows are view-only unless you are an examiner. Clone the workflow to make changes.
+          <ShieldCheck style={{ width: 14, height: 14, flexShrink: 0, color: '#b45309' }} />
+          <span style={{ flex: 1 }}>
+            This is a verified workflow. Make a copy to edit it — your edits won't affect the verified version.
+          </span>
+          <button
+            onClick={handleMakeCopy}
+            disabled={duplicating}
+            style={{
+              padding: '4px 10px', fontSize: 11, fontWeight: 700, fontFamily: 'inherit',
+              borderRadius: 4, border: '1px solid #b45309',
+              backgroundColor: '#fff7ed', color: '#78350f', cursor: 'pointer',
+              whiteSpace: 'nowrap', opacity: duplicating ? 0.6 : 1,
+            }}
+          >
+            {duplicating ? 'Copying...' : 'Make a copy to edit'}
+          </button>
         </div>
       )}
 
@@ -491,8 +553,9 @@ export function WorkflowEditorPanel() {
                 await importIntoWorkflow(workflow.id, f)
                 await queryClient.invalidateQueries({ queryKey: ['workflows'] })
                 await refresh()
+                toast('Workflow imported successfully', 'success')
               } catch (err: unknown) {
-                alert(err instanceof Error ? err.message : 'Import failed')
+                toast(err instanceof Error ? err.message : 'Import failed', 'error')
               }
             }}
           />
@@ -786,6 +849,12 @@ export function WorkflowEditorPanel() {
             </label>
           )
         )}
+        {!isTextInput && selectedDocUuids.length === 0 && (
+          <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <FileText style={{ width: 12, height: 12 }} />
+            Select a document to run this workflow
+          </div>
+        )}
         <button
           onClick={handleRun}
           disabled={runner.running || (isTextInput ? !textInput.trim() : selectedDocUuids.length === 0)}
@@ -1046,7 +1115,7 @@ function DesignCanvas({
       })()}
 
       {/* +ADD STEP */}
-      {canManage && (
+      {canManage && !runnerRunning && (
         <>
           <ConnectionLine />
           <div style={{ display: 'flex', justifyContent: 'center' }}>
@@ -1410,6 +1479,7 @@ function EditStepOverlay({
                       : task.name === 'FormFiller' ? 'Fill template'
                       : task.name === 'DataExport' ? 'Export data'
                       : task.name === 'PackageBuilder' ? 'Build zip package'
+                      : task.name === 'Approval' ? 'Approval gate'
                       : task.name}
                   </div>
                 </div>
@@ -1500,6 +1570,25 @@ function TaskTypePicker({ category, setCategory, onSelect, onClose }: {
     category === 'all' ? true : t.categories.includes(category)
   )
 
+  const [tooltip, setTooltip] = useState<{
+    task: TaskTypeDef
+    x: number
+    y: number
+    placement: 'top' | 'bottom'
+  } | null>(null)
+
+  const showTooltip = (taskType: TaskTypeDef, target: HTMLElement) => {
+    const rect = target.getBoundingClientRect()
+    const placeAbove = rect.top > 140
+    setTooltip({
+      task: taskType,
+      x: rect.left + rect.width / 2,
+      y: placeAbove ? rect.top - 8 : rect.bottom + 8,
+      placement: placeAbove ? 'top' : 'bottom',
+    })
+  }
+  const hideTooltip = () => setTooltip(null)
+
   return (
     <div style={{
       position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1001,
@@ -1571,10 +1660,14 @@ function TaskTypePicker({ category, setCategory, onSelect, onClose }: {
                   }}
                   onMouseEnter={e => {
                     (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.08)'
+                    showTooltip(taskType, e.currentTarget)
                   }}
                   onMouseLeave={e => {
                     (e.currentTarget as HTMLElement).style.boxShadow = 'none'
+                    hideTooltip()
                   }}
+                  onFocus={e => showTooltip(taskType, e.currentTarget)}
+                  onBlur={hideTooltip}
                 >
                   <div style={{
                     width: 40, height: 40, borderRadius: 8,
@@ -1623,6 +1716,8 @@ function TaskTypePicker({ category, setCategory, onSelect, onClose }: {
                         opacity: 0.4,
                         fontFamily: 'inherit',
                       }}
+                      onMouseEnter={e => showTooltip(taskType, e.currentTarget)}
+                      onMouseLeave={hideTooltip}
                     >
                       <div style={{
                         width: 40, height: 40, borderRadius: 8,
@@ -1645,6 +1740,34 @@ function TaskTypePicker({ category, setCategory, onSelect, onClose }: {
           )}
         </div>
       </div>
+
+      {/* Hover tooltip — fixed position so it escapes the scrollable grid */}
+      {tooltip && (
+        <div
+          style={{
+            position: 'fixed',
+            left: tooltip.x,
+            top: tooltip.y,
+            transform: tooltip.placement === 'top'
+              ? 'translate(-50%, -100%)'
+              : 'translate(-50%, 0)',
+            maxWidth: 280,
+            background: '#1f2937',
+            color: '#fff',
+            padding: '8px 12px',
+            borderRadius: 8,
+            fontSize: 12,
+            lineHeight: 1.4,
+            pointerEvents: 'none',
+            zIndex: 1100,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+          }}
+          role="tooltip"
+        >
+          <div style={{ fontWeight: 600, marginBottom: 2 }}>{tooltip.task.label}</div>
+          <div style={{ opacity: 0.9 }}>{tooltip.task.description}</div>
+        </div>
+      )}
     </div>
   )
 }
@@ -1750,14 +1873,29 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
   onSave: (taskId: string, data: Record<string, unknown>) => void
   onRefreshWorkflow: () => void
 }) {
+  const { user } = useAuth()
   const [taskData, setTaskData] = useState<Record<string, unknown>>({ ...task.data })
   const [saving, setSaving] = useState(false)
   const [subTab, setSubTab] = useState<TaskSubTab>('design')
 
-  // Input source config
-  const [inputSource, setInputSource] = useState<TaskInputSource>(
-    (task.data.input_source as TaskInputSource) || 'step_input'
-  )
+  // Input source config — multi-select. Migrate legacy single `input_source`
+  // when the new `input_sources` list is absent.
+  const [inputSources, setInputSources] = useState<TaskInputSource[]>(() => {
+    const list = task.data.input_sources as TaskInputSource[] | undefined
+    if (Array.isArray(list) && list.length > 0) return list
+    const legacy = (task.data.input_source as TaskInputSource) || 'step_input'
+    return [legacy]
+  })
+  const inputSource: TaskInputSource = inputSources[0] || 'step_input'
+  const toggleInputSource = (src: TaskInputSource) => {
+    setInputSources(prev => {
+      if (prev.includes(src)) {
+        const next = prev.filter(s => s !== src)
+        return next.length > 0 ? next : [src]  // never empty
+      }
+      return [...prev, src]
+    })
+  }
   const [selectedDocUuid, setSelectedDocUuid] = useState<string>(
     (task.data.selected_document_uuid as string) || ''
   )
@@ -1776,6 +1914,32 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
   const [dragOver, setDragOver] = useState(false)
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Credentials (API Node auth_strategy picker)
+  const [credentials, setCredentials] = useState<Credential[] | null>(null)
+  useEffect(() => {
+    if (task.name !== 'APINode') return
+    let cancelled = false
+    listCredentials()
+      .then(list => { if (!cancelled) setCredentials(list) })
+      .catch(() => { if (!cancelled) setCredentials([]) })
+    return () => { cancelled = true }
+  }, [task.name])
+
+  // Team members (Approval Gate assignee picker)
+  const [approvalTeamMembers, setApprovalTeamMembers] = useState<{ user_id: string; name: string | null; email: string | null; role: string }[]>([])
+  useEffect(() => {
+    if (task.name !== 'Approval') return
+    const teamUuid = user?.current_team_uuid
+    if (!teamUuid) { setApprovalTeamMembers([]); return }
+    let cancelled = false
+    import('../../api/teams').then(({ getTeamMembers }) =>
+      getTeamMembers(teamUuid)
+        .then(list => { if (!cancelled) setApprovalTeamMembers(list) })
+        .catch(() => { if (!cancelled) setApprovalTeamMembers([]) })
+    )
+    return () => { cancelled = true }
+  }, [task.name, user?.current_team_uuid])
 
   // Save fixed documents to workflow input_config
   const saveFixedDocs = async (docs: { uuid: string; title: string }[]) => {
@@ -1825,8 +1989,10 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
   // Fixed doc search debounce — empty query loads recent docs so the field
   // doubles as a browsable picker.
   const fixedSearchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const wantsWorkflowDocs = inputSources.includes('workflow_documents')
+  const wantsSelectDocument = inputSources.includes('select_document')
   useEffect(() => {
-    if (inputSource !== 'workflow_documents') return
+    if (!wantsWorkflowDocs) return
     if (fixedSearchTimeoutRef.current) clearTimeout(fixedSearchTimeoutRef.current)
     const query = fixedDocSearch.trim()
     fixedSearchTimeoutRef.current = setTimeout(async () => {
@@ -1843,7 +2009,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
       }
     }, query ? 250 : 0)
     return () => { if (fixedSearchTimeoutRef.current) clearTimeout(fixedSearchTimeoutRef.current) }
-  }, [fixedDocSearch, fixedDocs, inputSource])
+  }, [fixedDocSearch, fixedDocs, wantsWorkflowDocs])
 
   // Output post-process
   const [postProcessEnabled, setPostProcessEnabled] = useState(
@@ -1855,6 +2021,25 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
 
   // Extraction set picker
   const [showSetPicker, setShowSetPicker] = useState(false)
+
+  // Items from the linked SearchSet — fetched so the editor can show fields
+  // without forcing the user to run the workflow first.
+  const linkedSearchSetUuid = (taskData.search_set_uuid as string | undefined) || null
+  const [linkedSetItems, setLinkedSetItems] = useState<SearchSetItem[]>([])
+  const [linkedSetLoading, setLinkedSetLoading] = useState(false)
+  useEffect(() => {
+    if (task.name !== 'Extraction' || !linkedSearchSetUuid) {
+      setLinkedSetItems([])
+      return
+    }
+    let cancelled = false
+    setLinkedSetLoading(true)
+    listSearchSetItems(linkedSearchSetUuid)
+      .then(items => { if (!cancelled) setLinkedSetItems(items) })
+      .catch(() => { if (!cancelled) setLinkedSetItems([]) })
+      .finally(() => { if (!cancelled) setLinkedSetLoading(false) })
+    return () => { cancelled = true }
+  }, [task.name, linkedSearchSetUuid])
 
   // Model override for LLM tasks
   const LLM_TASKS = ['Extraction', 'Prompt', 'Formatter', 'DescribeImage', 'ResearchNode', 'FormFiller', 'Browser']
@@ -1873,7 +2058,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
   const testMsgRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const color = getTaskColor(task.name)
-  const Icon = getTaskIcon(task.name)
+  const taskIcon = getTaskIcon(task.name)
 
   // Load models for LLM task types
   useEffect(() => {
@@ -1894,7 +2079,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
   // Empty query loads recent docs so the field doubles as a browsable picker.
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
-    if (inputSource !== 'select_document') return
+    if (!wantsSelectDocument) return
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current)
     const query = docSearchQuery.trim()
     searchTimeoutRef.current = setTimeout(async () => {
@@ -1907,7 +2092,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
       }
     }, query ? 250 : 0)
     return () => { if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current) }
-  }, [docSearchQuery, inputSource])
+  }, [docSearchQuery, wantsSelectDocument])
 
   // Cleanup test intervals on unmount
   useEffect(() => {
@@ -1922,8 +2107,11 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
     try {
       const finalData = {
         ...taskData,
-        input_source: inputSource,
-        ...(inputSource === 'select_document' ? { selected_document_uuid: selectedDocUuid } : {}),
+        input_sources: inputSources,
+        // Keep `input_source` for backward compatibility — set to the first
+        // selected source so older code paths still see something sensible.
+        input_source: inputSources[0] || 'step_input',
+        ...(inputSources.includes('select_document') ? { selected_document_uuid: selectedDocUuid } : {}),
         ...(postProcessEnabled ? { post_process_prompt: postProcessPrompt } : { post_process_prompt: undefined }),
       }
       onSave(task.id, finalData)
@@ -2057,7 +2245,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
               backgroundColor: color + '18',
               display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
             }}>
-              <Icon style={{ width: 16, height: 16, color }} />
+              {React.createElement(taskIcon, { style: { width: 16, height: 16, color } })}
             </div>
             <div>
               <div style={{ fontSize: 16, fontWeight: 600, color: '#202124' }}>{task.name}</div>
@@ -2077,6 +2265,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                   : task.name === 'FormFiller' ? 'Fill a template with data'
                   : task.name === 'DataExport' ? 'Export structured data as a file'
                   : task.name === 'PackageBuilder' ? 'Bundle outputs into a zip'
+                  : task.name === 'Approval' ? 'Pause for human review before continuing'
                   : 'Configure this task'}
               </div>
             </div>
@@ -2146,22 +2335,54 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                   )}
                 </div>
 
-                <div style={{ marginBottom: 16 }}>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
-                    Extraction fields
-                  </label>
-                  <ExtractionTagInput
-                    tags={Array.isArray(taskData.extractions) ? (taskData.extractions as string[]) : []}
-                    onChange={(tags) => setTaskData(prev => ({ ...prev, extractions: tags }))}
-                  />
-                </div>
-
-                {Boolean(taskData.search_set_uuid) && (
-                  <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
-                    <span style={{ fontWeight: 600 }}>Linked extraction:</span>{' '}
-                    <span style={{ fontFamily: 'monospace', fontSize: 11 }}>
-                      {String(taskData.search_set_uuid)}
-                    </span>
+                {linkedSearchSetUuid ? (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6, gap: 8 }}>
+                      <label style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
+                        Extraction fields
+                      </label>
+                      <span style={{ fontSize: 11, color: '#6b7280' }}>
+                        From saved set — edit in the Extractions library
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        display: 'flex', flexWrap: 'wrap', gap: 4, padding: '6px 8px',
+                        border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#f9fafb',
+                        minHeight: 38, alignItems: 'center', boxSizing: 'border-box',
+                      }}
+                    >
+                      {linkedSetLoading && linkedSetItems.length === 0 && (
+                        <span style={{ fontSize: 12, color: '#9ca3af', padding: '4px 6px' }}>Loading fields…</span>
+                      )}
+                      {!linkedSetLoading && linkedSetItems.length === 0 && (
+                        <span style={{ fontSize: 12, color: '#9ca3af', padding: '4px 6px' }}>No fields in this saved set</span>
+                      )}
+                      {linkedSetItems.map(item => (
+                        <span
+                          key={item.id}
+                          title={item.searchphrase}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 4,
+                            backgroundColor: '#f3f4f6', border: '1px solid #e5e7eb',
+                            borderRadius: 4, padding: '2px 8px', fontSize: 13,
+                            color: '#374151', lineHeight: '22px',
+                          }}
+                        >
+                          {item.title || item.searchphrase}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                      Extraction fields
+                    </label>
+                    <ExtractionTagInput
+                      tags={Array.isArray(taskData.extractions) ? (taskData.extractions as string[]) : []}
+                      onChange={(tags) => setTaskData(prev => ({ ...prev, extractions: tags }))}
+                    />
                   </div>
                 )}
 
@@ -2628,12 +2849,72 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                 </div>
                 <div style={{ marginBottom: 16 }}>
                   <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+                    Authentication
+                  </label>
+                  <div style={{ position: 'relative', marginBottom: 8 }}>
+                    <select
+                      value={(getTextValue('auth_strategy') || 'none')}
+                      onChange={e => {
+                        const strategy = e.target.value
+                        setTaskData(prev => ({
+                          ...prev,
+                          auth_strategy: strategy,
+                          ...(strategy === 'none' ? { credential_id: '' } : {}),
+                        }))
+                      }}
+                      style={{
+                        width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
+                        border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#fff',
+                        color: '#374151', appearance: 'none', paddingRight: 32,
+                      }}
+                    >
+                      <option value="none">None / inline headers</option>
+                      <option value="static_header">Static header (from credentials)</option>
+                      <option value="oauth_client_credentials">OAuth client_credentials (JWT)</option>
+                    </select>
+                    <ChevronDown style={{
+                      position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                      width: 14, height: 14, color: '#9ca3af', pointerEvents: 'none',
+                    }} />
+                  </div>
+                  {getTextValue('auth_strategy') && getTextValue('auth_strategy') !== 'none' && (
+                    <div style={{ position: 'relative' }}>
+                      <select
+                        value={getTextValue('credential_id') || ''}
+                        onChange={e => setTextValue('credential_id', e.target.value)}
+                        style={{
+                          width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
+                          border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#fff',
+                          color: '#374151', appearance: 'none', paddingRight: 32,
+                        }}
+                      >
+                        <option value="">Select a credential...</option>
+                        {(credentials || [])
+                          .filter(c => c.type === getTextValue('auth_strategy'))
+                          .map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                      </select>
+                      <ChevronDown style={{
+                        position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                        width: 14, height: 14, color: '#9ca3af', pointerEvents: 'none',
+                      }} />
+                      {credentials && credentials.filter(c => c.type === getTextValue('auth_strategy')).length === 0 && (
+                        <p style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
+                          No matching credentials. Create one in Credentials.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
                     Headers (JSON)
                   </label>
                   <textarea
                     value={getTextValue('headers')}
                     onChange={e => setTextValue('headers', e.target.value)}
-                    placeholder={'{"Authorization": "Bearer ...", "Content-Type": "application/json"}'}
+                    placeholder={'{"Content-Type": "application/json"}'}
                     rows={3}
                     style={{
                       width: '100%', padding: '10px 12px', fontSize: 13,
@@ -2794,6 +3075,162 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
               </div>
             )}
 
+            {task.name === 'Approval' && (() => {
+              const assigneeRole = (taskData.assignee_role as string) || 'specific_users'
+              const assignedIds = (taskData.assigned_to_user_ids as string[] | undefined) || []
+              const slaDays = (taskData.sla_days as number | undefined) ?? 0
+              const timeoutAction = (taskData.timeout_action as string) || 'none'
+              const escalationIds = (taskData.escalation_user_ids as string[] | undefined) || []
+
+              const toggleAssigned = (uid: string) => {
+                const next = assignedIds.includes(uid)
+                  ? assignedIds.filter(x => x !== uid)
+                  : [...assignedIds, uid]
+                setTaskData(prev => ({ ...prev, assigned_to_user_ids: next }))
+              }
+              const toggleEscalation = (uid: string) => {
+                const next = escalationIds.includes(uid)
+                  ? escalationIds.filter(x => x !== uid)
+                  : [...escalationIds, uid]
+                setTaskData(prev => ({ ...prev, escalation_user_ids: next }))
+              }
+
+              const memberLabel = (m: { user_id: string; name: string | null; email: string | null; role: string }) =>
+                `${m.name || m.user_id}${m.email ? ` (${m.email})` : ''}${m.role !== 'member' ? ` — ${m.role}` : ''}`
+
+              return (
+                <div>
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                      Review instructions
+                    </label>
+                    <textarea
+                      value={getTextValue('review_instructions')}
+                      onChange={e => setTextValue('review_instructions', e.target.value)}
+                      rows={4}
+                      placeholder="What should the reviewer check?"
+                      style={{
+                        width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
+                        border: '1px solid #d1d5db', borderRadius: 6, resize: 'vertical', boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                      Who reviews?
+                    </label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {[
+                        { v: 'specific_users', l: 'Specific people' },
+                        { v: 'workflow_owner', l: 'Workflow owner' },
+                        { v: 'team_admins', l: 'Team admins' },
+                      ].map(opt => (
+                        <label key={opt.v} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151', cursor: 'pointer' }}>
+                          <input
+                            type="radio"
+                            name="approval_assignee_role"
+                            checked={assigneeRole === opt.v}
+                            onChange={() => setTaskData(prev => ({ ...prev, assignee_role: opt.v }))}
+                          />
+                          {opt.l}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {assigneeRole === 'specific_users' && (
+                    <div style={{ marginBottom: 16 }}>
+                      <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                        Reviewers
+                      </label>
+                      {approvalTeamMembers.length === 0 ? (
+                        <div style={{ fontSize: 12, color: '#6b7280' }}>
+                          No team members available. Use Workflow owner or Team admins, or add members in Team Settings.
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, border: '1px solid #e5e7eb', borderRadius: 6, padding: 8, maxHeight: 200, overflowY: 'auto' }}>
+                          {approvalTeamMembers.map(m => (
+                            <label key={m.user_id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151', cursor: 'pointer' }}>
+                              <input
+                                type="checkbox"
+                                checked={assignedIds.includes(m.user_id)}
+                                onChange={() => toggleAssigned(m.user_id)}
+                              />
+                              {memberLabel(m)}
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                      Deadline (days)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={slaDays}
+                      onChange={e => setTaskData(prev => ({ ...prev, sla_days: Number(e.target.value) || 0 }))}
+                      style={{
+                        width: 120, padding: '6px 10px', fontSize: 13,
+                        border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box',
+                      }}
+                    />
+                    <div style={{ fontSize: 11, color: '#6b7280', marginTop: 6 }}>
+                      0 = no deadline. The timeout action below fires once this many days elapse.
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                      If the deadline passes
+                    </label>
+                    <select
+                      value={timeoutAction}
+                      onChange={e => setTaskData(prev => ({ ...prev, timeout_action: e.target.value }))}
+                      style={{
+                        width: '100%', padding: '8px 12px', fontSize: 13,
+                        border: '1px solid #d1d5db', borderRadius: 6, background: '#fff', color: '#374151',
+                      }}
+                    >
+                      <option value="none">Mark expired (workflow stays paused)</option>
+                      <option value="approve">Auto-approve and continue</option>
+                      <option value="reject">Auto-reject and fail the workflow</option>
+                      <option value="escalate">Escalate to additional reviewers</option>
+                    </select>
+                  </div>
+
+                  {timeoutAction === 'escalate' && (
+                    <div style={{ marginBottom: 16 }}>
+                      <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                        Escalate to
+                      </label>
+                      {approvalTeamMembers.length === 0 ? (
+                        <div style={{ fontSize: 12, color: '#6b7280' }}>No team members available.</div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, border: '1px solid #e5e7eb', borderRadius: 6, padding: 8, maxHeight: 200, overflowY: 'auto' }}>
+                          {approvalTeamMembers.map(m => (
+                            <label key={m.user_id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151', cursor: 'pointer' }}>
+                              <input
+                                type="checkbox"
+                                checked={escalationIds.includes(m.user_id)}
+                                onChange={() => toggleEscalation(m.user_id)}
+                              />
+                              {memberLabel(m)}
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
+
             {/* Model override for LLM tasks */}
             {LLM_TASKS.includes(task.name) && models.length > 0 && (
               <div style={{ marginTop: 16 }}>
@@ -2855,21 +3292,23 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
         {/* ===== INPUT SUB-TAB ===== */}
         {subTab === 'input' && (
           <div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 12 }}>
-              Data Source
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
+              Data Sources
+            </div>
+            <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
+              Pick one or more. When multiple are selected, the LLM sees each in a labeled section.
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {/* Step Input */}
               <label style={{
                 display: 'flex', alignItems: 'flex-start', gap: 10, padding: 12,
-                border: inputSource === 'step_input' ? '2px solid var(--highlight-color, #eab308)' : '1px solid #e5e7eb',
+                border: inputSources.includes('step_input') ? '2px solid var(--highlight-color, #eab308)' : '1px solid #e5e7eb',
                 borderRadius: 8, cursor: 'pointer', backgroundColor: '#fff',
               }}>
                 <input
-                  type="radio"
-                  name="input_source"
-                  checked={inputSource === 'step_input'}
-                  onChange={() => setInputSource('step_input')}
+                  type="checkbox"
+                  checked={inputSources.includes('step_input')}
+                  onChange={() => toggleInputSource('step_input')}
                   style={{ marginTop: 2 }}
                 />
                 <div>
@@ -2883,14 +3322,13 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
               {/* Select a Document */}
               <label style={{
                 display: 'flex', alignItems: 'flex-start', gap: 10, padding: 12,
-                border: inputSource === 'select_document' ? '2px solid var(--highlight-color, #eab308)' : '1px solid #e5e7eb',
+                border: wantsSelectDocument ? '2px solid var(--highlight-color, #eab308)' : '1px solid #e5e7eb',
                 borderRadius: 8, cursor: 'pointer', backgroundColor: '#fff',
               }}>
                 <input
-                  type="radio"
-                  name="input_source"
-                  checked={inputSource === 'select_document'}
-                  onChange={() => setInputSource('select_document')}
+                  type="checkbox"
+                  checked={wantsSelectDocument}
+                  onChange={() => toggleInputSource('select_document')}
                   style={{ marginTop: 2 }}
                 />
                 <div style={{ flex: 1 }}>
@@ -2898,7 +3336,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                   <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
                     Choose a specific document to use as input.
                   </div>
-                  {inputSource === 'select_document' && (
+                  {wantsSelectDocument && (
                     <div style={{ marginTop: 8, position: 'relative' }}>
                       <input
                         type="text"
@@ -2971,14 +3409,13 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
               {/* Workflow Documents */}
               <label style={{
                 display: 'flex', alignItems: 'flex-start', gap: 10, padding: 12,
-                border: inputSource === 'workflow_documents' ? '2px solid var(--highlight-color, #eab308)' : '1px solid #e5e7eb',
+                border: wantsWorkflowDocs ? '2px solid var(--highlight-color, #eab308)' : '1px solid #e5e7eb',
                 borderRadius: 8, cursor: 'pointer', backgroundColor: '#fff',
               }}>
                 <input
-                  type="radio"
-                  name="input_source"
-                  checked={inputSource === 'workflow_documents'}
-                  onChange={() => setInputSource('workflow_documents')}
+                  type="checkbox"
+                  checked={wantsWorkflowDocs}
+                  onChange={() => toggleInputSource('workflow_documents')}
                   style={{ marginTop: 2 }}
                 />
                 <div style={{ flex: 1 }}>
@@ -2987,7 +3424,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                     Use the documents selected when the workflow runs, plus any fixed documents.
                   </div>
 
-                  {inputSource === 'workflow_documents' && (
+                  {wantsWorkflowDocs && (
                     <div style={{ marginTop: 10 }} onClick={e => e.stopPropagation()}>
                       {/* Fixed documents list */}
                       {fixedDocs.length > 0 && (
@@ -3263,14 +3700,14 @@ function WorkflowOutputCard({ status, sessionId, running, runElapsed, showDownlo
   const isPendingApproval = status?.status === 'pending_approval'
   const isDone = isCompleted || isError
 
-  const [approval, setApproval] = useState<ApprovalRequest | null>(null)
+  const [approval, setApproval] = useState<ReviewDetail | null>(null)
   const [approvalComments, setApprovalComments] = useState('')
   const [approvalProcessing, setApprovalProcessing] = useState(false)
   const [approvalError, setApprovalError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isPendingApproval || !status?.approval_request_id) return
-    getApproval(status.approval_request_id).then(setApproval).catch(() => {})
+    getReview(status.approval_request_id).then(setApproval).catch(() => {})
   }, [isPendingApproval, status?.approval_request_id])
 
   const handleApprove = async () => {
@@ -3278,7 +3715,7 @@ function WorkflowOutputCard({ status, sessionId, running, runElapsed, showDownlo
     setApprovalProcessing(true)
     setApprovalError(null)
     try {
-      await approveRequest(approval.uuid, approvalComments)
+      await approveReview(approval.uuid, { comments: approvalComments })
       setApproval({ ...approval, status: 'approved' })
     } catch (e) {
       setApprovalError(e instanceof Error ? e.message : 'Failed to approve')
@@ -3292,7 +3729,7 @@ function WorkflowOutputCard({ status, sessionId, running, runElapsed, showDownlo
     setApprovalProcessing(true)
     setApprovalError(null)
     try {
-      await rejectRequest(approval.uuid, approvalComments)
+      await rejectReview(approval.uuid, approvalComments)
       setApproval({ ...approval, status: 'rejected' })
     } catch (e) {
       setApprovalError(e instanceof Error ? e.message : 'Failed to reject')
@@ -3324,8 +3761,18 @@ function WorkflowOutputCard({ status, sessionId, running, runElapsed, showDownlo
         : isPendingApproval ? '2px solid #fbbf24'
         : '2px solid #e5e7eb',
     }}>
-      <div style={{ fontWeight: 600, fontSize: 14, color: '#202124', marginBottom: 8 }}>
-        {running ? 'Workflow Running' : isCompleted ? 'Output' : isError ? 'Error' : isPendingApproval ? 'Awaiting Approval' : 'View Output'}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 8 }}>
+        <div style={{ fontWeight: 600, fontSize: 14, color: '#202124' }}>
+          {running ? 'Workflow Running' : isCompleted ? 'Output' : isError ? 'Error' : isPendingApproval ? 'Awaiting Approval' : 'View Output'}
+        </div>
+        {isPendingApproval && status?.approval_request_id && (
+          <a
+            href={`/reviews/${status.approval_request_id}`}
+            style={{ fontSize: 12, color: '#0ea5e9', textDecoration: 'none' }}
+          >
+            Open full review →
+          </a>
+        )}
       </div>
 
       {/* Pending approval state */}
@@ -3491,6 +3938,7 @@ function WorkflowOutputCard({ status, sessionId, running, runElapsed, showDownlo
                   { fmt: 'csv', label: 'CSV', desc: 'Spreadsheet format', parseStructured: false },
                   { fmt: 'csv', label: 'CSV (parse structured)', desc: 'Detect JSON/tables in prompt output', parseStructured: true },
                   { fmt: 'pdf', label: 'PDF', desc: 'Printable report', parseStructured: false },
+                  { fmt: 'docx', label: 'Word (.docx)', desc: 'Editable document', parseStructured: false },
                   { fmt: 'text', label: 'Plain Text', desc: 'Raw text output', parseStructured: false },
                 ] as const).map(({ fmt, label, desc, parseStructured }) => (
                   <a
@@ -3904,19 +4352,55 @@ function InputTab({ workflow, openWorkflowId, onRefresh }: {
   openWorkflowId: string | null
   onRefresh: () => void
 }) {
-  const [triggerType, setTriggerType] = useState(workflow.input_config?.trigger_type || 'manual')
+  const inputCfg = (workflow as unknown as Record<string, unknown>)?.input_config as Record<string, unknown> | undefined
+  const [triggerType, setTriggerType] = useState((inputCfg?.trigger_type as string) || 'manual')
   const [saving, setSaving] = useState(false)
+  const [fixedDocs, setFixedDocs] = useState<{ uuid: string; title: string }[]>(
+    () => ((inputCfg?.fixed_documents as { uuid: string; title: string }[]) || [])
+  )
+
+  // Keep fixedDocs in sync when workflow refreshes from outside
+  useEffect(() => {
+    const cfg = (workflow as unknown as Record<string, unknown>)?.input_config as Record<string, unknown> | undefined
+    setFixedDocs((cfg?.fixed_documents as { uuid: string; title: string }[]) || [])
+  }, [workflow])
+
+  const persistInputConfig = async (patch: Record<string, unknown>) => {
+    if (!openWorkflowId) return
+    const current = (workflow as unknown as Record<string, unknown>)?.input_config as Record<string, unknown> | undefined
+    await updateWorkflow(openWorkflowId, { input_config: { ...(current || {}), ...patch } })
+    onRefresh()
+  }
 
   const handleTriggerChange = async (value: string) => {
     setTriggerType(value)
-    if (!openWorkflowId) return
     setSaving(true)
     try {
-      await updateWorkflow(openWorkflowId, { input_config: { trigger_type: value } })
-      onRefresh()
+      await persistInputConfig({ trigger_type: value })
     } finally {
       setSaving(false)
     }
+  }
+
+  const saveFixedDocs = async (docs: { uuid: string; title: string }[]) => {
+    setFixedDocs(docs)
+    await persistInputConfig({ fixed_documents: docs })
+  }
+
+  const addFixedDocs = async (docs: { uuid: string; title: string }[]) => {
+    const existing = new Set(fixedDocs.map(d => d.uuid))
+    const merged = [...fixedDocs]
+    for (const d of docs) {
+      if (!existing.has(d.uuid)) {
+        merged.push(d)
+        existing.add(d.uuid)
+      }
+    }
+    if (merged.length !== fixedDocs.length) await saveFixedDocs(merged)
+  }
+
+  const removeFixedDoc = (uuid: string) => {
+    saveFixedDocs(fixedDocs.filter(d => d.uuid !== uuid))
   }
 
   return (
@@ -3954,12 +4438,11 @@ function InputTab({ workflow, openWorkflowId, onRefresh }: {
             <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
               Pre-assign documents that will always be included when this workflow runs.
             </div>
-            <div style={{
-              border: '2px dashed #d1d5db', borderRadius: 8, padding: '24px 16px',
-              textAlign: 'center', color: '#9ca3af', fontSize: 13,
-            }}>
-              Drag documents here or click to browse
-            </div>
+            <FixedDocumentsZone
+              fixedDocs={fixedDocs}
+              onAddDocs={addFixedDocs}
+              onRemoveDoc={removeFixedDoc}
+            />
           </div>
         )}
 
@@ -3986,18 +4469,336 @@ function InputTab({ workflow, openWorkflowId, onRefresh }: {
               <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
                 Pre-assign documents to always include alongside the text input.
               </div>
-              <div style={{
-                border: '2px dashed #d1d5db', borderRadius: 8, padding: '24px 16px',
-                textAlign: 'center', color: '#9ca3af', fontSize: 13,
-              }}>
-                Drag documents here or click to browse
-              </div>
+              <FixedDocumentsZone
+                fixedDocs={fixedDocs}
+                onAddDocs={addFixedDocs}
+                onRemoveDoc={removeFixedDoc}
+              />
             </div>
           </>
         )}
 
       </div>
+
+      <div style={{ fontSize: 14, fontWeight: 600, color: '#202124', margin: '32px 0 16px' }}>
+        Output Configuration
+      </div>
+      <OutputConfigCard
+        workflow={workflow}
+        openWorkflowId={openWorkflowId}
+        onRefresh={onRefresh}
+      />
     </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Output config card — saves workflow result to the library so chained
+// workflows can consume it as input.
+// ---------------------------------------------------------------------------
+
+function OutputConfigCard({
+  workflow,
+  openWorkflowId,
+  onRefresh,
+}: {
+  workflow: Workflow
+  openWorkflowId: string | null
+  onRefresh: () => void
+}) {
+  const oc = (workflow as unknown as Record<string, unknown>)?.output_config as Record<string, unknown> | undefined
+  const storage = (oc?.storage || {}) as Record<string, unknown>
+  const enabled = (storage.enabled as boolean) || false
+  const destinationFolder = (storage.destination_folder as string) || ''
+  const format = (storage.format as string) || 'markdown'
+  const fileNaming = (storage.file_naming as string) || '{workflow_name}_{date}_{time}'
+  const onRerun = (storage.on_rerun as string) || 'new'
+  const skipIngest = (storage.skip_semantic_ingestion as boolean) || false
+
+  const [folders, setFolders] = useState<{ uuid: string; path: string }[]>([])
+
+  useEffect(() => {
+    listAllFolders()
+      .then(list => setFolders(list.map(f => ({ uuid: f.uuid, path: f.path }))))
+      .catch(() => {})
+  }, [])
+
+  const persistStorage = async (patch: Record<string, unknown>) => {
+    if (!openWorkflowId) return
+    const current = (workflow as unknown as Record<string, unknown>)?.output_config as Record<string, unknown> | undefined
+    const nextStorage = { ...storage, ...patch }
+    await updateWorkflow(openWorkflowId, {
+      output_config: { ...(current || {}), storage: nextStorage },
+    })
+    onRefresh()
+  }
+
+  return (
+    <div style={{ padding: 16, backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', marginBottom: enabled ? 12 : 0 }}>
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={e => persistStorage({ enabled: e.target.checked })}
+          style={{ width: 16, height: 16, accentColor: '#3b82f6' }}
+        />
+        <span style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
+          Save workflow output as a document
+        </span>
+      </label>
+      <div style={{ fontSize: 12, color: '#6b7280', marginLeft: 24, marginTop: -4, marginBottom: enabled ? 12 : 0 }}>
+        Each run writes the output to the chosen folder so downstream workflows can pick it up as input.
+      </div>
+
+      {enabled && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 24 }}>
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
+              Destination Folder
+            </label>
+            <select
+              value={destinationFolder}
+              onChange={e => persistStorage({ destination_folder: e.target.value })}
+              style={{
+                width: '100%', padding: '8px 12px', fontSize: 13,
+                border: '1px solid #d1d5db', borderRadius: 6, fontFamily: 'inherit',
+                backgroundColor: '#fff', color: '#202124', outline: 'none',
+              }}
+            >
+              <option value="">Select folder</option>
+              {folders.map(f => (
+                <option key={f.uuid} value={f.uuid}>{f.path}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
+              Format
+            </label>
+            <select
+              value={format}
+              onChange={e => persistStorage({ format: e.target.value })}
+              style={{
+                width: '100%', padding: '8px 12px', fontSize: 13,
+                border: '1px solid #d1d5db', borderRadius: 6, fontFamily: 'inherit',
+                backgroundColor: '#fff', color: '#202124', outline: 'none',
+              }}
+            >
+              <option value="markdown">Markdown</option>
+              <option value="text">Plain Text</option>
+              <option value="json">JSON</option>
+              <option value="csv">CSV</option>
+              <option value="pdf">PDF</option>
+            </select>
+            <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
+              Markdown is the most chainable format. PDFs and CSVs are saved as files but their text content is rendered as Markdown for downstream workflows.
+            </div>
+          </div>
+
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
+              File Naming Pattern
+            </label>
+            <input
+              type="text"
+              defaultValue={fileNaming}
+              onBlur={e => persistStorage({ file_naming: e.target.value })}
+              placeholder="{workflow_name}_{date}_{time}"
+              style={{
+                width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
+                border: '1px solid #d1d5db', borderRadius: 6, outline: 'none', boxSizing: 'border-box',
+              }}
+            />
+            <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
+              Variables: {'{workflow_name}'}, {'{date}'}, {'{time}'}, {'{workflow_id}'}, {'{run_id}'}
+            </div>
+          </div>
+
+          <div>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 6 }}>
+              On Re-run
+            </label>
+            <div style={{ display: 'flex', gap: 16 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#374151', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="on_rerun"
+                  value="new"
+                  checked={onRerun === 'new'}
+                  onChange={() => persistStorage({ on_rerun: 'new' })}
+                />
+                Save as new document
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#374151', cursor: 'pointer' }}>
+                <input
+                  type="radio"
+                  name="on_rerun"
+                  value="overwrite"
+                  checked={onRerun === 'overwrite'}
+                  onChange={() => persistStorage({ on_rerun: 'overwrite' })}
+                />
+                Overwrite previous output
+              </label>
+            </div>
+          </div>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={skipIngest}
+              onChange={e => persistStorage({ skip_semantic_ingestion: e.target.checked })}
+              style={{ width: 14, height: 14, accentColor: '#3b82f6' }}
+            />
+            <span style={{ fontSize: 12, color: '#374151' }}>
+              Skip semantic ingestion (saved doc won&apos;t appear in chat search)
+            </span>
+          </label>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Drag-and-drop / click-to-browse zone for the workflow's fixed documents.
+// Accepts: (1) document rows dragged from the file browser (text/plain = uuid),
+// (2) files dropped from the OS (uploaded as new documents), (3) click → picker.
+function FixedDocumentsZone({
+  fixedDocs,
+  onAddDocs,
+  onRemoveDoc,
+}: {
+  fixedDocs: { uuid: string; title: string }[]
+  onAddDocs: (docs: { uuid: string; title: string }[]) => Promise<void> | void
+  onRemoveDoc: (uuid: string) => void
+}) {
+  const [dragOver, setDragOver] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [showPicker, setShowPicker] = useState(false)
+
+  const handleFileUpload = async (file: File) => {
+    setUploading(true)
+    try {
+      const reader = new FileReader()
+      const base64 = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => {
+          const result = reader.result as string
+          resolve(result.split(',')[1] || result)
+        }
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+      const ext = file.name.split('.').pop() || ''
+      const { uuid } = await uploadFile({
+        contentAsBase64String: base64,
+        fileName: file.name,
+        extension: ext,
+      })
+      if (uuid) await onAddDocs([{ uuid, title: file.name }])
+    } catch { /* ignore upload errors */ }
+    finally { setUploading(false) }
+  }
+
+  const handleDroppedUuid = async (uuid: string) => {
+    // Look up title via search; fall back to a stub if lookup fails.
+    let title = `Document ${uuid.slice(0, 8)}`
+    try {
+      const res = await searchDocuments('', 100)
+      const match = res.items.find(d => d.uuid === uuid)
+      if (match) title = match.title
+    } catch { /* keep stub title */ }
+    await onAddDocs([{ uuid, title }])
+  }
+
+  return (
+    <>
+      {fixedDocs.length > 0 && (
+        <div style={{
+          border: '1px solid #e5e7eb', borderRadius: 6, overflow: 'hidden',
+          backgroundColor: '#fff', marginBottom: 8,
+        }}>
+          {fixedDocs.map((doc, idx) => (
+            <div
+              key={doc.uuid}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+                borderBottom: idx < fixedDocs.length - 1 ? '1px solid #f3f4f6' : 'none',
+                fontSize: 13,
+              }}
+            >
+              <FileText style={{ width: 13, height: 13, color: '#6b7280', flexShrink: 0 }} />
+              <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {doc.title}
+              </span>
+              <button
+                onClick={() => onRemoveDoc(doc.uuid)}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer', padding: 2,
+                  color: '#9ca3af', display: 'flex',
+                }}
+                aria-label={`Remove ${doc.title}`}
+              >
+                <X style={{ width: 14, height: 14 }} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div
+        onDragOver={e => {
+          e.preventDefault()
+          e.stopPropagation()
+          if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
+          setDragOver(true)
+        }}
+        onDragLeave={e => { e.preventDefault(); e.stopPropagation(); setDragOver(false) }}
+        onDrop={async e => {
+          e.preventDefault()
+          e.stopPropagation()
+          setDragOver(false)
+          // Internal drag from FileBrowser: text/plain = doc uuid
+          const uuid = e.dataTransfer.getData('text/plain')
+          if (uuid && !e.dataTransfer.files.length) {
+            await handleDroppedUuid(uuid)
+            return
+          }
+          // OS file drop: upload each as a new document
+          const files = Array.from(e.dataTransfer.files)
+          for (const file of files) {
+            await handleFileUpload(file)
+          }
+        }}
+        onClick={() => { if (!uploading) setShowPicker(true) }}
+        style={{
+          border: `2px dashed ${dragOver ? 'var(--highlight-color, #eab308)' : '#d1d5db'}`,
+          borderRadius: 8, padding: '24px 16px', textAlign: 'center',
+          color: '#6b7280', fontSize: 13, cursor: uploading ? 'wait' : 'pointer',
+          backgroundColor: dragOver ? '#fefce8' : '#fff',
+          transition: 'all 0.15s ease',
+        }}
+      >
+        {uploading ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />
+            Uploading...
+          </div>
+        ) : (
+          <>
+            <Upload style={{ width: 18, height: 18, color: '#9ca3af', margin: '0 auto 6px' }} />
+            <div>Drag documents here or click to browse</div>
+          </>
+        )}
+      </div>
+
+      {showPicker && (
+        <DocumentPickerDialog
+          onSelect={async docs => { await onAddDocs(docs) }}
+          onClose={() => setShowPicker(false)}
+          excludeUuids={fixedDocs.map(d => d.uuid)}
+        />
+      )}
+    </>
   )
 }
 

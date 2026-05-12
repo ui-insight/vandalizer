@@ -5,11 +5,13 @@ import uuid
 from beanie import PydanticObjectId
 
 from app.models.folder import SmartFolder
-from app.models.team import Team, TeamInvite, TeamMembership
+from app.models.team import Team, TeamInvite, TeamJoinLink, TeamMembership
 from app.models.user import User
 
 ROLE_RANK = {"owner": 0, "admin": 1, "member": 2}
 INVITE_EXPIRY_DAYS = 30
+JOIN_LINK_DEFAULT_EXPIRY_HOURS = 48
+JOIN_LINK_MAX_EXPIRY_HOURS = 24 * 30  # 30 days hard ceiling
 
 
 async def get_user_teams(user_id: str) -> list[dict]:
@@ -289,6 +291,74 @@ async def _notify_invite_accepted(
         await send_email(inviter.email, subject, html, settings, email_type="team_member_joined")
 
 
+async def notify_team_share(
+    *,
+    sharer: User,
+    team: Team,
+    item_kind: str,
+    item_name: str,
+    item_id: str,
+    link: str,
+    comment: str | None = None,
+) -> None:
+    """Fan out a bell notification + email to every team member (except the sharer).
+
+    `item_kind` should match values used elsewhere: "workflow", "extraction",
+    "search_set", "knowledge_base". `link` is a frontend path (e.g. "/library").
+    """
+    from app.config import Settings
+    from app.services.email_service import send_email, team_share_email
+    from app.services.notification_service import create_notification
+
+    sharer_name = sharer.name or sharer.user_id
+    kind_labels = {
+        "workflow": "workflow",
+        "extraction": "extraction",
+        "search_set": "search set",
+        "knowledge_base": "knowledge base",
+    }
+    kind_label = kind_labels.get(item_kind, item_kind.replace("_", " "))
+    title = f'{sharer_name} shared a {kind_label} with {team.name}'
+    body = f'"{item_name}"'
+    if comment:
+        # Keep notification body compact for the bell dropdown
+        snippet = comment.strip().replace("\n", " ")
+        body = f'"{item_name}" — {snippet[:160]}'
+
+    members = await get_team_members(team.id)
+    settings: Settings | None = None
+    for m in members:
+        recipient_id = m.get("user_id")
+        if not recipient_id or recipient_id == sharer.user_id:
+            continue
+
+        await create_notification(
+            user_id=recipient_id,
+            kind="team_share",
+            title=title,
+            body=body,
+            link=link,
+            item_kind=item_kind,
+            item_id=item_id,
+            item_name=item_name,
+        )
+
+        email = m.get("email")
+        if email:
+            if settings is None:
+                settings = Settings()
+            view_url = f"{settings.frontend_url}{link}"
+            subject, html = team_share_email(
+                sharer_name=sharer_name,
+                item_kind=item_kind,
+                item_name=item_name,
+                team_name=team.name,
+                comment=comment,
+                view_url=view_url,
+            )
+            await send_email(email, subject, html, settings, email_type="team_share")
+
+
 async def switch_team(team_uuid: str, user: User) -> Team:
     """Switch the user's current team."""
     team = await Team.find_one(Team.uuid == team_uuid)
@@ -480,6 +550,170 @@ async def delete_team(team_uuid: str, actor_id: str) -> bool:
     await team.delete()
 
     return True
+
+
+# ---------------------------------------------------------------------------
+# Public join links — multi-use, time-limited, revocable
+# ---------------------------------------------------------------------------
+
+
+async def create_join_link(
+    team_uuid: str,
+    actor_user_id: str,
+    role: str = "member",
+    expires_in_hours: int = JOIN_LINK_DEFAULT_EXPIRY_HOURS,
+    max_uses: int | None = None,
+) -> TeamJoinLink:
+    """Create a new public join link. Actor must be owner or admin."""
+    if role not in ("admin", "member"):
+        raise ValueError("Role must be 'admin' or 'member'")
+    if expires_in_hours <= 0:
+        raise ValueError("expires_in_hours must be positive")
+    if expires_in_hours > JOIN_LINK_MAX_EXPIRY_HOURS:
+        raise ValueError(
+            f"expires_in_hours cannot exceed {JOIN_LINK_MAX_EXPIRY_HOURS}"
+        )
+    if max_uses is not None and max_uses <= 0:
+        raise ValueError("max_uses must be positive")
+
+    team = await Team.find_one(Team.uuid == team_uuid)
+    if not team:
+        raise ValueError("Team not found")
+    _require_min_role(
+        await _get_membership(team.id, actor_user_id), "admin"
+    )
+
+    link = TeamJoinLink(
+        team=team.id,
+        token=secrets.token_urlsafe(32),
+        created_by_user_id=actor_user_id,
+        role=role,
+        expires_at=datetime.datetime.now()
+        + datetime.timedelta(hours=expires_in_hours),
+        max_uses=max_uses,
+    )
+    await link.insert()
+    return link
+
+
+async def get_team_join_links(
+    team_uuid: str, actor_user_id: str
+) -> list[dict]:
+    """List active (non-revoked) join links for a team. Admin/owner only."""
+    team = await Team.find_one(Team.uuid == team_uuid)
+    if not team:
+        raise ValueError("Team not found")
+    _require_min_role(
+        await _get_membership(team.id, actor_user_id), "admin"
+    )
+
+    links = await TeamJoinLink.find(
+        TeamJoinLink.team == team.id,
+        TeamJoinLink.revoked == False,  # noqa: E712
+    ).to_list()
+    return [_serialize_join_link(link) for link in links]
+
+
+def _serialize_join_link(link: TeamJoinLink) -> dict:
+    return {
+        "id": str(link.id),
+        "token": link.token,
+        "role": link.role,
+        "expires_at": link.expires_at.isoformat() if link.expires_at else None,
+        "max_uses": link.max_uses,
+        "use_count": link.use_count,
+        "revoked": link.revoked,
+        "created_at": link.created_at.isoformat() if link.created_at else None,
+        "created_by_user_id": link.created_by_user_id,
+    }
+
+
+async def revoke_join_link(token: str, actor_user_id: str) -> None:
+    """Revoke a join link. Actor must be owner or admin of the team."""
+    link = await TeamJoinLink.find_one(TeamJoinLink.token == token)
+    if not link:
+        raise ValueError("Join link not found")
+    _require_min_role(
+        await _get_membership(link.team, actor_user_id), "admin"
+    )
+    link.revoked = True
+    await link.save()
+
+
+def _join_link_status(link: TeamJoinLink) -> str | None:
+    """Return None if usable, else a reason string."""
+    if link.revoked:
+        return "revoked"
+    if link.expires_at and datetime.datetime.now() >= link.expires_at:
+        return "expired"
+    if link.max_uses is not None and link.use_count >= link.max_uses:
+        return "exhausted"
+    return None
+
+
+async def get_join_link_info(token: str) -> dict | None:
+    """Public — return team metadata for a join link, or None if invalid.
+
+    Used by unauthenticated users landing on the join page so they can see
+    which team they're joining before signing up or logging in.
+    """
+    link = await TeamJoinLink.find_one(TeamJoinLink.token == token)
+    if not link:
+        return None
+    status = _join_link_status(link)
+    team = await Team.get(link.team)
+    creator = await User.find_one(User.user_id == link.created_by_user_id)
+    return {
+        "role": link.role,
+        "team_name": team.name if team else "a team",
+        "team_uuid": team.uuid if team else None,
+        "inviter_name": (creator.name or creator.user_id) if creator else None,
+        "expires_at": link.expires_at.isoformat() if link.expires_at else None,
+        "status": status,  # None = usable; else "revoked"|"expired"|"exhausted"
+    }
+
+
+async def accept_join_link(token: str, user: User) -> Team:
+    """Accept a join link: add the user to the team."""
+    link = await TeamJoinLink.find_one(TeamJoinLink.token == token)
+    if not link:
+        raise ValueError("Invalid join link")
+
+    status = _join_link_status(link)
+    if status == "revoked":
+        raise ValueError("This join link has been revoked")
+    if status == "expired":
+        raise ValueError("This join link has expired")
+    if status == "exhausted":
+        raise ValueError("This join link has reached its use limit")
+
+    team = await Team.get(link.team)
+    if not team:
+        raise ValueError("Team not found")
+
+    existing = await TeamMembership.find_one(
+        TeamMembership.team == team.id,
+        TeamMembership.user_id == user.user_id,
+    )
+    if existing:
+        # Already a member — just switch them to the team; don't bump count
+        # or change their role (a join link must not demote an admin).
+        user.current_team = team.id
+        await user.save()
+        return team
+
+    membership = TeamMembership(
+        team=team.id, user_id=user.user_id, role=link.role
+    )
+    await membership.insert()
+
+    link.use_count += 1
+    await link.save()
+
+    user.current_team = team.id
+    await user.save()
+
+    return team
 
 
 # --- helpers ---

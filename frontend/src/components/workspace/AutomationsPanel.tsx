@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { FolderSearch, Globe, Loader2, Mail, Plus, Search, X } from 'lucide-react'
-import { AutomationsTutorial } from './AutomationsTutorial'
+import { AutomationsExplainer } from './AutomationsExplainer'
 import { AutomationCreationWizard } from './AutomationCreationWizard'
 import { useAutomations } from '../../hooks/useAutomations'
 import { useWorkflows } from '../../hooks/useWorkflows'
@@ -162,13 +162,13 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
       )}
 
       {/* List */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px', position: 'relative' }}>
         {loading ? (
           <div style={{ textAlign: 'center', padding: 40, color: '#888' }}>
             <Loader2 style={{ width: 20, height: 20, margin: '0 auto', animation: 'spin 1s linear infinite' }} />
           </div>
         ) : automations.length === 0 ? (
-          <AutomationsTutorial />
+          <AutomationsExplainer />
         ) : filtered.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 40, color: '#666', fontSize: 13 }}>
             No matching automations

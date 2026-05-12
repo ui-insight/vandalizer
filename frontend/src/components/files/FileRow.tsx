@@ -1,4 +1,4 @@
-import { Loader2, MoreVertical, AlertTriangle, Shield } from 'lucide-react'
+import { Loader2, MoreHorizontal, AlertTriangle, Shield } from 'lucide-react'
 import type { Document } from '../../types/document'
 import { formatFileDate } from '../../utils/time'
 
@@ -22,7 +22,7 @@ interface FileRowProps {
 export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect, snippet }: FileRowProps) {
   return (
     <tr
-      className="hover:bg-[#a6b5c945]"
+      className="group hover:bg-[#a6b5c945]"
       tabIndex={0}
       role="row"
       aria-label={`Document: ${doc.title}`}
@@ -70,7 +70,22 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
           {doc.processing ? (
             <Loader2 className="h-4 w-4 animate-spin shrink-0 mr-2.5" style={{ color: 'var(--highlight-color)' }} />
           ) : !doc.valid ? (
-            <AlertTriangle className="h-4 w-4 shrink-0 mr-2.5 text-red-500" />
+            <span
+              className="shrink-0 mr-2.5 inline-flex items-center"
+              role="img"
+              aria-label={
+                doc.validation_feedback
+                  ? `Failed validation: ${doc.validation_feedback}`
+                  : 'This document did not pass automated upload validation.'
+              }
+              title={
+                doc.validation_feedback
+                  ? `Failed validation: ${doc.validation_feedback}`
+                  : 'This document did not pass automated upload validation.'
+              }
+            >
+              <AlertTriangle className="h-4 w-4 text-red-500" />
+            </span>
           ) : null}
           <div style={{ minWidth: 0, flex: 1 }}>
             <span className="flex items-center gap-1.5">
@@ -118,7 +133,7 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
         </div>
       </td>
 
-      {/* Modified */}
+      {/* Modified — right-aligned, with hover-revealed action overlay */}
       <td
         style={{
           padding: '12px 15px',
@@ -126,28 +141,54 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
           fontSize: '0.8em',
           fontWeight: 300,
           whiteSpace: 'nowrap',
+          textAlign: 'right',
+          position: 'relative',
         }}
         title={doc.updated_at || doc.created_at || undefined}
       >
-        {doc.processing ? (
-          <span style={{ color: 'var(--highlight-color)' }}>{doc.task_status || 'Processing...'}</span>
-        ) : (
-          (doc.updated_at || doc.created_at) && formatFileDate(doc.updated_at || doc.created_at)
-        )}
-      </td>
-
-      {/* Menu */}
-      <td style={{ padding: '12px 4px', width: 40 }}>
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            onContextMenu(e)
+        <span className="group-hover:opacity-0 transition-opacity">
+          {doc.processing ? (
+            <span style={{ color: 'var(--highlight-color)' }}>{doc.task_status || 'Processing...'}</span>
+          ) : (
+            (doc.updated_at || doc.created_at) && formatFileDate(doc.updated_at || doc.created_at)
+          )}
+        </span>
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="opacity-0 group-hover:opacity-100 transition-opacity"
+          style={{
+            position: 'absolute',
+            right: 8,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            display: 'flex',
+            alignItems: 'center',
+            background: '#fff',
+            border: '1px solid #e5e7eb',
+            borderRadius: 999,
+            padding: '2px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
           }}
-          className="bg-transparent border-0 cursor-pointer p-1 text-[#191919] hover:bg-black/5 rounded"
-          aria-label="More options"
         >
-          <MoreVertical className="h-4 w-4" />
-        </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onContextMenu(e)
+            }}
+            className="bg-transparent border-0 cursor-pointer text-[#191919] hover:bg-black/5"
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 14,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+            aria-label="More options"
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </button>
+        </div>
       </td>
     </tr>
   )

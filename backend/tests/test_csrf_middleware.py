@@ -91,7 +91,7 @@ class TestCSRFMiddleware:
 
         with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
              patch("app.dependencies.User") as MockUser, \
-             patch("app.routers.approvals.ApprovalRequest") as MockApproval:
+             patch("app.routers.reviews.ApprovalRequest") as MockApproval:
             MockUser.find_one = AsyncMock(return_value=user)
             mock_find_query.sort = MagicMock(return_value=mock_find_query)
             MockApproval.find = MagicMock(return_value=mock_find_query)
@@ -99,7 +99,7 @@ class TestCSRFMiddleware:
 
             # Use a GET endpoint that we know works with auth
             resp = await client.get(
-                "/api/approvals/",
+                "/api/reviews",
                 cookies=cookies,
                 headers=headers,
             )

@@ -1,0 +1,73 @@
+name: E2E (Playwright smoke)
+
+# Runs the @smoke-tagged Playwright tests against a built frontend served by
+# vite preview. No backend is started — only purely-frontend behavior is exercised.
+# Tests that need a backend are gated on E2E_BACKEND_AVAILABLE and skip cleanly.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Playwright smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: make frontend-install
+
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Build frontend
+        run: make frontend-build
+
+      - name: Start vite preview
+        working-directory: frontend
+        run: |
+          npx vite preview --port 5173 --strictPort &
+          echo "PREVIEW_PID=$!" >> $GITHUB_ENV
+          # Wait for server
+          for i in {1..30}; do
+            if curl -sf http://localhost:5173/ > /dev/null; then
+              echo "Preview ready"; exit 0
+            fi
+            sleep 1
+          done
+          echo "Preview did not start"; exit 1
+
+      - name: Run smoke e2e
+        working-directory: frontend
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:5173
+          CI: "true"
+        run: npx playwright test --grep "@smoke"
+
+      - name: Stop vite preview
+        if: always()
+        run: kill $PREVIEW_PID || true
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7

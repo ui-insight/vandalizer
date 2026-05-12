@@ -272,6 +272,73 @@ class TestAddItem:
             result = await add_item(str(lib.id), user, str(PydanticObjectId()), "unknown_kind")
             assert result is None
 
+    @pytest.mark.asyncio
+    async def test_propagates_verified_flag_for_workflow(self):
+        # Saving a verified workflow into a personal/team library should mark
+        # the LibraryItem verified so the row shows the verified badge and
+        # editing prompts the user to clone instead of mutating the verified
+        # source.
+        lib = _make_library()
+        user = _make_user()
+        mock_wf = MagicMock()
+        mock_wf.name = "Verified WF"
+        mock_wf.description = "desc"
+        mock_wf.verified = True
+        item_id = str(PydanticObjectId())
+
+        captured: dict = {}
+
+        def _capture(**kwargs):
+            captured.update(kwargs)
+            mock_item = _make_library_item(verified=kwargs.get("verified", False))
+            return mock_item
+
+        with (
+            patch("app.services.library_service.access_control") as mock_ac,
+            patch("app.services.library_service.LibraryItem", side_effect=_capture),
+            patch("app.services.library_service.Workflow") as MockWF,
+        ):
+            mock_ac.get_authorized_library = AsyncMock(return_value=lib)
+            mock_ac.get_authorized_workflow = AsyncMock(return_value=mock_wf)
+            MockWF.get = AsyncMock(return_value=mock_wf)
+
+            from app.services.library_service import add_item
+
+            await add_item(str(lib.id), user, item_id, "workflow")
+            assert captured.get("verified") is True
+
+    @pytest.mark.asyncio
+    async def test_does_not_set_verified_for_unverified_search_set(self):
+        lib = _make_library()
+        user = _make_user()
+        mock_ss = MagicMock()
+        mock_ss.uuid = "abc-uuid"
+        mock_ss.title = "SS"
+        mock_ss.set_type = "extraction"
+        mock_ss.extraction_config = {}
+        mock_ss.verified = False
+        item_id = str(PydanticObjectId())
+
+        captured: dict = {}
+
+        def _capture(**kwargs):
+            captured.update(kwargs)
+            return _make_library_item()
+
+        with (
+            patch("app.services.library_service.access_control") as mock_ac,
+            patch("app.services.library_service.LibraryItem", side_effect=_capture),
+            patch("app.services.library_service.SearchSet") as MockSS,
+        ):
+            mock_ac.get_authorized_library = AsyncMock(return_value=lib)
+            mock_ac.get_authorized_search_set = AsyncMock(return_value=mock_ss)
+            MockSS.get = AsyncMock(return_value=mock_ss)
+
+            from app.services.library_service import add_item
+
+            await add_item(str(lib.id), user, item_id, "search_set")
+            assert captured.get("verified") is False
+
 
 # ---------------------------------------------------------------------------
 # remove_item
@@ -512,6 +579,71 @@ class TestResolveTeamOid:
 
             with pytest.raises(ValueError, match="Team not found"):
                 await _resolve_team_oid("x" * 32)
+
+
+# ---------------------------------------------------------------------------
+# share_to_team — failure mode classification
+# ---------------------------------------------------------------------------
+
+
+class TestShareToTeamErrors:
+    @pytest.mark.asyncio
+    async def test_raises_item_not_found_when_item_missing(self):
+        from app.services.library_service import ShareError, share_to_team
+
+        with patch("app.services.library_service.access_control") as ac:
+            ac.get_authorized_library_item = AsyncMock(return_value=None)
+            with pytest.raises(ShareError) as exc:
+                await share_to_team("missing", _make_user(), "team-1")
+            assert exc.value.code == "item_not_found"
+            assert exc.value.status == 404
+
+    @pytest.mark.asyncio
+    async def test_raises_team_not_found_when_team_unresolvable(self):
+        from app.services.library_service import ShareError, share_to_team
+
+        item = _make_library_item()
+        with patch("app.services.library_service.access_control") as ac, \
+             patch("app.services.library_service._resolve_team_oid", AsyncMock(side_effect=ValueError("nope"))):
+            ac.get_authorized_library_item = AsyncMock(return_value=item)
+            ac.get_team_access_context = AsyncMock(return_value=MagicMock())
+            with pytest.raises(ShareError) as exc:
+                await share_to_team("item-1", _make_user(), "bogus-team")
+            assert exc.value.code == "team_not_found"
+            assert exc.value.status == 404
+
+    @pytest.mark.asyncio
+    async def test_raises_not_team_member_when_user_is_not_on_team(self):
+        from app.services.library_service import ShareError, share_to_team
+
+        item = _make_library_item()
+        team_oid = PydanticObjectId()
+        with patch("app.services.library_service.access_control") as ac, \
+             patch("app.services.library_service._resolve_team_oid", AsyncMock(return_value=team_oid)):
+            ac.get_authorized_library_item = AsyncMock(return_value=item)
+            ac.get_team_access_context = AsyncMock(return_value=MagicMock())
+            ac.can_view_team = MagicMock(return_value=False)
+            with pytest.raises(ShareError) as exc:
+                await share_to_team("item-1", _make_user(), str(team_oid))
+            assert exc.value.code == "not_team_member"
+            assert exc.value.status == 403
+
+    @pytest.mark.asyncio
+    async def test_raises_clone_failed_when_underlying_object_missing(self):
+        from app.services.library_service import ShareError, share_to_team
+
+        item = _make_library_item()
+        team_oid = PydanticObjectId()
+        with patch("app.services.library_service.access_control") as ac, \
+             patch("app.services.library_service._resolve_team_oid", AsyncMock(return_value=team_oid)), \
+             patch("app.services.library_service._clone_underlying_object", AsyncMock(return_value=None)):
+            ac.get_authorized_library_item = AsyncMock(return_value=item)
+            ac.get_team_access_context = AsyncMock(return_value=MagicMock())
+            ac.can_view_team = MagicMock(return_value=True)
+            with pytest.raises(ShareError) as exc:
+                await share_to_team("item-1", _make_user(), str(team_oid))
+            assert exc.value.code == "clone_failed"
+            assert exc.value.status == 500
 
 
 # ---------------------------------------------------------------------------

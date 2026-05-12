@@ -107,6 +107,7 @@ async def search_documents(
             "updated_at": doc.updated_at.isoformat() if doc.updated_at else None,
             "processing": doc.processing,
             "valid": doc.valid,
+            "validation_feedback": doc.validation_feedback,
             "task_status": doc.task_status,
             "folder": doc.folder,
             "token_count": doc.token_count,

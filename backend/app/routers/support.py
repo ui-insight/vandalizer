@@ -2,6 +2,7 @@
 
 import base64
 import logging
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from fastapi.responses import Response
@@ -28,6 +29,13 @@ class UpdateTicketRequest(BaseModel):
     status: str | None = None
     priority: str | None = None
     assigned_to: str | None = None
+    tags: list[str] | None = None
+
+
+def _strip_tags(payload: dict) -> dict:
+    """Remove the internal-only tags field — non-support callers must not see it."""
+    payload.pop("tags", None)
+    return payload
 
 
 # ---------------------------------------------------------------------------
@@ -75,8 +83,10 @@ async def create_ticket(
         team_id=team_id,
     )
 
+    is_support = await _is_support_user(user)
+
     if not file_payloads:
-        return ticket
+        return ticket if is_support else _strip_tags(ticket)
 
     initial_message_uuid = ticket["messages"][0]["uuid"] if ticket.get("messages") else None
     for filename, content_type, data in file_payloads:
@@ -91,26 +101,46 @@ async def create_ticket(
         if result is not None:
             ticket = result
 
-    return ticket
+    return ticket if is_support else _strip_tags(ticket)
 
 
 @router.get("/tickets")
 async def list_tickets(
     status: str | None = None,
+    tag: str | None = None,
+    category: str | None = None,
     limit: int = 50,
     offset: int = 0,
+    scope: str | None = None,
     user: User = Depends(get_current_user),
 ):
-    """List tickets. Support users see all; regular users see only their own."""
+    """List tickets.
+
+    - Default: support users see all tickets, regular users see their own.
+    - ``scope=mine``: always return only the caller's own tickets, even for
+      support users. Used by the Support Center page (where agents file QA
+      tickets) so they see their personal queue, not the global one.
+    - ``tag``: filter to tickets carrying this tag. Tags are support-internal,
+      so this filter is ignored for non-support callers.
+    - ``category``: support-only filter. Used by the admin Demo tab to fetch
+      trial check-in tickets (``category=feedback_prompt``), which the global
+      Support Center listing excludes by default.
+    """
     is_support = await _is_support_user(user)
-    if is_support:
-        tickets = await support_service.list_all_tickets(
-            status=status, limit=limit, offset=offset
+    effective_tag = tag if is_support else None
+    effective_category = category if is_support else None
+    if scope == "mine" or not is_support:
+        tickets = await support_service.list_tickets(
+            user_id=user.user_id, status=status, tag=effective_tag,
+            category=effective_category, limit=limit, offset=offset,
         )
     else:
-        tickets = await support_service.list_tickets(
-            user_id=user.user_id, status=status, limit=limit, offset=offset
+        tickets = await support_service.list_all_tickets(
+            status=status, tag=effective_tag, category=effective_category,
+            limit=limit, offset=offset,
         )
+    if not is_support:
+        tickets = [_strip_tags(t) for t in tickets]
     return {"tickets": tickets}
 
 
@@ -128,6 +158,8 @@ async def get_ticket(
     if ticket["user_id"] != user.user_id and not is_support:
         raise HTTPException(status_code=403, detail="Not authorized")
 
+    if not is_support:
+        _strip_tags(ticket)
     return ticket
 
 
@@ -166,7 +198,7 @@ async def add_message(
     )
     if not result:
         raise HTTPException(status_code=404, detail="Ticket not found")
-    return result
+    return result if is_support else _strip_tags(result)
 
 
 @router.post("/tickets/{ticket_uuid}/attachments")
@@ -196,7 +228,7 @@ async def add_attachment(
     )
     if not result:
         raise HTTPException(status_code=404, detail="Ticket not found")
-    return result
+    return result if is_support else _strip_tags(result)
 
 
 @router.get("/tickets/{ticket_uuid}/attachments/{attachment_uuid}")
@@ -225,10 +257,20 @@ async def download_attachment(
     inline_types = ("image/", "application/pdf")
     disposition = "inline" if any(content_type.startswith(t) for t in inline_types) else "attachment"
 
+    # Filenames may contain non-latin-1 characters (e.g.   narrow no-break
+    # space from copy-pasted Word titles). Encode per RFC 5987 with an ASCII
+    # fallback so the latin-1 header encoding doesn't blow up.
+    ascii_fallback = filename.encode("ascii", "replace").decode("ascii").replace('"', "")
+    encoded = quote(filename, safe="")
     return Response(
         content=file_bytes,
         media_type=content_type,
-        headers={"Content-Disposition": f'{disposition}; filename="{filename}"'},
+        headers={
+            "Content-Disposition": (
+                f'{disposition}; filename="{ascii_fallback}"; '
+                f"filename*=UTF-8''{encoded}"
+            ),
+        },
     )
 
 
@@ -248,6 +290,8 @@ async def update_ticket(
         status=body.status,
         priority=body.priority,
         assigned_to=body.assigned_to,
+        tags=body.tags,
+        actor=user,
     )
     if not result:
         raise HTTPException(status_code=404, detail="Ticket not found")
@@ -261,6 +305,15 @@ async def get_ticket_stats(user: User = Depends(get_current_user)):
     if not is_support:
         raise HTTPException(status_code=403, detail="Not authorized")
     return await support_service.get_ticket_stats()
+
+
+@router.get("/tags")
+async def list_tags(user: User = Depends(get_current_user)):
+    """Return distinct tags currently in use across tickets. Support users only."""
+    is_support = await _is_support_user(user)
+    if not is_support:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    return {"tags": await support_service.list_all_tags()}
 
 
 @router.get("/contacts")

@@ -261,6 +261,27 @@ def password_reset_email(
     return subject, html
 
 
+def password_set_email(
+    name: str, reset_url: str,
+) -> tuple[str, str]:
+    """Returns (subject, html_body) for SSO-only users who don't yet have a password.
+
+    Same token flow as a reset, but the copy reflects that they're setting a
+    password for the first time and can keep using SSO afterward.
+    """
+    subject = "Set a password for your Vandalizer account"
+    html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
+    <div class="container"><div class="card">
+      <div class="logo">Vandalizer</div>
+      <h1>Set Your Password</h1>
+      <p>Hi {name}, you've been signing in with single sign-on (SSO), so your account doesn't have a password yet. Click the button below to set one.</p>
+      <p style="margin-top:24px"><a class="btn" href="{reset_url}">Set Password</a></p>
+      <p style="font-size:13px;color:#6b7280;margin-top:16px">After setting a password you can sign in either way &mdash; SSO will keep working. This link expires in 1 hour. If you didn't request this, you can safely ignore this email.</p>
+      <div class="footer">Vandalizer</div>
+    </div></div></body></html>"""
+    return subject, html
+
+
 # ---------------------------------------------------------------------------
 # Team invitation emails
 # ---------------------------------------------------------------------------
@@ -388,6 +409,37 @@ def support_new_message_email(
     return subject, html
 
 
+def support_tag_added_email(
+    support_name: str,
+    ticket_subject: str,
+    ticket_user: str,
+    added_tags: list[str],
+    actor_name: str,
+    ticket_uuid: str,
+    frontend_url: str,
+) -> tuple[str, str]:
+    """Returns (subject, html_body) when a support agent adds tag(s) to a ticket."""
+    tag_list = ", ".join(added_tags)
+    plural = "s" if len(added_tags) != 1 else ""
+    subject = f"Tag{plural} added to ticket: {ticket_subject}"
+    tag_pills = "".join(
+        f'<span style="display:inline-block;background:#f1b300;color:#000;'
+        f'font-weight:600;font-size:13px;padding:3px 10px;border-radius:12px;'
+        f'margin:0 6px 6px 0;">{t}</span>'
+        for t in added_tags
+    )
+    html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
+    <div class="container"><div class="card">
+      <div class="logo">Vandalizer Support</div>
+      <h1>Tag{plural} added to a ticket</h1>
+      <p>Hi {support_name}, <span class="highlight">{actor_name}</span> added tag{plural} <strong style="color:#fff">{tag_list}</strong> to ticket <strong style="color:#fff">{ticket_subject}</strong> (from {ticket_user}).</p>
+      <div style="margin:16px 0;">{tag_pills}</div>
+      <p style="margin-top:24px"><a class="btn" href="{frontend_url}/support?ticket={ticket_uuid}">View Ticket</a></p>
+      <div class="footer">Vandalizer Support System</div>
+    </div></div></body></html>"""
+    return subject, html
+
+
 # ---------------------------------------------------------------------------
 # Approval request emails
 # ---------------------------------------------------------------------------
@@ -411,7 +463,7 @@ def approval_request_email(
       <h1>Approval Required</h1>
       <p>Hi {reviewer_name}, the workflow <span class="highlight">{workflow_name}</span> is paused at step <strong style="color:#fff">{step_name}</strong> and needs your review.</p>
       {instructions_block}
-      <p style="margin-top:24px"><a class="btn" href="{frontend_url}/approvals?id={approval_uuid}">Review Now</a></p>
+      <p style="margin-top:24px"><a class="btn" href="{frontend_url}/reviews/{approval_uuid}">Review Now</a></p>
       <div class="footer">Vandalizer</div>
     </div></div></body></html>"""
     return subject, html
@@ -444,6 +496,55 @@ def approval_resolved_email(
 # ---------------------------------------------------------------------------
 # Team member joined email
 # ---------------------------------------------------------------------------
+
+
+_KIND_LABELS = {
+    "workflow": "workflow",
+    "extraction": "extraction",
+    "search_set": "search set",
+    "knowledge_base": "knowledge base",
+}
+
+
+def team_share_email(
+    sharer_name: str,
+    item_kind: str,
+    item_name: str,
+    team_name: str,
+    comment: str | None,
+    view_url: str,
+) -> tuple[str, str]:
+    """Returns (subject, html_body) when a teammate shares an item with the team."""
+    import html as html_lib
+
+    kind_label = _KIND_LABELS.get(item_kind, item_kind.replace("_", " "))
+    safe_sharer = html_lib.escape(sharer_name)
+    safe_item = html_lib.escape(item_name)
+    safe_team = html_lib.escape(team_name)
+    safe_kind = html_lib.escape(kind_label)
+
+    subject = f'{sharer_name} shared "{item_name}" with {team_name}'
+
+    comment_block = ""
+    if comment:
+        safe_comment = html_lib.escape(comment).replace("\n", "<br/>")
+        comment_block = f"""
+      <div style="margin:16px 0;padding:12px 16px;background:rgba(255,255,255,0.05);border-left:3px solid #f1b300;border-radius:4px;">
+        <p style="margin:0;font-size:14px;color:#d1d5db;"><strong style="color:#fff;">Note from {safe_sharer}:</strong><br/>{safe_comment}</p>
+      </div>"""
+
+    html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
+    <div class="container"><div class="card">
+      <div class="logo">Vandalizer</div>
+      <h1>New {safe_kind} shared with your team</h1>
+      <p><span class="highlight">{safe_sharer}</span> shared the {safe_kind}
+         <span class="highlight">{safe_item}</span> with
+         <strong style="color:#fff">{safe_team}</strong>.</p>
+      {comment_block}
+      <p style="margin-top:24px"><a class="btn" href="{view_url}">Open in Vandalizer</a></p>
+      <div class="footer">Vandalizer</div>
+    </div></div></body></html>"""
+    return subject, html
 
 
 def team_member_joined_email(

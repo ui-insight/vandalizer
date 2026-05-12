@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { X, Pencil, Trash2, FolderOpen, Globe, Copy, Check, ChevronRight } from 'lucide-react'
+import { X, Pencil, Trash2, FolderOpen, Globe, Copy, Check, ChevronRight, HelpCircle } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { getAutomation, updateAutomation, deleteAutomation } from '../../api/automations'
 import { apiFetch } from '../../api/client'
 import { useWorkflows } from '../../hooks/useWorkflows'
 import { useSearchSets } from '../../hooks/useExtractions'
 import { ItemPickerModal } from './ItemPickerModal'
+import { AutomationsExplainer } from './AutomationsExplainer'
 import type { Automation, TriggerType, ActionType } from '../../types/automation'
 
 const TRIGGER_OPTIONS: { value: TriggerType; label: string; icon: typeof FolderOpen; description: string }[] = [
@@ -26,6 +27,7 @@ export function AutomationEditorPanel() {
   const [automation, setAutomation] = useState<Automation | null>(null)
   const [loading, setLoading] = useState(true)
   const [showActionPicker, setShowActionPicker] = useState(false)
+  const [showExplainer, setShowExplainer] = useState(false)
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleValue, setTitleValue] = useState('')
   const titleInputRef = useRef<HTMLInputElement>(null)
@@ -51,12 +53,15 @@ export function AutomationEditorPanel() {
     }
   }, [editingTitle])
 
+  const canManage = automation?.can_manage ?? true
+
   const save = useCallback(async (updates: Parameters<typeof updateAutomation>[1]) => {
     if (!openAutomationId) return
+    if (automation && !automation.can_manage) return
     const updated = await updateAutomation(openAutomationId, updates)
     setAutomation(updated)
     window.dispatchEvent(new Event('automations-updated'))
-  }, [openAutomationId])
+  }, [openAutomationId, automation])
 
   const debouncedSave = useCallback((updates: Parameters<typeof updateAutomation>[1]) => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current)
@@ -77,30 +82,33 @@ export function AutomationEditorPanel() {
   }
 
   const handleDelete = async () => {
-    if (!openAutomationId) return
+    if (!openAutomationId || !canManage) return
     await deleteAutomation(openAutomationId)
     closeAutomation()
   }
 
   const handleToggleEnabled = async () => {
-    if (!automation) return
+    if (!automation || !canManage) return
     await save({ enabled: !automation.enabled })
   }
 
   const handleToggleShared = async () => {
-    if (!automation) return
+    if (!automation || !canManage) return
     await save({ shared_with_team: !automation.shared_with_team })
   }
 
   const handleTriggerTypeChange = async (type: TriggerType) => {
+    if (!canManage) return
     await save({ trigger_type: type, trigger_config: {} })
   }
 
   const handleActionTypeChange = async (type: ActionType) => {
+    if (!canManage) return
     await save({ action_type: type, action_id: undefined })
   }
 
   const handleActionSelect = async (id: string) => {
+    if (!canManage) return
     await save({ action_id: id || undefined })
   }
 
@@ -123,7 +131,7 @@ export function AutomationEditorPanel() {
   }
 
   return (
-    <div className="flex h-full flex-col" style={{ backgroundColor: '#fff' }}>
+    <div className="flex h-full flex-col" style={{ backgroundColor: '#fff', position: 'relative' }}>
       {/* Header */}
       <div style={{ padding: '16px 24px', borderBottom: '1px solid #e5e7eb', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -145,26 +153,33 @@ export function AutomationEditorPanel() {
             />
           ) : (
             <div
-              style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', flex: 1 }}
-              onClick={() => { setTitleValue(automation.name); setEditingTitle(true) }}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: canManage ? 'pointer' : 'default', flex: 1 }}
+              onClick={() => {
+                if (!canManage) return
+                setTitleValue(automation.name)
+                setEditingTitle(true)
+              }}
             >
               <span style={{ fontSize: 18, fontWeight: 600, color: '#202124', letterSpacing: '-0.01em' }}>
                 {automation.name}
               </span>
-              <Pencil style={{ width: 14, height: 14, color: '#9ca3af' }} />
+              {canManage && <Pencil style={{ width: 14, height: 14, color: '#9ca3af' }} />}
             </div>
           )}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
             {/* Enabled toggle */}
             <button
               onClick={handleToggleEnabled}
+              disabled={!canManage}
+              title={canManage ? undefined : 'Only the creator or a team owner/admin can change this'}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px',
                 fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
                 color: automation.enabled ? '#15803d' : '#6b7280',
                 backgroundColor: automation.enabled ? '#dcfce7' : '#f3f4f6',
                 border: '1px solid ' + (automation.enabled ? '#bbf7d0' : '#e5e7eb'),
-                borderRadius: 16, cursor: 'pointer',
+                borderRadius: 16, cursor: canManage ? 'pointer' : 'not-allowed',
+                opacity: canManage ? 1 : 0.6,
               }}
             >
               <span style={{
@@ -176,25 +191,30 @@ export function AutomationEditorPanel() {
             {/* Visible to team toggle */}
             <button
               onClick={handleToggleShared}
+              disabled={!canManage}
+              title={canManage ? undefined : 'Only the creator or a team owner/admin can change this'}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6, padding: '4px 12px',
                 fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
                 color: automation.shared_with_team ? 'rgb(0, 128, 128)' : '#6b7280',
                 backgroundColor: automation.shared_with_team ? 'rgba(0, 128, 128, 0.1)' : '#f3f4f6',
                 border: '1px solid ' + (automation.shared_with_team ? 'rgba(0, 128, 128, 0.3)' : '#e5e7eb'),
-                borderRadius: 16, cursor: 'pointer',
+                borderRadius: 16, cursor: canManage ? 'pointer' : 'not-allowed',
+                opacity: canManage ? 1 : 0.6,
               }}
             >
               {automation.shared_with_team ? 'Visible to team' : 'Private'}
             </button>
             {/* Delete */}
-            <button
-              onClick={handleDelete}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 4, color: '#d93025', display: 'flex' }}
-              title="Delete automation"
-            >
-              <Trash2 style={{ width: 16, height: 16 }} />
-            </button>
+            {canManage && (
+              <button
+                onClick={handleDelete}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 4, color: '#d93025', display: 'flex' }}
+                title="Delete automation"
+              >
+                <Trash2 style={{ width: 16, height: 16 }} />
+              </button>
+            )}
             {/* Close */}
             <button
               onClick={closeAutomation}
@@ -208,10 +228,21 @@ export function AutomationEditorPanel() {
 
       {/* Body */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '24px', minHeight: 0 }}>
+        {!canManage && (
+          <div style={{
+            padding: '10px 14px', marginBottom: 16, borderRadius: 6,
+            backgroundColor: '#fef3c7', border: '1px solid #fde68a',
+            color: '#92400e', fontSize: 12, lineHeight: 1.45,
+          }}>
+            <strong>View only.</strong> This automation was shared with your team by another member.
+            Only the creator or a team owner/admin can change or delete it.
+          </div>
+        )}
         {/* Description */}
         <input
           type="text"
           defaultValue={automation.description || ''}
+          disabled={!canManage}
           onBlur={e => {
             const v = e.target.value.trim()
             if (v !== (automation.description || '')) debouncedSave({ description: v || undefined })
@@ -366,7 +397,38 @@ export function AutomationEditorPanel() {
         <SectionLabel>Post-Action Output</SectionLabel>
         <OutputStorageCard automation={automation} onSave={debouncedSave} />
         <OutputNotificationCard automation={automation} onSave={debouncedSave} />
+
+        {/* "What are automations?" pill */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 24, marginBottom: 4 }}>
+          <button
+            onClick={() => setShowExplainer(true)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '6px 14px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
+              color: '#6b7280',
+              backgroundColor: '#f9fafb',
+              border: '1px solid #e5e7eb',
+              borderRadius: 999, cursor: 'pointer',
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.backgroundColor = '#f3f4f6'
+              e.currentTarget.style.color = '#374151'
+              e.currentTarget.style.borderColor = '#d1d5db'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.backgroundColor = '#f9fafb'
+              e.currentTarget.style.color = '#6b7280'
+              e.currentTarget.style.borderColor = '#e5e7eb'
+            }}
+          >
+            <HelpCircle size={13} />
+            What are automations?
+          </button>
+        </div>
       </div>
+
+      {showExplainer && <AutomationsExplainer onClose={() => setShowExplainer(false)} />}
     </div>
   )
 }

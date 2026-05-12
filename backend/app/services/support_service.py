@@ -97,6 +97,7 @@ def _ticket_to_dict(t: SupportTicket) -> dict:
         "updated_at": _iso_utc(t.updated_at),
         "closed_at": _iso_utc(t.closed_at),
         "category": t.category,
+        "tags": list(getattr(t, "tags", []) or []),
     }
 
 
@@ -124,6 +125,7 @@ def _ticket_summary(t: SupportTicket) -> dict:
         ),
         "read_by": t.read_by,
         "category": t.category,
+        "tags": list(getattr(t, "tags", []) or []),
         "created_at": _iso_utc(t.created_at),
         "updated_at": _iso_utc(t.updated_at),
         "closed_at": _iso_utc(t.closed_at),
@@ -160,11 +162,19 @@ async def create_ticket(
     return _ticket_to_dict(ticket)
 
 
+# Trial check-in prompts are stored as support tickets with this category.
+# They are surfaced in the admin Demo tab, not the Support Center, so the
+# default list/stats queries exclude them.
+_CHECK_IN_CATEGORY = "feedback_prompt"
+_EXCLUDE_CHECK_INS = {"$ne": _CHECK_IN_CATEGORY}
+
+
 async def get_ticket_stats() -> dict:
-    """Return aggregate ticket counts by status."""
-    open_count = await SupportTicket.find({"status": "open"}).count()
-    in_progress_count = await SupportTicket.find({"status": "in_progress"}).count()
-    closed_count = await SupportTicket.find({"status": "closed"}).count()
+    """Return aggregate ticket counts by status (excludes trial check-ins)."""
+    base = {"category": _EXCLUDE_CHECK_INS}
+    open_count = await SupportTicket.find({**base, "status": "open"}).count()
+    in_progress_count = await SupportTicket.find({**base, "status": "in_progress"}).count()
+    closed_count = await SupportTicket.find({**base, "status": "closed"}).count()
     total = open_count + in_progress_count + closed_count
     return {
         "total": total,
@@ -178,6 +188,8 @@ async def list_tickets(
     user_id: str | None = None,
     status: str | None = None,
     assigned_to: str | None = None,
+    tag: str | None = None,
+    category: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> list[dict]:
@@ -188,6 +200,10 @@ async def list_tickets(
         query["status"] = status
     if assigned_to:
         query["assigned_to"] = assigned_to
+    if tag:
+        query["tags"] = tag
+    if category is not None:
+        query["category"] = category
 
     tickets = (
         await SupportTicket.find(query)
@@ -201,12 +217,23 @@ async def list_tickets(
 
 async def list_all_tickets(
     status: str | None = None,
+    tag: str | None = None,
+    category: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> list[dict]:
+    """List every ticket in the system. Defaults to regular tickets only —
+    pass ``category="feedback_prompt"`` to fetch trial check-ins instead.
+    """
     query: dict = {}
     if status:
         query["status"] = status
+    if tag:
+        query["tags"] = tag
+    if category is not None:
+        query["category"] = category
+    else:
+        query["category"] = _EXCLUDE_CHECK_INS
     tickets = (
         await SupportTicket.find(query)
         .sort("-updated_at")
@@ -215,6 +242,12 @@ async def list_all_tickets(
         .to_list()
     )
     return [_ticket_summary(t) for t in tickets]
+
+
+async def list_all_tags() -> list[str]:
+    """Return every distinct tag in use across tickets, sorted."""
+    raw = await SupportTicket.get_motor_collection().distinct("tags")
+    return sorted({str(t) for t in raw if t})
 
 
 async def get_ticket(ticket_uuid: str) -> dict | None:
@@ -360,6 +393,8 @@ async def update_ticket(
     status: str | None = None,
     priority: str | None = None,
     assigned_to: str | None = None,
+    tags: list[str] | None = None,
+    actor: User | None = None,
 ) -> dict | None:
     ticket = await SupportTicket.find_one(SupportTicket.uuid == ticket_uuid)
     if not ticket:
@@ -375,6 +410,19 @@ async def update_ticket(
         ticket.priority = TicketPriority(priority)
     if assigned_to is not None:
         ticket.assigned_to = assigned_to or None
+    added_tags: list[str] = []
+    if tags is not None:
+        # Normalize: strip whitespace, drop empties, dedupe (preserve order)
+        seen: set[str] = set()
+        cleaned: list[str] = []
+        for raw in tags:
+            t = raw.strip()
+            if t and t not in seen:
+                seen.add(t)
+                cleaned.append(t)
+        prev = set(ticket.tags or [])
+        added_tags = [t for t in cleaned if t not in prev]
+        ticket.tags = cleaned
 
     ticket.updated_at = datetime.datetime.now(datetime.timezone.utc)
     await ticket.save()
@@ -393,6 +441,10 @@ async def update_ticket(
         )
         # Email the ticket owner about status change
         await _email_ticket_owner_status(ticket, status)
+
+    # Email the other support agents when tags are added.
+    if added_tags:
+        await _notify_support_contacts_tag_added(ticket, added_tags, actor)
 
     return _ticket_to_dict(ticket)
 
@@ -484,6 +536,39 @@ async def _notify_support_contacts_new_message(
                     frontend_url=settings.frontend_url,
                 )
                 await send_email(email, subject, html, settings, email_type="support_new_message")
+
+
+async def _notify_support_contacts_tag_added(
+    ticket: SupportTicket,
+    added_tags: list[str],
+    actor: User | None,
+) -> None:
+    """Email the other support agents when a tag is added to a ticket."""
+    contacts = await _get_all_support_user_ids()
+    settings = Settings()
+    actor_user_id = actor.user_id if actor else None
+    actor_name = (actor.name or actor.user_id) if actor else "A support agent"
+
+    for contact in contacts:
+        user_id = contact.get("user_id")
+        email = contact.get("email")
+        name = contact.get("name", "Support")
+        # Don't email the agent who just added the tag.
+        if user_id and user_id == actor_user_id:
+            continue
+        if not email:
+            continue
+        from app.services.email_service import support_tag_added_email
+        subject, html = support_tag_added_email(
+            support_name=name,
+            ticket_subject=ticket.subject,
+            ticket_user=ticket.user_name or ticket.user_id,
+            added_tags=added_tags,
+            actor_name=actor_name,
+            ticket_uuid=ticket.uuid,
+            frontend_url=settings.frontend_url,
+        )
+        await send_email(email, subject, html, settings, email_type="support_tag_added")
 
 
 async def _email_ticket_owner_reply(

@@ -35,3 +35,15 @@ export interface TeamInvite {
   token: string
   created_at: string | null
 }
+
+export interface TeamJoinLink {
+  id: string
+  token: string
+  role: string
+  expires_at: string | null
+  max_uses: number | null
+  use_count: number
+  revoked: boolean
+  created_at: string | null
+  created_by_user_id: string
+}

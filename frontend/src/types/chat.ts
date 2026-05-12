@@ -68,6 +68,7 @@ export interface ActivityEvent {
   workflow_session_id: string | null
   started_at: string | null
   finished_at: string | null
+  last_updated_at: string | null
   error: string
   tokens_input: number
   tokens_output: number

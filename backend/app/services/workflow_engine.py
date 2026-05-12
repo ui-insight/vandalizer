@@ -114,6 +114,130 @@ def _stringify_value(value):
 
 
 # ---------------------------------------------------------------------------
+# Input source resolution (shared by Prompt / Extraction / Format / etc.)
+# ---------------------------------------------------------------------------
+
+INPUT_SOURCE_LABELS = {
+    "step_input": "Previous Step Output",
+    "select_document": "Selected Document",
+    "workflow_documents": "Workflow Documents",
+}
+
+
+def _resolve_input_sources(data: dict, prev_step_name: str | None = None) -> list[str]:
+    """Return the ordered, deduped list of input sources for a node.
+
+    Prefers the new `input_sources` list if present; otherwise falls back to
+    the legacy single `input_source` (default `step_input`). When the previous
+    step is the Document trigger, `step_input` is swapped for
+    `workflow_documents` because the trigger emits doc UUIDs, not text.
+    """
+    raw = data.get("input_sources")
+    if isinstance(raw, list) and raw:
+        sources = [s for s in raw if s in INPUT_SOURCE_LABELS]
+    else:
+        legacy = data.get("input_source", "step_input")
+        sources = [legacy] if legacy in INPUT_SOURCE_LABELS else ["step_input"]
+
+    if prev_step_name == "Document":
+        sources = ["workflow_documents" if s == "step_input" else s for s in sources]
+
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for s in sources:
+        if s not in seen:
+            seen.add(s)
+            deduped.append(s)
+    return deduped or ["step_input"]
+
+
+def _stringify_context(value) -> str:
+    if value is None or value == "":
+        return ""
+    if isinstance(value, str):
+        return value
+    try:
+        return json.dumps(value, indent=2, default=str)
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def _join_doc_texts(doc_texts: list[str]) -> str:
+    if not doc_texts:
+        return ""
+    if len(doc_texts) == 1:
+        return doc_texts[0]
+    return "\n\n".join(f"=== Document {i} ===\n{dt}" for i, dt in enumerate(doc_texts, 1))
+
+
+def _build_combined_context(data: dict, inputs: dict, sources: list[str]):
+    """Build the data payload to feed an LLM node.
+
+    For a single source, returns the raw payload (str / dict / list) so the
+    downstream prompt template formats it the same as before. For multiple
+    sources, returns a labeled multi-section string. Empty sources are
+    skipped; if all are empty, returns "".
+    """
+    sections: list[tuple[str, str]] = []
+    raw_single = None
+    for src in sources:
+        if src == "step_input":
+            payload = inputs.get("output")
+            text = _stringify_context(payload)
+            if text:
+                sections.append((INPUT_SOURCE_LABELS[src], text))
+                raw_single = payload
+        elif src == "select_document":
+            doc = data.get("selected_doc_text") or ""
+            if doc:
+                sections.append((INPUT_SOURCE_LABELS[src], doc))
+                raw_single = doc
+        elif src == "workflow_documents":
+            joined = _join_doc_texts(data.get("doc_texts") or [])
+            if joined:
+                sections.append((INPUT_SOURCE_LABELS[src], joined))
+                raw_single = joined
+
+    if not sections:
+        return ""
+    if len(sections) == 1:
+        return raw_single
+    return "\n\n".join(f"=== {label} ===\n{content}" for label, content in sections)
+
+
+def _build_extraction_texts(data: dict, inputs: dict, sources: list[str]) -> list[str]:
+    """Build a list of texts for ExtractionEngine, one entry per source/document.
+
+    Each non-empty source contributes one entry, except `workflow_documents`
+    which expands to one entry per loaded document (preserving existing
+    multi-doc extraction behavior).
+    """
+    texts: list[str] = []
+    for src in sources:
+        if src == "step_input":
+            payload = inputs.get("output")
+            if isinstance(payload, dict):
+                # Defensive: if a Prompt-style dict ever lands here, prefer
+                # its "answer" field; otherwise fall back to JSON.
+                text = payload.get("answer") or _stringify_context(payload)
+            elif isinstance(payload, list):
+                text = "\n".join(str(x) for x in payload if x is not None)
+            else:
+                text = _stringify_context(payload)
+            if text:
+                texts.append(text)
+        elif src == "select_document":
+            doc = data.get("selected_doc_text") or ""
+            if doc:
+                texts.append(doc)
+        elif src == "workflow_documents":
+            for dt in data.get("doc_texts") or []:
+                if dt:
+                    texts.append(dt)
+    return texts
+
+
+# ---------------------------------------------------------------------------
 # LLM helper functions (sync, for nodes)
 # ---------------------------------------------------------------------------
 
@@ -121,11 +245,27 @@ def llm_chat_model(model: str, prompt: str, data=None, progress_callback=None,
                    include_next_step: bool = True, system_config_doc: dict | None = None,
                    usage_acc: UsageAccumulator | None = None):
     """Run a chat prompt via LLM. Sync context."""
-    full_text = json.dumps(data) if data is not None else ""
+    if data is None or data == "":
+        data_block = "(No data provided.)"
+    elif isinstance(data, str):
+        data_block = data
+    else:
+        try:
+            data_block = json.dumps(data, indent=2, default=str)
+        except (TypeError, ValueError):
+            data_block = str(data)
+
     output_prompt = (
-        f"Follow the instruction and output your answer as a nicely formatted markdown "
-        f"to display in a web interface chat bot. Only show the markdown output and add "
-        f"no text before it.\n\nInstruction: {prompt}\n\n {full_text}"
+        "You are completing one step of a multi-step workflow. Answer the "
+        "INSTRUCTION below using ONLY the CONTEXT block, which is the output "
+        "of the previous step. Do not draw on outside knowledge or invent "
+        "details that are not present in the CONTEXT. If the CONTEXT does not "
+        "contain what the instruction needs, say so explicitly rather than "
+        "guessing.\n\n"
+        "Format your answer as clean markdown for a web chat UI. Output only "
+        "the markdown — no preamble, no code fences around the whole reply.\n\n"
+        f"INSTRUCTION:\n{prompt}\n\n"
+        f"CONTEXT:\n{data_block}"
     )
     chat_agent = create_chat_agent(model, system_config_doc=system_config_doc)
     result = chat_agent.run_sync(output_prompt)
@@ -302,37 +442,24 @@ class ExtractionNode(Node):
                 keys = [s.strip() for s in raw.split(",") if s.strip()]
 
         prev_step_name = inputs.get("step_name")
-        doc_texts = None
-        full_text = None
 
         task_label = self.data.get("name")
         self.report_progress(f"Running {task_label}" if task_label else "Extraction running")
 
-        input_source = self.data.get("input_source", "step_input")
+        sources = _resolve_input_sources(self.data, prev_step_name)
+        texts = _build_extraction_texts(self.data, inputs, sources)
 
-        if input_source == "select_document" and self.data.get("selected_doc_text"):
-            full_text = self.data["selected_doc_text"]
-        elif input_source == "workflow_documents" or prev_step_name == "Document":
-            doc_texts = self.data.get("doc_texts")
-        elif prev_step_name == "Prompt":
-            step_input = inputs.get("output")
-            if isinstance(step_input, dict):
-                full_text = step_input.get("answer", str(step_input))
-            elif isinstance(step_input, list):
-                full_text = "\n".join(str(x) for x in step_input)
-            else:
-                full_text = str(step_input) if step_input else ""
-        else:
-            step_input = inputs.get("output")
-            if isinstance(step_input, str):
-                full_text = step_input
-            elif step_input:
-                full_text = json.dumps(step_input)
+        # Use `doc_texts` whenever the user picked a doc-list source or has
+        # more than one text; otherwise pass a single string via `full_text`.
+        # Functionally equivalent in the engine, but preserves call-shape
+        # expectations from older callers.
+        kwargs: dict = {"system_config_doc": self._sys_cfg, "usage_acc": self._usage_acc}
+        if "workflow_documents" in sources or len(texts) > 1:
+            kwargs["doc_texts"] = texts
+        elif texts:
+            kwargs["full_text"] = texts[0]
 
-        extraction_response = data_extraction_model(
-            self.model, keys, doc_texts=doc_texts, full_text=full_text,
-            system_config_doc=self._sys_cfg, usage_acc=self._usage_acc,
-        )
+        extraction_response = data_extraction_model(self.model, keys, **kwargs)
 
         raw_output = extraction_response.get("raw") if isinstance(extraction_response, dict) else extraction_response
         formatted_output = extraction_response.get("formatted") if isinstance(extraction_response, dict) else extraction_response
@@ -365,35 +492,14 @@ class PromptNode(Node):
         prev_step_name = inputs.get("step_name")
         self.report_progress(f"Prompt: {prompt}")
 
-        input_source = self.data.get("input_source", "step_input")
+        sources = _resolve_input_sources(self.data, prev_step_name)
+        context = _build_combined_context(self.data, inputs, sources)
 
-        if input_source == "select_document" and self.data.get("selected_doc_text"):
-            chat_response = llm_chat_model(
-                model=self.model, prompt=prompt, data=self.data["selected_doc_text"],
-                include_next_step=False, system_config_doc=self._sys_cfg,
-                usage_acc=self._usage_acc,
-            )
-        elif input_source == "workflow_documents" or prev_step_name == "Document":
-            doc_texts = self.data.get("doc_texts", [])
-            if len(doc_texts) > 1:
-                sections = []
-                for i, dt in enumerate(doc_texts, 1):
-                    sections.append(f"=== Document {i} ===\n{dt}")
-                full_text = "\n\n".join(sections)
-            else:
-                full_text = doc_texts[0] if doc_texts else ""
-            chat_response = llm_chat_model(
-                model=self.model, prompt=prompt, data=full_text,
-                include_next_step=False, system_config_doc=self._sys_cfg,
-                usage_acc=self._usage_acc,
-            )
-        else:
-            data = inputs.get("output")
-            chat_response = llm_chat_model(
-                model=self.model, prompt=prompt, data=data,
-                include_next_step=False, system_config_doc=self._sys_cfg,
-                usage_acc=self._usage_acc,
-            )
+        chat_response = llm_chat_model(
+            model=self.model, prompt=prompt, data=context,
+            include_next_step=False, system_config_doc=self._sys_cfg,
+            usage_acc=self._usage_acc,
+        )
 
         return {"output": chat_response, "input": prompt, "step_name": self.name}
 
@@ -406,27 +512,11 @@ class FormatNode(Node):
 
     def process(self, inputs):
         formatting_prompt = self.data.get("format_template") or self.data.get("prompt", "")
-        data = inputs.get("output")
         prev_step_name = inputs.get("step_name")
         self.report_progress(f"Formatter: {formatting_prompt}")
 
-        input_source = self.data.get("input_source", "step_input")
-
-        if input_source == "select_document" and self.data.get("selected_doc_text"):
-            text = self.data["selected_doc_text"]
-        elif input_source == "workflow_documents" or prev_step_name == "Document":
-            doc_texts = self.data.get("doc_texts", [])
-            if len(doc_texts) > 1:
-                sections = []
-                for i, dt in enumerate(doc_texts, 1):
-                    sections.append(f"=== Document {i} ===\n{dt}")
-                text = "\n\n".join(sections)
-            else:
-                text = doc_texts[0] if doc_texts else ""
-        elif prev_step_name == "Prompt":
-            text = data.get("formatted_answer", "") if isinstance(data, dict) else data
-        else:
-            text = data
+        sources = _resolve_input_sources(self.data, prev_step_name)
+        text = _build_combined_context(self.data, inputs, sources)
 
         _, output = format_model(self.model, formatting_prompt, text, system_config_doc=self._sys_cfg,
                                  usage_acc=self._usage_acc)
@@ -615,7 +705,11 @@ class ResearchNode(Node):
 
     def process(self, inputs):
         question = self.data.get("question", "")
-        input_data = inputs.get("output")
+        prev_step_name = inputs.get("step_name")
+
+        sources = _resolve_input_sources(self.data, prev_step_name)
+        input_data = _build_combined_context(self.data, inputs, sources)
+
         self.report_progress("Pass 1: Analyzing data")
 
         analysis_prompt = (
@@ -643,6 +737,16 @@ class ResearchNode(Node):
         return {"output": report, "input": inputs.get("output"), "step_name": self.name}
 
 
+def _open_sync_db():
+    """Open a pymongo handle for in-node credential lookups (sync context)."""
+    from pymongo import MongoClient
+
+    from app.config import Settings
+    settings = Settings()
+    client = MongoClient(settings.mongo_host)
+    return client[settings.mongo_db]
+
+
 class APICallNode(Node):
     def __init__(self, data: dict) -> None:
         super().__init__("APINode")
@@ -653,6 +757,8 @@ class APICallNode(Node):
         method = self.data.get("method", "GET").upper()
         headers_raw = self.data.get("headers", "")
         body_raw = self.data.get("body", "")
+        auth_strategy = (self.data.get("auth_strategy") or "none").lower()
+        credential_id = self.data.get("credential_id") or ""
         if not url:
             return {"output": "", "input": inputs.get("output"), "step_name": self.name}
 
@@ -664,12 +770,56 @@ class APICallNode(Node):
             return {"output": f"Blocked URL: {e}", "input": inputs.get("output"), "step_name": self.name}
 
         self.report_progress(f"{method} {url}")
-        headers = {}
+        headers: dict[str, str] = {}
         if headers_raw:
             try:
                 headers = json.loads(headers_raw)
             except json.JSONDecodeError:
                 pass
+
+        # Apply credential-based auth (overrides any conflicting header).
+        if auth_strategy != "none":
+            if not credential_id:
+                return {
+                    "output": f"API Node auth_strategy {auth_strategy!r} requires credential_id",
+                    "input": inputs.get("output"),
+                    "step_name": self.name,
+                }
+            from app.services import credentials_service
+
+            try:
+                db = _open_sync_db()
+                cred_doc = credentials_service.fetch_credential_sync(db, credential_id)
+            except Exception as e:
+                logger.exception("Credential lookup failed")
+                return {
+                    "output": f"Credential lookup failed: {e}",
+                    "input": inputs.get("output"),
+                    "step_name": self.name,
+                }
+            if not cred_doc:
+                return {
+                    "output": f"Credential {credential_id!r} not found",
+                    "input": inputs.get("output"),
+                    "step_name": self.name,
+                }
+            if cred_doc.get("type") != auth_strategy:
+                return {
+                    "output": (
+                        f"Credential type {cred_doc.get('type')!r} does not match "
+                        f"auth_strategy {auth_strategy!r}"
+                    ),
+                    "input": inputs.get("output"),
+                    "step_name": self.name,
+                }
+            try:
+                credentials_service.apply_auth(credential_doc=cred_doc, headers=headers)
+            except credentials_service.CredentialError as e:
+                return {
+                    "output": f"Auth setup failed: {e}",
+                    "input": inputs.get("output"),
+                    "step_name": self.name,
+                }
 
         body = None
         if body_raw and method in ("POST", "PUT", "PATCH"):
@@ -726,7 +876,11 @@ class FormFillerNode(Node):
 
     def process(self, inputs):
         template = self.data.get("template", "")
-        input_data = inputs.get("output")
+        prev_step_name = inputs.get("step_name")
+
+        sources = _resolve_input_sources(self.data, prev_step_name)
+        input_data = _build_combined_context(self.data, inputs, sources)
+
         self.report_progress("Filling template")
 
         prompt = (
@@ -811,7 +965,20 @@ class PackageBuilderNode(Node):
 
 
 class ApprovalNode(Node):
-    """Workflow step that pauses execution for human review."""
+    """Workflow step that pauses execution for human review.
+
+    Configuration (`data`):
+      review_instructions: str — text shown to the reviewer.
+      assignee_role: "specific_users" | "workflow_owner" | "team_admins"
+      assigned_to_user_ids: list[str] — used when assignee_role == specific_users.
+      sla_days: int | None — days from pause until the timeout_action fires.
+      timeout_action: "none" | "approve" | "reject" | "escalate"
+      escalation_user_ids: list[str] — used when timeout_action == escalate.
+
+    The node emits a sentinel dict with `_approval_pause: True`. The engine's
+    execute() loop returns early when it sees that, and the workflow Celery
+    task persists an ApprovalRequest from the sentinel payload.
+    """
 
     def __init__(self, data: dict) -> None:
         super().__init__("Approval")
@@ -819,15 +986,17 @@ class ApprovalNode(Node):
 
     def process(self, inputs):
         review_instructions = self.data.get("review_instructions", "Please review the workflow output.")
-        assigned_to = self.data.get("assigned_to_user_ids", [])
-
         return {
             "output": inputs.get("output"),
             "input": inputs.get("output"),
             "step_name": self.name,
             "_approval_pause": True,
             "_review_instructions": review_instructions,
-            "_assigned_to_user_ids": assigned_to,
+            "_assignee_role": self.data.get("assignee_role", "specific_users"),
+            "_assigned_to_user_ids": self.data.get("assigned_to_user_ids", []),
+            "_sla_days": self.data.get("sla_days"),
+            "_timeout_action": self.data.get("timeout_action", "none"),
+            "_escalation_user_ids": self.data.get("escalation_user_ids", []),
             "_data_for_review": inputs.get("output"),
         }
 

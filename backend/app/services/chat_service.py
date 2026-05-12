@@ -125,6 +125,49 @@ class _ThinkTagParser:
         return last_lt
 
 
+def _classify_stream_error(exc: BaseException) -> tuple[str, str]:
+    """Classify a chat stream error into (severity, user_message).
+
+    severity is "warning" for transient/external/user-input issues that aren't
+    actionable bugs — these stay out of Sentry's error stream. "error" is the
+    fallback for unexpected exceptions.
+    """
+    text = str(exc)
+    lower = text.lower()
+
+    # Upstream LLM context window exceeded — user-input issue, not a bug.
+    if "exceeds model's maximum context length" in lower or "context length" in lower:
+        return "warning", (
+            "This conversation is too large for the selected model. "
+            "Remove some documents or switch to a larger model."
+        )
+
+    # Configured model isn't served by the upstream LLM gateway.
+    if "model_not_found" in lower or "does not exist" in lower:
+        return "warning", (
+            "The selected model is not available right now. "
+            "Pick a different model in Settings and try again."
+        )
+
+    # Upstream gateway / connectivity / retry exhaustion — transient.
+    transient_markers = (
+        "peer closed connection",
+        "incomplete chunked read",
+        "502 bad gateway",
+        "503 service unavailable",
+        "504 gateway timeout",
+        "connection error",
+        "streaming attempts failed",
+        "remoteprotocolerror",
+    )
+    if any(m in lower for m in transient_markers):
+        return "warning", (
+            "The model service was unreachable. Please try again in a moment."
+        )
+
+    return "error", text
+
+
 def _extract_event_content(event) -> tuple[str | None, bool]:
     """Extract content from a pydantic-ai stream event.
 
@@ -545,7 +588,6 @@ async def chat_stream(
     # KB context: query ChromaDB for relevant chunks and add as a segment.
     if kb_uuid:
         try:
-            import asyncio
             from app.services.document_manager import get_document_manager
             dm = get_document_manager()
             kb_results = await asyncio.to_thread(dm.query_kb, kb_uuid, message, 8)
@@ -653,12 +695,12 @@ async def chat_stream(
                 "Remove some documents or switch to a larger model."
             ),
         }) + "\n"
-        if activity_id:
-            ev = await ActivityEvent.get(activity_id)
-            if ev:
-                ev.status = ActivityStatus.FAILED.value
-                ev.error = "context over budget"
-                await ev.save()
+        await _save_failed_assistant_turn(
+            conversation,
+            "_(no response — request exceeded the model's context budget)_",
+            activity_id,
+            "context over budget",
+        )
         return
 
     previous_messages = compacted.history
@@ -891,55 +933,85 @@ async def chat_stream(
                 ev.status = ActivityStatus.COMPLETED.value
                 await ev.save()
     except asyncio.CancelledError:
-        # User hit Stop (or client disconnected). Persist whatever we have
-        # so the partial response isn't lost, then re-raise so the server
-        # knows the request was cancelled.
-        logger.info("Chat stream cancelled for user %s", user_id)
+        # Client disconnected mid-stream. Persist any partial response so the
+        # user message isn't orphaned (would leave consecutive user turns in
+        # history, which pydantic-ai rejects on the next request).
         try:
-            partial_text = _THINK_BLOCK_RE.sub("", "".join(full_response)).strip()
-            thinking_text = "".join(full_thinking) or None
-            cleaned_segments: list[dict] = []
-            for seg in streamed_segments:
-                if seg.get("kind") == "text":
-                    cleaned = _THINK_BLOCK_RE.sub("", seg["content"]).strip()
-                    if cleaned:
-                        cleaned_segments.append({"kind": "text", "content": cleaned})
-                else:
-                    cleaned_segments.append(seg)
-
-            if partial_text or streamed_tool_calls or streamed_tool_results:
-                await conversation.add_message(
-                    ChatRole.ASSISTANT,
-                    partial_text,
-                    thinking=thinking_text,
-                    thinking_duration=thinking_duration,
-                    tool_calls=streamed_tool_calls or None,
-                    tool_results=streamed_tool_results or None,
-                    segments=cleaned_segments or None,
-                )
-
-            if activity_id:
-                ev = await ActivityEvent.get(activity_id)
-                if ev:
-                    ev.status = ActivityStatus.CANCELED.value
-                    from datetime import datetime, timezone
-                    ev.finished_at = datetime.now(timezone.utc)
-                    ev.last_updated_at = datetime.now(timezone.utc)
-                    await ev.save()
-        except Exception as cleanup_err:
-            logger.warning("Cancel cleanup failed: %s", cleanup_err)
+            await asyncio.shield(_save_failed_assistant_turn(
+                conversation,
+                _build_interrupted_body(full_response, "connection closed before completion"),
+                activity_id,
+                "client disconnected",
+                thinking="".join(full_thinking) or None,
+                thinking_duration=thinking_duration,
+            ))
+        except Exception as save_err:
+            logger.error("Failed to persist interrupted chat on cancel: %s", save_err)
         raise
-    except Exception as e:
-        logger.error(f"Chat stream error: {e}")
-        yield json.dumps({"kind": "error", "content": str(e)}) + "\n"
-        # Mark activity as failed
-        if activity_id:
-            ev = await ActivityEvent.get(activity_id)
-            if ev:
-                ev.status = ActivityStatus.FAILED.value
-                ev.error = str(e)[:2000]
-                await ev.save()
 
+    except Exception as e:
+        severity, user_message = _classify_stream_error(e)
+        if severity == "warning":
+            logger.warning("Chat stream error: %s", e)
+        else:
+            logger.error("Chat stream error: %s", e)
+        yield json.dumps({"kind": "error", "content": user_message}) + "\n"
+        try:
+            await _save_failed_assistant_turn(
+                conversation,
+                _build_interrupted_body(full_response, user_message[:200]),
+                activity_id,
+                str(e),
+                thinking="".join(full_thinking) or None,
+                thinking_duration=thinking_duration,
+            )
+        except Exception as save_err:
+            logger.error("Failed to persist interrupted chat: %s", save_err)
+
+
+
+def _build_interrupted_body(full_response: list[str], reason: str) -> str:
+    """Compose an assistant-turn body from any partial stream content + a reason."""
+    partial = _THINK_BLOCK_RE.sub("", "".join(full_response)).strip()
+    if partial:
+        return f"{partial}\n\n_(response interrupted — {reason})_"
+    return f"_(no response — {reason})_"
+
+
+async def _save_failed_assistant_turn(
+    conversation: ChatConversation,
+    body: str,
+    activity_id: Optional[str],
+    reason: str,
+    thinking: Optional[str] = None,
+    thinking_duration: Optional[float] = None,
+) -> None:
+    """Persist a placeholder assistant turn after a failure or cancellation.
+
+    Why: chat.py saves the user message before streaming; if the LLM call
+    fails or is cancelled, the conversation would otherwise be left with an
+    orphan user turn. pydantic-ai's message_history rejects consecutive user
+    turns, so the *next* request would error or silently drop messages.
+    """
+    await conversation.add_message(
+        ChatRole.ASSISTANT,
+        body,
+        thinking=thinking,
+        thinking_duration=thinking_duration,
+    )
+    if not activity_id:
+        return
+    ev = await ActivityEvent.get(activity_id)
+    if not ev:
+        return
+    ev.status = ActivityStatus.FAILED.value
+    ev.error = reason[:2000]
+    from datetime import datetime, timezone
+    ev.finished_at = datetime.now(timezone.utc)
+    ev.last_updated_at = datetime.now(timezone.utc)
+    reloaded = await ChatConversation.get(conversation.id)
+    ev.message_count = len(reloaded.messages) if reloaded else 0
+    await ev.save()
 
 
 def _get_full_text(documents: list[SmartDocument]) -> str:

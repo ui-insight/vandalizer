@@ -13,7 +13,7 @@ dependencies = [
     "werkzeug>=3.1,<4",
     "python-multipart>=0.0.18,<1",
     "celery[redis]>=5.4,<6",
-    "pydantic-ai-slim[openai]>=1.56,<2",
+    "pydantic-ai-slim[openai,anthropic]>=1.56,<2",
     "pymongo>=4.0,<5",
     "chromadb>=0.5,<1.6",
     "httpx>=0.27,<1",
@@ -68,6 +68,7 @@ markers = [
     "integration_tier1: Integration tests needing no external services",
     "integration_tier2: Integration tests requiring MongoDB",
     "integration_tier3: Integration tests requiring LLM API key",
+    "integration_tier4: Integration tests exercising ChromaDB (PersistentClient or HttpClient)",
 ]
 
 [tool.mypy]

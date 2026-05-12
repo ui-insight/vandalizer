@@ -39,8 +39,16 @@ from app.schemas.workflows import (
 )
 from app.rate_limit import limiter
 from app.services import workflow_service as svc
+from app.services.user_lookup import resolve_author, resolve_authors
 
 router = APIRouter()
+
+
+async def _workflow_response_from_dict(wf: dict) -> WorkflowResponse:
+    """Build a WorkflowResponse from a workflow dict, resolving the author."""
+    creator_id = wf.get("created_by_user_id") or wf.get("user_id")
+    created_by = await resolve_author(creator_id)
+    return WorkflowResponse(**{**wf, "created_by": created_by})
 
 
 def _csv_cell(value) -> str:
@@ -128,6 +136,158 @@ def _pdf_safe(value) -> str:
     return text.encode("latin-1", errors="replace").decode("latin-1")
 
 
+_INLINE_BOLD = re.compile(r"\*\*(.+?)\*\*")
+_INLINE_ITALIC = re.compile(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)")
+_INLINE_CODE = re.compile(r"`(.+?)`")
+_MD_LINK = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
+
+
+def _add_runs_with_formatting(paragraph, text: str) -> None:
+    """Add runs to a docx paragraph, parsing inline **bold**, *italic*, `code`, [link](url)."""
+    # Drop markdown link syntax — keep the visible text only (URLs in LLM output
+    # are often hallucinated and useless in a Word doc).
+    text = _MD_LINK.sub(r"\1", text)
+
+    pos = 0
+    # Combined scan: find the next inline marker and emit the preceding plain run.
+    while pos < len(text):
+        next_match = None
+        next_kind = None
+        for kind, pattern in (("bold", _INLINE_BOLD), ("code", _INLINE_CODE), ("italic", _INLINE_ITALIC)):
+            m = pattern.search(text, pos)
+            if m and (next_match is None or m.start() < next_match.start()):
+                next_match = m
+                next_kind = kind
+        if next_match is None:
+            paragraph.add_run(text[pos:])
+            return
+        if next_match.start() > pos:
+            paragraph.add_run(text[pos:next_match.start()])
+        run = paragraph.add_run(next_match.group(1))
+        if next_kind == "bold":
+            run.bold = True
+        elif next_kind == "italic":
+            run.italic = True
+        elif next_kind == "code":
+            run.font.name = "Consolas"
+        pos = next_match.end()
+
+
+def _markdown_to_docx(text: str):
+    """Render a markdown-ish string into a python-docx Document.
+
+    Handles ATX headings, unordered/ordered lists, blank-line paragraphs, and
+    inline bold/italic/code. Unknown syntax falls back to a plain paragraph.
+    """
+    from docx import Document
+    from docx.shared import Inches, Pt
+
+    doc = Document()
+    for section in doc.sections:
+        section.top_margin = Inches(1)
+        section.bottom_margin = Inches(1)
+        section.left_margin = Inches(1)
+        section.right_margin = Inches(1)
+
+    style = doc.styles["Normal"]
+    style.font.name = "Arial"
+    style.font.size = Pt(11)
+
+    lines = (text or "").splitlines()
+    for raw in lines:
+        line = raw.rstrip()
+        if not line.strip():
+            doc.add_paragraph()
+            continue
+
+        heading = re.match(r"^(#{1,6})\s+(.+)$", line)
+        if heading:
+            level = min(len(heading.group(1)), 4)
+            doc.add_heading(heading.group(2).strip(), level=level)
+            continue
+
+        bullet = re.match(r"^\s*[-*+]\s+(.+)$", line)
+        if bullet:
+            p = doc.add_paragraph(style="List Bullet")
+            _add_runs_with_formatting(p, bullet.group(1).strip())
+            continue
+
+        numbered = re.match(r"^\s*\d+\.\s+(.+)$", line)
+        if numbered:
+            p = doc.add_paragraph(style="List Number")
+            _add_runs_with_formatting(p, numbered.group(1).strip())
+            continue
+
+        p = doc.add_paragraph()
+        _add_runs_with_formatting(p, line)
+
+    return doc
+
+
+def _data_to_docx_bytes(data) -> bytes:
+    """Serialize workflow output (str/dict/list) to a .docx byte payload."""
+    from docx import Document
+    from docx.shared import Inches, Pt
+
+    if isinstance(data, str):
+        try:
+            parsed = json.loads(data)
+        except (json.JSONDecodeError, ValueError):
+            parsed = None
+        if isinstance(parsed, (dict, list)):
+            data = parsed
+
+    if isinstance(data, str):
+        doc = _markdown_to_docx(data)
+    elif isinstance(data, list) and data and isinstance(data[0], dict):
+        doc = Document()
+        for section in doc.sections:
+            section.top_margin = section.bottom_margin = Inches(1)
+            section.left_margin = section.right_margin = Inches(1)
+        doc.styles["Normal"].font.name = "Arial"
+        doc.styles["Normal"].font.size = Pt(11)
+        headers = list(dict.fromkeys(k for row in data for k in row.keys()))
+        table = doc.add_table(rows=1, cols=len(headers))
+        table.style = "Light Grid Accent 1"
+        hdr_cells = table.rows[0].cells
+        for i, h in enumerate(headers):
+            hdr_cells[i].text = str(h)
+            for run in hdr_cells[i].paragraphs[0].runs:
+                run.bold = True
+        for row in data:
+            cells = table.add_row().cells
+            for i, h in enumerate(headers):
+                val = row.get(h, "")
+                cells[i].text = json.dumps(val, default=str) if isinstance(val, (dict, list)) else str(val if val is not None else "")
+    elif isinstance(data, dict):
+        doc = Document()
+        for section in doc.sections:
+            section.top_margin = section.bottom_margin = Inches(1)
+            section.left_margin = section.right_margin = Inches(1)
+        doc.styles["Normal"].font.name = "Arial"
+        doc.styles["Normal"].font.size = Pt(11)
+        table = doc.add_table(rows=1, cols=2)
+        table.style = "Light Grid Accent 1"
+        hdr = table.rows[0].cells
+        hdr[0].text = "Field"
+        hdr[1].text = "Value"
+        for cell in hdr:
+            for run in cell.paragraphs[0].runs:
+                run.bold = True
+        for k, v in data.items():
+            cells = table.add_row().cells
+            cells[0].text = str(k)
+            cells[1].text = json.dumps(v, default=str) if isinstance(v, (dict, list)) else str(v)
+    elif isinstance(data, list):
+        doc = _markdown_to_docx("\n".join(f"- {item}" for item in data))
+    else:
+        doc = _markdown_to_docx("" if data is None else str(data))
+
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
 async def _authorize_documents(document_uuids: list[str], user: User) -> list[str]:
     team_access = await access_control.get_team_access_context(user)
     authorized: list[str] = []
@@ -152,9 +312,11 @@ async def _authorize_documents(document_uuids: list[str], user: User) -> list[st
 async def create_workflow(req: CreateWorkflowRequest, user: User = Depends(get_current_user)):
     team_id = str(user.current_team) if user.current_team else None
     wf = await svc.create_workflow(req.name, user.user_id, req.description, team_id=team_id)
+    created_by = await resolve_author(wf.created_by_user_id or wf.user_id)
     return WorkflowResponse(
         id=str(wf.id), name=wf.name, description=wf.description,
         user_id=wf.user_id, num_executions=wf.num_executions,
+        created_by=created_by,
     )
 
 
@@ -167,10 +329,14 @@ async def list_workflows(
     user: User = Depends(get_current_user),
 ):
     workflows = await svc.list_workflows(user=user, skip=skip, limit=limit, scope=scope, search=search)
+    author_map = await resolve_authors(
+        (wf.created_by_user_id or wf.user_id) for wf in workflows
+    )
     return [
         WorkflowResponse(
             id=str(wf.id), name=wf.name, description=wf.description,
             user_id=wf.user_id, num_executions=wf.num_executions,
+            created_by=author_map.get(wf.created_by_user_id or wf.user_id),
         )
         for wf in workflows
     ]
@@ -470,6 +636,14 @@ async def download_results(
             headers={"Content-Disposition": 'attachment; filename="results.pdf"'},
         )
 
+    if format == "docx":
+        docx_bytes = _data_to_docx_bytes(output_data)
+        return StreamingResponse(
+            io.BytesIO(docx_bytes),
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            headers={"Content-Disposition": 'attachment; filename="results.docx"'},
+        )
+
     # Default: JSON
     json_bytes = json.dumps(output_data, indent=2, default=str).encode()
     return StreamingResponse(
@@ -522,7 +696,7 @@ async def import_workflow(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    return WorkflowResponse(**wf)
+    return await _workflow_response_from_dict(wf)
 
 
 @router.post("/{workflow_id}/import", response_model=WorkflowResponse)
@@ -554,7 +728,7 @@ async def import_into_workflow(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    return WorkflowResponse(**wf)
+    return await _workflow_response_from_dict(wf)
 
 
 @router.get("/{workflow_id}", response_model=WorkflowResponse)
@@ -562,23 +736,27 @@ async def get_workflow(workflow_id: str, user: User = Depends(get_current_user))
     wf = await svc.get_workflow(workflow_id, user=user)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
-    return WorkflowResponse(**wf)
+    return await _workflow_response_from_dict(wf)
 
 
 @router.patch("/{workflow_id}", response_model=WorkflowResponse)
 async def update_workflow(workflow_id: str, req: UpdateWorkflowRequest, user: User = Depends(get_current_user)):
     wf = await svc.update_workflow(
-        workflow_id, user=user, name=req.name, description=req.description, input_config=req.input_config,
+        workflow_id, user=user, name=req.name, description=req.description,
+        input_config=req.input_config, output_config=req.output_config,
     )
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
     # Flag stale verification if this workflow was verified
     from app.services.verification_service import check_and_flag_stale_verification
     await check_and_flag_stale_verification("workflow", str(wf.id))
+    created_by = await resolve_author(wf.created_by_user_id or wf.user_id)
     return WorkflowResponse(
         id=str(wf.id), name=wf.name, description=wf.description,
         user_id=wf.user_id, num_executions=wf.num_executions,
         input_config=wf.input_config,
+        output_config=wf.output_config,
+        created_by=created_by,
     )
 
 
@@ -596,7 +774,7 @@ async def duplicate_workflow(workflow_id: str, user: User = Depends(get_current_
     wf = await svc.duplicate_workflow(workflow_id, user=user, user_id=user.user_id, team_id=team_id)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
-    return WorkflowResponse(**wf)
+    return await _workflow_response_from_dict(wf)
 
 
 # ---------------------------------------------------------------------------

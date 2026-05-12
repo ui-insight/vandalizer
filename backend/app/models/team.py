@@ -46,3 +46,25 @@ class TeamInvite(Document):
     class Settings:
         name = "team_invite"
         indexes = ["token", "email"]
+
+
+class TeamJoinLink(Document):
+    """Public, multi-use join link for a team.
+
+    Distinct from TeamInvite: no recipient email, may be used by many
+    different people, short default lifetime (48h), and revocable.
+    """
+
+    team: PydanticObjectId
+    token: str
+    created_by_user_id: str
+    role: str = "member"  # admin or member; cannot grant ownership
+    expires_at: datetime.datetime
+    revoked: bool = False
+    max_uses: Optional[int] = None  # None = unlimited
+    use_count: int = 0
+    created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
+
+    class Settings:
+        name = "team_join_link"
+        indexes = ["token", "team"]

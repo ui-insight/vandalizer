@@ -105,7 +105,7 @@ function LandingRegisterForm({ onSwitch }: { onSwitch: () => void }) {
     setSubmitting(true)
     try {
       // user_id = email, matching Flask behavior
-      await register(email, email, password, name || undefined, undefined, role || undefined)
+      await register(email, email, password, name || undefined, undefined, undefined, role || undefined)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed')
     } finally {

@@ -1,0 +1,40 @@
+name: Seed Version Check
+
+# Fail any PR that modifies backend/seeds/** without bumping backend/seeds/VERSION.
+# Why: setup.sh advertises catalog updates by comparing the file at origin/HEAD
+# against the host-side .vandalizer_catalog_version, so seed changes that don't
+# bump VERSION will silently never reach existing installs.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/seeds/**'
+
+jobs:
+  check:
+    name: VERSION must bump when seeds change
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Verify VERSION changed alongside seeds
+        run: |
+          base="origin/${{ github.base_ref }}"
+          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          changed=$(git diff --name-only "$base"...HEAD -- 'backend/seeds/**')
+          if [[ -z "$changed" ]]; then
+            echo "No seed changes in this PR — nothing to check."
+            exit 0
+          fi
+          echo "Changed seed files:"
+          echo "$changed" | sed 's/^/  /'
+          if ! echo "$changed" | grep -qx 'backend/seeds/VERSION'; then
+            echo ""
+            echo "::error::backend/seeds/** changed but backend/seeds/VERSION was not updated."
+            echo "Bump backend/seeds/VERSION so existing installs see the catalog update."
+            exit 1
+          fi
+          echo "VERSION bump detected — OK."

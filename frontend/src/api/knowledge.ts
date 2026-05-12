@@ -86,9 +86,10 @@ export function removeKBSource(uuid: string, sourceUuid: string) {
   })
 }
 
-export function shareKnowledgeBase(uuid: string) {
+export function shareKnowledgeBase(uuid: string, comment?: string) {
   return apiFetch<{ ok: boolean; shared_with_team: boolean }>(`/api/knowledge/${uuid}/share`, {
     method: 'POST',
+    body: JSON.stringify({ comment: comment || undefined }),
   })
 }
 

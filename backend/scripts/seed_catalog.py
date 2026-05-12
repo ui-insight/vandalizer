@@ -11,6 +11,14 @@ Usage:
     python -m scripts.seed_catalog --only workflows
     python -m scripts.seed_catalog --only extractions,knowledge-bases
     python -m scripts.seed_catalog --only kbs                   # alias for knowledge-bases
+    python -m scripts.seed_catalog --reset                      # wipe catalog metadata, then re-seed
+
+The --reset flag clears the catalog "metadata layer" (VerifiedCollection,
+VerifiedItemMetadata, verified LibraryItem records, and the verified Library
+container) before re-seeding. The underlying Workflow / SearchSet /
+KnowledgeBase documents (and any user-added LibraryItem bookmarks pointing
+at them) are NOT deleted — the seed pass re-attaches existing entities to
+fresh metadata via their stored seed_id markers.
 """
 
 import argparse
@@ -36,7 +44,22 @@ from app.models.workflow import Workflow, WorkflowStep, WorkflowStepTask
 logger = logging.getLogger(__name__)
 
 SEEDS_DIR = pathlib.Path(__file__).resolve().parent.parent / "seeds"
+VERSION_FILE = SEEDS_DIR / "VERSION"
 SYSTEM_USER = "system"
+
+
+def _read_seed_version() -> str:
+    """Read the current catalog version from backend/seeds/VERSION.
+
+    Treated as required: the file is checked in and CI gates seed-data PRs
+    on a matching VERSION bump, so an absent or empty file is a packaging bug.
+    """
+    if not VERSION_FILE.exists():
+        raise RuntimeError(f"missing seed version file: {VERSION_FILE}")
+    text = VERSION_FILE.read_text().strip()
+    if not text:
+        raise RuntimeError(f"seed version file is empty: {VERSION_FILE}")
+    return text
 
 SeedResult = Literal["created", "updated", "skipped"]
 
@@ -725,6 +748,37 @@ async def seed_knowledge_base(
 
 
 # ---------------------------------------------------------------------------
+# Reset
+# ---------------------------------------------------------------------------
+
+async def reset_verified_catalog() -> dict[str, int]:
+    """Wipe the catalog metadata layer so the next seed pass rebuilds it cleanly.
+
+    Deletes all VerifiedCollection, VerifiedItemMetadata, and verified=True
+    LibraryItem documents, and removes the verified Library container. The
+    underlying Workflow / SearchSet / KnowledgeBase entities (and any
+    user-added LibraryItem bookmarks pointing at them) are NOT touched —
+    a subsequent seed_catalog() run re-attaches them via their stored
+    seed_id markers.
+    """
+    deleted: dict[str, int] = {}
+
+    res = await VerifiedCollection.find_all().delete()
+    deleted["collections"] = getattr(res, "deleted_count", 0) or 0
+
+    res = await VerifiedItemMetadata.find_all().delete()
+    deleted["metadata"] = getattr(res, "deleted_count", 0) or 0
+
+    res = await LibraryItem.find(LibraryItem.verified == True).delete()  # noqa: E712
+    deleted["library_items"] = getattr(res, "deleted_count", 0) or 0
+
+    res = await Library.find(Library.scope == LibraryScope.VERIFIED).delete()
+    deleted["libraries"] = getattr(res, "deleted_count", 0) or 0
+
+    return deleted
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -741,6 +795,9 @@ async def seed_catalog(types: set[str] | None = None):
     if unknown:
         raise ValueError(f"Unknown seed types: {sorted(unknown)}")
 
+    seed_version = _read_seed_version()
+    # Machine-readable line that setup.sh greps for to learn the applied version.
+    print(f"Catalog version: {seed_version}")
     print(f"Seeding verified catalog (types: {', '.join(sorted(selected))})...")
 
     verified_lib = await get_or_create_verified_library()
@@ -827,6 +884,17 @@ async def seed_catalog(types: set[str] | None = None):
     # --- Save verified library ---
     await verified_lib.save()
 
+    # --- Record the applied catalog version on the singleton config ---
+    # Only when seeding everything; partial seeds (--only) shouldn't claim the
+    # full catalog is at this version because some types were skipped.
+    if selected == ALL_TYPES:
+        from app.models.system_config import SystemConfig
+        cfg = await SystemConfig.get_config()
+        cfg.catalog_version = seed_version
+        cfg.catalog_version_applied_at = datetime.datetime.now(datetime.timezone.utc)
+        await cfg.save()
+        print(f"Recorded catalog_version={seed_version} on SystemConfig.")
+
     # --- Summary ---
     print("\nDone! " + " | ".join(summary))
 
@@ -856,11 +924,29 @@ async def main():
             "Default: seed everything."
         ),
     )
+    parser.add_argument(
+        "--reset",
+        action="store_true",
+        help=(
+            "Wipe catalog metadata (collections, verified metadata, verified "
+            "library items, verified library) before re-seeding. Underlying "
+            "Workflow/SearchSet/KnowledgeBase rows are preserved."
+        ),
+    )
     args = parser.parse_args()
     types = _parse_types(args.only)
 
     settings = Settings()
     await init_db(settings)
+    if args.reset:
+        print("Resetting verified catalog metadata...")
+        deleted = await reset_verified_catalog()
+        print(
+            f"  Deleted: {deleted['collections']} collection(s), "
+            f"{deleted['metadata']} metadata record(s), "
+            f"{deleted['library_items']} verified library item(s), "
+            f"{deleted['libraries']} verified library container(s)."
+        )
     await seed_catalog(types=types)
 
 

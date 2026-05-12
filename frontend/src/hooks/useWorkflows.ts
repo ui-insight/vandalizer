@@ -29,6 +29,11 @@ export function useWorkflows() {
     onSuccess: () => qc.invalidateQueries({ queryKey }),
   })
 
+  const importMutation = useMutation({
+    mutationFn: (file: File) => api.importWorkflow(file),
+    onSuccess: () => qc.invalidateQueries({ queryKey }),
+  })
+
   const create = async (name: string) => {
     return createMutation.mutateAsync({ name })
   }
@@ -41,5 +46,9 @@ export function useWorkflows() {
     return duplicateMutation.mutateAsync(id)
   }
 
-  return { workflows, loading, refresh, create, remove, duplicate }
+  const importFromFile = async (file: File) => {
+    return importMutation.mutateAsync(file)
+  }
+
+  return { workflows, loading, refresh, create, remove, duplicate, importFromFile }
 }

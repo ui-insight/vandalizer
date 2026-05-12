@@ -74,6 +74,10 @@ class SupportTicket(Document):
     # Read tracking — user_ids who have viewed the ticket since the last message
     read_by: list[str] = []
 
+    # Tags applied by support agents — internal-only; never returned to the
+    # ticket owner or other non-support users.
+    tags: list[str] = []
+
     # Timestamps
     created_at: datetime.datetime = Field(
         default_factory=lambda: datetime.datetime.now(datetime.timezone.utc)
@@ -90,6 +94,7 @@ class SupportTicket(Document):
             "user_id",
             "status",
             "assigned_to",
+            "tags",
             [("status", 1), ("created_at", -1)],
             [("user_id", 1), ("created_at", -1)],
         ]

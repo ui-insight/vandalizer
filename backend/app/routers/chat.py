@@ -203,23 +203,47 @@ async def chat(
     await conversation.add_message(ChatRole.USER, message)
 
     async def generate():
-        async for chunk in chat_stream(
-            message=message,
-            document_uuids=document_uuids,
-            conversation_uuid=conversation.uuid,
-            user_id=user_id,
-            activity_id=str(activity.id) if activity else None,
-            settings=settings,
-            model_override=body.model,
-            kb_uuid=body.knowledge_base_uuid,
-            include_onboarding_context=body.include_onboarding_context,
-            is_first_session=body.is_first_session,
-            run_demo=body.run_demo,
-            user=user,
-            team_access=team_access,
-            onboarding_context=onboarding_ctx,
-        ):
-            yield chunk
+        try:
+            async for chunk in chat_stream(
+                message=message,
+                document_uuids=document_uuids,
+                conversation_uuid=conversation.uuid,
+                user_id=user_id,
+                activity_id=str(activity.id) if activity else None,
+                settings=settings,
+                model_override=body.model,
+                kb_uuid=body.knowledge_base_uuid,
+                include_onboarding_context=body.include_onboarding_context,
+                is_first_session=body.is_first_session,
+                run_demo=body.run_demo,
+                user=user,
+                team_access=team_access,
+                onboarding_context=onboarding_ctx,
+            ):
+                yield chunk
+        finally:
+            # Safety net: chat_service handles normal completion, client
+            # disconnects, and LLM errors. This catches anything that slips
+            # through (early-return paths, save failures inside the exception
+            # handlers) so the activity rail never spins forever.
+            if activity:
+                try:
+                    ev = await ActivityEvent.get(activity.id)
+                    if ev and ev.status in (
+                        ActivityStatus.RUNNING.value,
+                        ActivityStatus.QUEUED.value,
+                    ):
+                        now = datetime.now(timezone.utc)
+                        ev.status = ActivityStatus.FAILED.value
+                        ev.error = "Chat stream ended without resolution."
+                        ev.finished_at = now
+                        ev.last_updated_at = now
+                        await ev.save()
+                except Exception:
+                    logger.exception(
+                        "Failed to reconcile activity %s after chat stream",
+                        activity.id,
+                    )
 
     headers = {"X-Conversation-UUID": conversation.uuid}
     if activity:

@@ -146,9 +146,11 @@ async def get_workflow(workflow_id: str, user: User | None = None) -> dict | Non
         "num_executions": wf.num_executions,
         "steps": steps,
         "input_config": _sanitize_for_json(wf.input_config),
+        "output_config": _sanitize_for_json(wf.output_config),
         "validation_plan": _sanitize_for_json(wf.validation_plan),
         "validation_inputs": _sanitize_for_json(wf.validation_inputs),
         "can_manage": can_manage,
+        "created_by_user_id": wf.created_by_user_id or wf.user_id,
     }
 
 
@@ -158,6 +160,7 @@ async def update_workflow(
     name: str | None = None,
     description: str | None = None,
     input_config: dict | None = None,
+    output_config: dict | None = None,
 ) -> Workflow | None:
     wf = await get_authorized_workflow(workflow_id, user, manage=True)
     if not wf:
@@ -168,6 +171,8 @@ async def update_workflow(
         wf.description = description
     if input_config is not None:
         wf.input_config = input_config
+    if output_config is not None:
+        wf.output_config = output_config
     wf.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
     await wf.save()
     return wf

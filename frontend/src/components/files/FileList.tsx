@@ -70,8 +70,7 @@ export function FileList({
       <colgroup>
         <col style={{ width: 32 }} />
         <col />
-        <col style={{ width: 140 }} />
-        <col style={{ width: 40 }} />
+        <col style={{ width: 110 }} />
       </colgroup>
       <thead>
         <tr style={{ borderBottom: '1px solid #dddddd' }}>
@@ -94,14 +93,13 @@ export function FileList({
             <SortIndicator column="name" sort={sort} />
           </th>
           <th
-            style={headerStyle}
+            style={{ ...headerStyle, textAlign: 'right', paddingRight: 15 }}
             className={onSort ? 'hover:bg-[#a6b5c945] hover:text-[#191919] transition-colors' : undefined}
             onClick={() => onSort?.('modified')}
           >
             Modified
             <SortIndicator column="modified" sort={sort} />
           </th>
-          <th style={{ width: 40 }} />
         </tr>
       </thead>
       <tbody>

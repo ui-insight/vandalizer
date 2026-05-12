@@ -12,6 +12,18 @@ from app.tasks import TRANSIENT_EXCEPTIONS
 logger = logging.getLogger(__name__)
 
 
+def _wants_selected_document(task_data: dict) -> bool:
+    """Whether the task expects `selected_doc_text` to be pre-loaded.
+
+    True if `select_document` appears in the new `input_sources` list, or
+    in the legacy single `input_source` field.
+    """
+    sources = task_data.get("input_sources")
+    if isinstance(sources, list) and "select_document" in sources:
+        return True
+    return task_data.get("input_source") == "select_document"
+
+
 def _notify_approval_reviewers_sync(
     db, assigned_user_ids: list[str], workflow_name: str,
     step_name: str, instructions: str, approval_uuid: str,
@@ -32,7 +44,7 @@ def _notify_approval_reviewers_sync(
             "kind": "approval_request",
             "title": f"Approval needed: {workflow_name}",
             "body": f"Step \"{step_name}\" is waiting for your review.",
-            "link": f"/approvals?id={approval_uuid}",
+            "link": f"/reviews/{approval_uuid}",
             "read": False,
             "created_at": now,
         })
@@ -147,6 +159,12 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
                     doc_texts = []
                     for uuid in doc_uuids:
                         doc = db.smart_document.find_one({"uuid": uuid})
+                        if doc and doc.get("origin_workflow_id") == workflow_id:
+                            logger.info(
+                                "Skipping own-origin document %s to prevent workflow self-loop",
+                                uuid,
+                            )
+                            continue
                         if doc and doc.get("raw_text"):
                             doc_texts.append(doc["raw_text"])
                         else:
@@ -161,8 +179,8 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
                         )
                     task_data["doc_texts"] = doc_texts
 
-                # Pre-load specific document text when input_source is "select_document"
-                if task_data.get("input_source") == "select_document" and task_data.get("selected_document_uuid"):
+                # Pre-load specific document text when select_document is selected
+                if _wants_selected_document(task_data) and task_data.get("selected_document_uuid"):
                     sel_doc = db.smart_document.find_one({"uuid": task_data["selected_document_uuid"]})
                     if sel_doc and sel_doc.get("raw_text"):
                         task_data["selected_doc_text"] = sel_doc["raw_text"]
@@ -244,6 +262,12 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
     # Check if workflow paused for approval
     if isinstance(final_output, dict) and final_output.get("_approval_pause"):
         import uuid as uuid_mod
+        from datetime import datetime, timedelta, timezone
+
+        from app.services.approval_service import (
+            detect_artifact_kind,
+            resolve_assignees_sync,
+        )
 
         # Find the step index (count of executed steps)
         nodes = engine.get_topological_order()
@@ -254,17 +278,50 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
                 break
 
         approval_uuid = str(uuid_mod.uuid4())
-        from datetime import datetime, timezone
+        workflow_doc = db.workflow.find_one({"_id": ObjectId(workflow_id)})
+        workflow_name = workflow_doc.get("name", "Workflow") if workflow_doc else "Workflow"
+        result_doc = db.workflow_result.find_one({"_id": ObjectId(workflow_result_id)}) or {}
+        source_doc_uuids = (result_doc.get("input_context") or {}).get("doc_uuids", [])
+
+        assignee_role = final_output.get("_assignee_role", "specific_users")
+        explicit_users = final_output.get("_assigned_to_user_ids", []) or []
+        resolved_assignees = resolve_assignees_sync(
+            db, assignee_role, workflow_doc or {}, explicit_users,
+        )
+
+        sla_days = final_output.get("_sla_days")
+        expires_at = None
+        if isinstance(sla_days, (int, float)) and sla_days > 0:
+            expires_at = datetime.now(timezone.utc) + timedelta(days=float(sla_days))
+
+        artifact_data = final_output.get("_data_for_review")
+        artifact_kind = detect_artifact_kind(artifact_data)
+
         db.approval_request.insert_one({
             "uuid": approval_uuid,
             "workflow_result_id": ObjectId(workflow_result_id),
             "workflow_id": ObjectId(workflow_id),
             "step_index": step_index,
             "step_name": "Approval",
-            "data_for_review": final_output.get("_data_for_review", {}),
+            "workflow_name": workflow_name,
+            "requester_user_id": (workflow_doc or {}).get("user_id"),
+            "team_id": (workflow_doc or {}).get("team_id"),
+            "source_doc_uuids": source_doc_uuids,
+            "artifact_kind": artifact_kind,
+            "data_for_review": artifact_data if isinstance(artifact_data, dict) else {"value": artifact_data},
+            "edited_artifact": None,
             "review_instructions": final_output.get("_review_instructions", ""),
+            "assignee_role": assignee_role,
+            "assigned_to_user_ids": resolved_assignees,
+            "expires_at": expires_at,
+            "timeout_action": final_output.get("_timeout_action", "none"),
+            "escalation_user_ids": final_output.get("_escalation_user_ids", []),
             "status": "pending",
-            "assigned_to_user_ids": final_output.get("_assigned_to_user_ids", []),
+            "reviewer_user_id": None,
+            "reviewer_comments": "",
+            "decision_at": None,
+            "expired_at": None,
+            "escalated_at": None,
             "created_at": datetime.now(timezone.utc),
         })
 
@@ -279,13 +336,9 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
             }},
         )
 
-        # Notify assigned reviewers
-        workflow_doc = db.workflow.find_one({"_id": ObjectId(workflow_id)})
-        workflow_name = workflow_doc.get("name", "Workflow") if workflow_doc else "Workflow"
-        assigned_ids = final_output.get("_assigned_to_user_ids", [])
         review_instructions = final_output.get("_review_instructions", "")
         _notify_approval_reviewers_sync(
-            db, assigned_ids, workflow_name, "Approval",
+            db, resolved_assignees, workflow_name, "Approval",
             review_instructions, approval_uuid,
         )
 
@@ -303,6 +356,19 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
             "final_output": {"output": final_output, "data": data},
         }},
     )
+
+    # Save output to library if configured. Manual runs don't go through
+    # process_outputs (which also fires notifications/webhooks/chains for
+    # passive runs); this targets storage only.
+    storage_cfg = (workflow_doc.get("output_config") or {}).get("storage") or {}
+    if storage_cfg.get("enabled") and storage_cfg.get("destination_folder"):
+        try:
+            from app.services.output_handlers import save_results_to_folder
+            fresh_result = db.workflow_result.find_one({"_id": ObjectId(workflow_result_id)})
+            if fresh_result:
+                save_results_to_folder(fresh_result, storage_cfg)
+        except Exception as e:
+            logger.exception("Failed to save workflow output to library: %s", e)
 
     # Increment workflow execution count
     db.workflow.update_one(
@@ -411,8 +477,8 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
             doc_texts.append(doc["raw_text"])
     task_data["doc_texts"] = doc_texts
 
-    # Pre-load specific document text when input_source is "select_document"
-    if task_data.get("input_source") == "select_document" and task_data.get("selected_document_uuid"):
+    # Pre-load specific document text when select_document is selected
+    if _wants_selected_document(task_data) and task_data.get("selected_document_uuid"):
         sel_doc = db.smart_document.find_one({"uuid": task_data["selected_document_uuid"]})
         if sel_doc and sel_doc.get("raw_text"):
             task_data["selected_doc_text"] = sel_doc["raw_text"]
@@ -530,6 +596,12 @@ def resume_workflow_after_approval(self, approval_uuid):
                     doc_texts = []
                     for uuid in doc_uuids:
                         doc = db.smart_document.find_one({"uuid": uuid})
+                        if doc and doc.get("origin_workflow_id") == workflow_id:
+                            logger.info(
+                                "Skipping own-origin document %s to prevent workflow self-loop",
+                                uuid,
+                            )
+                            continue
                         if doc and doc.get("raw_text"):
                             doc_texts.append(doc["raw_text"])
                         else:
@@ -543,7 +615,7 @@ def resume_workflow_after_approval(self, approval_uuid):
                             len(doc_uuids),
                         )
                     task_data["doc_texts"] = doc_texts
-                if task_data.get("input_source") == "select_document" and task_data.get("selected_document_uuid"):
+                if _wants_selected_document(task_data) and task_data.get("selected_document_uuid"):
                     sel_doc = db.smart_document.find_one({"uuid": task_data["selected_document_uuid"]})
                     if sel_doc and sel_doc.get("raw_text"):
                         task_data["selected_doc_text"] = sel_doc["raw_text"]
@@ -560,8 +632,10 @@ def resume_workflow_after_approval(self, approval_uuid):
     user_doc = db.user.find_one({"user_id": user_id}) if user_id else None
     is_admin = bool(user_doc and user_doc.get("is_admin"))
 
-    # Get saved output from before the pause
-    saved_output = approval_doc.get("data_for_review")
+    # If the reviewer edited the artifact, downstream steps see the edited
+    # version. Otherwise replay the original snapshot.
+    edited = approval_doc.get("edited_artifact")
+    saved_output = edited if edited not in (None, {}) else approval_doc.get("data_for_review")
     initial_output = {"output": saved_output, "step_name": "Approval"} if saved_output else None
 
     # Update result to running
