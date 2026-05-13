@@ -188,6 +188,10 @@ async def test_run_completes_with_no_test_queries_triggers_autogen():
          patch.object(kb_optimizer, "SystemConfig") as SC, \
          patch("app.services.kb_question_generator.KBQuestionGenerator", return_value=fake_gen), \
          patch("app.services.workflow_validator._resolve_model_name", return_value="m1"), \
+         patch.object(kb_optimizer.kb_validation_service, "judge_baselines_only", new=AsyncMock(return_value={
+             "avg_baseline_score": 0.3, "num_baselines_judged": 1, "tokens_used": 0,
+             "details": [{"query_uuid": "tq-gen", "baseline_judge": {"score": 0.3, "verdict": "FAIL"}}],
+         })), \
          patch.object(kb_optimizer.kb_validation_service, "judge_test_queries", new=AsyncMock(return_value={
              "details": [{"query_uuid": "tq-gen", "judge": {"score": 0.7, "verdict": "PASS"}, "actual_answer": "x"}],
              "avg_judge_score": 0.7, "avg_baseline_score": 0.3, "avg_lift": 0.4,
@@ -224,18 +228,11 @@ async def test_run_records_trials_and_picks_winner():
     # judge_test_queries returns different scores depending on the trial config.
     # We mark each call with the passed-in model name so we can track what won.
     call_count = {"n": 0}
-    scores = [0.5, 0.7, 0.6, 0.9, 0.4]  # baseline call + 4 trials
+    scores = [0.5, 0.7, 0.6, 0.9, 0.4]  # default-KB baseline + 4 trials
 
     async def fake_judge(kb_uuid, queries, model, mode="judge"):
         n = call_count["n"]
         call_count["n"] += 1
-        if mode == "judge+baseline":
-            return {
-                "details": [{"query_uuid": "tq-1", "judge": {"score": scores[0], "verdict": "PASS"}, "actual_answer": "x"}],
-                "avg_judge_score": scores[0], "avg_baseline_score": 0.2, "avg_lift": 0.3,
-                "num_queries_judged": 1, "num_queries_baselined": 1,
-                "discrimination_summary": {"useful": 1, "redundant": 0, "failing": 0, "other": 0},
-            }
         s = scores[n] if n < len(scores) else 0.5
         return {
             "details": [{"query_uuid": "tq-1", "judge": {"score": s, "verdict": "PASS"}, "actual_answer": "x"}],
@@ -248,6 +245,10 @@ async def test_run_records_trials_and_picks_winner():
          patch.object(kb_optimizer, "KBTestQuery") as KBTQ, \
          patch.object(kb_optimizer, "SystemConfig") as SC, \
          patch("app.services.workflow_validator._resolve_model_name", return_value="m1"), \
+         patch.object(kb_optimizer.kb_validation_service, "judge_baselines_only", new=AsyncMock(return_value={
+             "avg_baseline_score": 0.2, "num_baselines_judged": 1, "tokens_used": 0,
+             "details": [{"query_uuid": "tq-1", "baseline_judge": {"score": 0.2, "verdict": "FAIL"}}],
+         })), \
          patch.object(kb_optimizer.kb_validation_service, "judge_test_queries", side_effect=fake_judge), \
          patch.object(kb_optimizer.kb_validation_service, "_judge_answer", new=AsyncMock(return_value={"score": 0.5})):
         KBR.find_one = AsyncMock(return_value=run_doc)
@@ -301,13 +302,6 @@ async def test_run_honours_cancellation_between_trials():
     find_run_one.first_call = True
 
     async def fake_judge(kb_uuid, queries, model, mode="judge"):
-        if mode == "judge+baseline":
-            return {
-                "details": [{"query_uuid": "tq-1", "judge": {"score": 0.5, "verdict": "WARN"}, "actual_answer": "x"}],
-                "avg_judge_score": 0.5, "avg_baseline_score": 0.2, "avg_lift": 0.3,
-                "num_queries_judged": 1, "num_queries_baselined": 1,
-                "discrimination_summary": None,
-            }
         return {
             "details": [{"query_uuid": "tq-1", "judge": {"score": 0.5, "verdict": "WARN"}, "actual_answer": "x"}],
             "avg_judge_score": 0.5, "num_queries_judged": 1,
@@ -319,6 +313,10 @@ async def test_run_honours_cancellation_between_trials():
          patch.object(kb_optimizer, "KBTestQuery") as KBTQ, \
          patch.object(kb_optimizer, "SystemConfig") as SC, \
          patch("app.services.workflow_validator._resolve_model_name", return_value="m1"), \
+         patch.object(kb_optimizer.kb_validation_service, "judge_baselines_only", new=AsyncMock(return_value={
+             "avg_baseline_score": 0.2, "num_baselines_judged": 1, "tokens_used": 0,
+             "details": [{"query_uuid": "tq-1", "baseline_judge": {"score": 0.2, "verdict": "FAIL"}}],
+         })), \
          patch.object(kb_optimizer.kb_validation_service, "judge_test_queries", side_effect=fake_judge), \
          patch.object(kb_optimizer.kb_validation_service, "_judge_answer", new=AsyncMock(return_value={"score": 0.5})):
         KBR.find_one = AsyncMock(side_effect=find_run_one)
@@ -346,12 +344,17 @@ async def test_run_apply_on_finish_writes_kb_override():
     fake_kb.save = AsyncMock()
     tq = MagicMock(); tq.uuid = "tq-1"; tq.query = "Q?"; tq.expected_answer = "A."
 
+    call_count = {"n": 0}
+
     async def fake_judge(kb_uuid, queries, model, mode="judge"):
-        if mode == "judge+baseline":
+        # First call is the default-KB baseline pass (score 0.4); subsequent
+        # calls are per-trial and return the higher 0.85 winning score.
+        n = call_count["n"]
+        call_count["n"] += 1
+        if n == 0:
             return {
                 "details": [{"query_uuid": "tq-1", "judge": {"score": 0.4, "verdict": "WARN"}, "actual_answer": "x"}],
-                "avg_judge_score": 0.4, "avg_baseline_score": 0.1, "avg_lift": 0.3,
-                "num_queries_judged": 1, "num_queries_baselined": 1,
+                "avg_judge_score": 0.4, "num_queries_judged": 1,
                 "discrimination_summary": None,
             }
         return {
@@ -365,6 +368,10 @@ async def test_run_apply_on_finish_writes_kb_override():
          patch.object(kb_optimizer, "KBTestQuery") as KBTQ, \
          patch.object(kb_optimizer, "SystemConfig") as SC, \
          patch("app.services.workflow_validator._resolve_model_name", return_value="m1"), \
+         patch.object(kb_optimizer.kb_validation_service, "judge_baselines_only", new=AsyncMock(return_value={
+             "avg_baseline_score": 0.1, "num_baselines_judged": 1, "tokens_used": 0,
+             "details": [{"query_uuid": "tq-1", "baseline_judge": {"score": 0.1, "verdict": "FAIL"}}],
+         })), \
          patch.object(kb_optimizer.kb_validation_service, "judge_test_queries", side_effect=fake_judge), \
          patch.object(kb_optimizer.kb_validation_service, "_judge_answer", new=AsyncMock(return_value={"score": 0.85})):
         KBR.find_one = AsyncMock(return_value=run_doc)

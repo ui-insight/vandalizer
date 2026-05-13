@@ -159,19 +159,15 @@ class KBOptimizer:
             if user_default_model not in enabled_models:
                 enabled_models = [user_default_model] + enabled_models
 
-            # ----- Establish baselines (no-KB and default-KB) -----
+            # ----- Establish baselines (no-KB first, then default-KB) -----
+            # Measure no-KB first and persist it before the heavier default-KB
+            # pass, so the running tab can show users the target score to beat
+            # while the rest of the optimization runs.
             await self._update(run_doc, phase="running",
-                               progress_message="Establishing baselines (no-KB + default-KB)…")
+                               judge_model=user_default_model,
+                               progress_message="Measuring no-KB baseline (score to beat)…")
             baselines = await self._establish_baselines(
-                kb_uuid, user_id, test_queries, user_default_model,
-            )
-            await self._update(
-                run_doc,
-                baseline_no_kb_score=baselines["no_kb"],
-                baseline_default_score=baselines["default_kb"],
-                judge_variance=baselines["judge_variance"],
-                judge_model=user_default_model,
-                tokens_used=run_doc.tokens_used + baselines["tokens_used"],
+                run_doc, kb_uuid, user_id, test_queries, user_default_model,
             )
 
             # ----- Build & sample trials -----
@@ -306,24 +302,45 @@ class KBOptimizer:
 
     async def _establish_baselines(
         self,
+        run_doc: KBOptimizationRun,
         kb_uuid: str,
         user_id: str,
         test_queries: list[KBTestQuery],
         model_name: str,
     ) -> dict:
-        """Run a single judge_test_queries with mode='judge+baseline' against the
-        DEFAULT config to get both no-KB and default-KB scores in one pass.
+        """Establish no-KB and default-KB baselines in two visible phases.
+
+        Phase 1 measures the no-KB target score (the bar the KB must beat) and
+        persists it on ``run_doc`` immediately so the running tab can display
+        it. Phase 2 then measures the default-KB score and runs a small judge
+        variance sample on those results.
 
         Token usage is read from real pydantic-ai usage on each agent run
         (no estimation). Variance sampling adds two extra judge calls whose
         tokens we also account for.
         """
-        result = await kb_validation_service.judge_test_queries(
-            kb_uuid, test_queries, model_name, mode="judge+baseline",
+        # --- Phase 1: no-KB baseline (the score to beat) ---
+        baseline_result = await kb_validation_service.judge_baselines_only(
+            test_queries, model_name,
         )
-        no_kb = result.get("avg_baseline_score") or 0.0
+        no_kb = baseline_result.get("avg_baseline_score") or 0.0
+        baseline_tokens = int(baseline_result.get("tokens_used", 0) or 0)
+        no_kb_rounded = round(no_kb, 4)
+        await self._update(
+            run_doc,
+            baseline_no_kb_score=no_kb_rounded,
+            tokens_used=run_doc.tokens_used + baseline_tokens,
+            progress_message=(
+                f"No-KB baseline: {round(no_kb * 100)}% — measuring default-KB next…"
+            ),
+        )
+
+        # --- Phase 2: default-KB score + variance ---
+        result = await kb_validation_service.judge_test_queries(
+            kb_uuid, test_queries, model_name, mode="judge",
+        )
         default_kb = result.get("avg_judge_score") or 0.0
-        baseline_tokens = int(result.get("tokens_used", 0) or 0)
+        judge_tokens = int(result.get("tokens_used", 0) or 0)
 
         # Light variance sample: re-judge two queries' KB answers and compare.
         # ``_sample_judge_variance`` returns (variance, tokens_used).
@@ -332,11 +349,19 @@ class KBOptimizer:
             kb_uuid, result.get("details", []), by_uuid, model_name,
         )
 
+        default_kb_rounded = round(default_kb, 4)
+        await self._update(
+            run_doc,
+            baseline_default_score=default_kb_rounded,
+            judge_variance=variance,
+            tokens_used=run_doc.tokens_used + judge_tokens + variance_tokens,
+        )
+
         return {
-            "no_kb": round(no_kb, 4),
-            "default_kb": round(default_kb, 4),
+            "no_kb": no_kb_rounded,
+            "default_kb": default_kb_rounded,
             "judge_variance": variance,
-            "tokens_used": baseline_tokens + variance_tokens,
+            "tokens_used": baseline_tokens + judge_tokens + variance_tokens,
         }
 
     async def _run_trial(

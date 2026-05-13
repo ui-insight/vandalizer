@@ -116,7 +116,18 @@ class KBQuestionGenerator:
         if not model_name:
             raise ValueError("No LLM model configured for question generation")
 
-        model = get_agent_model(model_name)
+        # Load SystemConfig so per-model api_key/endpoint flow through to the
+        # provider; without it get_agent_model falls back to "no-api-key" and
+        # routes external models like openai/gpt-oss-120b at api.openai.com.
+        from app.models.system_config import SystemConfig
+        try:
+            cfg = await SystemConfig.get_config()
+            sys_config_doc = cfg.model_dump() if cfg else None
+        except Exception as e:
+            logger.warning("Could not load SystemConfig for question generation: %s", e)
+            sys_config_doc = None
+
+        model = get_agent_model(model_name, system_config_doc=sys_config_doc)
         agent = Agent(model, system_prompt=KB_QUESTION_GENERATION_SYSTEM_PROMPT)
         run = await agent.run(prompt)
 

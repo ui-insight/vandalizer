@@ -1,4 +1,4 @@
-import { Loader2, X, Sparkles } from 'lucide-react'
+import { Loader2, X, Sparkles, Target } from 'lucide-react'
 import type { KBOptimizationRun } from '../../api/knowledge'
 
 interface Props {
@@ -60,6 +60,32 @@ export function OptimizationProgress({ run, onCancel, cancelling }: Props) {
         color={tokenPct > 90 ? '#f59e0b' : '#3b82f6'}
       />
 
+      {/* No-KB target (score to beat) — shown as soon as phase 1 completes */}
+      {run.baseline_no_kb_score != null && (
+        <div style={{
+          marginTop: 12, padding: '10px 12px',
+          display: 'flex', alignItems: 'center', gap: 10,
+          backgroundColor: 'rgba(245, 158, 11, 0.08)',
+          border: '1px solid rgba(245, 158, 11, 0.25)', borderRadius: 6,
+        }}>
+          <Target size={16} style={{ color: '#f59e0b', flexShrink: 0 }} />
+          <div style={{ flex: 1 }}>
+            <div style={{
+              fontSize: 10, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: 0.5,
+              marginBottom: 2,
+            }}>
+              Score to beat (no-KB baseline)
+            </div>
+            <div style={{ fontSize: 11, color: '#aaa' }}>
+              How well the model answers without retrieval — the KB needs to clear this bar.
+            </div>
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: '#fff' }}>
+            {(run.baseline_no_kb_score * 100).toFixed(0)}%
+          </div>
+        </div>
+      )}
+
       {/* Best-so-far */}
       {run.best_score_so_far != null && (
         <div style={{
@@ -73,6 +99,13 @@ export function OptimizationProgress({ run, onCancel, cancelling }: Props) {
           }}>
             <Sparkles size={10} style={{ display: 'inline', marginRight: 4 }} />
             Best so far
+            {run.baseline_no_kb_score != null && (
+              <span style={{ marginLeft: 8, color: '#888', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>
+                {run.best_score_so_far > run.baseline_no_kb_score
+                  ? `+${((run.best_score_so_far - run.baseline_no_kb_score) * 100).toFixed(0)}pp vs no-KB`
+                  : `${((run.best_score_so_far - run.baseline_no_kb_score) * 100).toFixed(0)}pp vs no-KB`}
+              </span>
+            )}
           </div>
           <div style={{ fontSize: 18, fontWeight: 700, color: '#fff' }}>
             {(run.best_score_so_far * 100).toFixed(0)}%

@@ -1,5 +1,5 @@
 import { apiFetch } from './client'
-import type { KnowledgeBase, KnowledgeBaseDetail, KBListResponse, KBReference, KBScope } from '../types/knowledge'
+import type { KnowledgeBase, KnowledgeBaseDetail, KnowledgeBaseSourceDetail, KBListResponse, KBReference, KBScope } from '../types/knowledge'
 
 export function listKnowledgeBases() {
   return apiFetch<KnowledgeBase[]>('/api/knowledge/list')
@@ -44,7 +44,7 @@ export function getKnowledgeBase(uuid: string) {
   return apiFetch<KnowledgeBaseDetail>(`/api/knowledge/${uuid}`)
 }
 
-export function updateKnowledgeBase(uuid: string, data: { title?: string; description?: string }) {
+export function updateKnowledgeBase(uuid: string, data: { title?: string; description?: string; tags?: string[] }) {
   return apiFetch<{ ok: boolean }>(`/api/knowledge/${uuid}/update`, {
     method: 'POST',
     body: JSON.stringify(data),
@@ -84,6 +84,10 @@ export function removeKBSource(uuid: string, sourceUuid: string) {
   return apiFetch<{ ok: boolean }>(`/api/knowledge/${uuid}/source/${sourceUuid}`, {
     method: 'DELETE',
   })
+}
+
+export function getKBSource(uuid: string, sourceUuid: string) {
+  return apiFetch<KnowledgeBaseSourceDetail>(`/api/knowledge/${uuid}/source/${sourceUuid}`)
 }
 
 export function shareKnowledgeBase(uuid: string, comment?: string) {
@@ -423,7 +427,7 @@ export function listKBOptimizationHistory(
 // and the chosen budget; this returns a string the modal can render.
 export function formatBudgetEstimate(
   tokens: number,
-  modelEntry?: { cost_per_1m_input?: number; cost_per_1m_output?: number } | null,
+  modelEntry?: { cost_per_1m_input?: number | null; cost_per_1m_output?: number | null } | null,
 ): { tokens_label: string; cost_label: string | null } {
   const tokens_label = tokens >= 1_000_000
     ? `≈${(tokens / 1_000_000).toFixed(1)}M tokens`

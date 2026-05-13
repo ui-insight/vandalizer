@@ -4,6 +4,7 @@ and LLM-as-judge answer evaluation (with optional baseline ablation for lift mea
 
 import asyncio
 import logging
+from contextvars import ContextVar
 from typing import Optional
 
 import httpx
@@ -22,6 +23,32 @@ _dm: DocumentManager | None = None
 # Module-level agent cache. Key: (purpose, model_name). Each judge/answer agent
 # is reused across queries within a process.
 _agent_cache: dict[tuple[str, str], Agent] = {}
+
+# Per-task SystemConfig snapshot. Set by public entry points (judge_test_queries,
+# _sample_judge_variance, run_kb_validation) so the sync agent-builder can pass
+# per-model api_key/endpoint into get_agent_model. Without this the builder
+# falls back to "no-api-key" and routes through the InsightAI provider, which
+# fails with a 401 against api.openai.com for external models.
+_active_system_config_doc: ContextVar[dict | None] = ContextVar(
+    "kb_validation_sys_config_doc", default=None
+)
+
+
+async def _ensure_system_config_loaded() -> None:
+    """Populate the ContextVar with a SystemConfig dump if not already set.
+
+    Safe to call from any public async entry point; no-ops on re-entry so
+    nested helpers don't refetch.
+    """
+    if _active_system_config_doc.get() is not None:
+        return
+    from app.models.system_config import SystemConfig
+    try:
+        cfg = await SystemConfig.get_config()
+    except Exception as e:
+        logger.warning("Could not load SystemConfig for KB validation: %s", e)
+        return
+    _active_system_config_doc.set(cfg.model_dump() if cfg else None)
 
 
 # Stripped-down system prompt for baseline (no-KB) answers — used to measure how
@@ -154,7 +181,7 @@ def _get_or_build_agent(purpose: str, model_name: str, system_prompt: str, model
     cached = _agent_cache.get(key)
     if cached is not None:
         return cached
-    model = get_agent_model(model_name)
+    model = get_agent_model(model_name, system_config_doc=_active_system_config_doc.get())
     kwargs: dict = {"system_prompt": system_prompt}
     if model_settings:
         kwargs["model_settings"] = model_settings
@@ -427,6 +454,7 @@ async def judge_test_queries(
     Skips queries with no ``expected_answer`` (records ``judge: None``). Catches
     per-query exceptions so one bad query doesn't fail the whole run.
     """
+    await _ensure_system_config_loaded()
     judgeable = [tq for tq in test_queries if getattr(tq, "expected_answer", None)]
     skipped = [tq for tq in test_queries if not getattr(tq, "expected_answer", None)]
 
@@ -583,6 +611,72 @@ async def judge_test_queries(
     }
 
 
+async def judge_baselines_only(
+    test_queries: list,
+    model_name: str,
+    *,
+    concurrency: int = 4,
+) -> dict:
+    """Generate no-KB baseline answers and judge them — KB path is skipped.
+
+    Used by the optimizer to surface the no-KB target score to the user before
+    running trials, so they can see what the KB needs to beat. Returns the same
+    ``avg_baseline_score`` / ``tokens_used`` / ``details`` shape as the baseline
+    portion of ``judge_test_queries(mode="judge+baseline")``.
+    """
+    await _ensure_system_config_loaded()
+    judgeable = [tq for tq in test_queries if getattr(tq, "expected_answer", None)]
+    sem = asyncio.Semaphore(max(1, concurrency))
+
+    async def one(tq) -> dict:
+        async with sem:
+            try:
+                bl = await _generate_baseline_answer(tq.query, model_name)
+                if isinstance(bl, tuple):
+                    baseline_answer, baseline_tokens = bl
+                else:  # legacy mock returning bare string
+                    baseline_answer, baseline_tokens = bl, 0
+                baseline_judge = await _judge_answer(
+                    query=tq.query,
+                    expected_answer=tq.expected_answer,
+                    actual_answer=baseline_answer,
+                    model_name=model_name,
+                    retrieved_context=None,
+                )
+                return {
+                    "query_uuid": getattr(tq, "uuid", ""),
+                    "query": tq.query,
+                    "baseline_answer": (baseline_answer or "")[:2000],
+                    "baseline_judge": baseline_judge,
+                    "tokens_used": (
+                        baseline_tokens
+                        + int(baseline_judge.get("tokens_used", 0) or 0)
+                    ),
+                }
+            except Exception as e:
+                logger.exception(
+                    "judge_baselines_only: per-query failure for %s: %s",
+                    getattr(tq, "uuid", "?"), e,
+                )
+                return {
+                    "query_uuid": getattr(tq, "uuid", ""),
+                    "query": tq.query,
+                    "baseline_answer": "",
+                    "baseline_judge": None,
+                    "tokens_used": 0,
+                }
+
+    results = await asyncio.gather(*(one(tq) for tq in judgeable))
+    scores = [r["baseline_judge"]["score"] for r in results if r["baseline_judge"] is not None]
+    avg = sum(scores) / len(scores) if scores else None
+    return {
+        "avg_baseline_score": avg,
+        "num_baselines_judged": len(scores),
+        "tokens_used": sum(int(r.get("tokens_used", 0) or 0) for r in results),
+        "details": results,
+    }
+
+
 async def _sample_judge_variance(
     kb_uuid: str,
     judged_details: list[dict],
@@ -597,6 +691,7 @@ async def _sample_judge_variance(
     accumulate across attempted samples so the optimizer's budget tracking is
     accurate even when the variance estimate is inconclusive.
     """
+    await _ensure_system_config_loaded()
     candidates = [d for d in judged_details if d.get("judge") and d["judge"].get("verdict") != "SKIPPED"]
     if len(candidates) < 2:
         return (None, 0)

@@ -850,7 +850,12 @@ async def search_users(query: str, limit: int = 20) -> list[dict]:
 
 
 async def _mark_kb_verified(item_id: PydanticObjectId) -> None:
-    """Set verified=True on a KnowledgeBase and add to the verified library."""
+    """Set verified=True on a KnowledgeBase and add to the verified library.
+
+    User-defined KB tags are copied onto the verified LibraryItem so they
+    surface in the Explore catalog; subsequent edits flow through
+    sync_verified_kb_tags() from knowledge_service.update_knowledge_base.
+    """
     from app.services.library_service import get_or_create_verified_library
 
     kb = await KnowledgeBase.get(item_id)
@@ -859,29 +864,64 @@ async def _mark_kb_verified(item_id: PydanticObjectId) -> None:
     kb.verified = True
     await kb.save()
 
+    kb_tags = list(kb.tags or [])
+
     # Add a verified LibraryItem to the global verified library
     verified_lib = await get_or_create_verified_library()
-    verified_item_ids = set(verified_lib.items) if verified_lib.items else set()
+    verified_item_ids = list(verified_lib.items) if verified_lib.items else []
 
     existing_in_verified = await LibraryItem.find(
-        {"_id": {"$in": list(verified_item_ids)}},
-        {"item_id": item_id, "kind": "knowledge_base"},
+        {"_id": {"$in": verified_item_ids}},
+        LibraryItem.item_id == item_id,
+        LibraryItem.kind == LibraryItemKind.KNOWLEDGE_BASE,
     ).to_list() if verified_item_ids else []
 
-    if not existing_in_verified:
+    if existing_in_verified:
+        for existing in existing_in_verified:
+            if existing.tags != kb_tags:
+                existing.tags = kb_tags
+                await existing.save()
+    else:
         now = datetime.datetime.now(datetime.timezone.utc)
         new_item = LibraryItem(
             item_id=item_id,
             kind=LibraryItemKind.KNOWLEDGE_BASE,
             added_by_user_id="system",
             verified=True,
-            tags=[],
+            tags=kb_tags,
             created_at=now,
         )
         await new_item.insert()
         verified_lib.items.append(new_item.id)
         verified_lib.updated_at = now
         await verified_lib.save()
+
+
+async def sync_verified_kb_tags(kb: KnowledgeBase) -> None:
+    """Push the KB's current tags onto its verified LibraryItem(s), if any.
+
+    Called after a user edits tags on a verified KB so the Explore catalog
+    stays in sync. No-op for unverified KBs or KBs with no catalog entry.
+    """
+    if not kb.verified:
+        return
+    from app.services.library_service import get_or_create_verified_library
+
+    verified_lib = await get_or_create_verified_library()
+    if not verified_lib.items:
+        return
+
+    items = await LibraryItem.find(
+        {"_id": {"$in": list(verified_lib.items)}},
+        LibraryItem.item_id == kb.id,
+        LibraryItem.kind == LibraryItemKind.KNOWLEDGE_BASE,
+    ).to_list()
+
+    new_tags = list(kb.tags or [])
+    for item in items:
+        if item.tags != new_tags:
+            item.tags = new_tags
+            await item.save()
 
 
 async def _mark_item_verified(item_id: PydanticObjectId, item_kind: str) -> None:

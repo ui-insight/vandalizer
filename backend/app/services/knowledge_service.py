@@ -156,6 +156,7 @@ async def update_knowledge_base(
     title: str | None = None, description: str | None = None,
     shared_with_team: bool | None = None,
     organization_ids: list[str] | None = None,
+    tags: list[str] | None = None,
     user_org_ancestry: list[str] | None = None,
 ) -> KnowledgeBase | None:
     kb = await get_knowledge_base(
@@ -177,9 +178,42 @@ async def update_knowledge_base(
         kb.shared_with_team = shared_with_team
     if organization_ids is not None:
         kb.organization_ids = organization_ids
+    tags_changed = False
+    if tags is not None:
+        normalized = _normalize_tags(tags)
+        if normalized != list(kb.tags or []):
+            kb.tags = normalized
+            tags_changed = True
     kb.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
     await kb.save()
+
+    # Verified KBs surface their tags in the Explore catalog via the verified
+    # LibraryItem. Keep that copy in sync when the owner edits tags.
+    if tags_changed and kb.verified:
+        from app.services.verification_service import sync_verified_kb_tags
+        await sync_verified_kb_tags(kb)
+
     return kb
+
+
+def _normalize_tags(tags: list[str]) -> list[str]:
+    """De-dupe (case-insensitive), trim, cap length and count."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for raw in tags:
+        if not isinstance(raw, str):
+            continue
+        t = raw.strip()[:50]
+        if not t:
+            continue
+        key = t.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(t)
+        if len(out) >= 20:
+            break
+    return out
 
 async def share_with_team(
     uuid: str,
@@ -416,6 +450,7 @@ async def clone_knowledge_base(
     clone = KnowledgeBase(
         title=(new_title or f"{source_kb.title} (Clone)")[:300],
         description=source_kb.description,
+        tags=list(source_kb.tags or []),
         user_id=user.user_id,
         team_id=team_id,
     )
@@ -776,6 +811,7 @@ async def export_knowledge_base(kb: KnowledgeBase) -> dict:
         "exported_at": datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
         "title": kb.title,
         "description": kb.description,
+        "tags": list(kb.tags or []),
         "sources": exported_sources,
     }
 
@@ -796,9 +832,11 @@ async def import_knowledge_base(
         raw_title = "Imported Knowledge Base"
 
     team_id = str(user.current_team) if user.current_team else None
+    raw_tags = payload.get("tags") or []
     kb = KnowledgeBase(
         title=raw_title[:300],
         description=(payload.get("description") or "")[:5000] or None,
+        tags=_normalize_tags(raw_tags) if isinstance(raw_tags, list) else [],
         user_id=user.user_id,
         team_id=team_id,
     )

@@ -15,6 +15,7 @@ class UpdateKBRequest(BaseModel):
     description: Optional[str] = None
     shared_with_team: Optional[bool] = None
     organization_ids: Optional[list[str]] = None
+    tags: Optional[list[str]] = None
 
 
 class AddDocumentsRequest(BaseModel):
@@ -36,12 +37,29 @@ class KBSourceResponse(BaseModel):
     uuid: str
     source_type: str
     document_uuid: Optional[str] = None
+    document_title: Optional[str] = None  # Resolved from SmartDocument for display
     url: Optional[str] = None
     url_title: Optional[str] = None
     status: str
     error_message: Optional[str] = None
     chunk_count: int = 0
     created_at: Optional[str] = None
+
+
+class KBSourceDetailResponse(KBSourceResponse):
+    """Full source detail for the source inspector modal.
+
+    Includes cached content (for URLs), crawl metadata, and references to
+    parent/child sources when applicable.
+    """
+
+    content: Optional[str] = None  # Cached extracted text (URL sources)
+    crawl_enabled: bool = False
+    max_crawl_pages: int = 5
+    parent_source_uuid: Optional[str] = None
+    crawled_urls: Optional[list[str]] = None
+    child_sources: list[KBSourceResponse] = []  # Crawled children (when this is a parent)
+    processed_at: Optional[str] = None
 
 
 class KBResponse(BaseModel):
@@ -52,6 +70,7 @@ class KBResponse(BaseModel):
     shared_with_team: bool = False
     verified: bool = False
     organization_ids: list[str] = []
+    tags: list[str] = []
     total_sources: int = 0
     sources_ready: int = 0
     sources_failed: int = 0
@@ -68,6 +87,12 @@ class KBResponse(BaseModel):
     # surfaces as a small "Optimized" chip.
     has_optimized_config: bool = False
     optimized_config_set_at: Optional[str] = None
+    # AI-trust signals from the latest KB validation run.
+    # Scores are 0-1; lift is also 0-1 (e.g., 0.28 == +28pts vs. baseline).
+    last_validation_score: Optional[float] = None
+    last_validation_baseline_score: Optional[float] = None
+    last_validation_lift: Optional[float] = None
+    last_validated_at: Optional[str] = None
 
 
 class KBListResponse(BaseModel):
@@ -127,6 +152,7 @@ class KBExportPayload(BaseModel):
     exported_at: Optional[str] = None
     title: str
     description: Optional[str] = None
+    tags: list[str] = []
     sources: list[KBExportSource] = []
 
 

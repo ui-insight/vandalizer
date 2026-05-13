@@ -8,6 +8,7 @@ export interface KnowledgeBase {
   shared_with_team: boolean
   verified: boolean
   organization_ids: string[]
+  tags: string[]
   team_id: string | null
   total_sources: number
   sources_ready: number
@@ -24,18 +25,34 @@ export interface KnowledgeBase {
   // Set by KB Autovalidate's apply path
   has_optimized_config?: boolean
   optimized_config_set_at?: string | null
+  // AI-trust signals from the latest validation run. Scores are 0-1.
+  last_validation_score?: number | null
+  last_validation_baseline_score?: number | null
+  last_validation_lift?: number | null
+  last_validated_at?: string | null
 }
 
 export interface KnowledgeBaseSource {
   uuid: string
   source_type: 'document' | 'url'
   document_uuid?: string
+  document_title?: string
   url?: string
   url_title?: string
   status: 'pending' | 'processing' | 'ready' | 'error'
   error_message?: string
   chunk_count: number
   created_at: string
+}
+
+export interface KnowledgeBaseSourceDetail extends KnowledgeBaseSource {
+  content?: string | null
+  crawl_enabled: boolean
+  max_crawl_pages: number
+  parent_source_uuid?: string | null
+  crawled_urls?: string[] | null
+  child_sources: KnowledgeBaseSource[]
+  processed_at?: string | null
 }
 
 export interface KnowledgeBaseDetail extends KnowledgeBase {

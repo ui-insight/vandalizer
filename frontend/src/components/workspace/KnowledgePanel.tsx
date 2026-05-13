@@ -1,20 +1,21 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload, Sparkles, HelpCircle } from 'lucide-react'
+import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload, Sparkles, HelpCircle, Pencil } from 'lucide-react'
 import { useKnowledgeBases, useScopedKnowledgeBases } from '../../hooks/useKnowledgeBases'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useAuth } from '../../hooks/useAuth'
 import * as api from '../../api/knowledge'
 import { listOrganizationsFlat } from '../../api/organizations'
-import { getItemMetadata } from '../../api/library'
 import type { Organization } from '../../api/organizations'
-import type { KnowledgeBaseDetail, KnowledgeBaseSource, KBScope, KnowledgeBase } from '../../types/knowledge'
-import type { VerifiedCatalogItem } from '../../types/library'
-import { ItemDetailModal } from '../library/ExploreTab'
+import type { KnowledgeBaseDetail, KnowledgeBaseSource, KBScope } from '../../types/knowledge'
 import { AddUrlsModal } from '../knowledge/AddUrlsModal'
 import { DocumentPickerModal } from '../knowledge/DocumentPickerModal'
 import { KBSearchBar } from '../knowledge/KBSearchBar'
-import { KBListView } from '../knowledge/KBListView'
+import { KBGridView } from '../knowledge/KBGridView'
 import { KBValidationPanel } from '../knowledge/KBValidationPanel'
+import { KBSourceInspectorModal } from '../knowledge/KBSourceInspectorModal'
+import { KBExploreTab } from '../knowledge/KBExploreTab'
+import { CreateKBModal } from '../knowledge/CreateKBModal'
+import { KBTrustBanner } from '../knowledge/KBTrustBanner'
 import { KnowledgeExplainer } from './KnowledgeExplainer'
 import { ShareWithTeamDialog } from '../library/ShareWithTeamDialog'
 import { useToast } from '../../contexts/ToastContext'
@@ -74,60 +75,22 @@ export function KnowledgePanel() {
   const [addingUrls, setAddingUrls] = useState(false)
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
-  const [exploreDetail, setExploreDetail] = useState<VerifiedCatalogItem | null>(null)
+  const [editingDescription, setEditingDescription] = useState(false)
+  const [descriptionDraft, setDescriptionDraft] = useState('')
+  const [savingDescription, setSavingDescription] = useState(false)
+  const [inspectingSource, setInspectingSource] = useState<KnowledgeBaseSource | null>(null)
+  const [showCreateModal, setShowCreateModal] = useState(false)
 
-  const handleExploreKBClick = useCallback(async (kb: KnowledgeBase) => {
-    // Build a base item immediately so the modal opens without waiting
-    const base: VerifiedCatalogItem = {
-      id: kb.uuid,
-      item_id: kb.uuid,
-      kind: 'knowledge_base',
-      name: kb.title,
-      tags: [],
-      verified: true,
-      created_at: kb.created_at,
-      display_name: null,
-      description: kb.description || null,
-      markdown: null,
-      organization_ids: kb.organization_ids || [],
-      quality_score: null,
-      quality_tier: null,
-      quality_grade: null,
-      last_validated_at: null,
-      validation_run_count: 0,
-      total_sources: kb.total_sources,
-      total_chunks: kb.total_chunks,
-      kb_status: kb.status,
-      source_uuid: kb.uuid,
-    }
-    setExploreDetail(base)
-    // Enrich with catalog metadata in the background
-    try {
-      const meta = await getItemMetadata('knowledge_base', kb.uuid)
-      setExploreDetail(prev => prev?.id === kb.uuid ? {
-        ...prev,
-        display_name: meta.display_name,
-        description: meta.description ?? prev.description,
-        markdown: meta.markdown,
-        quality_score: meta.quality_score ?? null,
-        quality_tier: meta.quality_tier ?? null,
-        quality_grade: meta.quality_grade ?? null,
-        last_validated_at: meta.last_validated_at ?? null,
-        validation_run_count: meta.validation_run_count ?? 0,
-      } : prev)
-    } catch {
-      // Keep the base item if metadata fetch fails
-    }
-  }, [])
-
-  const handleCreate = async () => {
+  const handleCreate = async (title: string, description: string) => {
     setCreating(true)
     setError(null)
     try {
-      const kb = await create('New Knowledge Base')
+      const kb = await create(title, description || undefined)
+      setShowCreateModal(false)
       loadDetail(kb.uuid)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create')
+      throw err
     } finally {
       setCreating(false)
     }
@@ -408,17 +371,30 @@ export function KnowledgePanel() {
               </button>
             </form>
           ) : (
-            <span
-              onClick={() => { setTitleDraft(selectedKB.title); setEditingTitle(true) }}
-              title="Click to rename"
-              style={{
-                fontSize: 16, fontWeight: 600, color: '#fff', flex: 1,
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                cursor: 'text', borderRadius: 4, padding: '2px 0',
-              }}
-            >
-              {selectedKB.title}
-            </span>
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span
+                onClick={() => { setTitleDraft(selectedKB.title); setEditingTitle(true) }}
+                title="Click to rename"
+                style={{
+                  fontSize: 16, fontWeight: 600, color: '#fff',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  cursor: 'text', borderRadius: 4, padding: '2px 0',
+                  minWidth: 0,
+                }}
+              >
+                {selectedKB.title}
+              </span>
+              <button
+                onClick={() => { setTitleDraft(selectedKB.title); setEditingTitle(true) }}
+                title="Edit title"
+                style={{
+                  background: 'transparent', border: 'none', cursor: 'pointer',
+                  padding: 2, display: 'flex', color: '#888', flexShrink: 0,
+                }}
+              >
+                <Pencil size={13} />
+              </button>
+            </div>
           )}
           {selectedKB.shared_with_team && (
             <span style={{
@@ -473,11 +449,115 @@ export function KnowledgePanel() {
         ) : (
           <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px' }}>
             {/* Description */}
-            {selectedKB.description && (
-              <div style={{ fontSize: 13, color: '#aaa', marginBottom: 12, lineHeight: 1.5 }}>
-                {selectedKB.description}
-              </div>
-            )}
+            <div style={{ marginBottom: 12 }}>
+              {editingDescription ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <textarea
+                    autoFocus
+                    value={descriptionDraft}
+                    onChange={e => setDescriptionDraft(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Escape') {
+                        e.preventDefault()
+                        setEditingDescription(false)
+                      } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                        e.preventDefault()
+                        ;(e.currentTarget.form as HTMLFormElement | null)?.requestSubmit()
+                      }
+                    }}
+                    placeholder="Describe what this knowledge base contains, who it's for, and how to use it."
+                    rows={4}
+                    maxLength={5000}
+                    disabled={savingDescription}
+                    style={{
+                      width: '100%', fontSize: 13, fontFamily: 'inherit', lineHeight: 1.5,
+                      color: '#e5e5e5', backgroundColor: '#1a1a1a',
+                      border: '1px solid #555', borderRadius: 6,
+                      padding: '8px 10px', outline: 'none',
+                      resize: 'vertical', minHeight: 80,
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                    <button
+                      onClick={() => setEditingDescription(false)}
+                      disabled={savingDescription}
+                      style={{
+                        padding: '4px 10px', fontSize: 12, fontFamily: 'inherit',
+                        color: '#ccc', background: 'transparent',
+                        border: '1px solid #3a3a3a', borderRadius: 5, cursor: 'pointer',
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={async () => {
+                        const next = descriptionDraft.trim()
+                        const current = selectedKB.description || ''
+                        if (next === current) { setEditingDescription(false); return }
+                        setSavingDescription(true)
+                        try {
+                          await api.updateKnowledgeBase(selectedKB.uuid, { description: next })
+                          setSelectedKB(prev => prev ? { ...prev, description: next } : prev)
+                          refresh()
+                          setEditingDescription(false)
+                        } catch (err) {
+                          console.error('Failed to update description:', err)
+                          toast('Failed to update description', 'error')
+                        } finally {
+                          setSavingDescription(false)
+                        }
+                      }}
+                      disabled={savingDescription}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                        padding: '4px 10px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                        color: 'var(--highlight-text-color, #000)',
+                        background: 'var(--highlight-color, #eab308)',
+                        border: 'none', borderRadius: 5,
+                        cursor: savingDescription ? 'default' : 'pointer',
+                        opacity: savingDescription ? 0.7 : 1,
+                      }}
+                    >
+                      {savingDescription ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={11} />}
+                      Save
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                  <div style={{
+                    flex: 1, fontSize: 13, lineHeight: 1.5,
+                    color: selectedKB.description ? '#aaa' : '#666',
+                    fontStyle: selectedKB.description ? 'normal' : 'italic',
+                    whiteSpace: 'pre-wrap',
+                  }}>
+                    {selectedKB.description || 'No description yet — add one to help others understand what this KB is for.'}
+                  </div>
+                  <button
+                    onClick={() => {
+                      setDescriptionDraft(selectedKB.description || '')
+                      setEditingDescription(true)
+                    }}
+                    title="Edit description"
+                    style={{
+                      background: 'transparent', border: 'none', cursor: 'pointer',
+                      padding: 2, display: 'flex', color: '#888', flexShrink: 0,
+                      marginTop: 2,
+                    }}
+                  >
+                    <Pencil size={13} />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* AI Trust banner — headline answer to "is this KB worth using?" */}
+            <KBTrustBanner
+              score={selectedKB.last_validation_score}
+              baseline={selectedKB.last_validation_baseline_score}
+              lift={selectedKB.last_validation_lift}
+              validatedAt={selectedKB.last_validated_at}
+            />
 
             {/* Stats */}
             <div style={{ display: 'flex', gap: 12, marginBottom: 16, fontSize: 12, color: '#999' }}>
@@ -650,6 +730,17 @@ export function KnowledgePanel() {
               </div>
             )}
 
+            {/* Tags editor */}
+            <KBTagsEditor
+              tags={selectedKB.tags || []}
+              canManage={!!user && (selectedKB.user_id === user.user_id || isExaminerOrAdmin)}
+              onSave={async (next) => {
+                await api.updateKnowledgeBase(selectedKB.uuid, { tags: next })
+                setSelectedKB(prev => prev ? { ...prev, tags: next } : prev)
+                refresh()
+              }}
+            />
+
             {/* Sources list */}
             <div style={{ fontSize: 13, fontWeight: 600, color: '#ccc', marginBottom: 8 }}>Sources</div>
             {selectedKB.sources.length === 0 ? (
@@ -657,17 +748,39 @@ export function KnowledgePanel() {
                 No sources added yet. Add documents or URLs above.
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{
+                display: 'flex', flexDirection: 'column', gap: 6,
+                maxHeight: 320, overflowY: 'auto',
+                paddingRight: 4,
+              }}>
                 {selectedKB.sources.map((source: KnowledgeBaseSource) => {
                   const st = SOURCE_STATUS[source.status] || SOURCE_STATUS.pending
                   const StatusIcon = st.icon
+                  const displayName =
+                    source.source_type === 'url'
+                      ? (source.url_title || source.url || source.uuid)
+                      : (source.document_title || source.document_uuid || source.uuid)
+                  const canInspect = source.status !== 'pending'
                   return (
                     <div
                       key={source.uuid}
+                      onClick={() => { if (canInspect) setInspectingSource(source) }}
+                      title={canInspect ? 'Click to inspect this source' : undefined}
                       style={{
                         display: 'flex', alignItems: 'center', gap: 8,
                         padding: '8px 10px', backgroundColor: '#2a2a2a',
                         border: '1px solid #3a3a3a', borderRadius: 6,
+                        cursor: canInspect ? 'pointer' : 'default',
+                        transition: 'background-color 0.12s, border-color 0.12s',
+                      }}
+                      onMouseEnter={e => {
+                        if (!canInspect) return
+                        e.currentTarget.style.backgroundColor = '#323232'
+                        e.currentTarget.style.borderColor = '#4a4a4a'
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.backgroundColor = '#2a2a2a'
+                        e.currentTarget.style.borderColor = '#3a3a3a'
                       }}
                     >
                       {source.source_type === 'document' ? (
@@ -677,7 +790,7 @@ export function KnowledgePanel() {
                       )}
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 12, color: '#e5e5e5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {source.source_type === 'url' ? (source.url_title || source.url) : source.document_uuid}
+                          {displayName}
                         </div>
                         {source.error_message && (
                           <div style={{ fontSize: 11, color: '#ef4444', marginTop: 2 }}>{source.error_message}</div>
@@ -694,7 +807,8 @@ export function KnowledgePanel() {
                         }}
                       />
                       <button
-                        onClick={() => handleRemoveSource(source.uuid)}
+                        onClick={(e) => { e.stopPropagation(); handleRemoveSource(source.uuid) }}
+                        title="Remove source"
                         style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }}
                       >
                         <X size={12} style={{ color: '#666' }} />
@@ -744,6 +858,14 @@ export function KnowledgePanel() {
         )}
 
         {showExplainer && <KnowledgeExplainer onClose={() => setShowExplainer(false)} />}
+
+        {inspectingSource && selectedKB && (
+          <KBSourceInspectorModal
+            kbUuid={selectedKB.uuid}
+            source={inspectingSource}
+            onClose={() => setInspectingSource(null)}
+          />
+        )}
 
         {showUrlModal && (
           <AddUrlsModal
@@ -932,8 +1054,8 @@ export function KnowledgePanel() {
     )
   }
 
-  // Determine the scope for the KBListView based on active tab
-  const listScope: KBScope = activeTab === 'explore' ? 'verified' : activeTab
+  // Mine/team only — Explore renders its own KBExploreTab.
+  const listScope: KBScope = activeTab === 'team' ? 'team' : 'mine'
 
   // List view
   return (
@@ -991,7 +1113,7 @@ export function KnowledgePanel() {
               {importing ? 'Importing...' : 'Import'}
             </button>
             <button
-              onClick={handleCreate}
+              onClick={() => setShowCreateModal(true)}
               disabled={creating}
               style={{
                 display: 'flex',
@@ -1009,7 +1131,7 @@ export function KnowledgePanel() {
                 opacity: creating ? 0.6 : 1,
               }}
             >
-              {creating ? <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} /> : <Plus style={{ width: 14, height: 14 }} />}
+              <Plus style={{ width: 14, height: 14 }} />
               New
             </button>
           </div>
@@ -1046,12 +1168,10 @@ export function KnowledgePanel() {
         ))}
       </div>
 
-      {/* Search */}
-      <KBSearchBar
-        value={search}
-        onChange={setSearch}
-        placeholder={activeTab === 'explore' ? 'Search verified knowledge bases...' : 'Search...'}
-      />
+      {/* Search (hidden on Explore — KBExploreTab has its own) */}
+      {activeTab !== 'explore' && (
+        <KBSearchBar value={search} onChange={setSearch} placeholder="Search..." />
+      )}
 
       {/* Error */}
       {error && (
@@ -1064,60 +1184,144 @@ export function KnowledgePanel() {
         </div>
       )}
 
-      {/* List */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px', position: 'relative' }}>
-        <KBListView
-          scope={listScope}
-          search={search}
-          allOrgs={allOrgs}
-          onSelect={loadDetail}
-          onChat={(uuid, title) => activateKB(uuid, title)}
-          onEdit={activeTab !== 'explore' ? loadDetail : undefined}
-          onDelete={activeTab === 'mine' ? handleDelete : undefined}
-          onAdopt={activeTab === 'explore' || activeTab === 'team'
-            ? async (uuid) => { await scopedMine.adopt(uuid); refresh() }
-            : undefined}
-          onRemoveRef={activeTab === 'mine'
-            ? async (refUuid) => { await scopedMine.removeRef(refUuid); refresh() }
-            : undefined}
-          onClone={activeTab === 'explore'
-            ? async (uuid) => { await api.cloneKnowledgeBase(uuid); refresh() }
-            : undefined}
-          onExplore={activeTab === 'explore' ? handleExploreKBClick : undefined}
-          emptyComponent={activeTab === 'mine' && !search ? <KnowledgeExplainer /> : undefined}
-          emptyMessage={
-            activeTab === 'team'
-              ? 'No knowledge bases shared with your team yet.'
-              : activeTab === 'explore'
-                ? 'No verified knowledge bases available yet.'
+      {activeTab === 'explore' ? (
+        <KBExploreTab onAdopted={refresh} />
+      ) : (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px', position: 'relative' }}>
+          <KBGridView
+            scope={listScope}
+            search={search}
+            allOrgs={allOrgs}
+            onSelect={loadDetail}
+            onChat={(uuid, title) => activateKB(uuid, title)}
+            onEdit={loadDetail}
+            onDelete={activeTab === 'mine' ? handleDelete : undefined}
+            onAdopt={activeTab === 'team'
+              ? async (uuid) => { await scopedMine.adopt(uuid); refresh() }
+              : undefined}
+            onRemoveRef={activeTab === 'mine'
+              ? async (refUuid) => { await scopedMine.removeRef(refUuid); refresh() }
+              : undefined}
+            emptyComponent={activeTab === 'mine' && !search ? <KnowledgeExplainer /> : undefined}
+            emptyMessage={
+              activeTab === 'team'
+                ? 'No knowledge bases shared with your team yet.'
                 : 'No knowledge bases found.'
-          }
-        />
-      </div>
+            }
+          />
+        </div>
+      )}
     </div>
 
-    {exploreDetail && (
-      <ItemDetailModal
-        item={exploreDetail}
-        onClose={() => setExploreDetail(null)}
-        onAddToLibrary={() => {}}
-        onAdoptKB={async (kbUuid) => {
-          try {
-            await scopedMine.adopt(kbUuid)
-            refresh()
-            setExploreDetail(null)
-          } catch {
-            // already adopted — still close the modal
-            setExploreDetail(null)
-          }
-        }}
-        onTryIt={(item) => {
-          if (!item.source_uuid) return
-          setExploreDetail(null)
-          activateKB(item.source_uuid, item.display_name || item.name)
-        }}
+    {showCreateModal && (
+      <CreateKBModal
+        onClose={() => setShowCreateModal(false)}
+        onCreate={handleCreate}
       />
     )}
     </>
+  )
+}
+
+// Inline tag editor — free-form labels (e.g. "v1.2", "draft", "2026-Q1").
+// Owners and examiners/admins can add/remove; everyone else sees read-only chips.
+function KBTagsEditor({
+  tags, canManage, onSave,
+}: {
+  tags: string[]
+  canManage: boolean
+  onSave: (next: string[]) => Promise<void>
+}) {
+  const [draft, setDraft] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const normalize = (t: string) => t.trim().slice(0, 50)
+
+  const addTag = async () => {
+    const t = normalize(draft)
+    if (!t) return
+    if (tags.some(existing => existing.toLowerCase() === t.toLowerCase())) {
+      setDraft('')
+      return
+    }
+    if (tags.length >= 20) return
+    setSaving(true)
+    try {
+      await onSave([...tags, t])
+      setDraft('')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const removeTag = async (t: string) => {
+    setSaving(true)
+    try {
+      await onSave(tags.filter(x => x !== t))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!canManage && tags.length === 0) return null
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: '#ccc', marginBottom: 8 }}>Tags</div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+        {tags.map(t => (
+          <span
+            key={t}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              fontSize: 11, fontWeight: 600, padding: '2px 4px 2px 8px', borderRadius: 8,
+              color: '#cbd5e1', backgroundColor: '#2f2f2f',
+              border: '1px solid #3a3a3a',
+            }}
+          >
+            {t}
+            {canManage && (
+              <button
+                onClick={() => removeTag(t)}
+                disabled={saving}
+                title="Remove tag"
+                style={{
+                  background: 'transparent', border: 'none',
+                  cursor: saving ? 'default' : 'pointer',
+                  padding: 0, display: 'flex', color: '#888',
+                }}
+              >
+                <X size={11} />
+              </button>
+            )}
+          </span>
+        ))}
+        {canManage && tags.length < 20 && (
+          <input
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                addTag()
+              } else if (e.key === 'Backspace' && !draft && tags.length > 0) {
+                e.preventDefault()
+                removeTag(tags[tags.length - 1])
+              }
+            }}
+            onBlur={() => { if (draft.trim()) addTag() }}
+            disabled={saving}
+            placeholder={tags.length === 0 ? 'e.g. v1.2, draft' : 'Add tag…'}
+            maxLength={50}
+            style={{
+              minWidth: 100, fontSize: 12, fontFamily: 'inherit',
+              color: '#e5e5e5', backgroundColor: '#1a1a1a',
+              border: '1px solid #333', borderRadius: 6,
+              padding: '3px 8px', outline: 'none',
+            }}
+          />
+        )}
+      </div>
+    </div>
   )
 }

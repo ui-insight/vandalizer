@@ -8,6 +8,8 @@ from fastapi.responses import JSONResponse
 from app.dependencies import get_current_user
 from app.rate_limit import limiter
 from app.models.user import User
+from app.models.validation_run import ValidationRun
+from app.models.kb_optimization_run import KBOptimizationRun
 from app.services import organization_service
 from app.schemas.knowledge import (
     AddDocumentsRequest,
@@ -20,6 +22,7 @@ from app.schemas.knowledge import (
     KBListResponse,
     KBReferenceResponse,
     KBResponse,
+    KBSourceDetailResponse,
     KBSourceResponse,
     KBStatusResponse,
     ShareKBRequest,
@@ -55,7 +58,26 @@ async def _get_kb_suggestion_or_404(kb_uuid: str, suggestion_uuid: str):
     return suggestion
 
 
-def _kb_response(kb, *, scope: str | None = None) -> KBResponse:
+class _TrustSummary:
+    """Most recent AI-trust signal for a KB, unified across run sources."""
+
+    __slots__ = ("score", "baseline", "lift", "at")
+
+    def __init__(
+        self,
+        *,
+        score: float | None,
+        baseline: float | None,
+        lift: float | None,
+        at,
+    ) -> None:
+        self.score = score
+        self.baseline = baseline
+        self.lift = lift
+        self.at = at
+
+
+def _kb_response(kb, *, scope: str | None = None, trust: "_TrustSummary | None" = None) -> KBResponse:
     import datetime as _dt
     override = getattr(kb, "rag_config_override", None)
     # Only consider this a real applied override if the value is dict-shaped.
@@ -65,6 +87,14 @@ def _kb_response(kb, *, scope: str | None = None) -> KBResponse:
     override_at_str = (
         override_at.isoformat() if isinstance(override_at, _dt.datetime) else None
     )
+
+    last_score = trust.score if trust else None
+    last_baseline = trust.baseline if trust else None
+    last_lift = trust.lift if trust else None
+    last_validated_at_str = (
+        trust.at.isoformat() if trust and isinstance(trust.at, _dt.datetime) else None
+    )
+
     return KBResponse(
         uuid=kb.uuid,
         title=kb.title,
@@ -73,6 +103,7 @@ def _kb_response(kb, *, scope: str | None = None) -> KBResponse:
         shared_with_team=kb.shared_with_team,
         verified=kb.verified,
         organization_ids=kb.organization_ids,
+        tags=list(getattr(kb, "tags", None) or []),
         total_sources=kb.total_sources,
         sources_ready=kb.sources_ready,
         sources_failed=kb.sources_failed,
@@ -83,14 +114,77 @@ def _kb_response(kb, *, scope: str | None = None) -> KBResponse:
         scope=scope,
         has_optimized_config=has_override,
         optimized_config_set_at=override_at_str,
+        last_validation_score=last_score,
+        last_validation_baseline_score=last_baseline,
+        last_validation_lift=last_lift,
+        last_validated_at=last_validated_at_str,
     )
 
 
-def _source_response(s) -> KBSourceResponse:
+async def _latest_runs_by_kb(kb_uuids: list[str]) -> dict[str, _TrustSummary]:
+    """Return the most recent AI-trust signal per KB uuid, keyed by uuid.
+
+    Sources are merged across two collections:
+
+    * ``ValidationRun`` — written by the manual "Run Validation" button. Stores
+      avg_judge_score / avg_baseline_score / avg_lift inside ``result_snapshot``.
+    * ``KBOptimizationRun`` — written by KB Autovalidate, which doesn't go through
+      persist_validation_run. Stores optimized_score / baseline_no_kb_score
+      directly on the document.
+
+    Whichever has the most recent timestamp per KB wins, so an "Optimized" KB
+    never shows "Not yet validated" just because the user never clicked the
+    manual button.
+    """
+    if not kb_uuids:
+        return {}
+
+    out: dict[str, _TrustSummary] = {}
+
+    # Manual validation runs.
+    vruns = await ValidationRun.find({
+        "item_kind": "knowledge_base",
+        "item_id": {"$in": kb_uuids},
+    }).sort("-created_at").to_list()
+    for r in vruns:
+        if r.item_id in out:
+            continue
+        rp = (r.result_snapshot or {}).get("retrieval_precision", {}) or {}
+        out[r.item_id] = _TrustSummary(
+            score=rp.get("avg_judge_score"),
+            baseline=rp.get("avg_baseline_score"),
+            lift=rp.get("avg_lift"),
+            at=r.created_at,
+        )
+
+    # KB Autovalidate runs. Only completed runs have populated scores.
+    opt_runs = await KBOptimizationRun.find({
+        "kb_uuid": {"$in": kb_uuids},
+        "status": "completed",
+    }).sort("-completed_at").to_list()
+    for r in opt_runs:
+        ts = r.completed_at or r.started_at
+        existing = out.get(r.kb_uuid)
+        if existing is not None and existing.at is not None and ts is not None and existing.at >= ts:
+            continue
+        # The user-facing question is "does the AI do better with the KB?".
+        # Use the *applied* KB score (optimized_score when present, else the
+        # default-config baseline) against the no-KB baseline so the lift
+        # always reflects what the user actually gets at chat time.
+        score = r.optimized_score if r.optimized_score is not None else r.baseline_default_score
+        baseline = r.baseline_no_kb_score
+        lift = (score - baseline) if (score is not None and baseline is not None) else None
+        out[r.kb_uuid] = _TrustSummary(score=score, baseline=baseline, lift=lift, at=ts)
+
+    return out
+
+
+def _source_response(s, *, document_title: str | None = None) -> KBSourceResponse:
     return KBSourceResponse(
         uuid=s.uuid,
         source_type=s.source_type,
         document_uuid=s.document_uuid,
+        document_title=document_title,
         url=s.url,
         url_title=s.url_title or "",
         status=s.status,
@@ -98,6 +192,27 @@ def _source_response(s) -> KBSourceResponse:
         chunk_count=s.chunk_count,
         created_at=s.created_at.isoformat() if s.created_at else None,
     )
+
+
+async def _resolve_document_titles(sources) -> dict[str, str]:
+    """Batch-load SmartDocument titles for the given KB sources.
+
+    Title resolution is a display nicety — a lookup failure (missing collection
+    in a test, a deleted document, etc.) must not break the parent endpoint.
+    """
+    from app.models.document import SmartDocument
+
+    doc_uuids = [
+        s.document_uuid for s in sources
+        if s.source_type == "document" and s.document_uuid
+    ]
+    if not doc_uuids:
+        return {}
+    try:
+        docs = await SmartDocument.find({"uuid": {"$in": doc_uuids}}).to_list()
+    except Exception:
+        return {}
+    return {d.uuid: d.title for d in docs}
 
 
 @router.get("/list", response_model=list[KBResponse])
@@ -144,25 +259,32 @@ async def list_knowledge_bases_v2(
         limit=limit,
     )
 
-    items: list[KBResponse] = []
-    for kb in kbs:
-        kb_scope = scope or _classify_scope(kb, user.user_id, team_id)
-        items.append(_kb_response(kb, scope=kb_scope))
-
-    # If scope is "mine", also include bookmarked references
+    # Pre-load latest ValidationRun for every KB we'll render (including those
+    # reached via references), so the AI-trust chip renders in one pass.
+    ref_kbs: list = []
     if scope in (None, "mine"):
-        refs = await svc.list_references(user.user_id, team_id=team_id)
-        for ref in refs:
+        for ref in await svc.list_references(user.user_id, team_id=team_id):
             source_kb = await svc.resolve_reference(
                 ref.uuid, user, user_org_ancestry=user_org_ancestry,
             )
-            if not source_kb:
-                continue  # stale reference — source KB deleted or access revoked
-            resp = _kb_response(source_kb, scope="reference")
-            resp.is_reference = True
-            resp.source_kb_uuid = ref.source_kb_uuid
-            resp.reference_uuid = ref.uuid
-            items.append(resp)
+            if source_kb:
+                ref_kbs.append((ref, source_kb))
+
+    latest_runs = await _latest_runs_by_kb(
+        [kb.uuid for kb in kbs] + [src.uuid for _, src in ref_kbs]
+    )
+
+    items: list[KBResponse] = []
+    for kb in kbs:
+        kb_scope = scope or _classify_scope(kb, user.user_id, team_id)
+        items.append(_kb_response(kb, scope=kb_scope, trust=latest_runs.get(kb.uuid)))
+
+    for ref, source_kb in ref_kbs:
+        resp = _kb_response(source_kb, scope="reference", trust=latest_runs.get(source_kb.uuid))
+        resp.is_reference = True
+        resp.source_kb_uuid = ref.source_kb_uuid
+        resp.reference_uuid = ref.uuid
+        items.append(resp)
 
     return KBListResponse(items=items, total=total + len([i for i in items if i.is_reference]))
 
@@ -238,9 +360,14 @@ async def get_knowledge_base(uuid: str, user: User = Depends(get_current_user)):
     if not kb:
         raise HTTPException(status_code=404, detail="Knowledge base not found")
     sources = await svc.get_kb_sources(kb.uuid)
+    titles = await _resolve_document_titles(sources)
+    latest_runs = await _latest_runs_by_kb([kb.uuid])
     return KBDetailResponse(
-        **_kb_response(kb).model_dump(),
-        sources=[_source_response(s) for s in sources],
+        **_kb_response(kb, trust=latest_runs.get(kb.uuid)).model_dump(),
+        sources=[
+            _source_response(s, document_title=titles.get(s.document_uuid or ""))
+            for s in sources
+        ],
     )
 
 
@@ -254,6 +381,7 @@ async def update_knowledge_base(uuid: str, req: UpdateKBRequest, user: User = De
         description=req.description,
         shared_with_team=req.shared_with_team,
         organization_ids=req.organization_ids,
+        tags=req.tags,
         user_org_ancestry=user_org_ancestry,
     )
     if not kb:
@@ -336,6 +464,60 @@ async def add_urls(request: Request, uuid: str, req: AddUrlsRequest, user: User 
         allowed_domains=req.allowed_domains,
     )
     return {"ok": True, "added": added}
+
+
+@router.get("/{uuid}/source/{source_uuid}", response_model=KBSourceDetailResponse)
+async def get_source_detail(uuid: str, source_uuid: str, user: User = Depends(get_current_user)):
+    """Return full detail for a single source (for the inspector modal).
+
+    Access is read-only: any user who can view the KB can inspect its sources.
+    For URL sources, returns the cached extracted text. For document sources,
+    returns the resolved SmartDocument title — the frontend renders the document
+    itself via ``DocumentViewer`` against the document UUID.
+    """
+    from app.models.knowledge import KnowledgeBaseSource
+    from app.models.document import SmartDocument
+
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(
+        uuid,
+        user,
+        user_org_ancestry=user_org_ancestry,
+        allow_admin=True,
+    )
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    source = await KnowledgeBaseSource.find_one(
+        {"uuid": source_uuid, "knowledge_base_uuid": kb.uuid},
+    )
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+
+    document_title: str | None = None
+    if source.source_type == "document" and source.document_uuid:
+        doc = await SmartDocument.find_one(SmartDocument.uuid == source.document_uuid)
+        if doc:
+            document_title = doc.title
+
+    # Crawled children (only meaningful when this source is itself a crawl parent)
+    children = await KnowledgeBaseSource.find(
+        {"knowledge_base_uuid": kb.uuid, "parent_source_uuid": source.uuid},
+    ).to_list()
+    child_titles = await _resolve_document_titles(children)
+
+    return KBSourceDetailResponse(
+        **_source_response(source, document_title=document_title).model_dump(),
+        content=source.content,
+        crawl_enabled=bool(source.crawl_enabled),
+        max_crawl_pages=int(source.max_crawl_pages or 5),
+        parent_source_uuid=source.parent_source_uuid,
+        crawled_urls=source.crawled_urls,
+        child_sources=[
+            _source_response(c, document_title=child_titles.get(c.document_uuid or ""))
+            for c in children
+        ],
+        processed_at=source.processed_at.isoformat() if source.processed_at else None,
+    )
 
 
 @router.delete("/{uuid}/source/{source_uuid}")

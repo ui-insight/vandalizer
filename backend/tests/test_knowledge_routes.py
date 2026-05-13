@@ -322,11 +322,15 @@ class TestKnowledgeListEndpoints:
             patch("app.dependencies.User") as MockUser,
             patch("app.routers.knowledge.svc") as mock_svc,
             patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.routers.knowledge.ValidationRun") as MockRun,
+            patch("app.routers.knowledge.KBOptimizationRun") as MockOpt,
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
             mock_svc.list_knowledge_bases = AsyncMock(return_value=([kb], 1))
             mock_svc.list_references = AsyncMock(return_value=[])
+            MockRun.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
+            MockOpt.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
 
             resp = await client.get(
                 "/api/knowledge/list/v2?scope=mine",
@@ -411,11 +415,15 @@ class TestKnowledgeCRUD:
             patch("app.dependencies.User") as MockUser,
             patch("app.routers.knowledge.svc") as mock_svc,
             patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.routers.knowledge.ValidationRun") as MockRun,
+            patch("app.routers.knowledge.KBOptimizationRun") as MockOpt,
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
             mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
             mock_svc.get_kb_sources = AsyncMock(return_value=[src])
+            MockRun.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
+            MockOpt.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
 
             resp = await client.get("/api/knowledge/kb-uuid-1", cookies=cookies, headers=headers)
 

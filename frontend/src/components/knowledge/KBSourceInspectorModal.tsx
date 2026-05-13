@@ -1,0 +1,279 @@
+import { useEffect, useState } from 'react'
+import { X, FileText, Globe, ExternalLink, Loader2, AlertCircle } from 'lucide-react'
+import { getKBSource } from '../../api/knowledge'
+import type { KnowledgeBaseSource, KnowledgeBaseSourceDetail } from '../../types/knowledge'
+import { DocumentViewer } from '../files/DocumentViewer'
+
+interface Props {
+  kbUuid: string
+  source: KnowledgeBaseSource  // initial summary from the list — used for instant header
+  onClose: () => void
+}
+
+export function KBSourceInspectorModal({ kbUuid, source, onClose }: Props) {
+  const [detail, setDetail] = useState<KnowledgeBaseSourceDetail | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+    getKBSource(kbUuid, source.uuid)
+      .then(d => { if (!cancelled) setDetail(d) })
+      .catch(err => { if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load source') })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [kbUuid, source.uuid])
+
+  const isDoc = source.source_type === 'document'
+  const displayTitle =
+    source.document_title
+    || source.url_title
+    || source.url
+    || source.document_uuid
+    || 'Source'
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.65)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        zIndex: 1100, padding: 24,
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: '90vw', maxWidth: 960, height: '85vh',
+          display: 'flex', flexDirection: 'column',
+          backgroundColor: '#1f1f1f',
+          border: '1px solid #2e2e2e', borderRadius: 10,
+          overflow: 'hidden',
+        }}
+      >
+        {/* Header */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '14px 18px',
+          borderBottom: '1px solid #2e2e2e',
+          flexShrink: 0,
+        }}>
+          {isDoc
+            ? <FileText size={18} style={{ color: '#a78bfa', flexShrink: 0 }} />
+            : <Globe size={18} style={{ color: '#60a5fa', flexShrink: 0 }} />}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{
+              fontSize: 14, fontWeight: 600, color: '#fff',
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {displayTitle}
+            </div>
+            <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>
+              {isDoc ? 'Document source' : 'URL source'}
+              {source.chunk_count > 0 && <> · {source.chunk_count} chunks</>}
+              {source.status !== 'ready' && <> · {source.status}</>}
+            </div>
+          </div>
+          {!isDoc && source.url && (
+            <a
+              href={source.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Open URL in new tab"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                fontSize: 12, color: '#60a5fa', textDecoration: 'none',
+                padding: '4px 8px', border: '1px solid #2e2e2e', borderRadius: 5,
+              }}
+            >
+              <ExternalLink size={12} />
+              Open
+            </a>
+          )}
+          <button
+            onClick={onClose}
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, color: '#888' }}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex' }}>
+          {isDoc ? (
+            source.document_uuid ? (
+              <div style={{ flex: 1, minWidth: 0, minHeight: 0 }}>
+                <DocumentViewer docUuid={source.document_uuid} />
+              </div>
+            ) : (
+              <EmptyState message="No document associated with this source." />
+            )
+          ) : (
+            <UrlInspector
+              loading={loading}
+              error={error}
+              detail={detail}
+              fallbackUrl={source.url}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div style={{
+      flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: 13, color: '#888',
+    }}>
+      {message}
+    </div>
+  )
+}
+
+function UrlInspector({
+  loading, error, detail, fallbackUrl,
+}: {
+  loading: boolean
+  error: string | null
+  detail: KnowledgeBaseSourceDetail | null
+  fallbackUrl?: string
+}) {
+  if (loading) {
+    return (
+      <div style={{
+        flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: '#888',
+      }}>
+        <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+      </div>
+    )
+  }
+  if (error) {
+    return (
+      <div style={{
+        flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        gap: 8, color: '#ef4444', fontSize: 13,
+      }}>
+        <AlertCircle size={16} />
+        {error}
+      </div>
+    )
+  }
+  if (!detail) return null
+
+  const childCount = detail.child_sources?.length || 0
+  const hasContent = !!(detail.content && detail.content.trim())
+
+  return (
+    <div style={{
+      flex: 1, display: 'flex', flexDirection: 'column',
+      padding: '14px 18px', overflowY: 'auto',
+    }}>
+      {/* Meta block */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: '120px 1fr', gap: '4px 12px',
+        fontSize: 12, color: '#cbd5e1', marginBottom: 16,
+      }}>
+        <div style={{ color: '#888' }}>URL</div>
+        <div style={{ wordBreak: 'break-all' }}>
+          {detail.url ? (
+            <a
+              href={detail.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: '#60a5fa', textDecoration: 'none' }}
+            >
+              {detail.url}
+            </a>
+          ) : (fallbackUrl || '—')}
+        </div>
+        {detail.url_title && (
+          <>
+            <div style={{ color: '#888' }}>Page title</div>
+            <div>{detail.url_title}</div>
+          </>
+        )}
+        <div style={{ color: '#888' }}>Status</div>
+        <div>{detail.status}{detail.error_message ? ` — ${detail.error_message}` : ''}</div>
+        <div style={{ color: '#888' }}>Chunks</div>
+        <div>{detail.chunk_count}</div>
+        {detail.crawl_enabled && (
+          <>
+            <div style={{ color: '#888' }}>Crawl</div>
+            <div>up to {detail.max_crawl_pages} pages · {childCount} discovered</div>
+          </>
+        )}
+        {detail.parent_source_uuid && (
+          <>
+            <div style={{ color: '#888' }}>Crawled from</div>
+            <div style={{ fontFamily: 'monospace', fontSize: 11 }}>{detail.parent_source_uuid}</div>
+          </>
+        )}
+        {detail.processed_at && (
+          <>
+            <div style={{ color: '#888' }}>Processed</div>
+            <div>{new Date(detail.processed_at).toLocaleString()}</div>
+          </>
+        )}
+      </div>
+
+      {/* Crawled children list */}
+      {childCount > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#ccc', marginBottom: 6 }}>
+            Crawled pages ({childCount})
+          </div>
+          <div style={{
+            display: 'flex', flexDirection: 'column', gap: 4,
+            maxHeight: 160, overflowY: 'auto',
+            border: '1px solid #2a2a2a', borderRadius: 6, padding: 8,
+          }}>
+            {detail.child_sources.map(c => (
+              <a
+                key={c.uuid}
+                href={c.url || undefined}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={c.url}
+                style={{
+                  fontSize: 11, color: '#9ca3af', textDecoration: 'none',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                }}
+              >
+                {c.url_title || c.url}
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Cached content */}
+      <div style={{ fontSize: 12, fontWeight: 600, color: '#ccc', marginBottom: 6 }}>
+        Extracted text
+      </div>
+      {hasContent ? (
+        <pre style={{
+          margin: 0, padding: 12, flex: 1,
+          fontSize: 12, lineHeight: 1.55,
+          color: '#d1d5db',
+          backgroundColor: '#161616',
+          border: '1px solid #2a2a2a', borderRadius: 6,
+          whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+          overflowY: 'auto',
+          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+        }}>
+          {detail.content}
+        </pre>
+      ) : (
+        <div style={{ fontSize: 12, color: '#888', fontStyle: 'italic' }}>
+          No cached text available for this source.
+        </div>
+      )}
+    </div>
+  )
+}

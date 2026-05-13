@@ -78,6 +78,7 @@ class KnowledgeBase(Document):
     shared_with_team: bool = False
     verified: bool = False
     organization_ids: list[str] = Field(default_factory=list)  # Org UUIDs for visibility scoping
+    tags: list[str] = Field(default_factory=list)  # User-defined free-form tags (e.g. version, status)
     status: str = "empty"  # empty | building | ready | error
     total_sources: int = 0
     sources_ready: int = 0
