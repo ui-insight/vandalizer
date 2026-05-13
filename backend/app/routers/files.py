@@ -116,6 +116,21 @@ async def download_bulk(
     )
 
 
+@router.get("/{doc_uuid}/sheet-json")
+async def sheet_json(
+    doc_uuid: str,
+    user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+):
+    """Return evaluated rows for an .xlsx file so the viewer can render
+    formula results instead of blank cells when Excel didn't cache them.
+    """
+    result = await file_service.render_xlsx_sheets(doc_uuid, settings, user=user)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Sheet rendering not available")
+    return result
+
+
 @router.delete("/{doc_uuid}")
 async def delete(
     doc_uuid: str,

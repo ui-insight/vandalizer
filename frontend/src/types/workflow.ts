@@ -9,6 +9,13 @@ export interface SearchSetItem {
   pdf_binding?: string | null;
 }
 
+export interface ValidationPortability {
+  test_case_count: number;
+  text_count: number;
+  document_count: number;
+  missing_snapshot_count: number;
+}
+
 export interface SearchSet {
   id: string;
   title: string;
@@ -26,6 +33,7 @@ export interface SearchSet {
   quality_tier?: string | null;
   last_validated_at?: string | null;
   validation_run_count?: number;
+  validation_portability?: ValidationPortability | null;
 }
 
 export interface WorkflowTask {

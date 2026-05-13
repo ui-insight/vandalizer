@@ -79,6 +79,16 @@ export function buildFromDocument(searchSetUuid: string, documentUuids: string[]
   })
 }
 
+// AI-suggest extraction fields from documents without persisting to a SearchSet.
+// Used by the workflow editor's manual-fields path.
+
+export function suggestFields(documentUuids: string[], model?: string) {
+  return apiFetch<{ entities: string[] }>(`/api/extractions/suggest-fields`, {
+    method: 'POST',
+    body: JSON.stringify({ document_uuids: documentUuids, model }),
+  })
+}
+
 // Run extraction
 
 export function runExtractionSync(data: {
@@ -105,6 +115,7 @@ export interface TestCase {
   source_type: string
   source_text?: string | null
   document_uuid?: string | null
+  document_exists?: boolean | null
   expected_values: Record<string, string>
   user_id: string
   created_at: string
@@ -429,6 +440,30 @@ export function clearTuningResult(uuid: string) {
 
 export function exportSearchSetUrl(uuid: string) {
   return `/api/extractions/search-sets/${uuid}/export`
+}
+
+export async function downloadValidationZip(uuid: string): Promise<void> {
+  const res = await fetch(`/api/extractions/search-sets/${uuid}/download-validation`, {
+    method: 'GET',
+    credentials: 'include',
+    headers: csrfHeaders(),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ detail: 'Download failed' }))
+    throw new ApiError(res.status, body.detail || 'Download failed')
+  }
+  const blob = await res.blob()
+  const disposition = res.headers.get('Content-Disposition') ?? ''
+  const match = disposition.match(/filename="([^"]+)"/)
+  const filename = match ? match[1] : `validation-${uuid}.zip`
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
 }
 
 export async function importSearchSet(file: File, targetUuid?: string): Promise<SearchSet> {

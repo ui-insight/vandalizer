@@ -1,14 +1,20 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Copy, KeyRound, Plus, Trash2, X } from 'lucide-react'
+import { BookOpen, Copy, Download, KeyRound, Plus, Sparkles, Trash2, X } from 'lucide-react'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 
 import {
+  API_KEY_SKILL_DOWNLOAD_URL,
   createApiKey,
+  getApiKeyDocs,
   listApiKeys,
   MGMT_SCOPE_OPTIONS,
   revokeApiKey,
   type ApiKeyListItem,
   type CreateApiKeyResponse,
 } from '../../api/admin'
+
+marked.setOptions({ breaks: true, gfm: true })
 
 function fmtDate(iso: string | null): string {
   if (!iso) return '—'
@@ -58,6 +64,7 @@ export function ApiKeysTab() {
   const [error, setError] = useState<string | null>(null)
   const [showCreate, setShowCreate] = useState(false)
   const [createdKey, setCreatedKey] = useState<CreateApiKeyResponse | null>(null)
+  const [showDocs, setShowDocs] = useState(false)
 
   const reload = useCallback(async () => {
     setLoading(true)
@@ -96,20 +103,47 @@ export function ApiKeysTab() {
           <h2 style={{ fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Management API keys</h2>
           <p style={{ fontSize: 14, color: '#6b7280' }}>
             Scoped, named keys for service consumers (dashboards, agentic tooling).
-            See <code>/api/mgmt/v1</code> in the docs.
+            Mounted under <code>/api/mgmt/v1</code>.
           </p>
         </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            padding: '8px 14px', borderRadius: 6,
-            backgroundColor: 'var(--highlight-color, #3b82f6)', color: 'white',
-            border: 'none', fontWeight: 600, cursor: 'pointer',
-          }}
-        >
-          <Plus size={16} /> New key
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <a
+            href={API_KEY_SKILL_DOWNLOAD_URL}
+            download="SKILL.md"
+            title="Download a Claude Code skill that drives this API from any terminal"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '8px 14px', borderRadius: 6,
+              backgroundColor: 'transparent', color: '#374151',
+              border: '1px solid #d1d5db', fontWeight: 600,
+              cursor: 'pointer', textDecoration: 'none',
+            }}
+          >
+            <Download size={16} /> Claude Code skill
+          </a>
+          <button
+            onClick={() => setShowDocs(true)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '8px 14px', borderRadius: 6,
+              backgroundColor: 'transparent', color: '#374151',
+              border: '1px solid #d1d5db', fontWeight: 600, cursor: 'pointer',
+            }}
+          >
+            <BookOpen size={16} /> View documentation
+          </button>
+          <button
+            onClick={() => setShowCreate(true)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '8px 14px', borderRadius: 6,
+              backgroundColor: 'var(--highlight-color, #3b82f6)', color: 'white',
+              border: 'none', fontWeight: 600, cursor: 'pointer',
+            }}
+          >
+            <Plus size={16} /> New key
+          </button>
+        </div>
       </div>
 
       <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 12, fontSize: 13 }}>
@@ -222,6 +256,143 @@ export function ApiKeysTab() {
           onClose={() => setCreatedKey(null)}
         />
       )}
+
+      {showDocs && <DocsModal onClose={() => setShowDocs(false)} />}
+    </div>
+  )
+}
+
+function DocsModal({ onClose }: { onClose: () => void }) {
+  const [html, setHtml] = useState<string | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    getApiKeyDocs()
+      .then(res => {
+        if (cancelled) return
+        const rendered = DOMPurify.sanitize(marked.parse(res.markdown) as string)
+        setHtml(rendered)
+      })
+      .catch(e => {
+        if (cancelled) return
+        setErr(e instanceof Error ? e.message : 'Failed to load documentation')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.55)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 1000,
+    }}>
+      <div style={{
+        backgroundColor: 'white', borderRadius: 10,
+        maxWidth: 1080, width: '94%', maxHeight: '92vh',
+        display: 'flex', flexDirection: 'column',
+        boxShadow: '0 20px 50px rgba(0,0,0,0.25)',
+        overflow: 'hidden',
+      }}>
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: '16px 24px', borderBottom: '1px solid #e5e7eb',
+          flexShrink: 0, backgroundColor: '#fafafa',
+        }}>
+          <div>
+            <h3 style={{ fontSize: 18, fontWeight: 700, color: '#111827' }}>
+              Management API documentation
+            </h3>
+            <p style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+              Mounted at <code style={{
+                fontFamily: 'ui-monospace, monospace', fontSize: 12,
+                backgroundColor: '#fff', padding: '1px 6px', borderRadius: 4,
+                border: '1px solid #e5e7eb',
+              }}>/api/mgmt/v1</code> · scoped, named keys · audited
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close documentation"
+            style={{
+              padding: 6, border: 'none', background: 'transparent',
+              cursor: 'pointer', color: '#6b7280', borderRadius: 4,
+            }}
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        <div style={{
+          overflowY: 'auto', padding: '20px 28px',
+        }}>
+          <SkillCallout />
+          {err ? (
+            <div style={{
+              padding: 12, borderRadius: 6,
+              backgroundColor: '#fee2e2', color: '#991b1b', fontSize: 13,
+            }}>{err}</div>
+          ) : html === null ? (
+            <p style={{ color: '#6b7280' }}>Loading…</p>
+          ) : (
+            <div className="mgmt-docs" dangerouslySetInnerHTML={{ __html: html }} />
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SkillCallout() {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'flex-start', gap: 14,
+      padding: 16, marginBottom: 22,
+      borderRadius: 8,
+      background: 'linear-gradient(135deg, #fefce8 0%, #fef9c3 100%)',
+      border: '1px solid #fde68a',
+    }}>
+      <div style={{
+        flexShrink: 0, width: 36, height: 36, borderRadius: 8,
+        backgroundColor: '#fde68a', color: '#92400e',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <Sparkles size={18} />
+      </div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontWeight: 700, fontSize: 14, color: '#78350f', marginBottom: 4 }}>
+          Use this API from Claude Code in one command
+        </div>
+        <div style={{ fontSize: 13, color: '#92400e', lineHeight: 1.5, marginBottom: 10 }}>
+          Download the bundled skill, drop it in <code style={{
+            fontFamily: 'ui-monospace, monospace', fontSize: 12,
+            backgroundColor: '#ffffff', padding: '1px 5px', borderRadius: 3,
+            border: '1px solid #fde68a',
+          }}>~/.claude/skills/vandalizer-api/SKILL.md</code>, then type{' '}
+          <code style={{
+            fontFamily: 'ui-monospace, monospace', fontSize: 12,
+            backgroundColor: '#ffffff', padding: '1px 5px', borderRadius: 3,
+            border: '1px solid #fde68a',
+          }}>/vandalizer-api</code> in any session. It prompts you for a server
+          and key, saves them locally, and translates plain-English asks into
+          calls against this API.
+        </div>
+        <a
+          href={API_KEY_SKILL_DOWNLOAD_URL}
+          download="SKILL.md"
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '6px 12px', borderRadius: 6,
+            backgroundColor: '#92400e', color: '#fffbeb',
+            fontWeight: 600, fontSize: 13,
+            textDecoration: 'none',
+          }}
+        >
+          <Download size={14} /> Download SKILL.md
+        </a>
+      </div>
     </div>
   )
 }

@@ -202,11 +202,12 @@ export function getWorkflowEvents(page: number = 1, status?: string, search?: st
 
 // Config
 
-export interface M365Config {
+export interface CompliancePolicyConfig {
   enabled: boolean
-  client_id: string
-  client_secret: string
-  tenant_id: string
+  check_on_upload: boolean
+  rules: string
+  chunk_size?: number
+  chunk_overlap?: number
 }
 
 export interface SystemConfigData {
@@ -222,23 +223,24 @@ export interface SystemConfigData {
   highlight_color: string
   ui_radius: string
   default_team_id: string
-  m365_config: M365Config
+  compliance_config: CompliancePolicyConfig
+  retention_config: Record<string, unknown>
 }
 
 export function getSystemConfig() {
   return apiFetch<SystemConfigData>('/api/admin/config')
 }
 
-export function updateSystemConfig(data: { extraction_config?: Record<string, unknown>; quality_config?: Record<string, unknown>; ocr_endpoint?: string; ocr_api_key?: string; llm_endpoint?: string; default_team_id?: string; support_contacts?: { user_id: string; email: string; name: string }[] }) {
+export function updateSystemConfig(data: { extraction_config?: Record<string, unknown>; quality_config?: Record<string, unknown>; retention_config?: Record<string, unknown>; ocr_endpoint?: string; ocr_api_key?: string; llm_endpoint?: string; default_team_id?: string; support_contacts?: { user_id: string; email: string; name: string }[] }) {
   return apiFetch<{ status: string }>('/api/admin/config', { method: 'PUT', body: JSON.stringify(data) })
 }
 
-export function getM365Config() {
-  return apiFetch<M365Config>('/api/admin/config/m365')
+export function getCompliancePolicyConfig() {
+  return apiFetch<CompliancePolicyConfig>('/api/admin/config/compliance')
 }
 
-export function updateM365Config(data: Partial<M365Config>) {
-  return apiFetch<M365Config>('/api/admin/config/m365', { method: 'PUT', body: JSON.stringify(data) })
+export function updateCompliancePolicyConfig(data: Partial<CompliancePolicyConfig>) {
+  return apiFetch<CompliancePolicyConfig>('/api/admin/config/compliance', { method: 'PUT', body: JSON.stringify(data) })
 }
 
 // Admin Team Management
@@ -540,6 +542,69 @@ export function setCertificationUnlock(userId: string, unlocked: boolean) {
   )
 }
 
+// Compliance: classification + retention
+
+export interface ClassificationLevel {
+  name: string
+  label: string
+  color: string
+  severity: number
+}
+
+export interface ClassificationConfig {
+  enabled: boolean
+  auto_classify_on_upload: boolean
+  default_classification: string
+  levels: ClassificationLevel[]
+}
+
+export interface RetentionPolicy {
+  retention_days?: number
+  soft_delete_grace_days?: number
+  warning_days_before?: number
+}
+
+export interface RetentionConfig {
+  enabled: boolean
+  policies: Record<string, RetentionPolicy>
+  activity_retention_days?: number
+  chat_retention_days?: number
+  workflow_result_retention_days?: number
+  activity_stale_threshold_minutes?: number
+}
+
+export interface RecentClassification {
+  uuid: string
+  title: string | null
+  classification: string | null
+  confidence: number | null
+  classified_at: string | null
+  classified_by: string | null
+}
+
+export interface ClassificationDashboard {
+  config: ClassificationConfig
+  counts: Record<string, number>
+  recent_classifications: RecentClassification[]
+}
+
+export interface RetentionDashboard {
+  retention_config: RetentionConfig
+  classification_config: ClassificationConfig
+  document_counts: Record<string, number>
+  pending_deletions: number
+  soft_deleted: number
+  retention_holds: number
+}
+
+export function getClassificationDashboard() {
+  return apiFetch<ClassificationDashboard>('/api/admin/classification/dashboard')
+}
+
+export function getRetentionDashboard() {
+  return apiFetch<RetentionDashboard>('/api/admin/retention/dashboard')
+}
+
 // Management API keys (/api/admin/api-keys)
 
 export interface ApiKeyListItem {
@@ -607,3 +672,10 @@ export function revokeApiKey(keyId: string) {
     { method: 'DELETE' },
   )
 }
+
+export function getApiKeyDocs() {
+  return apiFetch<{ markdown: string }>('/api/admin/api-keys/docs')
+}
+
+/** URL for the downloadable Claude Code skill file (admin-gated, cookie auth). */
+export const API_KEY_SKILL_DOWNLOAD_URL = '/api/admin/api-keys/skill'

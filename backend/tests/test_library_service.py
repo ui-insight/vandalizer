@@ -669,3 +669,133 @@ class TestHelpers:
         assert result["name"] == "Grants"
         assert result["uuid"] == "f1"
         assert result["item_count"] == 5
+
+
+# ---------------------------------------------------------------------------
+# _clone_underlying_object — validation data preservation
+# ---------------------------------------------------------------------------
+
+
+class TestClonePreservesValidation:
+    @pytest.mark.asyncio
+    async def test_workflow_clone_copies_validation_plan_and_inputs(self):
+        # _clone_underlying_object historically dropped validation_plan /
+        # validation_inputs, leaving cloned workflows with no validation
+        # context. The clone must carry these fields so the new owner can
+        # re-run validation without rebuilding the plan.
+        from app.models.library import LibraryItemKind
+
+        original = MagicMock()
+        original.name = "Source WF"
+        original.description = "desc"
+        original.input_config = {"a": 1}
+        original.output_config = {"b": 2}
+        original.resource_config = {"c": 3}
+        original.validation_plan = [{"check": "field_present", "field": "title"}]
+        original.validation_inputs = [{"document_uuid": "doc-1"}]
+        original.steps = []
+
+        item = _make_library_item(kind_value="workflow")
+        item.kind = LibraryItemKind.WORKFLOW
+
+        captured: dict = {}
+
+        def workflow_factory(**kwargs):
+            captured.update(kwargs)
+            wf = MagicMock()
+            wf.id = PydanticObjectId()
+            wf.insert = AsyncMock()
+            wf.save = AsyncMock()
+            return wf
+
+        with (
+            patch("app.services.library_service.Workflow") as MockWF,
+            patch("app.services.library_service.WorkflowStep"),
+            patch("app.services.library_service.WorkflowStepTask"),
+        ):
+            MockWF.get = AsyncMock(return_value=original)
+            MockWF.side_effect = workflow_factory
+
+            from app.services.library_service import _clone_underlying_object
+
+            new_id = await _clone_underlying_object(item, "new-user")
+            assert new_id is not None
+            assert captured["validation_plan"] == [{"check": "field_present", "field": "title"}]
+            assert captured["validation_inputs"] == [{"document_uuid": "doc-1"}]
+
+    @pytest.mark.asyncio
+    async def test_search_set_clone_copies_plan_fields_and_test_cases(self):
+        # SearchSet clones must preserve cross_field_rules, tuning_result,
+        # domain, item_order, AND clone every ExtractionTestCase so the new
+        # owner inherits the validation plan. source_text snapshots travel
+        # so document-bound cases stay runnable without doc access.
+        original = MagicMock()
+        original.id = PydanticObjectId()
+        original.title = "NSF Extraction"
+        original.uuid = "src-uuid"
+        original.status = "active"
+        original.set_type = "extraction"
+        original.extraction_config = {"k": "v"}
+        original.cross_field_rules = [{"rule": "x"}]
+        original.tuning_result = {"best": "config"}
+        original.domain = "nsf"
+        original.item_order = ["a", "b"]
+        original.get_items = AsyncMock(return_value=[])
+
+        from app.models.library import LibraryItemKind
+
+        item = _make_library_item(kind_value="search_set")
+        item.kind = LibraryItemKind.SEARCH_SET
+
+        captured_ss: dict = {}
+        captured_tcs: list[dict] = []
+
+        def ss_factory(**kwargs):
+            captured_ss.update(kwargs)
+            ss = MagicMock()
+            ss.id = PydanticObjectId()
+            ss.insert = AsyncMock()
+            return ss
+
+        def tc_factory(**kwargs):
+            captured_tcs.append(kwargs)
+            tc = MagicMock()
+            tc.insert = AsyncMock()
+            return tc
+
+        original_tc = MagicMock()
+        original_tc.label = "Case A"
+        original_tc.source_type = "document"
+        original_tc.source_text = "snapshot text"
+        original_tc.document_uuid = "doc-xyz"
+        original_tc.expected_values = {"field1": "answer1"}
+
+        mock_etc_query = MagicMock()
+        mock_etc_query.to_list = AsyncMock(return_value=[original_tc])
+
+        with (
+            patch("app.services.library_service.SearchSet") as MockSS,
+            patch("app.services.library_service.SearchSetItem"),
+            patch("app.models.extraction_test_case.ExtractionTestCase") as MockETC,
+        ):
+            MockSS.get = AsyncMock(return_value=original)
+            MockSS.side_effect = ss_factory
+            MockETC.find = MagicMock(return_value=mock_etc_query)
+            MockETC.side_effect = tc_factory
+
+            from app.services.library_service import _clone_underlying_object
+
+            new_id = await _clone_underlying_object(item, "new-user", team_id="team-1")
+            assert new_id is not None
+            assert captured_ss["cross_field_rules"] == [{"rule": "x"}]
+            assert captured_ss["tuning_result"] == {"best": "config"}
+            assert captured_ss["domain"] == "nsf"
+            assert captured_ss["item_order"] == ["a", "b"]
+            assert captured_ss["team_id"] == "team-1"
+            assert len(captured_tcs) == 1
+            assert captured_tcs[0]["label"] == "Case A"
+            assert captured_tcs[0]["source_text"] == "snapshot text"
+            assert captured_tcs[0]["document_uuid"] == "doc-xyz"
+            assert captured_tcs[0]["expected_values"] == {"field1": "answer1"}
+            assert captured_tcs[0]["user_id"] == "new-user"
+            assert captured_tcs[0]["search_set_uuid"] == captured_ss["uuid"]

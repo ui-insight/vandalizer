@@ -11,8 +11,10 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from app.services.pdf_service import (
+    _normalize_for_pdf,
     generate_extraction_pdf,
     generate_fillable_template,
+    render_workflow_pdf,
 )
 
 
@@ -86,4 +88,27 @@ class TestGenerateExtractionPdf:
     def test_searchphrase_used_when_title_empty(self):
         items = [_item("just_a_key", None)]
         pdf = generate_extraction_pdf("T", items, {"just_a_key": "v"}, ["a.pdf", "b.pdf"])
+        assert pdf.startswith(b"%PDF-")
+
+
+class TestNormalizeForPdf:
+    def test_non_breaking_hyphen_becomes_ascii(self):
+        # U+2011 is outside Helvetica's WinAnsi encoding and rendered as ■.
+        assert _normalize_for_pdf("non‑expert") == "non-expert"
+
+    def test_minus_sign_and_figure_dash_normalize(self):
+        assert _normalize_for_pdf("a−b‒c‐d") == "a-b-c-d"
+
+    def test_zero_width_chars_are_stripped(self):
+        assert _normalize_for_pdf("a​b­c﻿d") == "abcd"
+
+    def test_regular_dashes_are_preserved(self):
+        # Regular hyphen, en-dash, em-dash are in WinAnsi and render fine.
+        text = "a-b – c — d"
+        assert _normalize_for_pdf(text) == text
+
+    def test_workflow_pdf_handles_non_breaking_hyphens(self):
+        # End-to-end smoke test for the bug being fixed.
+        md = "• Be a non‑expert\n• Drive cross‑functional teams"
+        pdf = render_workflow_pdf(md, title="Workflow Results")
         assert pdf.startswith(b"%PDF-")

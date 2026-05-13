@@ -34,6 +34,19 @@ export function downloadFileUrl(docid: string) {
   return `/api/files/download?docid=${docid}`
 }
 
+export interface SheetJsonResponse {
+  sheets: Array<{
+    name: string
+    headers: string[]
+    rows: string[][]
+    hidden: boolean
+  }>
+}
+
+export function fetchSheetJson(docUuid: string) {
+  return apiFetch<SheetJsonResponse>(`/api/files/${docUuid}/sheet-json`)
+}
+
 export function downloadFile(docid: string) {
   const a = document.createElement('a')
   a.href = downloadFileUrl(docid)

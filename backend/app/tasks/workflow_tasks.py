@@ -144,6 +144,10 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
                             "searchtype": "extraction",
                         }))
                         task_data["keys"] = [item["searchphrase"] for item in items]
+                        # UI is mutually exclusive between saved-set and manual fields,
+                        # but older workflows may have both persisted. Drop stale manual
+                        # fields so the saved set is unambiguously the source of truth.
+                        task_data.pop("extractions", None)
 
                 # Pre-load doc texts for extraction and prompt nodes
                 doc_uuids = list(trigger_step_data.get("doc_uuids", []))
@@ -580,6 +584,7 @@ def resume_workflow_after_approval(self, approval_uuid):
                             "searchtype": "extraction",
                         }))
                         task_data["keys"] = [item["searchphrase"] for item in items]
+                        task_data.pop("extractions", None)
                 if doc_uuids:
                     doc_texts = []
                     for uuid in doc_uuids:

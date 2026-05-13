@@ -198,13 +198,25 @@ export function testStep(data: { task_name: string; task_data: Record<string, un
 }
 
 export function getTestStepStatus(taskId: string) {
-  return apiFetch<{ status: string; result?: unknown }>(`/api/workflows/steps/test/${taskId}`)
+  return apiFetch<{ status: string; result?: unknown; error?: string }>(`/api/workflows/steps/test/${taskId}`)
 }
 
 export function downloadResults(sessionId: string, format: string = 'json', opts?: { parseStructured?: boolean }) {
   const params = new URLSearchParams({ session_id: sessionId, format })
   if (opts?.parseStructured) params.set('parse_structured', 'true')
   return `/api/workflows/download?${params.toString()}`
+}
+
+export type SaveOutputFormat = 'pdf' | 'markdown' | 'csv' | 'json' | 'text'
+
+export function saveResultToFolder(
+  sessionId: string,
+  data: { folder_uuid: string; format: SaveOutputFormat; file_name?: string },
+) {
+  return apiFetch<{ ok: boolean; folder_uuid: string; file_path: string }>(
+    `/api/workflows/sessions/${encodeURIComponent(sessionId)}/save-to-folder`,
+    { method: 'POST', body: JSON.stringify(data) },
+  )
 }
 
 // Export / Import
@@ -291,6 +303,7 @@ export interface ValidationInputDefinition {
   type: 'document' | 'text'
   document_uuid?: string
   document_title?: string
+  document_exists?: boolean
   text?: string
   label?: string
 }

@@ -1074,7 +1074,7 @@ export default function Certification() {
     }
   }, [completionResult, isModuleLocked, toast])
 
-  if (loading) {
+  if (loading && !progress) {
     return (
       <PageLayout>
         <div className="p-6 max-w-5xl mx-auto">

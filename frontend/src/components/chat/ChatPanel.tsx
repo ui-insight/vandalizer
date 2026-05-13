@@ -707,8 +707,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           </div>
         )}
 
-        {/* Chat messages — centered under banner for first-session */}
-        <div style={effectiveFirstSession ? { maxWidth: 640, margin: '0 auto' } : undefined}>
+        {/* Chat messages — centered column for readability */}
+        <div style={{ maxWidth: 640, margin: '0 auto' }}>
           {messages.map((msg, i) => {
             const isExcluded = contextMode !== 'full' && contextCutoffIndex > 0 && i < contextCutoffIndex
             const showBoundary = contextMode !== 'full' && contextCutoffIndex > 0 && i === contextCutoffIndex

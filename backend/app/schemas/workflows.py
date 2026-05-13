@@ -140,6 +140,7 @@ class ValidationInputDefinition(BaseModel):
     type: str  # "document" | "text"
     document_uuid: Optional[str] = None
     document_title: Optional[str] = None
+    document_exists: Optional[bool] = None
     text: Optional[str] = None
     label: Optional[str] = None
 

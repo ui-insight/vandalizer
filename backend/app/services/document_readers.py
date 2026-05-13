@@ -133,8 +133,8 @@ def ocr_extract_text_from_pdf(pdf_path: str, retries: int = 3) -> str:
     return ""
 
 
-def _format_xlsx_cell(value: object) -> str:
-    """Render an openpyxl cell value as a pipe-table-safe string."""
+def _stringify_cell_value(value: object) -> str:
+    """Render an openpyxl cell value as a plain display string."""
     if value is None:
         return ""
     if isinstance(value, bool):
@@ -151,7 +151,14 @@ def _format_xlsx_cell(value: object) -> str:
         rounded = round(value, 4)
         text = f"{rounded:.4f}".rstrip("0").rstrip(".")
         return text or "0"
-    text = str(value)
+    return str(value)
+
+
+def _format_xlsx_cell(value: object) -> str:
+    """Render an openpyxl cell value as a pipe-table-safe string."""
+    text = _stringify_cell_value(value)
+    if not text:
+        return ""
     return text.replace("\\", "\\\\").replace("|", r"\|").replace("\n", " ").strip()
 
 
@@ -335,6 +342,75 @@ def extract_text_from_xlsx(xlsx_path: str) -> str:
         out.append("\n".join(block))
 
     return "\n\n".join(out).strip()
+
+
+def extract_sheet_json_from_xlsx(xlsx_path: str) -> dict:
+    """Render an .xlsx workbook as JSON sheets for the document viewer.
+
+    Mirrors extract_text_from_xlsx's evaluation strategy so the viewer
+    and OCR agree on formula results: prefer Excel-cached values, then
+    fall back to the `formulas` library, then to the formula text.
+    """
+    import openpyxl
+
+    wb_values = openpyxl.load_workbook(xlsx_path, data_only=True)
+    wb_formulas = openpyxl.load_workbook(xlsx_path, data_only=False)
+
+    needs_eval = False
+    for sheet_name in wb_values.sheetnames:
+        ws_v = wb_values[sheet_name]
+        ws_f = wb_formulas[sheet_name]
+        for r in range(1, (ws_v.max_row or 0) + 1):
+            for c in range(1, (ws_v.max_column or 0) + 1):
+                if ws_v.cell(row=r, column=c).value is None:
+                    fv = ws_f.cell(row=r, column=c).value
+                    if isinstance(fv, str) and fv.startswith("="):
+                        needs_eval = True
+                        break
+            if needs_eval:
+                break
+        if needs_eval:
+            break
+
+    computed = _evaluate_xlsx_formulas(xlsx_path) if needs_eval else {}
+
+    sheets: list[dict] = []
+    for sheet_name in wb_values.sheetnames:
+        ws_v = wb_values[sheet_name]
+        ws_f = wb_formulas[sheet_name]
+
+        max_row = ws_v.max_row or 0
+        max_col = ws_v.max_column or 0
+        if max_row == 0 or max_col == 0:
+            sheets.append({"name": sheet_name, "headers": [], "rows": [], "hidden": ws_v.sheet_state != "visible"})
+            continue
+
+        sheet_key = sheet_name.upper()
+        grid: list[list[str]] = []
+        for r in range(1, max_row + 1):
+            row: list[str] = []
+            for c in range(1, max_col + 1):
+                cell_v = ws_v.cell(row=r, column=c)
+                cached = cell_v.value
+                formula = ws_f.cell(row=r, column=c).value
+                if cached is None and isinstance(formula, str) and formula.startswith("="):
+                    coord = cell_v.coordinate.upper()
+                    evaluated = computed.get((sheet_key, coord))
+                    row.append(_stringify_cell_value(evaluated if evaluated is not None else formula))
+                else:
+                    row.append(_stringify_cell_value(cached))
+            grid.append(row)
+
+        headers = grid[0] if grid else []
+        rows = grid[1:] if len(grid) > 1 else []
+        sheets.append({
+            "name": sheet_name,
+            "headers": headers,
+            "rows": rows,
+            "hidden": ws_v.sheet_state != "visible",
+        })
+
+    return {"sheets": sheets}
 
 
 _DOCX_W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"

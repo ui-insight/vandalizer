@@ -65,6 +65,19 @@ DEFAULT_RETENTION_CONFIG = {
     "activity_stale_threshold_minutes": 30,
 }
 
+DEFAULT_COMPLIANCE_CONFIG = {
+    "enabled": False,
+    "check_on_upload": True,
+    "rules": (
+        "Check that the document does not contain any sensitive PII data "
+        "that should not be processed by an external LLM. Flag SSNs, credit "
+        "card numbers, medical records, or classified information."
+    ),
+    "chunk_size": 8000,
+    "chunk_overlap": 200,
+}
+
+
 DEFAULT_EXTRACTION_CONFIG = {
     "mode": "two_pass",
     "model": "",
@@ -134,6 +147,9 @@ class SystemConfig(Document):
     # Retention configuration
     retention_config: dict = {}
 
+    # Compliance configuration (document content checks on upload)
+    compliance_config: dict = {}
+
     # UI Configuration
     highlight_color: str = "#eab308"
     ui_radius: str = "12px"
@@ -144,9 +160,6 @@ class SystemConfig(Document):
 
     # Support contacts — list of {"user_id": ..., "email": ..., "name": ...}
     support_contacts: list[dict] = []
-
-    # M365 Integration
-    m365_config: dict = {}
 
     # Default team for new user auto-assignment
     default_team_id: Optional[str] = None
@@ -209,19 +222,14 @@ class SystemConfig(Document):
             _deep_merge(config, self.retention_config)
         return config
 
-    def get_m365_config(self) -> dict:
-        """Return M365 config with defaults."""
-        defaults = {
-            "enabled": False,
-            "client_id": "",
-            "client_secret": "",
-            "tenant_id": "",
-        }
-        if self.m365_config:
-            _deep_merge(defaults, self.m365_config)
-        return defaults
+    def get_compliance_config(self) -> dict:
+        """Return compliance config with defaults merged in."""
+        config = deepcopy(DEFAULT_COMPLIANCE_CONFIG)
+        if self.compliance_config:
+            _deep_merge(config, self.compliance_config)
+        return config
 
-    def is_m365_enabled(self) -> bool:
-        """Return whether M365 integration is enabled and configured."""
-        cfg = self.get_m365_config()
-        return bool(cfg.get("enabled") and cfg.get("client_id") and cfg.get("tenant_id"))
+    def is_compliance_enabled(self) -> bool:
+        """Return whether compliance checks are active for document uploads."""
+        cfg = self.get_compliance_config()
+        return bool(cfg.get("enabled") and (cfg.get("rules") or "").strip())

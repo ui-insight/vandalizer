@@ -5,6 +5,7 @@ import base64
 import csv
 import io
 import json
+import logging
 import re
 import zipfile
 
@@ -41,7 +42,29 @@ from app.rate_limit import limiter
 from app.services import workflow_service as svc
 from app.services.user_lookup import resolve_author, resolve_authors
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
+
+
+async def _check_validation_input_documents_exist(uuids: list[str]) -> dict[str, bool]:
+    """Return {uuid: exists} for the supplied document UUIDs.
+
+    A soft-deleted doc is treated as gone — the UI should warn the user
+    before they try to run the workflow with it.
+    """
+    from app.models.document import SmartDocument
+
+    if not uuids:
+        return {}
+    unique = list({u for u in uuids if u})
+    if not unique:
+        return {}
+    found = await SmartDocument.find(
+        {"uuid": {"$in": unique}, "soft_deleted": {"$ne": True}}
+    ).to_list()
+    present = {d.uuid for d in found}
+    return {u: (u in present) for u in unique}
 
 
 async def _workflow_response_from_dict(wf: dict) -> WorkflowResponse:
@@ -109,31 +132,6 @@ def _parse_structured_string(text: str):
             return rows
 
     return None
-
-
-def _strip_markdown(text: str) -> str:
-    """Remove common markdown formatting for plain-text output."""
-    text = re.sub(r"^#{1,6}\s+", "", text, flags=re.MULTILINE)
-    text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
-    text = re.sub(r"\*(.+?)\*", r"\1", text)
-    text = re.sub(r"`(.+?)`", r"\1", text)
-    return text
-
-
-_PDF_UNICODE_REPLACEMENTS = str.maketrans({
-    "‘": "'", "’": "'", "‚": "'", "‛": "'",
-    "“": '"', "”": '"', "„": '"', "‟": '"',
-    "–": "-", "—": "-", "−": "-", "‐": "-", "‑": "-",
-    "…": "...", " ": " ", "​": "", "‌": "", "‍": "",
-    "•": "*", "·": "*", "™": "(TM)", "®": "(R)", "©": "(C)",
-})
-
-
-def _pdf_safe(value) -> str:
-    """Coerce a value to a latin-1-safe string for fpdf core fonts."""
-    text = value if isinstance(value, str) else ("" if value is None else str(value))
-    text = text.translate(_PDF_UNICODE_REPLACEMENTS)
-    return text.encode("latin-1", errors="replace").decode("latin-1")
 
 
 _INLINE_BOLD = re.compile(r"\*\*(.+?)\*\*")
@@ -553,85 +551,11 @@ async def download_results(
         )
 
     if format == "pdf":
-        from fpdf import FPDF
-        from fpdf.fonts import FontFace
+        from app.services.pdf_service import render_workflow_pdf
 
-        data = output_data
-        if isinstance(data, str):
-            try:
-                data = json.loads(data)
-            except (json.JSONDecodeError, ValueError):
-                pass
-
-        pdf = FPDF()
-        pdf.set_auto_page_break(auto=True, margin=20)
-        pdf.add_page()
-        pdf.set_font("Helvetica", "B", 14)
-        pdf.cell(0, 10, _pdf_safe("Workflow Results"), new_x="LMARGIN", new_y="NEXT")
-        pdf.ln(4)
-
-        heading_style = FontFace(color=255, fill_color=(55, 65, 81), emphasis="BOLD")
-
-        if isinstance(data, list) and data and isinstance(data[0], dict):
-            headers = list(dict.fromkeys(k for row in data for k in row.keys()))
-            usable = pdf.w - pdf.l_margin - pdf.r_margin
-            # Smart column widths: allocate proportionally to max content length
-            max_lens = []
-            for h in headers:
-                col_max = len(str(h))
-                for row in data:
-                    col_max = max(col_max, len(str(row.get(h, ""))))
-                max_lens.append(min(col_max, 80))
-            total = sum(max_lens) or 1
-            col_widths = tuple(max(usable * (ml / total), 20) for ml in max_lens)
-
-            pdf.set_font("Helvetica", "", 9)
-            with pdf.table(
-                col_widths=col_widths,
-                headings_style=heading_style,
-                text_align="LEFT",
-            ) as table:
-                header_row = table.row()
-                for h in headers:
-                    header_row.cell(_pdf_safe(h))
-                for i, item in enumerate(data):
-                    row = table.row()
-                    for h in headers:
-                        val = item.get(h, "")
-                        cell_text = str(val) if val is not None else ""
-                        if isinstance(val, (dict, list)):
-                            cell_text = json.dumps(val, default=str)
-                        row.cell(_pdf_safe(cell_text))
-
-        elif isinstance(data, dict):
-            usable = pdf.w - pdf.l_margin - pdf.r_margin
-            pdf.set_font("Helvetica", "", 10)
-            with pdf.table(
-                col_widths=(usable * 0.3, usable * 0.7),
-                headings_style=heading_style,
-                text_align="LEFT",
-            ) as table:
-                header_row = table.row()
-                header_row.cell(_pdf_safe("Field"))
-                header_row.cell(_pdf_safe("Value"))
-                for k, v in data.items():
-                    row = table.row()
-                    row.cell(_pdf_safe(k))
-                    val_text = str(v) if not isinstance(v, (dict, list)) else json.dumps(v, default=str)
-                    row.cell(_pdf_safe(val_text))
-
-        elif isinstance(data, str):
-            text = _strip_markdown(data)
-            pdf.set_font("Helvetica", "", 10)
-            pdf.multi_cell(0, 5, _pdf_safe(text))
-        else:
-            pdf.set_font("Helvetica", "", 10)
-            pdf.multi_cell(0, 5, _pdf_safe(str(data) if data else ""))
-
-        pdf_buf = io.BytesIO(pdf.output())
-
+        pdf_bytes = render_workflow_pdf(output_data, title="Workflow Results")
         return StreamingResponse(
-            pdf_buf,
+            io.BytesIO(pdf_bytes),
             media_type="application/pdf",
             headers={"Content-Disposition": 'attachment; filename="results.pdf"'},
         )
@@ -651,6 +575,68 @@ async def download_results(
         media_type="application/json",
         headers={"Content-Disposition": 'attachment; filename="results.json"'},
     )
+
+
+class SaveOutputToFolderRequest(BaseModel):
+    folder_uuid: str
+    format: str = "pdf"  # pdf | markdown | csv | json | text
+    file_name: str | None = None
+
+
+@router.post("/sessions/{session_id}/save-to-folder")
+async def save_session_output_to_folder(
+    session_id: str,
+    req: SaveOutputToFolderRequest,
+    user: User = Depends(get_current_user),
+):
+    """Save a workflow run's output as a SmartDocument in the chosen SmartFolder.
+
+    Writes the rendered output to disk (PDF/Markdown/CSV/JSON/text) and inserts
+    a SmartDocument record so the file shows up in the user's file structure.
+    """
+    from app.models.workflow import WorkflowResult
+    from app.services.access_control import get_authorized_folder
+    from app.services.output_handlers import save_results_to_folder
+
+    valid_formats = {"pdf", "markdown", "csv", "json", "text"}
+    if req.format not in valid_formats:
+        raise HTTPException(status_code=400, detail=f"Invalid format. Use one of: {sorted(valid_formats)}")
+
+    result = await WorkflowResult.find_one(WorkflowResult.session_id == session_id)
+    if not result or not result.workflow:
+        raise HTTPException(status_code=404, detail="Workflow result not found")
+    wf = await get_authorized_workflow(str(result.workflow), user)
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow result not found")
+
+    folder = await get_authorized_folder(req.folder_uuid, user, manage=True)
+    if not folder:
+        raise HTTPException(status_code=404, detail="Folder not found")
+
+    storage_cfg: dict = {
+        "destination_folder": req.folder_uuid,
+        "format": req.format,
+        "on_rerun": "new",
+        "actor_user_id": user.user_id,
+    }
+    if req.file_name:
+        safe = "".join(c if c.isalnum() or c in " _-." else "_" for c in req.file_name).strip()
+        if safe:
+            storage_cfg["file_naming"] = safe.rsplit(".", 1)[0] if "." in safe else safe
+
+    result_doc = result.model_dump(by_alias=True)
+    result_doc["_id"] = result.id
+    result_doc["workflow"] = result.workflow
+
+    try:
+        file_path = await asyncio.to_thread(save_results_to_folder, result_doc, storage_cfg)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        logger.exception("Failed to save workflow output to folder")
+        raise HTTPException(status_code=500, detail="Failed to save output")
+
+    return {"ok": True, "folder_uuid": req.folder_uuid, "file_path": file_path}
 
 
 @router.get("/{workflow_id}/export")
@@ -1161,6 +1147,11 @@ async def generate_validation_plan(request: Request, workflow_id: str, user: Use
 async def get_validation_inputs(workflow_id: str, user: User = Depends(get_current_user)):
     try:
         inputs = await svc.get_validation_inputs(workflow_id, user=user)
+        doc_uuids = [inp.get("document_uuid") for inp in inputs if inp.get("document_uuid")]
+        exists_map = await _check_validation_input_documents_exist(doc_uuids)
+        for inp in inputs:
+            if inp.get("document_uuid"):
+                inp["document_exists"] = exists_map.get(inp["document_uuid"], False)
         return ValidationInputsResponse(inputs=inputs)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))

@@ -669,9 +669,16 @@ async def test_step(task_name: str, task_data: dict, document_uuids: list[str], 
 def get_test_status(task_id: str) -> dict:
     """Poll a step test Celery task."""
     result = AsyncResult(task_id, app=celery_app)
-    if result.ready():
+    if not result.ready():
+        return {"status": result.state}
+    if result.successful():
         return {"status": "completed", "result": result.result}
-    return {"status": result.state}
+    payload = result.result
+    if isinstance(payload, BaseException):
+        error_text = f"{type(payload).__name__}: {payload}"
+    else:
+        error_text = str(payload) if payload else "Test failed"
+    return {"status": "failed", "error": error_text}
 
 
 # ---------------------------------------------------------------------------

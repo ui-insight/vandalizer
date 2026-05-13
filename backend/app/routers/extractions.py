@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
@@ -29,6 +30,7 @@ from app.schemas.extractions import (
     SearchSetItemRequest,
     SearchSetItemResponse,
     SearchSetResponse,
+    SuggestFieldsRequest,
     TestCaseResponse,
     UpdateSearchSetRequest,
     UpdateSearchSetItemRequest,
@@ -36,6 +38,8 @@ from app.schemas.extractions import (
 )
 from app.services import extraction_validation_service as val_svc
 from app.services import search_set_service as svc
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -77,12 +81,14 @@ async def _ss_response(ss) -> SearchSetResponse:
     """Build a SearchSetResponse with quality data attached."""
     count = await ss.item_count()
     quality = await _attach_quality(ss)
+    portability = await val_svc.portability_summary(ss.uuid)
     return SearchSetResponse(
         id=str(ss.id), title=ss.title, uuid=ss.uuid,
         status=ss.status, set_type=ss.set_type, user_id=ss.user_id,
         team_id=ss.team_id, is_global=ss.is_global, verified=ss.verified, item_count=count,
         extraction_config=ss.extraction_config,
         fillable_pdf_url=ss.fillable_pdf_url,
+        validation_portability=portability,
         **quality,
     )
 
@@ -206,6 +212,134 @@ async def export_search_set(uuid: str, user: User = Depends(get_current_user)):
         io.BytesIO(json_bytes),
         media_type="application/json",
         headers={"Content-Disposition": f'attachment; filename="{safe_name}.vandalizer.json"'},
+    )
+
+
+@router.get("/search-sets/{uuid}/download-validation")
+async def download_validation_zip(uuid: str, user: User = Depends(get_current_user)):
+    """Download a zip with the full validation setup: setup metadata, answer key,
+    snapshotted source text for every test case, and original source documents
+    where available and accessible.
+    """
+    import datetime
+    import io
+    import zipfile
+    from app.config import Settings
+    from app.services import file_service
+
+    ss = await _get_search_set_or_404(uuid, user)
+    items = await svc.list_items(uuid)
+    if ss.item_order:
+        order_map = {oid: idx for idx, oid in enumerate(ss.item_order)}
+        items = sorted(items, key=lambda i: order_map.get(str(i.id), 9999))
+
+    test_cases = await val_svc.list_test_cases(uuid)
+
+    settings = Settings()
+
+    def _safe(name: str | None, fallback: str) -> str:
+        cleaned = "".join(c if c.isalnum() or c in " _-." else "_" for c in (name or "")).strip()
+        return cleaned or fallback
+
+    safe_title = _safe(ss.title, "extraction")
+
+    buf = io.BytesIO()
+    case_entries: list[dict] = []
+    answer_key: dict[str, dict] = {}
+
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for tc in test_cases:
+            short = tc.uuid[:8]
+            base = f"{_safe(tc.label, 'case')}__{short}"
+
+            source_text_path: str | None = None
+            if tc.source_text:
+                source_text_path = f"sources/{base}.txt"
+                zf.writestr(source_text_path, tc.source_text)
+
+            document_path: str | None = None
+            document_filename: str | None = None
+            if tc.document_uuid:
+                dl = await file_service.download_document(tc.document_uuid, settings, user=user)
+                if dl:
+                    document_filename = dl.title
+                    document_path = f"documents/{base}__{_safe(dl.title, 'document')}"
+                    zf.writestr(document_path, dl.data)
+
+            case_entries.append({
+                "uuid": tc.uuid,
+                "label": tc.label,
+                "source_type": tc.source_type,
+                "document_uuid": tc.document_uuid,
+                "document_filename": document_filename,
+                "document_path": document_path,
+                "source_text_path": source_text_path,
+                "expected_values": tc.expected_values,
+                "created_at": tc.created_at.isoformat() if tc.created_at else None,
+            })
+            answer_key[tc.uuid] = {
+                "label": tc.label,
+                "expected_values": tc.expected_values,
+            }
+
+        setup = {
+            "format": "vandalizer.validation-setup.v1",
+            "exported_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "exported_by_user_id": user.user_id,
+            "search_set": {
+                "uuid": ss.uuid,
+                "title": ss.title,
+                "set_type": ss.set_type,
+                "extraction_config": ss.extraction_config or {},
+                "items": [
+                    {
+                        "id": str(item.id),
+                        "searchphrase": item.searchphrase,
+                        "title": item.title,
+                        "is_optional": item.is_optional,
+                        "enum_values": item.enum_values or [],
+                    }
+                    for item in items
+                ],
+            },
+            "test_cases": case_entries,
+        }
+        answer_key_payload = {
+            "search_set_uuid": ss.uuid,
+            "search_set_title": ss.title,
+            "test_cases": answer_key,
+        }
+
+        zf.writestr(
+            "validation-setup.json",
+            json.dumps(setup, indent=2, default=str),
+        )
+        zf.writestr(
+            "expected-values.json",
+            json.dumps(answer_key_payload, indent=2, default=str),
+        )
+        zf.writestr(
+            "README.txt",
+            (
+                "Vandalizer validation setup export\n"
+                "==================================\n\n"
+                f"Extraction: {ss.title}\n"
+                f"Test cases: {len(test_cases)}\n\n"
+                "validation-setup.json — full setup metadata, extraction field schema,\n"
+                "  and per-test-case expected values + paths to source content.\n"
+                "expected-values.json — flat answer key keyed by test case uuid.\n"
+                "sources/ — snapshotted text content for every test case (the text\n"
+                "  validation runs against).\n"
+                "documents/ — original source files for test cases that reference a\n"
+                "  document, when the file was available and you have access.\n"
+            ),
+        )
+
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{safe_title}_validation.zip"'},
     )
 
 
@@ -546,6 +680,26 @@ async def build_from_document(request: Request, uuid: str, req: BuildFromDocumen
     return {"entities": entities}
 
 
+@router.post("/suggest-fields")
+@limiter.limit("10/minute")
+async def suggest_fields(request: Request, req: SuggestFieldsRequest, user: User = Depends(get_current_user)):
+    """AI-suggest extraction field names from documents without persisting to a SearchSet.
+
+    Used by the workflow editor's manual-fields path so users can get AI suggestions
+    without first creating a saved extraction set.
+    """
+    document_uuids = await _authorize_documents(req.document_uuids, user)
+    try:
+        entities = await svc.suggest_fields_from_documents(
+            document_uuids=document_uuids,
+            user_id=user.user_id,
+            model=req.model,
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    return {"entities": entities}
+
+
 @router.post("/run-sync")
 @limiter.limit("30/minute")
 async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, user: User = Depends(get_current_user)) -> dict:
@@ -615,13 +769,16 @@ async def run_extraction_integrated(
     document_uuids: Optional[str] = Form(None),
     text: Optional[str] = Form(None),
     text_title: Optional[str] = Form(None),
+    ephemeral: bool = Form(True),
     files: list[UploadFile] = File(default=[]),
     user: User = Depends(get_api_key_user),
 ) -> dict:
     """Run extraction via external API.
 
     Accepts any combination of file uploads, existing document UUIDs, and a
-    raw ``text`` payload. At least one must be provided.
+    raw ``text`` payload. At least one must be provided. When ``ephemeral``
+    is true (default), documents created by this request are deleted after
+    the extraction completes; existing ``document_uuids`` are never touched.
     """
     import uuid as _uuid
     from pathlib import Path
@@ -631,6 +788,8 @@ async def run_extraction_integrated(
 
     settings = Settings()
     all_doc_uuids: list[str] = []
+    # Docs created by THIS request — only these are ever cleaned up.
+    created_doc_uuids: list[str] = []
 
     # Parse existing document UUIDs
     if document_uuids:
@@ -654,6 +813,7 @@ async def run_extraction_integrated(
         )
         await doc.insert()
         all_doc_uuids.append(uid)
+        created_doc_uuids.append(uid)
 
     # Handle file uploads
     for upload in files:
@@ -704,6 +864,7 @@ async def run_extraction_integrated(
         doc.task_id = task_id
         await doc.save()
         all_doc_uuids.append(uid)
+        created_doc_uuids.append(uid)
 
     if not all_doc_uuids:
         raise HTTPException(
@@ -763,6 +924,37 @@ async def run_extraction_integrated(
     except Exception as e:
         await activity_service.activity_finish(activity.id, ActivityStatus.FAILED, error=str(e))
         raise
+    finally:
+        if ephemeral and created_doc_uuids:
+            await _cleanup_ephemeral_docs(created_doc_uuids, user, settings)
+
+
+async def _cleanup_ephemeral_docs(uuids: list[str], user: User, settings) -> None:
+    """Best-effort delete of API-created docs (Mongo + file + ChromaDB).
+
+    Failures are logged and swallowed so cleanup never surfaces as an error
+    after the extraction itself has already succeeded.
+    """
+    from app.services import file_service
+
+    dm = None
+    try:
+        from app.services.document_manager import DocumentManager
+
+        dm = DocumentManager(persist_directory=settings.chromadb_persist_dir)
+    except Exception:
+        logger.warning("Could not initialize DocumentManager for ephemeral cleanup", exc_info=True)
+
+    for uid in uuids:
+        if dm is not None:
+            try:
+                dm.delete_document(user.user_id, uid)
+            except Exception:
+                logger.warning("ChromaDB cleanup failed for ephemeral doc %s", uid, exc_info=True)
+        try:
+            await file_service.delete_document(uid, settings, user=user)
+        except Exception:
+            logger.warning("Mongo/file cleanup failed for ephemeral doc %s", uid, exc_info=True)
 
 
 @router.get("/status/{activity_id}")
@@ -794,7 +986,10 @@ async def get_extraction_status(
 # Extraction test cases & validation
 # ---------------------------------------------------------------------------
 
-def _tc_response(tc: "ExtractionTestCase") -> TestCaseResponse:
+def _tc_response(
+    tc: "ExtractionTestCase",
+    document_exists: Optional[bool] = None,
+) -> TestCaseResponse:
     return TestCaseResponse(
         id=str(tc.id),
         uuid=tc.uuid,
@@ -803,10 +998,32 @@ def _tc_response(tc: "ExtractionTestCase") -> TestCaseResponse:
         source_type=tc.source_type,
         source_text=tc.source_text,
         document_uuid=tc.document_uuid,
+        document_exists=document_exists,
         expected_values=tc.expected_values,
         user_id=tc.user_id,
         created_at=tc.created_at.isoformat(),
     )
+
+
+async def _check_documents_exist(uuids: list[str]) -> dict[str, bool]:
+    """Return {uuid: exists} for the supplied document UUIDs.
+
+    A document counts as 'existing' if it's present and not soft-deleted —
+    a soft-deleted doc is on its way out and the UI should treat it the
+    same as gone.
+    """
+    from app.models.document import SmartDocument
+
+    if not uuids:
+        return {}
+    unique = list({u for u in uuids if u})
+    if not unique:
+        return {}
+    found = await SmartDocument.find(
+        {"uuid": {"$in": unique}, "soft_deleted": {"$ne": True}}
+    ).to_list()
+    present = {d.uuid for d in found}
+    return {u: (u in present) for u in unique}
 
 
 @router.post("/test-cases", response_model=TestCaseResponse)
@@ -823,14 +1040,19 @@ async def create_test_case(req: CreateTestCaseRequest, user: User = Depends(get_
         document_uuid=req.document_uuid,
         expected_values=req.expected_values,
     )
-    return _tc_response(tc)
+    exists_map = await _check_documents_exist([tc.document_uuid] if tc.document_uuid else [])
+    return _tc_response(tc, document_exists=exists_map.get(tc.document_uuid) if tc.document_uuid else None)
 
 
 @router.get("/test-cases", response_model=list[TestCaseResponse])
 async def list_test_cases(search_set_uuid: str, user: User = Depends(get_current_user)) -> list[TestCaseResponse]:
     await _get_search_set_or_404(search_set_uuid, user, manage=True)
     tcs = await val_svc.list_test_cases(search_set_uuid)
-    return [_tc_response(tc) for tc in tcs]
+    exists_map = await _check_documents_exist([tc.document_uuid for tc in tcs if tc.document_uuid])
+    return [
+        _tc_response(tc, document_exists=exists_map.get(tc.document_uuid) if tc.document_uuid else None)
+        for tc in tcs
+    ]
 
 
 @router.patch("/test-cases/{uuid}", response_model=TestCaseResponse)
@@ -851,7 +1073,8 @@ async def update_test_case(uuid: str, req: UpdateTestCaseRequest, user: User = D
     )
     if not tc:
         raise HTTPException(status_code=404, detail="Test case not found")
-    return _tc_response(tc)
+    exists_map = await _check_documents_exist([tc.document_uuid] if tc.document_uuid else [])
+    return _tc_response(tc, document_exists=exists_map.get(tc.document_uuid) if tc.document_uuid else None)
 
 
 @router.delete("/test-cases/{uuid}")
@@ -894,7 +1117,14 @@ async def create_test_cases_from_extraction(request: Request, user: User = Depen
             user_id=user.user_id,
             model=model,
         )
-        return {"test_cases": [_tc_response(tc) for tc in test_cases], "count": len(test_cases)}
+        exists_map = await _check_documents_exist([tc.document_uuid for tc in test_cases if tc.document_uuid])
+        return {
+            "test_cases": [
+                _tc_response(tc, document_exists=exists_map.get(tc.document_uuid) if tc.document_uuid else None)
+                for tc in test_cases
+            ],
+            "count": len(test_cases),
+        }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
