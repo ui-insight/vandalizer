@@ -2,8 +2,11 @@
 
 import datetime
 import json
+import logging
 import re
 from io import BytesIO
+
+logger = logging.getLogger(__name__)
 
 
 def generate_fillable_template(title: str, items: list) -> tuple[bytes, list[str]]:
@@ -183,6 +186,12 @@ def generate_extraction_pdf(
 # --------------------------------------------------------------------------- #
 
 _MD_LINK_RE = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
+# Triple-marker (bold-italic) must come *before* the bold pattern; otherwise
+# `\*\*(.+?)\*\*` pulls a leading `*` into the bold body and the leftover stray
+# `*`s pair with the closing `*` across the `</b>`, producing mis-nested tags
+# like `<b><i>x</b></i>` that crash reportlab's paraparser.
+_MD_BOLD_ITALIC_RE = re.compile(r"\*\*\*(.+?)\*\*\*")
+_MD_UNDERSCORE_BOLD_ITALIC_RE = re.compile(r"___(.+?)___")
 _MD_BOLD_RE = re.compile(r"\*\*(.+?)\*\*")
 _MD_ITALIC_RE = re.compile(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)")
 _MD_UNDERSCORE_BOLD_RE = re.compile(r"__(.+?)__")
@@ -246,11 +255,31 @@ def _format_inline(text: str) -> str:
     text = _MD_CODE_RE.sub(
         r'<font face="Courier" backColor="#f3f4f6">\1</font>', text
     )
+    # Triple markers before double, so `***x***` becomes properly nested
+    # `<b><i>x</i></b>` instead of malformed `<b><i>x</b></i>`.
+    text = _MD_BOLD_ITALIC_RE.sub(r"<b><i>\1</i></b>", text)
+    text = _MD_UNDERSCORE_BOLD_ITALIC_RE.sub(r"<b><i>\1</i></b>", text)
     text = _MD_BOLD_RE.sub(r"<b>\1</b>", text)
     text = _MD_UNDERSCORE_BOLD_RE.sub(r"<b>\1</b>", text)
     text = _MD_ITALIC_RE.sub(r"<i>\1</i>", text)
     text = _MD_UNDERSCORE_ITALIC_RE.sub(r"<i>\1</i>", text)
     return text
+
+
+def _safe_paragraph(raw: str, style, **kwargs):
+    """Build a Paragraph from a markdown string, falling back to escaped text.
+
+    Reportlab's paraparser raises ValueError on malformed mini-HTML (e.g. tags
+    closed in the wrong order). When that happens we'd rather lose the
+    formatting on one line than 500 the entire PDF download.
+    """
+    from reportlab.platypus import Paragraph
+
+    try:
+        return Paragraph(_format_inline(raw), style, **kwargs)
+    except ValueError:
+        logger.warning("PDF inline-markdown parse failed; falling back to plain text", exc_info=True)
+        return Paragraph(_xml_escape(raw), style, **kwargs)
 
 
 def _styles() -> dict:
@@ -437,7 +466,7 @@ def _split_table_row(line: str) -> list[str]:
 
 
 def _build_table_flowable(headers: list[str], rows: list[list[str]], styles: dict, usable_width: float):
-    from reportlab.platypus import Paragraph, Table, TableStyle
+    from reportlab.platypus import Table, TableStyle
     from reportlab.lib import colors
 
     col_count = max(len(headers), max((len(r) for r in rows), default=0)) or 1
@@ -461,9 +490,9 @@ def _build_table_flowable(headers: list[str], rows: list[list[str]], styles: dic
         scale = usable_width / width_sum
         col_widths = [w * scale for w in col_widths]
 
-    data = [[Paragraph(_format_inline(h), styles["table_header"]) for h in headers]]
+    data = [[_safe_paragraph(h, styles["table_header"]) for h in headers]]
     for row in rows:
-        data.append([Paragraph(_format_inline(cell), styles["table_cell"]) for cell in row])
+        data.append([_safe_paragraph(cell, styles["table_cell"]) for cell in row])
 
     table = Table(data, colWidths=col_widths, repeatRows=1)
     row_count = len(data)
@@ -548,7 +577,7 @@ def _markdown_to_story(text: str, styles: dict, usable_width: float) -> list:
         heading = _MD_HEADING_RE.match(line)
         if heading:
             level = len(heading.group(1))
-            story.append(Paragraph(_format_inline(heading.group(2).strip()), _heading_style(level, styles)))
+            story.append(_safe_paragraph(heading.group(2).strip(), _heading_style(level, styles)))
             i += 1
             continue
 
@@ -561,8 +590,13 @@ def _markdown_to_story(text: str, styles: dict, usable_width: float) -> list:
                     break
                 quote_lines.append(m.group(1))
                 i += 1
-            quote_html = "<br/>".join(_format_inline(q) for q in quote_lines)
-            story.append(Paragraph(quote_html, styles["blockquote"]))
+            try:
+                quote_html = "<br/>".join(_format_inline(q) for q in quote_lines)
+                story.append(Paragraph(quote_html, styles["blockquote"]))
+            except ValueError:
+                logger.warning("PDF blockquote inline parse failed; falling back to plain text", exc_info=True)
+                quote_html = "<br/>".join(_xml_escape(q) for q in quote_lines)
+                story.append(Paragraph(quote_html, styles["blockquote"]))
             continue
 
         # Bullet list
@@ -571,7 +605,7 @@ def _markdown_to_story(text: str, styles: dict, usable_width: float) -> list:
             indent = len(bullet.group(1).expandtabs(4))
             nested = indent >= 2
             style = styles["bullet_nested"] if nested else styles["bullet"]
-            story.append(Paragraph(_format_inline(bullet.group(2).strip()), style, bulletText="•"))
+            story.append(_safe_paragraph(bullet.group(2).strip(), style, bulletText="•"))
             i += 1
             continue
 
@@ -582,7 +616,7 @@ def _markdown_to_story(text: str, styles: dict, usable_width: float) -> list:
             nested = indent >= 2
             style = styles["bullet_nested"] if nested else styles["bullet"]
             bullet_text = f"{numbered.group(2)}."
-            story.append(Paragraph(_format_inline(numbered.group(3).strip()), style, bulletText=bullet_text))
+            story.append(_safe_paragraph(numbered.group(3).strip(), style, bulletText=bullet_text))
             i += 1
             continue
 
@@ -607,7 +641,7 @@ def _markdown_to_story(text: str, styles: dict, usable_width: float) -> list:
             para_lines.append(nxt)
             i += 1
         joined = " ".join(para_lines)
-        story.append(Paragraph(_format_inline(joined), styles["body"]))
+        story.append(_safe_paragraph(joined, styles["body"]))
 
     return story
 
@@ -653,16 +687,16 @@ def _kv_table_flowable(data: dict, styles: dict, usable_width: float):
             v_text = "" if v is None else str(v)
         rows.append([str(k), v_text])
     # Use fixed proportional widths for a more report-like look (30% / 70%).
-    from reportlab.platypus import Paragraph, Table, TableStyle
+    from reportlab.platypus import Table, TableStyle
     from reportlab.lib import colors
 
     data_rows = [
-        [Paragraph(_format_inline(h), styles["table_header"]) for h in headers]
+        [_safe_paragraph(h, styles["table_header"]) for h in headers]
     ]
     for k, v_text in rows:
         data_rows.append([
-            Paragraph(_format_inline(str(k)), styles["table_cell"]),
-            Paragraph(_format_inline(v_text), styles["table_cell"]),
+            _safe_paragraph(str(k), styles["table_cell"]),
+            _safe_paragraph(v_text, styles["table_cell"]),
         ])
 
     col_widths = [usable_width * 0.3, usable_width * 0.7]

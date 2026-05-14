@@ -11,6 +11,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from app.services.pdf_service import (
+    _format_inline,
     _normalize_for_pdf,
     generate_extraction_pdf,
     generate_fillable_template,
@@ -110,5 +111,29 @@ class TestNormalizeForPdf:
     def test_workflow_pdf_handles_non_breaking_hyphens(self):
         # End-to-end smoke test for the bug being fixed.
         md = "• Be a non‑expert\n• Drive cross‑functional teams"
+        pdf = render_workflow_pdf(md, title="Workflow Results")
+        assert pdf.startswith(b"%PDF-")
+
+
+class TestFormatInline:
+    def test_triple_asterisk_produces_nested_bold_italic(self):
+        # The bug: bold regex would non-greedily consume one leading `*`,
+        # leaving stray `*`s that the italic regex paired *across* `</b>`,
+        # producing `<b><i>x</b></i>` and crashing reportlab.
+        assert _format_inline("***REQUIRED Components***") == "<b><i>REQUIRED Components</i></b>"
+
+    def test_triple_underscore_produces_nested_bold_italic(self):
+        assert _format_inline("___emphasis___") == "<b><i>emphasis</i></b>"
+
+    def test_double_asterisk_still_renders_bold(self):
+        assert _format_inline("**bold**") == "<b>bold</b>"
+
+    def test_single_asterisk_still_renders_italic(self):
+        assert _format_inline("*italic*") == "<i>italic</i>"
+
+    def test_workflow_pdf_with_triple_asterisk_markdown_does_not_crash(self):
+        # Regression: production crash on `***REQUIRED Components***` from
+        # an LLM extraction output. Should render cleanly now.
+        md = "**DATES**\n\n***REQUIRED Components***\n\nMore body text."
         pdf = render_workflow_pdf(md, title="Workflow Results")
         assert pdf.startswith(b"%PDF-")
