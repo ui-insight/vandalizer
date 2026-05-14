@@ -86,6 +86,12 @@ ci: backend-ci frontend-ci
 
 docker-build:
 	docker build -t vandalizer-backend ./backend
-	docker build -t vandalizer-frontend ./frontend
+	# Forward Sentry build-args from the shell. Unset vars expand to empty,
+	# which makes initSentry() a no-op (matches the no-DSN dev case).
+	docker build \
+		--build-arg VITE_SENTRY_DSN="$$VITE_SENTRY_DSN" \
+		--build-arg VITE_SENTRY_ENVIRONMENT="$$VITE_SENTRY_ENVIRONMENT" \
+		--build-arg VITE_SENTRY_RELEASE="$$VITE_SENTRY_RELEASE" \
+		-t vandalizer-frontend ./frontend
 
 release-check: backend-static ci docker-build
