@@ -3373,7 +3373,8 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
               Data Sources
             </div>
             <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
-              Pick one or more. When multiple are selected, the LLM sees each in a labeled section.
+              Pick one or more. Multiple selections are combined in labeled sections — e.g.,
+              check Step Input + Workflow Documents to give this step both the prior output and the original documents.
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {/* Step Input */}
@@ -3391,7 +3392,8 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#202124' }}>Step Input</div>
                   <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                    Use the output from the previous step as input for this task.
+                    Only the output of the immediately previous step — no documents, no earlier
+                    steps. Pair with another source to also include document context.
                   </div>
                 </div>
               </label>
@@ -3411,7 +3413,8 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#202124' }}>Select a Document</div>
                   <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                    Choose a specific document to use as input.
+                    A single document pinned to this step now — used every run, regardless of
+                    what triggered the workflow.
                   </div>
                   {wantsSelectDocument && (
                     <div style={{ marginTop: 8, position: 'relative' }}>
@@ -3498,7 +3501,8 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#202124' }}>Workflow Documents</div>
                   <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                    Use the documents selected when the workflow runs, plus any fixed documents.
+                    The documents the workflow was triggered with this run, plus any fixed
+                    documents pinned below at the workflow level.
                   </div>
 
                   {wantsWorkflowDocs && (
