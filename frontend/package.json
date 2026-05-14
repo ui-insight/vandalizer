@@ -15,7 +15,7 @@
     "ci": "npm run typecheck && npm run lint && npm run test:coverage -- --coverage.thresholds.lines=40 && npm run build"
   },
   "dependencies": {
-    "@sentry/react": "^10.50.0",
+    "@sentry/react": "^10.53.1",
     "@tailwindcss/vite": "^4.2.4",
     "@tanstack/react-query": "^5.99.0",
     "@tanstack/react-router": "^1.169.2",
