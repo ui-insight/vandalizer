@@ -65,10 +65,24 @@ def process_pending_triggers(self) -> dict:
                 )
                 continue
 
-            # Check folder watch enabled (for folder_watch triggers)
+            # Check folder watch enabled (for folder_watch triggers).
+            # New automation-driven flow gates on automation.enabled; legacy
+            # workflow-driven flow gates on workflow.input_config.folder_watch.enabled.
             if event.get("trigger_type") == "folder_watch":
                 fw_cfg = (workflow.get("input_config") or {}).get("folder_watch", {})
-                if not fw_cfg.get("enabled"):
+                automation_id = (event.get("trigger_context") or {}).get("automation_id")
+
+                if automation_id:
+                    auto_doc = None
+                    try:
+                        auto_doc = db.automation.find_one({"_id": ObjectId(automation_id)})
+                    except Exception:
+                        auto_doc = None
+                    fw_enabled = bool(auto_doc and auto_doc.get("enabled"))
+                else:
+                    fw_enabled = bool(fw_cfg.get("enabled"))
+
+                if not fw_enabled:
                     db.workflow_trigger_event.update_one(
                         {"_id": event["_id"]},
                         {"$set": {"status": "skipped", "error": "Folder watch disabled"}},
@@ -571,22 +585,33 @@ def process_outputs(self, workflow_result_id: str) -> dict:
     if not workflow:
         return {"error": "Workflow not found"}
 
-    output_config = workflow.get("output_config") or {}
-
-    # Override with automation output_config if an enabled automation targets this workflow
-    automation = db.automation.find_one({
-        "action_type": "workflow",
-        "action_id": str(workflow["_id"]),
-        "enabled": True,
-    })
-    if automation and automation.get("output_config"):
-        output_config = automation["output_config"]
-
     # Find associated trigger event and work item
     work_item = None
     trigger_event = db.workflow_trigger_event.find_one({"workflow_result": result_doc["_id"]})
     if trigger_event:
         work_item = db.work_items.find_one({"trigger_event": trigger_event["_id"]})
+
+    # Resolve output_config. Prefer the specific automation that produced this
+    # run (carried on trigger_context.automation_id) — using a workflow-wide
+    # find_one would arbitrarily pick among multiple automations that share
+    # the same workflow (e.g. folder_watch + api).
+    output_config = workflow.get("output_config") or {}
+
+    automation = None
+    automation_id = (trigger_event.get("trigger_context") or {}).get("automation_id") if trigger_event else None
+    if automation_id:
+        try:
+            automation = db.automation.find_one({"_id": ObjectId(automation_id)})
+        except Exception:
+            automation = None
+    if not automation:
+        automation = db.automation.find_one({
+            "action_type": "workflow",
+            "action_id": str(workflow["_id"]),
+            "enabled": True,
+        })
+    if automation and automation.get("output_config"):
+        output_config = automation["output_config"]
 
     outputs = {"storage": None, "onedrive": None, "notifications": [], "webhooks": [], "chains": []}
 
