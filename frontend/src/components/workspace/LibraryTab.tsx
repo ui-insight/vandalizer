@@ -599,7 +599,7 @@ export function LibraryTab() {
         <div style={{ display: scope === 'explore' ? 'none' : 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingBottom: 2 }}>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             {([
-              { value: 'all' as const, label: 'All Types' },
+              { value: 'all' as const, label: 'All' },
               { value: 'workflow' as const, label: 'Workflows' },
               { value: 'search_set' as const, label: 'Tasks' },
             ]).map(({ value, label }) => {
