@@ -165,6 +165,12 @@ class TestRequireMgmtScope:
                     count=AsyncMock(return_value=0),
                     distinct=AsyncMock(return_value=[]),
                 ))
+            # /stats now sums token_count via a Beanie aggregation rather than
+            # materializing every document — older stub records in prod can be
+            # missing required SmartDocument fields and trip Beanie validation.
+            MockDoc.aggregate = MagicMock(return_value=MagicMock(
+                to_list=AsyncMock(return_value=[]),
+            ))
             resp = await client.get(
                 "/api/mgmt/v1/stats",
                 headers={"X-API-Key": "vk_live_wildcard"},
@@ -176,6 +182,51 @@ class TestRequireMgmtScope:
         body = resp.json()
         assert body["users_total"] == 0
         assert "generated_at" in body
+
+    @pytest.mark.asyncio
+    async def test_stats_uses_aggregation_for_token_sum(self, client):
+        """The token-bytes total comes from a MongoDB aggregation, not from
+        materializing every SmartDocument. Regression for Sentry 7479098685:
+        legacy stub records missing required fields would otherwise crash the
+        endpoint with Beanie ValidationError."""
+        wildcard = _make_key(scopes=["*"])
+        with (
+            patch("app.dependencies.ApiKey") as MockKey,
+            patch("app.dependencies.audit_service.log_event", new_callable=AsyncMock),
+            patch("app.routers.mgmt.User") as MockUser,
+            patch("app.routers.mgmt.Team") as MockTeam,
+            patch("app.routers.mgmt.SmartDocument") as MockDoc,
+            patch("app.routers.mgmt.Workflow") as MockWorkflow,
+            patch("app.routers.mgmt.WorkflowResult") as MockWR,
+            patch("app.routers.mgmt.ActivityEvent") as MockAct,
+        ):
+            MockKey.find_one = AsyncMock(return_value=wildcard)
+            for M in (MockUser, MockTeam, MockDoc, MockWorkflow, MockWR, MockAct):
+                M.find_all = MagicMock(return_value=MagicMock(
+                    count=AsyncMock(return_value=0),
+                    to_list=AsyncMock(return_value=[]),
+                ))
+                M.find = MagicMock(return_value=MagicMock(
+                    count=AsyncMock(return_value=0),
+                    distinct=AsyncMock(return_value=[]),
+                ))
+            aggregate_mock = MagicMock(return_value=MagicMock(
+                to_list=AsyncMock(return_value=[{"_id": None, "total_tokens": 1_000_000}]),
+            ))
+            MockDoc.aggregate = aggregate_mock
+
+            resp = await client.get(
+                "/api/mgmt/v1/stats",
+                headers={"X-API-Key": "vk_live_wildcard"},
+            )
+
+        assert resp.status_code == 200
+        # The endpoint asked Mongo to sum token_count, not Python.
+        aggregate_mock.assert_called_once()
+        pipeline = aggregate_mock.call_args.args[0]
+        assert pipeline == [{"$group": {"_id": None, "total_tokens": {"$sum": "$token_count"}}}]
+        # 1M tokens * 4 bytes/token = 4M bytes.
+        assert resp.json()["documents_size_bytes_total"] == 4_000_000
 
 
 # ---------------------------------------------------------------------------
