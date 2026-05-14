@@ -50,7 +50,7 @@
     "globals": "^16.5.0",
     "jsdom": "^29.1.0",
     "typescript": "~5.9.3",
-    "typescript-eslint": "^8.48.0",
+    "typescript-eslint": "^8.59.3",
     "vite": "^8.0.8",
     "vitest": "^4.1.0"
   }
