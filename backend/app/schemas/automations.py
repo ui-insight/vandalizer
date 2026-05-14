@@ -47,14 +47,15 @@ class UpdateAutomationRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_trigger_config(self) -> "UpdateAutomationRequest":
-        if self.trigger_type == "schedule":
-            cfg = self.trigger_config or {}
-            if not cfg.get("cron_expression"):
-                raise ValueError("Schedule trigger requires 'cron_expression' in trigger_config")
-        if self.trigger_type == "folder_watch":
-            cfg = self.trigger_config or {}
-            if not cfg.get("folder_id"):
-                raise ValueError("Folder watch trigger requires 'folder_id' in trigger_config")
+        # Only enforce required fields when the caller actually provides config.
+        # Switching trigger_type with an empty trigger_config is the first step of a
+        # two-step UI flow: pick the new type, then fill in its required fields.
+        if not self.trigger_config:
+            return self
+        if self.trigger_type == "schedule" and not self.trigger_config.get("cron_expression"):
+            raise ValueError("Schedule trigger requires 'cron_expression' in trigger_config")
+        if self.trigger_type == "folder_watch" and not self.trigger_config.get("folder_id"):
+            raise ValueError("Folder watch trigger requires 'folder_id' in trigger_config")
         return self
 
 
