@@ -215,7 +215,7 @@ export interface SystemConfigData {
   quality_config: Record<string, unknown>
   auth_methods: string[]
   oauth_providers: Record<string, unknown>[]
-  available_models: { name: string; tag: string; external: boolean; thinking: boolean; endpoint?: string; api_protocol?: string; api_key?: string; speed?: string; tier?: string; privacy?: string; supports_structured?: boolean; multimodal?: boolean; supports_pdf?: boolean }[]
+  available_models: { name: string; tag: string; external: boolean; thinking: boolean; endpoint?: string; api_protocol?: string; api_key?: string; speed?: string; tier?: string; privacy?: string; supports_structured?: boolean; multimodal?: boolean; supports_pdf?: boolean; context_window?: number }[]
   default_model: string
   ocr_endpoint: string
   ocr_api_key: string
@@ -292,16 +292,53 @@ export function updateUserRoles(userId: string, roles: { is_admin?: boolean; is_
 
 // Models
 
-export function addModel(data: { name: string; tag: string; external?: boolean; thinking?: boolean; endpoint?: string; api_protocol?: string; api_key?: string; speed?: string; tier?: string; privacy?: string; supports_structured?: boolean; multimodal?: boolean; supports_pdf?: boolean }) {
+export type ModelFormData = {
+  name: string
+  tag: string
+  external?: boolean
+  thinking?: boolean
+  endpoint?: string
+  api_protocol?: string
+  api_key?: string
+  speed?: string
+  tier?: string
+  privacy?: string
+  supports_structured?: boolean
+  multimodal?: boolean
+  supports_pdf?: boolean
+  context_window?: number
+}
+
+export function addModel(data: ModelFormData) {
   return apiFetch<{ status: string; models: SystemConfigData['available_models'] }>('/api/admin/config/models', {
     method: 'POST',
     body: JSON.stringify(data),
   })
 }
 
-export function updateModel(index: number, data: { name: string; tag: string; external?: boolean; thinking?: boolean; endpoint?: string; api_protocol?: string; api_key?: string; speed?: string; tier?: string; privacy?: string; supports_structured?: boolean; multimodal?: boolean; supports_pdf?: boolean }) {
+export function updateModel(index: number, data: ModelFormData) {
   return apiFetch<{ status: string; models: SystemConfigData['available_models'] }>(`/api/admin/config/models/${index}`, {
     method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export type ProbeModelResult = {
+  context_window: number | null
+  source: string
+  detail: string | null
+  raw: Record<string, unknown> | null
+}
+
+export function probeModel(data: {
+  name: string
+  endpoint?: string
+  api_protocol?: string
+  api_key?: string
+  existing_model_index?: number | null
+}) {
+  return apiFetch<ProbeModelResult>('/api/admin/config/probe-model', {
+    method: 'POST',
     body: JSON.stringify(data),
   })
 }

@@ -267,7 +267,7 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
 
         # Resolve the actual model config so context_window override is honored.
         model_cfg = None
-        for m in (sys_config.get("llm_models") or []):
+        for m in (sys_config.get("available_models") or []):
             if m.get("name") == model:
                 model_cfg = m
                 break

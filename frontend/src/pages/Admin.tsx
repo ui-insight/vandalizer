@@ -23,7 +23,7 @@ import {
   getUsageStats, getUsageTimeseries, getUserLeaderboard, getTeamLeaderboard,
   getTeamDetail, getUserDetail,
   getWorkflowEvents, getSystemConfig, updateSystemConfig, updateCompliancePolicyConfig,
-  addModel, updateModel, deleteModel, setDefaultModel, testOcr, testModel, addOAuthProvider,
+  addModel, updateModel, deleteModel, setDefaultModel, testOcr, testModel, probeModel, addOAuthProvider,
   updateOAuthProvider, deleteOAuthProvider, updateAuthMethods,
   getQualitySummary, getQualityTimeline, runRegressionSuite,
   getQualityAlerts, acknowledgeAlert, getQualityItems, getQualityItemDetail,
@@ -2344,7 +2344,9 @@ function ConfigTab() {
   const [showModelForm, setShowModelForm] = useState(false)
   const [editingModelIndex, setEditingModelIndex] = useState<number | null>(null)
   const [savingModel, setSavingModel] = useState(false)
-  const [newModel, setNewModel] = useState({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '', speed: '', tier: '', privacy: '', supports_structured: true, multimodal: false, supports_pdf: false })
+  const [newModel, setNewModel] = useState({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '', speed: '', tier: '', privacy: '', supports_structured: true, multimodal: false, supports_pdf: false, context_window: 128000 })
+  const [probingContext, setProbingContext] = useState(false)
+  const [probeResult, setProbeResult] = useState<{ ok: boolean; message: string } | null>(null)
 
   // Support contacts
   const [supportContacts, setSupportContacts] = useState<{ user_id: string; email: string; name: string }[]>([])
@@ -2497,6 +2499,30 @@ function ConfigTab() {
     }
   }
 
+  const handleProbeContextWindow = async () => {
+    setProbingContext(true)
+    setProbeResult(null)
+    try {
+      const result = await probeModel({
+        name: newModel.name,
+        endpoint: newModel.endpoint,
+        api_protocol: newModel.api_protocol,
+        api_key: newModel.api_key,
+        existing_model_index: editingModelIndex,
+      })
+      if (result.context_window && result.context_window > 0) {
+        setNewModel(prev => ({ ...prev, context_window: result.context_window as number }))
+        setProbeResult({ ok: true, message: `Detected ${result.context_window.toLocaleString()} tokens (${result.source}).` })
+      } else {
+        setProbeResult({ ok: false, message: result.detail || `No context length reported (${result.source}).` })
+      }
+    } catch (e) {
+      setProbeResult({ ok: false, message: e instanceof Error ? e.message : 'Probe failed' })
+    } finally {
+      setProbingContext(false)
+    }
+  }
+
   const handleSaveModel = async () => {
     if (!newModel.name.trim()) {
       setError('Model name is required')
@@ -2523,7 +2549,8 @@ function ConfigTab() {
           ...(resDefault !== undefined ? { default_model: resDefault } : {}),
         })
       }
-      setNewModel({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '', speed: '', tier: '', privacy: '', supports_structured: true, multimodal: false, supports_pdf: false })
+      setNewModel({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '', speed: '', tier: '', privacy: '', supports_structured: true, multimodal: false, supports_pdf: false, context_window: 128000 })
+      setProbeResult(null)
       setShowModelForm(false)
       setEditingModelIndex(null)
     } catch (e) {
@@ -2550,7 +2577,9 @@ function ConfigTab() {
       supports_structured: m.supports_structured !== false,
       multimodal: !!m.multimodal,
       supports_pdf: !!m.supports_pdf,
+      context_window: typeof m.context_window === 'number' && m.context_window > 0 ? m.context_window : 128000,
     })
+    setProbeResult(null)
     setEditingModelIndex(index)
     setShowModelForm(true)
   }
@@ -2762,7 +2791,8 @@ function ConfigTab() {
           <div style={{ flex: 1 }} />
           <button
             onClick={() => {
-              setNewModel({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '', speed: '', tier: '', privacy: '', supports_structured: true, multimodal: false, supports_pdf: false })
+              setNewModel({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '', speed: '', tier: '', privacy: '', supports_structured: true, multimodal: false, supports_pdf: false, context_window: 128000 })
+              setProbeResult(null)
               setEditingModelIndex(null)
               setShowModelForm(!showModelForm)
             }}
@@ -2925,6 +2955,51 @@ function ConfigTab() {
                     <option value="external">External</option>
                   </select>
                 </div>
+              </div>
+              <div style={{ marginTop: 12 }}>
+                <label style={labelStyle}>Context Window (tokens)</label>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
+                  <input
+                    type="number"
+                    min={1}
+                    value={newModel.context_window}
+                    onChange={e => {
+                      const v = parseInt(e.target.value, 10)
+                      setNewModel(prev => ({ ...prev, context_window: Number.isFinite(v) && v > 0 ? v : 0 }))
+                      setProbeResult(null)
+                    }}
+                    placeholder="e.g. 65536"
+                    style={{ ...inputStyle, flex: 1 }}
+                  />
+                  <button
+                    onClick={handleProbeContextWindow}
+                    disabled={probingContext || !newModel.name.trim()}
+                    title="Ask the endpoint what context window it actually serves. Catches the case where the model card says 131k but the deployment was launched with a smaller --max-model-len."
+                    style={{
+                      padding: '0 14px', borderRadius: 'var(--ui-radius, 12px)',
+                      border: '1px solid #d1d5db', background: '#fff', fontSize: 13,
+                      cursor: probingContext || !newModel.name.trim() ? 'not-allowed' : 'pointer',
+                      opacity: probingContext || !newModel.name.trim() ? 0.6 : 1,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {probingContext ? 'Probing…' : 'Probe endpoint'}
+                  </button>
+                </div>
+                <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+                  The serving cap (e.g. vLLM&rsquo;s <code>--max-model-len</code>), not the model card&rsquo;s theoretical max. Compaction and the oversize-doc check use this to decide what fits.
+                </div>
+                {probeResult && (
+                  <div style={{
+                    marginTop: 6, padding: '6px 10px', borderRadius: 'var(--ui-radius, 12px)',
+                    background: probeResult.ok ? '#ecfdf5' : '#fef3c7',
+                    border: `1px solid ${probeResult.ok ? '#a7f3d0' : '#fcd34d'}`,
+                    color: probeResult.ok ? '#065f46' : '#92400e',
+                    fontSize: 12,
+                  }}>
+                    {probeResult.message}
+                  </div>
+                )}
               </div>
               <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
                 <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, cursor: 'pointer' }}>
