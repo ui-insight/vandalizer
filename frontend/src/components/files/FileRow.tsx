@@ -1,4 +1,4 @@
-import { Loader2, MoreHorizontal, AlertTriangle, Shield } from 'lucide-react'
+import { Loader2, MoreHorizontal, AlertTriangle, Shield, AlertCircle } from 'lucide-react'
 import type { Document } from '../../types/document'
 import { formatFileDate } from '../../utils/time'
 
@@ -85,6 +85,15 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
               }
             >
               <AlertTriangle className="h-4 w-4 text-red-500" />
+            </span>
+          ) : doc.ingest_error ? (
+            <span
+              className="shrink-0 mr-2.5 inline-flex items-center"
+              role="img"
+              aria-label={`Could not index this document for search: ${doc.ingest_error}. Chat and Knowledge Base retrieval will not work.`}
+              title={`Could not index this document for search: ${doc.ingest_error}. Chat and Knowledge Base retrieval will not work.`}
+            >
+              <AlertCircle className="h-4 w-4 text-amber-500" />
             </span>
           ) : null}
           <div style={{ minWidth: 0, flex: 1 }}>

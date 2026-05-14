@@ -1103,12 +1103,35 @@ class KnowledgeBaseQueryNode(Node):
 
         # Format as plain text context block so downstream LLM steps can use it naturally
         parts = []
+        sources: list[dict] = []
         for i, r in enumerate(results, 1):
-            source = r["metadata"].get("source_name", "Unknown source")
-            parts.append(f"[{i}] {source}\n{r['content']}")
+            meta = r.get("metadata") or {}
+            source_name = meta.get("source_name", "Unknown source")
+            page = meta.get("page")
+            sheet = meta.get("sheet")
+            label = source_name
+            if isinstance(page, int):
+                label = f"{source_name} · p. {page}"
+            elif isinstance(sheet, str) and sheet:
+                label = f"{source_name} · {sheet}"
+            parts.append(f"[{i}] {label}\n{r['content']}")
+            sources.append({
+                "document_id": meta.get("source_id"),
+                "document_title": source_name,
+                "page": page if isinstance(page, int) else None,
+                "sheet": sheet if isinstance(sheet, str) else None,
+                "chunk_id": r.get("chunk_id"),
+                "score": r.get("score"),
+                "content_preview": (r.get("content") or "")[:240],
+            })
 
         output = "\n\n---\n\n".join(parts)
-        return {"output": output, "input": inputs.get("output"), "step_name": self.name}
+        return {
+            "output": output,
+            "input": inputs.get("output"),
+            "step_name": self.name,
+            "retrieved_sources": sources,
+        }
 
 
 # ---------------------------------------------------------------------------
@@ -1182,11 +1205,15 @@ class WorkflowEngine:
                     "num_steps_completed": idx,
                 })
 
-            data.append({
+            entry = {
                 "name": node.name,
                 "output": latest_output.get("output"),
                 "input": latest_output.get("input"),
-            })
+            }
+            sources = latest_output.get("retrieved_sources")
+            if isinstance(sources, list) and sources:
+                entry["retrieved_sources"] = sources
+            data.append(entry)
 
         if latest_output is None:
             return None, data

@@ -879,6 +879,7 @@ async def _ingest_document_source(source: KnowledgeBaseSource, kb: KnowledgeBase
         dm = _get_dm()
         chunk_count = await asyncio.to_thread(
             dm.add_to_kb, kb.uuid, source.uuid, doc.title, doc.raw_text,
+            list(doc.text_markers or []),
         )
         source.chunk_count = chunk_count
         source.status = "ready"

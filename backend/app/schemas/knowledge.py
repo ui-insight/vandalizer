@@ -21,6 +21,15 @@ class AddDocumentsRequest(BaseModel):
     document_uuids: list[str]
 
 
+class ConvertDocumentsRequest(BaseModel):
+    """Wrap one or more SmartDocuments in a new KB so they can be retrieved
+    instead of inlined. Used by the chat / workflow "Convert to Knowledge
+    Base" affordance shown when a doc is too large for the current model.
+    """
+    document_uuids: list[str]
+    title: Optional[str] = None  # defaults to the first doc's title
+
+
 class ShareKBRequest(BaseModel):
     comment: Optional[str] = None
 

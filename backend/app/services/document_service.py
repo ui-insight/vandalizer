@@ -103,6 +103,9 @@ async def list_contents(
                 "classified_by": d.classified_by,
                 "retention_hold": d.retention_hold,
                 "soft_deleted": d.soft_deleted,
+                "chromadb_ready": d.chromadb_ready,
+                "chunk_count": d.chunk_count,
+                "ingest_error": d.ingest_error,
             }
             for d in documents
         ],

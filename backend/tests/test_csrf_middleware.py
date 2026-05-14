@@ -130,7 +130,7 @@ class TestCSRFMiddleware:
     async def test_post_to_exempt_path_bypasses_csrf(self, client):
         """POST to an exempt path (e.g., /api/auth/login) does not require CSRF."""
         with patch("app.routers.auth.auth_service") as mock_auth_svc:
-            mock_auth_svc.authenticate = AsyncMock(return_value=None)
+            mock_auth_svc.authenticate_with_reason = AsyncMock(return_value=(None, None))
 
             resp = await client.post(
                 "/api/auth/login",

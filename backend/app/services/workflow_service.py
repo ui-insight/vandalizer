@@ -512,6 +512,9 @@ async def get_workflow_status(session_id: str, user: User | None = None) -> dict
         "steps_output": result.steps_output,
         "output_step_names": result.output_step_names,
         "approval_request_id": result.approval_request_id,
+        "error": result.error,
+        "error_payload": result.error_payload,
+        "retrieved_sources": result.retrieved_sources,
         "workflow_name": workflow_name,
         "document_title": result.document_title,
     }

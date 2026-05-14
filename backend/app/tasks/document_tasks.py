@@ -44,7 +44,6 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
         convert_to_markdown,
         extract_docx_extras,
         extract_text_from_file,
-        extract_text_from_xlsx,
         remove_images_from_markdown,
     )
 
@@ -69,9 +68,11 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
         )
 
         raw_text = ""
+        text_markers: list[dict] = []
 
         if extension == "xlsx":
-            raw_text = extract_text_from_xlsx(str(absolute_path))
+            from app.services.document_readers import extract_text_with_markers
+            raw_text, text_markers = extract_text_with_markers(str(absolute_path), extension)
 
         elif extension == "xls":
             raw_text = convert_to_markdown(str(absolute_path))
@@ -90,11 +91,17 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
                 if extras:
                     raw_text = (raw_text or "").rstrip() + "\n\n" + extras
 
+        elif extension == "pdf":
+            from app.services.document_readers import extract_text_with_markers
+            raw_text, text_markers = extract_text_with_markers(str(absolute_path), extension)
+
         else:
             raw_text = extract_text_from_file(str(absolute_path), extension)
 
-        # Count tokens (rough estimate: ~4 chars per token)
-        token_count = len(raw_text) // 4 if raw_text else 0
+        # Count tokens using the same tokenizer the budget planner uses so the
+        # pre-flight oversize check is accurate.
+        from app.services.context_budget import count_tokens
+        token_count = count_tokens(raw_text) if raw_text else 0
 
         db.smart_document.update_one(
             {"uuid": document_uuid},
@@ -103,6 +110,7 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
                     "raw_text": raw_text,
                     "processing": False,
                     "token_count": token_count,
+                    "text_markers": text_markers,
                 }
             },
         )
@@ -386,7 +394,11 @@ def cleanup_document(self, document_uuid: str) -> None:
     default_retry_delay=5,
 )
 def perform_semantic_ingestion(self, raw_text: str, document_uuid: str, user_id: str) -> str:
-    """Chunk text and embed into ChromaDB for RAG search."""
+    """Chunk text and embed into ChromaDB for RAG search.
+
+    Writes back ``chromadb_ready`` / ``chunk_count`` / ``ingest_error`` so the
+    frontend can show a meaningful retrieval state on the document.
+    """
 
     from app.services.document_manager import DocumentManager
 
@@ -401,21 +413,49 @@ def perform_semantic_ingestion(self, raw_text: str, document_uuid: str, user_id:
         {"$set": {"task_status": "readying"}},
     )
 
+    # If the caller passed empty raw_text, fall back to whatever the
+    # extraction task already wrote to the DB.
+    text = raw_text or doc.get("raw_text", "") or ""
+    markers = doc.get("text_markers") or []
+
     from app.config import Settings
 
     settings = Settings()
-    dm = DocumentManager(persist_directory=settings.chromadb_persist_dir)
-    dm.add_document(
-        user_id=user_id,
-        document_name=doc.get("title", ""),
-        document_id=document_uuid,
-        doc_path=doc.get("path", ""),
-        raw_text=raw_text,
-    )
+    try:
+        dm = DocumentManager(persist_directory=settings.chromadb_persist_dir)
+        chunk_count = dm.add_document(
+            user_id=user_id,
+            document_name=doc.get("title", ""),
+            document_id=document_uuid,
+            doc_path=doc.get("path", ""),
+            raw_text=text,
+            text_markers=markers,
+        )
+    except Exception as e:
+        logger.exception("Semantic ingestion failed for %s", document_uuid)
+        db.smart_document.update_one(
+            {"uuid": document_uuid},
+            {
+                "$set": {
+                    "task_status": "complete",
+                    "chromadb_ready": False,
+                    "chunk_count": 0,
+                    "ingest_error": str(e)[:500],
+                }
+            },
+        )
+        raise
 
     db.smart_document.update_one(
         {"uuid": document_uuid},
-        {"$set": {"task_status": "complete"}},
+        {
+            "$set": {
+                "task_status": "complete",
+                "chromadb_ready": chunk_count > 0,
+                "chunk_count": chunk_count,
+                "ingest_error": None,
+            }
+        },
     )
 
     return document_uuid
