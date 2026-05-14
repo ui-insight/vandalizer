@@ -904,14 +904,22 @@ async def _mark_item_verified(item_id: PydanticObjectId, item_kind: str) -> None
     verified_lib = await get_or_create_verified_library()
     verified_item_ids = set(verified_lib.items) if verified_lib.items else set()
 
-    # Check if this item is already in the verified library
+    # Check if this item is already in the verified library. The submitter's own
+    # LibraryItem is often already attached to the verified library at submission
+    # time but with verified=False — flip it to True rather than silently leaving
+    # it unverified (or creating a duplicate).
     existing_in_verified = await LibraryItem.find(
         {"_id": {"$in": list(verified_item_ids)}},
         {"item_id": item_id, "kind": item_kind},
     ).to_list() if verified_item_ids else []
 
-    if not existing_in_verified:
-        now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.now(datetime.timezone.utc)
+    if existing_in_verified:
+        for li in existing_in_verified:
+            if not li.verified:
+                li.verified = True
+                await li.save()
+    else:
         new_item = LibraryItem(
             item_id=item_id,
             kind=LibraryItemKind(item_kind),
