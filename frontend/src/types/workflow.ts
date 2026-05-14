@@ -79,6 +79,22 @@ export interface Workflow {
   created_by?: AuthorRef | null;
 }
 
+export interface WorkflowErrorPayload {
+  code: string;
+  suggested_action?: 'convert_to_kb';
+  oversize_documents?: Array<{ uuid: string; title: string; token_count: number }>;
+}
+
+export interface WorkflowCitation {
+  document_id?: string | null;
+  document_title: string;
+  page?: number | null;
+  sheet?: string | null;
+  chunk_id?: string | null;
+  score?: number | null;
+  content_preview?: string;
+}
+
 export interface WorkflowStatus {
   status: string;
   num_steps_completed: number;
@@ -90,6 +106,9 @@ export interface WorkflowStatus {
   steps_output: Record<string, unknown> | null;
   output_step_names: string[];
   approval_request_id: string | null;
+  error?: string | null;
+  error_payload?: WorkflowErrorPayload | null;
+  retrieved_sources?: WorkflowCitation[];
 }
 
 export interface ModelInfo {

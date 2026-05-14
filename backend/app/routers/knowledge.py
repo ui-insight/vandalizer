@@ -13,6 +13,7 @@ from app.schemas.knowledge import (
     AddDocumentsRequest,
     AddUrlsRequest,
     AdoptKBRequest,
+    ConvertDocumentsRequest,
     CreateKBRequest,
     ImportKBRequest,
     ImportKBResponse,
@@ -174,6 +175,44 @@ async def create_knowledge_base(req: CreateKBRequest, user: User = Depends(get_c
         title=req.title, user_id=user.user_id,
         team_id=team_id, description=req.description,
     )
+    return _kb_response(kb)
+
+
+@router.post("/convert_documents", response_model=KBResponse)
+async def convert_documents_to_kb(
+    req: ConvertDocumentsRequest, user: User = Depends(get_current_user),
+):
+    """One-click "Convert to Knowledge Base" for oversized documents.
+
+    Creates a new KB with a sensible default title, then attaches the given
+    SmartDocuments via the standard add_documents pipeline. The frontend uses
+    this to recover from a context-over-budget error without making the user
+    navigate to the KB UI.
+    """
+    if not req.document_uuids:
+        raise HTTPException(status_code=400, detail="No documents provided")
+
+    # Pick a default title from the first doc when the client didn't supply one.
+    title = (req.title or "").strip()
+    if not title:
+        from app.models.document import SmartDocument
+
+        first = await SmartDocument.find_one(SmartDocument.uuid == req.document_uuids[0])
+        if first and first.title:
+            title = first.title if len(req.document_uuids) == 1 else f"{first.title} (and {len(req.document_uuids) - 1} more)"
+        else:
+            title = "Reference documents"
+
+    team_id = str(user.current_team) if user.current_team else None
+    kb = await svc.create_knowledge_base(
+        title=title, user_id=user.user_id, team_id=team_id, description=None,
+    )
+    kb.status = "building"
+    await kb.save()
+    try:
+        await svc.add_documents(kb, req.document_uuids, user)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     return _kb_response(kb)
 
 

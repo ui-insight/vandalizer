@@ -228,3 +228,60 @@ def test_last_ditch_trim_handles_multiple_rounds():
     # Should not be fatal — we should have compacted enough to fit.
     assert not result.fatal
     assert result.plan.total_input_tokens <= result.plan.input_budget
+
+
+# ---------------------------------------------------------------------------
+# find_oversize_documents
+# ---------------------------------------------------------------------------
+
+
+def test_find_oversize_documents_flags_giants():
+    from app.services.context_budget import find_oversize_documents
+
+    # A 50k-token doc against a 16k-window model is clearly oversize.
+    docs = [
+        {"uuid": "a", "title": "small.txt", "token_count": 500},
+        {"uuid": "b", "title": "huge.pdf", "token_count": 50_000},
+    ]
+    oversize = find_oversize_documents(
+        documents=docs,
+        model_name="gpt-3.5",  # 16k context per fallback table
+    )
+    assert [o.uuid for o in oversize] == ["b"]
+    assert oversize[0].title == "huge.pdf"
+    assert oversize[0].token_count == 50_000
+
+
+def test_find_oversize_documents_respects_model_config_override():
+    from app.services.context_budget import find_oversize_documents
+
+    docs = [{"uuid": "a", "title": "doc.txt", "token_count": 50_000}]
+    # Override the window to 1M — same doc is now small enough.
+    oversize = find_oversize_documents(
+        documents=docs,
+        model_name="gpt-3.5",
+        model_config={"context_window": 1_000_000},
+    )
+    assert oversize == []
+
+
+def test_find_oversize_documents_sorted_largest_first():
+    from app.services.context_budget import find_oversize_documents
+
+    docs = [
+        {"uuid": "a", "title": "medium", "token_count": 20_000},
+        {"uuid": "b", "title": "huge", "token_count": 80_000},
+        {"uuid": "c", "title": "big", "token_count": 30_000},
+    ]
+    oversize = find_oversize_documents(documents=docs, model_name="gpt-3.5")
+    # All three exceed 16k - 4k reserve - 1k overhead = ~11k; largest first.
+    assert [o.uuid for o in oversize] == ["b", "c", "a"]
+
+
+def test_find_oversize_documents_handles_missing_token_count():
+    from app.services.context_budget import find_oversize_documents
+
+    # Documents with missing/zero token_count should never be flagged.
+    docs = [{"uuid": "a", "title": "no-count"}, {"uuid": "b", "title": "zero", "token_count": 0}]
+    oversize = find_oversize_documents(documents=docs, model_name="gpt-3.5")
+    assert oversize == []

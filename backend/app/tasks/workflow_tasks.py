@@ -234,6 +234,92 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
         allow_code_execution=is_admin,
     )
 
+    # Pre-flight oversize check: refuse the run cleanly when an attached
+    # document's token_count would blow the model's input budget on its own.
+    # The user sees a guided "Convert to Knowledge Base" affordance instead
+    # of a mid-step 400 from the LLM gateway.
+    try:
+        from app.services.context_budget import find_oversize_documents
+
+        attached_uuids: set[str] = set()
+        for step in steps_data:
+            for task in step.get("tasks", []):
+                td = task.get("data", {}) or {}
+                sel = td.get("selected_document_uuid")
+                if sel:
+                    attached_uuids.add(sel)
+            for u in (step.get("data", {}) or {}).get("doc_uuids", []) or []:
+                if u:
+                    attached_uuids.add(u)
+
+        candidate_docs: list[dict] = []
+        for uuid in attached_uuids:
+            d = db.smart_document.find_one(
+                {"uuid": uuid},
+                {"uuid": 1, "title": 1, "token_count": 1},
+            )
+            if d:
+                candidate_docs.append({
+                    "uuid": d.get("uuid"),
+                    "title": d.get("title") or d.get("uuid"),
+                    "token_count": d.get("token_count") or 0,
+                })
+
+        # Resolve the actual model config so context_window override is honored.
+        model_cfg = None
+        for m in (sys_config.get("llm_models") or []):
+            if m.get("name") == model:
+                model_cfg = m
+                break
+
+        oversize = find_oversize_documents(
+            documents=candidate_docs,
+            model_name=model,
+            model_config=model_cfg,
+        )
+        if oversize:
+            titles = ", ".join(o.title for o in oversize[:3])
+            if len(oversize) > 3:
+                titles += f", and {len(oversize) - 3} more"
+            error_msg = (
+                f"{titles} is too large to read inline with the selected model. "
+                "Convert it to a Knowledge Base and use a Knowledge Base Query step instead."
+            )
+            error_payload = {
+                "code": "context_over_budget_convertible",
+                "suggested_action": "convert_to_kb",
+                "oversize_documents": [o.to_dict() for o in oversize],
+            }
+            db.workflow_result.update_one(
+                {"_id": ObjectId(workflow_result_id)},
+                {"$set": {
+                    "status": "error",
+                    "error": error_msg,
+                    "error_payload": error_payload,
+                }},
+            )
+            if activity_id:
+                from datetime import datetime, timezone
+                try:
+                    db.activity_event.update_one(
+                        {"_id": ObjectId(activity_id)},
+                        {"$set": {
+                            "status": "failed",
+                            "error": error_msg[:2000],
+                            "finished_at": datetime.now(timezone.utc),
+                        }},
+                    )
+                except Exception:
+                    pass
+            logger.warning(
+                "Workflow %s aborted pre-flight: oversize docs %s for model=%s",
+                workflow_id, [o.uuid for o in oversize], model,
+            )
+            return
+    except Exception:
+        # The pre-flight is best-effort; don't let it block a valid run.
+        logger.exception("Pre-flight oversize check failed for workflow %s", workflow_id)
+
     # Mark activity as running
     if activity_id:
         try:
@@ -352,12 +438,22 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
             "result_id": workflow_result_id,
         }
 
+    # Aggregate citations from every step that produced retrieved_sources so
+    # the frontend can render them next to the workflow output without
+    # walking the steps_output dict itself.
+    retrieved_sources: list[dict] = []
+    for step in data or []:
+        sources = step.get("retrieved_sources") if isinstance(step, dict) else None
+        if isinstance(sources, list):
+            retrieved_sources.extend(sources)
+
     # Save final result
     db.workflow_result.update_one(
         {"_id": ObjectId(workflow_result_id)},
         {"$set": {
             "status": "completed",
             "final_output": {"output": final_output, "data": data},
+            "retrieved_sources": retrieved_sources,
         }},
     )
 

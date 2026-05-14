@@ -81,6 +81,10 @@ class WorkflowStatusResponse(BaseModel):
     final_output: Optional[Any] = None
     steps_output: Optional[dict] = None
     output_step_names: list[str] = []
+    approval_request_id: Optional[str] = None
+    error: Optional[str] = None
+    error_payload: Optional[dict] = None
+    retrieved_sources: list[dict] = []
 
 
 class BatchStatusItem(BaseModel):

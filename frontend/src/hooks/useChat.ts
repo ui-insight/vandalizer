@@ -1,11 +1,18 @@
 import { useState, useCallback, useRef } from 'react'
 import { streamChat, getHistory } from '../api/chat'
-import type { ChatMessage, ContextBudgetPlan, StreamChunk } from '../types/chat'
+import type { ChatMessage, Citation, ContextBudgetPlan, OversizeDocument, StreamChunk } from '../types/chat'
 
 export interface ContextNotice {
   action: string
   detail: string
   tokens_dropped: number
+}
+
+export interface ChatError {
+  message: string
+  code?: string
+  suggestedAction?: 'convert_to_kb'
+  oversizeDocuments?: OversizeDocument[]
 }
 
 const THINK_BLOCK_RE = /<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>\n?/g
@@ -20,6 +27,7 @@ export function useChat() {
   const [conversationUuid, setConversationUuid] = useState<string | null>(null)
   const [activityId, setActivityId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [errorDetails, setErrorDetails] = useState<ChatError | null>(null)
   const [contextTokens, setContextTokens] = useState(0)
   const [contextMode, setContextMode] = useState<'full' | 'truncated' | 'compacted'>('full')
   const [contextCutoffIndex, setContextCutoffIndex] = useState(0)
@@ -29,10 +37,12 @@ export function useChat() {
   const streamingRef = useRef('')
   const thinkingRef = useRef('')
   const thinkingDurationRef = useRef<number | null>(null)
+  const citationsRef = useRef<Citation[]>([])
 
   const send = useCallback(
     async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuid?: string, includeOnboardingContext?: boolean, folderUuids?: string[], isFirstSession?: boolean) => {
       setError(null)
+      setErrorDetails(null)
       setIsStreaming(true)
       setStreamingContent('')
       setThinkingContent('')
@@ -42,6 +52,7 @@ export function useChat() {
       streamingRef.current = ''
       thinkingRef.current = ''
       thinkingDurationRef.current = null
+      citationsRef.current = []
 
       // Add user message immediately
       setMessages((prev) => [...prev, { role: 'user', content: message }])
@@ -75,6 +86,10 @@ export function useChat() {
                   setContextTokens(chunk.plan.total_input_tokens)
                 }
               }
+            } else if (chunk.kind === 'sources') {
+              if (chunk.sources?.length) {
+                citationsRef.current = [...citationsRef.current, ...chunk.sources]
+              }
             } else if (chunk.kind === 'context_notice') {
               setContextNotices((prev) => [
                 ...prev,
@@ -86,6 +101,12 @@ export function useChat() {
               ])
             } else if (chunk.kind === 'error') {
               setError(chunk.content)
+              setErrorDetails({
+                message: chunk.content,
+                code: chunk.code,
+                suggestedAction: chunk.suggested_action,
+                oversizeDocuments: chunk.oversize_documents,
+              })
             }
           },
           model,
@@ -110,6 +131,9 @@ export function useChat() {
             if (thinkingDurationRef.current != null) {
               assistantMsg.thinking_duration = thinkingDurationRef.current
             }
+          }
+          if (citationsRef.current.length) {
+            assistantMsg.citations = citationsRef.current
           }
           setMessages((prev) => [...prev, assistantMsg])
         }
@@ -146,11 +170,17 @@ export function useChat() {
     setConversationUuid(null)
     setActivityId(null)
     setError(null)
+    setErrorDetails(null)
     setContextTokens(0)
     setContextMode('full')
     setContextCutoffIndex(0)
     setContextPlan(null)
     setContextNotices([])
+  }, [])
+
+  const clearError = useCallback(() => {
+    setError(null)
+    setErrorDetails(null)
   }, [])
 
   const setActivity = useCallback((newActivityId: string, newConversationUuid: string) => {
@@ -168,6 +198,8 @@ export function useChat() {
     conversationUuid,
     activityId,
     error,
+    errorDetails,
+    clearError,
     contextTokens,
     contextMode,
     contextCutoffIndex,

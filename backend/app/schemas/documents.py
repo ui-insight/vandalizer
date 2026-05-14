@@ -9,11 +9,15 @@ class DocumentResponse(BaseModel):
     extension: str
     processing: bool
     valid: bool
+    validation_feedback: Optional[str] = None
     task_status: Optional[str] = None
     folder: Optional[str] = None
     created_at: str
     token_count: int = 0
     num_pages: int = 0
+    chromadb_ready: bool = False
+    chunk_count: int = 0
+    ingest_error: Optional[str] = None
 
 
 class FolderResponse(BaseModel):

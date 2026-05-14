@@ -12,6 +12,7 @@ import { useWorkspace, type PendingChatMessage } from '../../contexts/WorkspaceC
 import { useToast } from '../../contexts/ToastContext'
 import { addLink, removeDocument, removeLink, truncateContext, compactContext, clearContext } from '../../api/chat'
 import { uploadFile } from '../../api/files'
+import { convertDocumentsToKB } from '../../api/knowledge'
 import { getUserConfig, updateUserConfig, markFirstSessionComplete } from '../../api/config'
 import type { FileAttachment, UrlAttachment } from '../../types/chat'
 import type { ModelInfo } from '../../types/workflow'
@@ -65,6 +66,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     activityId,
     conversationUuid,
     error,
+    errorDetails,
+    clearError,
     contextTokens,
     contextMode,
     contextCutoffIndex,
@@ -77,7 +80,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     setActivity,
   } = useChat()
 
-  const { bumpActivitySignal, processingDoc, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, activeKBUuid, activeKBTitle, deactivateKB } = useWorkspace()
+  const { bumpActivitySignal, processingDoc, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, activeKBUuid, activeKBTitle, activateKB, deactivateKB } = useWorkspace()
+  const [convertingToKB, setConvertingToKB] = useState(false)
   const { toast } = useToast()
   const { pills: onboardingPills, isFirstSession, loading: onboardingLoading } = useOnboarding()
   // Lock the first-session flag once it's set so remounts/refetches can't
@@ -184,6 +188,29 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     setContextMode('truncated')
     setContextCutoffIndex(result.context_cutoff_index)
     setContextTokens(0)
+  }
+
+  const handleConvertToKB = async () => {
+    const docs = errorDetails?.oversizeDocuments ?? []
+    if (!docs.length) return
+    setConvertingToKB(true)
+    try {
+      const kb = await convertDocumentsToKB(docs.map(d => d.uuid))
+      // Detach the now-oversized docs from the message so retrying with the KB
+      // doesn't immediately re-trigger the same error.
+      setSelectedDocUuids(prev => prev.filter(u => !docs.some(d => d.uuid === u)))
+      setSelectedDocNames(prev => prev.filter((_, i) => !docs.some(d => d.uuid === selectedDocUuids[i])))
+      activateKB(kb.uuid, kb.title)
+      clearError()
+      toast('Converted to Knowledge Base — ask your question again.', 'success')
+    } catch (e) {
+      toast(
+        e instanceof Error ? e.message : 'Could not convert the documents to a Knowledge Base.',
+        'error',
+      )
+    } finally {
+      setConvertingToKB(false)
+    }
   }
 
   const handleScroll = useCallback(() => {
@@ -770,7 +797,33 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         )}
 
         {error && (
-          <div className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>
+          <div className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 border border-red-200">
+            <div>{error}</div>
+            {errorDetails?.suggestedAction === 'convert_to_kb' && (errorDetails.oversizeDocuments?.length ?? 0) > 0 && (
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  onClick={handleConvertToKB}
+                  disabled={convertingToKB}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {convertingToKB ? (
+                    <>
+                      <Loader2 size={12} className="animate-spin" />
+                      Converting…
+                    </>
+                  ) : (
+                    <>
+                      <BookOpen size={12} />
+                      Convert to Knowledge Base
+                    </>
+                  )}
+                </button>
+                <span className="text-xs text-red-600/80">
+                  Builds a searchable index so chat can read the document a chunk at a time.
+                </span>
+              </div>
+            )}
+          </div>
         )}
 
         {contextNotices.length > 0 && (

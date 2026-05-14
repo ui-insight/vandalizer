@@ -18,6 +18,9 @@ export interface Document {
   classified_by?: string | null
   retention_hold?: boolean
   soft_deleted?: boolean
+  chromadb_ready?: boolean
+  chunk_count?: number
+  ingest_error?: string | null
 }
 
 export interface Folder {

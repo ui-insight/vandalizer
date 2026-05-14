@@ -302,6 +302,7 @@ async def chat_stream(
         )
 
     # KB context: query ChromaDB for relevant chunks and add as a segment.
+    kb_sources: list[dict] = []
     if kb_uuid:
         try:
             from app.services.document_manager import DocumentManager
@@ -310,8 +311,25 @@ async def chat_stream(
             if kb_results:
                 kb_text = "\n\n## Knowledge Base Context:\n"
                 for r in kb_results:
-                    src = r.get("metadata", {}).get("source_name", "Unknown")
-                    kb_text += f"\n**Source: {src}**\n{r['content']}\n"
+                    meta = r.get("metadata") or {}
+                    src = meta.get("source_name", "Unknown")
+                    page = meta.get("page")
+                    sheet = meta.get("sheet")
+                    label = src
+                    if isinstance(page, int):
+                        label = f"{src} (p. {page})"
+                    elif isinstance(sheet, str) and sheet:
+                        label = f"{src} ({sheet})"
+                    kb_text += f"\n**Source: {label}**\n{r['content']}\n"
+                    kb_sources.append({
+                        "document_id": meta.get("source_id"),
+                        "document_title": src,
+                        "page": page if isinstance(page, int) else None,
+                        "sheet": sheet if isinstance(sheet, str) else None,
+                        "chunk_id": r.get("chunk_id"),
+                        "score": r.get("score"),
+                        "content_preview": (r.get("content") or "")[:240],
+                    })
                 doc_segments.insert(0, DocumentSegment(label="kb", text=kb_text))
             else:
                 logger.warning("KB query returned no results for kb_uuid=%s", kb_uuid)
@@ -369,21 +387,60 @@ async def chat_stream(
             "tokens_dropped": action.tokens_dropped,
         }) + "\n"
 
+    # Emit KB sources before the LLM streams its answer so the UI can render
+    # citation chips alongside (or just before) the response.
+    if kb_sources:
+        yield json.dumps({
+            "kind": "sources",
+            "content": "",
+            "sources": kb_sources,
+        }) + "\n"
+
     if compacted.fatal:
         logger.warning(
             "Chat context over budget for model=%s: plan=%s actions=%s",
             model_name, compacted.plan.to_dict(),
             [a.to_dict() for a in compacted.actions],
         )
-        yield json.dumps({
-            "kind": "error",
-            "content": (
-                "This request is too large for the selected model "
-                f"(~{compacted.plan.total_input_tokens} tokens vs "
-                f"{compacted.plan.input_budget} token input budget). "
-                "Remove some documents or switch to a larger model."
-            ),
-        }) + "\n"
+        # Identify which attached documents are individually too large for the
+        # model — those are the ones the user should convert to a Knowledge
+        # Base. If none qualify, the prompt is just generically too big and we
+        # fall back to the plain error.
+        from app.services.context_budget import find_oversize_documents
+        oversize = find_oversize_documents(
+            documents=[
+                {"uuid": d.uuid, "title": d.title, "token_count": d.token_count}
+                for d in documents
+            ],
+            model_name=model_name,
+            model_config=model_config,
+        )
+        if oversize:
+            titles = ", ".join(o.title for o in oversize[:3])
+            if len(oversize) > 3:
+                titles += f", and {len(oversize) - 3} more"
+            content = (
+                f"{titles} is too large to read inline with the selected model. "
+                "Convert it to a Knowledge Base and chat will search it instead."
+            )
+            yield json.dumps({
+                "kind": "error",
+                "code": "context_over_budget_convertible",
+                "content": content,
+                "suggested_action": "convert_to_kb",
+                "oversize_documents": [o.to_dict() for o in oversize],
+            }) + "\n"
+        else:
+            yield json.dumps({
+                "kind": "error",
+                "code": "context_over_budget",
+                "content": (
+                    "This request is too large for the selected model "
+                    f"(~{compacted.plan.total_input_tokens} tokens vs "
+                    f"{compacted.plan.input_budget} token input budget). "
+                    "Remove some documents or switch to a larger model."
+                ),
+            }) + "\n"
         await _save_failed_assistant_turn(
             conversation,
             "_(no response — request exceeded the model's context budget)_",

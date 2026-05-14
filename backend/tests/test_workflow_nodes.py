@@ -1107,6 +1107,45 @@ class TestKnowledgeBaseQueryNode:
         result = node.process({"output": "prev"})
         assert result["output"] == ""
 
+    @patch("app.services.document_manager.DocumentManager")
+    def test_emits_retrieved_sources_with_page_and_score(self, mock_dm_cls):
+        """The KB node returns a structured citation list for the workflow
+        result to persist, in addition to the joined prompt text."""
+        mock_dm = MagicMock()
+        mock_dm.query_kb.return_value = [
+            {
+                "content": "Section II.D — cost share",
+                "metadata": {"source_id": "src-1", "source_name": "PAPPG.pdf", "page": 234},
+                "chunk_id": "src-1_chunk_47",
+                "score": 0.12,
+            },
+            {
+                "content": "Q1 budget row",
+                "metadata": {"source_id": "src-2", "source_name": "Budget.xlsx", "sheet": "Year 1"},
+                "chunk_id": "src-2_chunk_3",
+                "score": 0.19,
+            },
+        ]
+        mock_dm_cls.return_value = mock_dm
+
+        node = KnowledgeBaseQueryNode({"kb_uuid": "kb-1", "query": "cost share"})
+        result = node.process({"output": "prev"})
+
+        # Prompt-side: cited label appears in the joined output text.
+        assert "p. 234" in result["output"]
+        assert "Year 1" in result["output"]
+
+        # Citation-side: each result becomes a retrieved_sources entry.
+        sources = result["retrieved_sources"]
+        assert len(sources) == 2
+        assert sources[0]["document_title"] == "PAPPG.pdf"
+        assert sources[0]["page"] == 234
+        assert sources[0]["sheet"] is None
+        assert sources[0]["chunk_id"] == "src-1_chunk_47"
+        assert sources[0]["score"] == 0.12
+        assert sources[1]["sheet"] == "Year 1"
+        assert sources[1]["page"] is None
+
 
 # ---------------------------------------------------------------------------
 # BrowserAutomationNode

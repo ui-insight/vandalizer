@@ -28,6 +28,7 @@ import type { ValidationCheck, ValidationCheckDefinition, ValidationInputDefinit
 import { ItemPickerModal } from './ItemPickerModal'
 import { getModels } from '../../api/config'
 import { searchDocuments } from '../../api/documents'
+import { convertDocumentsToKB } from '../../api/knowledge'
 import { listCredentials } from '../../api/credentials'
 import type { Credential } from '../../types/credential'
 import { uploadFile } from '../../api/files'
@@ -36,7 +37,7 @@ import { listAllFolders } from '../../api/folders'
 import type { KnowledgeBase } from '../../types/knowledge'
 import { listItems as listSearchSetItems, suggestFields } from '../../api/extractions'
 import { useWorkflowRunner } from '../../hooks/useWorkflowRunner'
-import type { Workflow, WorkflowStep, WorkflowTask, WorkflowStatus, ModelInfo, SearchSetItem } from '../../types/workflow'
+import type { Workflow, WorkflowStep, WorkflowTask, WorkflowStatus, WorkflowCitation, ModelInfo, SearchSetItem } from '../../types/workflow'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
@@ -4108,12 +4109,124 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
 
       {/* Error */}
       {isError && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#dc2626', fontWeight: 500 }}>
-          <XCircle style={{ width: 16, height: 16 }} />
-          Failed
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13, color: '#dc2626', fontWeight: 500 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <XCircle style={{ width: 16, height: 16 }} />
+            {status?.error || 'Failed'}
+          </div>
+          {status?.error_payload?.suggested_action === 'convert_to_kb' && (status?.error_payload?.oversize_documents?.length ?? 0) > 0 && (
+            <ConvertWorkflowDocsButton
+              docs={status.error_payload?.oversize_documents ?? []}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Sources from KB query steps */}
+      {(status?.retrieved_sources?.length ?? 0) > 0 && (
+        <WorkflowSourcesPanel sources={status?.retrieved_sources ?? []} />
+      )}
+    </div>
+  )
+}
+
+function WorkflowSourcesPanel({ sources }: { sources: WorkflowCitation[] }) {
+  const [expanded, setExpanded] = useState(false)
+  return (
+    <div style={{ marginTop: 4, borderTop: '1px solid #e5e7eb', paddingTop: 8 }}>
+      <button
+        onClick={() => setExpanded(e => !e)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 4, padding: 0,
+          background: 'transparent', border: 'none', cursor: 'pointer',
+          fontSize: 12, fontWeight: 600, color: '#374151', fontFamily: 'inherit',
+        }}
+      >
+        <ChevronRight
+          size={14}
+          style={{ transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }}
+        />
+        Sources ({sources.length})
+      </button>
+      {expanded && (
+        <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {sources.map((c, i) => {
+            const locator = typeof c.page === 'number' ? `p. ${c.page}` : (c.sheet || null)
+            const label = locator ? `${c.document_title} · ${locator}` : c.document_title
+            return (
+              <span
+                key={`${c.chunk_id ?? c.document_id ?? i}`}
+                title={c.content_preview || ''}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  padding: '2px 8px', fontSize: 11, fontWeight: 500,
+                  backgroundColor: '#f3f4f6', color: '#374151',
+                  border: '1px solid #e5e7eb', borderRadius: 999,
+                  cursor: 'help',
+                }}
+              >
+                {label}
+              </span>
+            )
+          })}
         </div>
       )}
     </div>
+  )
+}
+
+function ConvertWorkflowDocsButton({
+  docs,
+}: { docs: Array<{ uuid: string; title: string; token_count: number }> }) {
+  const [converting, setConverting] = useState(false)
+  const [convertedKB, setConvertedKB] = useState<{ uuid: string; title: string } | null>(null)
+  const { toast } = useToast()
+
+  const handleConvert = async () => {
+    setConverting(true)
+    try {
+      const kb = await convertDocumentsToKB(docs.map(d => d.uuid))
+      setConvertedKB({ uuid: kb.uuid, title: kb.title })
+      toast(
+        `Created Knowledge Base "${kb.title}". Add a Knowledge Base Query step to use it.`,
+        'success',
+      )
+    } catch (e) {
+      toast(
+        e instanceof Error ? e.message : 'Could not convert documents to a Knowledge Base.',
+        'error',
+      )
+    } finally {
+      setConverting(false)
+    }
+  }
+
+  if (convertedKB) {
+    return (
+      <div style={{ fontSize: 12, fontWeight: 400, color: '#374151' }}>
+        Knowledge Base <strong>{convertedKB.title}</strong> is being built. Edit the workflow:
+        replace the oversized document(s) with a <strong>Knowledge Base Query</strong> step
+        targeting it.
+      </div>
+    )
+  }
+
+  return (
+    <button
+      onClick={handleConvert}
+      disabled={converting}
+      style={{
+        alignSelf: 'flex-start',
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        padding: '6px 10px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+        border: '1px solid #dc2626', borderRadius: 6,
+        backgroundColor: '#dc2626', color: '#fff',
+        cursor: converting ? 'not-allowed' : 'pointer',
+        opacity: converting ? 0.6 : 1,
+      }}
+    >
+      {converting ? 'Converting…' : 'Convert to Knowledge Base'}
+    </button>
   )
 }
 
