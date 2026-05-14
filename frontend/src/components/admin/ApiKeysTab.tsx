@@ -473,7 +473,30 @@ function CreateKeyModal({
       </label>
 
       <div style={{ marginBottom: 12 }}>
-        <span style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 6 }}>Scopes</span>
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+          marginBottom: 6,
+        }}>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>Scopes</span>
+          <div style={{ display: 'flex', gap: 12, fontSize: 12 }}>
+            <button
+              type="button"
+              onClick={() => setScopes([...MGMT_SCOPE_OPTIONS])}
+              disabled={scopes.length === MGMT_SCOPE_OPTIONS.length}
+              style={linkButtonStyle}
+            >
+              Select all
+            </button>
+            <button
+              type="button"
+              onClick={() => setScopes([])}
+              disabled={scopes.length === 0}
+              style={linkButtonStyle}
+            >
+              Clear
+            </button>
+          </div>
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6 }}>
           {MGMT_SCOPE_OPTIONS.map(s => (
             <label key={s} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
@@ -621,4 +644,10 @@ const cancelButtonStyle: React.CSSProperties = {
   padding: '8px 14px', borderRadius: 6,
   backgroundColor: 'transparent', color: '#374151',
   border: '1px solid #d1d5db', fontWeight: 600, cursor: 'pointer',
+}
+
+const linkButtonStyle: React.CSSProperties = {
+  padding: 0, border: 'none', background: 'transparent',
+  color: 'var(--highlight-color, #3b82f6)', fontWeight: 600,
+  cursor: 'pointer',
 }
