@@ -38,6 +38,7 @@ dependencies = [
     "prometheus-fastapi-instrumentator>=7.0,<8",
     "pymupdf>=1.27.2",
     "tiktoken>=0.9,<1",
+    "langchain-text-splitters>=0.3,<1",
 ]
 
 [project.optional-dependencies]

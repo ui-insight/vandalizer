@@ -133,6 +133,8 @@ def ocr_extract_text_from_pdf(pdf_path: str, retries: int = 3) -> str:
     if ocr_api_key:
         headers["Authorization"] = f"Bearer {ocr_api_key}"
 
+    import time as _time
+
     import httpx
     for attempt in range(retries):
         try:
@@ -151,6 +153,8 @@ def ocr_extract_text_from_pdf(pdf_path: str, retries: int = 3) -> str:
                 )
         except Exception as e:
             logger.warning("OCR attempt %d raised: %s", attempt + 1, e)
+        if attempt < retries - 1:
+            _time.sleep(2 ** attempt)
 
     logger.error("OCR failed after %d attempts for %s", retries, pdf_path)
     return ""
