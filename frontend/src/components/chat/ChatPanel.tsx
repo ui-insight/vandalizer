@@ -198,8 +198,13 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       const kb = await convertDocumentsToKB(docs.map(d => d.uuid))
       // Detach the now-oversized docs from the message so retrying with the KB
       // doesn't immediately re-trigger the same error.
-      setSelectedDocUuids(prev => prev.filter(u => !docs.some(d => d.uuid === u)))
-      setSelectedDocNames(prev => prev.filter((_, i) => !docs.some(d => d.uuid === selectedDocUuids[i])))
+      const oversizeUuids = new Set(docs.map(d => d.uuid))
+      setSelectedDocUuids(selectedDocUuids.filter(u => !oversizeUuids.has(u)))
+      const remainingNames: Record<string, string> = {}
+      for (const [uuid, name] of Object.entries(selectedDocNames)) {
+        if (!oversizeUuids.has(uuid)) remainingNames[uuid] = name
+      }
+      setSelectedDocNames(remainingNames)
       activateKB(kb.uuid, kb.title)
       clearError()
       toast('Converted to Knowledge Base — ask your question again.', 'success')
