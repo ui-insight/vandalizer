@@ -2727,7 +2727,7 @@ function ConfigTab() {
         position: 'sticky', top: 0, zIndex: 20,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         background: '#fff', borderBottom: '1px solid #e5e7eb',
-        padding: '12px 0', margin: '0 0 -4px',
+        padding: '12px 20px', margin: '0 0 -4px',
         boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
       }}>
         <span style={{ fontSize: 14, fontWeight: 600, color: '#374151', display: 'flex', alignItems: 'center', gap: 8 }}>
