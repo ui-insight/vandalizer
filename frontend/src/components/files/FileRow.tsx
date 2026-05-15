@@ -1,7 +1,7 @@
 import { Loader2, MoreHorizontal, AlertTriangle, Shield, AlertCircle } from 'lucide-react'
 import type { Document } from '../../types/document'
 import { formatFileDate } from '../../utils/time'
-import { stageCopy } from '../../utils/processingStatus'
+import { stageCopy, isDocReady } from '../../utils/processingStatus'
 
 const CLASSIFICATION_STYLES: Record<string, { bg: string; text: string }> = {
   unrestricted: { bg: '#dcfce7', text: '#166534' },
@@ -21,6 +21,9 @@ interface FileRowProps {
 }
 
 export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect, snippet }: FileRowProps) {
+  // Spinner stays on through the whole upload pipeline (text extraction +
+  // RAG indexing), not just the `processing` flag which flips off early.
+  const stillProcessing = !isDocReady(doc)
   return (
     <tr
       className="group hover:bg-[#a6b5c945]"
@@ -68,7 +71,7 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
       {/* Name + icon */}
       <td style={{ padding: '12px 15px' }}>
         <div className="flex items-center min-w-0">
-          {doc.processing ? (
+          {stillProcessing ? (
             <Loader2 className="h-4 w-4 animate-spin shrink-0 mr-2.5" style={{ color: 'var(--highlight-color)' }} />
           ) : !doc.valid ? (
             <span
@@ -157,7 +160,7 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
         title={doc.updated_at || doc.created_at || undefined}
       >
         <span className="group-hover:opacity-0 transition-opacity">
-          {doc.processing ? (
+          {stillProcessing ? (
             <span style={{ color: 'var(--highlight-color)' }}>{stageCopy(doc.task_status).short}</span>
           ) : (
             (doc.updated_at || doc.created_at) && formatFileDate(doc.updated_at || doc.created_at)

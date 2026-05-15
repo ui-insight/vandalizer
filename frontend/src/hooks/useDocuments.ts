@@ -2,6 +2,7 @@ import { useCallback, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Document, Folder } from '../types/document'
 import { listContents } from '../api/documents'
+import { isDocReady } from '../utils/processingStatus'
 
 interface ContentsResult {
   documents: Document[]
@@ -18,10 +19,14 @@ export function useDocuments(folderId: string | null, teamUuid?: string) {
   const { data, isLoading: loading } = useQuery<ContentsResult>({
     queryKey,
     queryFn: () => listContents(folderId ?? undefined, teamUuid),
-    // Auto-poll every 3s when any document is still processing
+    // Auto-poll every 3s while any document is still moving through the
+    // pipeline. We can't just check `processing` here — that flag flips off
+    // after text extraction, but the doc continues through RAG indexing
+    // (task_status="readying") before it's truly done. Without this the list
+    // would freeze on a stale state and the chat banner would never update.
     refetchInterval: (query) => {
       const docs = query.state.data?.documents
-      if (docs?.some((d) => d.processing)) return 3000
+      if (docs?.some((d) => !isDocReady(d))) return 3000
       return false
     },
   })

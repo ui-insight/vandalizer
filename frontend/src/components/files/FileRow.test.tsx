@@ -68,6 +68,19 @@ describe('FileRow', () => {
     expect(screen.queryByText('readying')).toBeNull()
   })
 
+  it('shows spinner during RAG indexing even when processing flips off', () => {
+    // The backend pipeline flips `processing` off after text extraction but
+    // keeps `task_status` on "readying" while indexing for retrieval. The
+    // row must keep its spinner so users don't think the doc is fully ready.
+    renderFileRow({ doc: makeDoc({ processing: false, task_status: 'readying' }) })
+    expect(screen.getByText('Indexing…')).toBeTruthy()
+  })
+
+  it('treats task_status=complete with processing=false as ready', () => {
+    renderFileRow({ doc: makeDoc({ processing: false, task_status: 'complete' }) })
+    expect(screen.queryByText(/Indexing|Reading|Processing/)).toBeNull()
+  })
+
   it('checkbox calls onToggleSelect', () => {
     const onToggleSelect = vi.fn()
     renderFileRow({

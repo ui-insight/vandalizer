@@ -16,6 +16,7 @@ import { deleteFile, renameFile, downloadFile, downloadFilesAsZip, moveFile } fr
 import { createFolder, renameFolder, deleteFolder, convertFolderToTeam } from '../../api/folders'
 import { listAutomations } from '../../api/automations'
 import type { Document, Folder } from '../../types/document'
+import { isDocReady } from '../../utils/processingStatus'
 
 export type SortColumn = 'name' | 'modified'
 export type SortDirection = 'asc' | 'desc'
@@ -118,11 +119,13 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
     const names: Record<string, string> = {}
     for (const d of selectedDocs) names[d.uuid] = d.title
     onDocNamesChange?.(names)
-    // And which selected docs are still processing — re-emitted on each poll
-    // because useDocuments refetches while any doc is processing.
+    // And which selected docs aren't fully ready yet. `processing` flips off
+    // after text extraction, but the doc still goes through RAG indexing
+    // (task_status="readying") before it's truly ready for analysis. Use
+    // isDocReady so the chat banner stays accurate across that whole window.
     onSelectionProcessingChange?.(
       selectedDocs
-        .filter(d => d.processing)
+        .filter(d => !isDocReady(d))
         .map(d => ({ uuid: d.uuid, title: d.title, status: d.task_status })),
     )
   }, [selectedUuids, documents, onSelectionChange, onDocNamesChange, onSelectionProcessingChange])
