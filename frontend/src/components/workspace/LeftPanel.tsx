@@ -8,7 +8,7 @@ import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { pollStatus, searchDocuments } from '../../api/documents'
 
 export function LeftPanel() {
-  const { setSelectedDocUuids, setSelectedDocNames, setSelectedFolderUuids, highlightTerms, setHighlightTerms, setProcessingDoc, viewDocumentRequest, clearViewDocumentRequest } = useWorkspace()
+  const { setSelectedDocUuids, setSelectedDocNames, setSelectedFolderUuids, highlightTerms, setHighlightTerms, setProcessingDoc, setSelectedDocsProcessing, viewDocumentRequest, clearViewDocumentRequest } = useWorkspace()
   const [viewingDoc, setViewingDoc] = useState<{
     uuid: string
     title: string
@@ -40,6 +40,16 @@ export function LeftPanel() {
   const handleFolderSelectionChange = useCallback((uuids: string[]) => {
     if (!viewingDocRef.current) setSelectedFolderUuids(uuids)
   }, [setSelectedFolderUuids])
+
+  const handleSelectionProcessingChange = useCallback(
+    (docs: Array<{ uuid: string; title: string; status: string | null }>) => {
+      // Same guard as handleSelectionChange: ignore FileBrowser-driven
+      // updates when the user is in the document viewer (selection there
+      // is single-doc and managed directly).
+      if (!viewingDocRef.current) setSelectedDocsProcessing(docs)
+    },
+    [setSelectedDocsProcessing],
+  )
 
   // Open a document when requested from another panel (e.g. validation tab)
   useEffect(() => {
@@ -272,6 +282,7 @@ export function LeftPanel() {
             onSelectionChange={handleSelectionChange}
             onDocNamesChange={handleDocNamesChange}
             onFolderSelectionChange={handleFolderSelectionChange}
+            onSelectionProcessingChange={handleSelectionProcessingChange}
           />
         </div>
       )}

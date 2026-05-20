@@ -219,6 +219,8 @@ class PaginatedWorkflowResponse(BaseModel):
 class ConfigUpdateRequest(BaseModel):
     extraction_config: Optional[dict] = None
     quality_config: Optional[dict] = None
+    compliance_config: Optional[dict] = None
+    retention_config: Optional[dict] = None
     ocr_endpoint: Optional[str] = None
     ocr_api_key: Optional[str] = None
     llm_endpoint: Optional[str] = None
@@ -1245,7 +1247,8 @@ async def get_config(
         "ui_radius": cfg.ui_radius,
         "default_team_id": cfg.default_team_id or "",
         "support_contacts": cfg.support_contacts,
-        "m365_config": _sanitize_m365_config(cfg.get_m365_config()),
+        "compliance_config": cfg.get_compliance_config(),
+        "retention_config": cfg.get_retention_config(),
     }
 
 
@@ -1266,6 +1269,10 @@ async def update_config(
         cfg.extraction_config = body.extraction_config
     if body.quality_config is not None:
         cfg.quality_config = body.quality_config
+    if body.compliance_config is not None:
+        cfg.compliance_config = body.compliance_config
+    if body.retention_config is not None:
+        cfg.retention_config = body.retention_config
     if body.ocr_endpoint is not None:
         cfg.ocr_endpoint = body.ocr_endpoint
     if body.ocr_api_key is not None and body.ocr_api_key != "***":
@@ -1326,7 +1333,44 @@ async def add_model(
 
 
 # ---------------------------------------------------------------------------
-# 7b. PUT /config/models/{index}  - Update an existing model
+# 7b. PUT /config/models/default  - Set (or clear) the system default model
+# ---------------------------------------------------------------------------
+# Defined before PUT /config/models/{index} so "default" isn't parsed as an int.
+
+class DefaultModelRequest(BaseModel):
+    name: str = ""
+
+
+@router.put("/config/models/default")
+async def set_default_model(
+    body: DefaultModelRequest,
+    user: User = Depends(get_current_user),
+):
+    await _require_superadmin(user)
+
+    cfg = await SystemConfig.get_config()
+    name = (body.name or "").strip()
+
+    if name:
+        match = next(
+            (m for m in cfg.available_models if isinstance(m, dict) and m.get("name") == name),
+            None,
+        )
+        if not match:
+            raise HTTPException(status_code=404, detail=f"Model '{name}' is not configured")
+
+    cfg.default_model = name
+    cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
+    cfg.updated_by = user.user_id
+    await cfg.save()
+    clear_agent_caches()
+    await _audit(user, "set_default_model", f"Default model: {name or '(cleared)'}")
+
+    return {"status": "ok", "default_model": cfg.default_model or ""}
+
+
+# ---------------------------------------------------------------------------
+# 7c. PUT /config/models/{index}  - Update an existing model
 # ---------------------------------------------------------------------------
 
 @router.put("/config/models/{index}")
@@ -1403,42 +1447,6 @@ async def delete_model(
     await _audit(user, "delete_model", f"Deleted model at index {index}: {removed.get('tag', '?')}")
 
     return {"status": "ok", "removed": removed, "models": cfg.available_models, "default_model": cfg.default_model or ""}
-
-
-# ---------------------------------------------------------------------------
-# 8b. PUT /config/models/default  - Set (or clear) the system default model
-# ---------------------------------------------------------------------------
-
-class DefaultModelRequest(BaseModel):
-    name: str = ""
-
-
-@router.put("/config/models/default")
-async def set_default_model(
-    body: DefaultModelRequest,
-    user: User = Depends(get_current_user),
-):
-    await _require_superadmin(user)
-
-    cfg = await SystemConfig.get_config()
-    name = (body.name or "").strip()
-
-    if name:
-        match = next(
-            (m for m in cfg.available_models if isinstance(m, dict) and m.get("name") == name),
-            None,
-        )
-        if not match:
-            raise HTTPException(status_code=404, detail=f"Model '{name}' is not configured")
-
-    cfg.default_model = name
-    cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
-    cfg.updated_by = user.user_id
-    await cfg.save()
-    clear_agent_caches()
-    await _audit(user, "set_default_model", f"Default model: {name or '(cleared)'}")
-
-    return {"status": "ok", "default_model": cfg.default_model or ""}
 
 
 # ---------------------------------------------------------------------------
@@ -1543,53 +1551,56 @@ async def update_auth_methods(
 
 
 # ---------------------------------------------------------------------------
-# 12b. GET/PUT /config/m365  - M365 integration config
+# 12b. GET/PUT /config/compliance  - Document compliance check config
 # ---------------------------------------------------------------------------
 
 
-def _sanitize_m365_config(cfg: dict) -> dict:
-    """Mask the client_secret for safe display."""
-    out = {**cfg}
-    secret = out.get("client_secret", "")
-    if secret and secret != "***":
-        out["client_secret"] = "***"
-    return out
-
-
-@router.get("/config/m365")
-async def get_m365_config(
+@router.get("/config/compliance")
+async def get_compliance_config(
     user: User = Depends(get_current_user),
 ):
     await _require_superadmin(user)
     cfg = await SystemConfig.get_config()
-    return _sanitize_m365_config(cfg.get_m365_config())
+    return cfg.get_compliance_config()
 
 
-@router.put("/config/m365")
-async def update_m365_config(
+@router.put("/config/compliance")
+async def update_compliance_config(
     body: dict,
     user: User = Depends(get_current_user),
 ):
     await _require_superadmin(user)
     cfg = await SystemConfig.get_config()
-    current = cfg.get_m365_config()
+    current = cfg.get_compliance_config()
 
     if "enabled" in body:
         current["enabled"] = bool(body["enabled"])
-    if "client_id" in body:
-        current["client_id"] = body["client_id"]
-    if "tenant_id" in body:
-        current["tenant_id"] = body["tenant_id"]
-    if "client_secret" in body and body["client_secret"] != "***":
-        current["client_secret"] = encrypt_value(body["client_secret"])
+    if "check_on_upload" in body:
+        current["check_on_upload"] = bool(body["check_on_upload"])
+    if "rules" in body:
+        current["rules"] = str(body["rules"] or "")
+    if "chunk_size" in body:
+        try:
+            current["chunk_size"] = max(500, int(body["chunk_size"]))
+        except (TypeError, ValueError):
+            pass
+    if "chunk_overlap" in body:
+        try:
+            current["chunk_overlap"] = max(0, int(body["chunk_overlap"]))
+        except (TypeError, ValueError):
+            pass
 
-    cfg.m365_config = current
+    cfg.compliance_config = current
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
     cfg.updated_by = user.user_id
     await cfg.save()
-    await _audit(user, "update_m365_config", "Updated M365 integration configuration")
+    await _audit(
+        user,
+        "update_compliance_config",
+        f"Updated compliance configuration (enabled={current.get('enabled')})",
+    )
 
-    return _sanitize_m365_config(cfg.get_m365_config())
+    return cfg.get_compliance_config()
 
 
 # ---------------------------------------------------------------------------
@@ -2050,6 +2061,50 @@ async def test_model(index: int, user: User = Depends(get_current_user)):
         raise HTTPException(status_code=502, detail=f"Model test failed: {e}")
 
 
+class ModelProbeRequest(BaseModel):
+    name: str
+    endpoint: Optional[str] = ""
+    api_protocol: Optional[str] = ""
+    api_key: Optional[str] = ""
+    # When editing an existing model, the form sends api_key="***" to
+    # preserve the stored credential. Pass that model's index so we can
+    # decrypt and use it.
+    existing_model_index: Optional[int] = None
+
+
+@router.post("/config/probe-model")
+async def probe_model(
+    body: ModelProbeRequest,
+    user: User = Depends(get_current_user),
+):
+    """Ask the endpoint what context window it actually serves.
+
+    Used by the admin model form to pre-fill `context_window` from the
+    truth instead of the substring fallback table. Result is advisory —
+    the admin still chooses whether to accept it.
+    """
+    await _require_superadmin(user)
+
+    from app.services.model_probe import probe_context_window
+
+    api_key = (body.api_key or "").strip()
+    if (api_key == "***" or not api_key) and body.existing_model_index is not None:
+        cfg = await SystemConfig.get_config()
+        idx = body.existing_model_index
+        if 0 <= idx < len(cfg.available_models):
+            stored = cfg.available_models[idx].get("api_key", "")
+            if stored:
+                api_key = decrypt_value(stored) or ""
+
+    result = await probe_context_window(
+        endpoint=(body.endpoint or "").strip(),
+        api_protocol=(body.api_protocol or "").strip(),
+        api_key=api_key,
+        model_name=(body.name or "").strip(),
+    )
+    return result.to_dict()
+
+
 # ---------------------------------------------------------------------------
 # Version / update check
 # ---------------------------------------------------------------------------
@@ -2374,7 +2429,7 @@ async def create_api_key(
     user: User = Depends(get_current_user),
 ):
     """Issue a new management API key. Returns the full token once."""
-    await _require_superadmin(user)
+    await _require_admin(user)
 
     from app.dependencies import MGMT_SCOPES
     from app.models.api_key import ApiKey
@@ -2421,7 +2476,7 @@ async def list_api_keys(
     include_revoked: bool = False,
     user: User = Depends(get_current_user),
 ):
-    await _require_superadmin(user)
+    await _require_admin(user)
 
     from app.models.api_key import ApiKey
 
@@ -2452,7 +2507,7 @@ async def revoke_api_key(
     key_id: str,
     user: User = Depends(get_current_user),
 ):
-    await _require_superadmin(user)
+    await _require_admin(user)
 
     from app.models.api_key import ApiKey
 
@@ -2477,3 +2532,35 @@ async def revoke_api_key(
         {"key_id": key_id, "name": key.name},
     )
     return {"id": key_id, "revoked": True}
+
+
+@router.get("/api-keys/docs")
+async def get_api_key_docs(user: User = Depends(get_current_user)):
+    """Return the management-API documentation as markdown."""
+    await _require_admin(user)
+
+    from pathlib import Path
+
+    docs_path = Path(__file__).resolve().parent.parent / "docs" / "mgmt-api.md"
+    if not docs_path.is_file():
+        raise HTTPException(status_code=404, detail="Documentation not found")
+    return {"markdown": docs_path.read_text(encoding="utf-8")}
+
+
+@router.get("/api-keys/skill")
+async def get_api_key_skill(user: User = Depends(get_current_user)):
+    """Download the Claude Code skill file for the Management API."""
+    from pathlib import Path
+
+    from fastapi.responses import FileResponse
+
+    await _require_admin(user)
+
+    skill_path = Path(__file__).resolve().parent.parent / "docs" / "vandalizer-api-skill.md"
+    if not skill_path.is_file():
+        raise HTTPException(status_code=404, detail="Skill file not found")
+    return FileResponse(
+        path=skill_path,
+        media_type="text/markdown; charset=utf-8",
+        filename="SKILL.md",
+    )

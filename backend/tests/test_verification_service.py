@@ -181,6 +181,17 @@ def _chain_query(*items):
     return chain
 
 
+@pytest.fixture(autouse=True)
+def _stub_author_resolvers():
+    """The service module pulls in resolve_author/resolve_authors at import time
+    to attach submitter AuthorRefs to verification dicts. These require a live
+    Beanie-initialized User collection, which the unit tests don't provide. Stub
+    them out so the existing serialization tests stay focused on their subject."""
+    with patch(f"{MODULE}.resolve_author", new_callable=AsyncMock, return_value=None), \
+         patch(f"{MODULE}.resolve_authors", new_callable=AsyncMock, return_value={}):
+        yield
+
+
 # ---------------------------------------------------------------------------
 # _request_to_dict
 # ---------------------------------------------------------------------------

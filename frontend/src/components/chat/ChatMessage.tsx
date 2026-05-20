@@ -224,6 +224,34 @@ export function ChatMessage({ message, messageIndex, conversationUuid, streaming
             />
           )}
 
+          {message.citations && message.citations.length > 0 && (
+            <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              <span style={{ fontSize: 11, color: '#6b7280', alignSelf: 'center', marginRight: 2 }}>
+                Sources:
+              </span>
+              {message.citations.map((c, i) => {
+                const locator = typeof c.page === 'number' ? `p. ${c.page}` : (c.sheet || null)
+                const label = locator ? `${c.document_title} · ${locator}` : c.document_title
+                const preview = c.content_preview || ''
+                return (
+                  <span
+                    key={`${c.chunk_id ?? c.document_id ?? i}`}
+                    title={preview}
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                      padding: '2px 8px', fontSize: 11, fontWeight: 500,
+                      backgroundColor: '#f3f4f6', color: '#374151',
+                      border: '1px solid #e5e7eb', borderRadius: 999,
+                      cursor: 'help',
+                    }}
+                  >
+                    {label}
+                  </span>
+                )
+              })}
+            </div>
+          )}
+
           {/* Feedback bar - hidden during streaming */}
           {!isStreamingProp && message.content && <div style={{
             display: 'flex', alignItems: 'center', gap: 4, marginTop: 10,

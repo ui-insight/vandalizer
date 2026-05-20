@@ -123,6 +123,7 @@ class TestExtractionsRoutes:
                 "quality_score": None, "quality_tier": None,
                 "last_validated_at": None, "validation_run_count": 0,
             }),
+            patch("app.routers.extractions.val_svc.portability_summary", new_callable=AsyncMock, return_value=None),
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_svc.create_search_set = AsyncMock(return_value=ss)
@@ -153,6 +154,7 @@ class TestExtractionsRoutes:
                 "quality_score": None, "quality_tier": None,
                 "last_validated_at": None, "validation_run_count": 0,
             }),
+            patch("app.routers.extractions.val_svc.portability_summary", new_callable=AsyncMock, return_value=None),
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_svc.list_search_sets = AsyncMock(return_value=[ss])
@@ -182,6 +184,7 @@ class TestExtractionsRoutes:
                 "quality_score": None, "quality_tier": None,
                 "last_validated_at": None, "validation_run_count": 0,
             }),
+            patch("app.routers.extractions.val_svc.portability_summary", new_callable=AsyncMock, return_value=None),
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_ac.get_authorized_search_set = AsyncMock(return_value=ss)
@@ -258,6 +261,7 @@ class TestExtractionsRoutes:
                 "quality_score": None, "quality_tier": None,
                 "last_validated_at": None, "validation_run_count": 0,
             }),
+            patch("app.routers.extractions.val_svc.portability_summary", new_callable=AsyncMock, return_value=None),
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_ac.get_authorized_search_set = AsyncMock(return_value=ss)

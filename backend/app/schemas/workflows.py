@@ -27,10 +27,15 @@ class WorkflowResponse(BaseModel):
     name: str
     description: Optional[str] = None
     user_id: str
+    # Set when the workflow is shared with a team; None for personal workflows
+    # or workflows that have been removed from their team library.
+    team_id: Optional[str] = None
     num_executions: int = 0
     steps: list[dict] = []  # Dereferenced step objects
     input_config: dict = {}
     output_config: dict = {}
+    # True when the caller can edit / delete / remove-from-team this workflow.
+    # Mirrors can_manage_workflow: creator OR team owner/admin.
     can_manage: bool = True
     created_by: Optional[AuthorRef] = None
 
@@ -81,6 +86,10 @@ class WorkflowStatusResponse(BaseModel):
     final_output: Optional[Any] = None
     steps_output: Optional[dict] = None
     output_step_names: list[str] = []
+    approval_request_id: Optional[str] = None
+    error: Optional[str] = None
+    error_payload: Optional[dict] = None
+    retrieved_sources: list[dict] = []
 
 
 class BatchStatusItem(BaseModel):
@@ -140,6 +149,7 @@ class ValidationInputDefinition(BaseModel):
     type: str  # "document" | "text"
     document_uuid: Optional[str] = None
     document_title: Optional[str] = None
+    document_exists: Optional[bool] = None
     text: Optional[str] = None
     label: Optional[str] = None
 

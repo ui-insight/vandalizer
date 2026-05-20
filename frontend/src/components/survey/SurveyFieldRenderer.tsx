@@ -50,22 +50,24 @@ export function SurveyFieldRenderer({ field, value, onChange }: Props) {
         />
       )
 
-    case 'select':
+    case 'select': {
+      const optionStyle = { color: '#000', backgroundColor: '#fff' }
       return (
         <select
           required={field.required}
           value={(value as string) || ''}
           onChange={(e) => onChange(field.key, e.target.value)}
-          className={`${INPUT_CLASS} [&>option]:text-black`}
+          className={INPUT_CLASS}
         >
-          <option value="">Select...</option>
+          <option value="" style={optionStyle}>Select...</option>
           {field.options?.map((opt) => (
-            <option key={opt} value={opt}>
+            <option key={opt} value={opt} style={optionStyle}>
               {opt}
             </option>
           ))}
         </select>
       )
+    }
 
     case 'multiselect': {
       const selected = (value as string[]) || []

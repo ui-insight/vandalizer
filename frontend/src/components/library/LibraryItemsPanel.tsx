@@ -9,6 +9,13 @@ import { LibraryItemRow } from './LibraryItemRow'
 import { LibraryItemDetails } from './LibraryItemDetails'
 import { ShareWithTeamDialog } from './ShareWithTeamDialog'
 import { useToast } from '../../contexts/ToastContext'
+import { useConfirm } from '../shared/useConfirm'
+
+const KIND_LABEL: Record<string, string> = {
+  workflow: 'workflow',
+  search_set: 'extraction',
+  automation: 'automation',
+}
 
 interface Props {
   library: Library
@@ -17,6 +24,7 @@ interface Props {
 
 export function LibraryItemsPanel({ library, teamId }: Props) {
   const { toast } = useToast()
+  const confirm = useConfirm()
   const [kindFilter, setKindFilter] = useState<string | undefined>()
   const [search, setSearch] = useState('')
   const [selectedItem, setSelectedItem] = useState<LibraryItem | null>(null)
@@ -62,6 +70,19 @@ export function LibraryItemsPanel({ library, teamId }: Props) {
   }
 
   const handleRemove = async (itemId: string) => {
+    const item = items.find((i) => i.id === itemId)
+    const kindLabel = item ? (KIND_LABEL[item.kind] ?? 'item') : 'item'
+    const ok = await confirm({
+      title: `Delete ${kindLabel}?`,
+      message: (
+        <>
+          Are you sure you want to delete <strong>{item?.name ?? 'this item'}</strong>? This action cannot be undone.
+        </>
+      ),
+      confirmLabel: 'Delete',
+      destructive: true,
+    })
+    if (!ok) return
     if (selectedItem?.id === itemId) {
       setSelectedItem(null)
     }

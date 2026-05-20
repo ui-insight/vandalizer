@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ZoomIn, ZoomOut, Maximize2, Search } from 'lucide-react'
-import { downloadFileUrl } from '../../api/files'
+import { downloadFileUrl, fetchSheetJson, type SheetJsonResponse } from '../../api/files'
 import * as XLSX from 'xlsx'
 import { DocumentSearchBar, useFindInDocumentHotkey } from './DocumentSearchBar'
+
+type ServerSheet = SheetJsonResponse['sheets'][number]
 
 interface SpreadsheetViewerProps {
   docUuid: string
@@ -19,6 +21,7 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
   const [sheets, setSheets] = useState<string[]>([])
   const [activeSheet, setActiveSheet] = useState(0)
   const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null)
+  const [serverSheets, setServerSheets] = useState<ServerSheet[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -101,46 +104,69 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
     setActiveSheet(index)
   }
 
-  // Fetch and parse spreadsheet
+  function showServerSheet(sheets: ServerSheet[], index: number) {
+    const s = sheets[index]
+    setHeaders(s?.headers ?? [])
+    setRows(s?.rows ?? [])
+    setActiveSheet(index)
+  }
+
+  // Fetch and parse spreadsheet. Prefer the backend's evaluated JSON for
+  // .xlsx (so formulas without cached values still render); fall back to
+  // client-side SheetJS parsing for .csv / .xls / older deployments.
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(null)
+    setServerSheets(null)
+    setWorkbook(null)
 
-    fetch(url, { credentials: 'include' })
-      .then(async (resp) => {
+    fetchSheetJson(docUuid)
+      .then((json) => {
         if (cancelled) return
-        const ct = resp.headers.get('content-type') || ''
-
-        if (ct.includes('csv') || ct.includes('text/plain')) {
-          const text = await resp.text()
-          if (cancelled) return
-          const wb = XLSX.read(text, { type: 'string' })
-          setWorkbook(wb)
-          setSheets(wb.SheetNames)
-          loadSheet(wb, 0)
-        } else {
-          const buf = await resp.arrayBuffer()
-          if (cancelled) return
-          const wb = XLSX.read(buf, { type: 'array' })
-          setWorkbook(wb)
-          setSheets(wb.SheetNames)
-          loadSheet(wb, 0)
-        }
+        setServerSheets(json.sheets)
+        setSheets(json.sheets.map(s => s.name))
+        showServerSheet(json.sheets, 0)
         setLoading(false)
       })
-      .catch((err) => {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Failed to load spreadsheet')
-          setLoading(false)
-        }
+      .catch(() => {
+        if (cancelled) return
+        fetch(url, { credentials: 'include' })
+          .then(async (resp) => {
+            if (cancelled) return
+            const ct = resp.headers.get('content-type') || ''
+
+            if (ct.includes('csv') || ct.includes('text/plain')) {
+              const text = await resp.text()
+              if (cancelled) return
+              const wb = XLSX.read(text, { type: 'string' })
+              setWorkbook(wb)
+              setSheets(wb.SheetNames)
+              loadSheet(wb, 0)
+            } else {
+              const buf = await resp.arrayBuffer()
+              if (cancelled) return
+              const wb = XLSX.read(buf, { type: 'array' })
+              setWorkbook(wb)
+              setSheets(wb.SheetNames)
+              loadSheet(wb, 0)
+            }
+            setLoading(false)
+          })
+          .catch((err) => {
+            if (!cancelled) {
+              setError(err instanceof Error ? err.message : 'Failed to load spreadsheet')
+              setLoading(false)
+            }
+          })
       })
 
     return () => { cancelled = true }
-  }, [url])
+  }, [docUuid, url])
 
   const handleSheetChange = (index: number) => {
-    if (workbook) loadSheet(workbook, index)
+    if (serverSheets) showServerSheet(serverSheets, index)
+    else if (workbook) loadSheet(workbook, index)
   }
 
   const btnStyle: React.CSSProperties = {

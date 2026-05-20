@@ -6,11 +6,56 @@ Uses pymongo (sync) for DB access.
 
 import datetime
 import logging
+import re
 
 from app.celery_app import celery_app
 from app.tasks import TRANSIENT_EXCEPTIONS
 
 logger = logging.getLogger(__name__)
+
+# Strips a leading <think>…</think> reasoning block that some Qwen/DeepSeek-R1
+# style models emit even when thinking is disabled at the request level.
+_THINK_BLOCK_RE = re.compile(r"<think\b[^>]*>.*?</think>", re.IGNORECASE | re.DOTALL)
+# Catches a stray opening <think> with no closing tag (some models stream the
+# block and then truncate at max_tokens without ever closing it).
+_OPEN_THINK_RE = re.compile(r"<think\b[^>]*>.*", re.IGNORECASE | re.DOTALL)
+
+
+def _clean_title(raw: str) -> str:
+    """Strip thinking tags, surrounding quotes/punctuation, and clamp length."""
+    text = _THINK_BLOCK_RE.sub("", raw or "")
+    text = _OPEN_THINK_RE.sub("", text)
+    text = text.strip().strip('"').strip("'").strip()
+    # Drop leading prefixes like "Title:" the model sometimes adds.
+    text = re.sub(r"^(title|description)\s*[:\-]\s*", "", text, flags=re.IGNORECASE)
+    # Collapse whitespace and remove trailing period.
+    text = " ".join(text.split())
+    text = text.rstrip(".")
+    return text
+
+
+def _pick_title_model(sys_cfg: dict, user_model_name: str | None) -> str | None:
+    """Choose the fastest non-thinking model available.
+
+    Priority:
+      1. Any model in available_models with thinking explicitly False
+      2. The user's selected model
+      3. The first available model
+    """
+    models = sys_cfg.get("available_models") or []
+    for m in models:
+        if m.get("thinking") is False and m.get("name"):
+            return m["name"]
+    if user_model_name:
+        return user_model_name
+    return models[0]["name"] if models and models[0].get("name") else None
+
+
+TITLE_SYSTEM_PROMPT = (
+    "You write very short, descriptive titles for activity log entries. "
+    "Output the title only — no quotes, no punctuation, no preamble, no "
+    "thinking. Five to seven words. Title Case."
+)
 
 # Fallback when SystemConfig.retention_config doesn't override it. Activity is
 # considered stuck if its last_updated_at hasn't advanced in this long — workflow
@@ -140,17 +185,17 @@ def generate_activity_description_task(
                     if non_null > 0:
                         extraction_context += f"\nFound {non_null} values"
 
-        # Resolve model
+        # Resolve model — prefer the fastest non-thinking model so the rail
+        # title arrives quickly; reasoning models add 5–30s of latency for
+        # what should be a one-shot 5-word output.
         sys_cfg = db.system_config.find_one() or {}
         user_id = activity.get("user_id")
-        model_name = ""
+        user_model_name = ""
         if user_id:
             user_cfg = db.user_model_config.find_one({"user_id": user_id})
             if user_cfg:
-                model_name = user_cfg.get("name", "")
-        if not model_name:
-            models = sys_cfg.get("available_models", [])
-            model_name = models[0]["name"] if models else ""
+                user_model_name = user_cfg.get("name", "") or ""
+        model_name = _pick_title_model(sys_cfg, user_model_name)
 
         if not model_name:
             logger.warning("No model available for description generation")
@@ -159,33 +204,43 @@ def generate_activity_description_task(
         # Build prompt
         if activity_type == "search_set_run":
             prompt = (
-                f"You are generating a short title for an extraction activity. "
-                f"Based on the extraction set name, the fields being extracted, "
-                f"and the document content, create a 4-to-6-word title.\n\n"
-                f"Extraction Set: {extraction_set_title or 'Data Extraction'}\n"
+                f"Write a short title for an extraction activity.\n\n"
+                f"Extraction Set: {extraction_set_title or 'Data Extraction'}"
                 f"{extraction_context}\n\n"
                 f"Document content (first page):\n{document_text}\n\n"
-                f"Generate a memorable 4-to-6-word title describing what data is being extracted "
-                f"from what type of document. No punctuation. Return only the words, nothing else."
+                f"Title (5–7 words, no punctuation, just the words):"
             )
         else:
             prompt = (
-                f"Based on the following content and the task being performed, "
-                f"generate a very short 4-to-6-word title.\n\n"
+                f"Write a short title for this activity.\n\n"
                 f"Task: {task_description}{extraction_context}\n\n"
                 f"Content:\n{document_text}\n\n"
-                f"Generate a memorable 4-to-6-word title. No punctuation. "
-                f"Return only the words, nothing else."
+                f"Title (5–7 words, no punctuation, just the words):"
             )
 
-        chat_agent = create_chat_agent(model_name, system_config_doc=sys_cfg)
+        # Force thinking off — the per-model `thinking` flag from SystemConfig
+        # would otherwise leak in and add latency. Use a tight system prompt
+        # instead of the default chat preamble so the model stays on task.
+        chat_agent = create_chat_agent(
+            model_name,
+            system_prompt=TITLE_SYSTEM_PROMPT,
+            thinking_override=False,
+            system_config_doc=sys_cfg,
+        )
         result = chat_agent.run_sync(prompt)
-        description = result.output.strip()
+        description = _clean_title(result.output)
 
-        # Truncate to 6 words max; accept shorter descriptions as-is
+        # Truncate to 8 words max; the UI clamps to 2 lines anyway.
         words = description.split()
-        if len(words) > 6:
-            description = " ".join(words[:6])
+        if len(words) > 8:
+            description = " ".join(words[:8])
+
+        if not description:
+            logger.warning(
+                "Empty title from model %s for activity %s (raw=%r)",
+                model_name, activity_id, result.output[:200],
+            )
+            return
 
         # Update activity
         meta_summary = activity.get("meta_summary", {}) or {}
@@ -197,7 +252,10 @@ def generate_activity_description_task(
             {"$set": {"title": description, "meta_summary": meta_summary}},
         )
 
-        logger.info("Updated activity %s with description: %s", activity_id, description)
+        logger.info(
+            "Updated activity %s with title %r (model=%s)",
+            activity_id, description, model_name,
+        )
 
     except Exception as e:
         logger.error("Error generating description for activity %s: %s", activity_id, e, exc_info=True)

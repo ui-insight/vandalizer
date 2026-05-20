@@ -56,13 +56,14 @@ async def client():
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _mock_workflow(wf_id="wf-1", user_id="user1", name="Test Workflow"):
+def _mock_workflow(wf_id="wf-1", user_id="user1", name="Test Workflow", team_id=None):
     """Return a MagicMock that looks like a Workflow document."""
     wf = MagicMock()
     wf.id = wf_id
     wf.name = name
     wf.description = "A test workflow"
     wf.user_id = user_id
+    wf.team_id = team_id
     wf.space = "default"
     wf.num_executions = 0
     wf.input_config = {}
@@ -87,9 +88,12 @@ class TestWorkflowListScoping:
         with patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}), \
              patch("app.dependencies.User") as MockUser, \
              patch("app.routers.workflows.svc") as mock_svc, \
-             patch("app.routers.workflows.resolve_authors", new_callable=AsyncMock, return_value={}):
+             patch("app.routers.workflows.resolve_authors", new_callable=AsyncMock, return_value={}), \
+             patch("app.routers.workflows.access_control") as mock_ac:
             MockUser.find_one = AsyncMock(return_value=user)
             mock_svc.list_workflows = AsyncMock(return_value=[wf])
+            mock_ac.get_team_access_context = AsyncMock(return_value=MagicMock())
+            mock_ac.can_manage_workflow = MagicMock(return_value=True)
 
             resp = await client.get("/api/workflows", cookies=cookies, headers=headers)
 

@@ -130,7 +130,7 @@ class TestCSRFMiddleware:
     async def test_post_to_exempt_path_bypasses_csrf(self, client):
         """POST to an exempt path (e.g., /api/auth/login) does not require CSRF."""
         with patch("app.routers.auth.auth_service") as mock_auth_svc:
-            mock_auth_svc.authenticate = AsyncMock(return_value=None)
+            mock_auth_svc.authenticate_with_reason = AsyncMock(return_value=(None, None))
 
             resp = await client.post(
                 "/api/auth/login",
@@ -172,3 +172,73 @@ class TestCSRFMiddleware:
         # Should not be blocked by CSRF; webhook prefix is exempt
         assert resp.status_code != 403
         assert resp.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_legacy_cookie_still_accepted(self, client):
+        """A user holding only the legacy csrf_token cookie can still validate.
+
+        This covers the transition window: users whose browsers haven't yet
+        received the new __Host-csrf_token cookie must not be locked out.
+        """
+        user = _make_user()
+        token = create_access_token("testuser", _TEST_SETTINGS)
+        csrf = secrets.token_urlsafe(32)
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser:
+            MockUser.find_one = AsyncMock(return_value=user)
+
+            resp = await client.post(
+                "/api/documents/search",
+                json={"query": "test"},
+                cookies={"access_token": token, "csrf_token": csrf},
+                headers={"X-CSRF-Token": csrf},
+            )
+
+        # Not blocked by CSRF (legacy cookie still validates)
+        assert resp.status_code != 403
+
+
+class TestBuildCsrfCookieHeader:
+    """Unit tests for the cookie-name + attributes builder."""
+
+    def test_uses_legacy_name_when_insecure(self):
+        from app.middleware.csrf import _build_csrf_cookie_header
+
+        header = _build_csrf_cookie_header(name="csrf_token", secure=False)
+        assert header.startswith("csrf_token=")
+        assert "Path=/" in header
+        assert "SameSite=Strict" in header
+        assert "Max-Age=" in header
+        assert "Secure" not in header
+
+    def test_uses_host_prefix_when_secure(self):
+        """In production the cookie must carry the __Host- prefix and Secure flag.
+
+        The __Host- prefix makes the cookie unspoofable by collisions: the
+        browser refuses to store any cookie of this name without Secure,
+        Path=/, and no Domain. This eliminates the duplicate-cookie failure
+        mode that caused the "CSRF validation failed in Chrome but not
+        incognito" bug.
+        """
+        from app.middleware.csrf import _build_csrf_cookie_header
+
+        header = _build_csrf_cookie_header(name="__Host-csrf_token", secure=True)
+        assert header.startswith("__Host-csrf_token=")
+        assert "Path=/" in header
+        assert "SameSite=Strict" in header
+        assert "Secure" in header
+        # __Host- prefix forbids a Domain attribute
+        assert "Domain=" not in header
+
+    def test_primary_cookie_name_selection(self):
+        from app.middleware.csrf import (
+            LEGACY_COOKIE_NAME,
+            MODERN_COOKIE_NAME,
+            _primary_cookie_name,
+        )
+
+        assert _primary_cookie_name(secure=True) == MODERN_COOKIE_NAME
+        assert _primary_cookie_name(secure=False) == LEGACY_COOKIE_NAME
+        assert MODERN_COOKIE_NAME == "__Host-csrf_token"
+        assert LEGACY_COOKIE_NAME == "csrf_token"

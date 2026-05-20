@@ -13,9 +13,11 @@ export function useActivities(externalSignal?: number) {
     DEFAULT_STALE_THRESHOLD_MINUTES,
   )
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const prevRef = useRef<Map<string, string | null>>(new Map())
+  const prevRef = useRef<Map<string, string>>(new Map())
   const lastActiveAtRef = useRef<number>(0)
-  const TAIL_DURATION = 15000 // keep polling 15s after completion for AI title
+  // Hard upper bound on tail polling — ensures we stop eventually if the
+  // title generator silently fails (e.g. no model configured).
+  const TAIL_DURATION = 120000
 
   const markTitleShimmered = useCallback((id: string) => {
     setFreshTitleIds((prev) => {
@@ -30,22 +32,38 @@ export function useActivities(externalSignal?: number) {
       const data = await listActivities(50)
       const newActivities = data.events
 
-      // Detect title changes on completed activities — those just got an AI title
+      // Detect AI-title arrival on completed activities. Track via the
+      // description_generated flag rather than title-string diffs so we
+      // also catch the case where the AI title happens to equal the
+      // placeholder.
       const prevMap = prevRef.current
       const changedIds: string[] = []
       for (const activity of newActivities) {
-        const prevTitle = prevMap.get(activity.id)
+        const generated = (activity.meta_summary as { description_generated?: boolean } | undefined)
+          ?.description_generated === true
+        const prevKey = prevMap.get(activity.id)
+        const wasGenerated = prevKey?.startsWith('gen:') ?? false
         if (
           prevMap.has(activity.id) &&
-          prevTitle !== activity.title &&
+          activity.status === 'completed' &&
           activity.title &&
-          activity.status === 'completed'
+          generated &&
+          !wasGenerated
         ) {
           changedIds.push(activity.id)
         }
       }
 
-      prevRef.current = new Map(newActivities.map((a) => [a.id, a.title]))
+      // Encode both "have we seen this id" and "was the AI title in" in
+      // one map value so the next refresh can detect the gen:false → gen:true
+      // transition without a second ref.
+      prevRef.current = new Map(
+        newActivities.map((a) => {
+          const generated = (a.meta_summary as { description_generated?: boolean } | undefined)
+            ?.description_generated === true
+          return [a.id, `${generated ? 'gen' : 'pre'}:${a.title ?? ''}`]
+        }),
+      )
       setActivities(newActivities)
 
       if (typeof data.stale_threshold_minutes === 'number' && data.stale_threshold_minutes > 0) {
@@ -77,9 +95,10 @@ export function useActivities(externalSignal?: number) {
     }
   }, [refresh, externalSignal])
 
-  // Poll while active, then keep polling for TAIL_DURATION after completion
-  // so the AI-generated title (written by Celery after the activity completes)
-  // gets picked up.
+  // Poll while active, then keep polling until every recently-completed
+  // activity has its AI title (or we hit the TAIL_DURATION cap). The AI
+  // title is written by Celery after completion and can take 5–30s on slow
+  // models, so we can't use a fixed short tail.
   useEffect(() => {
     const hasActive = activities.some(
       (a) => a.status === 'running' || a.status === 'queued',
@@ -89,8 +108,17 @@ export function useActivities(externalSignal?: number) {
       lastActiveAtRef.current = Date.now()
     }
 
-    const inTail = Date.now() - lastActiveAtRef.current < TAIL_DURATION
-    const shouldPoll = hasActive || inTail
+    const sinceActive = Date.now() - lastActiveAtRef.current
+    const inTail = sinceActive < TAIL_DURATION
+    // Keep polling if any completed activity in the recent window is still
+    // waiting on its AI-generated title.
+    const awaitingTitle = inTail && activities.some((a) => {
+      if (a.status !== 'completed') return false
+      const generated = (a.meta_summary as { description_generated?: boolean } | undefined)
+        ?.description_generated
+      return !generated
+    })
+    const shouldPoll = hasActive || awaitingTitle
 
     if (shouldPoll) {
       if (!pollRef.current) {

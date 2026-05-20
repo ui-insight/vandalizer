@@ -29,6 +29,11 @@ export function useWorkflows() {
     onSuccess: () => qc.invalidateQueries({ queryKey }),
   })
 
+  const removeFromTeamMutation = useMutation({
+    mutationFn: (id: string) => api.removeWorkflowFromTeam(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey }),
+  })
+
   const importMutation = useMutation({
     mutationFn: (file: File) => api.importWorkflow(file),
     onSuccess: () => qc.invalidateQueries({ queryKey }),
@@ -46,9 +51,13 @@ export function useWorkflows() {
     return duplicateMutation.mutateAsync(id)
   }
 
+  const removeFromTeam = async (id: string) => {
+    return removeFromTeamMutation.mutateAsync(id)
+  }
+
   const importFromFile = async (file: File) => {
     return importMutation.mutateAsync(file)
   }
 
-  return { workflows, loading, refresh, create, remove, duplicate, importFromFile }
+  return { workflows, loading, refresh, create, remove, duplicate, removeFromTeam, importFromFile }
 }

@@ -148,3 +148,74 @@ class TestExtractTextFromFileFallback:
                 os.unlink(path)
             except OSError:
                 pass
+
+
+# ---------------------------------------------------------------------------
+# Phase 1: page-aware chunking and citation metadata
+# ---------------------------------------------------------------------------
+
+
+class TestSplitTextWithOffsets:
+    """The offset variant has to return chunks AND each chunk's start
+    position in the source so callers can map chunks back to page markers."""
+
+    def test_offsets_track_chunk_positions(self):
+        from app.services.document_manager import _split_text_with_offsets
+
+        # Build a deterministic input that will produce multiple chunks.
+        text = ("aaaa " * 60).strip()  # 299 chars
+        chunks = _split_text_with_offsets(text, chunk_size=100, chunk_overlap=20)
+        assert len(chunks) >= 2
+        # Each entry is (chunk_text, start_offset).
+        for chunk, offset in chunks:
+            assert isinstance(chunk, str) and chunk
+            assert isinstance(offset, int)
+            assert text[offset:offset + len(chunk)].startswith(chunk[:20])
+
+    def test_split_text_string_variant_still_works(self):
+        from app.services.document_manager import _split_text
+
+        # The legacy wrapper must still return a list[str] for callers that
+        # don't care about offsets (chunking-only tests, KB ingest paths).
+        chunks = _split_text("hello world " * 30, 80, 16)
+        assert all(isinstance(c, str) for c in chunks)
+        assert chunks
+
+
+class TestLocationForOffset:
+    def test_returns_most_recent_marker(self):
+        from app.services.document_manager import _location_for_offset
+
+        markers = [
+            {"char_offset": 0, "kind": "page", "value": 1},
+            {"char_offset": 1000, "kind": "page", "value": 2},
+            {"char_offset": 2500, "kind": "page", "value": 3},
+        ]
+        # Offset just past the page-2 marker should map to page 2.
+        assert _location_for_offset(1200, markers)["value"] == 2
+        # Offset past the last marker stays on the last page.
+        assert _location_for_offset(99_999, markers)["value"] == 3
+        # Offset at zero with markers starting at zero maps to the first page.
+        assert _location_for_offset(0, markers)["value"] == 1
+
+    def test_returns_empty_dict_when_no_markers(self):
+        from app.services.document_manager import _location_for_offset
+
+        assert _location_for_offset(42, []) == {}
+
+
+class TestPageMarkerInterpolation:
+    def test_interpolation_spreads_pages_uniformly(self):
+        from app.services.document_readers import _interpolate_page_markers
+
+        # 100 chars across 4 pages → markers at 0, 25, 50, 75.
+        markers = _interpolate_page_markers("x" * 100, 4)
+        assert [m["value"] for m in markers] == [1, 2, 3, 4]
+        assert [m["char_offset"] for m in markers] == [0, 25, 50, 75]
+        assert all(m["kind"] == "page" for m in markers)
+
+    def test_handles_zero_pages(self):
+        from app.services.document_readers import _interpolate_page_markers
+
+        assert _interpolate_page_markers("anything", 0) == []
+        assert _interpolate_page_markers("", 5) == []

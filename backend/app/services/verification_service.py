@@ -16,6 +16,8 @@ from app.models.knowledge import KnowledgeBase
 from app.models.system_config import SystemConfig
 from app.models.workflow import Workflow
 from app.models.search_set import SearchSet
+from app.schemas.user import AuthorRef
+from app.services.user_lookup import resolve_author, resolve_authors
 
 
 async def submit_for_verification(
@@ -139,7 +141,8 @@ async def submit_for_verification(
         validation_tier=validation_tier,
     )
     await req.insert()
-    return await _request_to_dict(req)
+    submitter_ref = await resolve_author(user_id)
+    return await _request_to_dict(req, submitter_ref=submitter_ref)
 
 
 async def list_queue(
@@ -147,6 +150,7 @@ async def list_queue(
     limit: int = 50,
 ) -> list[dict]:
     """List verification requests (for reviewers)."""
+
     query: dict = {}
     if status_filter:
         query["status"] = status_filter
@@ -157,9 +161,10 @@ async def list_queue(
         ]}
 
     requests = await VerificationRequest.find(query).sort("-submitted_at").limit(limit).to_list()
+    author_map = await resolve_authors(r.submitter_user_id for r in requests)
     results = []
     for req in requests:
-        d = await _request_to_dict(req)
+        d = await _request_to_dict(req, submitter_ref=author_map.get(req.submitter_user_id))
         # Attach item name
         d["item_name"] = await _get_item_name(req.item_kind, req.item_id)
         results.append(d)
@@ -168,10 +173,12 @@ async def list_queue(
 
 async def get_request(request_uuid: str) -> dict | None:
     """Get a single verification request by UUID."""
+
     req = await VerificationRequest.find_one(VerificationRequest.uuid == request_uuid)
     if not req:
         return None
-    d = await _request_to_dict(req)
+    submitter_ref = await resolve_author(req.submitter_user_id)
+    d = await _request_to_dict(req, submitter_ref=submitter_ref)
     d["item_name"] = await _get_item_name(req.item_kind, req.item_id)
     return d
 
@@ -225,20 +232,23 @@ async def update_status(
             for cid in collection_ids:
                 await add_to_collection(cid, str(req.item_id))
 
-    return await _request_to_dict(req)
+    submitter_ref = await resolve_author(req.submitter_user_id)
+    return await _request_to_dict(req, submitter_ref=submitter_ref)
 
 
 async def my_requests(user_id: str, limit: int = 50) -> list[dict]:
     """List a user's own verification requests."""
+
     requests = (
         await VerificationRequest.find(VerificationRequest.submitter_user_id == user_id)
         .sort("-submitted_at")
         .limit(limit)
         .to_list()
     )
+    submitter_ref = await resolve_author(user_id)
     results = []
     for req in requests:
-        d = await _request_to_dict(req)
+        d = await _request_to_dict(req, submitter_ref=submitter_ref)
         d["item_name"] = await _get_item_name(req.item_kind, req.item_id)
         results.append(d)
     return results
@@ -480,9 +490,28 @@ async def list_verified_items(
     for m in all_meta:
         meta_map[(m.item_kind, m.item_id)] = m
 
-    # --- Batch-resolve workflow authors ---
-    from app.services.user_lookup import resolve_authors
-    author_map = await resolve_authors(wf_creator_map.values())
+    # --- Batch-resolve submitters from latest approved VerificationRequest per item ---
+    all_object_ids = [i.item_id for i in items]
+    submitter_user_map: dict[tuple[str, str], str] = {}
+    if all_object_ids:
+        approved_reqs = (
+            await VerificationRequest.find(
+                {
+                    "item_id": {"$in": all_object_ids},
+                    "status": VerificationStatus.APPROVED.value,
+                }
+            )
+            .sort("-reviewed_at")
+            .to_list()
+        )
+        for req in approved_reqs:
+            key = (req.item_kind, str(req.item_id))
+            # First occurrence is the latest (sorted desc)
+            submitter_user_map.setdefault(key, req.submitter_user_id)
+
+    # --- Batch-resolve workflow authors + submitters in one shot ---
+    all_user_ids = list(wf_creator_map.values()) + list(submitter_user_map.values())
+    author_map = await resolve_authors(all_user_ids)
 
     # --- Batch-fetch KB metrics ---
     kb_map: dict[str, KnowledgeBase] = {}
@@ -521,6 +550,9 @@ async def list_verified_items(
         if quality_tier and item_tier != quality_tier:
             continue
 
+        submitter_id = submitter_user_map.get((item.kind.value, item_id_str))
+        submitter_ref = author_map.get(submitter_id) if submitter_id else None
+
         entry = {
             "id": str(item.id),
             "item_id": item_id_str,
@@ -538,6 +570,7 @@ async def list_verified_items(
             "quality_grade": meta.quality_grade if meta else None,
             "last_validated_at": meta.last_validated_at.isoformat() if meta and meta.last_validated_at else None,
             "validation_run_count": meta.validation_run_count if meta else 0,
+            "submitted_by": submitter_ref.model_dump() if submitter_ref else None,
         }
 
         # KB-specific metrics (from batch)
@@ -904,14 +937,22 @@ async def _mark_item_verified(item_id: PydanticObjectId, item_kind: str) -> None
     verified_lib = await get_or_create_verified_library()
     verified_item_ids = set(verified_lib.items) if verified_lib.items else set()
 
-    # Check if this item is already in the verified library
+    # Check if this item is already in the verified library. The submitter's own
+    # LibraryItem is often already attached to the verified library at submission
+    # time but with verified=False — flip it to True rather than silently leaving
+    # it unverified (or creating a duplicate).
     existing_in_verified = await LibraryItem.find(
         {"_id": {"$in": list(verified_item_ids)}},
         {"item_id": item_id, "kind": item_kind},
     ).to_list() if verified_item_ids else []
 
-    if not existing_in_verified:
-        now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.now(datetime.timezone.utc)
+    if existing_in_verified:
+        for li in existing_in_verified:
+            if not li.verified:
+                li.verified = True
+                await li.save()
+    else:
         new_item = LibraryItem(
             item_id=item_id,
             kind=LibraryItemKind(item_kind),
@@ -938,7 +979,10 @@ async def _get_item_name(item_kind: str, item_id: PydanticObjectId) -> str:
         return ss.title if ss else "Unknown extraction"
 
 
-async def _request_to_dict(req: VerificationRequest) -> dict:
+async def _request_to_dict(
+    req: VerificationRequest,
+    submitter_ref: AuthorRef | None = None,
+) -> dict:
     # Resolve item_uuid for search_set and knowledge_base items
     item_uuid = None
     if req.item_kind == "search_set":
@@ -961,6 +1005,7 @@ async def _request_to_dict(req: VerificationRequest) -> dict:
         "submitter_name": req.submitter_name,
         "submitter_org": req.submitter_org,
         "submitter_role": req.submitter_role,
+        "submitter": submitter_ref.model_dump() if submitter_ref else None,
         "summary": req.summary,
         "description": req.description,
         "category": req.category,

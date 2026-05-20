@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { apiFetch, ApiError } from './client'
+import { apiFetch, ApiError, parseCsrfToken } from './client'
 
 // Mock global fetch
 const mockFetch = vi.fn()
@@ -14,8 +14,9 @@ function jsonResponse(data: unknown, status = 200, headers: Record<string, strin
 
 beforeEach(() => {
   mockFetch.mockReset()
-  // Clear cookies
+  // Clear both legacy and modern cookies
   document.cookie = 'csrf_token=; max-age=0'
+  document.cookie = '__Host-csrf_token=; max-age=0'
 })
 
 afterEach(() => {
@@ -139,5 +140,39 @@ describe('ApiError', () => {
     expect(err.status).toBe(500)
     expect(err.message).toBe('Server error')
     expect(err).toBeInstanceOf(Error)
+  })
+})
+
+describe('parseCsrfToken', () => {
+  // jsdom rejects __Host- prefixed cookies on http:// (matching real browser
+  // behavior), so we test the parser directly with crafted cookie strings.
+  it('prefers __Host-csrf_token over legacy csrf_token when both present', () => {
+    expect(
+      parseCsrfToken('csrf_token=legacy-value; __Host-csrf_token=modern-value'),
+    ).toBe('modern-value')
+  })
+
+  it('handles __Host- variant first in the string', () => {
+    expect(
+      parseCsrfToken('__Host-csrf_token=modern-value; csrf_token=legacy-value'),
+    ).toBe('modern-value')
+  })
+
+  it('falls back to legacy csrf_token when __Host- variant is absent', () => {
+    expect(parseCsrfToken('csrf_token=legacy-only')).toBe('legacy-only')
+  })
+
+  it('returns null when neither cookie is present', () => {
+    expect(parseCsrfToken('access_token=foo; other=bar')).toBeNull()
+    expect(parseCsrfToken('')).toBeNull()
+  })
+
+  it('does not confuse __Host-csrf_token with csrf_token', () => {
+    // A naive regex for csrf_token would match the tail of __Host-csrf_token.
+    // Verify the legacy fallback skips that case and returns the legacy value.
+    expect(parseCsrfToken('__Host-csrf_token=modern')).toBe('modern')
+    expect(parseCsrfToken('not__Host-csrf_token=weird; csrf_token=legit')).toBe(
+      'legit',
+    )
   })
 })

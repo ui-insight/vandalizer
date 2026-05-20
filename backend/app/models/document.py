@@ -14,6 +14,7 @@ class SmartDocument(Document):
     validation_feedback: Optional[str] = None
     task_id: Optional[str] = None
     task_status: Optional[str] = None
+    error_message: Optional[str] = None
     title: str
     raw_text: str = ""
     extension: str = "pdf"
@@ -26,6 +27,18 @@ class SmartDocument(Document):
     is_default: bool = False
     token_count: int = 0
     num_pages: int = 0
+
+    # Retrieval readiness — set by perform_semantic_ingestion. A document is
+    # only safe to use via Knowledge Base retrieval once chromadb_ready is True.
+    chromadb_ready: bool = False
+    chunk_count: int = 0
+    ingest_error: Optional[str] = None
+
+    # Per-location char-offset markers from text extraction, used to attach
+    # page (PDF) or sheet (XLSX) metadata to chunks for citations. Empty for
+    # formats with no location structure (docx, txt, html, code).
+    # Shape: [{"char_offset": int, "kind": "page"|"sheet", "value": int|str}]
+    text_markers: list[dict] = []
 
     # Data classification (FERPA, CUI, etc.)
     classification: Optional[str] = None  # unrestricted | internal | ferpa | cui | itar

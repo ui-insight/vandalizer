@@ -14,6 +14,7 @@ import {
   LineChart, Line,
 } from 'recharts'
 import { PageLayout } from '../components/layout/PageLayout'
+import { useConfirm } from '../components/shared/useConfirm'
 import { useAuth } from '../hooks/useAuth'
 import { useTeams } from '../hooks/useTeams'
 import { getThemeConfig, updateThemeConfig } from '../api/config'
@@ -21,8 +22,8 @@ import type { ThemeConfig } from '../api/config'
 import {
   getUsageStats, getUsageTimeseries, getUserLeaderboard, getTeamLeaderboard,
   getTeamDetail, getUserDetail,
-  getWorkflowEvents, getSystemConfig, updateSystemConfig, updateM365Config,
-  addModel, updateModel, deleteModel, setDefaultModel, testOcr, testModel, addOAuthProvider,
+  getWorkflowEvents, getSystemConfig, updateSystemConfig, updateCompliancePolicyConfig,
+  addModel, updateModel, deleteModel, setDefaultModel, testOcr, testModel, probeModel, addOAuthProvider,
   updateOAuthProvider, deleteOAuthProvider, updateAuthMethods,
   getQualitySummary, getQualityTimeline, runRegressionSuite,
   getQualityAlerts, acknowledgeAlert, getQualityItems, getQualityItemDetail,
@@ -64,6 +65,7 @@ import type { AuditLogEntry } from '../api/audit'
 import { getAuthConfig } from '../api/auth'
 import { UpdateBanner } from '../components/admin/UpdateBanner'
 import { ApiKeysTab } from '../components/admin/ApiKeysTab'
+import { ComplianceTab } from '../components/admin/ComplianceTab'
 
 function applyThemeToDOM(theme: ThemeConfig) {
   const root = document.documentElement
@@ -71,7 +73,7 @@ function applyThemeToDOM(theme: ThemeConfig) {
   root.style.setProperty('--ui-radius', theme.ui_radius)
 }
 
-type Tab = 'usage' | 'users' | 'teams' | 'organizations' | 'workflows' | 'quality' | 'audit' | 'demo' | 'email' | 'certifications' | 'apikeys' | 'config'
+type Tab = 'usage' | 'users' | 'teams' | 'organizations' | 'workflows' | 'quality' | 'compliance' | 'audit' | 'demo' | 'email' | 'certifications' | 'apikeys' | 'config'
 
 const TABS: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'usage', label: 'Usage', icon: BarChart3 },
@@ -80,6 +82,7 @@ const TABS: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'organizations', label: 'Organizations', icon: FolderTree },
   { key: 'workflows', label: 'Workflows', icon: Workflow },
   { key: 'quality', label: 'Quality', icon: ShieldCheck },
+  { key: 'compliance', label: 'Compliance', icon: Lock },
   { key: 'audit', label: 'Audit Log', icon: FileText },
   { key: 'demo', label: 'Demo', icon: Zap },
   { key: 'email', label: 'Email', icon: Mail },
@@ -1056,6 +1059,7 @@ function TeamDrillDown({ teamId, onBack }: { teamId: string; onBack: () => void 
 }
 
 function TeamsTab() {
+  const confirm = useConfirm()
   const [subTab, setSubTab] = useState<'manage' | 'stats' | 'isolated'>('manage')
 
   // ── Manage sub-tab state ──────────────────────────────────────────────────
@@ -1181,7 +1185,17 @@ function TeamsTab() {
   }
 
   const handleRemoveUser = async (teamUuid: string, userId: string, userName: string) => {
-    if (!window.confirm(`Remove ${userName} from this team?`)) return
+    const ok = await confirm({
+      title: 'Remove user from team?',
+      message: (
+        <>
+          Are you sure you want to remove <strong>{userName}</strong> from this team? They will lose access to the team's content.
+        </>
+      ),
+      confirmLabel: 'Remove',
+      destructive: true,
+    })
+    if (!ok) return
     await adminRemoveUserFromTeam(teamUuid, userId)
     const members = await getTeamMembers(teamUuid)
     setTeamMembers(prev => ({ ...prev, [teamUuid]: members }))
@@ -2276,6 +2290,7 @@ function QualityTab() {
 // ──────────────────────────────────────────
 
 function ConfigTab() {
+  const confirm = useConfirm()
   const [cfg, setCfg] = useState<SystemConfigData | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -2329,20 +2344,34 @@ function ConfigTab() {
   const [showModelForm, setShowModelForm] = useState(false)
   const [editingModelIndex, setEditingModelIndex] = useState<number | null>(null)
   const [savingModel, setSavingModel] = useState(false)
-  const [newModel, setNewModel] = useState({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '', speed: '', tier: '', privacy: '', supports_structured: true, multimodal: false, supports_pdf: false })
+  const [newModel, setNewModel] = useState({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '', speed: '', tier: '', privacy: '', supports_structured: true, multimodal: false, supports_pdf: false, context_window: 128000 })
+  const [probingContext, setProbingContext] = useState(false)
+  const [probeResult, setProbeResult] = useState<{ ok: boolean; message: string } | null>(null)
 
   // Support contacts
   const [supportContacts, setSupportContacts] = useState<{ user_id: string; email: string; name: string }[]>([])
   const [showAddContact, setShowAddContact] = useState(false)
   const [newContact, setNewContact] = useState({ user_id: '', email: '', name: '' })
 
-  // M365 integration
-  const [m365Enabled, setM365Enabled] = useState(false)
-  const [m365ClientId, setM365ClientId] = useState('')
-  const [m365ClientSecret, setM365ClientSecret] = useState('')
-  const [m365TenantId, setM365TenantId] = useState('')
-  const [m365Saving, setM365Saving] = useState(false)
-  const [m365Saved, setM365Saved] = useState(false)
+  // Compliance activation
+  const [complianceEnabled, setComplianceEnabled] = useState(false)
+  const [complianceCheckOnUpload, setComplianceCheckOnUpload] = useState(true)
+  const [complianceRules, setComplianceRules] = useState('')
+  const [complianceChunkSize, setComplianceChunkSize] = useState(8000)
+  const [complianceChunkOverlap, setComplianceChunkOverlap] = useState(200)
+  const [complianceSaving, setComplianceSaving] = useState(false)
+  const [complianceSaved, setComplianceSaved] = useState(false)
+
+  // Retention policy
+  type RetentionPolicyForm = { retention_days: number; soft_delete_grace_days: number; warning_days_before?: number }
+  const [retentionEnabled, setRetentionEnabled] = useState(false)
+  const [retentionPolicies, setRetentionPolicies] = useState<Record<string, RetentionPolicyForm>>({})
+  const [activityRetentionDays, setActivityRetentionDays] = useState(180)
+  const [chatRetentionDays, setChatRetentionDays] = useState(365)
+  const [workflowResultRetentionDays, setWorkflowResultRetentionDays] = useState(365)
+  const [staleActivityMinutes, setStaleActivityMinutes] = useState(30)
+  const [retentionSaving, setRetentionSaving] = useState(false)
+  const [retentionSaved, setRetentionSaved] = useState(false)
 
   // Add/edit provider form
   const [showAddProvider, setShowAddProvider] = useState(false)
@@ -2392,12 +2421,21 @@ function ConfigTab() {
       setExcellentThreshold((tiers.excellent?.min_score as number) ?? 90)
       setGoodThreshold((tiers.good?.min_score as number) ?? 70)
       setFairThreshold((tiers.fair?.min_score as number) ?? 50)
-      // M365 config
-      const m365 = c.m365_config || {}
-      setM365Enabled(!!m365.enabled)
-      setM365ClientId(m365.client_id || '')
-      setM365ClientSecret(m365.client_secret || '')
-      setM365TenantId(m365.tenant_id || '')
+      // Compliance config
+      const comp = c.compliance_config || ({} as Partial<typeof c.compliance_config>)
+      setComplianceEnabled(!!comp.enabled)
+      setComplianceCheckOnUpload(comp.check_on_upload !== false)
+      setComplianceRules(comp.rules || '')
+      setComplianceChunkSize(comp.chunk_size || 8000)
+      setComplianceChunkOverlap(comp.chunk_overlap ?? 200)
+      // Retention config
+      const rc = (c.retention_config || {}) as Record<string, unknown>
+      setRetentionEnabled(!!rc.enabled)
+      setRetentionPolicies((rc.policies as Record<string, RetentionPolicyForm>) || {})
+      setActivityRetentionDays((rc.activity_retention_days as number) ?? 180)
+      setChatRetentionDays((rc.chat_retention_days as number) ?? 365)
+      setWorkflowResultRetentionDays((rc.workflow_result_retention_days as number) ?? 365)
+      setStaleActivityMinutes((rc.activity_stale_threshold_minutes as number) ?? 30)
     }).finally(() => setLoading(false))
 
     getThemeConfig().then(t => {
@@ -2461,6 +2499,30 @@ function ConfigTab() {
     }
   }
 
+  const handleProbeContextWindow = async () => {
+    setProbingContext(true)
+    setProbeResult(null)
+    try {
+      const result = await probeModel({
+        name: newModel.name,
+        endpoint: newModel.endpoint,
+        api_protocol: newModel.api_protocol,
+        api_key: newModel.api_key,
+        existing_model_index: editingModelIndex,
+      })
+      if (result.context_window && result.context_window > 0) {
+        setNewModel(prev => ({ ...prev, context_window: result.context_window as number }))
+        setProbeResult({ ok: true, message: `Detected ${result.context_window.toLocaleString()} tokens (${result.source}).` })
+      } else {
+        setProbeResult({ ok: false, message: result.detail || `No context length reported (${result.source}).` })
+      }
+    } catch (e) {
+      setProbeResult({ ok: false, message: e instanceof Error ? e.message : 'Probe failed' })
+    } finally {
+      setProbingContext(false)
+    }
+  }
+
   const handleSaveModel = async () => {
     if (!newModel.name.trim()) {
       setError('Model name is required')
@@ -2487,7 +2549,8 @@ function ConfigTab() {
           ...(resDefault !== undefined ? { default_model: resDefault } : {}),
         })
       }
-      setNewModel({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '', speed: '', tier: '', privacy: '', supports_structured: true, multimodal: false, supports_pdf: false })
+      setNewModel({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '', speed: '', tier: '', privacy: '', supports_structured: true, multimodal: false, supports_pdf: false, context_window: 128000 })
+      setProbeResult(null)
       setShowModelForm(false)
       setEditingModelIndex(null)
     } catch (e) {
@@ -2514,12 +2577,26 @@ function ConfigTab() {
       supports_structured: m.supports_structured !== false,
       multimodal: !!m.multimodal,
       supports_pdf: !!m.supports_pdf,
+      context_window: typeof m.context_window === 'number' && m.context_window > 0 ? m.context_window : 128000,
     })
+    setProbeResult(null)
     setEditingModelIndex(index)
     setShowModelForm(true)
   }
 
   const handleDeleteModel = async (index: number) => {
+    const model = cfg?.available_models?.[index]
+    const ok = await confirm({
+      title: 'Delete model?',
+      message: (
+        <>
+          Are you sure you want to delete the model <strong>{model?.name || 'this model'}</strong>? Workflows and chats configured to use it will fail until reconfigured.
+        </>
+      ),
+      confirmLabel: 'Delete',
+      destructive: true,
+    })
+    if (!ok) return
     try {
       const res = await deleteModel(index)
       if (cfg) {
@@ -2597,6 +2674,19 @@ function ConfigTab() {
   }
 
   const handleDeleteProvider = async (index: number) => {
+    const provider = cfg?.oauth_providers?.[index] as Record<string, unknown> | undefined
+    const name = (provider?.display_name as string) || (provider?.provider as string) || 'this provider'
+    const ok = await confirm({
+      title: 'Delete OAuth provider?',
+      message: (
+        <>
+          Are you sure you want to delete <strong>{name}</strong>? Users authenticating through this provider will no longer be able to sign in via it.
+        </>
+      ),
+      confirmLabel: 'Delete',
+      destructive: true,
+    })
+    if (!ok) return
     try {
       await deleteOAuthProvider(index)
       const c = await getSystemConfig()
@@ -2666,7 +2756,7 @@ function ConfigTab() {
         position: 'sticky', top: 0, zIndex: 20,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         background: '#fff', borderBottom: '1px solid #e5e7eb',
-        padding: '12px 0', margin: '0 0 -4px',
+        padding: '12px 20px', margin: '0 0 -4px',
         boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
       }}>
         <span style={{ fontSize: 14, fontWeight: 600, color: '#374151', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -2701,7 +2791,8 @@ function ConfigTab() {
           <div style={{ flex: 1 }} />
           <button
             onClick={() => {
-              setNewModel({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '', speed: '', tier: '', privacy: '', supports_structured: true, multimodal: false, supports_pdf: false })
+              setNewModel({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '', speed: '', tier: '', privacy: '', supports_structured: true, multimodal: false, supports_pdf: false, context_window: 128000 })
+              setProbeResult(null)
               setEditingModelIndex(null)
               setShowModelForm(!showModelForm)
             }}
@@ -2864,6 +2955,51 @@ function ConfigTab() {
                     <option value="external">External</option>
                   </select>
                 </div>
+              </div>
+              <div style={{ marginTop: 12 }}>
+                <label style={labelStyle}>Context Window (tokens)</label>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
+                  <input
+                    type="number"
+                    min={1}
+                    value={newModel.context_window}
+                    onChange={e => {
+                      const v = parseInt(e.target.value, 10)
+                      setNewModel(prev => ({ ...prev, context_window: Number.isFinite(v) && v > 0 ? v : 0 }))
+                      setProbeResult(null)
+                    }}
+                    placeholder="e.g. 65536"
+                    style={{ ...inputStyle, flex: 1 }}
+                  />
+                  <button
+                    onClick={handleProbeContextWindow}
+                    disabled={probingContext || !newModel.name.trim()}
+                    title="Ask the endpoint what context window it actually serves. Catches the case where the model card says 131k but the deployment was launched with a smaller --max-model-len."
+                    style={{
+                      padding: '0 14px', borderRadius: 'var(--ui-radius, 12px)',
+                      border: '1px solid #d1d5db', background: '#fff', fontSize: 13,
+                      cursor: probingContext || !newModel.name.trim() ? 'not-allowed' : 'pointer',
+                      opacity: probingContext || !newModel.name.trim() ? 0.6 : 1,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {probingContext ? 'Probing…' : 'Probe endpoint'}
+                  </button>
+                </div>
+                <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+                  The serving cap (e.g. vLLM&rsquo;s <code>--max-model-len</code>), not the model card&rsquo;s theoretical max. Compaction and the oversize-doc check use this to decide what fits.
+                </div>
+                {probeResult && (
+                  <div style={{
+                    marginTop: 6, padding: '6px 10px', borderRadius: 'var(--ui-radius, 12px)',
+                    background: probeResult.ok ? '#ecfdf5' : '#fef3c7',
+                    border: `1px solid ${probeResult.ok ? '#a7f3d0' : '#fcd34d'}`,
+                    color: probeResult.ok ? '#065f46' : '#92400e',
+                    fontSize: 12,
+                  }}>
+                    {probeResult.message}
+                  </div>
+                )}
               </div>
               <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
                 <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, cursor: 'pointer' }}>
@@ -3519,66 +3655,288 @@ function ConfigTab() {
         </div>
       </div>
 
-      {/* M365 Integration */}
+      {/* Compliance Activation */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          <Globe size={18} color="#6b7280" /> Microsoft 365 Integration
+          <Lock size={18} color="#6b7280" /> Document Compliance Checks
         </div>
         <div style={{ padding: '0 20px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.5 }}>
+            When enabled, every uploaded document is scanned in chunks by an LLM
+            against the policy below. Documents containing sensitive or policy-violating
+            content are flagged in the document library.
+          </div>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-            <input type="checkbox" checked={m365Enabled} onChange={e => setM365Enabled(e.target.checked)} />
-            <span style={{ fontSize: 14, fontWeight: 500 }}>Enable M365 Integration</span>
+            <input type="checkbox" checked={complianceEnabled} onChange={e => setComplianceEnabled(e.target.checked)} />
+            <span style={{ fontSize: 14, fontWeight: 500 }}>Activate compliance checks</span>
           </label>
-          {m365Enabled && (
+          {complianceEnabled && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '8px 0' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={complianceCheckOnUpload}
+                  onChange={e => setComplianceCheckOnUpload(e.target.checked)}
+                />
+                <span style={{ fontSize: 13 }}>Run checks automatically on every upload</span>
+              </label>
               <div>
-                <label style={labelStyle}>Azure Tenant ID</label>
-                <input value={m365TenantId} onChange={e => setM365TenantId(e.target.value)} placeholder="e.g. xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" style={inputStyle} />
+                <label style={labelStyle}>Compliance policy (sent to the validator LLM)</label>
+                <textarea
+                  value={complianceRules}
+                  onChange={e => setComplianceRules(e.target.value)}
+                  placeholder="Describe what content should be flagged…"
+                  rows={6}
+                  style={{ ...inputStyle, fontFamily: 'inherit', resize: 'vertical' }}
+                />
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+                  Plain English. The validator decides whether each chunk passes or fails based on this rule set.
+                </div>
               </div>
-              <div>
-                <label style={labelStyle}>Application (Client) ID</label>
-                <input value={m365ClientId} onChange={e => setM365ClientId(e.target.value)} placeholder="Azure AD app registration client ID" style={inputStyle} />
-              </div>
-              <div>
-                <label style={labelStyle}>Client Secret</label>
-                <input type="password" value={m365ClientSecret} onChange={e => setM365ClientSecret(e.target.value)} placeholder={m365ClientSecret === '***' ? '(unchanged)' : 'Azure AD client secret'} style={inputStyle} />
-              </div>
-              <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
-                Requires an Azure AD app registration with Graph API permissions (Mail.Read, Files.Read).
-                Your IT department may need to grant admin consent.
+              <div style={{ display: 'flex', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>Chunk size (chars)</label>
+                  <input
+                    type="number"
+                    min={500}
+                    value={complianceChunkSize}
+                    onChange={e => setComplianceChunkSize(Number(e.target.value) || 8000)}
+                    style={inputStyle}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>Chunk overlap (chars)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={complianceChunkOverlap}
+                    onChange={e => setComplianceChunkOverlap(Number(e.target.value) || 0)}
+                    style={inputStyle}
+                  />
+                </div>
               </div>
             </div>
           )}
           <div>
             <button
               onClick={async () => {
-                setM365Saving(true)
-                setM365Saved(false)
+                setComplianceSaving(true)
+                setComplianceSaved(false)
                 try {
-                  await updateM365Config({
-                    enabled: m365Enabled,
-                    client_id: m365ClientId,
-                    tenant_id: m365TenantId,
-                    ...(m365ClientSecret !== '***' ? { client_secret: m365ClientSecret } : {}),
+                  await updateCompliancePolicyConfig({
+                    enabled: complianceEnabled,
+                    check_on_upload: complianceCheckOnUpload,
+                    rules: complianceRules,
+                    chunk_size: complianceChunkSize,
+                    chunk_overlap: complianceChunkOverlap,
                   })
-                  setM365Saved(true)
-                  setTimeout(() => setM365Saved(false), 3000)
+                  setComplianceSaved(true)
+                  setTimeout(() => setComplianceSaved(false), 3000)
                 } catch {
-                  setError('Failed to save M365 configuration')
+                  setError('Failed to save compliance configuration')
                 } finally {
-                  setM365Saving(false)
+                  setComplianceSaving(false)
                 }
               }}
-              disabled={m365Saving}
+              disabled={complianceSaving}
               style={{
                 padding: '8px 20px', borderRadius: 'var(--ui-radius, 12px)', border: 'none',
                 background: '#111827', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                opacity: m365Saving ? 0.6 : 1,
+                opacity: complianceSaving ? 0.6 : 1,
               }}
             >
-              {m365Saving ? 'Saving...' : 'Save M365 Configuration'}
+              {complianceSaving ? 'Saving...' : 'Save Compliance Settings'}
             </button>
-            {m365Saved && <span style={{ marginLeft: 10, fontSize: 13, color: '#16a34a' }}>Saved!</span>}
+            {complianceSaved && <span style={{ marginLeft: 10, fontSize: 13, color: '#16a34a' }}>Saved!</span>}
+          </div>
+        </div>
+      </div>
+
+      {/* Retention Policy */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}>
+          <ShieldCheck size={18} color="#6b7280" /> Document Retention Policy
+        </div>
+        <div style={{ padding: '0 20px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.5 }}>
+            When enforcement is on, documents are auto-scheduled for soft-deletion after their
+            classification-specific retention window. Soft-deleted documents become unrecoverable
+            after the grace period expires. Items on retention hold are never auto-deleted.
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={retentionEnabled}
+              onChange={e => setRetentionEnabled(e.target.checked)}
+              style={checkStyle}
+            />
+            <span style={{ fontSize: 14, fontWeight: 500 }}>Activate retention enforcement</span>
+          </label>
+          {retentionEnabled && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '8px 0' }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+                  Per-classification rules
+                </div>
+                <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f9fafb', color: '#6b7280', textAlign: 'left' }}>
+                      <th style={{ padding: '8px 12px', fontWeight: 500 }}>Tier</th>
+                      <th style={{ padding: '8px 12px', fontWeight: 500 }}>Retention (days)</th>
+                      <th style={{ padding: '8px 12px', fontWeight: 500 }}>Grace before purge (days)</th>
+                      <th style={{ padding: '8px 12px', fontWeight: 500 }}>Warn before (days)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      { name: 'unrestricted', label: 'Unrestricted', color: '#22c55e' },
+                      { name: 'internal', label: 'Internal', color: '#3b82f6' },
+                      { name: 'ferpa', label: 'FERPA', color: '#f59e0b' },
+                      { name: 'cui', label: 'CUI', color: '#f97316' },
+                      { name: 'itar', label: 'ITAR', color: '#ef4444' },
+                    ].map(level => {
+                      const p = retentionPolicies[level.name] || { retention_days: 0, soft_delete_grace_days: 0 }
+                      const update = (patch: Partial<RetentionPolicyForm>) => {
+                        setRetentionPolicies(prev => ({
+                          ...prev,
+                          [level.name]: { ...p, ...patch },
+                        }))
+                      }
+                      return (
+                        <tr key={level.name} style={{ borderTop: '1px solid #f3f4f6' }}>
+                          <td style={{ padding: '8px 12px' }}>
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 6,
+                              padding: '2px 10px', borderRadius: 9999,
+                              fontSize: 12, fontWeight: 600,
+                              backgroundColor: `${level.color}1a`, color: level.color,
+                              border: `1px solid ${level.color}66`,
+                            }}>
+                              <span style={{ width: 6, height: 6, borderRadius: 9999, backgroundColor: level.color }} />
+                              {level.label}
+                            </span>
+                          </td>
+                          <td style={{ padding: '8px 12px' }}>
+                            <input
+                              type="number"
+                              min={0}
+                              value={p.retention_days || 0}
+                              onChange={e => update({ retention_days: Number(e.target.value) || 0 })}
+                              style={{ ...inputStyle, padding: '6px 10px', width: 120 }}
+                            />
+                          </td>
+                          <td style={{ padding: '8px 12px' }}>
+                            <input
+                              type="number"
+                              min={0}
+                              value={p.soft_delete_grace_days || 0}
+                              onChange={e => update({ soft_delete_grace_days: Number(e.target.value) || 0 })}
+                              style={{ ...inputStyle, padding: '6px 10px', width: 120 }}
+                            />
+                          </td>
+                          <td style={{ padding: '8px 12px' }}>
+                            <input
+                              type="number"
+                              min={0}
+                              value={p.warning_days_before ?? ''}
+                              placeholder="—"
+                              onChange={e => {
+                                const v = e.target.value
+                                update({ warning_days_before: v === '' ? undefined : Number(v) || 0 })
+                              }}
+                              style={{ ...inputStyle, padding: '6px 10px', width: 120 }}
+                            />
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+                  Other retention windows
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+                  <div>
+                    <label style={labelStyle}>Activity logs (days)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={activityRetentionDays}
+                      onChange={e => setActivityRetentionDays(Number(e.target.value) || 0)}
+                      style={inputStyle}
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Chat conversations (days)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={chatRetentionDays}
+                      onChange={e => setChatRetentionDays(Number(e.target.value) || 0)}
+                      style={inputStyle}
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Workflow results (days)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={workflowResultRetentionDays}
+                      onChange={e => setWorkflowResultRetentionDays(Number(e.target.value) || 0)}
+                      style={inputStyle}
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Stale activity threshold (min)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={staleActivityMinutes}
+                      onChange={e => setStaleActivityMinutes(Number(e.target.value) || 0)}
+                      style={inputStyle}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          <div>
+            <button
+              onClick={async () => {
+                setRetentionSaving(true)
+                setRetentionSaved(false)
+                try {
+                  await updateSystemConfig({
+                    retention_config: {
+                      enabled: retentionEnabled,
+                      policies: retentionPolicies,
+                      activity_retention_days: activityRetentionDays,
+                      chat_retention_days: chatRetentionDays,
+                      workflow_result_retention_days: workflowResultRetentionDays,
+                      activity_stale_threshold_minutes: staleActivityMinutes,
+                    },
+                  })
+                  setRetentionSaved(true)
+                  setTimeout(() => setRetentionSaved(false), 3000)
+                } catch {
+                  setError('Failed to save retention configuration')
+                } finally {
+                  setRetentionSaving(false)
+                }
+              }}
+              disabled={retentionSaving}
+              style={{
+                padding: '8px 20px', borderRadius: 'var(--ui-radius, 12px)', border: 'none',
+                background: '#111827', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                opacity: retentionSaving ? 0.6 : 1,
+              }}
+            >
+              {retentionSaving ? 'Saving...' : 'Save Retention Settings'}
+            </button>
+            {retentionSaved && <span style={{ marginLeft: 10, fontSize: 13, color: '#16a34a' }}>Saved!</span>}
           </div>
         </div>
       </div>
@@ -3691,6 +4049,7 @@ function DemoResponseDetail({ responses }: { responses: Record<string, unknown> 
 }
 
 function DemoTab() {
+  const confirm = useConfirm()
   const [subTab, setSubTab] = useState<'applications' | 'surveys'>('applications')
   const [stats, setStats] = useState<DemoAdminStats | null>(null)
   const [apps, setApps] = useState<DemoApp[]>([])
@@ -3806,7 +4165,12 @@ function DemoTab() {
   }
 
   async function handleRestartTrial(uuid: string) {
-    if (!confirm('Restart this user\'s trial? This will give them a fresh 14-day trial.')) return
+    const ok = await confirm({
+      title: 'Restart trial?',
+      message: 'Restart this user\'s trial? They will get a fresh 14-day trial period starting now.',
+      confirmLabel: 'Restart trial',
+    })
+    if (!ok) return
     setActionLoading(`restart-${uuid}`)
     try {
       await restartDemoTrial(uuid)
@@ -3831,7 +4195,17 @@ function DemoTab() {
   }
 
   async function handleResendCredentials(uuid: string, email: string) {
-    if (!confirm(`Resend credentials to ${email}? This will reset their password.`)) return
+    const ok = await confirm({
+      title: 'Resend credentials?',
+      message: (
+        <>
+          Resend credentials to <strong>{email}</strong>? This will reset their password.
+        </>
+      ),
+      confirmLabel: 'Resend',
+      destructive: true,
+    })
+    if (!ok) return
     setActionLoading(`resend-${uuid}`)
     try {
       await adminResendCredentials(uuid)
@@ -5448,6 +5822,7 @@ function ImportDialog({ onClose, onImported }: { onClose: () => void; onImported
 }
 
 function OrganizationsTab() {
+  const confirm = useConfirm()
   const [tree, setTree] = useState<Organization[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -5483,7 +5858,17 @@ function OrganizationsTab() {
     catch (e) { setError(e instanceof Error ? e.message : 'Failed to update') }
   }
   const handleDelete = async (org: Organization) => {
-    if (!confirm(`Delete "${org.name}"? Children will be re-parented to its parent.`)) return
+    const ok = await confirm({
+      title: 'Delete organization?',
+      message: (
+        <>
+          Are you sure you want to delete <strong>{org.name}</strong>? Any child organizations will be re-parented to its parent.
+        </>
+      ),
+      confirmLabel: 'Delete',
+      destructive: true,
+    })
+    if (!ok) return
     setError(null)
     if (selectedOrg?.uuid === org.uuid) setSelectedOrg(null)
     try { await orgApi.deleteOrganization(org.uuid); loadTree() }
@@ -5923,7 +6308,7 @@ export default function Admin() {
   const hasAccess = isGlobalAdmin || isStaff || isExaminer || isTeamAdmin
 
   // Staff see everything except config; examiners see analytics tabs only
-  const hiddenForNonAdmin = ['config', 'quality', 'demo', 'organizations', 'approvals', 'audit', 'certifications']
+  const hiddenForNonAdmin = ['config', 'quality', 'compliance', 'demo', 'organizations', 'approvals', 'audit', 'certifications', 'apikeys']
   let visibleTabs = isGlobalAdmin
     ? TABS
     : isStaff
@@ -6002,11 +6387,12 @@ export default function Admin() {
           {activeTab === 'organizations' && (isGlobalAdmin || isStaff) && <OrganizationsTab />}
           {activeTab === 'workflows' && <WorkflowsTab />}
           {activeTab === 'quality' && <QualityTab />}
+          {activeTab === 'compliance' && (isGlobalAdmin || isStaff) && <ComplianceTab />}
           {activeTab === 'audit' && (isGlobalAdmin || isStaff) && <AuditTab />}
           {activeTab === 'demo' && (isGlobalAdmin || isStaff) && <DemoTab />}
           {activeTab === 'email' && (isGlobalAdmin || isStaff) && <EmailAnalyticsTab />}
           {activeTab === 'certifications' && (isGlobalAdmin || isStaff) && <CertificationsTab />}
-          {activeTab === 'apikeys' && isGlobalAdmin && <ApiKeysTab />}
+          {activeTab === 'apikeys' && (isGlobalAdmin || isStaff) && <ApiKeysTab />}
           {activeTab === 'config' && isGlobalAdmin && <ConfigTab />}
         </div>
       </div>

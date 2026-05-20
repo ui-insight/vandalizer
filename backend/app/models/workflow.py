@@ -82,6 +82,12 @@ class WorkflowResult(Document):
     output_step_names: list[str] = []
     start_time: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
     status: str = "running"
+    error: Optional[str] = None
+    # Machine-readable error payload set by the runner when the failure has a
+    # suggested user action (e.g. oversize-context with a convert-to-KB hint).
+    # Schema: {"code": "context_over_budget", "suggested_action": "convert_to_kb",
+    #          "oversize_documents": [{"uuid": ..., "title": ..., "token_count": ...}]}
+    error_payload: Optional[dict] = None
     session_id: str
     current_step_name: Optional[str] = None
     current_step_detail: Optional[str] = None
@@ -95,6 +101,10 @@ class WorkflowResult(Document):
     # Batch run fields
     batch_id: Optional[str] = None
     document_title: Optional[str] = None
+    # Citations aggregated from every KnowledgeBaseQuery step that ran. Each
+    # entry: {document_id, document_title, page, sheet, chunk_id, score,
+    # content_preview}. The frontend renders these as citation chips.
+    retrieved_sources: list[dict] = []
 
     class Settings:
         name = "workflow_result"

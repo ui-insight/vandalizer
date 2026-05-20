@@ -15,6 +15,7 @@ import {
   Eye,
 } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
+import { useConfirm } from '../components/shared/useConfirm'
 import {
   getOfficeStatus,
   listIntakes,
@@ -53,6 +54,7 @@ function workItemStatusBadge(status: string) {
 }
 
 export default function Office() {
+  const confirm = useConfirm()
   const [tab, setTab] = useState<Tab>('intakes')
   const [status, setStatus] = useState<OfficeStatus | null>(null)
   const [intakes, setIntakes] = useState<IntakeConfig[]>([])
@@ -113,6 +115,18 @@ export default function Office() {
   }
 
   const handleDelete = async (uuid: string) => {
+    const intake = intakes.find(i => i.uuid === uuid)
+    const ok = await confirm({
+      title: 'Delete intake?',
+      message: (
+        <>
+          Are you sure you want to delete <strong>{intake?.name || 'this intake'}</strong>? Incoming items from this source will no longer be processed.
+        </>
+      ),
+      confirmLabel: 'Delete',
+      destructive: true,
+    })
+    if (!ok) return
     await deleteIntake(uuid)
     refreshIntakes()
   }

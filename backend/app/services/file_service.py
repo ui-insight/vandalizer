@@ -165,6 +165,49 @@ async def upload_document(
     return {"complete": True, "uuid": uid, "document_id": str(document.id)}
 
 
+async def render_xlsx_sheets(
+    doc_uuid: str, settings: Settings, *, user: User
+) -> dict | None:
+    """Evaluate formulas in an .xlsx file and return per-sheet JSON.
+
+    Returns None when the document doesn't exist, isn't an .xlsx, or the
+    user lacks access. Returns None on parser failure too — caller can
+    decide to surface a 404 in either case.
+    """
+    doc = await access_control.get_authorized_document(doc_uuid, user)
+    if not doc:
+        return None
+
+    extension = (doc.extension or "").lower().lstrip(".")
+    if extension != "xlsx":
+        return None
+
+    from app.services.storage import get_storage
+
+    storage = get_storage(settings)
+    relative_path = doc.downloadpath or doc.path
+    try:
+        data = await storage.read(relative_path)
+    except Exception:
+        return None
+
+    from app.services.document_readers import extract_sheet_json_from_xlsx
+
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+    try:
+        tmp.write(data)
+        tmp.close()
+        return extract_sheet_json_from_xlsx(tmp.name)
+    except Exception as e:
+        logger.warning("sheet-json rendering failed for %s: %s", doc_uuid, e)
+        return None
+    finally:
+        try:
+            Path(tmp.name).unlink(missing_ok=True)
+        except Exception:
+            pass
+
+
 async def download_document(
     doc_uuid: str, settings: Settings, *, user: User
 ) -> DownloadResult | None:

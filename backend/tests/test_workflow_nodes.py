@@ -734,6 +734,35 @@ class TestAPICallNode:
         call_kwargs = mock_client.request.call_args[1]
         assert call_kwargs["headers"]["Authorization"] == "Bearer token"
 
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_malformed_headers_returns_error(self, mock_client_cls, _mock_validate):
+        # Smart quotes — looks like JSON to a human but fails json.loads.
+        # Previously the parse error was silently swallowed, which sent the
+        # request with no auth headers and produced a confusing 403 from the
+        # target server (commonly Vandalizer's own CSRF middleware when the
+        # missing header was x-api-key).
+        node = APICallNode({
+            "url": "https://api.example.com",
+            "method": "POST",
+            "headers": '{“x-api-key”: “secret”}',
+        })
+        result = node.process({"output": "prev"})
+        assert "Invalid Headers JSON" in result["output"]
+        mock_client_cls.assert_not_called()
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_non_object_headers_returns_error(self, mock_client_cls, _mock_validate):
+        node = APICallNode({
+            "url": "https://api.example.com",
+            "method": "POST",
+            "headers": '"just-a-string"',
+        })
+        result = node.process({"output": "prev"})
+        assert "Invalid Headers JSON" in result["output"]
+        mock_client_cls.assert_not_called()
+
     @patch("app.utils.url_validation.validate_outbound_url")
     @patch("app.services.workflow_engine.httpx.Client")
     def test_non_json_response(self, mock_client_cls, mock_validate):
@@ -1077,6 +1106,45 @@ class TestKnowledgeBaseQueryNode:
         node = KnowledgeBaseQueryNode({"kb_uuid": "kb-123", "query": "obscure"})
         result = node.process({"output": "prev"})
         assert result["output"] == ""
+
+    @patch("app.services.document_manager.DocumentManager")
+    def test_emits_retrieved_sources_with_page_and_score(self, mock_dm_cls):
+        """The KB node returns a structured citation list for the workflow
+        result to persist, in addition to the joined prompt text."""
+        mock_dm = MagicMock()
+        mock_dm.query_kb.return_value = [
+            {
+                "content": "Section II.D — cost share",
+                "metadata": {"source_id": "src-1", "source_name": "PAPPG.pdf", "page": 234},
+                "chunk_id": "src-1_chunk_47",
+                "score": 0.12,
+            },
+            {
+                "content": "Q1 budget row",
+                "metadata": {"source_id": "src-2", "source_name": "Budget.xlsx", "sheet": "Year 1"},
+                "chunk_id": "src-2_chunk_3",
+                "score": 0.19,
+            },
+        ]
+        mock_dm_cls.return_value = mock_dm
+
+        node = KnowledgeBaseQueryNode({"kb_uuid": "kb-1", "query": "cost share"})
+        result = node.process({"output": "prev"})
+
+        # Prompt-side: cited label appears in the joined output text.
+        assert "p. 234" in result["output"]
+        assert "Year 1" in result["output"]
+
+        # Citation-side: each result becomes a retrieved_sources entry.
+        sources = result["retrieved_sources"]
+        assert len(sources) == 2
+        assert sources[0]["document_title"] == "PAPPG.pdf"
+        assert sources[0]["page"] == 234
+        assert sources[0]["sheet"] is None
+        assert sources[0]["chunk_id"] == "src-1_chunk_47"
+        assert sources[0]["score"] == 0.12
+        assert sources[1]["sheet"] == "Year 1"
+        assert sources[1]["page"] is None
 
 
 # ---------------------------------------------------------------------------

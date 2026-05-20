@@ -315,16 +315,13 @@ def create_chat_agent(
     thinking_override: Optional[bool] = None,
     system_config_doc: dict | None = None,
 ) -> Agent:
-    """Create or retrieve a cached chat agent."""
+    # Always build fresh: cached Agents carry an httpx pool bound to whichever
+    # event loop first used them, and Celery's sync wrapper creates a new loop
+    # per pydantic-ai run_sync() call — causing silent retries on every call.
     prompt_to_use = system_prompt or DEFAULT_CHAT_SYSTEM_PROMPT
-    cache_key = f"{agent_model}_{hash(prompt_to_use)}_{thinking_override}"
-
-    if cache_key not in _chat_agent_cache:
-        model = get_agent_model(agent_model, thinking_override=thinking_override, system_config_doc=system_config_doc)
-        model_settings = build_thinking_model_settings(agent_model, thinking_override, system_config_doc)
-        _chat_agent_cache[cache_key] = Agent(model, system_prompt=prompt_to_use, model_settings=model_settings)
-
-    return _chat_agent_cache[cache_key]
+    model = get_agent_model(agent_model, thinking_override=thinking_override, system_config_doc=system_config_doc)
+    model_settings = build_thinking_model_settings(agent_model, thinking_override, system_config_doc)
+    return Agent(model, system_prompt=prompt_to_use, model_settings=model_settings)
 
 
 # ---------------------------------------------------------------------------
@@ -684,44 +681,50 @@ def create_rag_agent(
     agent_model: str,
     system_config_doc: dict | None = None,
 ) -> Agent:
-    """Create or retrieve a cached RAG agent with retrieve tool."""
-    cache_key = f"rag_{agent_model}"
+    # Always build fresh (see create_chat_agent for rationale).
+    model = get_agent_model(agent_model, system_config_doc=system_config_doc)
+    model_settings = build_thinking_model_settings(agent_model, system_config_doc=system_config_doc)
+    agent = Agent(
+        model,
+        deps_type=RagDeps,
+        system_prompt=RAG_SYSTEM_PROMPT,
+        model_settings=model_settings,
+    )
 
-    if cache_key not in _rag_agent_cache:
-        model = get_agent_model(agent_model, system_config_doc=system_config_doc)
-        model_settings = build_thinking_model_settings(agent_model, system_config_doc=system_config_doc)
-        _rag_agent_cache[cache_key] = Agent(
-            model,
-            deps_type=RagDeps,
-            system_prompt=RAG_SYSTEM_PROMPT,
-            model_settings=model_settings,
+    @agent.tool
+    def retrieve(
+        context: RunContext[RagDeps],
+        question: str,
+        docs_ids: Optional[list[str]] = None,
+    ):
+        if docs_ids is None:
+            docs_ids = []
+
+        prompt_agent = create_prompt_agent(agent_model, system_config_doc=system_config_doc)
+        prompt_response = prompt_agent.run_sync(
+            f"Generate a prompt for the following user question: {question}",
+        )
+        prompt = prompt_response.output
+
+        results = context.deps.doc_manager.query_documents(
+            context.deps.user_id,
+            prompt,
+            docs_ids,
+            k=10,
         )
 
-        @_rag_agent_cache[cache_key].tool
-        def retrieve(
-            context: RunContext[RagDeps],
-            question: str,
-            docs_ids: Optional[list[str]] = None,
-        ):
-            """Retrieve relevant document chunks for a given question.
-
-            Args:
-                context: The call context
-                question: The question of the user
-                docs_ids: A list of document IDs to search in (optional).
-
-            Returns:
-                A list of document chunks that match the question
-            """
-            if docs_ids is None:
-                docs_ids = []
-
-            # Use prompt agent to optimize the query
-            prompt_agent = create_prompt_agent(agent_model, system_config_doc=system_config_doc)
-            prompt_response = prompt_agent.run_sync(
-                f"Generate a prompt for the following user question: {question}",
-            )
-            prompt = prompt_response.output
+        if len(results) == 0:
+            for doc in context.deps.documents:
+                if not context.deps.doc_manager.document_exists(
+                    context.deps.user_id, doc.uuid
+                ):
+                    context.deps.doc_manager.add_document(
+                        user_id=context.deps.user_id,
+                        doc_path="",
+                        document_name=doc.title,
+                        document_id=doc.uuid,
+                        raw_text=doc.raw_text or "",
+                    )
 
             results = context.deps.doc_manager.query_documents(
                 context.deps.user_id,
@@ -730,46 +733,20 @@ def create_rag_agent(
                 k=10,
             )
 
-            if len(results) == 0:
-                # Try to re-ingest missing documents
-                for doc in context.deps.documents:
-                    if not context.deps.doc_manager.document_exists(
-                        context.deps.user_id, doc.uuid
-                    ):
-                        context.deps.doc_manager.add_document(
-                            user_id=context.deps.user_id,
-                            doc_path="",
-                            document_name=doc.title,
-                            document_id=doc.uuid,
-                            raw_text=doc.raw_text or "",
-                        )
+        return results
 
-                results = context.deps.doc_manager.query_documents(
-                    context.deps.user_id,
-                    prompt,
-                    docs_ids,
-                    k=10,
-                )
-
-            return results
-
-    return _rag_agent_cache[cache_key]
+    return agent
 
 
 def create_prompt_agent(
     agent_model: str,
     system_config_doc: dict | None = None,
 ) -> Agent:
-    """Create or retrieve a cached prompt optimization agent."""
-    cache_key = f"prompt_{agent_model}"
-
-    if cache_key not in _prompt_agent_cache:
-        model = get_agent_model(agent_model, system_config_doc=system_config_doc)
-        model_settings = build_thinking_model_settings(agent_model, system_config_doc=system_config_doc)
-        _prompt_agent_cache[cache_key] = Agent(
-            model,
-            system_prompt=PROMPT_AGENT_SYSTEM_PROMPT,
-            model_settings=model_settings,
-        )
-
-    return _prompt_agent_cache[cache_key]
+    # Always build fresh (see create_chat_agent for rationale).
+    model = get_agent_model(agent_model, system_config_doc=system_config_doc)
+    model_settings = build_thinking_model_settings(agent_model, system_config_doc=system_config_doc)
+    return Agent(
+        model,
+        system_prompt=PROMPT_AGENT_SYSTEM_PROMPT,
+        model_settings=model_settings,
+    )

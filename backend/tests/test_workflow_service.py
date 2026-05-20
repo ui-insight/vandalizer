@@ -114,17 +114,24 @@ class TestCreateWorkflow:
 
 
 class TestGetWorkflowStatus:
+    @patch("app.services.workflow_service.Workflow")
     @patch("app.services.workflow_service.WorkflowResult")
-    async def test_returns_status_dict(self, mock_wr_cls):
+    async def test_returns_status_dict(self, mock_wr_cls, mock_wf_cls):
         from app.services.workflow_service import get_workflow_status
 
         wr = _make_result(session_id="sess1", status="completed")
         mock_wr_cls.find_one = AsyncMock(return_value=wr)
+        # get_workflow_status now resolves a workflow_name via Workflow.get();
+        # without this mock the call would hit uninitialized Beanie.
+        mock_wf = MagicMock()
+        mock_wf.name = "Test workflow"
+        mock_wf_cls.get = AsyncMock(return_value=mock_wf)
 
         result = await get_workflow_status("sess1")
         assert result["status"] == "completed"
         assert result["num_steps_completed"] == 3
         assert result["final_output"] == {"output": "done"}
+        assert result["workflow_name"] == "Test workflow"
 
     @patch("app.services.workflow_service.WorkflowResult")
     async def test_returns_none_for_missing(self, mock_wr_cls):

@@ -57,6 +57,12 @@ export function LoginForm() {
           Forgot password?
         </Link>
       </p>
+      <p className="text-center text-sm text-gray-400">
+        Don&apos;t have an account?{' '}
+        <Link to="/register" className="font-bold text-white hover:text-[#f1b300]">
+          Create one
+        </Link>
+      </p>
     </form>
   )
 }

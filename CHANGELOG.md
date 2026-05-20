@@ -6,6 +6,82 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [v4.3.0] - 2026-05-15
+
+### Added
+- **Workflow approval / review system, end-to-end.** The Approval node is now reachable from the editor with a full config panel (review instructions, assignee role, SLA in days, timeout action, escalation reviewers). New `/reviews` inbox with My / Team queues, status filter, and type-aware artifact rendering (text, markdown, JSON, extraction table, document download). Reviewers can edit text / markdown / JSON / single-row tables before approving — the edited artifact flows back into downstream workflow steps. Assignee roles: `workflow_owner`, `team_admins`, `specific_users`. SLA enforcement runs on a 5-minute Celery beat sweep (`tasks.approvals.expire_overdue`) that fires the configured timeout action (auto-approve / auto-reject / escalate / mark expired). `/api/approvals` is replaced by `/api/reviews`; the old `/approvals` route redirects.
+- **Scoped management API at `/api/mgmt/v1`** for service consumers and agentic tools. New `ApiKey` model with named, scoped, revocable keys (`vk_live_…`), per-key rate limiting, and audit-log entries on every call. Read endpoints cover stats, users, teams, workflows, documents, activity, audit, config (secrets redacted), and the full validation domain (runs, test cases, plans, cross-field rules). Write endpoints support test cases (incl. bulk upload), cross-field rules, and validation plans. Run endpoints (validation, workflows, extractions) gated on separate scopes since they spend tokens. Issuance + revocation now open to all staff via the in-app API Keys tab, with `docs/mgmt-api.md` linked alongside.
+- **Convert-to-Knowledge-Base flow for oversized documents.** Workflow and chat now pre-flight document size against the model's input budget; oversized refs trigger a structured error with an inline "Convert to Knowledge Base" action that wraps the docs in a fresh KB and activates it in workspace context. Page-level (PDF) and per-sheet (XLSX) citation offsets are now generated end-to-end, including for OCR-routed PDFs. Document ingest writes `chromadb_ready` / `chunk_count` / `ingest_error`; the file browser shows a distinct amber icon for retrieval-broken docs (separate from upload-validation failures).
+- **LLM endpoint context-window probe.** System Config → Models gains a "Context Window" field and a "Probe endpoint" button that queries the configured endpoint for its real serving limit — `max_model_len` (vLLM), `context_length` (OpenRouter), or `model_info.<arch>.context_length` (Ollama). Anthropic and plain-OpenAI endpoints that do not expose the value report that, so admins know to fill it in by hand. The chat and workflow context-budget planner now trims against the real number instead of an inflated substring-table default, so compaction no longer undertrims into a mid-workflow `400`.
+- **Credentials store + OAuth `client_credentials` on API Node.** New team-scoped `Credential` collection with per-field Fernet encryption and Redis-cached bearer tokens. API Node grows an `auth_strategy` selector (`none` / `static_header` / `oauth_client_credentials`). Secrets never round-trip back to the client (redacted as `"<set>"`). New Credentials management page and credential picker in the API Node config panel.
+- **Public team join links.** Owners and admins can mint shareable join URLs that bypass the trial waitlist; invite acceptance has a proper OAuth + redirect flow.
+- **Workflow output as chainable artifacts.** Run output saves as a `SmartDocument` that downstream steps can ingest, or as a real file in a SmartFolder of the user's choosing. Markdown output renders as a beautifully formatted PDF (with Unicode-hyphen normalization to avoid encoding crashes), a real `.docx` is generated alongside, and multi-step deliverables bundle as a ZIP. Download filenames are now unique per session.
+- **Retention and classification dashboards in the Admin panel**, plus a Retention Policy admin UI for configuring rules.
+- **Team notifications when content is shared** (bell + email). Activity rail auto-fails items stuck in `processing` so users do not stare at zombie spinners.
+- **LLM tasks can combine multiple input sources** in a single step (previously: one source per task).
+- **Auto-clone from Explore** when running a verified workflow, with linked extraction fields preserved.
+- **Workflow editor polish**: "Add selected documents" shortcut for fixed-doc inputs, hover tooltips with descriptions on each task type in the picker, explainer overlays in empty Automations and Knowledge Bases tabs, Combined-vs-per-doc tooltips on Run, original author shown on workflow cards (Workflows, Library, Explore).
+- **Confirm-before-delete** dialogs across workflows, extractions, Library panel, and the workspace Library tab. File-browser bulk selection clears even when a delete throws.
+- **API Keys tab** offers a downloadable Claude Code skill for users wired up against the mgmt API.
+- **OCR rerun script** (`scripts/re_ocr_old_documents.py`) to re-OCR documents older than N days.
+- **Workflow JSON upload-from-creation-modal** entry point.
+- **Test Step** is now honest about failures and its (limited) scope.
+- **Certification panel** is mounted app-wide so it opens from any page; the Foundations lesson no longer misroutes users below the action button.
+- **Trial check-in tickets** move out of Support Center into the Demo tab.
+- **`setup.sh` menu restructured** with a catalog reset entry.
+
+### Changed
+- **M365 config setup is replaced by a Document Compliance activation flow** in the admin UI. The new path is the supported way to wire Microsoft Graph integration; the old config-driven setup is gone.
+- **Workflow output "save" semantics:** "Save to folder" now means a SmartFolder file in the user's folder tree, not a Library bookmark. Add-to-Library dialog is trimmed from Explore; the dialog now drops the unmanaged note/tags fields and splits share errors so the user can tell what failed.
+- **Verified items save to the Library by reference**, not by silently cloning the underlying document.
+- **Workflow runner treats `pending_approval` as paused** (not running), so polling state matches what the user sees.
+- **Workflow activity-rail polling resumes** when the user opens a running workflow from the rail.
+- **Any team member** can now share items and create folders in the team Library (previously: owners/admins only).
+- **API Node** surfaces header JSON parse errors instead of silently dropping them; OAuth-authenticated API Node calls use the new credentials store rather than inline static headers.
+- **Login error messages** now explain why a login was rejected (locked, unverified, bad credentials) instead of a generic "Invalid credentials".
+- **Workflow run button** muted state shows a "Select a document to run" hint; clearer errors when adding a workflow task fails.
+- **Activity rail** shimmers in AI-generated titles as they stream in.
+- **Library / Explore UI polish**: "more options" icon unified across file browser and library; verified-catalog "system" author renders as "Verified Catalog"; library row title takes full width with actions floating over `last used` on hover; same for file/folder rows; Library type filter "All Types" shortened to "All"; chat input restored to full width; assistant chat constrained to match input width; in-progress KB convert button dropped from the workflow editor panel; Add Document task search boxes now surface files; API Key scopes picker has Select all / Clear shortcuts.
+- **Workflow / extraction inputs** can be uploaded from a JSON file at creation time; "Add selected documents" works from the library context menu.
+- **Extraction validations decoupled from their source documents** — validation plans persist independently and can be downloaded as a zip of the setup. Extraction Tools tab orders import/export at the top; saved sets no longer silently drop manual extraction fields.
+- **XLSX document viewer** renders formulas; markdown step output explains how input sources combine.
+- **Extract API uploads default to ephemeral cleanup** so test runs don't litter the workspace.
+- **Pause/resume flow**: `ApprovalNode` honors the new approval record fields; the workflow editor pending-approval banner links to the full review screen.
+- **Module 4 certification content** renames "enum values" to "Allowed values"; cert module stays on the Challenge tab after completion.
+- **`seed_catalog`** behavior already shipped in v4.2.0; this release continues the catalog reset entry in `setup.sh`.
+- **System Config sticky header** gets horizontal padding so the gear icon and Save button no longer hug the panel edges.
+
+### Fixed
+- **Doubled workflow LLM latency** from cross-event-loop agent caches.
+- **Workflow PDF crash** on triple-asterisk markdown sequences.
+- **Folder-watch automations** dropping storage + notifications.
+- **`/api/mgmt/v1/stats`** choking on legacy stub `SmartDocument` records.
+- **Upload validation crash** when `langchain-text-splitters` was not installed (dep is now declared in `pyproject.toml`).
+- **Approval flow** leaving the existing `LibraryItem` unverified after an approve.
+- **Convert-to-KB setter calls** for non-Dispatch workspaces.
+- **Invisible role dropdown options** on trial signup.
+- **Re-OCR script** for old documents (operator tooling).
+- **Pending-task leaks** from custom HTTP middlewares (`SecurityHeadersMiddleware` rewritten as pure ASGI middleware so client disconnects mid-response don't strand asyncio tasks).
+- **Switching an automation's trigger type back to `folder_watch`** no longer errors.
+- **Activity-rail items stuck in `processing`** auto-fail after the watchdog window instead of hanging the rail.
+- **"Documents ready for analysis" banner, file-list polling, and the row spinner** flipped to "ready" the moment text extraction finished, while RAG indexing was still running in the background. All three now key off `isDocReady` and treat the `readying` / `extracting` task states as not-yet-ready, so the UI stays honest across the full upload pipeline.
+- **Silent OCR / extraction failures** (image-only PDFs, OCR endpoint down, encrypted files) were recorded as a successful `complete` with empty text — the extracted-text modal rendered blank and chat silently skipped the document. Extraction now marks the document errored with a specific reason, `poll_status` surfaces it, and the modal offers a **Retry extraction** button that re-dispatches the upload pipeline.
+- **Star / set-default button on System Config models** — `PUT /config/models/default` was registered after `PUT /config/models/{index}`, so FastAPI tried to parse `default` as an integer index and rejected the request. The literal route is now registered first.
+- **Workflow pre-flight oversize check** read `llm_models` from `SystemConfig` when the field is `available_models`, so any `context_window` override was silently ignored.
+- **Frontend errors never reached Sentry.** `VITE_SENTRY_DSN` is a Vite compile-time variable but was missing from every Docker build path, so `initSentry()` short-circuited in production and the Sentry dashboard stayed empty. The DSN, environment, and release are now passed as build args through `frontend/Dockerfile`, the Makefile `docker-build` target, and the release / build-container GitHub workflows.
+
+### Security
+- **Default extract-API uploads to ephemeral cleanup** so transient uploads do not persist in shared storage.
+- **Mgmt API keys**: per-key scope, per-key rate limit, audit log on every call; secrets redacted in all read responses.
+- **Credentials store** uses per-field Fernet encryption; `payload` is never echoed back to clients.
+
+### Operator Notes
+- **New backend Python dependency**: `langchain-text-splitters>=0.3,<1`. `./setup.sh --redeploy` and `docker compose up -d --build` pick it up automatically via `uv sync`. Manual installs must rerun `uv sync` in `backend/`.
+- **New Celery beat job**: `tasks.approvals.expire_overdue` runs every 5 minutes to expire SLA-overdue reviews. No operator action — runs out of the standard worker pool.
+- **Three new routers** mounted: `credentials` (`/api/credentials`), `reviews` (`/api/reviews`), `mgmt` (`/api/mgmt/v1`). The old `/api/approvals` is removed; the frontend `/approvals` URL redirects to `/reviews`.
+- **New GitHub Actions secret for frontend error reporting**: add `VITE_SENTRY_DSN` as a repository secret (Settings → Secrets and variables → Actions) so released frontend images report to Sentry. `build-container.yaml` also reads an optional `vars.VITE_SENTRY_ENVIRONMENT` repository variable to label non-tag builds (e.g. "staging"). This is a CI-only setting — no `.env` or `compose.yaml` change.
+- **No drift** in `.env.example`, `compose.yaml`, `DEPLOY.md`, `OPERATIONS.md`, or `README.md` since v4.2.0.
+
 ## [v4.2.0] - 2026-05-04
 
 ### Added

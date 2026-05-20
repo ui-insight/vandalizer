@@ -879,6 +879,7 @@ async def _ingest_document_source(source: KnowledgeBaseSource, kb: KnowledgeBase
         dm = _get_dm()
         chunk_count = await asyncio.to_thread(
             dm.add_to_kb, kb.uuid, source.uuid, doc.title, doc.raw_text,
+            list(doc.text_markers or []),
         )
         source.chunk_count = chunk_count
         source.status = "ready"
@@ -953,6 +954,12 @@ async def _ingest_url_source(
             logger.warning("URL source %s returned %d: %s", source.uuid, e.response.status_code, e.request.url)
         else:
             logger.error(f"Error ingesting URL source {source.uuid}: {e}")
+        source.status = "error"
+        source.error_message = str(e)[:2000]
+        await source.save()
+        return None
+    except (ValueError, httpx.RequestError) as e:
+        logger.warning("URL source %s unreachable: %s", source.uuid, e)
         source.status = "error"
         source.error_message = str(e)[:2000]
         await source.save()

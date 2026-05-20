@@ -56,6 +56,11 @@ interface ChatStateContextValue {
   deactivateKB: () => void
   processingDoc: { title: string; status: string | null } | null
   setProcessingDoc: (doc: { title: string; status: string | null } | null) => void
+  // Subset of selectedDocUuids that are still being processed by the upload
+  // pipeline. Populated by the file browser so the chat banner can avoid
+  // claiming "ready for analysis" while OCR/indexing is still running.
+  selectedDocsProcessing: Array<{ uuid: string; title: string; status: string | null }>
+  setSelectedDocsProcessing: (docs: Array<{ uuid: string; title: string; status: string | null }>) => void
 }
 
 const ChatStateContext = createContext<ChatStateContextValue | null>(null)
@@ -171,6 +176,22 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [highlightTerms, setHighlightTerms] = useState<string[]>([])
   const [activitySignal, setActivitySignal] = useState(0)
   const [processingDoc, setProcessingDoc] = useState<{ title: string; status: string | null } | null>(null)
+  const [selectedDocsProcessing, _setSelectedDocsProcessing] = useState<Array<{ uuid: string; title: string; status: string | null }>>([])
+  // Wrap the setter so consumers passing a fresh array each render don't
+  // trigger needless re-renders of every chat consumer when the contents
+  // are identical (this gets called on every documents poll).
+  const setSelectedDocsProcessing = useCallback(
+    (next: Array<{ uuid: string; title: string; status: string | null }>) => {
+      _setSelectedDocsProcessing(prev => {
+        if (prev.length !== next.length) return next
+        for (let i = 0; i < prev.length; i++) {
+          if (prev[i].uuid !== next[i].uuid || prev[i].status !== next[i].status) return next
+        }
+        return prev
+      })
+    },
+    [],
+  )
   const [activeKBUuid, setActiveKBUuid] = useState<string | null>(null)
   const [activeKBTitle, setActiveKBTitle] = useState<string | null>(null)
   const [viewDocumentRequest, setViewDocumentRequest] = useState<{ uuid: string; title: string } | null>(null)
@@ -366,11 +387,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     pendingChatMessage, sendChatMessage, clearPendingChatMessage,
     activeKBUuid, activeKBTitle, activateKB, deactivateKB,
     processingDoc, setProcessingDoc,
+    selectedDocsProcessing, setSelectedDocsProcessing,
   }), [
     loadConversationId, newChatSignal, triggerNewChat,
     pendingChatMessage, sendChatMessage, clearPendingChatMessage,
     activeKBUuid, activeKBTitle, activateKB, deactivateKB,
     processingDoc,
+    selectedDocsProcessing, setSelectedDocsProcessing,
   ])
 
   const uiValue = useMemo<UIStateContextValue>(() => ({

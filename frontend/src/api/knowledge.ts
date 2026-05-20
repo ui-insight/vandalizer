@@ -62,6 +62,13 @@ export function addDocumentsToKB(uuid: string, documentUuids: string[]) {
   })
 }
 
+export function convertDocumentsToKB(documentUuids: string[], title?: string) {
+  return apiFetch<KnowledgeBase>('/api/knowledge/convert_documents', {
+    method: 'POST',
+    body: JSON.stringify({ document_uuids: documentUuids, title }),
+  })
+}
+
 export function addUrlsToKB(
   uuid: string,
   urls: string[],

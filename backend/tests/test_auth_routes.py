@@ -148,7 +148,8 @@ class TestAuthLogin:
              patch("app.routers.auth.audit_service") as mock_audit, \
              patch("app.routers.auth.get_settings", return_value=_TEST_SETTINGS), \
              patch("app.routers.auth._user_response", new_callable=AsyncMock, return_value=mock_user_resp):
-            mock_svc.authenticate = AsyncMock(return_value=user)
+            # The route uses authenticate_with_reason(...) -> (user, reason).
+            mock_svc.authenticate_with_reason = AsyncMock(return_value=(user, None))
             mock_audit.log_event = AsyncMock()
             resp = await client.post("/api/auth/login", json={
                 "user_id": "testuser",
@@ -167,14 +168,16 @@ class TestAuthLogin:
     @pytest.mark.asyncio
     async def test_login_invalid_credentials(self, client):
         with patch("app.routers.auth.auth_service") as mock_svc:
-            mock_svc.authenticate = AsyncMock(return_value=None)
+            mock_svc.authenticate_with_reason = AsyncMock(return_value=(None, None))
             resp = await client.post("/api/auth/login", json={
                 "user_id": "testuser",
                 "password": "wrong-password",
             })
 
+        # Route returns a generic "couldn't sign you in" message for the
+        # unknown-reason case; the older "Invalid credentials" literal is gone.
         assert resp.status_code == 401
-        assert "Invalid credentials" in resp.json()["detail"]
+        assert "sign you in" in resp.json()["detail"].lower()
 
 
 # ---------------------------------------------------------------------------
@@ -326,7 +329,7 @@ class TestCSRFProtection:
     async def test_csrf_exempt_endpoints_work_without_token(self, client):
         """Login and other exempt endpoints should work without CSRF."""
         with patch("app.routers.auth.auth_service") as mock_svc:
-            mock_svc.authenticate = AsyncMock(return_value=None)
+            mock_svc.authenticate_with_reason = AsyncMock(return_value=(None, None))
             resp = await client.post("/api/auth/login", json={
                 "user_id": "test", "password": "test",
             })

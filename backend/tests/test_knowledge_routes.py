@@ -813,3 +813,122 @@ class TestKnowledgeReference:
             )
 
         assert resp.status_code == 404
+
+
+class TestConvertDocumentsToKB:
+    @pytest.mark.asyncio
+    async def test_convert_creates_kb_and_attaches_docs(self, client):
+        # Supply an explicit title so the route skips the SmartDocument lookup
+        # (which would require initializing Beanie's class-level field
+        # descriptors). The default-title fallback is covered in unit tests.
+        user = _make_user()
+        cookies, headers = _auth()
+
+        fake_kb = MagicMock()
+        fake_kb.uuid = "kb-new"
+        fake_kb.title = "PAPPG"
+        fake_kb.description = ""
+        fake_kb.status = "building"
+        fake_kb.shared_with_team = False
+        fake_kb.verified = False
+        fake_kb.organization_ids = []
+        fake_kb.total_sources = 0
+        fake_kb.sources_ready = 0
+        fake_kb.sources_failed = 0
+        fake_kb.total_chunks = 0
+        fake_kb.created_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        fake_kb.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        fake_kb.user_id = "user1"
+        fake_kb.save = AsyncMock()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.create_knowledge_base = AsyncMock(return_value=fake_kb)
+            mock_svc.add_documents = AsyncMock(return_value=1)
+
+            resp = await client.post(
+                "/api/knowledge/convert_documents",
+                cookies=cookies,
+                headers=headers,
+                json={"document_uuids": ["doc-1"], "title": "PAPPG"},
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["uuid"] == "kb-new"
+        assert body["title"] == "PAPPG"
+        # KB was set to "building" before add_documents fires, so retrieval UIs
+        # can show progress.
+        assert fake_kb.status == "building"
+        mock_svc.create_knowledge_base.assert_awaited_once()
+        mock_svc.add_documents.assert_awaited_once()
+        # Both doc UUIDs flow through to the existing attach pipeline.
+        attach_args = mock_svc.add_documents.await_args.args
+        assert attach_args[1] == ["doc-1"]
+
+    @pytest.mark.asyncio
+    async def test_convert_rejects_empty_uuid_list(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+
+            resp = await client.post(
+                "/api/knowledge/convert_documents",
+                cookies=cookies,
+                headers=headers,
+                json={"document_uuids": []},
+            )
+
+        assert resp.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_convert_uses_supplied_title_when_provided(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+
+        fake_kb = MagicMock()
+        fake_kb.uuid = "kb-new"
+        fake_kb.title = "Reference materials"
+        fake_kb.description = ""
+        fake_kb.status = "building"
+        fake_kb.shared_with_team = False
+        fake_kb.verified = False
+        fake_kb.organization_ids = []
+        fake_kb.total_sources = 0
+        fake_kb.sources_ready = 0
+        fake_kb.sources_failed = 0
+        fake_kb.total_chunks = 0
+        fake_kb.created_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        fake_kb.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        fake_kb.user_id = "user1"
+        fake_kb.save = AsyncMock()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.create_knowledge_base = AsyncMock(return_value=fake_kb)
+            mock_svc.add_documents = AsyncMock(return_value=2)
+
+            resp = await client.post(
+                "/api/knowledge/convert_documents",
+                cookies=cookies,
+                headers=headers,
+                json={"document_uuids": ["d1", "d2"], "title": "Reference materials"},
+            )
+
+        assert resp.status_code == 200
+        # Title should be the supplied one, NOT the first doc's title.
+        call_kwargs = mock_svc.create_knowledge_base.await_args.kwargs
+        assert call_kwargs["title"] == "Reference materials"

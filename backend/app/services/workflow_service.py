@@ -143,6 +143,7 @@ async def get_workflow(workflow_id: str, user: User | None = None) -> dict | Non
         "name": wf.name,
         "description": wf.description,
         "user_id": wf.user_id,
+        "team_id": wf.team_id,
         "num_executions": wf.num_executions,
         "steps": steps,
         "input_config": _sanitize_for_json(wf.input_config),
@@ -173,6 +174,33 @@ async def update_workflow(
         wf.input_config = input_config
     if output_config is not None:
         wf.output_config = output_config
+    wf.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
+    await wf.save()
+    return wf
+
+
+class WorkflowNotInTeam(Exception):
+    """Raised when remove_workflow_from_team is called on a workflow with no team."""
+
+
+async def remove_workflow_from_team(workflow_id: str, user: User) -> Workflow | None:
+    """Unset ``team_id`` on a workflow so it no longer appears in the team library.
+
+    The workflow itself is preserved — the creator (``user_id``) keeps access via
+    their personal scope. Other team members lose access immediately because
+    visibility joins on ``team_id``.
+
+    Authorization mirrors ``can_manage_workflow``: only the creator or a team
+    owner/admin can remove a workflow from its team. Returns the updated workflow,
+    or ``None`` if the workflow doesn't exist or the caller isn't authorized.
+    Raises ``WorkflowNotInTeam`` if the workflow has no team to remove from.
+    """
+    wf = await get_authorized_workflow(workflow_id, user, manage=True)
+    if not wf:
+        return None
+    if not wf.team_id:
+        raise WorkflowNotInTeam("Workflow is not in a team")
+    wf.team_id = None
     wf.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
     await wf.save()
     return wf
@@ -496,6 +524,11 @@ async def get_workflow_status(session_id: str, user: User | None = None) -> dict
         result = await WorkflowResult.find_one(WorkflowResult.session_id == session_id)
     if not result:
         return None
+    workflow_name: str | None = None
+    if result.workflow:
+        wf = await Workflow.get(result.workflow)
+        if wf:
+            workflow_name = wf.name
     return {
         "status": result.status,
         "num_steps_completed": result.num_steps_completed,
@@ -507,6 +540,11 @@ async def get_workflow_status(session_id: str, user: User | None = None) -> dict
         "steps_output": result.steps_output,
         "output_step_names": result.output_step_names,
         "approval_request_id": result.approval_request_id,
+        "error": result.error,
+        "error_payload": result.error_payload,
+        "retrieved_sources": result.retrieved_sources,
+        "workflow_name": workflow_name,
+        "document_title": result.document_title,
     }
 
 
@@ -669,9 +707,16 @@ async def test_step(task_name: str, task_data: dict, document_uuids: list[str], 
 def get_test_status(task_id: str) -> dict:
     """Poll a step test Celery task."""
     result = AsyncResult(task_id, app=celery_app)
-    if result.ready():
+    if not result.ready():
+        return {"status": result.state}
+    if result.successful():
         return {"status": "completed", "result": result.result}
-    return {"status": result.state}
+    payload = result.result
+    if isinstance(payload, BaseException):
+        error_text = f"{type(payload).__name__}: {payload}"
+    else:
+        error_text = str(payload) if payload else "Test failed"
+    return {"status": "failed", "error": error_text}
 
 
 # ---------------------------------------------------------------------------

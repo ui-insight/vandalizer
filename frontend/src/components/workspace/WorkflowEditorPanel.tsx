@@ -8,7 +8,7 @@ import {
   ChevronDown, ChevronRight, ArrowUp, ArrowDown,
   Circle, Hand, Keyboard, Sparkles, ShieldCheck, Type,
   ArrowRight, Pause, TrendingUp, RefreshCw,
-  Upload, Clock, Copy, Check,
+  Upload, Clock, Copy, Check, FolderInput,
 } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
@@ -28,21 +28,23 @@ import type { ValidationCheck, ValidationCheckDefinition, ValidationInputDefinit
 import { ItemPickerModal } from './ItemPickerModal'
 import { getModels } from '../../api/config'
 import { searchDocuments } from '../../api/documents'
+import { convertDocumentsToKB } from '../../api/knowledge'
 import { listCredentials } from '../../api/credentials'
 import type { Credential } from '../../types/credential'
 import { uploadFile } from '../../api/files'
 import { listKnowledgeBases } from '../../api/knowledge'
 import { listAllFolders } from '../../api/folders'
 import type { KnowledgeBase } from '../../types/knowledge'
-import { listItems as listSearchSetItems } from '../../api/extractions'
+import { listItems as listSearchSetItems, suggestFields } from '../../api/extractions'
 import { useWorkflowRunner } from '../../hooks/useWorkflowRunner'
-import type { Workflow, WorkflowStep, WorkflowTask, WorkflowStatus, ModelInfo, SearchSetItem } from '../../types/workflow'
+import type { Workflow, WorkflowStep, WorkflowTask, WorkflowStatus, WorkflowCitation, ModelInfo, SearchSetItem } from '../../types/workflow'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from 'recharts'
 import { QualityBadge } from '../library/QualityBadge'
 import { QualitySparkline } from '../library/QualitySparkline'
+import { SaveWorkflowOutputDialog } from './SaveWorkflowOutputDialog'
 import { useQualitySparkline } from '../../hooks/useQualitySparkline'
 import { relativeTime } from '../../utils/time'
 import { VerificationSubmitDialog } from '../shared/VerificationSubmitDialog'
@@ -158,6 +160,31 @@ const TEST_MESSAGES = [
   'Still working...',
   'Almost there...',
 ]
+
+// Task types where Test Step is meaningful and safe. Excludes:
+//   - Approval, KnowledgeBaseQuery: backend test handler doesn't support them
+//   - APINode, BrowserAutomation, CodeNode: real side effects make "test" misleading
+const TEST_STEP_SUPPORTED_TYPES = new Set([
+  'Extraction', 'Prompt', 'Formatter', 'Format', 'AddWebsite', 'AddDocument',
+  'DescribeImage', 'CrawlerNode', 'ResearchNode', 'DocumentRenderer',
+  'FormFiller', 'DataExport', 'PackageBuilder',
+])
+
+const TEST_STEP_TOOLTIP = [
+  'Tests this step in isolation — prior steps are NOT run.',
+  'If this step references earlier step output, that input will be empty.',
+  '',
+  'What it does:',
+  '• Runs only this step with its current configuration',
+  '• Uses the first selected document as input',
+  '• Makes real LLM / network calls (spends real tokens)',
+  '• Shows the raw output below',
+  '',
+  "What it doesn't do:",
+  '• Run upstream steps to build context',
+  '• Iterate over all selected documents (only the first is used)',
+  '• Persist the result — close the panel and it’s gone',
+].join('\n')
 
 // ---------------------------------------------------------------------------
 // Main component
@@ -275,14 +302,20 @@ export function WorkflowEditorPanel() {
 
   // --- handlers ---
 
-  // Block edits on verified workflows for non-examiners. Returns true if blocked.
-  const blockedByVerified = (): boolean => {
+  // Block edits on shared/verified workflows. If blocked, offer to make a copy.
+  // Returns true if the edit should not proceed on the current workflow.
+  const confirmCopyOnEdit = (): boolean => {
     const isVerified = !!(workflow as Workflow & { verified?: boolean })?.verified
-    if (isVerified && !user?.is_examiner) {
-      toast('This workflow is verified — make a copy to edit', 'error')
-      return true
+    const verifiedBlock = isVerified && !user?.is_examiner
+    const sharedBlock = workflow?.can_manage === false
+    if (!verifiedBlock && !sharedBlock) return false
+    const msg = verifiedBlock
+      ? "This workflow is verified — edits would change the verified version. Make a copy to edit?\n\nYour copy will be saved to your team."
+      : "This workflow is shared with you. Make a copy to edit?\n\nYour copy will be saved to your team."
+    if (window.confirm(msg)) {
+      void handleMakeCopy()
     }
-    return false
+    return true
   }
 
   const handleTitleSave = async () => {
@@ -290,7 +323,7 @@ export function WorkflowEditorPanel() {
       setEditingTitle(false)
       return
     }
-    if (blockedByVerified()) {
+    if (confirmCopyOnEdit()) {
       setEditingTitle(false)
       return
     }
@@ -301,12 +334,7 @@ export function WorkflowEditorPanel() {
 
   const handleAddStep = async () => {
     if (!openWorkflowId || !newStepName.trim()) return
-    if (workflow?.can_manage === false) {
-      toast('Make a copy to edit this workflow', 'error')
-      setShowNewStepModal(false)
-      return
-    }
-    if (blockedByVerified()) {
+    if (confirmCopyOnEdit()) {
       setShowNewStepModal(false)
       return
     }
@@ -332,12 +360,7 @@ export function WorkflowEditorPanel() {
 
   const handleAddTask = async (taskType: TaskTypeDef) => {
     if (!editingStepId) return
-    if (workflow?.can_manage === false) {
-      toast('Make a copy to edit this workflow', 'error')
-      setShowTaskPicker(false)
-      return
-    }
-    if (blockedByVerified()) {
+    if (confirmCopyOnEdit()) {
       setShowTaskPicker(false)
       return
     }
@@ -466,32 +489,6 @@ export function WorkflowEditorPanel() {
 
   return (
     <div className="flex h-full flex-col" style={{ backgroundColor: '#fff', position: 'relative' }}>
-      {/* ===== VERIFIED WORKFLOW NOTICE ===== */}
-      {(workflow as Workflow & { verified?: boolean }).verified && (
-        <div style={{
-          margin: '8px 24px 0', padding: '8px 12px', fontSize: 12, color: '#78350f',
-          backgroundColor: '#fef3c7', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 8,
-          border: '1px solid #fde68a',
-        }}>
-          <ShieldCheck style={{ width: 14, height: 14, flexShrink: 0, color: '#b45309' }} />
-          <span style={{ flex: 1 }}>
-            This is a verified workflow. Make a copy to edit it — your edits won't affect the verified version.
-          </span>
-          <button
-            onClick={handleMakeCopy}
-            disabled={duplicating}
-            style={{
-              padding: '4px 10px', fontSize: 11, fontWeight: 700, fontFamily: 'inherit',
-              borderRadius: 4, border: '1px solid #b45309',
-              backgroundColor: '#fff7ed', color: '#78350f', cursor: 'pointer',
-              whiteSpace: 'nowrap', opacity: duplicating ? 0.6 : 1,
-            }}
-          >
-            {duplicating ? 'Copying...' : 'Make a copy to edit'}
-          </button>
-        </div>
-      )}
-
       {/* ===== HEADER ===== */}
       <div style={{ padding: '16px 24px', borderBottom: '1px solid #e5e7eb', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -520,6 +517,19 @@ export function WorkflowEditorPanel() {
                 {workflow.name}
               </span>
               <Pencil style={{ width: 14, height: 14, color: '#9ca3af' }} />
+              {((workflow as Workflow & { verified?: boolean }).verified || !canManage) && (
+                <span
+                  title={
+                    (workflow as Workflow & { verified?: boolean }).verified
+                      ? 'Verified workflow — make a copy to edit'
+                      : 'Shared with you — make a copy to edit'
+                  }
+                  onClick={(e) => { e.stopPropagation(); void handleMakeCopy() }}
+                  style={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}
+                >
+                  <ShieldCheck style={{ width: 14, height: 14, color: '#b45309' }} />
+                </span>
+              )}
               {qualityStatus?.tier && (
                 <>
                   <QualityBadge tier={qualityStatus.tier} score={qualityStatus.score ?? null} />
@@ -570,37 +580,6 @@ export function WorkflowEditorPanel() {
           <div style={{ fontSize: 13, color: '#5f6368', marginTop: 4 }}>{workflow.description}</div>
         )}
       </div>
-
-      {/* ===== READ-ONLY BANNER (shared workflow you don't own) ===== */}
-      {!canManage && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 12,
-          padding: '10px 24px',
-          backgroundColor: '#fffbeb',
-          borderBottom: '1px solid #fde68a',
-          fontSize: 13,
-          color: '#78350f',
-          flexShrink: 0,
-        }}>
-          <ShieldCheck style={{ width: 16, height: 16, color: '#b45309', flexShrink: 0 }} />
-          <span style={{ flex: 1 }}>
-            This workflow is shared with you. Make a copy to edit it — your copy will be saved to your team.
-          </span>
-          <button
-            onClick={handleMakeCopy}
-            disabled={duplicating}
-            style={{
-              padding: '6px 14px', fontSize: 12, fontWeight: 700, fontFamily: 'inherit',
-              borderRadius: 6, border: '1px solid var(--highlight-color, #eab308)',
-              backgroundColor: 'var(--highlight-color, #eab308)',
-              color: 'var(--highlight-text-color, #000)', cursor: 'pointer',
-              whiteSpace: 'nowrap', opacity: duplicating ? 0.6 : 1,
-            }}
-          >
-            {duplicating ? 'Copying...' : 'Make a copy to edit'}
-          </button>
-        </div>
-      )}
 
       {/* ===== TAB BAR ===== */}
       <div ref={tabBarRef} style={{ display: 'flex', borderBottom: '1px solid #e5e7eb', padding: tabsCompact ? '0 8px' : '0 24px', backgroundColor: '#fff', flexShrink: 0 }}>
@@ -1143,6 +1122,7 @@ function DesignCanvas({
           <WorkflowOutputCard
             status={runnerStatus}
             sessionId={runnerSessionId}
+            workflowName={workflow?.name}
             running={runnerRunning}
             runElapsed={runElapsed}
             showDownloadPopup={showDownloadPopup}
@@ -1874,6 +1854,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
   onRefreshWorkflow: () => void
 }) {
   const { user } = useAuth()
+  const { selectedDocNames } = useWorkspace()
   const [taskData, setTaskData] = useState<Record<string, unknown>>({ ...task.data })
   const [saving, setSaving] = useState(false)
   const [subTab, setSubTab] = useState<TaskSubTab>('design')
@@ -2154,7 +2135,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
             if (res.status === 'completed') {
               setTestResult(res.result)
             } else {
-              setTestError('Test failed. Please check your configuration.')
+              setTestError(res.error || 'Test failed. Please check your configuration.')
             }
           } else {
             setTestProgress(prev => Math.min(prev + 8, 90))
@@ -2219,8 +2200,56 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
   }
 
   const handleSelectSavedSet = (id: string, name: string) => {
-    setTaskData(prev => ({ ...prev, search_set_uuid: id, name: name || prev.name }))
+    // Linking a saved set must clear any manual fields the user had typed.
+    // The UI hides them once linked, and the engine ignores them at runtime
+    // (saved-set keys win) — leaving them in state silently drops the user's
+    // manual work the next time they unlink. Make state match what the UI shows.
+    setTaskData(prev => {
+      const next = { ...prev, search_set_uuid: id, name: name || prev.name }
+      delete (next as Record<string, unknown>).extractions
+      return next
+    })
     setShowSetPicker(false)
+  }
+
+  const handleUnlinkSavedSet = () => {
+    setTaskData(prev => {
+      const next = { ...prev }
+      delete (next as Record<string, unknown>).search_set_uuid
+      return next
+    })
+  }
+
+  // AI: suggest extraction fields from the workspace's selected document(s).
+  const [suggestingFields, setSuggestingFields] = useState(false)
+  const [suggestError, setSuggestError] = useState<string | null>(null)
+  const handleSuggestFields = async () => {
+    if (selectedDocUuids.length === 0 || suggestingFields) return
+    setSuggestingFields(true)
+    setSuggestError(null)
+    try {
+      const { entities } = await suggestFields(selectedDocUuids.slice(0, 1))
+      if (entities.length === 0) {
+        setSuggestError('No fields suggested — document text may be empty.')
+        return
+      }
+      setTaskData(prev => {
+        const existing = Array.isArray(prev.extractions) ? (prev.extractions as string[]) : []
+        const seen = new Set(existing.map(s => s.toLowerCase()))
+        const merged = [...existing]
+        for (const name of entities) {
+          if (!seen.has(name.toLowerCase())) {
+            merged.push(name)
+            seen.add(name.toLowerCase())
+          }
+        }
+        return { ...prev, extractions: merged }
+      })
+    } catch (err) {
+      setSuggestError(err instanceof Error ? err.message : 'Failed to suggest fields')
+    } finally {
+      setSuggestingFields(false)
+    }
   }
 
   const SUB_TABS: { key: TaskSubTab; label: string }[] = [
@@ -2341,9 +2370,23 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                       <label style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
                         Extraction fields
                       </label>
-                      <span style={{ fontSize: 11, color: '#6b7280' }}>
-                        From saved set — edit in the Extractions library
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 11, color: '#6b7280' }}>
+                          From saved set — edit in the Extractions library
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleUnlinkSavedSet}
+                          title="Unlink this saved set and enter fields manually"
+                          style={{
+                            fontSize: 11, padding: '2px 8px', border: '1px solid #d1d5db',
+                            borderRadius: 4, backgroundColor: '#fff', color: '#374151',
+                            cursor: 'pointer', fontFamily: 'inherit',
+                          }}
+                        >
+                          Unlink
+                        </button>
+                      </div>
                     </div>
                     <div
                       style={{
@@ -2376,13 +2419,49 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                   </div>
                 ) : (
                   <div style={{ marginBottom: 16 }}>
-                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
-                      Extraction fields
-                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, gap: 8 }}>
+                      <label style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
+                        Extraction fields
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleSuggestFields}
+                        disabled={suggestingFields || selectedDocUuids.length === 0}
+                        title={selectedDocUuids.length === 0
+                          ? 'Select a document in the workspace to use AI-suggested fields'
+                          : 'Use AI to suggest extraction fields from the selected document'}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                          fontSize: 11, padding: '3px 8px',
+                          border: '1px solid #d1d5db', borderRadius: 4,
+                          backgroundColor: '#fff', color: '#374151',
+                          cursor: (suggestingFields || selectedDocUuids.length === 0) ? 'not-allowed' : 'pointer',
+                          opacity: (suggestingFields || selectedDocUuids.length === 0) ? 0.6 : 1,
+                          fontFamily: 'inherit',
+                        }}
+                      >
+                        {suggestingFields ? (
+                          <Loader2 style={{ width: 11, height: 11 }} className="animate-spin" />
+                        ) : (
+                          <Sparkles style={{ width: 11, height: 11 }} />
+                        )}
+                        {suggestingFields ? 'Suggesting…' : 'Suggest from document'}
+                      </button>
+                    </div>
                     <ExtractionTagInput
                       tags={Array.isArray(taskData.extractions) ? (taskData.extractions as string[]) : []}
                       onChange={(tags) => setTaskData(prev => ({ ...prev, extractions: tags }))}
                     />
+                    {suggestError && (
+                      <div style={{ marginTop: 6, fontSize: 12, color: '#b91c1c' }}>
+                        {suggestError}
+                      </div>
+                    )}
+                    {!suggestError && selectedDocUuids.length === 0 && (
+                      <div style={{ marginTop: 6, fontSize: 11, color: '#6b7280' }}>
+                        Tip: select a document in the workspace to enable AI-suggested fields.
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -3296,7 +3375,8 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
               Data Sources
             </div>
             <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
-              Pick one or more. When multiple are selected, the LLM sees each in a labeled section.
+              Pick one or more. Multiple selections are combined in labeled sections — e.g.,
+              check Step Input + Workflow Documents to give this step both the prior output and the original documents.
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {/* Step Input */}
@@ -3314,7 +3394,8 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#202124' }}>Step Input</div>
                   <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                    Use the output from the previous step as input for this task.
+                    Only the output of the immediately previous step — no documents, no earlier
+                    steps. Pair with another source to also include document context.
                   </div>
                 </div>
               </label>
@@ -3334,7 +3415,8 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#202124' }}>Select a Document</div>
                   <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                    Choose a specific document to use as input.
+                    A single document pinned to this step now — used every run, regardless of
+                    what triggered the workflow.
                   </div>
                   {wantsSelectDocument && (
                     <div style={{ marginTop: 8, position: 'relative' }}>
@@ -3421,7 +3503,8 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#202124' }}>Workflow Documents</div>
                   <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                    Use the documents selected when the workflow runs, plus any fixed documents.
+                    The documents the workflow was triggered with this run, plus any fixed
+                    documents pinned below at the workflow level.
                   </div>
 
                   {wantsWorkflowDocs && (
@@ -3563,6 +3646,34 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                           </>
                         )}
                       </div>
+
+                      {/* Quick add selected docs from file browser */}
+                      {(() => {
+                        const existing = new Set(fixedDocs.map(d => d.uuid))
+                        const addable = selectedDocUuids.filter(uuid => !existing.has(uuid))
+                        if (addable.length === 0) return null
+                        return (
+                          <button
+                            onClick={() => {
+                              for (const uuid of addable) {
+                                addFixedDoc({
+                                  uuid,
+                                  title: selectedDocNames[uuid] || `Document ${uuid.slice(0, 8)}`,
+                                })
+                              }
+                            }}
+                            style={{
+                              marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 4,
+                              padding: '6px 12px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
+                              borderRadius: 6, border: '1px dashed #93c5fd', backgroundColor: '#eff6ff',
+                              color: '#1d4ed8', cursor: 'pointer',
+                            }}
+                          >
+                            <Plus style={{ width: 12, height: 12 }} />
+                            Add {addable.length} selected document{addable.length !== 1 ? 's' : ''}
+                          </button>
+                        )
+                      })()}
                     </div>
                   )}
                 </div>
@@ -3651,19 +3762,22 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
         padding: '12px 20px', borderTop: '1px solid #e5e7eb', flexShrink: 0,
         display: 'flex', gap: 8,
       }}>
-        <button
-          onClick={handleTestStep}
-          disabled={testing || selectedDocUuids.length === 0}
-          style={{
-            flex: 1, padding: '10px 16px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
-            border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#fff',
-            cursor: testing || selectedDocUuids.length === 0 ? 'not-allowed' : 'pointer',
-            color: '#374151',
-            opacity: testing || selectedDocUuids.length === 0 ? 0.5 : 1,
-          }}
-        >
-          {testing ? 'Testing...' : 'Test Step'}
-        </button>
+        {TEST_STEP_SUPPORTED_TYPES.has(task.name) && (
+          <button
+            onClick={handleTestStep}
+            disabled={testing || selectedDocUuids.length === 0}
+            title={TEST_STEP_TOOLTIP}
+            style={{
+              flex: 1, padding: '10px 16px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+              border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#fff',
+              cursor: testing || selectedDocUuids.length === 0 ? 'not-allowed' : 'pointer',
+              color: '#374151',
+              opacity: testing || selectedDocUuids.length === 0 ? 0.5 : 1,
+            }}
+          >
+            {testing ? 'Testing...' : 'Test Step'}
+          </button>
+        )}
         <button
           onClick={handleUpdate}
           disabled={saving}
@@ -3687,9 +3801,10 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
 // Workflow output card (shown in design canvas during/after run)
 // ---------------------------------------------------------------------------
 
-function WorkflowOutputCard({ status, sessionId, running, runElapsed, showDownloadPopup, setShowDownloadPopup }: {
+function WorkflowOutputCard({ status, sessionId, workflowName, running, runElapsed, showDownloadPopup, setShowDownloadPopup }: {
   status: WorkflowStatus | null
   sessionId: string | null
+  workflowName?: string
   running: boolean
   runElapsed: number
   showDownloadPopup: boolean
@@ -3704,6 +3819,8 @@ function WorkflowOutputCard({ status, sessionId, running, runElapsed, showDownlo
   const [approvalComments, setApprovalComments] = useState('')
   const [approvalProcessing, setApprovalProcessing] = useState(false)
   const [approvalError, setApprovalError] = useState<string | null>(null)
+  const [showSaveToFolder, setShowSaveToFolder] = useState(false)
+  const { toast } = useToast()
 
   useEffect(() => {
     if (!isPendingApproval || !status?.approval_request_id) return
@@ -3913,7 +4030,8 @@ function WorkflowOutputCard({ status, sessionId, running, runElapsed, showDownlo
             }}
             dangerouslySetInnerHTML={{ __html: renderOutput(output) }}
           />
-          <div style={{ marginTop: 12, position: 'relative', display: 'inline-block' }}>
+          <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ position: 'relative', display: 'inline-block' }}>
             <button
               onClick={() => setShowDownloadPopup(!showDownloadPopup)}
               style={{
@@ -3961,17 +4079,154 @@ function WorkflowOutputCard({ status, sessionId, running, runElapsed, showDownlo
               </div>
             )}
           </div>
+            <button
+              onClick={() => setShowSaveToFolder(true)}
+              disabled={!sessionId}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px',
+                fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+                border: '1px solid #d1d5db', borderRadius: 6,
+                backgroundColor: '#fff',
+                cursor: sessionId ? 'pointer' : 'not-allowed',
+                color: '#374151', opacity: sessionId ? 1 : 0.5,
+              }}
+            >
+              <FolderInput style={{ width: 14, height: 14 }} />
+              Save to folder
+            </button>
+          </div>
+          {showSaveToFolder && sessionId && (
+            <SaveWorkflowOutputDialog
+              sessionId={sessionId}
+              workflowName={workflowName}
+              outputPreview={output}
+              onClose={() => setShowSaveToFolder(false)}
+              onSaved={() => toast('Saved to folder', 'success')}
+            />
+          )}
         </div>
       )}
 
       {/* Error */}
       {isError && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#dc2626', fontWeight: 500 }}>
-          <XCircle style={{ width: 16, height: 16 }} />
-          Failed
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13, color: '#dc2626', fontWeight: 500 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <XCircle style={{ width: 16, height: 16 }} />
+            {status?.error || 'Failed'}
+          </div>
+          {status?.error_payload?.suggested_action === 'convert_to_kb' && (status?.error_payload?.oversize_documents?.length ?? 0) > 0 && (
+            <ConvertWorkflowDocsButton
+              docs={status.error_payload?.oversize_documents ?? []}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Sources from KB query steps */}
+      {(status?.retrieved_sources?.length ?? 0) > 0 && (
+        <WorkflowSourcesPanel sources={status?.retrieved_sources ?? []} />
+      )}
+    </div>
+  )
+}
+
+function WorkflowSourcesPanel({ sources }: { sources: WorkflowCitation[] }) {
+  const [expanded, setExpanded] = useState(false)
+  return (
+    <div style={{ marginTop: 4, borderTop: '1px solid #e5e7eb', paddingTop: 8 }}>
+      <button
+        onClick={() => setExpanded(e => !e)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 4, padding: 0,
+          background: 'transparent', border: 'none', cursor: 'pointer',
+          fontSize: 12, fontWeight: 600, color: '#374151', fontFamily: 'inherit',
+        }}
+      >
+        <ChevronRight
+          size={14}
+          style={{ transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }}
+        />
+        Sources ({sources.length})
+      </button>
+      {expanded && (
+        <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {sources.map((c, i) => {
+            const locator = typeof c.page === 'number' ? `p. ${c.page}` : (c.sheet || null)
+            const label = locator ? `${c.document_title} · ${locator}` : c.document_title
+            return (
+              <span
+                key={`${c.chunk_id ?? c.document_id ?? i}`}
+                title={c.content_preview || ''}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  padding: '2px 8px', fontSize: 11, fontWeight: 500,
+                  backgroundColor: '#f3f4f6', color: '#374151',
+                  border: '1px solid #e5e7eb', borderRadius: 999,
+                  cursor: 'help',
+                }}
+              >
+                {label}
+              </span>
+            )
+          })}
         </div>
       )}
     </div>
+  )
+}
+
+function ConvertWorkflowDocsButton({
+  docs,
+}: { docs: Array<{ uuid: string; title: string; token_count: number }> }) {
+  const [converting, setConverting] = useState(false)
+  const [convertedKB, setConvertedKB] = useState<{ uuid: string; title: string } | null>(null)
+  const { toast } = useToast()
+
+  const handleConvert = async () => {
+    setConverting(true)
+    try {
+      const kb = await convertDocumentsToKB(docs.map(d => d.uuid))
+      setConvertedKB({ uuid: kb.uuid, title: kb.title })
+      toast(
+        `Created Knowledge Base "${kb.title}". Add a Knowledge Base Query step to use it.`,
+        'success',
+      )
+    } catch (e) {
+      toast(
+        e instanceof Error ? e.message : 'Could not convert documents to a Knowledge Base.',
+        'error',
+      )
+    } finally {
+      setConverting(false)
+    }
+  }
+
+  if (convertedKB) {
+    return (
+      <div style={{ fontSize: 12, fontWeight: 400, color: '#374151' }}>
+        Knowledge Base <strong>{convertedKB.title}</strong> is being built. Edit the workflow:
+        replace the oversized document(s) with a <strong>Knowledge Base Query</strong> step
+        targeting it.
+      </div>
+    )
+  }
+
+  return (
+    <button
+      onClick={handleConvert}
+      disabled={converting}
+      style={{
+        alignSelf: 'flex-start',
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        padding: '6px 10px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+        border: '1px solid #dc2626', borderRadius: 6,
+        backgroundColor: '#dc2626', color: '#fff',
+        cursor: converting ? 'not-allowed' : 'pointer',
+        opacity: converting ? 0.6 : 1,
+      }}
+    >
+      {converting ? 'Converting…' : 'Convert to Knowledge Base'}
+    </button>
   )
 }
 
@@ -4672,9 +4927,13 @@ function FixedDocumentsZone({
   onAddDocs: (docs: { uuid: string; title: string }[]) => Promise<void> | void
   onRemoveDoc: (uuid: string) => void
 }) {
+  const { selectedDocUuids, selectedDocNames } = useWorkspace()
   const [dragOver, setDragOver] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [showPicker, setShowPicker] = useState(false)
+
+  const existingUuids = new Set(fixedDocs.map(d => d.uuid))
+  const addableSelected = selectedDocUuids.filter(uuid => !existingUuids.has(uuid))
 
   const handleFileUpload = async (file: File) => {
     setUploading(true)
@@ -4790,6 +5049,27 @@ function FixedDocumentsZone({
           </>
         )}
       </div>
+
+      {addableSelected.length > 0 && (
+        <button
+          onClick={async () => {
+            const docs = addableSelected.map(uuid => ({
+              uuid,
+              title: selectedDocNames[uuid] || `Document ${uuid.slice(0, 8)}`,
+            }))
+            await onAddDocs(docs)
+          }}
+          style={{
+            marginTop: 8, display: 'inline-flex', alignItems: 'center', gap: 4,
+            padding: '6px 12px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
+            borderRadius: 6, border: '1px dashed #93c5fd', backgroundColor: '#eff6ff',
+            color: '#1d4ed8', cursor: 'pointer',
+          }}
+        >
+          <Plus style={{ width: 12, height: 12 }} />
+          Add {addableSelected.length} selected document{addableSelected.length !== 1 ? 's' : ''}
+        </button>
+      )}
 
       {showPicker && (
         <DocumentPickerDialog
@@ -5002,9 +5282,10 @@ function ValidateTab({
     setRunProgress('Preparing inputs...')
 
     try {
-      // Collect document UUIDs from document inputs
+      // Collect document UUIDs from document inputs, skipping any whose
+      // source document was deleted (those would 404 the run).
       const docUuids: string[] = inputs
-        .filter(i => i.type === 'document' && i.document_uuid)
+        .filter(i => i.type === 'document' && i.document_uuid && i.document_exists !== false)
         .map(i => i.document_uuid!)
 
       // Create temp documents from text inputs
@@ -5297,6 +5578,18 @@ function ValidateTab({
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {input.document_title || input.document_uuid}
                         </span>
+                        {input.document_exists === false && (
+                          <span
+                            style={{
+                              fontSize: 10, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase',
+                              padding: '1px 6px', borderRadius: 4,
+                              backgroundColor: '#fee2e2', color: '#b91c1c', flexShrink: 0,
+                            }}
+                            title="The source document was deleted. Remove this input or re-add the document before running the workflow."
+                          >
+                            Deleted
+                          </span>
+                        )}
                       </div>
                     ) : (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>

@@ -30,8 +30,22 @@ export function moveFile(fileUUID: string, folderID: string) {
   })
 }
 
-export function downloadFileUrl(docid: string) {
-  return `/api/files/download?docid=${docid}`
+export function downloadFileUrl(docid: string, options?: { inline?: boolean }) {
+  const base = `/api/files/download?docid=${encodeURIComponent(docid)}`
+  return options?.inline ? `${base}&inline=1` : base
+}
+
+export interface SheetJsonResponse {
+  sheets: Array<{
+    name: string
+    headers: string[]
+    rows: string[][]
+    hidden: boolean
+  }>
+}
+
+export function fetchSheetJson(docUuid: string) {
+  return apiFetch<SheetJsonResponse>(`/api/files/${docUuid}/sheet-json`)
 }
 
 export function downloadFile(docid: string) {

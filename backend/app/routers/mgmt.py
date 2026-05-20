@@ -231,9 +231,15 @@ async def stats(_: ApiKey = Depends(require_mgmt_scope("metrics:read"))):
     ).count()
 
     # Aggregate token-count bytes proxy: doc reader doesn't store size, so use
-    # a coarse aggregate of token_count (proxy for content volume).
-    docs = await SmartDocument.find_all().to_list()
-    documents_size_bytes_total = sum(d.token_count for d in docs) * 4  # ~4 bytes/token
+    # a coarse aggregate of token_count (proxy for content volume). Run this
+    # in MongoDB rather than materializing every SmartDocument — older stub
+    # records in production are missing required fields and would trip Beanie
+    # validation on the way through `to_list()`.
+    token_agg = await SmartDocument.aggregate(
+        [{"$group": {"_id": None, "total_tokens": {"$sum": "$token_count"}}}],
+    ).to_list()
+    total_tokens = int(token_agg[0].get("total_tokens", 0)) if token_agg else 0
+    documents_size_bytes_total = total_tokens * 4  # ~4 bytes/token
 
     active_user_ids = await ActivityEvent.find(
         {"started_at": {"$gte": cutoff_30d}}

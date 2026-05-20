@@ -11,10 +11,12 @@ import { UploadProgress } from './UploadProgress'
 import { ContextMenu } from './ContextMenu'
 import { RenameDialog } from './RenameDialog'
 import { CreateFolderDialog } from './CreateFolderDialog'
+import { useConfirm } from '../shared/useConfirm'
 import { deleteFile, renameFile, downloadFile, downloadFilesAsZip, moveFile } from '../../api/files'
 import { createFolder, renameFolder, deleteFolder, convertFolderToTeam } from '../../api/folders'
 import { listAutomations } from '../../api/automations'
 import type { Document, Folder } from '../../types/document'
+import { isDocReady } from '../../utils/processingStatus'
 
 export type SortColumn = 'name' | 'modified'
 export type SortDirection = 'asc' | 'desc'
@@ -45,12 +47,19 @@ interface FileBrowserProps {
   onSelectionChange?: (docUuids: string[]) => void
   onDocNamesChange?: (names: Record<string, string>) => void
   onFolderSelectionChange?: (folderUuids: string[]) => void
+  // Emits the subset of selected docs that are still being processed
+  // (text extraction, OCR, indexing, etc.). Used by the chat banner to
+  // avoid the false "ready for analysis" claim.
+  onSelectionProcessingChange?: (
+    docs: Array<{ uuid: string; title: string; status: string | null }>,
+  ) => void
   currentFolder?: string | null
   onFolderNavigate?: (folderId: string | null) => void
 }
 
-export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSelectionChange, onDocNamesChange, onFolderSelectionChange, currentFolder: controlledFolder, onFolderNavigate }: FileBrowserProps) {
+export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSelectionChange, onDocNamesChange, onFolderSelectionChange, onSelectionProcessingChange, currentFolder: controlledFolder, onFolderNavigate }: FileBrowserProps) {
   const { currentTeam } = useTeams()
+  const confirm = useConfirm()
 
   const [internalFolder, setInternalFolder] = useState<string | null>(null)
   const currentFolder = controlledFolder !== undefined ? controlledFolder : internalFolder
@@ -110,7 +119,16 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
     const names: Record<string, string> = {}
     for (const d of selectedDocs) names[d.uuid] = d.title
     onDocNamesChange?.(names)
-  }, [selectedUuids, documents, onSelectionChange, onDocNamesChange])
+    // And which selected docs aren't fully ready yet. `processing` flips off
+    // after text extraction, but the doc still goes through RAG indexing
+    // (task_status="readying") before it's truly ready for analysis. Use
+    // isDocReady so the chat banner stays accurate across that whole window.
+    onSelectionProcessingChange?.(
+      selectedDocs
+        .filter(d => !isDocReady(d))
+        .map(d => ({ uuid: d.uuid, title: d.title, status: d.task_status })),
+    )
+  }, [selectedUuids, documents, onSelectionChange, onDocNamesChange, onSelectionProcessingChange])
 
   // Sync selected folder UUIDs to parent
   useEffect(() => {
@@ -223,6 +241,21 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
 
   const handleBulkDelete = useCallback(async () => {
     if (selectedUuids.size === 0) return
+    const folderCount = [...selectedUuids].filter(u => folders.some(f => f.uuid === u)).length
+    const fileCount = selectedUuids.size - folderCount
+    const parts: string[] = []
+    if (fileCount > 0) parts.push(`${fileCount} file${fileCount === 1 ? '' : 's'}`)
+    if (folderCount > 0) parts.push(`${folderCount} folder${folderCount === 1 ? '' : 's'}`)
+    const summary = parts.join(' and ')
+    const ok = await confirm({
+      title: `Delete ${summary}?`,
+      message: folderCount > 0
+        ? `Are you sure you want to delete ${summary}? Folders will be removed along with everything inside them. This cannot be undone.`
+        : `Are you sure you want to delete ${summary}? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      destructive: true,
+    })
+    if (!ok) return
     setBulkDeleting(true)
     try {
       const promises: Promise<unknown>[] = []
@@ -232,15 +265,17 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
         else promises.push(deleteFile(uuid))
       }
       await Promise.all(promises)
-      setSelectedUuids(new Set())
-      refresh()
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Failed to delete')
-      refresh()
     } finally {
+      // Always clear selection + refresh: the user confirmed a destructive
+      // action and the state of the items is now uncertain. Refresh
+      // reconciles what's actually left on the server.
+      setSelectedUuids(new Set())
+      refresh()
       setBulkDeleting(false)
     }
-  }, [selectedUuids, folders, refresh])
+  }, [selectedUuids, folders, refresh, confirm])
 
   const handleDropFile = useCallback(async (fileUuid: string, folderUuid: string) => {
     await moveFile(fileUuid, folderUuid)
@@ -362,6 +397,27 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
 
   const handleDelete = useCallback(
     async (type: 'folder' | 'doc', uuid: string) => {
+      const item = type === 'folder'
+        ? folders.find(f => f.uuid === uuid)
+        : documents.find(d => d.uuid === uuid)
+      const name = (item as { name?: string; title?: string } | undefined)?.name
+        || (item as { title?: string } | undefined)?.title
+        || (type === 'folder' ? 'this folder' : 'this file')
+      const ok = await confirm({
+        title: type === 'folder' ? 'Delete folder?' : 'Delete file?',
+        message: type === 'folder' ? (
+          <>
+            Are you sure you want to delete <strong>{name}</strong> and everything inside it? This cannot be undone.
+          </>
+        ) : (
+          <>
+            Are you sure you want to delete <strong>{name}</strong>? This cannot be undone.
+          </>
+        ),
+        confirmLabel: 'Delete',
+        destructive: true,
+      })
+      if (!ok) return
       try {
         if (type === 'doc') {
           await deleteFile(uuid)
@@ -373,7 +429,7 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
       }
       refresh()
     },
-    [refresh],
+    [refresh, folders, documents, confirm],
   )
 
   if (loading && documents.length === 0 && folders.length === 0) {

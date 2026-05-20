@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ZoomIn, ZoomOut, Maximize2, ChevronLeft, ChevronRight, Loader2, X, Search } from 'lucide-react'
+import { ZoomIn, ZoomOut, Maximize2, ChevronLeft, ChevronRight, Loader2, X, Search, AlertCircle, RefreshCw } from 'lucide-react'
 import { downloadFileUrl } from '../../api/files'
-import { pollStatus } from '../../api/documents'
+import { pollStatus, retryExtraction } from '../../api/documents'
 import { SpreadsheetViewer } from './SpreadsheetViewer'
 import { DocumentSearchBar, useFindInDocumentHotkey } from './DocumentSearchBar'
+import { stageCopy } from '../../utils/processingStatus'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs'
@@ -111,35 +112,17 @@ function highlightHtmlSearch(root: HTMLElement, query: string): number {
   return count
 }
 
-const STATUS_MESSAGES: Record<string, { title: string; message: string }> = {
-  layout: {
-    title: 'Converting & Preparing Your Document...',
-    message: "We're converting your document so it can be read and analyzed accurately.",
-  },
-  ocr: {
-    title: 'Extracting Text From Your Document...',
-    message: 'Running OCR to extract text content from your document.',
-  },
-  security: {
-    title: 'Scanning Your Document for Security...',
-    message: "Please hang tight. We're checking for any sensitive information.",
-  },
-  readying: {
-    title: 'Preparing Your Document...',
-    message: 'Almost done. Indexing your document for search and analysis.',
-  },
-}
-
 export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights, processing, taskStatus }: DocumentViewerProps) {
   const [zoom, setZoom] = useState(2) // index into ZOOM_LEVELS, default 100%
   const [isPdf, setIsPdf] = useState<boolean | null>(null) // null = loading
   const [isSpreadsheet, setIsSpreadsheet] = useState(false)
   const [isDocx, setIsDocx] = useState(false)
   const [docxText, setDocxText] = useState<string | null>(null)
+  const [extractionError, setExtractionError] = useState<string | null>(null)
+  const [retrying, setRetrying] = useState(false)
   const [blobUrl, setBlobUrl] = useState<string | null>(null) // for non-PDF iframe fallback
   const containerRef = useRef<HTMLDivElement>(null)
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null)
-  const pdfDataRef = useRef<ArrayBuffer | null>(null)
   const renderingRef = useRef(false)
   const [totalHighlights, setTotalHighlights] = useState(0)
   const [currentHighlight, setCurrentHighlight] = useState(0)
@@ -153,7 +136,13 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
   const [docxCurrentMatch, setDocxCurrentMatch] = useState(0)
 
   const zoomLevel = ZOOM_LEVELS[zoom]
-  const url = downloadFileUrl(docUuid)
+  // Two URLs for the same file:
+  //  - `inlineUrl` asks the server to serve with `Content-Disposition: inline`
+  //    so the browser will render the file (used by PDF.js and "open in tab").
+  //  - `downloadUrl` retains the default `attachment` disposition for the
+  //    user-facing Download button.
+  const inlineUrl = downloadFileUrl(docUuid, { inline: true })
+  const downloadUrl = downloadFileUrl(docUuid)
 
   const openSearch = useCallback(() => setSearchOpen(true), [])
   const closeSearch = useCallback(() => {
@@ -173,7 +162,13 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
     return highlightTerms
   }, [searchOpen, searchQuery, highlightTerms])
 
-  // Fetch file data with credentials and detect content type
+  // Detect file type, then route to the right loader.
+  //
+  // For PDFs we deliberately skip pre-fetching the bytes: a HEAD picks the
+  // type, then pdfjs streams pages via byte-range requests as the user
+  // scrolls (the backend serves `Accept-Ranges: bytes`). For a 20 MB file
+  // this paints the first page in seconds instead of waiting for the full
+  // body to land.
   useEffect(() => {
     let cancelled = false
     let createdBlobUrl: string | null = null
@@ -182,10 +177,8 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
     setIsDocx(false)
     setDocxText(null)
     setBlobUrl(null)
-    pdfDataRef.current = null
 
-    // Fetch the full file once — avoids a second round-trip and works for all types
-    fetch(url, { credentials: 'include' })
+    fetch(inlineUrl, { method: 'HEAD', credentials: 'include' })
       .then(async (resp) => {
         if (cancelled) return
         const ct = resp.headers.get('content-type') || ''
@@ -193,9 +186,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
           setIsSpreadsheet(true)
           setIsPdf(false)
         } else if (ct.includes('pdf')) {
-          const data = await resp.arrayBuffer()
-          if (cancelled) return
-          pdfDataRef.current = data
+          // PDF.js loads progressively from the URL — no full-body fetch
           setIsPdf(true)
         } else if (
           ct.includes('wordprocessingml') ||
@@ -206,14 +197,23 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
           setIsDocx(true)
           setIsPdf(false)
           pollStatus(docUuid).then(res => {
-            if (!cancelled) setDocxText(res.raw_text || '')
+            if (cancelled) return
+            if (res.status === 'error' || (res.complete && !res.raw_text)) {
+              setExtractionError(res.error_message || "We couldn't extract any text from this document.")
+              setDocxText('')
+            } else {
+              setExtractionError(null)
+              setDocxText(res.raw_text || '')
+            }
           }).catch(() => {
             if (!cancelled) setDocxText('')
           })
         } else {
-          // Generic fallback: create a blob URL so the iframe doesn't need to
-          // re-authenticate. This also avoids X-Frame-Options blocking the iframe.
-          const blob = await resp.blob()
+          // Generic fallback: fetch into a blob URL so the iframe inherits
+          // browser-side caching and doesn't need a second auth round-trip.
+          const fullResp = await fetch(inlineUrl, { credentials: 'include' })
+          if (cancelled) return
+          const blob = await fullResp.blob()
           if (cancelled) return
           createdBlobUrl = URL.createObjectURL(blob)
           setBlobUrl(createdBlobUrl)
@@ -228,24 +228,67 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
       cancelled = true
       if (createdBlobUrl) URL.revokeObjectURL(createdBlobUrl)
     }
-  }, [url, docUuid])
+  }, [inlineUrl, docUuid])
 
   // Re-fetch docx text when processing completes
   useEffect(() => {
     if (!isDocx || processing) return
     let cancelled = false
     pollStatus(docUuid).then(res => {
-      if (!cancelled) setDocxText(res.raw_text || '')
+      if (cancelled) return
+      if (res.status === 'error' || (res.complete && !res.raw_text)) {
+        setExtractionError(res.error_message || "We couldn't extract any text from this document.")
+        setDocxText('')
+      } else {
+        setExtractionError(null)
+        setDocxText(res.raw_text || '')
+      }
     }).catch(() => {})
     return () => { cancelled = true }
   }, [isDocx, processing, docUuid])
 
-  // Load PDF document from fetched data
+  const handleRetryExtraction = useCallback(async () => {
+    setRetrying(true)
+    setExtractionError(null)
+    try {
+      await retryExtraction(docUuid)
+      setDocxText(null) // back to loading state
+      // Poll for completion every 3s.
+      const interval = window.setInterval(async () => {
+        try {
+          const res = await pollStatus(docUuid)
+          if (res.complete || (!res.processing && res.status !== 'extracting' && res.status !== 'readying')) {
+            window.clearInterval(interval)
+            if (res.status === 'error' || (res.complete && !res.raw_text)) {
+              setExtractionError(res.error_message || "We couldn't extract any text from this document.")
+              setDocxText('')
+            } else {
+              setDocxText(res.raw_text || '')
+            }
+            setRetrying(false)
+          }
+        } catch {
+          window.clearInterval(interval)
+          setRetrying(false)
+        }
+      }, 3000)
+    } catch (err) {
+      setExtractionError(err instanceof Error ? err.message : 'Retry failed.')
+      setRetrying(false)
+    }
+  }, [docUuid])
+
+  // Load PDF document by streaming from the server. pdfjs issues byte-range
+  // requests under the hood so we don't block on the full file; pages render
+  // as they arrive instead of after a multi-minute arrayBuffer wait.
   useEffect(() => {
-    if (isPdf !== true || !pdfDataRef.current) return
+    if (isPdf !== true) return
     let cancelled = false
 
-    const loadTask = pdfjsLib.getDocument({ data: pdfDataRef.current.slice(0) })
+    const loadTask = pdfjsLib.getDocument({
+      url: inlineUrl,
+      withCredentials: true,
+    })
     loadTask.promise
       .then((doc) => {
         if (cancelled) {
@@ -268,7 +311,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPdf])
+  }, [isPdf, inlineUrl])
 
   // Re-render pages when zoom changes
   useEffect(() => {
@@ -641,16 +684,11 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
     setZoom(2)
   }, [])
 
-  // The /api/files/download endpoint always sets Content-Disposition: attachment,
-  // so opening it in a new tab triggers a download. For inline viewing we open
-  // a blob URL instead — no disposition header means the browser renders it.
+  // The download endpoint serves `inline` disposition when `?inline=1` is set,
+  // so the browser renders the PDF in the new tab instead of downloading it.
   const openPdfInNewTab = useCallback(() => {
-    if (!pdfDataRef.current) return
-    const blob = new Blob([pdfDataRef.current.slice(0)], { type: 'application/pdf' })
-    const inlineUrl = URL.createObjectURL(blob)
     window.open(inlineUrl, '_blank')
-    setTimeout(() => URL.revokeObjectURL(inlineUrl), 60_000)
-  }, [])
+  }, [inlineUrl])
 
   const btnStyle: React.CSSProperties = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -687,10 +725,10 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
           <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white shrink-0" />
           <div>
             <div style={{ fontSize: 14, fontWeight: 600, lineHeight: 1.3 }}>
-              {STATUS_MESSAGES[taskStatus || '']?.title || 'Processing Your Document...'}
+              {stageCopy(taskStatus).title}
             </div>
             <div style={{ fontSize: 12, opacity: 0.8, marginTop: 3 }}>
-              {STATUS_MESSAGES[taskStatus || '']?.message || 'Please wait while we prepare your document.'}
+              {stageCopy(taskStatus).message}
             </div>
           </div>
         </div>
@@ -708,11 +746,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
               height: '100%',
               borderRadius: 2,
               backgroundColor: 'rgba(255,255,255,0.7)',
-              width: taskStatus === 'layout' ? '20%'
-                : taskStatus === 'ocr' ? '45%'
-                : taskStatus === 'security' ? '65%'
-                : taskStatus === 'readying' ? '85%'
-                : '10%',
+              width: `${Math.round(stageCopy(taskStatus).progress * 100)}%`,
               transition: 'width 0.5s ease',
             }}
           />
@@ -755,7 +789,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
           <button onClick={openSearch} style={btnStyle} title="Find in document (⌘F / Ctrl+F)" aria-label="Find in document">
             <Search size={16} />
           </button>
-          <button onClick={() => window.open(url, '_blank')} style={btnStyle} title="Download original">
+          <button onClick={() => window.open(downloadUrl, '_blank')} style={btnStyle} title="Download original">
             <Maximize2 size={16} />
           </button>
         </div>
@@ -777,6 +811,38 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
           {docxText === null ? (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
               <Loader2 style={{ width: 32, height: 32, color: 'var(--highlight-color)', animation: 'spin 1s linear infinite' }} />
+            </div>
+          ) : extractionError ? (
+            <div style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+              gap: 16, padding: 32, height: '100%', textAlign: 'center',
+            }}>
+              <AlertCircle style={{ width: 40, height: 40, color: '#dc2626' }} />
+              <div style={{ fontSize: 15, fontWeight: 600, color: '#111' }}>
+                Text extraction failed
+              </div>
+              <div style={{ fontSize: 14, color: '#555', maxWidth: 480, lineHeight: 1.5 }}>
+                {extractionError}
+              </div>
+              <button
+                onClick={handleRetryExtraction}
+                disabled={retrying}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '8px 14px', fontSize: 14, fontWeight: 500,
+                  backgroundColor: retrying ? '#9ca3af' : 'var(--highlight-color)',
+                  color: '#fff', border: 'none', borderRadius: 6,
+                  cursor: retrying ? 'not-allowed' : 'pointer',
+                }}
+              >
+                <RefreshCw
+                  style={{
+                    width: 14, height: 14,
+                    animation: retrying ? 'spin 1s linear infinite' : undefined,
+                  }}
+                />
+                {retrying ? 'Retrying...' : 'Retry extraction'}
+              </button>
             </div>
           ) : (
             <div style={{

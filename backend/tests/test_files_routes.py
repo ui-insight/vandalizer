@@ -102,6 +102,112 @@ class TestFileDownloadAuth:
         assert resp.status_code == 404
 
 
+class TestFileDownloadRangeAndInline:
+    """Cover the progressive-loading additions to /api/files/download."""
+
+    @pytest.mark.asyncio
+    async def test_download_advertises_accept_ranges_and_attachment(self, client):
+        user = _make_user()
+        cookies, headers = _auth_cookies()
+        from app.services.file_service import DownloadResult
+
+        result = DownloadResult(data=b"A" * 1024, extension="pdf", title="big.pdf")
+        with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.files.file_service") as mock_svc:
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.download_document = AsyncMock(return_value=result)
+
+            resp = await client.get(
+                "/api/files/download?docid=u",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.headers["accept-ranges"] == "bytes"
+        # Default disposition stays `attachment` so the Download button still
+        # triggers a save dialog.
+        assert resp.headers["content-disposition"].startswith("attachment;")
+
+    @pytest.mark.asyncio
+    async def test_download_inline_query_param(self, client):
+        user = _make_user()
+        cookies, headers = _auth_cookies()
+        from app.services.file_service import DownloadResult
+
+        result = DownloadResult(data=b"%PDF-1.4\n", extension="pdf", title="x.pdf")
+        with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.files.file_service") as mock_svc:
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.download_document = AsyncMock(return_value=result)
+
+            resp = await client.get(
+                "/api/files/download?docid=u&inline=1",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.headers["content-disposition"].startswith("inline;")
+
+    @pytest.mark.asyncio
+    async def test_download_range_request_returns_206(self, client):
+        user = _make_user()
+        cookies, headers = _auth_cookies()
+        from app.services.file_service import DownloadResult
+
+        body = bytes(range(256))  # 0..255
+        result = DownloadResult(data=body, extension="pdf", title="x.pdf")
+        with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.files.file_service") as mock_svc:
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.download_document = AsyncMock(return_value=result)
+
+            resp = await client.get(
+                "/api/files/download?docid=u&inline=1",
+                cookies=cookies,
+                headers={**headers, "Range": "bytes=10-19"},
+            )
+
+        assert resp.status_code == 206
+        assert resp.content == body[10:20]
+        assert resp.headers["content-range"] == "bytes 10-19/256"
+        assert resp.headers["accept-ranges"] == "bytes"
+
+
+class TestRangeHeaderParser:
+    """Unit tests for the `Range` header parser used by the download route."""
+
+    def _parse(self, header: str, total: int):
+        from app.routers.files import _parse_range_header
+        return _parse_range_header(header, total)
+
+    def test_basic_range(self):
+        assert self._parse("bytes=0-99", 1000) == (0, 99)
+
+    def test_open_ended_range(self):
+        assert self._parse("bytes=500-", 1000) == (500, 999)
+
+    def test_suffix_range(self):
+        assert self._parse("bytes=-100", 1000) == (900, 999)
+
+    def test_clamps_to_total(self):
+        assert self._parse("bytes=100-9999", 1000) == (100, 999)
+
+    def test_rejects_multi_range(self):
+        # Multi-range responses aren't worth the complexity; fall back to 200.
+        assert self._parse("bytes=0-99,200-299", 1000) is None
+
+    def test_rejects_invalid(self):
+        assert self._parse("bytes=abc", 1000) is None
+        assert self._parse("bytes=-", 1000) is None
+        assert self._parse("", 1000) is None
+        assert self._parse("bytes=1000-2000", 1000) is None  # start beyond total
+
+
 class TestFileDeleteAuth:
     @pytest.mark.asyncio
     async def test_delete_calls_service_with_user(self, client):

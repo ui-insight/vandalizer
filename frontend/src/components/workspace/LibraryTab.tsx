@@ -7,6 +7,13 @@ import { useLibraries, useLibraryItems } from '../../hooks/useLibrary'
 import { LibraryItemRow } from '../library/LibraryItemRow'
 import { ExploreTab } from '../library/ExploreTab'
 import { ShareWithTeamDialog } from '../library/ShareWithTeamDialog'
+import { useConfirm } from '../shared/useConfirm'
+
+const KIND_LABEL: Record<string, string> = {
+  workflow: 'workflow',
+  search_set: 'extraction',
+  automation: 'automation',
+}
 import { cloneToPersonal, shareToTeam, addItem as addItemToLibrary, touchItem, listCollections } from '../../api/library'
 import { ApiError } from '../../api/client'
 import { createWorkflow, importWorkflow } from '../../api/workflows'
@@ -41,6 +48,7 @@ type SortOption = 'recent' | 'az'
 export function LibraryTab() {
   const { openWorkflow, openExtraction, sendChatMessage, selectedDocUuids, selectedFolderUuids } = useWorkspace()
   const { toast } = useToast()
+  const confirm = useConfirm()
   const { user } = useAuth()
   const teamId = user?.current_team ?? undefined
   const { libraries, loading: libLoading, error, refresh } = useLibraries(teamId)
@@ -163,6 +171,19 @@ export function LibraryTab() {
     }
   }
   const handleRemove = async (itemId: string) => {
+    const item = items.find((i) => i.id === itemId)
+    const kindLabel = item ? (KIND_LABEL[item.kind] ?? 'item') : 'item'
+    const ok = await confirm({
+      title: `Delete ${kindLabel}?`,
+      message: (
+        <>
+          Are you sure you want to delete <strong>{item?.name ?? 'this item'}</strong>? This action cannot be undone.
+        </>
+      ),
+      confirmLabel: 'Delete',
+      destructive: true,
+    })
+    if (!ok) return
     await remove(itemId)
   }
   const handleMoveToFolder = async (itemId: string, folderUuid: string | null) => {
@@ -578,7 +599,7 @@ export function LibraryTab() {
         <div style={{ display: scope === 'explore' ? 'none' : 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingBottom: 2 }}>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             {([
-              { value: 'all' as const, label: 'All Types' },
+              { value: 'all' as const, label: 'All' },
               { value: 'workflow' as const, label: 'Workflows' },
               { value: 'search_set' as const, label: 'Tasks' },
             ]).map(({ value, label }) => {

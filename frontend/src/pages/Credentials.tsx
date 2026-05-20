@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { KeyRound, Plus, Trash2, RefreshCw } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
+import { useConfirm } from '../components/shared/useConfirm'
 import {
   createCredential,
   deleteCredential,
@@ -60,6 +61,7 @@ function buildPayload(form: FormState): Record<string, string> {
 }
 
 export default function Credentials() {
+  const confirm = useConfirm()
   const [creds, setCreds] = useState<Credential[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -105,7 +107,18 @@ export default function Credentials() {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this credential? Workflows referencing it will fail.')) return
+    const cred = creds.find(c => c.id === id)
+    const ok = await confirm({
+      title: 'Delete credential?',
+      message: (
+        <>
+          Are you sure you want to delete <strong>{cred?.name || 'this credential'}</strong>? Workflows referencing it will fail.
+        </>
+      ),
+      confirmLabel: 'Delete',
+      destructive: true,
+    })
+    if (!ok) return
     try {
       await deleteCredential(id)
       await loadCreds()

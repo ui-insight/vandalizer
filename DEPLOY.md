@@ -177,6 +177,7 @@ Each model entry includes:
 - **API key** — the key for that provider
 - **Endpoint URL** — the API base URL
 - **Protocol** — `openai`, `anthropic`, `openrouter`, `ollama`, or `vllm` (or leave blank for auto-detect)
+- **Context Window** — the model's real serving token limit. Use the **Probe endpoint** button to read it from the configured endpoint (`max_model_len` for vLLM, `context_length` for OpenRouter, `model_info` for Ollama). Anthropic and plain-OpenAI endpoints do not expose this — set it by hand. The chat and workflow context-budget planner trims against this value, so a value larger than what the endpoint was actually started with (e.g. vLLM `--max-model-len`) causes mid-workflow `400` errors.
 
 The `anthropic` protocol uses Anthropic's native Messages API for first-class
 support of Claude models (tool use, streaming, native thinking). The

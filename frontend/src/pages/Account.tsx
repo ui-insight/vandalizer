@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react'
 import { User, KeyRound, Save, Eye, EyeOff, Copy, Check, RefreshCw, Trash2, Code } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
 import { useAuth } from '../hooks/useAuth'
+import { useConfirm } from '../components/shared/useConfirm'
 import { generateApiToken, revokeApiToken, getApiTokenStatus, updateProfile } from '../api/auth'
 
 export default function Account() {
   const { user, refreshUser } = useAuth()
+  const confirm = useConfirm()
 
   // Editable profile state
   const [name, setName] = useState('')
@@ -58,7 +60,15 @@ export default function Account() {
   }, [])
 
   const handleGenerateToken = async () => {
-    if (hasToken && !confirm('This will replace your existing token. Continue?')) return
+    if (hasToken) {
+      const ok = await confirm({
+        title: 'Replace existing token?',
+        message: 'Generating a new token will revoke your existing one. Any scripts or integrations using it will stop working immediately.',
+        confirmLabel: 'Generate new token',
+        destructive: true,
+      })
+      if (!ok) return
+    }
     setTokenGenerating(true)
     setTokenError(null)
     try {
@@ -75,7 +85,13 @@ export default function Account() {
   }
 
   const handleRevokeToken = async () => {
-    if (!confirm('Are you sure you want to revoke this token?')) return
+    const ok = await confirm({
+      title: 'Revoke API token?',
+      message: 'Are you sure you want to revoke this token? Any scripts or integrations using it will stop working immediately.',
+      confirmLabel: 'Revoke',
+      destructive: true,
+    })
+    if (!ok) return
     setTokenRevoking(true)
     setTokenError(null)
     try {

@@ -15,7 +15,7 @@
     "ci": "npm run typecheck && npm run lint && npm run test:coverage -- --coverage.thresholds.lines=40 && npm run build"
   },
   "dependencies": {
-    "@sentry/react": "^10.50.0",
+    "@sentry/react": "^10.53.1",
     "@tailwindcss/vite": "^4.2.4",
     "@tanstack/react-query": "^5.99.0",
     "@tanstack/react-router": "^1.169.2",
@@ -23,14 +23,14 @@
     "@types/dompurify": "^3.2.0",
     "clsx": "^2.1.1",
     "d3": "^7.9.0",
-    "dompurify": "^3.3.1",
+    "dompurify": "^3.4.3",
     "lucide-react": "^1.8.0",
     "marked": "^18.0.2",
     "pdfjs-dist": "^5.6.205",
     "react": "^19.2.0",
     "react-dom": "^19.2.6",
     "recharts": "^3.8.1",
-    "tailwind-merge": "^3.5.0",
+    "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4.2.2",
     "xlsx": "^0.18.5"
   },
@@ -39,7 +39,7 @@
     "@playwright/test": "^1.49.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
-    "@types/node": "^25.6.0",
+    "@types/node": "^25.7.0",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
@@ -50,7 +50,7 @@
     "globals": "^16.5.0",
     "jsdom": "^29.1.0",
     "typescript": "~5.9.3",
-    "typescript-eslint": "^8.48.0",
+    "typescript-eslint": "^8.59.3",
     "vite": "^8.0.8",
     "vitest": "^4.1.0"
   }

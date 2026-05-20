@@ -237,6 +237,12 @@ def kb_ingest_url(self, source_uuid: str) -> None:
                 {"$set": {"status": "error", "error_message": str(e)[:2000]}},
             )
             raise
+    except (ValueError, httpx.RequestError) as e:
+        logger.warning("URL source %s unreachable: %s", source_uuid, e)
+        db.knowledge_base_sources.update_one(
+            {"uuid": source_uuid},
+            {"$set": {"status": "error", "error_message": str(e)[:2000]}},
+        )
     except Exception as e:
         logger.error("Error ingesting URL source %s: %s", source_uuid, e)
         db.knowledge_base_sources.update_one(

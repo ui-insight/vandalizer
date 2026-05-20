@@ -3,6 +3,7 @@ export interface ChatMessage {
   content: string
   thinking?: string
   thinking_duration?: number
+  citations?: Citation[]
 }
 
 export interface FileAttachment {
@@ -46,6 +47,7 @@ export interface ActivityEvent {
   tokens_output: number
   message_count: number
   result_snapshot: Record<string, unknown>
+  meta_summary?: Record<string, unknown>
 }
 
 export interface ContextBudgetPlan {
@@ -62,6 +64,22 @@ export interface ContextBudgetPlan {
   headroom_tokens: number
 }
 
+export interface OversizeDocument {
+  uuid: string
+  title: string
+  token_count: number
+}
+
+export interface Citation {
+  document_id?: string | null
+  document_title: string
+  page?: number | null
+  sheet?: string | null
+  chunk_id?: string | null
+  score?: number | null
+  content_preview?: string
+}
+
 export interface StreamChunk {
   kind:
     | 'text'
@@ -71,6 +89,7 @@ export interface StreamChunk {
     | 'usage'
     | 'context_budget'
     | 'context_notice'
+    | 'sources'
   content: string
   duration?: number
   request_tokens?: number
@@ -79,4 +98,10 @@ export interface StreamChunk {
   plan?: ContextBudgetPlan
   action?: string
   tokens_dropped?: number
+  // Error-only: machine-readable failure code + optional suggested recovery.
+  code?: string
+  suggested_action?: 'convert_to_kb'
+  oversize_documents?: OversizeDocument[]
+  // sources kind only: citation list emitted before the LLM streams text.
+  sources?: Citation[]
 }
