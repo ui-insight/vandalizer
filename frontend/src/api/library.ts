@@ -244,8 +244,8 @@ export function updateItemMetadata(itemKind: string, itemId: string, data: { dis
 }
 
 export function unverifyItem(itemKind: string, itemId: string) {
-  return apiFetch<{ ok: boolean }>(`/api/verification/verified/${itemKind}/${itemId}/unverify`, {
-    method: 'POST',
+  return apiFetch<{ ok: boolean }>(`/api/verification/verified/${itemKind}/${itemId}`, {
+    method: 'DELETE',
   })
 }
 
