@@ -55,13 +55,18 @@ class ErrorBoundary extends Component<
 function useGlobalDropPrevention() {
   useEffect(() => {
     // Prevent the browser from opening/downloading files when dropped outside a drop zone.
-    // Use bubble phase (not capture) so React drop handlers run first and can
-    // stopPropagation before these fallback handlers fire.
+    // Only intervene for OS file drags — in-app element drags (extraction reorder,
+    // org tree, etc.) have no 'Files' type and rely on the default drop behavior,
+    // so forcing dropEffect to 'none' on them would silently cancel the drop.
+    const isFileDrag = (e: DragEvent) =>
+      !!e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files')
     const preventDragOver = (e: DragEvent) => {
+      if (!isFileDrag(e)) return
       e.preventDefault()
       if (e.dataTransfer) e.dataTransfer.dropEffect = 'none'
     }
     const preventDrop = (e: DragEvent) => {
+      if (!isFileDrag(e)) return
       e.preventDefault()
     }
     document.addEventListener('dragover', preventDragOver as EventListener)
