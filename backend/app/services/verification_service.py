@@ -465,24 +465,28 @@ async def list_verified_items(
     kb_ids = [i.item_id for i in items if i.kind == LibraryItemKind.KNOWLEDGE_BASE]
 
     name_map: dict[str, str] = {}
-    wf_creator_map: dict[str, str] = {}
+    creator_map: dict[tuple[str, str], str] = {}
     if wf_ids:
         wfs = await Workflow.find({"_id": {"$in": wf_ids}}).to_list()
         for wf in wfs:
             name_map[str(wf.id)] = wf.name
             creator_id = wf.created_by_user_id or wf.user_id
             if creator_id:
-                wf_creator_map[str(wf.id)] = creator_id
+                creator_map[(LibraryItemKind.WORKFLOW.value, str(wf.id))] = creator_id
     ss_map: dict[str, SearchSet] = {}
     if ss_ids:
         ssets = await SearchSet.find({"_id": {"$in": ss_ids}}).to_list()
         for ss in ssets:
             name_map[str(ss.id)] = ss.title
             ss_map[str(ss.id)] = ss
+            if ss.user_id:
+                creator_map[(LibraryItemKind.SEARCH_SET.value, str(ss.id))] = ss.user_id
     if kb_ids:
         kbs = await KnowledgeBase.find({"_id": {"$in": kb_ids}}).to_list()
         for kb in kbs:
             name_map[str(kb.id)] = kb.title
+            if kb.user_id:
+                creator_map[(LibraryItemKind.KNOWLEDGE_BASE.value, str(kb.id))] = kb.user_id
 
     # --- Batch-fetch all metadata ---
     all_meta = await VerifiedItemMetadata.find_all().to_list()
@@ -509,8 +513,8 @@ async def list_verified_items(
             # First occurrence is the latest (sorted desc)
             submitter_user_map.setdefault(key, req.submitter_user_id)
 
-    # --- Batch-resolve workflow authors + submitters in one shot ---
-    all_user_ids = list(wf_creator_map.values()) + list(submitter_user_map.values())
+    # --- Batch-resolve creators + submitters in one shot ---
+    all_user_ids = list(creator_map.values()) + list(submitter_user_map.values())
     author_map = await resolve_authors(all_user_ids)
 
     # --- Batch-fetch KB metrics ---
@@ -552,6 +556,8 @@ async def list_verified_items(
 
         submitter_id = submitter_user_map.get((item.kind.value, item_id_str))
         submitter_ref = author_map.get(submitter_id) if submitter_id else None
+        creator_id = creator_map.get((item.kind.value, item_id_str))
+        creator_ref = author_map.get(creator_id) if creator_id else None
 
         entry = {
             "id": str(item.id),
@@ -571,6 +577,7 @@ async def list_verified_items(
             "last_validated_at": meta.last_validated_at.isoformat() if meta and meta.last_validated_at else None,
             "validation_run_count": meta.validation_run_count if meta else 0,
             "submitted_by": submitter_ref.model_dump() if submitter_ref else None,
+            "created_by": creator_ref.model_dump() if creator_ref else None,
         }
 
         # KB-specific metrics (from batch)
@@ -592,9 +599,6 @@ async def list_verified_items(
         # Workflow: use MongoDB _id as source_uuid (workspace routes by _id)
         if item.kind == LibraryItemKind.WORKFLOW:
             entry["source_uuid"] = item_id_str
-            creator_id = wf_creator_map.get(item_id_str)
-            ref = author_map.get(creator_id) if creator_id else None
-            entry["created_by"] = ref.model_dump() if ref else None
 
         results.append(entry)
 
