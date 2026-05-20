@@ -126,9 +126,12 @@ export function KnowledgePanel() {
     setError(null)
     try {
       const kb = await create('New Knowledge Base')
+      toast('Knowledge base created', 'success')
       loadDetail(kb.uuid)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create')
+      const msg = err instanceof Error ? err.message : 'Failed to create knowledge base'
+      setError(msg)
+      toast(msg, 'error')
     } finally {
       setCreating(false)
     }
@@ -142,10 +145,11 @@ export function KnowledgePanel() {
       setSelectedKB(detail)
     } catch (err) {
       console.error('Failed to load KB:', err)
+      toast(err instanceof Error ? err.message : 'Failed to open knowledge base', 'error')
     } finally {
       setDetailLoading(false)
     }
-  }, [])
+  }, [toast])
 
   // Poll status when building
   useEffect(() => {
@@ -178,8 +182,10 @@ export function KnowledgePanel() {
     try {
       await remove(uuid)
       if (selectedKB?.uuid === uuid) setSelectedKB(null)
+      toast('Knowledge base deleted', 'success')
     } catch (err) {
       console.error('Failed to delete KB:', err)
+      toast(err instanceof Error ? err.message : 'Failed to delete knowledge base', 'error')
     }
   }
 
@@ -188,11 +194,14 @@ export function KnowledgePanel() {
     setAddingDocs(true)
     setShowDocPicker(false)
     try {
-      await api.addDocumentsToKB(selectedKB.uuid, docUuids)
+      const result = await api.addDocumentsToKB(selectedKB.uuid, docUuids)
+      const n = result?.added ?? docUuids.length
+      toast(`Added ${n} document${n === 1 ? '' : 's'}`, 'success')
       loadDetail(selectedKB.uuid)
       refresh()
     } catch (err) {
       console.error('Failed to add documents:', err)
+      toast(err instanceof Error ? err.message : 'Failed to add documents', 'error')
     } finally {
       setAddingDocs(false)
     }
@@ -204,11 +213,16 @@ export function KnowledgePanel() {
     // Optimistically set status to building so the poller starts
     setSelectedKB(prev => prev ? { ...prev, status: 'building' } : prev)
     api.addUrlsToKB(selectedKB.uuid, urls, crawlEnabled, maxCrawlPages, allowedDomains)
-      .then(() => {
+      .then((result) => {
+        const n = result?.added ?? urls.length
+        toast(`Added ${n} URL${n === 1 ? '' : 's'} — crawling in background`, 'success')
         loadDetail(selectedKB.uuid)
         refresh()
       })
-      .catch(err => console.error('Failed to add URLs:', err))
+      .catch(err => {
+        console.error('Failed to add URLs:', err)
+        toast(err instanceof Error ? err.message : 'Failed to add URLs', 'error')
+      })
       .finally(() => setAddingUrls(false))
   }
 
@@ -216,10 +230,12 @@ export function KnowledgePanel() {
     if (!selectedKB) return
     try {
       await api.removeKBSource(selectedKB.uuid, sourceUuid)
+      toast('Source removed', 'success')
       loadDetail(selectedKB.uuid)
       refresh()
     } catch (err) {
       console.error('Failed to remove source:', err)
+      toast(err instanceof Error ? err.message : 'Failed to remove source', 'error')
     }
   }
 
@@ -232,17 +248,19 @@ export function KnowledgePanel() {
 
   const handleToggleShare = async () => {
     if (!selectedKB) return
-    // Sharing for the first time → prompt for a note. Unsharing is silent.
+    // Sharing for the first time → prompt for a note.
     if (!selectedKB.shared_with_team) {
       setShareKBDialogOpen(true)
       return
     }
     try {
-      await api.shareKnowledgeBase(selectedKB.uuid)
+      const result = await api.shareKnowledgeBase(selectedKB.uuid)
+      toast(result.shared_with_team ? 'Shared with team' : 'Unshared from team', 'success')
       loadDetail(selectedKB.uuid)
       refresh()
     } catch (err) {
       console.error('Failed to toggle sharing:', err)
+      toast(err instanceof Error ? err.message : 'Failed to update team sharing', 'error')
     }
   }
 
@@ -272,11 +290,13 @@ export function KnowledgePanel() {
     setSavingOrgs(true)
     try {
       await api.setKBOrganizations(selectedKB.uuid, selectedOrgIds)
+      toast('Org visibility updated', 'success')
       loadDetail(selectedKB.uuid)
       refresh()
       setShowOrgsModal(false)
     } catch (err) {
       console.error('Failed to update org visibility:', err)
+      toast(err instanceof Error ? err.message : 'Failed to update org visibility', 'error')
     } finally {
       setSavingOrgs(false)
     }
@@ -392,9 +412,15 @@ export function KnowledgePanel() {
                 e.preventDefault()
                 const t = titleDraft.trim()
                 if (t && t !== selectedKB.title) {
-                  await api.updateKnowledgeBase(selectedKB.uuid, { title: t })
-                  setSelectedKB(prev => prev ? { ...prev, title: t } : prev)
-                  refresh()
+                  try {
+                    await api.updateKnowledgeBase(selectedKB.uuid, { title: t })
+                    setSelectedKB(prev => prev ? { ...prev, title: t } : prev)
+                    toast('Title updated', 'success')
+                    refresh()
+                  } catch (err) {
+                    console.error('Failed to rename KB:', err)
+                    toast(err instanceof Error ? err.message : 'Failed to rename', 'error')
+                  }
                 }
                 setEditingTitle(false)
               }}
@@ -1063,13 +1089,40 @@ export function KnowledgePanel() {
           onEdit={activeTab !== 'explore' ? loadDetail : undefined}
           onDelete={activeTab === 'mine' ? handleDelete : undefined}
           onAdopt={activeTab === 'explore' || activeTab === 'team'
-            ? async (uuid) => { await scopedMine.adopt(uuid); refresh() }
+            ? async (uuid) => {
+                try {
+                  await scopedMine.adopt(uuid)
+                  toast('Added to My KBs', 'success')
+                  refresh()
+                } catch (err) {
+                  console.error('Failed to adopt KB:', err)
+                  toast(err instanceof Error ? err.message : 'Failed to add to My KBs', 'error')
+                }
+              }
             : undefined}
           onRemoveRef={activeTab === 'mine'
-            ? async (refUuid) => { await scopedMine.removeRef(refUuid); refresh() }
+            ? async (refUuid) => {
+                try {
+                  await scopedMine.removeRef(refUuid)
+                  toast('Removed from My KBs', 'success')
+                  refresh()
+                } catch (err) {
+                  console.error('Failed to remove KB reference:', err)
+                  toast(err instanceof Error ? err.message : 'Failed to remove', 'error')
+                }
+              }
             : undefined}
           onClone={activeTab === 'explore'
-            ? async (uuid) => { await api.cloneKnowledgeBase(uuid); refresh() }
+            ? async (uuid) => {
+                try {
+                  await api.cloneKnowledgeBase(uuid)
+                  toast('Knowledge base cloned to My KBs', 'success')
+                  refresh()
+                } catch (err) {
+                  console.error('Failed to clone KB:', err)
+                  toast(err instanceof Error ? err.message : 'Failed to clone knowledge base', 'error')
+                }
+              }
             : undefined}
           onExplore={activeTab === 'explore' ? handleExploreKBClick : undefined}
           emptyComponent={activeTab === 'mine' && !search ? <KnowledgeExplainer /> : undefined}
@@ -1092,10 +1145,16 @@ export function KnowledgePanel() {
         onAdoptKB={async (kbUuid) => {
           try {
             await scopedMine.adopt(kbUuid)
+            toast('Added to My KBs', 'success')
             refresh()
             setExploreDetail(null)
-          } catch {
-            // already adopted — still close the modal
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : ''
+            if (msg.toLowerCase().includes('already')) {
+              toast('Already in My KBs', 'info')
+            } else {
+              toast(msg || 'Failed to add to My KBs', 'error')
+            }
             setExploreDetail(null)
           }
         }}
