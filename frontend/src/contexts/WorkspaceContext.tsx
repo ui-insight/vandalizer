@@ -42,6 +42,11 @@ export interface PendingChatMessage {
 interface ChatStateContextValue {
   loadConversationId: string | null
   setLoadConversationId: (id: string | null) => void
+  // UUID of the conversation currently displayed in ChatPanel. Surfaced
+  // upward so other UI (e.g. ActivityRail delete) can tell whether a
+  // deleted activity is the one the user is looking at right now.
+  currentConversationUuid: string | null
+  setCurrentConversationUuid: (uuid: string | null) => void
   newChatSignal: number
   triggerNewChat: () => void
   pendingChatMessage: PendingChatMessage | null
@@ -171,6 +176,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [railDocked, setRailDocked] = useState(() => getStoredBool('workspace:railDocked', false))
   const [panelSplit, _setPanelSplit] = useState(() => getStoredNumber('workspace:panelSplit', 60))
   const [loadConversationId, setLoadConversationId] = useState<string | null>(null)
+  const [currentConversationUuid, setCurrentConversationUuid] = useState<string | null>(null)
   const [newChatSignal, setNewChatSignal] = useState(0)
   const [pendingChatMessage, setPendingChatMessage] = useState<PendingChatMessage | null>(null)
   const [highlightTerms, setHighlightTerms] = useState<string[]>([])
@@ -383,13 +389,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const chatValue = useMemo<ChatStateContextValue>(() => ({
     loadConversationId, setLoadConversationId,
+    currentConversationUuid, setCurrentConversationUuid,
     newChatSignal, triggerNewChat,
     pendingChatMessage, sendChatMessage, clearPendingChatMessage,
     activeKBUuid, activeKBTitle, activateKB, deactivateKB,
     processingDoc, setProcessingDoc,
     selectedDocsProcessing, setSelectedDocsProcessing,
   }), [
-    loadConversationId, newChatSignal, triggerNewChat,
+    loadConversationId, currentConversationUuid,
+    newChatSignal, triggerNewChat,
     pendingChatMessage, sendChatMessage, clearPendingChatMessage,
     activeKBUuid, activeKBTitle, activateKB, deactivateKB,
     processingDoc,

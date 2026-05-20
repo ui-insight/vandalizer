@@ -81,7 +81,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     setActivity,
   } = useChat()
 
-  const { bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, activeKBUuid, activeKBTitle, activateKB, deactivateKB } = useWorkspace()
+  const { bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, activeKBUuid, activeKBTitle, activateKB, deactivateKB, setCurrentConversationUuid } = useWorkspace()
   const [convertingToKB, setConvertingToKB] = useState(false)
   const { toast } = useToast()
   const { pills: onboardingPills, isFirstSession, loading: onboardingLoading } = useOnboarding()
@@ -248,6 +248,13 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       setShowScrollDown(false)
     }
   }, [conversationUuid])
+
+  // Mirror the active conversation into workspace context so ActivityRail
+  // can clear the chat when the user deletes the currently-open activity.
+  useEffect(() => {
+    setCurrentConversationUuid(conversationUuid)
+    return () => setCurrentConversationUuid(null)
+  }, [conversationUuid, setCurrentConversationUuid])
 
   const prevMsgCount = useRef(messages.length)
   useEffect(() => {

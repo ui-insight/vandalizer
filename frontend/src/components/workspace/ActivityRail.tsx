@@ -78,7 +78,7 @@ function isStale(activity: ActivityEvent, thresholdMinutes: number): boolean {
 }
 
 export function ActivityRail() {
-  const { railDocked, toggleRailDocked, setActiveRightTab, setLoadConversationId, triggerNewChat, openWorkflow, openExtraction, closeWorkflow, closeExtraction, closeAutomation, activitySignal } = useWorkspace()
+  const { railDocked, toggleRailDocked, setActiveRightTab, setLoadConversationId, triggerNewChat, openWorkflow, openExtraction, closeWorkflow, closeExtraction, closeAutomation, activitySignal, currentConversationUuid } = useWorkspace()
   const { activities, refresh, freshTitleIds, markTitleShimmered, staleThresholdMinutes } = useActivities(activitySignal)
   const { toast } = useToast()
   const { togglePanel, progress } = useCertificationPanel()
@@ -110,12 +110,22 @@ export function ActivityRail() {
       if (!ok) return
       try {
         await deleteActivity(id)
+        // If the deleted activity is the conversation currently open in
+        // the chat panel, reset the panel so its messages don't linger
+        // after the backing conversation is gone.
+        if (
+          activity?.type === 'conversation' &&
+          activity.conversation_id &&
+          activity.conversation_id === currentConversationUuid
+        ) {
+          triggerNewChat()
+        }
       } catch (err) {
         toast(err instanceof Error ? err.message : 'Failed to delete activity', 'error')
       }
       refresh()
     },
-    [refresh, toast, activities, confirm],
+    [refresh, toast, activities, confirm, currentConversationUuid, triggerNewChat],
   )
 
   const handleClick = useCallback(
