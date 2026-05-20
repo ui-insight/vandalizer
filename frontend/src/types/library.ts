@@ -62,6 +62,7 @@ export interface VerificationRequest {
   status: VerificationStatus
   submitter_user_id: string
   submitter_name: string | null
+  submitter: AuthorRef | null
   submitter_org?: string | null
   submitter_role?: string | null
   summary: string | null
@@ -126,6 +127,7 @@ export interface VerifiedCatalogItem {
   kb_status?: string
   source_uuid?: string
   created_by?: AuthorRef | null
+  submitted_by?: AuthorRef | null
 }
 
 export interface VerifiedCollection {

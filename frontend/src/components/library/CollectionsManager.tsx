@@ -5,6 +5,7 @@ import {
   addToCollection, removeFromCollection, listVerifiedItems,
 } from '../../api/library'
 import type { VerifiedCollection, VerifiedCatalogItem } from '../../types/library'
+import { AuthorChip } from '../shared/AuthorChip'
 import { useOptionalWorkspace } from '../../contexts/WorkspaceContext'
 import { useConfirm } from '../shared/useConfirm'
 
@@ -334,6 +335,9 @@ export function CollectionsManager() {
                                   }`}>
                                     {item.quality_tier}
                                   </span>
+                                )}
+                                {item?.submitted_by && (
+                                  <AuthorChip author={item.submitted_by} label="by" />
                                 )}
                               </div>
                               <div className="flex items-center gap-1 shrink-0">
