@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Search, ShieldCheck, X, Pencil, ShieldOff, Tag, FolderPlus, Download, Upload } from 'lucide-react'
 import { QualityContractBadge } from './QualityContractBadge'
 import { CatalogImportDialog } from './CatalogImportDialog'
+import { AuthorChip } from '../shared/AuthorChip'
 import { listVerifiedItems, updateItemMetadata, unverifyItem, listCollections, addToCollection, exportCatalogUrl, previewCatalogImport } from '../../api/library'
 import type { CatalogPreviewItem } from '../../api/library'
 import type { VerifiedCatalogItem, VerifiedCollection } from '../../types/library'
@@ -426,6 +427,9 @@ export function VerifiedCatalog() {
                       <span className="text-xs text-gray-500">
                         {new Date(item.created_at).toLocaleDateString()}
                       </span>
+                    )}
+                    {item.submitted_by && (
+                      <AuthorChip author={item.submitted_by} label="by" />
                     )}
                   </div>
                   {item.description && (

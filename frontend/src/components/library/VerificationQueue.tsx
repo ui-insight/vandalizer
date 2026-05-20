@@ -3,6 +3,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { ShieldCheck, Clock, Search, ChevronDown, ChevronRight, Tag, FileText, ExternalLink } from 'lucide-react'
 import { listVerificationQueue, myVerificationRequests, updateVerificationStatus, listCollections } from '../../api/library'
 import type { VerificationRequest, VerificationStatus, VerifiedCollection } from '../../types/library'
+import { AuthorChip } from '../shared/AuthorChip'
 import { listOrganizationsFlat } from '../../api/organizations'
 import type { Organization } from '../../api/organizations'
 
@@ -146,6 +147,8 @@ export function VerificationQueue() {
         (r.item_name || '').toLowerCase().includes(q) ||
         (r.summary || '').toLowerCase().includes(q) ||
         (r.submitter_name || '').toLowerCase().includes(q) ||
+        (r.submitter?.name || '').toLowerCase().includes(q) ||
+        (r.submitter?.email || '').toLowerCase().includes(q) ||
         (r.description || '').toLowerCase().includes(q)
       )
     }
@@ -259,9 +262,13 @@ export function VerificationQueue() {
                           </span>
                         )}
                       </div>
-                      <div className="text-xs text-gray-500 space-x-3 ml-9">
+                      <div className="text-xs text-gray-500 ml-9 flex items-center gap-3 flex-wrap">
                         <span>{req.item_kind === 'workflow' ? 'Workflow' : req.item_kind === 'knowledge_base' ? 'Knowledge Base' : 'Extraction'}</span>
-                        {req.submitter_name && <span>by {req.submitter_name}</span>}
+                        {req.submitter ? (
+                          <AuthorChip author={req.submitter} label="by" />
+                        ) : req.submitter_name ? (
+                          <span>by {req.submitter_name}</span>
+                        ) : null}
                         {req.submitter_org && <span>({req.submitter_org})</span>}
                         {req.submitted_at && (
                           <span>
