@@ -6,9 +6,21 @@ export class ApiError extends Error {
   }
 }
 
+// Exported for unit testing — jsdom rejects __Host- prefix cookies (matching
+// real browser behavior), so we can't drive this purely through document.cookie.
+export function parseCsrfToken(cookieString: string): string | null {
+  // Prefer the modern __Host- prefixed cookie. Browsers enforce its
+  // uniqueness (Secure + Path=/ + no Domain), so it can't be shadowed by a
+  // stale duplicate from a prior deploy or a sibling app on a shared parent
+  // domain. Fall back to the legacy name for users mid-transition.
+  const hostMatch = cookieString.match(/(?:^|;\s*)__Host-csrf_token=([^;]+)/)
+  if (hostMatch) return decodeURIComponent(hostMatch[1])
+  const legacyMatch = cookieString.match(/(?:^|;\s*)csrf_token=([^;]+)/)
+  return legacyMatch ? decodeURIComponent(legacyMatch[1]) : null
+}
+
 export function getCsrfToken(): string | null {
-  const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/)
-  return match ? decodeURIComponent(match[1]) : null
+  return parseCsrfToken(document.cookie)
 }
 
 /** Return a headers object with the CSRF token set (for raw fetch calls). */

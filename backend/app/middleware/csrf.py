@@ -26,6 +26,19 @@ CSRF_EXEMPT_PREFIXES = (
     "/api/certification/levels",
 )
 
+# The modern cookie carries the ``__Host-`` prefix, which the browser enforces
+# to be ``Secure``, ``Path=/``, and ``Domain``-less.  That guarantees only one
+# cookie of this name can live in the jar — immune to collisions from sibling
+# apps on a shared parent domain, prior deploys that set different attributes,
+# or proxies.  HTTP (development) cannot satisfy the prefix's ``Secure``
+# requirement, so we fall back to the legacy name there.
+MODERN_COOKIE_NAME = "__Host-csrf_token"
+LEGACY_COOKIE_NAME = "csrf_token"
+
+
+def _primary_cookie_name(*, secure: bool) -> str:
+    return MODERN_COOKIE_NAME if secure else LEGACY_COOKIE_NAME
+
 
 class CSRFMiddleware:
     """Validate a double-submit CSRF token on state-changing requests.
@@ -49,11 +62,19 @@ class CSRFMiddleware:
             await self.app(scope, receive, send)
             return
 
+        from app.dependencies import get_settings
+
+        settings = get_settings()
+        primary_name = _primary_cookie_name(secure=settings.is_production)
+
         method: str = scope["method"]
         path: str = scope["path"]
         headers = Headers(scope=scope)
         cookies = _parse_cookie_header(headers.get("cookie", ""))
-        csrf_cookie = cookies.get("csrf_token")
+        # Prefer the modern cookie; fall back to the legacy name so users
+        # mid-transition (older SPA in a tab, browser still holding only the
+        # old cookie) keep working until they reload.
+        csrf_cookie = cookies.get(primary_name) or cookies.get(LEGACY_COOKIE_NAME)
 
         is_safe = method in SAFE_METHODS
         is_exempt_path = any(path.startswith(prefix) for prefix in CSRF_EXEMPT_PREFIXES)
@@ -76,16 +97,15 @@ class CSRFMiddleware:
             await self.app(scope, receive, send)
             return
 
-        # If the client already has a csrf_token cookie there's nothing to set.
-        if csrf_cookie:
+        # Only skip setting if the *primary* cookie is already present.  A user
+        # holding only the legacy cookie should still receive the modern one so
+        # subsequent requests can ignore stale duplicates of the old name.
+        if cookies.get(primary_name):
             await self.app(scope, receive, send)
             return
 
-        # Otherwise append a Set-Cookie header onto the outgoing response.
-        from app.dependencies import get_settings
-
         set_cookie_value = _build_csrf_cookie_header(
-            secure=get_settings().is_production
+            name=primary_name, secure=settings.is_production
         )
 
         async def send_with_cookie(message: Message) -> None:
@@ -115,15 +135,20 @@ def _parse_cookie_header(cookie_header: str) -> dict[str, str]:
     return cookies
 
 
-def _build_csrf_cookie_header(*, secure: bool) -> str:
-    """Build a Set-Cookie value matching the original middleware's settings."""
-    cookie: http.cookies.SimpleCookie = http.cookies.SimpleCookie()
-    cookie["csrf_token"] = secrets.token_urlsafe(32)
-    morsel = cookie["csrf_token"]
-    morsel["path"] = "/"
-    morsel["samesite"] = "strict"
-    morsel["max-age"] = 86400 * 30
+def _build_csrf_cookie_header(*, name: str, secure: bool) -> str:
+    """Build a Set-Cookie value for the CSRF cookie.
+
+    Assembled by hand rather than via ``SimpleCookie`` so the ``__Host-``
+    prefix in the name passes through verbatim without any quoting.
+    httpOnly is intentionally omitted — JS must be able to read this cookie.
+    """
+    value = secrets.token_urlsafe(32)
+    parts = [
+        f"{name}={value}",
+        "Path=/",
+        "SameSite=Strict",
+        f"Max-Age={86400 * 30}",
+    ]
     if secure:
-        morsel["secure"] = True
-    # httpOnly intentionally unset — JS must be able to read this cookie.
-    return cookie.output(header="").strip()
+        parts.append("Secure")
+    return "; ".join(parts)
