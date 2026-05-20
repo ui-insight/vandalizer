@@ -198,6 +198,79 @@ class TestCSRFMiddleware:
         # Not blocked by CSRF (legacy cookie still validates)
         assert resp.status_code != 403
 
+    @pytest.mark.asyncio
+    async def test_stale_spa_with_both_cookies_accepts_legacy_header(self, client):
+        """Stale OLD-SPA tab post-deploy: both cookies set, header from legacy.
+
+        Once a user with the old SPA still loaded makes any GET after the
+        deploy, the middleware sets ``__Host-csrf_token=Y`` alongside the
+        existing ``csrf_token=X``.  The old SPA's regex doesn't match the
+        ``__Host-`` prefix, so it sends the legacy value ``X`` in the header.
+        The backend must accept that header against the legacy cookie rather
+        than mismatching against the modern one — otherwise every POST from
+        long-lived tabs 403s until the user reloads.
+        """
+        prod_settings = Settings(
+            jwt_secret_key="test-secret-key", environment="production"
+        )
+        user = _make_user()
+        token = create_access_token("testuser", prod_settings)
+        legacy_value = secrets.token_urlsafe(32)
+        modern_value = secrets.token_urlsafe(32)
+
+        with patch("app.dependencies.get_settings", return_value=prod_settings), \
+             patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser:
+            MockUser.find_one = AsyncMock(return_value=user)
+
+            resp = await client.post(
+                "/api/documents/search",
+                json={"query": "test"},
+                cookies={
+                    "access_token": token,
+                    "csrf_token": legacy_value,
+                    "__Host-csrf_token": modern_value,
+                },
+                # Old SPA reads the legacy cookie and sends its value
+                headers={"X-CSRF-Token": legacy_value},
+            )
+
+        assert resp.status_code != 403, resp.text
+
+    @pytest.mark.asyncio
+    async def test_stale_spa_with_both_cookies_accepts_modern_header(self, client):
+        """Same transition state, but the SPA has been reloaded.
+
+        The new SPA reads the modern cookie and sends its value.  Must also
+        be accepted even though the legacy cookie is still sitting in the
+        jar with a different random value.
+        """
+        prod_settings = Settings(
+            jwt_secret_key="test-secret-key", environment="production"
+        )
+        user = _make_user()
+        token = create_access_token("testuser", prod_settings)
+        legacy_value = secrets.token_urlsafe(32)
+        modern_value = secrets.token_urlsafe(32)
+
+        with patch("app.dependencies.get_settings", return_value=prod_settings), \
+             patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser:
+            MockUser.find_one = AsyncMock(return_value=user)
+
+            resp = await client.post(
+                "/api/documents/search",
+                json={"query": "test"},
+                cookies={
+                    "access_token": token,
+                    "csrf_token": legacy_value,
+                    "__Host-csrf_token": modern_value,
+                },
+                headers={"X-CSRF-Token": modern_value},
+            )
+
+        assert resp.status_code != 403, resp.text
+
 
 class TestBuildCsrfCookieHeader:
     """Unit tests for the cookie-name + attributes builder."""

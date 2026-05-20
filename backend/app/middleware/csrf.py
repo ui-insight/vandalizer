@@ -71,10 +71,14 @@ class CSRFMiddleware:
         path: str = scope["path"]
         headers = Headers(scope=scope)
         cookies = _parse_cookie_header(headers.get("cookie", ""))
-        # Prefer the modern cookie; fall back to the legacy name so users
-        # mid-transition (older SPA in a tab, browser still holding only the
-        # old cookie) keep working until they reload.
-        csrf_cookie = cookies.get(primary_name) or cookies.get(LEGACY_COOKIE_NAME)
+        # Accept the header if it matches *either* cookie value.  A stale
+        # old-SPA tab will only read the legacy name (its regex doesn't match
+        # the ``__Host-`` prefix), while a fresh SPA reads the modern one.
+        # Once we've set the modern cookie alongside an existing legacy one
+        # the two values differ, so we can't pick a single "preferred" cookie
+        # without locking out one population.
+        csrf_modern = cookies.get(primary_name)
+        csrf_legacy = cookies.get(LEGACY_COOKIE_NAME)
 
         is_safe = method in SAFE_METHODS
         is_exempt_path = any(path.startswith(prefix) for prefix in CSRF_EXEMPT_PREFIXES)
@@ -84,7 +88,8 @@ class CSRFMiddleware:
         # requests.
         if not is_safe and not is_exempt_path and not has_api_key:
             csrf_header = headers.get("x-csrf-token")
-            if not csrf_cookie or not csrf_header or csrf_cookie != csrf_header:
+            valid_values = {v for v in (csrf_modern, csrf_legacy) if v}
+            if not csrf_header or csrf_header not in valid_values:
                 response = JSONResponse(
                     {"detail": "CSRF validation failed"}, status_code=403
                 )
