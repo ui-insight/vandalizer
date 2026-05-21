@@ -28,6 +28,7 @@ export interface KnowledgeBaseSource {
   uuid: string
   source_type: 'document' | 'url'
   document_uuid?: string
+  document_title?: string
   url?: string
   url_title?: string
   status: 'pending' | 'processing' | 'ready' | 'error'

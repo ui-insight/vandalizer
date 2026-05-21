@@ -47,4 +47,5 @@ export interface PollStatusResponse {
   path: string | null
   error_message: string | null
   processing: boolean
+  title: string
 }

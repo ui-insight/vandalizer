@@ -136,4 +136,5 @@ async def poll_status(doc_uuid: str, user: User) -> dict | None:
         "path": doc.path,
         "error_message": doc.error_message,
         "processing": doc.processing,
+        "title": doc.title,
     }

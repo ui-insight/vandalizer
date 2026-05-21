@@ -77,11 +77,12 @@ def _kb_response(kb, *, scope: str | None = None) -> KBResponse:
     )
 
 
-def _source_response(s) -> KBSourceResponse:
+def _source_response(s, document_title: str | None = None) -> KBSourceResponse:
     return KBSourceResponse(
         uuid=s.uuid,
         source_type=s.source_type,
         document_uuid=s.document_uuid,
+        document_title=document_title,
         url=s.url,
         url_title=s.url_title or "",
         status=s.status,
@@ -89,6 +90,20 @@ def _source_response(s) -> KBSourceResponse:
         chunk_count=s.chunk_count,
         created_at=s.created_at.isoformat() if s.created_at else None,
     )
+
+
+async def _lookup_document_titles(sources) -> dict[str, str]:
+    """Batch-fetch SmartDocument titles for document-type sources.
+
+    Returns a {uuid: title} map. Missing/deleted docs are simply absent.
+    """
+    from app.models.document import SmartDocument
+
+    doc_uuids = [s.document_uuid for s in sources if s.source_type == "document" and s.document_uuid]
+    if not doc_uuids:
+        return {}
+    docs = await SmartDocument.find({"uuid": {"$in": doc_uuids}}).to_list()
+    return {d.uuid: d.title for d in docs if d.title}
 
 
 @router.get("/list", response_model=list[KBResponse])
@@ -269,9 +284,10 @@ async def get_knowledge_base(uuid: str, user: User = Depends(get_current_user)):
     if not kb:
         raise HTTPException(status_code=404, detail="Knowledge base not found")
     sources = await svc.get_kb_sources(kb.uuid)
+    titles = await _lookup_document_titles(sources)
     return KBDetailResponse(
         **_kb_response(kb).model_dump(),
-        sources=[_source_response(s) for s in sources],
+        sources=[_source_response(s, titles.get(s.document_uuid or "")) for s in sources],
     )
 
 

@@ -28,7 +28,7 @@ import { RunHistoryTab } from './RunHistoryTab'
 import type { ValidationCheck, ValidationCheckDefinition, ValidationInputDefinition, QualityHistoryRun, BatchStatus, WorkflowQualityStatus, PromptImprovement } from '../../api/workflows'
 import { ItemPickerModal } from './ItemPickerModal'
 import { getModels } from '../../api/config'
-import { searchDocuments } from '../../api/documents'
+import { searchDocuments, pollStatus as pollDocumentStatus } from '../../api/documents'
 import { convertDocumentsToKB } from '../../api/knowledge'
 import { listCredentials } from '../../api/credentials'
 import type { Credential } from '../../types/credential'
@@ -1890,8 +1890,20 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
     (task.data.selected_document_uuid as string) || ''
   )
   const [docSearchQuery, setDocSearchQuery] = useState('')
+  const [selectedDocTitle, setSelectedDocTitle] = useState('')
   const [docSearchResults, setDocSearchResults] = useState<{ uuid: string; title: string }[]>([])
   const [showDocDropdown, setShowDocDropdown] = useState(false)
+
+  // Saved tasks only store the UUID — fetch the title so the chip shows the
+  // filename instead of a raw UUID when the editor reopens.
+  useEffect(() => {
+    if (!selectedDocUuid) { setSelectedDocTitle(''); return }
+    let cancelled = false
+    pollDocumentStatus(selectedDocUuid)
+      .then(res => { if (!cancelled && res?.title) setSelectedDocTitle(res.title) })
+      .catch(() => { /* leave title empty; chip will fall back to UUID */ })
+    return () => { cancelled = true }
+  }, [selectedDocUuid])
 
   // Fixed documents for workflow_documents input source
   const inputCfg = (workflow as unknown as Record<string, unknown>)?.input_config as Record<string, unknown> | undefined
@@ -3458,6 +3470,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                               key={doc.uuid}
                               onMouseDown={() => {
                                 setSelectedDocUuid(doc.uuid)
+                                setSelectedDocTitle(doc.title)
                                 setDocSearchQuery(doc.title)
                                 setShowDocDropdown(false)
                               }}
@@ -3483,9 +3496,14 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                           padding: '6px 10px', backgroundColor: '#f3f4f6', borderRadius: 6, fontSize: 12,
                         }}>
                           <FileText style={{ width: 12, height: 12, color: '#6b7280' }} />
-                          <span style={{ color: '#374151', flex: 1 }}>{docSearchQuery || selectedDocUuid}</span>
+                          <span
+                            style={{ color: '#374151', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                            title={selectedDocTitle ? `${selectedDocTitle} (${selectedDocUuid})` : selectedDocUuid}
+                          >
+                            {selectedDocTitle || selectedDocUuid}
+                          </span>
                           <button
-                            onClick={() => { setSelectedDocUuid(''); setDocSearchQuery('') }}
+                            onClick={() => { setSelectedDocUuid(''); setSelectedDocTitle(''); setDocSearchQuery('') }}
                             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#9ca3af', display: 'flex' }}
                           >
                             <X style={{ width: 12, height: 12 }} />
