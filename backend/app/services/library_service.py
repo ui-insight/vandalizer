@@ -232,7 +232,7 @@ async def add_item(
     tags: list[str] | None = None,
     folder: str | None = None,
 ) -> dict | None:
-    lib = await access_control.get_authorized_library(library_id, user, manage=True)
+    lib = await access_control.get_authorized_library(library_id, user, contribute=True)
     if not lib:
         return None
     is_verified = False

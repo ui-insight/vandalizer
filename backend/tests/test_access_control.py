@@ -7,6 +7,7 @@ import pytest
 from app.models.library import LibraryScope
 from app.services.access_control import (
     TeamAccessContext,
+    can_contribute_library,
     can_manage_automation,
     can_manage_document,
     can_manage_folder,
@@ -560,6 +561,56 @@ class TestLibraryAccess:
         access = _team_access()
         assert can_view_library(lib, user, access) is True
         assert can_manage_library(lib, user, access) is False
+
+
+class TestCanContributeLibrary:
+    def test_owner_can_contribute_to_personal_library(self):
+        user = _make_user("owner1")
+        lib = _make_library(owner_user_id="owner1")
+        access = _team_access()
+        assert can_contribute_library(lib, user, access) is True
+
+    def test_non_owner_cannot_contribute_to_personal_library(self):
+        user = _make_user("other")
+        lib = _make_library(owner_user_id="owner1")
+        access = _team_access()
+        assert can_contribute_library(lib, user, access) is False
+
+    def test_team_member_can_contribute_to_team_library(self):
+        user = _make_user("member1")
+        lib = _make_library(scope=LibraryScope.TEAM, owner_user_id="owner1", team="team-obj-1")
+        access = _team_access(
+            team_object_ids={"team-obj-1"},
+            object_roles={"team-obj-1": "member"},
+        )
+        assert can_contribute_library(lib, user, access) is True
+
+    def test_team_admin_can_contribute_to_team_library(self):
+        user = _make_user("admin1")
+        lib = _make_library(scope=LibraryScope.TEAM, owner_user_id="owner1", team="team-obj-1")
+        access = _team_access(
+            team_object_ids={"team-obj-1"},
+            object_roles={"team-obj-1": "admin"},
+        )
+        assert can_contribute_library(lib, user, access) is True
+
+    def test_non_member_cannot_contribute_to_team_library(self):
+        user = _make_user("outsider")
+        lib = _make_library(scope=LibraryScope.TEAM, owner_user_id="owner1", team="team-obj-1")
+        access = _team_access()
+        assert can_contribute_library(lib, user, access) is False
+
+    def test_non_admin_cannot_contribute_to_verified_library(self):
+        user = _make_user("viewer")
+        lib = _make_library(scope=LibraryScope.VERIFIED, owner_user_id="system")
+        access = _team_access()
+        assert can_contribute_library(lib, user, access) is False
+
+    def test_admin_can_contribute_to_verified_library(self):
+        user = _make_user("admin", is_admin=True)
+        lib = _make_library(scope=LibraryScope.VERIFIED, owner_user_id="system")
+        access = _team_access()
+        assert can_contribute_library(lib, user, access) is True
 
 
 class TestLibraryFolderAccess:
