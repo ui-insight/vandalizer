@@ -273,6 +273,34 @@ class TestAddItem:
             assert result is None
 
     @pytest.mark.asyncio
+    async def test_uses_contribute_authorization_not_manage(self):
+        # Regression guard: members must be able to add items to team libraries,
+        # so add_item should request contribute-level access (not manage).
+        lib = _make_library()
+        user = _make_user()
+        mock_wf = MagicMock()
+        mock_wf.name = "WF"
+        mock_wf.description = "d"
+        item_id = str(PydanticObjectId())
+        with (
+            patch("app.services.library_service.access_control") as mock_ac,
+            patch("app.services.library_service.LibraryItem") as MockItem,
+            patch("app.services.library_service.Workflow") as MockWF,
+        ):
+            mock_ac.get_authorized_library = AsyncMock(return_value=lib)
+            mock_ac.get_authorized_workflow = AsyncMock(return_value=mock_wf)
+            MockItem.return_value = _make_library_item()
+            MockWF.get = AsyncMock(return_value=mock_wf)
+
+            from app.services.library_service import add_item
+
+            await add_item(str(lib.id), user, item_id, "workflow")
+            mock_ac.get_authorized_library.assert_awaited_once()
+            _, kwargs = mock_ac.get_authorized_library.call_args
+            assert kwargs.get("contribute") is True
+            assert kwargs.get("manage") is not True
+
+    @pytest.mark.asyncio
     async def test_propagates_verified_flag_for_workflow(self):
         # Saving a verified workflow into a personal/team library should mark
         # the LibraryItem verified so the row shows the verified badge and

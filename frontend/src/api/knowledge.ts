@@ -51,8 +51,15 @@ export function updateKnowledgeBase(uuid: string, data: { title?: string; descri
   })
 }
 
-export function deleteKnowledgeBase(uuid: string) {
-  return apiFetch<{ ok: boolean }>(`/api/knowledge/${uuid}`, { method: 'DELETE' })
+export function deleteKnowledgeBase(uuid: string, mode?: 'unshare_and_delete') {
+  const qs = mode ? `?mode=${mode}` : ''
+  return apiFetch<{ ok: boolean }>(`/api/knowledge/${uuid}${qs}`, { method: 'DELETE' })
+}
+
+export function transferKnowledgeBaseToTeam(uuid: string) {
+  return apiFetch<{ ok: boolean; team_owned: boolean }>(`/api/knowledge/${uuid}/transfer-to-team`, {
+    method: 'POST',
+  })
 }
 
 export function addDocumentsToKB(uuid: string, documentUuids: string[]) {

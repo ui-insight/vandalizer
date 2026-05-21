@@ -119,12 +119,17 @@ export function KBCard({
           {kb.title}
         </span>
         {kb.shared_with_team && (
-          <span style={{
-            fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
-            color: 'rgb(0, 128, 128)', backgroundColor: 'rgba(0, 128, 128, 0.1)',
-            whiteSpace: 'nowrap',
-          }}>
-            Team
+          <span
+            title={kb.team_owned
+              ? 'Owned by your team — not in any individual\'s My KBs'
+              : 'Shared with your team'}
+            style={{
+              fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
+              color: 'rgb(0, 128, 128)', backgroundColor: 'rgba(0, 128, 128, 0.1)',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {kb.team_owned ? 'Team-owned' : 'Team'}
           </span>
         )}
         {kb.verified && (

@@ -244,6 +244,28 @@ def can_manage_library(
     return False
 
 
+def can_contribute_library(
+    library: Library,
+    user: User,
+    team_access: TeamAccessContext,
+    *,
+    allow_admin: bool = False,
+) -> bool:
+    """Can the user add items to this library?
+
+    Looser than ``can_manage_library``: any team member can contribute to a
+    team library, while library-level operations (rename/delete) stay
+    admin-only. Verified library still requires admin.
+    """
+    if user.is_admin:
+        return True
+    if library.scope == LibraryScope.PERSONAL:
+        return library.owner_user_id == user.user_id
+    if library.scope == LibraryScope.TEAM:
+        return _has_team_membership(str(library.team) if library.team else None, team_access)
+    return False
+
+
 def can_view_library_folder(
     folder: LibraryFolder,
     user: User,
@@ -284,6 +306,7 @@ async def get_authorized_library(
     user: User,
     *,
     manage: bool = False,
+    contribute: bool = False,
     allow_admin: bool = False,
     team_access: TeamAccessContext | None = None,
 ) -> Library | None:
@@ -295,11 +318,12 @@ async def get_authorized_library(
         return None
 
     access = team_access or await get_team_access_context(user)
-    allowed = (
-        can_manage_library(library, user, access, allow_admin=allow_admin)
-        if manage
-        else can_view_library(library, user, access, allow_admin=allow_admin)
-    )
+    if manage:
+        allowed = can_manage_library(library, user, access, allow_admin=allow_admin)
+    elif contribute:
+        allowed = can_contribute_library(library, user, access, allow_admin=allow_admin)
+    else:
+        allowed = can_view_library(library, user, access, allow_admin=allow_admin)
     return library if allowed else None
 
 
