@@ -2,14 +2,18 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   ArrowLeft,
+  Check,
   CheckCircle2,
   Circle,
   Clock,
+  Eye,
   Loader2,
   MessageSquare,
   Paperclip,
+  Pencil,
   Plus,
   Send,
+  UserPlus,
   X,
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
@@ -101,6 +105,8 @@ function TicketListView({
           <>
             {open.map((t) => {
               const attention = needsAttention(t)
+              const isWatching = t.user_id !== currentUserId
+                && (t.watcher_ids ?? []).includes(currentUserId)
               return (
                 <button
                   key={t.uuid}
@@ -117,7 +123,19 @@ function TicketListView({
                           Check-in
                         </span>
                       )}
+                      {isWatching && (
+                        <span
+                          className="shrink-0 inline-flex items-center gap-0.5 rounded bg-indigo-50 px-1 py-0.5 text-[9px] font-bold uppercase text-indigo-700"
+                          title="You were tagged on this ticket"
+                        >
+                          <Eye className="h-2.5 w-2.5" />
+                          Watching
+                        </span>
+                      )}
                       <p className={`truncate text-sm ${attention ? 'font-semibold text-gray-900' : 'font-medium text-gray-900'}`}>
+                        {t.ticket_number != null && (
+                          <span className="mr-1 font-mono text-[11px] text-gray-400">#{t.ticket_number}</span>
+                        )}
                         {t.subject}
                       </p>
                       {attention && (
@@ -154,7 +172,12 @@ function TicketListView({
                   >
                     <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${STATUS_DOT.closed}`} />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm text-gray-700">{t.subject}</p>
+                      <p className="truncate text-sm text-gray-700">
+                        {t.ticket_number != null && (
+                          <span className="mr-1 font-mono text-[11px] text-gray-400">#{t.ticket_number}</span>
+                        )}
+                        {t.subject}
+                      </p>
                     </div>
                     <span className="text-[10px] text-gray-400">{timeAgo(t.updated_at)}</span>
                   </button>
@@ -394,6 +417,9 @@ function ChatView({
   const [sending, setSending] = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [previewAttachment, setPreviewAttachment] = useState<import('../../types/support').SupportAttachment | null>(null)
+  const [editingMessageUuid, setEditingMessageUuid] = useState<string | null>(null)
+  const [editDraft, setEditDraft] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -465,6 +491,33 @@ function ChatView({
     }
   }
 
+  const startEdit = (msg: import('../../types/support').SupportMessage) => {
+    setEditingMessageUuid(msg.uuid)
+    setEditDraft(msg.content)
+  }
+
+  const cancelEdit = () => {
+    setEditingMessageUuid(null)
+    setEditDraft('')
+  }
+
+  const saveEdit = async () => {
+    if (!editingMessageUuid) return
+    const trimmed = editDraft.trim()
+    if (!trimmed) return
+    setSavingEdit(true)
+    try {
+      const updated = await supportApi.editMessage(ticketUuid, editingMessageUuid, trimmed)
+      setTicket(updated)
+      cancelEdit()
+    } catch (err) {
+      const m = err instanceof Error ? err.message : 'Could not save edit'
+      toast(m, 'error')
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
   const handleStatusChange = async (newStatus: string) => {
     setUpdatingStatus(true)
     try {
@@ -507,7 +560,12 @@ function ChatView({
             <ArrowLeft className="h-4 w-4" />
           </button>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-gray-900">{ticket.subject}</p>
+            <p className="truncate text-sm font-medium text-gray-900">
+              {ticket.ticket_number != null && (
+                <span className="mr-1 font-mono text-[11px] text-gray-400">#{ticket.ticket_number}</span>
+              )}
+              {ticket.subject}
+            </p>
             <div className="flex items-center gap-2">
               <StatusIcon className={`h-3 w-3 ${
                 ticket.status === 'closed' ? 'text-gray-400' : ticket.status === 'in_progress' ? 'text-blue-500' : 'text-yellow-500'
@@ -561,15 +619,23 @@ function ChatView({
             )}
           </div>
         )}
+
+        {/* Watchers — visible to everyone on the ticket */}
+        <WatcherBar
+          ticket={ticket}
+          currentUserId={user?.user_id ?? ''}
+          onChange={setTicket}
+        />
       </div>
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
         {ticket.messages.map((msg) => {
           const isMe = msg.user_id === user?.user_id
+          const isEditing = editingMessageUuid === msg.uuid
           const msgAttachments = ticket.attachments.filter(a => a.message_uuid === msg.uuid)
           return (
-            <div key={msg.uuid} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+            <div key={msg.uuid} className={`group flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
               <div
                 className={`max-w-[85%] rounded-xl px-3 py-2 ${
                   isMe
@@ -582,11 +648,61 @@ function ChatView({
                     {msg.user_name || 'Support'}
                   </p>
                 )}
-                <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
+                {isEditing ? (
+                  <div className="flex flex-col gap-1.5">
+                    <textarea
+                      autoFocus
+                      value={editDraft}
+                      onChange={(e) => setEditDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                          e.preventDefault()
+                          saveEdit()
+                        }
+                        if (e.key === 'Escape') {
+                          e.preventDefault()
+                          cancelEdit()
+                        }
+                      }}
+                      rows={Math.min(8, Math.max(2, editDraft.split('\n').length))}
+                      className="resize-none rounded-md px-2 py-1 text-sm text-gray-900 bg-white/95 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                    />
+                    <div className="flex items-center justify-end gap-1">
+                      <button
+                        onClick={cancelEdit}
+                        disabled={savingEdit}
+                        className="rounded px-2 py-0.5 text-[11px] font-medium text-white/90 hover:bg-white/10 disabled:opacity-50"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={saveEdit}
+                        disabled={savingEdit || !editDraft.trim()}
+                        className="inline-flex items-center gap-1 rounded bg-white/20 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-white/30 disabled:opacity-50"
+                      >
+                        {savingEdit ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
+                )}
                 <p className={`mt-1 text-[10px] ${isMe ? 'text-blue-200' : 'text-gray-400'}`}>
                   {timeAgo(msg.created_at)}
+                  {msg.edited_at && <span className="ml-1 italic">(edited)</span>}
                 </p>
               </div>
+              {isMe && !isEditing && (
+                <button
+                  onClick={() => startEdit(msg)}
+                  className="mt-0.5 inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] text-gray-400 opacity-0 transition-opacity hover:bg-gray-100 hover:text-gray-600 group-hover:opacity-100"
+                  title="Edit message"
+                >
+                  <Pencil className="h-2.5 w-2.5" />
+                  Edit
+                </button>
+              )}
               {msgAttachments.length > 0 && (
                 <div className={`flex flex-col gap-1.5 mt-1.5 max-w-[85%] ${isMe ? 'items-end' : 'items-start'}`}>
                   {msgAttachments.map((a) => (
@@ -674,6 +790,117 @@ function ChatView({
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Watcher bar — tagged users who see and follow the ticket
+// ---------------------------------------------------------------------------
+
+function WatcherBar({
+  ticket,
+  currentUserId,
+  onChange,
+}: {
+  ticket: SupportTicket
+  currentUserId: string
+  onChange: (next: SupportTicket) => void
+}) {
+  const { toast } = useToast()
+  const [adding, setAdding] = useState(false)
+  const [email, setEmail] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const watchers = ticket.watchers ?? []
+  // Anyone who can view the ticket can add/remove watchers from the UI; the
+  // backend enforces the actual rule (owner, support, or self-remove). We
+  // simplify the client by always showing controls and letting a 403 toast.
+
+  const submit = async () => {
+    const trimmed = email.trim()
+    if (!trimmed || busy) return
+    setBusy(true)
+    try {
+      const updated = await supportApi.addWatcher(ticket.uuid, trimmed)
+      onChange(updated)
+      setEmail('')
+      setAdding(false)
+      toast('Watcher added', 'success')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Could not add watcher'
+      toast(msg, 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const remove = async (userId: string) => {
+    try {
+      const updated = await supportApi.removeWatcher(ticket.uuid, userId)
+      onChange(updated)
+    } catch {
+      toast('Could not remove watcher', 'error')
+    }
+  }
+
+  return (
+    <div className="mt-2 ml-7 flex flex-wrap items-center gap-1.5">
+      <span
+        className="inline-flex items-center gap-1 text-[10px] font-medium uppercase text-gray-400"
+        title="Tagged users follow this ticket and get notified on updates"
+      >
+        <Eye className="h-3 w-3" />
+        Watchers
+      </span>
+      {watchers.length === 0 && !adding && (
+        <span className="text-[11px] text-gray-400">None</span>
+      )}
+      {watchers.map((w) => {
+        const isMe = w.user_id === currentUserId
+        return (
+          <span
+            key={w.user_id}
+            className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-medium text-indigo-700"
+            title={w.email || w.user_id}
+          >
+            {isMe ? 'You' : w.name}
+            <button
+              onClick={() => remove(w.user_id)}
+              className="rounded-full p-0.5 text-indigo-500 hover:bg-indigo-100 hover:text-indigo-900"
+              title={isMe ? 'Stop watching' : `Remove ${w.name}`}
+            >
+              <X className="h-2.5 w-2.5" />
+            </button>
+          </span>
+        )
+      })}
+      {adding ? (
+        <input
+          autoFocus
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          onBlur={() => { if (!busy) { setEmail(''); setAdding(false) } }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { e.preventDefault(); submit() }
+            if (e.key === 'Escape') { setEmail(''); setAdding(false) }
+          }}
+          placeholder="email…"
+          type="email"
+          disabled={busy}
+          className="rounded-full border border-gray-300 px-2 py-0.5 text-[11px] outline-none focus:border-blue-500 disabled:opacity-50"
+          style={{ minWidth: 140 }}
+        />
+      ) : (
+        <button
+          onClick={() => setAdding(true)}
+          className="inline-flex items-center gap-1 rounded-full border border-dashed border-gray-300 px-2 py-0.5 text-[11px] text-gray-500 hover:border-blue-400 hover:text-blue-600"
+          title="Tag a user to follow this ticket"
+        >
+          <UserPlus className="h-2.5 w-2.5" />
+          Tag user
+        </button>
+      )}
     </div>
   )
 }

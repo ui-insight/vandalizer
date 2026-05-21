@@ -1,15 +1,18 @@
 """Support ticket service."""
 
+import asyncio
 import datetime
 import logging
 from pathlib import Path
 
 import redis.asyncio as aioredis
+from pymongo import ReturnDocument
 
 from app.config import Settings
 from app.services.email_service import _BASE_STYLE
 from app.models.support import (
     SupportAttachment,
+    SupportCounter,
     SupportMessage,
     SupportTicket,
     TicketPriority,
@@ -25,6 +28,59 @@ logger = logging.getLogger(__name__)
 # Cooldown in seconds — skip email if we already emailed this person about
 # this ticket within this window (avoids spam during live chat).
 _EMAIL_COOLDOWN_SECONDS = 600  # 10 minutes
+
+# Sequential ticket numbers start at this base — "#1001" reads better than
+# "#1" and makes it obvious it isn't an internal db id.
+_TICKET_NUMBER_BASE = 1000
+
+_counter_init_lock = asyncio.Lock()
+_counter_initialized = False
+
+
+async def _ensure_counter_initialized() -> None:
+    """First-call backfill: assign ticket_number to legacy tickets and seed
+    the counter. Idempotent; the asyncio lock guards concurrent inserts on
+    process start.
+    """
+    global _counter_initialized
+    if _counter_initialized:
+        return
+    async with _counter_init_lock:
+        if _counter_initialized:
+            return
+        coll = SupportCounter.get_motor_collection()
+        existing = await coll.find_one({"name": "support_ticket"})
+        if existing is None:
+            # Chronological backfill so older tickets get smaller numbers.
+            legacy = (
+                await SupportTicket.find({"ticket_number": None})
+                .sort("+created_at")
+                .to_list()
+            )
+            next_num = 0
+            for t in legacy:
+                next_num += 1
+                t.ticket_number = _TICKET_NUMBER_BASE + next_num
+                await t.save()
+            await coll.update_one(
+                {"name": "support_ticket"},
+                {"$set": {"name": "support_ticket", "value": next_num}},
+                upsert=True,
+            )
+        _counter_initialized = True
+
+
+async def _next_ticket_number() -> int:
+    """Atomically reserve the next ticket number."""
+    await _ensure_counter_initialized()
+    coll = SupportCounter.get_motor_collection()
+    res = await coll.find_one_and_update(
+        {"name": "support_ticket"},
+        {"$inc": {"value": 1}},
+        upsert=True,
+        return_document=ReturnDocument.AFTER,
+    )
+    return _TICKET_NUMBER_BASE + int(res["value"])
 
 
 def _iso_utc(dt: datetime.datetime | None) -> str | None:
@@ -59,9 +115,32 @@ async def _check_email_cooldown(ticket_uuid: str, recipient: str) -> bool:
         return True
 
 
-def _ticket_to_dict(t: SupportTicket) -> dict:
+async def _hydrate_watchers(user_ids: list[str]) -> list[dict]:
+    """Look up watcher user_ids and return [{user_id, name, email}] dicts.
+
+    Users that no longer exist are returned with just their user_id so the
+    UI can still render and unfollow them.
+    """
+    if not user_ids:
+        return []
+    users = await User.find({"user_id": {"$in": list(user_ids)}}).to_list()
+    by_id = {u.user_id: u for u in users}
+    result: list[dict] = []
+    for uid in user_ids:
+        u = by_id.get(uid)
+        result.append({
+            "user_id": uid,
+            "name": (u.name if u else None) or uid,
+            "email": u.email if u else None,
+        })
+    return result
+
+
+async def _ticket_to_dict(t: SupportTicket) -> dict:
+    watcher_ids = list(getattr(t, "watchers", []) or [])
     return {
         "uuid": t.uuid,
+        "ticket_number": getattr(t, "ticket_number", None),
         "subject": t.subject,
         "status": t.status.value,
         "priority": t.priority.value,
@@ -78,6 +157,7 @@ def _ticket_to_dict(t: SupportTicket) -> dict:
                 "content": m.content,
                 "is_support_reply": m.is_support_reply,
                 "created_at": _iso_utc(m.created_at),
+                "edited_at": _iso_utc(getattr(m, "edited_at", None)),
             }
             for m in t.messages
         ],
@@ -98,6 +178,7 @@ def _ticket_to_dict(t: SupportTicket) -> dict:
         "closed_at": _iso_utc(t.closed_at),
         "category": t.category,
         "tags": list(getattr(t, "tags", []) or []),
+        "watchers": await _hydrate_watchers(watcher_ids),
     }
 
 
@@ -106,6 +187,7 @@ def _ticket_summary(t: SupportTicket) -> dict:
     last_message = t.messages[-1] if t.messages else None
     return {
         "uuid": t.uuid,
+        "ticket_number": getattr(t, "ticket_number", None),
         "subject": t.subject,
         "status": t.status.value,
         "priority": t.priority.value,
@@ -126,6 +208,10 @@ def _ticket_summary(t: SupportTicket) -> dict:
         "read_by": t.read_by,
         "category": t.category,
         "tags": list(getattr(t, "tags", []) or []),
+        # List view only needs the user_ids — the full name/email lookup is
+        # done in the ticket detail view. We surface them here so the UI can
+        # show a "Watching" badge for the current user without an extra fetch.
+        "watcher_ids": list(getattr(t, "watchers", []) or []),
         "created_at": _iso_utc(t.created_at),
         "updated_at": _iso_utc(t.updated_at),
         "closed_at": _iso_utc(t.closed_at),
@@ -146,6 +232,7 @@ async def create_ticket(
         is_support_reply=False,
     )
     ticket = SupportTicket(
+        ticket_number=await _next_ticket_number(),
         subject=subject,
         priority=TicketPriority(priority),
         user_id=user.user_id,
@@ -159,7 +246,7 @@ async def create_ticket(
     # Notify support contacts
     await _notify_support_contacts_new_ticket(ticket)
 
-    return _ticket_to_dict(ticket)
+    return await _ticket_to_dict(ticket)
 
 
 # Trial check-in prompts are stored as support tickets with this category.
@@ -193,9 +280,16 @@ async def list_tickets(
     limit: int = 50,
     offset: int = 0,
 ) -> list[dict]:
+    """List tickets the given user_id owns *or* is tagged as a watcher on.
+
+    Watched tickets are surfaced in the same list as owned ones so the
+    requester sees a single unified queue — owner_tickets vs. tickets I
+    follow are distinguished client-side via `user_id` vs. `watcher_ids`.
+    """
     query: dict = {}
     if user_id:
-        query["user_id"] = user_id
+        # Owner OR watcher. We $or this with the other filters via $and.
+        query["$or"] = [{"user_id": user_id}, {"watchers": user_id}]
     if status:
         query["status"] = status
     if assigned_to:
@@ -254,7 +348,7 @@ async def get_ticket(ticket_uuid: str) -> dict | None:
     ticket = await SupportTicket.find_one(SupportTicket.uuid == ticket_uuid)
     if not ticket:
         return None
-    return _ticket_to_dict(ticket)
+    return await _ticket_to_dict(ticket)
 
 
 async def mark_ticket_read(ticket_uuid: str, user_id: str) -> bool:
@@ -317,8 +411,62 @@ async def add_message(
         await _email_ticket_owner_reply(ticket, msg)
     else:
         await _notify_support_contacts_new_message(ticket, msg)
+        # Watchers can reply too — when they do, the owner needs to know
+        # (the support-contacts branch above covers support staff).
+        if user.user_id != ticket.user_id:
+            await create_notification(
+                user_id=ticket.user_id,
+                kind="support_new_message",
+                title=f"New message on ticket: {ticket.subject}",
+                body=msg.content[:120],
+                link=f"/support?ticket={ticket.uuid}",
+                item_kind="support_ticket",
+                item_id=ticket.uuid,
+                item_name=ticket.subject,
+            )
 
-    return _ticket_to_dict(ticket)
+    # Notify watchers on every new message (they followed the ticket precisely
+    # to stay in the loop). Skip the sender — they obviously know.
+    await _notify_watchers_new_message(ticket, msg)
+
+    return await _ticket_to_dict(ticket)
+
+
+async def edit_message(
+    ticket_uuid: str,
+    message_uuid: str,
+    user: User,
+    content: str,
+) -> tuple[dict | None, str | None]:
+    """Edit an existing message's content. Only the author can edit.
+
+    Returns (ticket_dict, error). ``error`` is set on permission/validation
+    failures so the router can map it to a 4xx response.
+    """
+    cleaned = (content or "").strip()
+    if not cleaned:
+        return None, "Message content is required"
+
+    ticket = await SupportTicket.find_one(SupportTicket.uuid == ticket_uuid)
+    if not ticket:
+        return None, "Ticket not found"
+
+    target: SupportMessage | None = None
+    for m in ticket.messages:
+        if m.uuid == message_uuid:
+            target = m
+            break
+    if target is None:
+        return None, "Message not found"
+
+    if target.user_id != user.user_id:
+        return None, "You can only edit your own messages"
+
+    target.content = cleaned
+    target.edited_at = datetime.datetime.now(datetime.timezone.utc)
+    ticket.updated_at = target.edited_at
+    await ticket.save()
+    return await _ticket_to_dict(ticket), None
 
 
 def _support_attachments_dir() -> Path:
@@ -357,7 +505,7 @@ async def add_attachment(
     ticket.attachments.append(att)
     ticket.updated_at = datetime.datetime.now(datetime.timezone.utc)
     await ticket.save()
-    return _ticket_to_dict(ticket)
+    return await _ticket_to_dict(ticket)
 
 
 async def get_attachment_data(ticket_uuid: str, attachment_uuid: str) -> dict | None:
@@ -441,12 +589,169 @@ async def update_ticket(
         )
         # Email the ticket owner about status change
         await _email_ticket_owner_status(ticket, status)
+        # Watchers asked to follow the ticket — keep them in the loop on
+        # status changes too (in-app notification only; no email blast).
+        await _notify_watchers_status(ticket, status, actor)
 
     # Email the other support agents when tags are added.
     if added_tags:
         await _notify_support_contacts_tag_added(ticket, added_tags, actor)
 
-    return _ticket_to_dict(ticket)
+    return await _ticket_to_dict(ticket)
+
+
+# ---------------------------------------------------------------------------
+# Watchers — users tagged on a ticket to follow its progress
+# ---------------------------------------------------------------------------
+
+async def add_watcher(
+    ticket_uuid: str,
+    actor: User,
+    email: str,
+) -> tuple[dict | None, str | None]:
+    """Tag a user (by email) as a watcher on the ticket.
+
+    Returns (ticket_dict, error). ``error`` is set if the email doesn't map
+    to a real account, or the user is the ticket owner (already participant).
+    """
+    ticket = await SupportTicket.find_one(SupportTicket.uuid == ticket_uuid)
+    if not ticket:
+        return None, "Ticket not found"
+
+    normalized = (email or "").strip().lower()
+    if not normalized:
+        return None, "Email is required"
+
+    target = await User.find_one(User.email == normalized)
+    if not target:
+        return None, f"No Vandalizer account found for {email}"
+
+    if target.user_id == ticket.user_id:
+        return None, "That user already owns this ticket"
+
+    if target.user_id in (ticket.watchers or []):
+        # Idempotent — return the ticket without re-notifying.
+        return await _ticket_to_dict(ticket), None
+
+    ticket.watchers = list(ticket.watchers or []) + [target.user_id]
+    ticket.updated_at = datetime.datetime.now(datetime.timezone.utc)
+    await ticket.save()
+
+    await _notify_watcher_added(ticket, target, actor)
+
+    return await _ticket_to_dict(ticket), None
+
+
+async def remove_watcher(
+    ticket_uuid: str,
+    watcher_user_id: str,
+) -> dict | None:
+    ticket = await SupportTicket.find_one(SupportTicket.uuid == ticket_uuid)
+    if not ticket:
+        return None
+    current = list(ticket.watchers or [])
+    if watcher_user_id not in current:
+        return await _ticket_to_dict(ticket)
+    ticket.watchers = [w for w in current if w != watcher_user_id]
+    ticket.updated_at = datetime.datetime.now(datetime.timezone.utc)
+    await ticket.save()
+    return await _ticket_to_dict(ticket)
+
+
+async def _notify_watcher_added(
+    ticket: SupportTicket, watcher: User, actor: User,
+) -> None:
+    """Notify a user that they've been tagged on a ticket — in-app + email."""
+    actor_name = (actor.name or actor.user_id) if actor else "Someone"
+    first_message = ticket.messages[0].content if ticket.messages else ""
+    await create_notification(
+        user_id=watcher.user_id,
+        kind="support_watcher_added",
+        title=f"{actor_name} added you to a support ticket",
+        body=ticket.subject,
+        link=f"/support?ticket={ticket.uuid}",
+        item_kind="support_ticket",
+        item_id=ticket.uuid,
+        item_name=ticket.subject,
+    )
+    if not watcher.email:
+        return
+    settings = Settings()
+    from app.services.email_service import support_watcher_added_email
+    subject, html = support_watcher_added_email(
+        watcher_name=watcher.name or watcher.user_id,
+        ticket_subject=ticket.subject,
+        ticket_user=ticket.user_name or ticket.user_id,
+        actor_name=actor_name,
+        first_message=first_message,
+        ticket_uuid=ticket.uuid,
+        frontend_url=settings.frontend_url,
+        ticket_number=ticket.ticket_number,
+    )
+    await send_email(
+        watcher.email, subject, html, settings, email_type="support_watcher_added",
+    )
+
+
+async def _notify_watchers_new_message(
+    ticket: SupportTicket, msg: SupportMessage,
+) -> None:
+    """In-app notification (and cooldown-respecting email) to each watcher."""
+    if not ticket.watchers:
+        return
+    watchers = await User.find({"user_id": {"$in": list(ticket.watchers)}}).to_list()
+    settings = Settings()
+    for w in watchers:
+        if w.user_id == msg.user_id:
+            continue  # sender already knows
+        await create_notification(
+            user_id=w.user_id,
+            kind="support_new_message",
+            title=f"New message on ticket: {ticket.subject}",
+            body=msg.content[:120],
+            link=f"/support?ticket={ticket.uuid}",
+            item_kind="support_ticket",
+            item_id=ticket.uuid,
+            item_name=ticket.subject,
+        )
+        if w.email and await _check_email_cooldown(ticket.uuid, w.user_id):
+            from app.services.email_service import support_new_message_email
+            subject, html = support_new_message_email(
+                support_name=w.name or w.user_id,
+                ticket_subject=ticket.subject,
+                ticket_user=msg.user_name or msg.user_id,
+                message=msg.content,
+                ticket_uuid=ticket.uuid,
+                frontend_url=settings.frontend_url,
+                ticket_number=ticket.ticket_number,
+            )
+            await send_email(
+                w.email, subject, html, settings,
+                email_type="support_new_message",
+            )
+
+
+async def _notify_watchers_status(
+    ticket: SupportTicket, new_status: str, actor: User | None,
+) -> None:
+    """In-app only — watchers see status flips alongside the ticket owner."""
+    if not ticket.watchers:
+        return
+    actor_id = actor.user_id if actor else None
+    pretty = new_status.replace("_", " ")
+    for watcher_id in ticket.watchers:
+        if watcher_id == actor_id:
+            continue
+        await create_notification(
+            user_id=watcher_id,
+            kind="support_status",
+            title=f"Ticket {pretty}",
+            body=f"\"{ticket.subject}\" was marked as {pretty}.",
+            link=f"/support?ticket={ticket.uuid}",
+            item_kind="support_ticket",
+            item_id=ticket.uuid,
+            item_name=ticket.subject,
+        )
 
 
 async def get_support_contacts() -> list[dict]:
@@ -490,7 +795,8 @@ async def _notify_support_contacts_new_ticket(ticket: SupportTicket) -> None:
 
         # Email notification
         if email:
-            subject = f"New Support Ticket: {ticket.subject}"
+            num_prefix = f"[#{ticket.ticket_number}] " if ticket.ticket_number else ""
+            subject = f"{num_prefix}New Support Ticket: {ticket.subject}"
             html = _new_ticket_email(
                 support_name=name,
                 ticket_subject=ticket.subject,
@@ -498,6 +804,7 @@ async def _notify_support_contacts_new_ticket(ticket: SupportTicket) -> None:
                 message=ticket.messages[0].content if ticket.messages else "",
                 ticket_uuid=ticket.uuid,
                 frontend_url=settings.frontend_url,
+                ticket_number=ticket.ticket_number,
             )
             await send_email(email, subject, html, settings, email_type="support_new_ticket")
 
@@ -534,6 +841,7 @@ async def _notify_support_contacts_new_message(
                     message=msg.content,
                     ticket_uuid=ticket.uuid,
                     frontend_url=settings.frontend_url,
+                    ticket_number=ticket.ticket_number,
                 )
                 await send_email(email, subject, html, settings, email_type="support_new_message")
 
@@ -567,6 +875,7 @@ async def _notify_support_contacts_tag_added(
             actor_name=actor_name,
             ticket_uuid=ticket.uuid,
             frontend_url=settings.frontend_url,
+            ticket_number=ticket.ticket_number,
         )
         await send_email(email, subject, html, settings, email_type="support_tag_added")
 
@@ -588,6 +897,7 @@ async def _email_ticket_owner_reply(
         message=msg.content,
         ticket_uuid=ticket.uuid,
         frontend_url=settings.frontend_url,
+        ticket_number=ticket.ticket_number,
     )
     await send_email(owner.email, subject, html, settings, email_type="support_reply")
 
@@ -607,6 +917,7 @@ async def _email_ticket_owner_status(
         new_status=new_status.replace("_", " "),
         ticket_uuid=ticket.uuid,
         frontend_url=settings.frontend_url,
+        ticket_number=ticket.ticket_number,
     )
     await send_email(owner.email, subject, html, settings, email_type="support_status")
 
@@ -629,12 +940,20 @@ def _new_ticket_email(
     message: str,
     ticket_uuid: str,
     frontend_url: str,
+    ticket_number: int | None = None,
 ) -> str:
+    number_line = (
+        f'<p><strong style="color:#fff">Ticket:</strong> '
+        f'<span class="highlight">#{ticket_number}</span></p>'
+        if ticket_number is not None
+        else ""
+    )
     return f"""<!DOCTYPE html><html><head>{_STYLE}</head><body>
     <div class="container"><div class="card">
       <div class="logo">Vandalizer Support</div>
       <h1>New Support Ticket</h1>
       <p>Hi {support_name}, a new support ticket has been created.</p>
+      {number_line}
       <p><strong style="color:#fff">From:</strong> {ticket_user}<br/>
          <strong style="color:#fff">Subject:</strong> <span class="highlight">{ticket_subject}</span></p>
       <div class="message-box"><p style="margin:0">{message[:500]}</p></div>

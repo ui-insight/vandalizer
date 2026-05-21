@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { Navigate, useNavigate, useSearch } from '@tanstack/react-router'
 import {
-  ArrowLeft, MessageSquare, Send, Plus, Paperclip, X, Loader2, Link2, Tag,
+  ArrowLeft, Check, MessageSquare, Send, Plus, Paperclip, Pencil, X, Loader2, Link2, Tag,
+  Eye, UserPlus,
 } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
 import { useAuth } from '../hooks/useAuth'
@@ -293,6 +294,16 @@ function ListView({
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       {needsAttention && <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3b82f6', flexShrink: 0 }} />}
+                      {t.ticket_number != null && (
+                        <span
+                          style={{
+                            fontSize: 12, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                            color: '#6b7280', flexShrink: 0,
+                          }}
+                        >
+                          #{t.ticket_number}
+                        </span>
+                      )}
                       <span style={{ fontSize: 14, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {t.subject}
                       </span>
@@ -530,12 +541,16 @@ function ChatView({
   ticketUuid: string
   onBack: () => void
 }) {
+  const { user } = useAuth()
   const { toast } = useToast()
   const [ticket, setTicket] = useState<SupportTicket | null>(null)
   const [loading, setLoading] = useState(true)
   const [reply, setReply] = useState('')
   const [sending, setSending] = useState(false)
   const [previewAttachment, setPreviewAttachment] = useState<SupportAttachment | null>(null)
+  const [editingMessageUuid, setEditingMessageUuid] = useState<string | null>(null)
+  const [editDraft, setEditDraft] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -581,6 +596,32 @@ function ChatView({
       setTicket(updated)
     } catch {
       toast('Failed to update status', 'error')
+    }
+  }
+
+  const startEdit = (msg: { uuid: string; content: string }) => {
+    setEditingMessageUuid(msg.uuid)
+    setEditDraft(msg.content)
+  }
+
+  const cancelEdit = () => {
+    setEditingMessageUuid(null)
+    setEditDraft('')
+  }
+
+  const saveEdit = async () => {
+    if (!editingMessageUuid) return
+    const trimmed = editDraft.trim()
+    if (!trimmed) return
+    setSavingEdit(true)
+    try {
+      const updated = await supportApi.editMessage(ticketUuid, editingMessageUuid, trimmed)
+      setTicket(updated)
+      cancelEdit()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Could not save edit', 'error')
+    } finally {
+      setSavingEdit(false)
     }
   }
 
@@ -639,7 +680,19 @@ function ChatView({
         {/* Header with requester + status controls */}
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>{ticket.subject}</h3>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {ticket.ticket_number != null && (
+                <span
+                  style={{
+                    fontSize: 13, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                    color: '#6b7280', marginRight: 8,
+                  }}
+                >
+                  #{ticket.ticket_number}
+                </span>
+              )}
+              {ticket.subject}
+            </h3>
             <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>
               {ticket.user_name || ticket.user_id}
               {ticket.user_email ? ` (${ticket.user_email})` : ''}
@@ -720,10 +773,15 @@ function ChatView({
           }}
         />
 
+        {/* Watchers — tagged users who follow the ticket. Visible to all parties. */}
+        <WatcherBar ticket={ticket} onChange={setTicket} />
+
         {/* Messages — agent on right (blue, "Support" label), customer on left */}
         <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 520, overflowY: 'auto' }}>
           {ticket.messages.map((m) => {
             const isSupport = m.is_support_reply
+            const isMine = m.user_id === user?.user_id
+            const isEditing = editingMessageUuid === m.uuid
             const msgAttachments = ticket.attachments.filter((a) => a.message_uuid === m.uuid)
             return (
               <div key={m.uuid} style={{ display: 'flex', flexDirection: 'column', alignItems: isSupport ? 'flex-end' : 'flex-start' }}>
@@ -736,11 +794,89 @@ function ChatView({
                     {m.user_name || m.user_id}
                     {isSupport && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 500, opacity: 0.85 }}>Support</span>}
                   </div>
-                  <div style={{ fontSize: 14, whiteSpace: 'pre-wrap' }}>{m.content}</div>
+                  {isEditing ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <textarea
+                        autoFocus
+                        value={editDraft}
+                        onChange={(e) => setEditDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                            e.preventDefault()
+                            saveEdit()
+                          }
+                          if (e.key === 'Escape') {
+                            e.preventDefault()
+                            cancelEdit()
+                          }
+                        }}
+                        rows={Math.min(10, Math.max(2, editDraft.split('\n').length))}
+                        style={{
+                          fontSize: 14, padding: '6px 8px', borderRadius: 6,
+                          border: '1px solid rgba(0,0,0,0.1)', resize: 'vertical',
+                          background: isSupport ? 'rgba(255,255,255,0.95)' : '#fff',
+                          color: '#111827', fontFamily: 'inherit', minWidth: 280,
+                        }}
+                      />
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
+                        <button
+                          onClick={cancelEdit}
+                          disabled={savingEdit}
+                          style={{
+                            padding: '2px 8px', fontSize: 11, fontWeight: 600,
+                            borderRadius: 6, border: 'none', cursor: 'pointer',
+                            background: 'transparent',
+                            color: isSupport ? 'rgba(255,255,255,0.85)' : '#6b7280',
+                            opacity: savingEdit ? 0.5 : 1,
+                          }}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={saveEdit}
+                          disabled={savingEdit || !editDraft.trim()}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 3,
+                            padding: '2px 10px', fontSize: 11, fontWeight: 600,
+                            borderRadius: 6, border: 'none', cursor: 'pointer',
+                            background: isSupport ? 'rgba(255,255,255,0.25)' : '#2563eb',
+                            color: '#fff',
+                            opacity: (savingEdit || !editDraft.trim()) ? 0.5 : 1,
+                          }}
+                        >
+                          {savingEdit ? (
+                            <Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} />
+                          ) : (
+                            <Check size={10} />
+                          )}
+                          Save
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 14, whiteSpace: 'pre-wrap' }}>{m.content}</div>
+                  )}
                   <div style={{ fontSize: 10, marginTop: 4, color: isSupport ? 'rgba(255,255,255,0.75)' : '#9ca3af' }}>
                     {timeAgo(m.created_at)}
+                    {m.edited_at && <span style={{ marginLeft: 4, fontStyle: 'italic' }}>(edited)</span>}
                   </div>
                 </div>
+                {isMine && !isEditing && (
+                  <button
+                    onClick={() => startEdit(m)}
+                    title="Edit message"
+                    style={{
+                      marginTop: 2, display: 'inline-flex', alignItems: 'center', gap: 3,
+                      padding: '2px 6px', fontSize: 11, color: '#9ca3af',
+                      background: 'transparent', border: 'none', cursor: 'pointer',
+                      borderRadius: 4, fontFamily: 'inherit',
+                    }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#374151' }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af' }}
+                  >
+                    <Pencil size={10} /> Edit
+                  </button>
+                )}
                 {msgAttachments.length > 0 && (
                   <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6, alignItems: isSupport ? 'flex-end' : 'flex-start' }}>
                     {msgAttachments.map((a) => (
@@ -881,6 +1017,119 @@ function AttachmentChip({
       <Paperclip size={12} />
       {a.filename}
     </a>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Watcher bar — agent view of tagged users; can add/remove anyone
+// ---------------------------------------------------------------------------
+
+function WatcherBar({
+  ticket, onChange,
+}: {
+  ticket: SupportTicket
+  onChange: (next: SupportTicket) => void
+}) {
+  const { toast } = useToast()
+  const [adding, setAdding] = useState(false)
+  const [email, setEmail] = useState('')
+  const [busy, setBusy] = useState(false)
+  const watchers = ticket.watchers ?? []
+
+  const submit = async () => {
+    const trimmed = email.trim()
+    if (!trimmed || busy) return
+    setBusy(true)
+    try {
+      const updated = await supportApi.addWatcher(ticket.uuid, trimmed)
+      onChange(updated)
+      setEmail('')
+      setAdding(false)
+      toast('Watcher added', 'success')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Could not add watcher', 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const remove = async (userId: string) => {
+    try {
+      const updated = await supportApi.removeWatcher(ticket.uuid, userId)
+      onChange(updated)
+    } catch {
+      toast('Could not remove watcher', 'error')
+    }
+  }
+
+  return (
+    <div style={{
+      padding: '8px 20px', borderBottom: '1px solid #e5e7eb', background: '#fafafa',
+      display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
+    }}>
+      <Eye size={12} color="#6b7280" />
+      <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, marginRight: 4 }}>
+        Watchers
+      </span>
+      {watchers.length === 0 && !adding && (
+        <span style={{ fontSize: 12, color: '#9ca3af' }}>None</span>
+      )}
+      {watchers.map((w) => (
+        <span
+          key={w.user_id}
+          title={w.email || w.user_id}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            fontSize: 12, padding: '2px 4px 2px 8px', borderRadius: 9999,
+            background: '#eef2ff', color: '#4338ca', fontWeight: 500,
+          }}
+        >
+          {w.name}
+          <button
+            onClick={() => remove(w.user_id)}
+            title={`Remove ${w.name}`}
+            style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: 16, height: 16, padding: 0, border: 'none', background: 'none',
+              color: '#4338ca', cursor: 'pointer', borderRadius: 9999,
+            }}
+          >
+            <X size={10} />
+          </button>
+        </span>
+      ))}
+      {adding ? (
+        <input
+          autoFocus
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          onBlur={() => { if (!busy) { setEmail(''); setAdding(false) } }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { e.preventDefault(); submit() }
+            if (e.key === 'Escape') { setEmail(''); setAdding(false) }
+          }}
+          placeholder="user email…"
+          type="email"
+          disabled={busy}
+          style={{
+            fontSize: 12, padding: '2px 8px', border: '1px solid #d1d5db',
+            borderRadius: 9999, outline: 'none', minWidth: 160, fontFamily: 'inherit',
+          }}
+        />
+      ) : (
+        <button
+          onClick={() => setAdding(true)}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 3,
+            fontSize: 12, padding: '2px 8px', borderRadius: 9999,
+            border: '1px dashed #d1d5db', background: 'transparent', color: '#6b7280',
+            cursor: 'pointer', fontFamily: 'inherit',
+          }}
+        >
+          <UserPlus size={10} /> Tag user
+        </button>
+      )}
+    </div>
   )
 }
 

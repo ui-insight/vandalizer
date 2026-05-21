@@ -57,6 +57,20 @@ export function addMessage(ticketUuid: string, content: string) {
   })
 }
 
+export function editMessage(
+  ticketUuid: string,
+  messageUuid: string,
+  content: string,
+) {
+  return apiFetch<SupportTicket>(
+    `/api/support/tickets/${ticketUuid}/messages/${messageUuid}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ content }),
+    },
+  )
+}
+
 export async function addAttachment(
   ticketUuid: string,
   file: File,
@@ -103,4 +117,18 @@ export function getSupportContacts() {
 
 export function listAllTags() {
   return apiFetch<{ tags: string[] }>('/api/support/tags')
+}
+
+export function addWatcher(ticketUuid: string, email: string) {
+  return apiFetch<SupportTicket>(`/api/support/tickets/${ticketUuid}/watchers`, {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  })
+}
+
+export function removeWatcher(ticketUuid: string, watcherUserId: string) {
+  return apiFetch<SupportTicket>(
+    `/api/support/tickets/${ticketUuid}/watchers/${encodeURIComponent(watcherUserId)}`,
+    { method: 'DELETE' },
+  )
 }

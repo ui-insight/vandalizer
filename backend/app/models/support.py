@@ -32,6 +32,7 @@ class SupportMessage(BaseModel):
     created_at: datetime.datetime = Field(
         default_factory=lambda: datetime.datetime.now(datetime.timezone.utc)
     )
+    edited_at: Optional[datetime.datetime] = None
 
 
 class SupportAttachment(BaseModel):
@@ -51,6 +52,10 @@ class SupportAttachment(BaseModel):
 
 class SupportTicket(Document):
     uuid: str = Field(default_factory=lambda: uuid_mod.uuid4().hex)
+    # Human-friendly sequential id (e.g. 1024). Assigned at insert time via an
+    # atomic counter; legacy tickets created before this feature get backfilled
+    # on first read. Optional only so older docs deserialize cleanly.
+    ticket_number: Optional[int] = None
     subject: str
     status: TicketStatus = TicketStatus.OPEN
     priority: TicketPriority = TicketPriority.NORMAL
@@ -78,6 +83,13 @@ class SupportTicket(Document):
     # ticket owner or other non-support users.
     tags: list[str] = []
 
+    # Users (by user_id) the requester or an agent has looped in on this
+    # ticket. Watchers can view the ticket, get notified on new messages
+    # and status changes, and reply to it. Distinct from `tags` (which are
+    # support-internal labels) — watchers are always visible to everyone
+    # who can see the ticket.
+    watchers: list[str] = []
+
     # Timestamps
     created_at: datetime.datetime = Field(
         default_factory=lambda: datetime.datetime.now(datetime.timezone.utc)
@@ -91,10 +103,28 @@ class SupportTicket(Document):
         name = "support_ticket"
         indexes = [
             "uuid",
+            "ticket_number",
             "user_id",
             "status",
             "assigned_to",
             "tags",
+            "watchers",
             [("status", 1), ("created_at", -1)],
             [("user_id", 1), ("created_at", -1)],
         ]
+
+
+class SupportCounter(Document):
+    """Atomic counter for sequential ticket numbers.
+
+    One singleton document keyed by `name` (always "support_ticket"). Mongo's
+    findOneAndUpdate with $inc + upsert guarantees each create_ticket call
+    gets a unique increasing value, even under concurrent inserts.
+    """
+
+    name: str
+    value: int = 0
+
+    class Settings:
+        name = "support_counter"
+        indexes = ["name"]

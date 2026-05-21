@@ -25,6 +25,10 @@ class AddMessageRequest(BaseModel):
     content: str
 
 
+class EditMessageRequest(BaseModel):
+    content: str
+
+
 class UpdateTicketRequest(BaseModel):
     status: str | None = None
     priority: str | None = None
@@ -32,10 +36,27 @@ class UpdateTicketRequest(BaseModel):
     tags: list[str] | None = None
 
 
+class AddWatcherRequest(BaseModel):
+    email: str
+
+
 def _strip_tags(payload: dict) -> dict:
     """Remove the internal-only tags field — non-support callers must not see it."""
     payload.pop("tags", None)
     return payload
+
+
+def _can_view_ticket(ticket: dict, user: User, is_support: bool) -> bool:
+    """Owner, support, or a tagged watcher can read/reply on a ticket."""
+    if is_support:
+        return True
+    if ticket.get("user_id") == user.user_id:
+        return True
+    watcher_ids = {
+        w.get("user_id") if isinstance(w, dict) else w
+        for w in (ticket.get("watchers") or [])
+    }
+    return user.user_id in watcher_ids
 
 
 # ---------------------------------------------------------------------------
@@ -153,9 +174,9 @@ async def get_ticket(
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
 
-    # Only allow the ticket owner or support users to view
+    # Owner, support, or tagged watcher may view.
     is_support = await _is_support_user(user)
-    if ticket["user_id"] != user.user_id and not is_support:
+    if not _can_view_ticket(ticket, user, is_support):
         raise HTTPException(status_code=403, detail="Not authorized")
 
     if not is_support:
@@ -181,13 +202,13 @@ async def add_message(
     body: AddMessageRequest,
     user: User = Depends(get_current_user),
 ):
-    # Check access
+    # Check access — owner, support, or watcher may reply.
     ticket_data = await support_service.get_ticket(ticket_uuid)
     if not ticket_data:
         raise HTTPException(status_code=404, detail="Ticket not found")
 
     is_support = await _is_support_user(user)
-    if ticket_data["user_id"] != user.user_id and not is_support:
+    if not _can_view_ticket(ticket_data, user, is_support):
         raise HTTPException(status_code=403, detail="Not authorized")
 
     result = await support_service.add_message(
@@ -196,6 +217,37 @@ async def add_message(
         content=body.content,
         is_support_reply=is_support and ticket_data["user_id"] != user.user_id,
     )
+    if not result:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    return result if is_support else _strip_tags(result)
+
+
+@router.patch("/tickets/{ticket_uuid}/messages/{message_uuid}")
+async def edit_message(
+    ticket_uuid: str,
+    message_uuid: str,
+    body: EditMessageRequest,
+    user: User = Depends(get_current_user),
+):
+    """Edit your own message on a ticket. Authorship is required — even
+    support agents can't rewrite someone else's words."""
+    ticket_data = await support_service.get_ticket(ticket_uuid)
+    if not ticket_data:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    is_support = await _is_support_user(user)
+    if not _can_view_ticket(ticket_data, user, is_support):
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    result, error = await support_service.edit_message(
+        ticket_uuid=ticket_uuid,
+        message_uuid=message_uuid,
+        user=user,
+        content=body.content,
+    )
+    if error:
+        status_code = 404 if "not found" in error.lower() else 403 if "edit your own" in error.lower() else 400
+        raise HTTPException(status_code=status_code, detail=error)
     if not result:
         raise HTTPException(status_code=404, detail="Ticket not found")
     return result if is_support else _strip_tags(result)
@@ -212,7 +264,7 @@ async def add_attachment(
         raise HTTPException(status_code=404, detail="Ticket not found")
 
     is_support = await _is_support_user(user)
-    if ticket_data["user_id"] != user.user_id and not is_support:
+    if not _can_view_ticket(ticket_data, user, is_support):
         raise HTTPException(status_code=403, detail="Not authorized")
 
     file_bytes = await file.read()
@@ -242,7 +294,7 @@ async def download_attachment(
         raise HTTPException(status_code=404, detail="Ticket not found")
 
     is_support = await _is_support_user(user)
-    if ticket_data["user_id"] != user.user_id and not is_support:
+    if not _can_view_ticket(ticket_data, user, is_support):
         raise HTTPException(status_code=403, detail="Not authorized")
 
     data = await support_service.get_attachment_data(ticket_uuid, attachment_uuid)
@@ -296,6 +348,61 @@ async def update_ticket(
     if not result:
         raise HTTPException(status_code=404, detail="Ticket not found")
     return result
+
+
+@router.post("/tickets/{ticket_uuid}/watchers")
+async def add_watcher(
+    ticket_uuid: str,
+    body: AddWatcherRequest,
+    user: User = Depends(get_current_user),
+):
+    """Tag a user (by email) to follow this ticket.
+
+    Owner, support agents, and existing watchers may all add new watchers —
+    if you can read the ticket, you can pull in another collaborator.
+    """
+    ticket_data = await support_service.get_ticket(ticket_uuid)
+    if not ticket_data:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    is_support = await _is_support_user(user)
+    if not _can_view_ticket(ticket_data, user, is_support):
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    result, error = await support_service.add_watcher(
+        ticket_uuid=ticket_uuid,
+        actor=user,
+        email=body.email,
+    )
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+    if not result:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    return result if is_support else _strip_tags(result)
+
+
+@router.delete("/tickets/{ticket_uuid}/watchers/{watcher_user_id}")
+async def remove_watcher(
+    ticket_uuid: str,
+    watcher_user_id: str,
+    user: User = Depends(get_current_user),
+):
+    """Untag a watcher. Owner, support, or the watcher themselves may remove."""
+    ticket_data = await support_service.get_ticket(ticket_uuid)
+    if not ticket_data:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    is_support = await _is_support_user(user)
+    is_owner = ticket_data["user_id"] == user.user_id
+    is_self = user.user_id == watcher_user_id
+    if not (is_support or is_owner or is_self):
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    result = await support_service.remove_watcher(
+        ticket_uuid=ticket_uuid,
+        watcher_user_id=watcher_user_id,
+    )
+    if not result:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    return result if is_support else _strip_tags(result)
 
 
 @router.get("/stats")

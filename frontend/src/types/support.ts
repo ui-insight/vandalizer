@@ -5,6 +5,7 @@ export interface SupportMessage {
   content: string
   is_support_reply: boolean
   created_at: string | null
+  edited_at: string | null
 }
 
 export interface SupportAttachment {
@@ -16,8 +17,17 @@ export interface SupportAttachment {
   created_at: string | null
 }
 
+export interface SupportWatcher {
+  user_id: string
+  name: string
+  email: string | null
+}
+
 export interface SupportTicket {
   uuid: string
+  // Human-friendly sequential id (e.g. 1024). Nullable for any legacy ticket
+  // created before this feature shipped that hasn't been backfilled yet.
+  ticket_number: number | null
   subject: string
   status: 'open' | 'in_progress' | 'closed'
   priority: 'low' | 'normal' | 'high'
@@ -29,6 +39,8 @@ export interface SupportTicket {
   category: string | null
   // Only present for support agents — backend strips this for ticket owners.
   tags?: string[]
+  // Users tagged to follow the ticket. Visible to anyone who can see it.
+  watchers: SupportWatcher[]
   messages: SupportMessage[]
   attachments: SupportAttachment[]
   message_count: number
@@ -39,6 +51,7 @@ export interface SupportTicket {
 
 export interface SupportTicketSummary {
   uuid: string
+  ticket_number: number | null
   subject: string
   status: 'open' | 'in_progress' | 'closed'
   priority: 'low' | 'normal' | 'high'
@@ -48,6 +61,8 @@ export interface SupportTicketSummary {
   category: string | null
   // Only present for support agents — backend strips this for ticket owners.
   tags?: string[]
+  // user_ids of watchers; used to render a "Watching" badge without a detail fetch.
+  watcher_ids: string[]
   message_count: number
   last_message_preview: string | null
   last_message_at: string | null
