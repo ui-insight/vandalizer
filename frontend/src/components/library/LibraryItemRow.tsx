@@ -6,6 +6,7 @@ import {
   Star,
   Copy,
   Share2,
+  Link2,
   Trash2,
   Pencil,
   ShieldCheck,
@@ -16,6 +17,7 @@ import { QualityBadge } from './QualityBadge'
 import { VerificationSubmitModal } from './VerificationSubmitModal'
 import { AuthorChip } from '../shared/AuthorChip'
 import { useAuth } from '../../hooks/useAuth'
+import { useShareLink } from '../../lib/shareLink'
 import { relativeTime } from '../../utils/time'
 import type { LibraryItem, LibraryFolder } from '../../types/library'
 
@@ -37,6 +39,7 @@ interface Props {
 
 export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShare, onRemove, onOpen, onEdit, onMoveToFolder, folders, qualityTier, qualityScore }: Props) {
   const { user } = useAuth()
+  const shareLink = useShareLink()
   const [hovered, setHovered] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [folderSubmenuOpen, setFolderSubmenuOpen] = useState(false)
@@ -307,6 +310,17 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                     />
                   )}
                   <div style={{ borderTop: '1px solid #e0e0e0', margin: '4px 0' }} />
+                  {(item.kind === 'workflow' || item.kind === 'search_set') && (item.item_uuid || item.item_id) && (
+                    <MenuItem
+                      icon={<Link2 size={14} />}
+                      label="Copy share link"
+                      onClick={() => {
+                        const kind = item.kind === 'workflow' ? 'workflow' : 'extraction'
+                        shareLink(kind, (item.item_uuid || item.item_id) as string, item.name)
+                        setMenuOpen(false)
+                      }}
+                    />
+                  )}
                   {scope === 'mine' ? (
                     <>
                       <MenuItem

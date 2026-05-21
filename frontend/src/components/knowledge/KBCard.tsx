@@ -10,12 +10,14 @@ import {
   MessageSquare,
   MoreHorizontal,
   Share2,
+  Link2,
   Send,
   Bookmark,
   Users,
 } from 'lucide-react'
 import type { KnowledgeBase } from '../../types/knowledge'
 import type { Organization } from '../../api/organizations'
+import { useShareLink } from '../../lib/shareLink'
 
 const STATUS_BADGE: Record<string, { label: string; color: string; bg: string }> = {
   empty: { label: 'Empty', color: '#6b7280', bg: '#f3f4f6' },
@@ -46,6 +48,7 @@ export function KBCard({
   const badge = STATUS_BADGE[kb.status] || STATUS_BADGE.empty
   const isReady = kb.status === 'ready'
   const isReference = kb.is_reference
+  const shareLink = useShareLink()
 
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -239,6 +242,16 @@ export function KBCard({
               label={kb.shared_with_team ? 'Unshare from team' : 'Share with team'}
               onClick={() => {
                 onShare(kb)
+                setMenuOpen(false)
+              }}
+            />
+          )}
+          {isReady && (
+            <MenuItem
+              icon={<Link2 size={14} />}
+              label="Copy share link"
+              onClick={() => {
+                shareLink('kb', kb.uuid, kb.title)
                 setMenuOpen(false)
               }}
             />

@@ -265,15 +265,30 @@ function AuthBlock({ config }: { config: AuthConfig | null }) {
 // Landing page
 // ---------------------------------------------------------------------------
 
+function safeNextPath(raw: string | undefined): string | null {
+  if (!raw) return null
+  // Must be a same-origin relative path. Reject protocol-relative (//host)
+  // and absolute URLs to prevent open-redirect.
+  if (!raw.startsWith('/') || raw.startsWith('//')) return null
+  return raw
+}
+
 export default function Landing() {
   const { user, loading, demoExpired, demoFeedbackToken } = useAuth()
   const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null)
   const search = useSearch({ strict: false }) as Record<string, string | undefined>
   const inviteToken = search?.invite_token
+  const nextPath = safeNextPath(search?.next)
 
   useEffect(() => {
     getAuthConfig().then(setAuthConfig)
   }, [])
+
+  useEffect(() => {
+    if (user && !demoExpired && !inviteToken && nextPath) {
+      window.location.replace(nextPath)
+    }
+  }, [user, demoExpired, inviteToken, nextPath])
 
   if (loading) return null
   if (user && demoExpired && demoFeedbackToken) {
@@ -283,6 +298,10 @@ export default function Landing() {
     // If user arrived here with an invite token, redirect to accept it
     if (inviteToken) {
       return <Navigate to="/invite" search={{ token: inviteToken }} />
+    }
+    if (nextPath) {
+      // Effect above is handling the redirect via location.replace — render nothing meanwhile.
+      return null
     }
     return (
       <Navigate

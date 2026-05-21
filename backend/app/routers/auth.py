@@ -169,6 +169,15 @@ async def register(
             detail="Registration failed. Please check your details and try again.",
         )
 
+    if settings.enable_trial_system:
+        from app.services.demo_service import TRIAL_DAYS
+
+        now = datetime.datetime.now(datetime.timezone.utc)
+        user.is_demo_user = True
+        user.demo_expires_at = now + datetime.timedelta(days=TRIAL_DAYS)
+        user.demo_status = "active"
+        await user.save()
+
     # If the user was signing up to accept a team invite, auto-accept it.
     # Only accepts when the registered email matches the invite's recipient
     # email — otherwise silently ignore and let them accept manually later.

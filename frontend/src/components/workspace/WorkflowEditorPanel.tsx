@@ -8,11 +8,12 @@ import {
   ChevronDown, ChevronRight, ArrowUp, ArrowDown,
   Circle, Hand, Keyboard, Sparkles, ShieldCheck, Type,
   ArrowRight, Pause, TrendingUp, RefreshCw,
-  Upload, Clock, Copy, Check, FolderInput,
+  Upload, Clock, Copy, Check, FolderInput, Link2,
 } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
 import { useAuth } from '../../hooks/useAuth'
+import { useShareLink } from '../../lib/shareLink'
 import {
   getWorkflow, addStep, deleteStep, addTask, deleteTask, updateTask,
   updateWorkflow, updateStep, downloadResults, testStep, getTestStepStatus,
@@ -194,6 +195,7 @@ export function WorkflowEditorPanel() {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const { user } = useAuth()
+  const shareLink = useShareLink()
   const { openWorkflowId, openWorkflow, closeWorkflow, consumeWorkflowSession, selectedDocUuids, bumpActivitySignal } = useWorkspace()
   const [workflow, setWorkflow] = useState<Workflow | null>(null)
   const [loading, setLoading] = useState(true)
@@ -569,6 +571,13 @@ export function WorkflowEditorPanel() {
               }
             }}
           />
+          <button
+            onClick={() => shareLink('workflow', workflow.id, workflow.name)}
+            title="Copy share link"
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 4, color: '#5f6368', display: 'flex', flexShrink: 0 }}
+          >
+            <Link2 style={{ width: 18, height: 18 }} />
+          </button>
           <button
             onClick={closeWorkflow}
             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 4, color: '#5f6368', display: 'flex', flexShrink: 0 }}

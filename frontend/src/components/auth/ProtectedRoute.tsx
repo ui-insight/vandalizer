@@ -16,7 +16,16 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     )
   }
 
-  if (!user) return <Navigate to="/landing" search={{ error: undefined, invite_token: undefined, admin: undefined }} />
+  if (!user) {
+    const here = window.location.pathname + window.location.search
+    const next = here && here !== '/' && !here.startsWith('/landing') ? here : undefined
+    return (
+      <Navigate
+        to="/landing"
+        search={{ error: undefined, invite_token: undefined, admin: undefined, next }}
+      />
+    )
+  }
 
   if (demoExpired && demoFeedbackToken) {
     return <Navigate to="/demo/feedback" search={{ token: demoFeedbackToken }} />

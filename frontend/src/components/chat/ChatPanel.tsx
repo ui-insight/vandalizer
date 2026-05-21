@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, type DragEvent } from 'react'
-import { Loader2, BookOpen, X, ArrowDown, ChevronRight, Shield, CheckCircle2, Upload } from 'lucide-react'
+import { Loader2, BookOpen, X, ArrowDown, ChevronRight, Shield, CheckCircle2, Upload, Link2 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
@@ -10,6 +10,7 @@ import { useChat } from '../../hooks/useChat'
 import { useOnboarding } from '../../hooks/useOnboarding'
 import { useWorkspace, type PendingChatMessage } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
+import { useShareLink } from '../../lib/shareLink'
 import { addLink, removeDocument, removeLink, truncateContext, compactContext, clearContext } from '../../api/chat'
 import { uploadFile } from '../../api/files'
 import { convertDocumentsToKB } from '../../api/knowledge'
@@ -84,6 +85,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const { bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, activeKBUuid, activeKBTitle, activateKB, deactivateKB, setCurrentConversationUuid } = useWorkspace()
   const [convertingToKB, setConvertingToKB] = useState(false)
   const { toast } = useToast()
+  const shareLink = useShareLink()
   const { pills: onboardingPills, isFirstSession, loading: onboardingLoading } = useOnboarding()
   // Lock the first-session flag once it's set so remounts/refetches can't
   // flip it mid-conversation (markFirstSessionComplete fires early).
@@ -909,6 +911,21 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         >
           <BookOpen size={14} />
           <span style={{ flex: 1 }}>Knowledge Base: {activeKBTitle}</span>
+          <button
+            onClick={() => shareLink('kb', activeKBUuid, activeKBTitle || undefined)}
+            title="Copy share link"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 2,
+              display: 'flex',
+              color: 'inherit',
+              opacity: 0.7,
+            }}
+          >
+            <Link2 size={14} />
+          </button>
           <button
             onClick={deactivateKB}
             style={{

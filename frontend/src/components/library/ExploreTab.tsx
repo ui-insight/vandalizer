@@ -5,7 +5,7 @@ import { marked } from 'marked'
 import {
   Search, ShieldCheck, BookOpen, Workflow, FileSearch,
   FolderOpen, Star, X, Plus, ArrowUpDown,
-  Bookmark, ArrowLeft, Loader2, Tag, Sparkles, ExternalLink,
+  Bookmark, ArrowLeft, Loader2, Tag, Sparkles, ExternalLink, Link2,
 } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
 import { QualityBadge } from './QualityBadge'
@@ -19,6 +19,7 @@ import { adoptKnowledgeBase } from '../../api/knowledge'
 import type { VerifiedCatalogItem, VerifiedCollection, Library, LibraryItemKind } from '../../types/library'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../contexts/ToastContext'
+import { useShareLink } from '../../lib/shareLink'
 
 marked.setOptions({ breaks: true, gfm: true })
 
@@ -111,6 +112,12 @@ export function ItemDetailModal({
 }) {
   const tierStyle = TIER_STYLES[(item.quality_tier || '') as keyof typeof TIER_STYLES]
   const kindConf = KIND_CONFIG[item.kind as keyof typeof KIND_CONFIG]
+  const shareLink = useShareLink()
+  const shareKind: 'workflow' | 'extraction' | 'kb' | null =
+    item.kind === 'workflow' ? 'workflow'
+    : item.kind === 'search_set' ? 'extraction'
+    : item.kind === 'knowledge_base' ? 'kb'
+    : null
 
   return createPortal(
     <div className="fixed inset-0 z-[9990] flex items-start justify-center pt-[5vh] bg-black/40" onClick={onClose}>
@@ -213,6 +220,16 @@ export function ItemDetailModal({
               >
                 <ExternalLink className="h-4 w-4" />
                 Open
+              </button>
+            )}
+            {shareKind && item.source_uuid && (
+              <button
+                onClick={() => shareLink(shareKind, item.source_uuid!, item.display_name || item.name)}
+                className="ml-auto inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors"
+                title="Copy share link"
+              >
+                <Link2 className="h-4 w-4" />
+                Share
               </button>
             )}
           </div>
