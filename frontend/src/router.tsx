@@ -90,7 +90,7 @@ const loginRoute = createRoute({
 const registerRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/register',
-  component: () => <Navigate to="/landing" search={{ error: undefined, invite_token: undefined, admin: undefined }} />,
+  component: () => <Navigate to="/landing" search={{ error: undefined, invite_token: undefined, admin: undefined, next: undefined }} />,
 })
 
 const resetPasswordRoute = createRoute({
