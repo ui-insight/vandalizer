@@ -270,6 +270,7 @@ class TestKbIngestUrl:
     @patch("app.services.document_manager.get_document_manager")
     @patch("app.tasks.knowledge_base_tasks._get_db")
     def test_successful_url_ingestion(self, mock_get_db, mock_get_dm):
+        from app.services.web_fetcher import WebFetchResult
         from app.tasks.knowledge_base_tasks import kb_ingest_url
 
         db = MagicMock()
@@ -283,12 +284,16 @@ class TestKbIngestUrl:
         mock_dm_instance.add_to_kb.return_value = 7
         mock_get_dm.return_value = mock_dm_instance
 
-        mock_response = MagicMock()
-        mock_response.text = "<html><head><title>Example Page</title></head><body><p>Hello world</p></body></html>"
-        mock_response.raise_for_status = MagicMock()
+        fetched = WebFetchResult(
+            url="https://example.com/page",
+            title="Example Page",
+            text="Hello world",
+            raw_html="<html><body><p>Hello world</p></body></html>",
+            used_browser=False,
+            status_code=200,
+        )
 
-        with patch("httpx.get", return_value=mock_response), \
-             patch("app.utils.url_validation.validate_outbound_url"):
+        with patch("app.services.web_fetcher.fetch_url_sync", return_value=fetched):
             kb_ingest_url("src-uuid")
 
         mock_dm_instance.add_to_kb.assert_called_once()
@@ -304,6 +309,7 @@ class TestKbIngestUrl:
 
     @patch("app.tasks.knowledge_base_tasks._get_db")
     def test_empty_page_content_sets_error(self, mock_get_db):
+        from app.services.web_fetcher import WebFetchResult
         from app.tasks.knowledge_base_tasks import kb_ingest_url
 
         db = MagicMock()
@@ -313,12 +319,16 @@ class TestKbIngestUrl:
         db.knowledge_base_sources.find_one.return_value = source
         db.knowledge_base_sources.find.return_value = [source]
 
-        mock_response = MagicMock()
-        mock_response.text = "<html><body><script>only scripts</script></body></html>"
-        mock_response.raise_for_status = MagicMock()
+        fetched = WebFetchResult(
+            url="https://example.com/empty",
+            title="",
+            text="",  # nothing extractable
+            raw_html="<html><body><script>only scripts</script></body></html>",
+            used_browser=False,
+            status_code=200,
+        )
 
-        with patch("httpx.get", return_value=mock_response), \
-             patch("app.utils.url_validation.validate_outbound_url"):
+        with patch("app.services.web_fetcher.fetch_url_sync", return_value=fetched):
             kb_ingest_url("src-uuid")
 
         calls = db.knowledge_base_sources.update_one.call_args_list
@@ -337,8 +347,8 @@ class TestKbIngestUrl:
         db.knowledge_base_sources.find_one.return_value = source
         db.knowledge_base_sources.find.return_value = [source]
 
-        with patch("httpx.get", side_effect=ConnectionError("Network down")), \
-             patch("app.utils.url_validation.validate_outbound_url"):
+        with patch("app.services.web_fetcher.fetch_url_sync",
+                   side_effect=ConnectionError("Network down")):
             with pytest.raises(ConnectionError, match="Network down"):
                 kb_ingest_url("src-uuid")
 

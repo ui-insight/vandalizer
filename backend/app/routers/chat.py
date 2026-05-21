@@ -9,7 +9,6 @@ from datetime import datetime, timezone
 from typing import Optional
 from urllib.parse import urlparse
 
-import httpx
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
@@ -278,16 +277,16 @@ async def add_link(
     if not conversation or not activity:
         raise HTTPException(status_code=500, detail="Failed to create conversation")
 
-    # Fetch URL content
+    # Fetch URL content — uses trafilatura for main-content extraction and
+    # falls back to a headless Chromium render for JS-only pages (e.g. SPA
+    # policy sites).  Storing extracted text (not raw HTML) keeps the chat
+    # prompt budget from being filled with <head>/script boilerplate.
     try:
-        from app.utils.url_validation import validate_outbound_url
+        from app.services.web_fetcher import fetch_url
 
-        validate_outbound_url(body.link)
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-            resp = await client.get(body.link)
-            resp.raise_for_status()
-            content = resp.text[:500000]
-            title = urlparse(body.link).netloc
+        result = await fetch_url(body.link)
+        content = result.text
+        title = result.title or urlparse(body.link).netloc
     except ValueError as e:
         await activity_service.activity_finish(
             activity.id, status=ActivityStatus.FAILED, error=str(e)

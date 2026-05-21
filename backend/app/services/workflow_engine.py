@@ -533,19 +533,14 @@ class WebsiteNode(Node):
         if not url:
             return {"output": "", "input": inputs.get("output"), "step_name": self.name}
 
-        from app.utils.url_validation import validate_outbound_url
-
-        try:
-            validate_outbound_url(url)
-        except ValueError as e:
-            return {"output": f"Blocked URL: {e}", "input": inputs.get("output"), "step_name": self.name}
+        from app.services.web_fetcher import fetch_url_sync
 
         self.report_progress(f"Fetching {url}")
         try:
-            with httpx.Client(timeout=30, follow_redirects=True) as client:
-                resp = client.get(url)
-                resp.raise_for_status()
-            text = _extract_text_from_html(resp.text)
+            result = fetch_url_sync(url)
+            text = result.text
+        except ValueError as e:
+            text = f"Blocked URL: {e}"
         except httpx.HTTPStatusError as e:
             text = f"HTTP error fetching {url}: {e.response.status_code}"
         except httpx.RequestError as e:

@@ -22,11 +22,21 @@ WORKDIR /app
 
 ENV VIRTUAL_ENV=/app/.venv \
     PATH="/app/.venv/bin:$PATH" \
-    VANDALIZER_VERSION=${VERSION}
+    VANDALIZER_VERSION=${VERSION} \
+    PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
 
 RUN echo "${VERSION}" > /app/VERSION
 
 COPY --from=builder /app/.venv /app/.venv
+
+# Install headless Chromium for the web_fetcher's JS-rendering fallback.
+# ``--with-deps`` pulls in the system libraries Chromium needs (libnss3,
+# libdrm2, libxkbcommon0, libgbm1, libasound2, fontconfig, etc.).  Browsers
+# are written to PLAYWRIGHT_BROWSERS_PATH so they're readable by appuser.
+# Set WEB_FETCHER_BROWSER_ENABLED=false to skip this if you don't need
+# JS-rendered URL ingestion.
+RUN playwright install --with-deps chromium && \
+    chmod -R a+rx /opt/ms-playwright
 
 COPY app ./app
 COPY certification-data ./certification-data

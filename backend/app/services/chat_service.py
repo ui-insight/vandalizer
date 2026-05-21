@@ -226,11 +226,15 @@ async def chat_stream(
     url_attachments = await conversation.get_url_attachments()
     for att in url_attachments:
         if att.content:
+            # Content is already clean extracted text (web_fetcher runs
+            # trafilatura).  Cap at 80K chars (~20K tokens) — enough for a
+            # multi-page policy or article; the budget planner trims further
+            # when prompt space is tight.
             attachment_segments.append(DocumentSegment(
                 label=f"web:{att.title or att.url}",
                 text=(
                     f"\n\n## Web Content: {att.title}\nSource: {att.url}\n\n"
-                    f"{att.content[:10000]}\n"
+                    f"{att.content[:80000]}\n"
                 ),
             ))
 
