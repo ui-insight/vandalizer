@@ -59,6 +59,7 @@ class KBResponse(BaseModel):
     description: Optional[str] = None
     status: str
     shared_with_team: bool = False
+    team_owned: bool = False
     verified: bool = False
     organization_ids: list[str] = []
     total_sources: int = 0

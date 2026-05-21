@@ -18,6 +18,7 @@ import { KnowledgeExplainer } from './KnowledgeExplainer'
 import { ShareWithTeamDialog } from '../library/ShareWithTeamDialog'
 import { useToast } from '../../contexts/ToastContext'
 import { useConfirm } from '../shared/useConfirm'
+import { SharedKBDeleteDialog, type SharedKBDeleteChoice } from '../shared/SharedKBDeleteDialog'
 
 type TabKey = 'mine' | 'team' | 'explore'
 const TABS: { key: TabKey; label: string }[] = [
@@ -44,7 +45,8 @@ export function KnowledgePanel() {
   const { activateKB } = useWorkspace()
   const { user } = useAuth()
   const { toast } = useToast()
-  const { create, remove, refresh } = useKnowledgeBases()
+  const { create, remove, transferToTeam, refresh } = useKnowledgeBases()
+  const [sharedDeleteTarget, setSharedDeleteTarget] = useState<KnowledgeBase | null>(null)
   const confirm = useConfirm()
   const [activeTab, setActiveTab] = useState<TabKey>('mine')
   const [search, setSearch] = useState('')
@@ -168,6 +170,10 @@ export function KnowledgePanel() {
 
   const handleDelete = async (uuid: string) => {
     const kb = scopedMine.knowledgeBases.find((k: KnowledgeBase) => k.uuid === uuid)
+    if (kb?.shared_with_team) {
+      setSharedDeleteTarget(kb)
+      return
+    }
     const ok = await confirm({
       title: 'Delete knowledge base?',
       message: (
@@ -186,6 +192,26 @@ export function KnowledgePanel() {
     } catch (err) {
       console.error('Failed to delete KB:', err)
       toast(err instanceof Error ? err.message : 'Failed to delete knowledge base', 'error')
+    }
+  }
+
+  const handleSharedDeleteChoice = async (choice: SharedKBDeleteChoice) => {
+    const kb = sharedDeleteTarget
+    if (!kb) return
+    try {
+      if (choice === 'transfer') {
+        await transferToTeam(kb.uuid)
+        if (selectedKB?.uuid === kb.uuid) setSelectedKB(null)
+        toast('Moved to Team Library', 'success')
+      } else {
+        await remove(kb.uuid, 'unshare_and_delete')
+        if (selectedKB?.uuid === kb.uuid) setSelectedKB(null)
+        toast('Knowledge base deleted', 'success')
+      }
+      setSharedDeleteTarget(null)
+    } catch (err) {
+      console.error('Failed to delete/transfer KB:', err)
+      toast(err instanceof Error ? err.message : 'Operation failed', 'error')
     }
   }
 
@@ -958,6 +984,12 @@ export function KnowledgePanel() {
 
       {shareDialogJSX}
       {verifyModalJSX}
+      <SharedKBDeleteDialog
+        open={!!sharedDeleteTarget}
+        kbTitle={sharedDeleteTarget?.title ?? ''}
+        onCancel={() => setSharedDeleteTarget(null)}
+        onChoose={handleSharedDeleteChoice}
+      />
       </>
     )
   }
@@ -1185,6 +1217,12 @@ export function KnowledgePanel() {
     )}
     {shareDialogJSX}
     {verifyModalJSX}
+    <SharedKBDeleteDialog
+      open={!!sharedDeleteTarget}
+      kbTitle={sharedDeleteTarget?.title ?? ''}
+      onCancel={() => setSharedDeleteTarget(null)}
+      onChoose={handleSharedDeleteChoice}
+    />
     </>
   )
 }

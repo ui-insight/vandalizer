@@ -76,6 +76,7 @@ class KnowledgeBase(Document):
     user_id: str
     team_id: Optional[str] = None
     shared_with_team: bool = False
+    team_owned: bool = False
     verified: bool = False
     organization_ids: list[str] = Field(default_factory=list)  # Org UUIDs for visibility scoping
     status: str = "empty"  # empty | building | ready | error

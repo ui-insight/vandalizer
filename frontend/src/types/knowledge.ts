@@ -6,6 +6,7 @@ export interface KnowledgeBase {
   description: string
   status: 'empty' | 'building' | 'ready' | 'error'
   shared_with_team: boolean
+  team_owned: boolean
   verified: boolean
   organization_ids: string[]
   team_id: string | null
