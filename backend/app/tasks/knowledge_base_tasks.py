@@ -168,22 +168,13 @@ def kb_ingest_url(self, source_uuid: str) -> None:
             _recalculate_kb(db, kb_uuid)
             return
 
-        # Fetch URL content
-        from bs4 import BeautifulSoup
-        from app.utils.url_validation import validate_outbound_url
+        # Fetch URL content via the shared web_fetcher (trafilatura + Playwright
+        # fallback for JS-rendered pages).
+        from app.services.web_fetcher import fetch_url_sync
 
-        validate_outbound_url(url)  # raises ValueError for internal/private URLs
-        resp = httpx.get(url, timeout=30.0, follow_redirects=True)
-        resp.raise_for_status()
-
-        soup = BeautifulSoup(resp.text, "html.parser")
-
-        # Remove non-content elements
-        for tag in soup(["script", "style", "nav", "footer", "header", "form"]):
-            tag.decompose()
-
-        raw_text = soup.get_text(separator="\n", strip=True)
-        url_title = soup.title.string if soup.title else ""
+        result = fetch_url_sync(url)  # raises ValueError for blocked URLs
+        raw_text = result.text
+        url_title = result.title
 
         if not raw_text.strip():
             db.knowledge_base_sources.update_one(

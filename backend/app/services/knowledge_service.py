@@ -892,28 +892,6 @@ async def _ingest_document_source(source: KnowledgeBaseSource, kb: KnowledgeBase
         await source.save()
 
 
-def _extract_text_from_html(html: str) -> str:
-    """Extract clean text from HTML using BeautifulSoup."""
-    soup = BeautifulSoup(html, "html.parser")
-    # Remove non-content elements
-    for tag in soup.find_all(["script", "style", "nav", "footer", "header", "aside", "form"]):
-        tag.decompose()
-    text = soup.get_text(separator="\n")
-    # Clean up whitespace
-    text = re.sub(r"[ \t]+", " ", text)
-    text = re.sub(r"\n{3,}", "\n\n", text)
-    return text.strip()
-
-
-def _extract_title_from_html(html: str, url: str) -> str:
-    """Extract page title from HTML."""
-    soup = BeautifulSoup(html, "html.parser")
-    if soup.title and soup.title.string:
-        return soup.title.string.strip()[:200]
-    from urllib.parse import urlparse
-    return urlparse(url).netloc
-
-
 async def _ingest_url_source(
     source: KnowledgeBaseSource, kb: KnowledgeBase,
 ) -> str | None:
@@ -921,15 +899,12 @@ async def _ingest_url_source(
     source.status = "processing"
     await source.save()
     try:
-        from app.utils.url_validation import validate_outbound_url
+        from app.services.web_fetcher import fetch_url
 
-        validate_outbound_url(source.url)
-        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
-            resp = await client.get(source.url)
-            resp.raise_for_status()
-            raw_html = resp.text[:500000]
+        result = await fetch_url(source.url)
+        raw_html = result.raw_html or ""
+        raw_text = result.text
 
-        raw_text = _extract_text_from_html(raw_html)
         if not raw_text.strip():
             source.status = "error"
             source.error_message = "Failed to extract text from URL"
@@ -937,7 +912,7 @@ async def _ingest_url_source(
             return None
 
         source.content = raw_text[:500000]
-        source.url_title = _extract_title_from_html(raw_html, source.url)
+        source.url_title = result.title
 
         dm = _get_dm()
         chunk_count = await asyncio.to_thread(
