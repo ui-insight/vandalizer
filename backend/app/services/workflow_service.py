@@ -22,7 +22,6 @@ from app.models.workflow import (
 )
 from app.services.access_control import (
     can_manage_workflow,
-    can_view_workflow,
     get_authorized_document,
     get_authorized_workflow,
     get_team_access_context,
@@ -506,12 +505,10 @@ async def _get_authorized_workflow_result(
     if not result or not result.workflow:
         return None
 
-    workflow = await Workflow.get(result.workflow)
+    # Use the library-aware authorizer so users can poll status for verified
+    # workflows they launched from the library but don't own / aren't on the team for.
+    workflow = await get_authorized_workflow(str(result.workflow), user)
     if not workflow:
-        return None
-
-    team_access = await get_team_access_context(user)
-    if not can_view_workflow(workflow, user, team_access):
         return None
 
     return result
@@ -634,11 +631,10 @@ async def get_batch_status(batch_id: str, user: User | None = None) -> dict | No
         first = results[0]
         if not first.workflow:
             return None
-        workflow = await Workflow.get(first.workflow)
+        # Library-aware: also allows batch status polling for verified workflows
+        # launched from the library (matches /run authorization).
+        workflow = await get_authorized_workflow(str(first.workflow), user)
         if not workflow:
-            return None
-        team_access = await get_team_access_context(user)
-        if not can_view_workflow(workflow, user, team_access):
             return None
 
     total = len(results)
