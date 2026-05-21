@@ -31,6 +31,26 @@ export function csrfHeaders(extra: Record<string, string> = {}): Record<string, 
   return headers
 }
 
+// Self-heal stale tabs whose CSRF cookie/header pairing is broken (old SPA
+// bundle still in cache, browser extension stripping the cookie, etc.).
+// A reload pulls a fresh index.html (which nginx serves with no-cache), the
+// current hashed JS bundle, and gives the backend another chance to set the
+// modern cookie. Guarded by a per-tab sessionStorage flag so a persistent
+// failure surfaces as the original error instead of an infinite reload loop.
+const CSRF_RELOAD_FLAG = 'vandalizer:csrf-reload-attempted'
+
+function attemptCsrfSelfHeal(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    if (window.sessionStorage.getItem(CSRF_RELOAD_FLAG)) return false
+    window.sessionStorage.setItem(CSRF_RELOAD_FLAG, '1')
+  } catch {
+    return false
+  }
+  window.location.reload()
+  return true
+}
+
 async function refreshToken(): Promise<boolean> {
   const res = await fetch('/api/auth/refresh', {
     method: 'POST',
@@ -98,6 +118,9 @@ export async function apiFetch<T>(
     const body = await res.json().catch(() => ({ detail: 'Forbidden' }))
     if (body.detail === 'DEMO_EXPIRED') {
       throw new ApiError(403, 'DEMO_EXPIRED')
+    }
+    if (body.detail === 'CSRF validation failed' && attemptCsrfSelfHeal()) {
+      throw new ApiError(403, 'CSRF validation failed (reloading)')
     }
     throw new ApiError(403, body.detail || 'Forbidden')
   }

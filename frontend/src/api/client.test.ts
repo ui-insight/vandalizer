@@ -17,6 +17,7 @@ beforeEach(() => {
   // Clear both legacy and modern cookies
   document.cookie = 'csrf_token=; max-age=0'
   document.cookie = '__Host-csrf_token=; max-age=0'
+  window.sessionStorage.clear()
 })
 
 afterEach(() => {
@@ -119,6 +120,42 @@ describe('apiFetch', () => {
       expect((err as ApiError).status).toBe(403)
       expect((err as ApiError).message).toBe('DEMO_EXPIRED')
     }
+  })
+
+  it('reloads the page once on 403 CSRF validation failed', async () => {
+    const reloadSpy = vi.fn()
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...window.location, reload: reloadSpy },
+    })
+
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ detail: 'CSRF validation failed' }, 403),
+    )
+
+    await expect(apiFetch('/api/test')).rejects.toThrow(
+      'CSRF validation failed (reloading)',
+    )
+    expect(reloadSpy).toHaveBeenCalledTimes(1)
+    expect(window.sessionStorage.getItem('vandalizer:csrf-reload-attempted')).toBe('1')
+  })
+
+  it('does not reload twice in a row on repeated CSRF failures', async () => {
+    const reloadSpy = vi.fn()
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...window.location, reload: reloadSpy },
+    })
+
+    // Simulate a previous reload attempt already burned this session's budget
+    window.sessionStorage.setItem('vandalizer:csrf-reload-attempted', '1')
+
+    mockFetch.mockResolvedValueOnce(
+      jsonResponse({ detail: 'CSRF validation failed' }, 403),
+    )
+
+    await expect(apiFetch('/api/test')).rejects.toThrow('CSRF validation failed')
+    expect(reloadSpy).not.toHaveBeenCalled()
   })
 
   it('throws ApiError on other error status codes', async () => {
