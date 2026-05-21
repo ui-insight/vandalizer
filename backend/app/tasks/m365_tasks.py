@@ -75,10 +75,20 @@ def _save_attachment_as_document(
 
 
 def _trigger_text_extraction(doc: dict) -> None:
-    """Kick off the document extraction pipeline."""
+    """Kick off the full document processing pipeline.
+
+    Uses dispatch_upload_tasks so the extraction → update chain runs and
+    task_status advances to "complete"; calling perform_extraction_and_update
+    on its own leaves docs stranded in task_status="extracting".
+    """
     try:
-        from app.tasks.document_tasks import perform_extraction_and_update
-        perform_extraction_and_update.delay(doc["uuid"], doc.get("extension", ""))
+        from app.tasks.upload_tasks import dispatch_upload_tasks
+        dispatch_upload_tasks(
+            document_uuid=doc["uuid"],
+            extension=doc.get("extension", ""),
+            document_path=doc.get("path", ""),
+            user_id=doc.get("user_id", ""),
+        )
     except Exception:
         logger.warning("Could not queue text extraction for doc %s", doc.get("uuid"))
 

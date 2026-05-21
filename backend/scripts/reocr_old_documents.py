@@ -67,13 +67,21 @@ async def main(days: int, dry_run: bool, limit: int | None, all_types: bool) -> 
         return
 
     # Import here so dry-run doesn't require Celery broker connectivity.
-    from app.tasks.document_tasks import perform_extraction_and_update
+    from app.tasks.upload_tasks import dispatch_upload_tasks
 
     dispatched = 0
     failed = 0
     for doc in docs:
         try:
-            perform_extraction_and_update.delay(doc.uuid, doc.extension or "")
+            # Use the full pipeline (extraction | update, plus semantic
+            # ingestion / classification / validation) — calling extraction
+            # alone strands docs in task_status="extracting".
+            dispatch_upload_tasks(
+                document_uuid=doc.uuid,
+                extension=doc.extension or "",
+                document_path=doc.path,
+                user_id=doc.user_id,
+            )
             dispatched += 1
             if dispatched % 50 == 0:
                 logger.info("  Dispatched %d/%d...", dispatched, len(docs))

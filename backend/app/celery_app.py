@@ -99,6 +99,11 @@ celery.conf.beat_schedule = {
         "task": "tasks.activity.reap_stale_running",
         "schedule": 120.0,  # every 2 minutes
     },
+    # Self-heal documents whose task_status got stranded in an in-progress stage
+    "document-reap-stuck": {
+        "task": "tasks.document.reap_stuck",
+        "schedule": 300.0,  # every 5 minutes
+    },
     # User engagement
     "engagement-onboarding-drips": {
         "task": "tasks.engagement.process_onboarding_drips",

@@ -523,3 +523,42 @@ def perform_semantic_ingestion(self, raw_text: str, document_uuid: str, user_id:
     )
 
     return document_uuid
+
+
+# In-progress task_status values. A doc with one of these stages but
+# processing=False has finished extraction without the chain advancing it —
+# usually because a caller dispatched extraction without chaining update.
+_IN_PROGRESS_TASK_STATUSES = ["layout", "extracting", "ocr", "security", "readying"]
+
+
+@celery_app.task(bind=True, name="tasks.document.reap_stuck")
+def reap_stuck_documents(self) -> None:
+    """Self-heal documents whose task_status is stuck in an in-progress stage.
+
+    Failure mode this handles: extraction finished (processing=False, raw_text
+    populated) but task_status never advanced to "complete" because the caller
+    dispatched the extraction task without chaining update_document_fields.
+    The frontend then shows these docs as "Reading text…" indefinitely.
+
+    Acts as a backstop against pipeline-chaining bugs; the fix in the caller
+    is still preferred.
+    """
+    db = get_sync_db()
+
+    orphans = list(db.smart_document.find(
+        {
+            "processing": False,
+            "task_status": {"$in": _IN_PROGRESS_TASK_STATUSES},
+            "soft_deleted": {"$ne": True},
+            "raw_text": {"$ne": ""},
+        },
+        {"uuid": 1},
+    ))
+
+    if not orphans:
+        return
+
+    for doc in orphans:
+        update_document_fields.delay(doc["uuid"])
+
+    logger.info("Reaped %d stuck document(s) — dispatched update step", len(orphans))
