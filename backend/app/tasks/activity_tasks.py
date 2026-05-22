@@ -113,8 +113,30 @@ def generate_activity_description_task(
         activity_id, activity_type,
     )
 
+    db = _get_db()
+
+    # Mark the title-generation attempt as complete on every exit path so the
+    # activity rail stops shimmering "Generating title…" and falls back to the
+    # activity's original title (workflow name / extraction set name). Without
+    # this, any early return below leaves the UI stuck on the shimmer until a
+    # 2-minute client-side fallback fires.
+    def _mark_done(description: str | None = None) -> None:
+        try:
+            update: dict = {"meta_summary.description_generated": True}
+            if description:
+                update["meta_summary.ai_description"] = description
+                update["title"] = description
+            db.activity_event.update_one(
+                {"_id": ObjectId(activity_id)},
+                {"$set": update},
+            )
+        except Exception:
+            logger.exception(
+                "Failed to mark description_generated for activity %s",
+                activity_id,
+            )
+
     try:
-        db = _get_db()
         activity = db.activity_event.find_one({"_id": ObjectId(activity_id)})
         if not activity:
             logger.warning("Activity %s not found", activity_id)
@@ -148,6 +170,7 @@ def generate_activity_description_task(
                             document_text = combined
             if not document_text.strip():
                 logger.info("No text context found for activity %s", activity_id)
+                _mark_done()
                 return
 
         # Build context based on activity type
@@ -199,6 +222,7 @@ def generate_activity_description_task(
 
         if not model_name:
             logger.warning("No model available for description generation")
+            _mark_done()
             return
 
         # Build prompt
@@ -240,17 +264,10 @@ def generate_activity_description_task(
                 "Empty title from model %s for activity %s (raw=%r)",
                 model_name, activity_id, result.output[:200],
             )
+            _mark_done()
             return
 
-        # Update activity
-        meta_summary = activity.get("meta_summary", {}) or {}
-        meta_summary["ai_description"] = description
-        meta_summary["description_generated"] = True
-
-        db.activity_event.update_one(
-            {"_id": ObjectId(activity_id)},
-            {"$set": {"title": description, "meta_summary": meta_summary}},
-        )
+        _mark_done(description=description)
 
         logger.info(
             "Updated activity %s with title %r (model=%s)",
@@ -259,6 +276,7 @@ def generate_activity_description_task(
 
     except Exception as e:
         logger.error("Error generating description for activity %s: %s", activity_id, e, exc_info=True)
+        _mark_done()
 
 
 @celery_app.task(bind=True, name="tasks.activity.reap_stale_running")
