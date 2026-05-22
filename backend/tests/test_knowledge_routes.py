@@ -273,6 +273,7 @@ def _mock_source(**overrides):
     s.document_uuid = overrides.get("document_uuid", "doc-1")
     s.url = overrides.get("url", None)
     s.url_title = overrides.get("url_title", None)
+    s.custom_name = overrides.get("custom_name", None)
     s.status = overrides.get("status", "ready")
     s.error_message = overrides.get("error_message", None)
     s.chunk_count = overrides.get("chunk_count", 50)
@@ -717,6 +718,65 @@ class TestKnowledgeDocSources:
 
             resp = await client.delete(
                 "/api/knowledge/kb-uuid-1/source/src-1",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_update_source_sets_custom_name(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+        renamed = _mock_source(custom_name="Friendly Label")
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.routers.knowledge._lookup_document_titles", new_callable=AsyncMock) as mock_titles,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+            mock_svc.update_source_name = AsyncMock(return_value=renamed)
+            mock_titles.return_value = {"doc-1": "Original.pdf"}
+
+            resp = await client.patch(
+                "/api/knowledge/kb-uuid-1/source/src-uuid-1",
+                json={"custom_name": "Friendly Label"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["custom_name"] == "Friendly Label"
+        assert body["document_title"] == "Original.pdf"
+        mock_svc.update_source_name.assert_awaited_once_with(kb, "src-uuid-1", "Friendly Label")
+
+    @pytest.mark.asyncio
+    async def test_update_source_not_found(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+            mock_svc.update_source_name = AsyncMock(return_value=None)
+
+            resp = await client.patch(
+                "/api/knowledge/kb-uuid-1/source/ghost",
+                json={"custom_name": "x"},
                 cookies=cookies,
                 headers=headers,
             )

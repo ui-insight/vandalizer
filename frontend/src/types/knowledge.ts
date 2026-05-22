@@ -31,6 +31,7 @@ export interface KnowledgeBaseSource {
   document_title?: string
   url?: string
   url_title?: string
+  custom_name?: string | null
   status: 'pending' | 'processing' | 'ready' | 'error'
   error_message?: string
   chunk_count: number

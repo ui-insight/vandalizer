@@ -265,6 +265,63 @@ export function KnowledgePanel() {
     }
   }
 
+  const [renamingSourceUuid, setRenamingSourceUuid] = useState<string | null>(null)
+  const [renameDraft, setRenameDraft] = useState('')
+  const [savingRename, setSavingRename] = useState(false)
+
+  const beginRenameSource = (source: KnowledgeBaseSource) => {
+    const current =
+      source.custom_name
+      || (source.source_type === 'url' ? (source.url_title || source.url || '') : (source.document_title || ''))
+    setRenamingSourceUuid(source.uuid)
+    setRenameDraft(current || '')
+  }
+
+  const cancelRenameSource = () => {
+    setRenamingSourceUuid(null)
+    setRenameDraft('')
+    setSavingRename(false)
+  }
+
+  const handleRenameSource = async () => {
+    if (!selectedKB || !renamingSourceUuid) return
+    const sourceUuid = renamingSourceUuid
+    const current = selectedKB.sources.find(s => s.uuid === sourceUuid)
+    const previous = current?.custom_name || ''
+    const next = renameDraft.trim()
+    if (next === previous) {
+      cancelRenameSource()
+      return
+    }
+    setSavingRename(true)
+    // Optimistic update so the row reflects the new name immediately
+    setSelectedKB(prev => prev ? {
+      ...prev,
+      sources: prev.sources.map(s => s.uuid === sourceUuid ? { ...s, custom_name: next || null } : s),
+    } : prev)
+    try {
+      const updated = await api.renameKBSource(selectedKB.uuid, sourceUuid, next)
+      setSelectedKB(prev => prev ? {
+        ...prev,
+        sources: prev.sources.map(s => s.uuid === sourceUuid ? {
+          ...s,
+          custom_name: updated.custom_name ?? null,
+        } : s),
+      } : prev)
+      toast(next ? 'Source renamed' : 'Custom name cleared', 'success')
+    } catch (err) {
+      console.error('Failed to rename source:', err)
+      toast(err instanceof Error ? err.message : 'Failed to rename source', 'error')
+      // Revert on failure
+      setSelectedKB(prev => prev ? {
+        ...prev,
+        sources: prev.sources.map(s => s.uuid === sourceUuid ? { ...s, custom_name: previous || null } : s),
+      } : prev)
+    } finally {
+      cancelRenameSource()
+    }
+  }
+
   const handleChat = () => {
     if (!selectedKB) return
     activateKB(selectedKB.uuid, selectedKB.title)
@@ -817,6 +874,11 @@ export function KnowledgePanel() {
                 {selectedKB.sources.map((source: KnowledgeBaseSource) => {
                   const st = SOURCE_STATUS[source.status] || SOURCE_STATUS.pending
                   const StatusIcon = st.icon
+                  const autoLabel = source.source_type === 'url'
+                    ? (source.url_title || source.url || '')
+                    : (source.document_title || source.document_uuid || '')
+                  const displayLabel = source.custom_name || autoLabel
+                  const isRenaming = renamingSourceUuid === source.uuid
                   return (
                     <div
                       key={source.uuid}
@@ -832,34 +894,91 @@ export function KnowledgePanel() {
                         <Globe size={14} style={{ color: '#888', flexShrink: 0 }} />
                       )}
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div
-                          style={{ fontSize: 12, color: '#e5e5e5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                          title={source.source_type === 'url' ? (source.url || '') : (source.document_uuid || '')}
-                        >
-                          {source.source_type === 'url'
-                            ? (source.url_title || source.url)
-                            : (source.document_title || source.document_uuid)}
-                        </div>
-                        {source.error_message && (
+                        {isRenaming ? (
+                          <input
+                            autoFocus
+                            value={renameDraft}
+                            onChange={e => setRenameDraft(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') { e.preventDefault(); handleRenameSource() }
+                              else if (e.key === 'Escape') { e.preventDefault(); cancelRenameSource() }
+                            }}
+                            placeholder={autoLabel || 'Custom name'}
+                            maxLength={300}
+                            disabled={savingRename}
+                            style={{
+                              width: '100%', fontSize: 12, color: '#e5e5e5',
+                              backgroundColor: '#1f1f1f', border: '1px solid #4a4a4a',
+                              borderRadius: 4, padding: '4px 6px', fontFamily: 'inherit',
+                              outline: 'none',
+                            }}
+                          />
+                        ) : (
+                          <div
+                            style={{ fontSize: 12, color: '#e5e5e5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                            title={source.custom_name
+                              ? `${displayLabel} — original: ${autoLabel || (source.source_type === 'url' ? source.url : source.document_uuid) || ''}`
+                              : (source.source_type === 'url' ? (source.url || '') : (source.document_uuid || ''))}
+                          >
+                            {displayLabel}
+                            {source.custom_name && autoLabel && autoLabel !== source.custom_name && (
+                              <span style={{ color: '#888', marginLeft: 6, fontStyle: 'italic' }}>
+                                · {autoLabel}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {!isRenaming && source.error_message && (
                           <div style={{ fontSize: 11, color: '#ef4444', marginTop: 2 }}>{source.error_message}</div>
                         )}
-                        {source.status === 'ready' && (
+                        {!isRenaming && source.status === 'ready' && (
                           <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>{source.chunk_count} chunks</div>
                         )}
                       </div>
-                      <StatusIcon
-                        size={14}
-                        style={{
-                          color: st.color, flexShrink: 0,
-                          ...(source.status === 'processing' || source.status === 'pending' ? { animation: 'spin 1s linear infinite' } : {}),
-                        }}
-                      />
-                      <button
-                        onClick={() => handleRemoveSource(source.uuid)}
-                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }}
-                      >
-                        <X size={12} style={{ color: '#666' }} />
-                      </button>
+                      {isRenaming ? (
+                        <>
+                          <button
+                            onClick={handleRenameSource}
+                            disabled={savingRename}
+                            title="Save name"
+                            style={{ background: 'transparent', border: 'none', cursor: savingRename ? 'default' : 'pointer', padding: 2, display: 'flex' }}
+                          >
+                            <Check size={14} style={{ color: '#22c55e' }} />
+                          </button>
+                          <button
+                            onClick={cancelRenameSource}
+                            disabled={savingRename}
+                            title="Cancel"
+                            style={{ background: 'transparent', border: 'none', cursor: savingRename ? 'default' : 'pointer', padding: 2, display: 'flex' }}
+                          >
+                            <X size={14} style={{ color: '#888' }} />
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <StatusIcon
+                            size={14}
+                            style={{
+                              color: st.color, flexShrink: 0,
+                              ...(source.status === 'processing' || source.status === 'pending' ? { animation: 'spin 1s linear infinite' } : {}),
+                            }}
+                          />
+                          <button
+                            onClick={() => beginRenameSource(source)}
+                            title={source.custom_name ? 'Rename (or clear to revert to original)' : 'Rename source'}
+                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }}
+                          >
+                            <Pencil size={12} style={{ color: '#888' }} />
+                          </button>
+                          <button
+                            onClick={() => handleRemoveSource(source.uuid)}
+                            title="Remove source"
+                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }}
+                          >
+                            <X size={12} style={{ color: '#666' }} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   )
                 })}

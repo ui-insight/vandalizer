@@ -384,3 +384,28 @@ class DocumentManager:
             collection.delete(where={"source_id": source_id})
         except Exception as e:
             logger.error(f"Error deleting KB source {source_id}: {e}")
+
+    def rename_kb_source(self, kb_uuid: str, source_id: str, new_name: str) -> None:
+        """Rewrite source_name on every chunk for this source.
+
+        Keeps retrieval citations in sync with the user-facing label.
+        """
+        try:
+            collection = self.get_kb_collection(kb_uuid)
+            existing = collection.get(where={"source_id": source_id})
+        except Exception as e:
+            logger.error(f"Error reading KB source {source_id} for rename: {e}")
+            return
+        ids = existing.get("ids") or []
+        metadatas = existing.get("metadatas") or []
+        if not ids:
+            return
+        updated: list[dict] = []
+        for meta in metadatas:
+            m = dict(meta or {})
+            m["source_name"] = new_name
+            updated.append(m)
+        try:
+            collection.update(ids=ids, metadatas=updated)
+        except Exception as e:
+            logger.error(f"Error updating KB source {source_id} metadata: {e}")

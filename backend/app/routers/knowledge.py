@@ -25,6 +25,7 @@ from app.schemas.knowledge import (
     KBStatusResponse,
     ShareKBRequest,
     UpdateKBRequest,
+    UpdateSourceRequest,
 )
 from app.services import knowledge_service as svc
 
@@ -85,6 +86,7 @@ def _source_response(s, document_title: str | None = None) -> KBSourceResponse:
         document_title=document_title,
         url=s.url,
         url_title=s.url_title or "",
+        custom_name=s.custom_name,
         status=s.status,
         error_message=s.error_message or "",
         chunk_count=s.chunk_count,
@@ -424,6 +426,35 @@ async def add_urls(request: Request, uuid: str, req: AddUrlsRequest, user: User 
         allowed_domains=req.allowed_domains,
     )
     return {"ok": True, "added": added}
+
+
+@router.patch("/{uuid}/source/{source_uuid}", response_model=KBSourceResponse)
+async def update_source(
+    uuid: str,
+    source_uuid: str,
+    req: UpdateSourceRequest,
+    user: User = Depends(get_current_user),
+):
+    """Rename a single source within a KB.
+
+    Send ``custom_name`` to set a user-facing label; send an empty string to
+    clear the override and revert to the auto-derived title.
+    """
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(
+        uuid,
+        user,
+        manage=True,
+        user_org_ancestry=user_org_ancestry,
+        allow_admin=True,
+    )
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    source = await svc.update_source_name(kb, source_uuid, req.custom_name)
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+    titles = await _lookup_document_titles([source])
+    return _source_response(source, titles.get(source.document_uuid or ""))
 
 
 @router.delete("/{uuid}/source/{source_uuid}")

@@ -17,6 +17,7 @@ class KnowledgeBaseSource(Document):
     document_uuid: Optional[str] = None
     url: Optional[str] = None
     url_title: Optional[str] = None
+    custom_name: Optional[str] = None  # user-provided label; overrides auto-derived title
     content: Optional[str] = None
     status: str = "pending"  # pending | processing | ready | error
     error_message: Optional[str] = None

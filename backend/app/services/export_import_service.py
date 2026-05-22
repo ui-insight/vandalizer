@@ -519,6 +519,7 @@ async def export_knowledge_base(kb_uuid: str, user_email: str) -> dict:
             "source_type": src.source_type,
             "url": src.url,
             "url_title": src.url_title,
+            "custom_name": src.custom_name,
             "document_uuid": src.document_uuid,
             "content": (src.content or "")[:100000],  # Truncate for export
         }
@@ -562,6 +563,7 @@ async def import_knowledge_base(
             source_type=src_data.get("source_type", "url"),
             url=src_data.get("url"),
             url_title=src_data.get("url_title"),
+            custom_name=src_data.get("custom_name"),
             document_uuid=src_data.get("document_uuid"),
             content=src_data.get("content"),
         )
@@ -575,7 +577,7 @@ async def import_knowledge_base(
             try:
                 chunk_count = await asyncio.to_thread(
                     dm.add_to_kb, kb.uuid, src.uuid,
-                    src.url_title or src.url or "Imported", src.content,
+                    src.custom_name or src.url_title or src.url or "Imported", src.content,
                 )
                 src.chunk_count = chunk_count
                 src.status = "ready"

@@ -439,6 +439,53 @@ async def add_urls(
     return added
 
 
+async def update_source_name(
+    kb: KnowledgeBase,
+    source_uuid: str,
+    custom_name: str | None,
+) -> KnowledgeBaseSource | None:
+    """Set or clear the user-provided label on a single KB source.
+
+    Pass an empty string or None to clear the custom name and fall back to the
+    auto-derived title (document title / url_title / url). Also rewrites the
+    ``source_name`` field on every chunk in ChromaDB so retrieval citations
+    reflect the new label.
+    """
+    source = await KnowledgeBaseSource.find_one(
+        KnowledgeBaseSource.uuid == source_uuid,
+        KnowledgeBaseSource.knowledge_base_uuid == kb.uuid,
+    )
+    if not source:
+        return None
+
+    cleaned = (custom_name or "").strip()
+    source.custom_name = cleaned[:300] if cleaned else None
+    await source.save()
+
+    # Compute the effective display name and sync it into ChromaDB metadata so
+    # retrieval cites the user's chosen label.
+    effective = source.custom_name
+    if not effective:
+        if source.source_type == "url":
+            effective = source.url_title or source.url or "Unknown"
+        else:
+            doc_title = None
+            if source.document_uuid:
+                doc = await SmartDocument.find_one(SmartDocument.uuid == source.document_uuid)
+                if doc:
+                    doc_title = doc.title
+            effective = doc_title or source.document_uuid or "Unknown"
+
+    if source.status == "ready":
+        try:
+            dm = _get_dm()
+            await asyncio.to_thread(dm.rename_kb_source, kb.uuid, source.uuid, effective)
+        except Exception as e:
+            logger.error(f"Error renaming KB source {source.uuid} in ChromaDB: {e}")
+
+    return source
+
+
 async def remove_source(kb: KnowledgeBase, source_uuid: str) -> bool:
     source = await KnowledgeBaseSource.find_one(
         KnowledgeBaseSource.uuid == source_uuid,
@@ -489,6 +536,7 @@ async def clone_knowledge_base(
             document_uuid=src.document_uuid,
             url=src.url,
             url_title=src.url_title,
+            custom_name=src.custom_name,
             content=src.content,  # Copy cached content for URLs
         )
         await new_src.insert()
@@ -501,7 +549,7 @@ async def clone_knowledge_base(
             try:
                 chunk_count = await asyncio.to_thread(
                     dm.add_to_kb, clone.uuid, new_src.uuid,
-                    new_src.url_title or new_src.url or "Unknown", src.content,
+                    new_src.custom_name or new_src.url_title or new_src.url or "Unknown", src.content,
                 )
                 new_src.chunk_count = chunk_count
                 new_src.status = "ready"
@@ -824,6 +872,7 @@ async def export_knowledge_base(kb: KnowledgeBase) -> dict:
             "document_title": document_title,
             "url": s.url,
             "url_title": s.url_title,
+            "custom_name": s.custom_name,
             "content": content,
             "crawl_enabled": s.crawl_enabled,
             "max_crawl_pages": s.max_crawl_pages,
@@ -878,6 +927,7 @@ async def import_knowledge_base(
             document_uuid=src.get("document_uuid"),
             url=(src.get("url") or None),
             url_title=src.get("url_title"),
+            custom_name=src.get("custom_name"),
             content=content,
             crawl_enabled=bool(src.get("crawl_enabled", False)),
             max_crawl_pages=int(src.get("max_crawl_pages") or 5),
@@ -889,7 +939,8 @@ async def import_knowledge_base(
 
         if content and content.strip():
             label = (
-                src.get("document_title")
+                new_src.custom_name
+                or src.get("document_title")
                 or new_src.url_title
                 or new_src.url
                 or "Imported Source"
