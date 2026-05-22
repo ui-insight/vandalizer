@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload, HelpCircle } from 'lucide-react'
+import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload, HelpCircle, Pencil } from 'lucide-react'
 import { useKnowledgeBases, useScopedKnowledgeBases } from '../../hooks/useKnowledgeBases'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useAuth } from '../../hooks/useAuth'
@@ -570,17 +570,29 @@ export function KnowledgePanel() {
               </button>
             </form>
           ) : (
-            <span
-              onClick={() => { setTitleDraft(selectedKB.title); setEditingTitle(true) }}
-              title="Click to rename"
-              style={{
-                fontSize: 16, fontWeight: 600, color: '#fff', flex: 1,
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                cursor: 'text', borderRadius: 4, padding: '2px 0',
-              }}
-            >
-              {selectedKB.title}
-            </span>
+            <>
+              <span
+                onClick={() => { setTitleDraft(selectedKB.title); setEditingTitle(true) }}
+                title="Click to rename"
+                style={{
+                  fontSize: 16, fontWeight: 600, color: '#fff', flex: 1,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  cursor: 'text', borderRadius: 4, padding: '2px 0',
+                }}
+              >
+                {selectedKB.title}
+              </span>
+              <button
+                onClick={() => { setTitleDraft(selectedKB.title); setEditingTitle(true) }}
+                title="Rename"
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  padding: 4, color: '#9ca3af', display: 'flex', flexShrink: 0,
+                }}
+              >
+                <Pencil style={{ width: 14, height: 14 }} />
+              </button>
+            </>
           )}
           {selectedKB.shared_with_team && (
             <span style={{
