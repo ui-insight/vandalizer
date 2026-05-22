@@ -43,6 +43,7 @@ export function LibraryItemDetails({ item, onClose, onRemove }: Props) {
           extraction: undefined,
           automation: undefined,
           kb: undefined,
+          workflow_share_token: undefined,
         },
       })
     } else {
@@ -55,6 +56,7 @@ export function LibraryItemDetails({ item, onClose, onRemove }: Props) {
           extraction: item.item_id,
           automation: undefined,
           kb: undefined,
+          workflow_share_token: undefined,
         },
       })
     }

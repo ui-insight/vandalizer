@@ -120,6 +120,7 @@ export function VerificationQueue() {
           extraction: undefined,
           automation: undefined,
           kb: undefined,
+          workflow_share_token: undefined,
         },
       })
     } else if (req.item_uuid) {
@@ -132,6 +133,7 @@ export function VerificationQueue() {
           extraction: req.item_uuid,
           automation: undefined,
           kb: undefined,
+          workflow_share_token: undefined,
         },
       })
     }

@@ -26,6 +26,7 @@ export function Header() {
         extraction: undefined,
         automation: undefined,
         kb: undefined,
+        workflow_share_token: undefined,
       },
     })
     workspace?.resetToHome()

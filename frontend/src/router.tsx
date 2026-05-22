@@ -47,6 +47,7 @@ function CertificationRedirect() {
         extraction: undefined,
         automation: undefined,
         kb: undefined,
+        workflow_share_token: undefined,
       },
     })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -186,13 +187,13 @@ const workflowEditorRoute = createRoute({
 const chatRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/chat',
-  component: () => <Navigate to="/" search={{ mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined }} />,
+  component: () => <Navigate to="/" search={{ mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined, workflow_share_token: undefined }} />,
 })
 
 const libraryRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/library',
-  component: () => <Navigate to="/" search={{ mode: undefined, tab: 'library', workflow: undefined, extraction: undefined, automation: undefined, kb: undefined }} />,
+  component: () => <Navigate to="/" search={{ mode: undefined, tab: 'library', workflow: undefined, extraction: undefined, automation: undefined, kb: undefined, workflow_share_token: undefined }} />,
 })
 
 const adminRoute = createRoute({
@@ -337,13 +338,13 @@ const approvalsRoute = createRoute({
 const officeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/office',
-  component: () => <Navigate to="/" search={{ mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined }} />,
+  component: () => <Navigate to="/" search={{ mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined, workflow_share_token: undefined }} />,
 })
 
 const browserAutomationRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/browser-automation',
-  component: () => <Navigate to="/" search={{ mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined }} />,
+  component: () => <Navigate to="/" search={{ mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined, workflow_share_token: undefined }} />,
 })
 
 const demoStatusRoute = createRoute({

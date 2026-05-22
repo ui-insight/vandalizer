@@ -85,7 +85,7 @@ export default function Reviews() {
     <div style={{ maxWidth: 920, margin: '0 auto', padding: '32px 24px' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 24 }}>
         <h1 style={{ fontSize: 24, fontWeight: 700, color: '#111827', margin: 0 }}>Reviews</h1>
-        <Link to="/" search={{ mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined } as never} style={{ fontSize: 13, color: '#6b7280', textDecoration: 'none' }}>
+        <Link to="/" search={{ mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined, workflow_share_token: undefined } as never} style={{ fontSize: 13, color: '#6b7280', textDecoration: 'none' }}>
           Back to workspace
         </Link>
       </div>
