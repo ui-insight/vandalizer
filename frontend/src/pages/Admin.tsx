@@ -232,17 +232,18 @@ function UserAvatar({ name }: { name: string | null }) {
   )
 }
 
-function SortableHeader({ label, sortKey, currentSort, onSort }: {
+function SortableHeader({ label, sortKey, currentSort, onSort, align = 'left' }: {
   label: string; sortKey: string
   currentSort: { key: string; dir: 'asc' | 'desc' }
   onSort: (key: string) => void
+  align?: 'left' | 'right' | 'center'
 }) {
   const active = currentSort.key === sortKey
   return (
     <th
       onClick={() => onSort(sortKey)}
       style={{
-        padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280',
+        padding: '10px 16px', textAlign: align, fontSize: 11, fontWeight: 600, color: '#6b7280',
         textTransform: 'uppercase', cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap',
       }}
     >
@@ -809,9 +810,9 @@ function UsersTab() {
                 <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>#</th>
                 <SortableHeader label="User" sortKey="name" currentSort={sort} onSort={handleSort} />
                 <SortableHeader label="Token Usage" sortKey="tokens_total" currentSort={sort} onSort={handleSort} />
-                <SortableHeader label="Workflows" sortKey="workflows_run" currentSort={sort} onSort={handleSort} />
-                <SortableHeader label="Chats" sortKey="conversations" currentSort={sort} onSort={handleSort} />
-                <SortableHeader label="Last Active" sortKey="last_active" currentSort={sort} onSort={handleSort} />
+                <SortableHeader label="Workflows" sortKey="workflows_run" currentSort={sort} onSort={handleSort} align="right" />
+                <SortableHeader label="Chats" sortKey="conversations" currentSort={sort} onSort={handleSort} align="right" />
+                <SortableHeader label="Last Active" sortKey="last_active" currentSort={sort} onSort={handleSort} align="right" />
               </tr>
             </thead>
             <tbody>
@@ -1455,10 +1456,10 @@ function TeamsTab() {
                   <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
                     <SortableHeader label="Team" sortKey="name" currentSort={sort} onSort={handleSort} />
                     <SortableHeader label="Token Usage" sortKey="tokens_total" currentSort={sort} onSort={handleSort} />
-                    <SortableHeader label="Workflows" sortKey="workflows_completed" currentSort={sort} onSort={handleSort} />
-                    <SortableHeader label="Active Users" sortKey="active_users" currentSort={sort} onSort={handleSort} />
-                    <SortableHeader label="Members" sortKey="member_count" currentSort={sort} onSort={handleSort} />
-                    <SortableHeader label="Avg Latency" sortKey="avg_latency_ms" currentSort={sort} onSort={handleSort} />
+                    <SortableHeader label="Workflows" sortKey="workflows_completed" currentSort={sort} onSort={handleSort} align="right" />
+                    <SortableHeader label="Active Users" sortKey="active_users" currentSort={sort} onSort={handleSort} align="right" />
+                    <SortableHeader label="Members" sortKey="member_count" currentSort={sort} onSort={handleSort} align="right" />
+                    <SortableHeader label="Avg Latency" sortKey="avg_latency_ms" currentSort={sort} onSort={handleSort} align="right" />
                   </tr>
                 </thead>
                 <tbody>
