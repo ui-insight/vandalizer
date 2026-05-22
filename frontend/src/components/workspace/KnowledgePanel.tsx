@@ -820,8 +820,13 @@ export function KnowledgePanel() {
                         <Globe size={14} style={{ color: '#888', flexShrink: 0 }} />
                       )}
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 12, color: '#e5e5e5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {source.source_type === 'url' ? (source.url_title || source.url) : source.document_uuid}
+                        <div
+                          style={{ fontSize: 12, color: '#e5e5e5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                          title={source.source_type === 'url' ? (source.url || '') : (source.document_uuid || '')}
+                        >
+                          {source.source_type === 'url'
+                            ? (source.url_title || source.url)
+                            : (source.document_title || source.document_uuid)}
                         </div>
                         {source.error_message && (
                           <div style={{ fontSize: 11, color: '#ef4444', marginTop: 2 }}>{source.error_message}</div>

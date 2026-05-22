@@ -45,6 +45,7 @@ class KBSourceResponse(BaseModel):
     uuid: str
     source_type: str
     document_uuid: Optional[str] = None
+    document_title: Optional[str] = None  # filename, looked up at response time
     url: Optional[str] = None
     url_title: Optional[str] = None
     status: str
