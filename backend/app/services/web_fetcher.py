@@ -29,6 +29,13 @@ from app.utils.url_validation import validate_outbound_url
 
 logger = logging.getLogger(__name__)
 
+# Trafilatura logs at ERROR whenever it's handed input it can't parse —
+# "empty HTML tree", "parsed tree length: 1, wrong data type...", and similar.
+# We already fall back to BeautifulSoup on parse failure, so none of these
+# are actionable, but Sentry's logging integration captures every ERROR as a
+# production event. Silence the whole trafilatura namespace below CRITICAL.
+logging.getLogger("trafilatura").setLevel(logging.CRITICAL)
+
 _USER_AGENT = (
     "Mozilla/5.0 (compatible; VandalizerBot/1.0; +https://vandalizer.uidaho.edu)"
 )

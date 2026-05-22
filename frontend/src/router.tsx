@@ -141,6 +141,9 @@ const indexRoute = createRoute({
     extraction: ((search.extraction as string) || (search.openExtraction as string) || undefined),
     automation: (search.automation as string) || undefined,
     kb: (search.kb as string) || undefined,
+    // Share-link tokens — present when arriving from a "Copy share link" URL
+    // and used to gate view-only access for users without team membership.
+    workflow_share_token: (search.workflow_share_token as string) || undefined,
   }),
   component: () => (
     <ProtectedRoute>

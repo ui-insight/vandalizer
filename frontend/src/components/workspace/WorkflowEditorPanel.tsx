@@ -196,7 +196,7 @@ export function WorkflowEditorPanel() {
   const { toast } = useToast()
   const { user } = useAuth()
   const shareLink = useShareLink()
-  const { openWorkflowId, openWorkflow, closeWorkflow, consumeWorkflowSession, selectedDocUuids, bumpActivitySignal } = useWorkspace()
+  const { openWorkflowId, openWorkflowShareToken, openWorkflow, closeWorkflow, consumeWorkflowSession, selectedDocUuids, bumpActivitySignal } = useWorkspace()
   const [workflow, setWorkflow] = useState<Workflow | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('design')
@@ -245,7 +245,7 @@ export function WorkflowEditorPanel() {
     if (!openWorkflowId) return
     setLoading(true)
     try {
-      const wf = await getWorkflow(openWorkflowId)
+      const wf = await getWorkflow(openWorkflowId, openWorkflowShareToken ?? undefined)
       setWorkflow(wf)
     } catch {
       setWorkflow(null)
@@ -254,7 +254,7 @@ export function WorkflowEditorPanel() {
     }
     refreshSparkline()
     getWorkflowQualityStatus(openWorkflowId).then(setQualityStatus).catch(() => {})
-  }, [openWorkflowId, refreshSparkline])
+  }, [openWorkflowId, openWorkflowShareToken, refreshSparkline])
 
   useEffect(() => { refresh() }, [refresh])
 
@@ -449,7 +449,7 @@ export function WorkflowEditorPanel() {
     if (!openWorkflowId || duplicating) return
     setDuplicating(true)
     try {
-      const copy = (await duplicateWorkflow(openWorkflowId)) as { id?: string }
+      const copy = (await duplicateWorkflow(openWorkflowId, openWorkflowShareToken ?? undefined)) as { id?: string }
       if (copy?.id) {
         toast('Copied workflow — opening your editable version', 'success')
         openWorkflow(copy.id)
@@ -571,13 +571,15 @@ export function WorkflowEditorPanel() {
               }
             }}
           />
-          <button
-            onClick={() => shareLink('workflow', workflow.id, workflow.name)}
-            title="Copy share link"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 4, color: '#5f6368', display: 'flex', flexShrink: 0 }}
-          >
-            <Link2 style={{ width: 18, height: 18 }} />
-          </button>
+          {canManage && (
+            <button
+              onClick={() => shareLink('workflow', workflow.id, workflow.name)}
+              title="Copy share link"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 4, color: '#5f6368', display: 'flex', flexShrink: 0 }}
+            >
+              <Link2 style={{ width: 18, height: 18 }} />
+            </button>
+          )}
           <button
             onClick={closeWorkflow}
             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 4, color: '#5f6368', display: 'flex', flexShrink: 0 }}

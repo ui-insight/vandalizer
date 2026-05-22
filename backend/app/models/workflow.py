@@ -60,6 +60,9 @@ class Workflow(Document):
     parent_version_id: Optional[str] = None
     validation_plan: list[dict] = []
     validation_inputs: list[dict] = []
+    # Random opaque token that grants view-only access to anyone holding it.
+    # Minted lazily the first time the owner copies a share link.
+    share_token: Optional[str] = None
 
     class Settings:
         name = "workflow"

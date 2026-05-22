@@ -14,6 +14,7 @@ interface NavigationContextValue {
   activeRightTab: RightTab
   setActiveRightTab: (tab: RightTab) => void
   openWorkflowId: string | null
+  openWorkflowShareToken: string | null
   openWorkflow: (id: string, sessionId?: string) => void
   closeWorkflow: () => void
   consumeWorkflowSession: () => string | null
@@ -135,6 +136,7 @@ type WorkspaceSearchState = {
   mode: WorkspaceMode | undefined
   tab: RightTab | undefined
   workflow: string | undefined
+  workflow_share_token: string | undefined
   extraction: string | undefined
   automation: string | undefined
   kb: string | undefined
@@ -145,6 +147,7 @@ function emptyWorkspaceSearch(): WorkspaceSearchState {
     mode: undefined,
     tab: undefined,
     workflow: undefined,
+    workflow_share_token: undefined,
     extraction: undefined,
     automation: undefined,
     kb: undefined,
@@ -165,6 +168,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     getStoredString('workspace:mode', 'chat', ['chat', 'files', 'automations', 'knowledge'])
 
   const openWorkflowId: string | null = search.workflow ?? null
+  const openWorkflowShareToken: string | null = search.workflow_share_token ?? null
   const openExtractionId: string | null = search.extraction ?? null
   const openAutomationId: string | null = search.automation ?? null
   const activeRightTab: RightTab = search.tab ?? 'assistant'
@@ -227,12 +231,18 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const openWorkflow = useCallback((id: string, sessionId?: string) => {
     pendingWorkflowSessionRef.current = sessionId ?? null
-    updateSearch((prev) => ({ ...prev, workflow: id, extraction: undefined, automation: undefined }))
+    updateSearch((prev) => ({
+      ...prev,
+      workflow: id,
+      workflow_share_token: undefined,
+      extraction: undefined,
+      automation: undefined,
+    }))
   }, [updateSearch])
 
   const closeWorkflow = useCallback(() => {
     pendingWorkflowSessionRef.current = null
-    updateSearch((prev) => ({ ...prev, workflow: undefined }))
+    updateSearch((prev) => ({ ...prev, workflow: undefined, workflow_share_token: undefined }))
   }, [updateSearch])
 
   const consumeWorkflowSession = useCallback((): string | null => {
@@ -372,7 +382,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const navValue = useMemo<NavigationContextValue>(() => ({
     workspaceMode, setWorkspaceMode,
     activeRightTab, setActiveRightTab,
-    openWorkflowId, openWorkflow, closeWorkflow, consumeWorkflowSession,
+    openWorkflowId, openWorkflowShareToken, openWorkflow, closeWorkflow, consumeWorkflowSession,
     openExtractionId, openExtraction, closeExtraction,
     consumeExtractionResults,
     openAutomationId, openAutomation, closeAutomation,
@@ -380,7 +390,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }), [
     workspaceMode, setWorkspaceMode,
     activeRightTab, setActiveRightTab,
-    openWorkflowId, openWorkflow, closeWorkflow, consumeWorkflowSession,
+    openWorkflowId, openWorkflowShareToken, openWorkflow, closeWorkflow, consumeWorkflowSession,
     openExtractionId, openExtraction, closeExtraction,
     consumeExtractionResults,
     openAutomationId, openAutomation, closeAutomation,

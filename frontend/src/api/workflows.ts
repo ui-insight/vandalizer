@@ -15,8 +15,16 @@ export function listWorkflows(params?: { scope?: string; search?: string }) {
   return apiFetch<Workflow[]>(`/api/workflows${qs ? `?${qs}` : ''}`)
 }
 
-export function getWorkflow(id: string) {
-  return apiFetch<Workflow>(`/api/workflows/${id}`)
+export function getWorkflow(id: string, shareToken?: string) {
+  const qs = shareToken ? `?share_token=${encodeURIComponent(shareToken)}` : ''
+  return apiFetch<Workflow>(`/api/workflows/${id}${qs}`)
+}
+
+export function mintWorkflowShareToken(id: string) {
+  return apiFetch<{ share_token: string }>(
+    `/api/workflows/${id}/share-token`,
+    { method: 'POST', headers: csrfHeaders() },
+  )
 }
 
 export function updateWorkflow(
@@ -35,8 +43,9 @@ export function deleteWorkflow(id: string) {
   return apiFetch<{ ok: boolean }>(`/api/workflows/${id}`, { method: 'DELETE' })
 }
 
-export function duplicateWorkflow(id: string) {
-  return apiFetch<Workflow>(`/api/workflows/${id}/duplicate`, { method: 'POST' })
+export function duplicateWorkflow(id: string, shareToken?: string) {
+  const qs = shareToken ? `?share_token=${encodeURIComponent(shareToken)}` : ''
+  return apiFetch<Workflow>(`/api/workflows/${id}/duplicate${qs}`, { method: 'POST' })
 }
 
 // Unset team_id on the workflow. The workflow stays, but disappears from

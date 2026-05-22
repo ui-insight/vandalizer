@@ -740,11 +740,34 @@ async def import_into_workflow(
 
 
 @router.get("/{workflow_id}", response_model=WorkflowResponse)
-async def get_workflow(workflow_id: str, user: User = Depends(get_current_user)):
-    wf = await svc.get_workflow(workflow_id, user=user)
+async def get_workflow(
+    workflow_id: str,
+    share_token: str | None = Query(default=None),
+    user: User = Depends(get_current_user),
+):
+    wf = await svc.get_workflow(workflow_id, user=user, share_token=share_token)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
     return await _workflow_response_from_dict(wf)
+
+
+@router.post("/{workflow_id}/share-token")
+async def mint_workflow_share_token(workflow_id: str, user: User = Depends(get_current_user)):
+    """Mint (or return existing) view-only share token for a workflow.
+
+    Manager-level access required: owners and team owner/admin can issue
+    share links. Anyone holding the token can view and duplicate the
+    workflow but cannot edit the original.
+    """
+    import secrets
+
+    wf = await get_authorized_workflow(workflow_id, user, manage=True)
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    if not wf.share_token:
+        wf.share_token = secrets.token_urlsafe(32)
+        await wf.save()
+    return {"share_token": wf.share_token}
 
 
 @router.patch("/{workflow_id}", response_model=WorkflowResponse)
@@ -778,9 +801,19 @@ async def delete_workflow(workflow_id: str, user: User = Depends(get_current_use
 
 
 @router.post("/{workflow_id}/duplicate", response_model=WorkflowResponse)
-async def duplicate_workflow(workflow_id: str, user: User = Depends(get_current_user)):
+async def duplicate_workflow(
+    workflow_id: str,
+    share_token: str | None = Query(default=None),
+    user: User = Depends(get_current_user),
+):
     team_id = str(user.current_team) if user.current_team else None
-    wf = await svc.duplicate_workflow(workflow_id, user=user, user_id=user.user_id, team_id=team_id)
+    wf = await svc.duplicate_workflow(
+        workflow_id,
+        user=user,
+        user_id=user.user_id,
+        team_id=team_id,
+        share_token=share_token,
+    )
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
     return await _workflow_response_from_dict(wf)
