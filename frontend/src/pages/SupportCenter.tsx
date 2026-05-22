@@ -937,6 +937,7 @@ function ChatView({
             const bubbleBg = isInternal ? '#fef9c3' : (isSupport ? '#2563eb' : '#f3f4f6')
             const bubbleColor = isInternal ? '#713f12' : (isSupport ? '#fff' : '#111827')
             const bubbleBorder = isInternal ? '1px dashed #ca8a04' : 'none'
+            const bubbleBorderLeft = isInternal ? '5px solid #ca8a04' : undefined
             const bubbleMaxWidth = isInternal ? '100%' : '85%'
             const labelColor = isInternal
               ? '#92400e'
@@ -946,22 +947,33 @@ function ChatView({
                 <div style={{
                   maxWidth: bubbleMaxWidth, padding: '10px 14px', borderRadius: 'var(--ui-radius, 12px)',
                   background: bubbleBg, color: bubbleColor, border: bubbleBorder,
+                  borderLeft: bubbleBorderLeft ?? bubbleBorder,
                   width: isInternal ? '100%' : undefined,
                 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4, color: labelColor, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {isInternal && (
+                  {isInternal && (
+                    <div
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        gap: 8, marginBottom: 6, paddingBottom: 6,
+                        borderBottom: '1px dashed #ca8a04',
+                      }}
+                    >
                       <span
                         style={{
-                          display: 'inline-flex', alignItems: 'center', gap: 3,
-                          padding: '1px 6px', fontSize: 10, fontWeight: 700,
-                          textTransform: 'uppercase', letterSpacing: 0.3,
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                          padding: '2px 8px', fontSize: 10, fontWeight: 700,
+                          textTransform: 'uppercase', letterSpacing: 0.4,
                           background: '#fde68a', color: '#78350f', borderRadius: 4,
                         }}
-                        title="Visible only to support agents"
                       >
-                        <Lock size={10} /> Internal note
+                        <Lock size={11} /> Internal note · Agents only
                       </span>
-                    )}
+                      <span style={{ fontSize: 10, fontStyle: 'italic', color: '#92400e' }}>
+                        Not visible to the requester
+                      </span>
+                    </div>
+                  )}
+                  <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4, color: labelColor, display: 'flex', alignItems: 'center', gap: 6 }}>
                     <span>{m.user_name || m.user_id}</span>
                     {isSupport && !isInternal && <span style={{ fontSize: 10, fontWeight: 500, opacity: 0.85 }}>Support</span>}
                   </div>

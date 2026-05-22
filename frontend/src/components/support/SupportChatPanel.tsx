@@ -688,7 +688,7 @@ function ChatView({
             ? 'group flex flex-col items-stretch'
             : `group flex flex-col ${isMe ? 'items-end' : 'items-start'}`
           const bubbleClass = isInternal
-            ? 'w-full rounded-xl border border-dashed border-yellow-500 bg-yellow-100 px-3 py-2 text-yellow-900'
+            ? 'w-full rounded-xl border border-yellow-500 border-l-[5px] border-l-yellow-600 bg-yellow-100 px-3 py-2 text-yellow-900'
             : `max-w-[85%] rounded-xl px-3 py-2 ${
                 isMe ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-900'
               }`
@@ -696,10 +696,15 @@ function ChatView({
             <div key={msg.uuid} className={wrapperClass}>
               <div className={bubbleClass}>
                 {isInternal && (
-                  <p className="mb-1 inline-flex items-center gap-1 rounded bg-yellow-300 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-yellow-900">
-                    <Lock className="h-2.5 w-2.5" />
-                    Internal note
-                  </p>
+                  <div className="mb-1.5 flex items-center justify-between gap-2 border-b border-dashed border-yellow-500 pb-1.5">
+                    <span className="inline-flex items-center gap-1 rounded bg-yellow-300 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-yellow-900">
+                      <Lock className="h-2.5 w-2.5" />
+                      Internal note · Agents only
+                    </span>
+                    <span className="text-[9px] italic text-yellow-800">
+                      Not visible to the requester
+                    </span>
+                  </div>
                 )}
                 {!isMe && !isInternal && (
                   <p className="mb-0.5 text-[10px] font-medium text-gray-500">
