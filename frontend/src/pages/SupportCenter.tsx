@@ -43,7 +43,7 @@ type Stats = { total: number; open: number; in_progress: number; closed: number 
 export default function SupportCenter() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const search = useSearch({ from: '/support' }) as { ticket?: string }
+  const urlSearch = useSearch({ from: '/support' }) as { ticket?: string }
   const { toast } = useToast()
 
   const [view, setView] = useState<View>('list')
@@ -96,14 +96,14 @@ export default function SupportCenter() {
   // Keep the URL in sync with the open ticket so agents can copy the address
   // bar (or the explicit Copy link button) and share it with each other.
   useEffect(() => {
-    if (search.ticket && search.ticket !== activeTicketUuid) {
-      setActiveTicketUuid(search.ticket)
+    if (urlSearch.ticket && urlSearch.ticket !== activeTicketUuid) {
+      setActiveTicketUuid(urlSearch.ticket)
       setView('chat')
-    } else if (!search.ticket && view === 'chat') {
+    } else if (!urlSearch.ticket && view === 'chat') {
       setActiveTicketUuid(null)
       setView('list')
     }
-  }, [search.ticket, activeTicketUuid, view])
+  }, [urlSearch.ticket, activeTicketUuid, view])
 
   if (!user?.is_support_agent) {
     return <Navigate to="/" search={{ mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined }} />
