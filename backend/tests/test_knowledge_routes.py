@@ -412,6 +412,13 @@ class TestKnowledgeCRUD:
             patch("app.dependencies.User") as MockUser,
             patch("app.routers.knowledge.svc") as mock_svc,
             patch("app.routers.knowledge.organization_service") as mock_org,
+            # SmartDocument.find requires Beanie initialization which the
+            # ASGI test client skips; stub the title lookup helper directly.
+            patch(
+                "app.routers.knowledge._lookup_document_titles",
+                new_callable=AsyncMock,
+                return_value={"doc-1": "Some Document.pdf"},
+            ),
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
@@ -424,6 +431,7 @@ class TestKnowledgeCRUD:
         data = resp.json()
         assert data["uuid"] == "kb-uuid-1"
         assert len(data["sources"]) == 1
+        assert data["sources"][0]["document_title"] == "Some Document.pdf"
 
     @pytest.mark.asyncio
     async def test_get_detail_not_found(self, client):
