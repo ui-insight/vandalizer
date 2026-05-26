@@ -1,4 +1,4 @@
-import { apiFetch, csrfHeaders } from './client'
+import { apiFetch, rawFetch } from './client'
 
 export function uploadFile(data: {
   contentAsBase64String: string
@@ -58,10 +58,9 @@ export function downloadFile(docid: string) {
 }
 
 export async function downloadFilesAsZip(docIds: string[]) {
-  const res = await fetch('/api/files/download-bulk', {
+  const res = await rawFetch('/api/files/download-bulk', {
     method: 'POST',
-    credentials: 'include',
-    headers: csrfHeaders({ 'Content-Type': 'application/json' }),
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ doc_ids: docIds }),
   })
   if (!res.ok) throw new Error('Download failed')

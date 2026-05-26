@@ -1,11 +1,14 @@
 """Double-submit cookie CSRF protection middleware."""
 
 import http.cookies
+import logging
 import secrets
 
 from starlette.datastructures import Headers
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
+
+logger = logging.getLogger(__name__)
 
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
@@ -98,6 +101,25 @@ class CSRFMiddleware:
             csrf_header = headers.get("x-csrf-token")
             valid_values = {v for v in (csrf_modern, *legacy_values) if v}
             if not csrf_header or csrf_header not in valid_values:
+                # Log enough to diagnose: which side is missing/mismatched,
+                # which cookie name the browser sent, and where the user was.
+                # Values are never logged — only their presence/length.
+                logger.warning(
+                    "CSRF validation failed",
+                    extra={
+                        "path": path,
+                        "method": method,
+                        "has_modern_cookie": bool(csrf_modern),
+                        "legacy_cookie_count": len(legacy_values),
+                        "has_csrf_header": bool(csrf_header),
+                        "header_len": len(csrf_header) if csrf_header else 0,
+                        "modern_len": len(csrf_modern) if csrf_modern else 0,
+                        "any_cookie_present": bool(valid_values),
+                        "origin": headers.get("origin", ""),
+                        "referer": headers.get("referer", ""),
+                        "user_agent": headers.get("user-agent", "")[:200],
+                    },
+                )
                 response = JSONResponse(
                     {"detail": "CSRF validation failed"}, status_code=403
                 )

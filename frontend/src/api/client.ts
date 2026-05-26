@@ -23,14 +23,6 @@ export function getCsrfToken(): string | null {
   return parseCsrfToken(document.cookie)
 }
 
-/** Return a headers object with the CSRF token set (for raw fetch calls). */
-export function csrfHeaders(extra: Record<string, string> = {}): Record<string, string> {
-  const headers: Record<string, string> = { ...extra }
-  const csrf = getCsrfToken()
-  if (csrf) headers['X-CSRF-Token'] = csrf
-  return headers
-}
-
 // Self-heal stale tabs whose CSRF cookie/header pairing is broken (old SPA
 // bundle still in cache, browser extension stripping the cookie, etc.).
 // A reload pulls a fresh index.html (which nginx serves with no-cache), the
@@ -69,6 +61,40 @@ function buildHeaders(options: RequestInit): HeadersInit {
     headers['X-CSRF-Token'] = csrf
   }
   return headers
+}
+
+// Wrap raw fetch (used by multipart uploads, streaming endpoints, blob
+// downloads — anything that can't go through apiFetch because the caller
+// needs the Response object). Always attaches credentials and the CSRF
+// header, and triggers the same self-heal as apiFetch when the backend
+// rejects the request as a CSRF failure. Keeping this in one place is the
+// whole point: stale-cookie reports were coming in for endpoints that
+// silently bypassed apiFetch's recovery.
+export async function rawFetch(
+  url: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  const headers: Record<string, string> = {
+    ...(init.headers as Record<string, string> | undefined),
+  }
+  const csrf = getCsrfToken()
+  if (csrf && !headers['X-CSRF-Token']) headers['X-CSRF-Token'] = csrf
+
+  const res = await fetch(url, {
+    ...init,
+    credentials: 'include',
+    headers,
+  })
+
+  if (res.status === 403) {
+    // Clone so the caller can still read the body if self-heal doesn't fire.
+    const peek = await res.clone().json().catch(() => null)
+    if (peek?.detail === 'CSRF validation failed' && attemptCsrfSelfHeal()) {
+      throw new ApiError(403, 'CSRF validation failed (reloading)')
+    }
+  }
+
+  return res
 }
 
 export async function apiFetch<T>(

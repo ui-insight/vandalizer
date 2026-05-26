@@ -1,4 +1,4 @@
-import { apiFetch, ApiError, csrfHeaders } from './client'
+import { apiFetch, ApiError, rawFetch } from './client'
 import type { SearchSet, SearchSetItem } from '../types/workflow'
 
 // SearchSet CRUD
@@ -384,10 +384,9 @@ export async function findBestSettingsStream(
   maxCandidates = 8,
   onEvent: (event: TuningStreamEvent) => void,
 ) {
-  const res = await fetch(`/api/extractions/search-sets/${uuid}/find-best-settings`, {
+  const res = await rawFetch(`/api/extractions/search-sets/${uuid}/find-best-settings`, {
     method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...csrfHeaders() },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ num_runs: numRuns, max_candidates: maxCandidates }),
   })
   if (!res.ok) {
@@ -443,10 +442,8 @@ export function exportSearchSetUrl(uuid: string) {
 }
 
 export async function downloadValidationZip(uuid: string): Promise<void> {
-  const res = await fetch(`/api/extractions/search-sets/${uuid}/download-validation`, {
+  const res = await rawFetch(`/api/extractions/search-sets/${uuid}/download-validation`, {
     method: 'GET',
-    credentials: 'include',
-    headers: csrfHeaders(),
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({ detail: 'Download failed' }))
@@ -470,10 +467,8 @@ export async function importSearchSet(file: File, targetUuid?: string): Promise<
   const form = new FormData()
   form.append('file', file)
   if (targetUuid) form.append('target_uuid', targetUuid)
-  const res = await fetch('/api/extractions/search-sets/import', {
+  const res = await rawFetch('/api/extractions/search-sets/import', {
     method: 'POST',
-    credentials: 'include',
-    headers: csrfHeaders(),
     body: form,
   })
   if (!res.ok) {
@@ -488,10 +483,8 @@ export async function importSearchSet(file: File, targetUuid?: string): Promise<
 export async function uploadPdfTemplate(uuid: string, file: File): Promise<SearchSet> {
   const form = new FormData()
   form.append('file', file)
-  const res = await fetch(`/api/extractions/search-sets/${uuid}/upload-template`, {
+  const res = await rawFetch(`/api/extractions/search-sets/${uuid}/upload-template`, {
     method: 'POST',
-    credentials: 'include',
-    headers: csrfHeaders(),
     body: form,
   })
   if (!res.ok) {
@@ -504,10 +497,8 @@ export async function uploadPdfTemplate(uuid: string, file: File): Promise<Searc
 // Generate example fillable PDF template from current extraction items
 
 export async function generateExampleTemplate(uuid: string): Promise<void> {
-  const res = await fetch(`/api/extractions/search-sets/${uuid}/generate-template`, {
+  const res = await rawFetch(`/api/extractions/search-sets/${uuid}/generate-template`, {
     method: 'POST',
-    credentials: 'include',
-    headers: csrfHeaders(),
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({ detail: 'Generation failed' }))
@@ -534,10 +525,9 @@ export async function exportExtractionPdf(
   results: Record<string, string>,
   documentNames: string[],
 ): Promise<void> {
-  const res = await fetch(`/api/extractions/search-sets/${uuid}/export-pdf`, {
+  const res = await rawFetch(`/api/extractions/search-sets/${uuid}/export-pdf`, {
     method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...csrfHeaders() },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ results, document_names: documentNames }),
   })
   if (!res.ok) {
