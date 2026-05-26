@@ -8,7 +8,7 @@ import {
   ChevronDown, ChevronRight, ArrowUp, ArrowDown,
   Circle, Hand, Keyboard, Sparkles, ShieldCheck, Type,
   ArrowRight, Pause, TrendingUp, RefreshCw,
-  Upload, Clock, Copy, Check, FolderInput, Link2,
+  Upload, Clock, Copy, Check, FolderInput, Link2, Info,
 } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
@@ -3394,6 +3394,20 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
         {/* ===== INPUT SUB-TAB ===== */}
         {subTab === 'input' && (
           <div>
+            <div style={{
+              display: 'flex', alignItems: 'flex-start', gap: 8,
+              padding: '10px 12px', marginBottom: 16,
+              backgroundColor: '#f3f4f6', borderRadius: 6,
+              border: '1px solid #e5e7eb',
+            }}>
+              <Info style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0, marginTop: 1 }} />
+              <div style={{ fontSize: 12, color: '#374151', lineHeight: 1.5 }}>
+                <strong>This step runs once per workflow run.</strong> Selected inputs are
+                combined into a single call — there's no fan-out over upstream items. If an
+                upstream step produced 5 results, this step receives one combined payload (not
+                five separate executions). Lists are stringified before reaching prompts.
+              </div>
+            </div>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
               Data Sources
             </div>
