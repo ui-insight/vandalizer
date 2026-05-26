@@ -32,6 +32,7 @@ from app.services.llm_service import (
     DOCUMENT_CHAT_SYSTEM_PROMPT,
     FIRST_SESSION_SYSTEM_PROMPT,
     HELP_CHAT_SYSTEM_PROMPT,
+    KB_CHAT_SYSTEM_PROMPT,
     VANDALIZER_CONTEXT,
 )
 
@@ -328,7 +329,13 @@ async def chat_stream(
             dm = DocumentManager()
             kb_results = await asyncio.to_thread(dm.query_kb, kb_uuid, message, 8)
             if kb_results:
-                kb_text = "\n\n## Knowledge Base Context:\n"
+                kb_text = (
+                    "\n\n## Retrieved Knowledge Base Snippets\n"
+                    "_The following are partial excerpts from a larger corpus, ranked "
+                    "by similarity to the user's question. They may be incomplete, "
+                    "off-topic, or miss the best answer. Cite by filename only when a "
+                    "snippet actually supports your claim._\n"
+                )
                 for r in kb_results:
                     meta = r.get("metadata") or {}
                     src = meta.get("source_name", "Unknown")
@@ -356,9 +363,14 @@ async def chat_stream(
             logger.error("KB context retrieval failed for kb_uuid=%s: %s", kb_uuid, e)
 
     # Select system prompt based on whether we have document context.
+    # KB chat needs a stricter prompt: snippets are partial excerpts, so the model
+    # must cite by filename, distinguish grounded answers from general knowledge,
+    # and admit when the retrieved set doesn't actually contain the answer.
     have_context = bool(doc_segments or attachment_segments)
-    if have_context:
-        system_prompt: Optional[str] = DOCUMENT_CHAT_SYSTEM_PROMPT
+    if kb_sources:
+        system_prompt: Optional[str] = KB_CHAT_SYSTEM_PROMPT
+    elif have_context:
+        system_prompt = DOCUMENT_CHAT_SYSTEM_PROMPT
     elif is_first_session:
         # First-session onboarding: conversational value discovery.
         # Do NOT inject VANDALIZER_CONTEXT here — it's a technical how-to dump
