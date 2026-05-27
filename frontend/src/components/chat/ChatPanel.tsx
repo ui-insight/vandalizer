@@ -10,6 +10,7 @@ import { useChat } from '../../hooks/useChat'
 import { useOnboarding } from '../../hooks/useOnboarding'
 import { useWorkspace, type PendingChatMessage } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
+import { useBranding, DEFAULT_LOGO_URL } from '../../contexts/BrandingContext'
 import { useShareLink } from '../../lib/shareLink'
 import { addLink, removeDocument, removeLink, truncateContext, compactContext, clearContext } from '../../api/chat'
 import { uploadFile } from '../../api/files'
@@ -58,6 +59,8 @@ interface ChatPanelProps {
 }
 
 export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessageConsumed }: ChatPanelProps) {
+  const branding = useBranding()
+  const showJoeVandal = branding.logoUrl === DEFAULT_LOGO_URL
   const {
     messages,
     setMessages,
@@ -156,7 +159,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       setMessages([{
         role: 'assistant',
         content:
-          "Hi, I'm your Vandalizer assistant. Before I show you around, I'd love to " +
+          `Hi, I'm your ${branding.orgName} assistant. Before I show you around, I'd love to ` +
           "know a bit about your work.\n\n" +
           "What kind of documents do you spend the most time processing? " +
           "Grant proposals, compliance reviews, progress reports, or something else entirely?",
@@ -548,12 +551,14 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                 }}
               />
               <div className="relative z-[1] flex items-center gap-4">
-                <div style={{ animation: 'float 3s ease-in-out infinite' }} className="shrink-0">
-                  <img src="/images/joevandal.png" alt="Joe Vandal" style={{ width: 22, height: 35 }} className="opacity-90" />
-                </div>
+                {showJoeVandal && (
+                  <div style={{ animation: 'float 3s ease-in-out infinite' }} className="shrink-0">
+                    <img src="/images/joevandal.png" alt="Joe Vandal" style={{ width: 22, height: 35 }} className="opacity-90" />
+                  </div>
+                )}
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3 }}>
-                    Welcome to Vandalizer
+                    Welcome to {branding.orgName}
                   </div>
                   <div style={{ fontSize: 13, opacity: 0.8, marginTop: 2, fontWeight: 400 }}>
                     AI-powered document intelligence for research administration

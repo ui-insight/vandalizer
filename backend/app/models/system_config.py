@@ -154,6 +154,12 @@ class SystemConfig(Document):
     highlight_color: str = "#eab308"
     ui_radius: str = "12px"
 
+    # Branding — empty strings mean "use the built-in Vandalizer defaults".
+    # logo_data_url accepts a data: URL (base64-encoded image) so the logo can
+    # be served by the same public theme endpoint without separate storage.
+    org_name: str = ""
+    logo_data_url: str = ""
+
     # Authentication
     auth_methods: list[str] = ["password"]
     oauth_providers: list[dict] = []

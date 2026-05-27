@@ -1,0 +1,86 @@
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
+import { getThemeConfig, type ThemeConfig } from '../api/config'
+import { getContrastTextColor, getComplementaryColor, getHoverColor } from '../utils/color'
+
+export const DEFAULT_ORG_NAME = 'Vandalizer'
+export const DEFAULT_LOGO_URL = '/images/Vandalizer_Wordmark_RGB.png'
+export const DEFAULT_LOGO_DARK_URL = '/images/Vandalizer_Wordmark_Color_RGB+W.png'
+
+export interface Branding {
+  /** Display name for this deployment. Always non-empty (falls back to "Vandalizer"). */
+  orgName: string
+  /** Logo for light backgrounds. */
+  logoUrl: string
+  /** Logo for dark backgrounds (auth pages, footer). Same as logoUrl when admin uploads a custom one. */
+  logoDarkUrl: string
+  /** True when the admin has overridden the default name. Used to surface "Powered by Vandalizer" attribution. */
+  isCustomized: boolean
+  /** Re-fetch from server (called by admin after saving theme). */
+  refresh: () => Promise<void>
+}
+
+const BrandingContext = createContext<Branding | null>(null)
+
+function applyTheme(theme: ThemeConfig) {
+  const root = document.documentElement
+  root.style.setProperty('--highlight-color', theme.highlight_color)
+  root.style.setProperty('--ui-radius', theme.ui_radius)
+  root.style.setProperty('--highlight-text-color', getContrastTextColor(theme.highlight_color))
+  root.style.setProperty('--highlight-complement', getComplementaryColor(theme.highlight_color))
+  root.style.setProperty('--highlight-hover', getHoverColor(theme.highlight_color))
+}
+
+function resolve(theme: ThemeConfig | null): Omit<Branding, 'refresh'> {
+  const orgName = (theme?.org_name || '').trim() || DEFAULT_ORG_NAME
+  const customLogo = (theme?.logo_data_url || '').trim()
+  const isCustomized = orgName !== DEFAULT_ORG_NAME || !!customLogo
+  return {
+    orgName,
+    logoUrl: customLogo || DEFAULT_LOGO_URL,
+    logoDarkUrl: customLogo || DEFAULT_LOGO_DARK_URL,
+    isCustomized,
+  }
+}
+
+export function BrandingProvider({ children }: { children: ReactNode }) {
+  const [state, setState] = useState<Omit<Branding, 'refresh'>>(() => resolve(null))
+
+  const load = useCallback(async () => {
+    try {
+      const theme = await getThemeConfig()
+      applyTheme(theme)
+      setState(resolve(theme))
+    } catch {
+      // Keep defaults if fetch fails (e.g., not logged in or backend down).
+    }
+  }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  useEffect(() => {
+    document.title = state.orgName
+  }, [state.orgName])
+
+  return (
+    <BrandingContext.Provider value={{ ...state, refresh: load }}>
+      {children}
+    </BrandingContext.Provider>
+  )
+}
+
+export function useBranding(): Branding {
+  const ctx = useContext(BrandingContext)
+  if (!ctx) {
+    // Render-safe fallback so components used outside the provider (tests, storybook) still work.
+    return {
+      orgName: DEFAULT_ORG_NAME,
+      logoUrl: DEFAULT_LOGO_URL,
+      logoDarkUrl: DEFAULT_LOGO_DARK_URL,
+      isCustomized: false,
+      refresh: async () => {},
+    }
+  }
+  return ctx
+}

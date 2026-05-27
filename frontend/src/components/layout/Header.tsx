@@ -6,11 +6,14 @@ import { NotificationBell } from './NotificationBell'
 import { SupportChatPanel } from '../support/SupportChatPanel'
 import { FeedbackPromptCard } from '../support/FeedbackPromptCard'
 import { useOptionalWorkspace } from '../../contexts/WorkspaceContext'
+import { useBranding, DEFAULT_LOGO_URL } from '../../contexts/BrandingContext'
 import { useFeedbackPrompt } from '../../hooks/useFeedbackPrompt'
 
 export function Header() {
   const navigate = useNavigate()
   const workspace = useOptionalWorkspace()
+  const branding = useBranding()
+  const usingDefaultLogo = branding.logoUrl === DEFAULT_LOGO_URL
   const [supportOpen, setSupportOpen] = useState(false)
   const [supportTicket, setSupportTicket] = useState<string | undefined>()
   const [promptCardHidden, setPromptCardHidden] = useState(false)
@@ -87,8 +90,14 @@ export function Header() {
         {/* Left: Logo images */}
         <div className="flex items-center">
           <button onClick={handleLogoClick} aria-label="Go to home page" className="flex items-center" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-            <img src="/images/joevandal.png" alt="" style={{ width: 25, height: 40, marginTop: 4 }} />
-            <img src="/images/Vandalizer_Wordmark_RGB.png" alt="Vandalizer" style={{ width: 200, height: 50, marginLeft: 4 }} />
+            {usingDefaultLogo && (
+              <img src="/images/joevandal.png" alt="" style={{ width: 25, height: 40, marginTop: 4 }} />
+            )}
+            <img
+              src={branding.logoUrl}
+              alt={branding.orgName}
+              style={{ height: 50, maxWidth: 240, objectFit: 'contain', marginLeft: usingDefaultLogo ? 4 : 0 }}
+            />
           </button>
         </div>
 

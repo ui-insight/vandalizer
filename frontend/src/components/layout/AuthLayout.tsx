@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
+import { useBranding } from '../../contexts/BrandingContext'
 
 export function AuthLayout({ children, title }: { children: ReactNode; title: string }) {
+  const branding = useBranding()
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-gray-200 antialiased relative">
       {/* Background glow */}
@@ -17,7 +19,7 @@ export function AuthLayout({ children, title }: { children: ReactNode; title: st
       <nav className="relative z-10 border-b border-white/10 bg-[#0a0a0a]/80 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
           <Link to="/landing" search={{ error: undefined, invite_token: undefined, admin: undefined, next: undefined }}>
-            <img src="/images/Vandalizer_Wordmark_Color_RGB+W.png" alt="Vandalizer" className="h-10" />
+            <img src={branding.logoDarkUrl} alt={branding.orgName} className="h-10" style={{ maxWidth: 260, objectFit: 'contain' }} />
           </Link>
         </div>
       </nav>

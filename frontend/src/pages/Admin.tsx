@@ -19,6 +19,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useTeams } from '../hooks/useTeams'
 import { getThemeConfig, updateThemeConfig } from '../api/config'
 import type { ThemeConfig } from '../api/config'
+import { useBranding, DEFAULT_ORG_NAME } from '../contexts/BrandingContext'
 import {
   getUsageStats, getUsageTimeseries, getUserLeaderboard, getTeamLeaderboard,
   getTeamDetail, getUserDetail,
@@ -72,6 +73,17 @@ function applyThemeToDOM(theme: ThemeConfig) {
   const root = document.documentElement
   root.style.setProperty('--highlight-color', theme.highlight_color)
   root.style.setProperty('--ui-radius', theme.ui_radius)
+}
+
+const MAX_LOGO_BYTES = 500_000 // matches backend cap on the encoded data URL
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
+    reader.onerror = () => reject(reader.error || new Error('Failed to read file'))
+    reader.readAsDataURL(file)
+  })
 }
 
 type Tab = 'usage' | 'users' | 'teams' | 'organizations' | 'workflows' | 'quality' | 'compliance' | 'audit' | 'demo' | 'email' | 'certifications' | 'apikeys' | 'config'
@@ -2300,8 +2312,12 @@ function ConfigTab() {
   const [error, setError] = useState<string | null>(null)
 
   // Theme state
+  const branding = useBranding()
   const [themeColor, setThemeColor] = useState('#eab308')
   const [themeRadius, setThemeRadius] = useState(12)
+  const [themeOrgName, setThemeOrgName] = useState('')
+  const [themeLogo, setThemeLogo] = useState('')
+  const [themeLogoError, setThemeLogoError] = useState<string | null>(null)
   const [themeSaving, setThemeSaving] = useState(false)
   const [themeSaved, setThemeSaved] = useState(false)
 
@@ -2443,6 +2459,8 @@ function ConfigTab() {
     getThemeConfig().then(t => {
       setThemeColor(t.highlight_color)
       setThemeRadius(parseInt(t.ui_radius) || 12)
+      setThemeOrgName(t.org_name || '')
+      setThemeLogo(t.logo_data_url || '')
     }).catch(() => {})
   }, [])
 
@@ -2492,12 +2510,37 @@ function ConfigTab() {
     setThemeSaving(true)
     setThemeSaved(false)
     try {
-      const updated = await updateThemeConfig({ highlight_color: themeColor, ui_radius: `${themeRadius}px` })
+      const updated = await updateThemeConfig({
+        highlight_color: themeColor,
+        ui_radius: `${themeRadius}px`,
+        org_name: themeOrgName.trim(),
+        logo_data_url: themeLogo,
+      })
       applyThemeToDOM(updated)
+      await branding.refresh()
       setThemeSaved(true)
       setTimeout(() => setThemeSaved(false), 3000)
     } finally {
       setThemeSaving(false)
+    }
+  }
+
+  const handleLogoFile = async (file: File | null) => {
+    setThemeLogoError(null)
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setThemeLogoError('Please choose an image file (PNG, SVG, JPG).')
+      return
+    }
+    try {
+      const dataUrl = await readFileAsDataUrl(file)
+      if (dataUrl.length > MAX_LOGO_BYTES) {
+        setThemeLogoError(`Image too large — keep encoded size under ${Math.round(MAX_LOGO_BYTES / 1024)} KB.`)
+        return
+      }
+      setThemeLogo(dataUrl)
+    } catch {
+      setThemeLogoError('Could not read the selected file.')
     }
   }
 
@@ -3323,7 +3366,7 @@ function ConfigTab() {
       {/* UI Theme */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          <Palette size={18} color="#6b7280" /> UI Theme
+          <Palette size={18} color="#6b7280" /> UI Theme &amp; Branding
         </div>
         <div style={sectionBodyStyle}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
@@ -3343,6 +3386,81 @@ function ConfigTab() {
               </div>
             </div>
           </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginTop: 20 }}>
+            <div>
+              <label style={labelStyle}>Organization Name</label>
+              <input
+                type="text"
+                value={themeOrgName}
+                onChange={e => setThemeOrgName(e.target.value)}
+                placeholder={DEFAULT_ORG_NAME}
+                style={inputStyle}
+              />
+              <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>
+                Shown in the header, login page, browser tab, and chat greeting. Leave blank to keep "Vandalizer".
+              </div>
+            </div>
+            <div>
+              <label style={labelStyle}>Logo</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                  width: 180, height: 56, borderRadius: 'var(--ui-radius, 12px)',
+                  border: '1px solid #e5e7eb', background: '#f9fafb',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+                }}>
+                  {themeLogo ? (
+                    <img src={themeLogo} alt="Logo preview" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                  ) : (
+                    <img src="/images/Vandalizer_Wordmark_RGB.png" alt="Default Vandalizer logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', opacity: 0.7 }} />
+                  )}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <label style={{
+                    padding: '6px 12px', borderRadius: 'var(--ui-radius, 12px)',
+                    border: '1px solid #d1d5db', background: '#fff',
+                    fontSize: 12, fontWeight: 500, cursor: 'pointer', textAlign: 'center',
+                  }}>
+                    {themeLogo ? 'Replace' : 'Upload'}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                      onChange={e => handleLogoFile(e.target.files?.[0] || null)}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+                  {themeLogo && (
+                    <button
+                      type="button"
+                      onClick={() => { setThemeLogo(''); setThemeLogoError(null) }}
+                      style={{
+                        padding: '6px 12px', borderRadius: 'var(--ui-radius, 12px)',
+                        border: '1px solid #fee2e2', background: '#fff',
+                        color: '#b91c1c', fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                      }}
+                    >
+                      Use default
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>
+                Wordmark-style image works best. PNG with transparency recommended. Max ~{Math.round(MAX_LOGO_BYTES / 1024)} KB encoded.
+              </div>
+              {themeLogoError && (
+                <div style={{ fontSize: 12, color: '#b91c1c', marginTop: 6 }}>{themeLogoError}</div>
+              )}
+            </div>
+          </div>
+
+          <div style={{
+            marginTop: 16, padding: 12, background: '#f9fafb',
+            borderRadius: 'var(--ui-radius, 12px)', border: '1px dashed #e5e7eb',
+            fontSize: 12, color: '#6b7280', lineHeight: 1.5,
+          }}>
+            Vandalizer is open source under the GPL v3 license and developed at the University of Idaho with support from the NSF GRANTED program (Award #2427549). Even with your custom branding applied, the footer will continue to credit the Vandalizer project and acknowledge NSF funding.
+          </div>
+
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16 }}>
             <div style={{ backgroundColor: themeColor, borderRadius: `${themeRadius}px`, padding: '8px 20px', color: 'var(--highlight-text-color, #000)', fontWeight: 600, fontSize: 13 }}>
               Sample Button

@@ -37,11 +37,15 @@ class ThemeConfigResponse(BaseModel):
     highlight_text_color: str = "#000000"
     highlight_complement: str = "#154cf7"
     ui_radius: str = "12px"
+    org_name: str = ""
+    logo_data_url: str = ""
 
 
 class UpdateThemeConfigRequest(BaseModel):
     highlight_color: Optional[str] = None
     ui_radius: Optional[str] = None
+    org_name: Optional[str] = None
+    logo_data_url: Optional[str] = None
 
 
 class OnboardingStatusResponse(BaseModel):
