@@ -8,8 +8,12 @@ from app.services import kb_optimizer
 from app.services.kb_optimizer import (
     KBOptimizer,
     _build_search_space,
-    _config_is_default,
+    _blended_quality_score,
     _sample_trial_configs,
+    BLEND_WEIGHT_COVERAGE,
+    BLEND_WEIGHT_HEALTH,
+    BLEND_WEIGHT_JUDGE,
+    BLEND_WEIGHT_RETRIEVAL,
     DEFAULT_TRIAL_TOKEN_ESTIMATE,
     MAX_TRIAL_COUNT,
 )
@@ -25,12 +29,13 @@ def test_build_search_space_with_no_models_uses_caller_default():
     'model=None' axis so the optimizer can sweep other knobs."""
     space = _build_search_space(enabled_models=None)
     assert all(c["model"] is None for c in space)
-    assert len(space) == 6 * 1 * 3 * 2 * 2  # k × models × prompt × rewrite × labels
+    # k × models × prompt × rewrite × labels × rerank × answer_temperature
+    assert len(space) == 6 * 1 * 3 * 2 * 2 * 2 * 2
 
 
 def test_build_search_space_with_three_models_multiplies_size():
     space = _build_search_space(enabled_models=["m1", "m2", "m3"])
-    assert len(space) == 6 * 3 * 3 * 2 * 2
+    assert len(space) == 6 * 3 * 3 * 2 * 2 * 2 * 2
 
 
 def test_build_search_space_includes_all_combinations():
@@ -40,6 +45,8 @@ def test_build_search_space_includes_all_combinations():
         c["k"] == 16 and c["prompt_variant"] == "strict"
         and c["query_rewriting"] is True
         and c["source_label_visibility"] is False
+        and c["rerank"] == "llm"
+        and c["answer_temperature"] == 0.3
         for c in space
     )
 
@@ -74,19 +81,6 @@ def test_sample_trial_configs_no_duplicates():
     assert len(seen) == len(sampled)
 
 
-def test_config_is_default_recognises_default_knobs():
-    assert _config_is_default({
-        "k": 8, "prompt_variant": "default",
-        "query_rewriting": False, "source_label_visibility": True,
-        "model": "anything",
-    })
-    # Any deviation flips it.
-    assert not _config_is_default({"k": 12, "prompt_variant": "default",
-                                    "query_rewriting": False, "source_label_visibility": True})
-    assert not _config_is_default({"k": 8, "prompt_variant": "strict",
-                                    "query_rewriting": False, "source_label_visibility": True})
-
-
 # ---------------------------------------------------------------------------
 # Suggestion analyser
 # ---------------------------------------------------------------------------
@@ -95,12 +89,104 @@ def test_config_is_default_recognises_default_knobs():
 def test_analyse_suggestions_low_lift_baseline_emits_warning():
     """When KB barely beats no-retrieval, surface a warning."""
     out = KBOptimizer()._analyse_suggestions(
+        # Judge-vs-judge comparison: default_kb_judge tracks raw judge so the
+        # low-lift detector ignores invariants (health/coverage/retrieval).
         trials=[{"score": 0.65, "status": "completed"}],
-        baselines={"no_kb": 0.60, "default_kb": 0.65},
+        baselines={"no_kb": 0.60, "default_kb": 0.65, "default_kb_judge": 0.65},
         test_queries=[],
     )
     kinds = {s["kind"] for s in out}
     assert "low_lift_baseline" in kinds
+
+
+def test_analyse_suggestions_low_lift_not_emitted_when_judge_lifts_clearly():
+    """High invariants must not mask a real judge lift — the warning is
+    keyed off the raw judge baseline, not the blended ``default_kb``."""
+    out = KBOptimizer()._analyse_suggestions(
+        trials=[{"score": 0.78, "status": "completed"}],
+        baselines={
+            "no_kb": 0.40,                # raw judge baseline (model alone)
+            "default_kb": 0.78,           # blended (judge + healthy invariants)
+            "default_kb_judge": 0.65,     # raw judge with default KB
+        },
+        test_queries=[],
+    )
+    kinds = {s["kind"] for s in out}
+    assert "low_lift_baseline" not in kinds
+
+
+def test_blended_quality_score_matches_validation_header_weights():
+    """The optimizer's blend must match ``run_kb_validation``'s 40/25/20/15."""
+    # Hand-computed expected value: 0.80 * 0.40 + 0.70 * 0.25 + 1.00 * 0.20 + 0.90 * 0.15
+    #                             = 0.320 + 0.175 + 0.200 + 0.135 = 0.830
+    assert _blended_quality_score(0.80, 0.70, 1.00, 0.90) == pytest.approx(0.830, abs=1e-9)
+    # Weights themselves sum to 1.0.
+    assert (
+        BLEND_WEIGHT_JUDGE + BLEND_WEIGHT_RETRIEVAL
+        + BLEND_WEIGHT_HEALTH + BLEND_WEIGHT_COVERAGE
+    ) == pytest.approx(1.0)
+
+
+@pytest.mark.asyncio
+async def test_run_trial_early_stops_below_current_best():
+    """A trial whose partial judge mean is > 2σ below the current best should
+    short-circuit instead of running to completion. Verifies via the captured
+    ``early_stop_reason="below_best"`` marker on the returned trial dict."""
+    from app.services.kb_validation_service import RAGConfig
+    tq_list = [MagicMock(uuid=f"q{i}", query=f"Q{i}", expected_answer="A") for i in range(8)]
+
+    # Simulate judge_test_queries honouring the early_stop_callback: after
+    # min_to_check queries with a low partial mean, return early_stopped=True.
+    async def fake_judge(kb_uuid, queries, model, mode="judge", judge_model=None,
+                          early_stop_callback=None, **_kw):
+        partial: list[float] = []
+        for _ in queries:
+            partial.append(0.20)  # clearly below the best=0.80
+            if early_stop_callback and early_stop_callback(partial):
+                return {
+                    "details": [],
+                    "avg_judge_score": sum(partial) / len(partial),
+                    "num_queries_judged": len(partial),
+                    "early_stopped": True,
+                    "tokens_used": 1000,
+                }
+        return {
+            "details": [],
+            "avg_judge_score": sum(partial) / len(partial),
+            "num_queries_judged": len(partial),
+            "tokens_used": 5000,
+        }
+
+    with patch.object(kb_optimizer.kb_validation_service, "judge_test_queries",
+                       side_effect=fake_judge):
+        result = await KBOptimizer()._run_trial(
+            cfg_dict=RAGConfig().model_dump(),
+            kb_uuid="kb-1", user_id="u1",
+            test_queries=tq_list,
+            fallback_model="m1",
+            baseline_default_score=0.60,
+            baseline_no_kb_score=0.10,  # very low → no_kb threshold won't trigger
+            judge_variance=0.05,
+            retrieval_score=1.0, health_score=1.0, coverage_score=1.0,
+            current_best_judge_score=0.80,  # current best, 2σ band = [0.70, 0.90]
+        )
+
+    assert result["status"] == "early_stopped"
+    assert result.get("early_stop_reason") == "below_best"
+    # With min_to_check = max(2, 8//4) = 2 and partial mean 0.20 < 0.70 threshold,
+    # the trial stops well before processing all 8 queries.
+    assert result["num_queries_judged"] < len(tq_list)
+
+
+def test_blended_quality_score_only_judge_varies_within_run():
+    """When retrieval/health/coverage are fixed, two trials' blend deltas equal
+    the judge delta scaled by BLEND_WEIGHT_JUDGE — this is the property that
+    justifies σ_blended = 0.40 × σ_judge in convergence + winner-selection."""
+    fixed = dict(retrieval_score=0.50, health_score=0.80, coverage_score=0.70)
+    blended_a = _blended_quality_score(judge_score=0.60, **fixed)
+    blended_b = _blended_quality_score(judge_score=0.80, **fixed)
+    judge_delta = 0.80 - 0.60
+    assert blended_b - blended_a == pytest.approx(BLEND_WEIGHT_JUDGE * judge_delta)
 
 
 def test_analyse_suggestions_coverage_gap_when_best_score_low():
@@ -167,6 +253,29 @@ def _make_run_doc(uuid="opt-1", **kw) -> MagicMock:
     return rd
 
 
+def _patch_invariants(
+    *,
+    health: float = 1.0,
+    coverage: float = 1.0,
+    retrieval: float = 1.0,
+):
+    """Return a list of patch context managers that stub the config-invariant
+    metrics ``_establish_baselines`` now reads at run start (health, coverage,
+    retrieval precision, default RAGConfig). Tests compose them into their
+    ``with`` blocks alongside the existing judge mocks."""
+    from app.services.kb_validation_service import RAGConfig
+    return [
+        patch.object(kb_optimizer.kb_validation_service, "check_source_health",
+                     new=AsyncMock(return_value={"ratio": health, "total": 1, "healthy": 1})),
+        patch.object(kb_optimizer.kb_validation_service, "check_chunk_coverage",
+                     new=AsyncMock(return_value={"ratio": coverage, "total": 1, "with_chunks": 1, "total_chunks": 1})),
+        patch.object(kb_optimizer.kb_validation_service, "check_retrieval_precision",
+                     new=AsyncMock(return_value={"avg_precision": retrieval, "total_queries": 1, "details": []})),
+        patch.object(kb_optimizer.kb_validation_service, "_resolve_rag_config",
+                     new=AsyncMock(return_value=RAGConfig())),
+    ]
+
+
 @pytest.mark.asyncio
 async def test_run_completes_with_no_test_queries_triggers_autogen():
     """If the KB has no expected_answer queries, run() auto-generates them."""
@@ -198,7 +307,15 @@ async def test_run_completes_with_no_test_queries_triggers_autogen():
              "num_queries_judged": 1, "num_queries_baselined": 1,
              "discrimination_summary": {"useful": 1, "redundant": 0, "failing": 0, "other": 0},
          })), \
-         patch.object(kb_optimizer.kb_validation_service, "_judge_answer", new=AsyncMock(return_value={"score": 0.7})):
+         patch.object(kb_optimizer.kb_validation_service, "_judge_answer", new=AsyncMock(return_value={"score": 0.7})), \
+         patch.object(kb_optimizer.kb_validation_service, "check_source_health",
+                      new=AsyncMock(return_value={"ratio": 1.0, "total": 1, "healthy": 1})), \
+         patch.object(kb_optimizer.kb_validation_service, "check_chunk_coverage",
+                      new=AsyncMock(return_value={"ratio": 1.0, "total": 1, "with_chunks": 1, "total_chunks": 1})), \
+         patch.object(kb_optimizer.kb_validation_service, "check_retrieval_precision",
+                      new=AsyncMock(return_value={"avg_precision": 1.0, "total_queries": 1, "details": []})), \
+         patch.object(kb_optimizer.kb_validation_service, "_resolve_rag_config",
+                      new=AsyncMock(return_value=kb_optimizer.kb_validation_service.RAGConfig())):
         KBR.find_one = AsyncMock(return_value=run_doc)
         KB.find_one = AsyncMock(return_value=fake_kb)
         # No existing test queries
@@ -214,8 +331,12 @@ async def test_run_completes_with_no_test_queries_triggers_autogen():
 
     fake_gen.generate.assert_awaited_once()
     assert result.status == "completed"
+    # baseline_no_kb_score stays as raw judge (no KB → nothing to blend).
     assert result.baseline_no_kb_score == 0.3
-    assert result.baseline_default_score == 0.7
+    # baseline_default_score is now blended: 0.7*0.40 + 1.0*0.25 + 1.0*0.20 + 1.0*0.15 = 0.88.
+    assert result.baseline_default_score == pytest.approx(0.88, abs=1e-4)
+    # Raw judge default is persisted separately for lift CI math.
+    assert result.baseline_default_judge_score == 0.7
 
 
 @pytest.mark.asyncio
@@ -230,7 +351,7 @@ async def test_run_records_trials_and_picks_winner():
     call_count = {"n": 0}
     scores = [0.5, 0.7, 0.6, 0.9, 0.4]  # default-KB baseline + 4 trials
 
-    async def fake_judge(kb_uuid, queries, model, mode="judge"):
+    async def fake_judge(kb_uuid, queries, model, mode="judge", judge_model=None, concurrency=4, **_kw):
         n = call_count["n"]
         call_count["n"] += 1
         s = scores[n] if n < len(scores) else 0.5
@@ -250,7 +371,15 @@ async def test_run_records_trials_and_picks_winner():
              "details": [{"query_uuid": "tq-1", "baseline_judge": {"score": 0.2, "verdict": "FAIL"}}],
          })), \
          patch.object(kb_optimizer.kb_validation_service, "judge_test_queries", side_effect=fake_judge), \
-         patch.object(kb_optimizer.kb_validation_service, "_judge_answer", new=AsyncMock(return_value={"score": 0.5})):
+         patch.object(kb_optimizer.kb_validation_service, "_judge_answer", new=AsyncMock(return_value={"score": 0.5})), \
+         patch.object(kb_optimizer.kb_validation_service, "check_source_health",
+                      new=AsyncMock(return_value={"ratio": 1.0, "total": 1, "healthy": 1})), \
+         patch.object(kb_optimizer.kb_validation_service, "check_chunk_coverage",
+                      new=AsyncMock(return_value={"ratio": 1.0, "total": 1, "with_chunks": 1, "total_chunks": 1})), \
+         patch.object(kb_optimizer.kb_validation_service, "check_retrieval_precision",
+                      new=AsyncMock(return_value={"avg_precision": 1.0, "total_queries": 1, "details": []})), \
+         patch.object(kb_optimizer.kb_validation_service, "_resolve_rag_config",
+                      new=AsyncMock(return_value=kb_optimizer.kb_validation_service.RAGConfig())):
         KBR.find_one = AsyncMock(return_value=run_doc)
         KB.find_one = AsyncMock(return_value=fake_kb)
         find_call = MagicMock(); find_call.to_list = AsyncMock(return_value=[tq])
@@ -270,10 +399,11 @@ async def test_run_records_trials_and_picks_winner():
 
     assert run_doc.status == "completed"
     assert len(run_doc.trials) == 4
-    # Best score is max of [scores[1], scores[2], scores[3], scores[4]]
-    # = max(0.7, 0.6, 0.9, 0.4) = 0.9
-    assert run_doc.optimized_score == 0.9
-    assert run_doc.best_score_so_far == 0.9
+    # Best raw judge score is max(0.7, 0.6, 0.9, 0.4) = 0.9.
+    # optimized_score is now BLENDED (judge 40% + retrieval 25% + health 20%
+    # + coverage 15%): 0.4*0.9 + 0.25*1.0 + 0.2*1.0 + 0.15*1.0 = 0.96.
+    assert run_doc.optimized_score == pytest.approx(0.96, abs=1e-4)
+    assert run_doc.best_score_so_far == pytest.approx(0.96, abs=1e-4)
     assert run_doc.best_config is not None
 
 
@@ -301,7 +431,7 @@ async def test_run_honours_cancellation_between_trials():
         return fresh_doc_states.pop(0)
     find_run_one.first_call = True
 
-    async def fake_judge(kb_uuid, queries, model, mode="judge"):
+    async def fake_judge(kb_uuid, queries, model, mode="judge", judge_model=None, concurrency=4, **_kw):
         return {
             "details": [{"query_uuid": "tq-1", "judge": {"score": 0.5, "verdict": "WARN"}, "actual_answer": "x"}],
             "avg_judge_score": 0.5, "num_queries_judged": 1,
@@ -318,7 +448,15 @@ async def test_run_honours_cancellation_between_trials():
              "details": [{"query_uuid": "tq-1", "baseline_judge": {"score": 0.2, "verdict": "FAIL"}}],
          })), \
          patch.object(kb_optimizer.kb_validation_service, "judge_test_queries", side_effect=fake_judge), \
-         patch.object(kb_optimizer.kb_validation_service, "_judge_answer", new=AsyncMock(return_value={"score": 0.5})):
+         patch.object(kb_optimizer.kb_validation_service, "_judge_answer", new=AsyncMock(return_value={"score": 0.5})), \
+         patch.object(kb_optimizer.kb_validation_service, "check_source_health",
+                      new=AsyncMock(return_value={"ratio": 1.0, "total": 1, "healthy": 1})), \
+         patch.object(kb_optimizer.kb_validation_service, "check_chunk_coverage",
+                      new=AsyncMock(return_value={"ratio": 1.0, "total": 1, "with_chunks": 1, "total_chunks": 1})), \
+         patch.object(kb_optimizer.kb_validation_service, "check_retrieval_precision",
+                      new=AsyncMock(return_value={"avg_precision": 1.0, "total_queries": 1, "details": []})), \
+         patch.object(kb_optimizer.kb_validation_service, "_resolve_rag_config",
+                      new=AsyncMock(return_value=kb_optimizer.kb_validation_service.RAGConfig())):
         KBR.find_one = AsyncMock(side_effect=find_run_one)
         KB.find_one = AsyncMock(return_value=fake_kb)
         find_call = MagicMock(); find_call.to_list = AsyncMock(return_value=[tq])
@@ -346,7 +484,7 @@ async def test_run_apply_on_finish_writes_kb_override():
 
     call_count = {"n": 0}
 
-    async def fake_judge(kb_uuid, queries, model, mode="judge"):
+    async def fake_judge(kb_uuid, queries, model, mode="judge", judge_model=None, concurrency=4, **_kw):
         # First call is the default-KB baseline pass (score 0.4); subsequent
         # calls are per-trial and return the higher 0.85 winning score.
         n = call_count["n"]
@@ -373,7 +511,15 @@ async def test_run_apply_on_finish_writes_kb_override():
              "details": [{"query_uuid": "tq-1", "baseline_judge": {"score": 0.1, "verdict": "FAIL"}}],
          })), \
          patch.object(kb_optimizer.kb_validation_service, "judge_test_queries", side_effect=fake_judge), \
-         patch.object(kb_optimizer.kb_validation_service, "_judge_answer", new=AsyncMock(return_value={"score": 0.85})):
+         patch.object(kb_optimizer.kb_validation_service, "_judge_answer", new=AsyncMock(return_value={"score": 0.85})), \
+         patch.object(kb_optimizer.kb_validation_service, "check_source_health",
+                      new=AsyncMock(return_value={"ratio": 1.0, "total": 1, "healthy": 1})), \
+         patch.object(kb_optimizer.kb_validation_service, "check_chunk_coverage",
+                      new=AsyncMock(return_value={"ratio": 1.0, "total": 1, "with_chunks": 1, "total_chunks": 1})), \
+         patch.object(kb_optimizer.kb_validation_service, "check_retrieval_precision",
+                      new=AsyncMock(return_value={"avg_precision": 1.0, "total_queries": 1, "details": []})), \
+         patch.object(kb_optimizer.kb_validation_service, "_resolve_rag_config",
+                      new=AsyncMock(return_value=kb_optimizer.kb_validation_service.RAGConfig())):
         KBR.find_one = AsyncMock(return_value=run_doc)
         KB.find_one = AsyncMock(return_value=fake_kb)
         find_call = MagicMock(); find_call.to_list = AsyncMock(return_value=[tq])
@@ -394,15 +540,18 @@ async def test_run_apply_on_finish_writes_kb_override():
 
 
 @pytest.mark.asyncio
-async def test_run_marks_failed_on_unexpected_error():
+async def test_run_marks_failed_with_kb_not_found_classification():
+    """When the KB lookup fails, persist a classified error_code so the UI
+    FailedBanner can render plain-English remediation instead of the raw
+    exception."""
     run_doc = _make_run_doc()
 
     with patch.object(kb_optimizer, "KBOptimizationRun") as KBR, \
          patch.object(kb_optimizer, "KnowledgeBase") as KB:
         KBR.find_one = AsyncMock(return_value=run_doc)
-        KB.find_one = AsyncMock(return_value=None)  # KB missing → ValueError
+        KB.find_one = AsyncMock(return_value=None)  # KB missing → KBOptimizerError
 
-        with pytest.raises(ValueError, match="Knowledge base not found"):
+        with pytest.raises(kb_optimizer.KBOptimizerError, match="Knowledge base not found"):
             await KBOptimizer().run(
                 kb_uuid="kb-missing", user_id="u1", run_uuid="opt-1",
                 token_budget=100_000,
@@ -410,6 +559,8 @@ async def test_run_marks_failed_on_unexpected_error():
 
     assert run_doc.status == "failed"
     assert "Knowledge base not found" in (run_doc.error_message or "")
+    assert run_doc.error_code == "kb_not_found"
+    assert run_doc.error_context == {"kb_uuid": "kb-missing"}
 
 
 @pytest.mark.asyncio

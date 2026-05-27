@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from app.models.extraction_test_case import ExtractionTestCase
 
 from beanie import PydanticObjectId
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile
+from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile
 from fastapi.responses import StreamingResponse
 
 from app.dependencies import get_api_key_user, get_current_user
@@ -1468,12 +1468,20 @@ def _serialize_extraction_optimization_run(run) -> dict:
         "baseline_default_score": run.baseline_default_score,
         "optimized_score": run.optimized_score,
         "judge_variance": run.judge_variance,
+        "judge_score_se": getattr(run, "judge_score_se", None),
+        "tied_with_baseline": getattr(run, "tied_with_baseline", False),
+        "winner_selection_reason": getattr(run, "winner_selection_reason", None),
+        "excluded_models": getattr(run, "excluded_models", []) or [],
         "judge_model": run.judge_model,
         "best_config": run.best_config,
         "trials": run.trials,
         "field_breakdown": run.field_breakdown,
+        "winner_cross_field_summary": getattr(run, "winner_cross_field_summary", None),
+        "winner_cross_field_rule_breakdown": getattr(run, "winner_cross_field_rule_breakdown", []) or [],
+        "post_apply_validation": getattr(run, "post_apply_validation", None),
         "suggestions": run.suggestions,
         "previous_override": run.previous_override,
+        "apply_preview": getattr(run, "apply_preview", None),
         "options": run.options,
         "error_message": run.error_message,
         "started_at": run.started_at.isoformat() if run.started_at else None,
@@ -1490,6 +1498,132 @@ class StartExtractionOptimizationRequest(BaseModel):
     # scoring instead of strict string matching. Costs more tokens; produces
     # less false-failure noise on date/name/format variation.
     include_judge: bool = False
+
+
+@router.post("/search-sets/{uuid}/baseline-probe")
+async def extraction_baseline_probe(
+    uuid: str, request: Request, user: User = Depends(get_current_user),
+):
+    """Cheap no-settings baseline probe for the tuning wizard.
+
+    Runs extraction with empty config_override against a sample of test cases
+    that have expected values, judged by the user's resolved model. Lets the
+    wizard show the floor *before* the user commits a budget — mirrors KB's
+    ``/baseline-probe`` so both wizards build budget trust the same way.
+
+    Body:
+      - sample_size: int, default 5. Capped at [1, 50].
+      - case_uuids: list[str], optional. When provided, runs the probe on
+        exactly these test cases.
+
+    Returns:
+      {
+        "no_settings_score": float in [0,1] or null if nothing judgeable,
+        "num_cases_judged": int,
+        "sample_case_ids": list[str],
+        "tokens_used": int,
+        "duration_ms": int,
+      }
+    """
+    import random
+    import time
+
+    from app.models.extraction_test_case import ExtractionTestCase
+    from app.models.system_config import SystemConfig
+    from app.services.config_service import get_user_model_name
+    from app.services.extraction_optimizer import _score_to_unit
+    from app.services.extraction_tuning_service import _run_single_config
+    from app.services.search_set_service import (
+        get_extraction_field_metadata,
+        get_extraction_keys,
+    )
+
+    ss = await _get_search_set_or_404(uuid, user, manage=True)
+
+    body: dict = {}
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    requested_uuids: list[str] = list(body.get("case_uuids") or [])
+    try:
+        sample_size = int(body.get("sample_size", 5))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="sample_size must be an integer")
+    if sample_size < 1 or sample_size > 50:
+        raise HTTPException(status_code=422, detail="sample_size must be between 1 and 50")
+
+    all_cases = await ExtractionTestCase.find(
+        {"search_set_uuid": ss.uuid},
+    ).to_list()
+    judgeable = [
+        tc for tc in all_cases
+        if getattr(tc, "expected_values", None)
+        and any(v for v in tc.expected_values.values())
+    ]
+    if not judgeable:
+        return {
+            "no_settings_score": None,
+            "num_cases_judged": 0,
+            "sample_case_ids": [],
+            "tokens_used": 0,
+            "duration_ms": 0,
+        }
+
+    if requested_uuids:
+        wanted = set(requested_uuids)
+        sample = [tc for tc in judgeable if tc.uuid in wanted]
+    elif len(judgeable) <= sample_size:
+        sample = list(judgeable)
+    else:
+        sample = random.sample(judgeable, sample_size)
+
+    if not sample:
+        return {
+            "no_settings_score": None,
+            "num_cases_judged": 0,
+            "sample_case_ids": [],
+            "tokens_used": 0,
+            "duration_ms": 0,
+        }
+
+    baseline_model = await get_user_model_name(user.user_id)
+    if not baseline_model:
+        raise HTTPException(status_code=400, detail="No LLM model configured for this user")
+
+    keys = await get_extraction_keys(ss.uuid)
+    if not keys:
+        raise HTTPException(status_code=400, detail="No extraction fields defined")
+
+    sys_config = await SystemConfig.get_config()
+    sys_config_doc = sys_config.model_dump() if sys_config else {}
+    field_metadata = await get_extraction_field_metadata(ss.uuid)
+
+    started = time.monotonic()
+    result = await _run_single_config(
+        candidate={
+            "label": "baseline-probe",
+            "model": baseline_model,
+            "config_override": {},
+        },
+        keys=keys,
+        test_cases=sample,
+        sys_config_doc=sys_config_doc,
+        field_metadata=field_metadata,
+        num_runs=1,
+        judge_model=baseline_model,
+        cross_field_rules=[],
+    )
+    duration_ms = int((time.monotonic() - started) * 1000)
+
+    return {
+        "no_settings_score": _score_to_unit(result.get("score")),
+        "num_cases_judged": len(sample),
+        "sample_case_ids": [tc.uuid for tc in sample],
+        "tokens_used": int(result.get("judge_tokens", 0) or 0),
+        "duration_ms": duration_ms,
+    }
 
 
 @router.post("/search-sets/{uuid}/optimize")
@@ -1657,13 +1791,32 @@ async def cancel_extraction_optimization(
     return {"ok": True, "status": "cancel_requested"}
 
 
+class ApplyExtractionOptimizationRequest(BaseModel):
+    # Minimum cross-field pass-rate (0..1) the winning config must hit on the
+    # rules evaluated during the run. When omitted, the check is skipped.
+    # When set and the winner's pass_rate falls below this, returns 409 with
+    # the violating rules unless ``force=True``.
+    min_cf_pass_rate: Optional[float] = None
+    # Override the cross-field gate. Use when the user has reviewed the
+    # violations and still wants the config applied.
+    force: bool = False
+
+
 @router.post("/search-sets/{uuid}/optimize/{run_uuid}/apply")
 async def apply_extraction_optimization(
     uuid: str,
     run_uuid: str,
+    # Body is optional — the existing UI calls this endpoint with no body. Use
+    # ``Body(None)`` so FastAPI treats a missing body as None rather than 422.
+    req: Optional[ApplyExtractionOptimizationRequest] = Body(default=None),
     user: User = Depends(get_current_user),
 ) -> dict:
-    """Apply a completed run's best_config to the SearchSet override."""
+    """Apply a completed run's best_config to the SearchSet override.
+
+    When ``min_cf_pass_rate`` is supplied and the winning config's cross-field
+    pass rate falls below it, returns 409 with a structured payload listing the
+    failing rules. The caller can resubmit with ``force=True`` to apply anyway.
+    """
     from app.models.extraction_optimization_run import ExtractionOptimizationRun
 
     ss = await _get_search_set_or_404(uuid, user, manage=True)
@@ -1681,12 +1834,83 @@ async def apply_extraction_optimization(
     if not run.best_config:
         raise HTTPException(status_code=400, detail="Run has no best_config to apply")
 
+    # Normalize missing body to a defaults instance — UI callers don't send one.
+    body = req or ApplyExtractionOptimizationRequest()
+
+    # Cross-field apply-gate. Only meaningful when the run actually evaluated
+    # rules (winner_cross_field_summary populated and has a decisive pass_rate).
+    if (
+        body.min_cf_pass_rate is not None
+        and not body.force
+        and run.winner_cross_field_summary
+    ):
+        cf_pass_rate = run.winner_cross_field_summary.get("pass_rate")
+        if cf_pass_rate is not None and cf_pass_rate < float(body.min_cf_pass_rate):
+            failing = [
+                {
+                    "rule_id": r.get("rule_id"),
+                    "type": r.get("type"),
+                    "label": r.get("label"),
+                    "pass": r.get("pass"),
+                    "fail": r.get("fail"),
+                    "pass_rate": r.get("pass_rate"),
+                }
+                for r in (run.winner_cross_field_rule_breakdown or [])
+                if (r.get("fail") or 0) > 0
+            ]
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "cross_field_below_threshold",
+                    "message": (
+                        f"Winning config's cross-field pass rate is "
+                        f"{cf_pass_rate:.0%}, below the requested minimum of "
+                        f"{float(req.min_cf_pass_rate):.0%}. Re-submit with "
+                        "force=true to apply anyway."
+                    ),
+                    "pass_rate": cf_pass_rate,
+                    "min_required": float(req.min_cf_pass_rate),
+                    "failing_rules": failing,
+                },
+            )
+
     # Persist previous override on the run so revert can restore it.
     run.previous_override = ss.extraction_config_override
     ss.extraction_config_override = dict(run.best_config)
     ss.extraction_config_override_set_at = datetime.datetime.now(tz=datetime.timezone.utc)
     await ss.save()
     await run.save()
+
+    # Close the loop: re-validate the test set with the applied config so the
+    # completed-state panel can show "optimizer score → real post-apply score."
+    # Synchronous so the UI's refetch sees post_apply_validation populated.
+    from app.services.extraction_optimizer import run_post_apply_validation
+    await run_post_apply_validation(
+        run_doc=run,
+        search_set_uuid=ss.uuid,
+        user_id=user.user_id,
+        source="explicit_apply",
+    )
+
+    # Phase 4: record this apply on the unified quality timeline.
+    try:
+        from app.services import quality_service as _qs
+        score_pct = float((run.optimized_score or 0.0) * 100.0)
+        await _qs.record_optimizer_apply(
+            item_kind="search_set",
+            item_id=ss.uuid,
+            item_name=getattr(ss, "title", "") or "",
+            run_type="extraction",
+            score=score_pct,
+            user_id=user.user_id,
+            source_run_uuid=run.uuid,
+            applied_config=ss.extraction_config_override,
+            judge_model=run.judge_model,
+            judge_variance=run.judge_variance,
+        )
+    except Exception:
+        logger.warning("Failed to record optimizer-apply ValidationRun for SearchSet %s", ss.uuid)
+
     return {"ok": True, "applied_config": ss.extraction_config_override}
 
 
@@ -1787,18 +2011,49 @@ async def run_validation_v2(request: Request, req: RunValidationV2Request, user:
 async def get_cross_field_rules(uuid: str, user: User = Depends(get_current_user)) -> dict:
     """Get cross-field validation rules for a search set."""
     ss = await _get_search_set_or_404(uuid, user)
-    return {"rules": ss.cross_field_rules}
+    rules = ss.normalized_cross_field_rules()
+    # Stamp normalized ids/counters back to disk on read — one-time migration
+    # for legacy rules. After this, every persisted rule carries an id.
+    if rules != ss.cross_field_rules:
+        ss.cross_field_rules = rules
+        await ss.save()
+    return {"rules": rules}
 
 
 @router.put("/search-sets/{uuid}/cross-field-rules")
 async def update_cross_field_rules(uuid: str, request: Request, user: User = Depends(get_current_user)) -> dict:
-    """Update cross-field validation rules for a search set."""
+    """Update cross-field validation rules for a search set.
+
+    Preserves counters on rules that the client sends back with an existing
+    id — UI edits the params but shouldn't reset eval/pass/fail history.
+    """
+    from app.services.cross_field_rules import (
+        normalize_rules,
+        validate_rule_shape,
+    )
+
     body = await request.json()
-    rules = body.get("rules", [])
+    incoming = body.get("rules", [])
 
     ss = await _get_search_set_or_404(uuid, user, manage=True)
 
-    ss.cross_field_rules = rules
+    for r in incoming:
+        ok, err = validate_rule_shape(r)
+        if not ok:
+            raise HTTPException(status_code=400, detail=err)
+
+    existing_by_id = {r.get("id"): r for r in ss.cross_field_rules if r.get("id")}
+    merged: list[dict] = []
+    for incoming_rule in incoming:
+        rid = incoming_rule.get("id")
+        if rid and rid in existing_by_id:
+            base = dict(existing_by_id[rid])
+            base.update(incoming_rule)
+            merged.append(base)
+        else:
+            merged.append(incoming_rule)
+
+    ss.cross_field_rules = normalize_rules(merged)
     await ss.save()
     return {"rules": ss.cross_field_rules}
 
@@ -1814,13 +2069,48 @@ async def validate_cross_field(uuid: str, request: Request, user: User = Depends
     if not ss.cross_field_rules:
         return {"results": [], "message": "No cross-field rules defined"}
 
-    from app.services.cross_field_validation import CrossFieldValidator
+    from app.services.cross_field_validation import CrossFieldValidator, summarize_results
     validator = CrossFieldValidator()
-    results = validator.validate(data, ss.cross_field_rules)
-
-    passed = sum(1 for r in results if r["passed"])
-    total = len(results)
+    rules = ss.normalized_cross_field_rules()
+    results = validator.validate(data, rules)
+    summary = summarize_results(results)
     return {
         "results": results,
-        "summary": {"passed": passed, "failed": total - passed, "total": total},
+        "summary": summary,
     }
+
+
+@router.post("/search-sets/{uuid}/cross-field-rules/{rule_id}/mark-false-positive")
+async def mark_rule_false_positive(
+    uuid: str,
+    rule_id: str,
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Mark a rule's most recent verdict as a false positive.
+
+    Bumps the rule's fp_count. If fp_count/eval_count crosses the threshold,
+    the rule is auto-disabled so it stops dragging down the optimizer score
+    until the user fixes or re-enables it.
+    """
+    from app.services.cross_field_rules import apply_false_positive, normalize_rules
+
+    ss = await _get_search_set_or_404(uuid, user, manage=True)
+    rules = ss.normalized_cross_field_rules()
+    changed, rule = apply_false_positive(rules, rule_id)
+    if not changed:
+        raise HTTPException(status_code=404, detail="Rule not found")
+    ss.cross_field_rules = normalize_rules(rules)
+    await ss.save()
+    return {"rule": rule}
+
+
+@router.post("/search-sets/{uuid}/cross-field-rules/suggest")
+async def suggest_cross_field_rules(uuid: str, user: User = Depends(get_current_user)) -> dict:
+    """Propose cross-field rules from the search set's field metadata."""
+    from app.services.cross_field_rules import suggest_rules
+    from app.services.search_set_service import get_extraction_field_metadata
+
+    ss = await _get_search_set_or_404(uuid, user)
+    field_metadata = await get_extraction_field_metadata(ss.uuid)
+    suggestions = suggest_rules(field_metadata, ss.normalized_cross_field_rules())
+    return {"suggestions": suggestions}

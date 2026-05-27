@@ -5,7 +5,7 @@ and LLM-as-judge answer evaluation (with optional baseline ablation for lift mea
 import asyncio
 import logging
 from contextvars import ContextVar
-from typing import Optional
+from typing import Callable, Optional
 
 import httpx
 from pydantic import BaseModel, Field
@@ -104,12 +104,87 @@ class RAGConfig(BaseModel):
     prompt_variant: str = "default"     # key into RAG_PROMPT_VARIANTS
     query_rewriting: bool = False       # if True, rewrite the user query via prompt agent before retrieval
     source_label_visibility: bool = True  # include "## Source: name" headers in the context block
+    # T4.1: "off" preserves legacy behaviour; "llm" retrieves 2k chunks and
+    # asks an LLM to pick the top-k by relevance to the query.
+    rerank: str = "off"
+    # T4.2: temperature passed to the answer-generation agent. Judge is pinned
+    # to 0.0 elsewhere; this only affects the RAG answer.
+    answer_temperature: float = 0.0
 
     model_config = {"extra": "forbid"}
 
     def with_overrides(self, **kw) -> "RAGConfig":
         """Return a copy with the given fields overridden."""
         return self.model_copy(update=kw)
+
+
+# Rerank-pool oversampling factor. With ``cfg.rerank="llm"`` we ask the
+# retriever for ``RERANK_POOL_MULTIPLIER × cfg.k`` candidates and then have
+# the LLM pick the top k. 2× is the standard rerank ratio — bigger pools
+# slow the rerank call without much marginal recall benefit.
+RERANK_POOL_MULTIPLIER = 2
+
+RERANKER_SYSTEM_PROMPT = (
+    "You rank retrieved knowledge-base chunks by how well they answer a "
+    "user's question. Given a question and a numbered list of candidate "
+    "chunks, return ONLY a JSON array of integer indices ordered from most "
+    "to least relevant. Include the requested number of indices (or fewer "
+    "if there aren't enough good matches). No prose, no markdown."
+)
+
+
+async def _llm_rerank(
+    query: str,
+    chunks: list[dict],
+    target_k: int,
+    model_name: str,
+) -> tuple[list[dict], int]:
+    """Use an LLM to rerank ``chunks`` and return the top ``target_k``.
+
+    Returns ``(ranked_chunks, tokens_used)``. On any failure falls back to
+    ``chunks[:target_k]`` (preserving original retrieval order) — rerank
+    should never crash the RAG path.
+    """
+    if len(chunks) <= target_k:
+        return chunks, 0
+
+    from app.services.workflow_validator import _extract_json
+
+    agent = _get_or_build_agent("kb_reranker", model_name, RERANKER_SYSTEM_PROMPT)
+    # Truncate chunk content for the rerank prompt — the model only needs
+    # enough text to judge relevance, not the whole chunk.
+    numbered = "\n\n".join(
+        f"[{i}] {(c.get('content') or '').strip()[:400]}"
+        for i, c in enumerate(chunks)
+    )
+    user_prompt = (
+        f"Question: {query}\n\n"
+        f"Candidates:\n{numbered}\n\n"
+        f"Return JSON array of the top {target_k} indices, most relevant first."
+    )
+
+    try:
+        run = await agent.run(user_prompt)
+        tokens = _usage_tokens(run)
+        raw = _extract_json(run.output or "")
+    except Exception as e:
+        logger.warning("LLM rerank failed; using original order: %s", e)
+        return chunks[:target_k], 0
+
+    if not isinstance(raw, list):
+        return chunks[:target_k], tokens
+
+    ranked: list[dict] = []
+    seen: set[int] = set()
+    for idx in raw[:target_k]:
+        try:
+            i = int(idx)
+        except (TypeError, ValueError):
+            continue
+        if 0 <= i < len(chunks) and i not in seen:
+            ranked.append(chunks[i])
+            seen.add(i)
+    return (ranked or chunks[:target_k]), tokens
 
 
 def _format_context_for_config(results: list[dict], cfg: RAGConfig) -> str:
@@ -269,15 +344,28 @@ async def _generate_kb_answer(
         retrieval_query = query
 
     dm = _get_dm()
-    results = await asyncio.to_thread(dm.query_kb, kb_uuid, retrieval_query, cfg.k)
+    # Reranking pulls a larger candidate pool from the vector store, then
+    # asks an LLM to pick the top cfg.k. Skips when results returned <=cfg.k
+    # (nothing to rerank).
+    retrieve_k = cfg.k * RERANK_POOL_MULTIPLIER if cfg.rerank == "llm" else cfg.k
+    results = await asyncio.to_thread(dm.query_kb, kb_uuid, retrieval_query, retrieve_k)
     if not results:
         return ("I could not find any relevant information in the knowledge base.", [], tokens)
+    if cfg.rerank == "llm":
+        results, rerank_tokens = await _llm_rerank(
+            query, results, cfg.k, effective_model,
+        )
+        tokens += rerank_tokens
 
     context = _format_context_for_config(results, cfg)
     instruction = RAG_PROMPT_VARIANTS.get(cfg.prompt_variant, RAG_PROMPT_VARIANTS["default"])
-    # Cache key includes the prompt variant so different variants don't collide.
-    purpose = f"kb_rag::{cfg.prompt_variant}"
-    agent = _get_or_build_agent(purpose, effective_model, RAG_SYSTEM_PROMPT)
+    # Cache key includes the prompt variant AND answer temperature so trial
+    # variations don't collide on the same agent instance.
+    purpose = f"kb_rag::{cfg.prompt_variant}::t{cfg.answer_temperature}"
+    agent = _get_or_build_agent(
+        purpose, effective_model, RAG_SYSTEM_PROMPT,
+        model_settings={"temperature": float(cfg.answer_temperature)},
+    )
     user_prompt = (
         f"Question: {query}\n\n"
         f"Retrieved context:\n{context}\n\n"
@@ -313,19 +401,108 @@ async def _generate_baseline_answer(query: str, model_name: str) -> tuple[str, i
 # ---------------------------------------------------------------------------
 
 
-KB_JUDGE_SYSTEM_PROMPT = (
-    "You are evaluating an answer against a canonical expected answer.\n"
-    "Return ONLY JSON (no markdown, no extra text) with this shape:\n"
+_KB_JUDGE_COMMON_TAIL = (
+    "\nReturn ONLY JSON (no markdown, no extra text) with this shape:\n"
     '{"score": 0.0..1.0, "verdict": "PASS|FAIL|WARN", "confidence": 0.0..1.0, '
     '"reasoning": "...", "evidence": "...", "missing_facts": [...], '
     '"hallucinated_facts": [...]}\n'
-    "Scoring guide:\n"
-    "- 1.0 = covers all expected facts, no contradictions, no hallucinations\n"
-    "- 0.5 = partial coverage OR one minor hallucination\n"
-    "- 0.0 = wrong, contradictory, or fabricated\n"
-    "Be lenient on phrasing, strict on facts.\n"
-    "Verdict mapping: score >= 0.7 -> PASS, 0.4..0.7 -> WARN, < 0.4 -> FAIL.\n"
+    "\n"
+    "General rules (apply across query types):\n"
+    "- Be lenient on phrasing, strict on facts. Length is not quality.\n"
+    "- A confident hallucination is still a FAIL. Confident phrasing is not\n"
+    "  evidence of grounding.\n"
+    "- When ``retrieved_context`` is provided, a claim that is grounded in the\n"
+    "  context but worded differently from ``expected_answer`` is PASS, not FAIL.\n"
+    "- Absence equality: when both expected and actual say 'not specified' /\n"
+    "  'N/A' / 'unknown', that's PASS.\n"
+    "- Verdict mapping: score >= 0.7 -> PASS, 0.4..0.7 -> WARN, < 0.4 -> FAIL.\n"
+    "- Reasoning must cite the specific discrepancy or agreement, not restate\n"
+    "  the values. ≤ 40 words.\n"
 )
+
+
+_KB_JUDGE_PROMPTS: dict[str, str] = {
+    "factoid": (
+        "You evaluate a SINGLE-FACT answer against an expected fact.\n"
+        "  1.0 — same fact, any reasonable formatting/synonym variation\n"
+        "        ('NIH' ≡ 'National Institutes of Health', '48.5%' ≡ '0.485').\n"
+        "  0.5 — right fact buried in extra text that adds no new claims, OR a\n"
+        "        right fact stated alongside a hedged-and-not-load-bearing extra.\n"
+        "  0.0 — wrong fact, hallucinated value, antonym, or unit error\n"
+        "        ('$1.2M' vs '$120,000' is FAIL).\n"
+    ),
+    "summarization": (
+        "You evaluate a MULTI-POINT SUMMARY against the set of facts the\n"
+        "expected answer covers.\n"
+        "  1.0 — every expected fact is represented (ordering and phrasing free).\n"
+        "  0.5 — most expected facts present; one minor fact missing or one\n"
+        "        minor inaccuracy; no fabricated facts.\n"
+        "  0.0 — multiple expected facts missing, a critical fact missing, or\n"
+        "        any single fact contradicted.\n"
+        "Do not credit padding/restated-question text as facts. Order does not\n"
+        "matter; presence does.\n"
+    ),
+    "multi_hop": (
+        "You evaluate an answer that requires combining multiple facts from\n"
+        "the context.\n"
+        "  1.0 — the final answer is correct AND each intermediate fact the\n"
+        "        actual answer cites is grounded.\n"
+        "  0.5 — final answer correct but one intermediate fact is wrong or\n"
+        "        unsupported; OR final answer is one of multiple equally-\n"
+        "        defensible interpretations.\n"
+        "  0.0 — final answer wrong, OR final answer happens to be correct but\n"
+        "        was reached by inventing an intermediate fact.\n"
+        "Reward grounded reasoning, not coincidental correctness.\n"
+    ),
+    "partial_coverage": (
+        "You evaluate an answer expected to cover a SET of items.\n"
+        "  1.0 — all expected items present; extras are allowed if grounded.\n"
+        "  0.5 — most expected items present (e.g. 2 of 3) and none invented.\n"
+        "  0.0 — most expected items missing OR an invented item is added.\n"
+        "Counting matters here: if expected says 'three required sections' and\n"
+        "actual gives one, that's FAIL, not WARN.\n"
+    ),
+    "hallucination_trap": (
+        "You evaluate an answer where the expected fact is correct but the\n"
+        "actual answer may add unsupported claims.\n"
+        "  1.0 — every claim is grounded in the retrieved context (or is the\n"
+        "        expected fact itself).\n"
+        "  0.5 — one borderline unsupported claim that is hedged ('approximately',\n"
+        "        'likely', 'possibly') and not load-bearing.\n"
+        "  0.0 — at least one specific, confident, unsupported claim — even\n"
+        "        when the original expected fact is correctly stated.\n"
+        "The hardest mode: do NOT credit a correct-fact wrapper around a\n"
+        "fabricated extension.\n"
+    ),
+    "absence": (
+        "You evaluate a question whose correct answer is 'not specified' /\n"
+        "'N/A' / 'unknown'.\n"
+        "  1.0 — actual answer also declines to invent ('not specified',\n"
+        "        'unknown', 'the document does not say', 'N/A').\n"
+        "  0.5 — actual answer hedges but introduces speculation\n"
+        "        ('possibly X, though the document does not say').\n"
+        "  0.0 — actual answer invents a value, OR — in the inverse case —\n"
+        "        the expected answer was a real fact and actual incorrectly\n"
+        "        says 'not specified'.\n"
+    ),
+}
+
+
+def _kb_judge_prompt_for_category(category: str | None) -> str:
+    """Pick the rubric for a KBTestQuery.category.
+
+    Unknown / missing categories fall back to ``factoid``, the most common
+    shape. Unknown categories also include the legacy 'other' bucket used by
+    ``_classify_discrimination``."""
+    key = (category or "").strip().lower().replace("-", "_")
+    return (_KB_JUDGE_PROMPTS.get(key) or _KB_JUDGE_PROMPTS["factoid"]) + _KB_JUDGE_COMMON_TAIL
+
+
+# Back-compat: callers and tests importing ``KB_JUDGE_SYSTEM_PROMPT`` get the
+# default (factoid) rubric. The kb_optimizer uses this exact string to compute
+# its rubric-version hash, so it's still the right canonical name for "the KB
+# judge prompt as a whole".
+KB_JUDGE_SYSTEM_PROMPT = _kb_judge_prompt_for_category(None)
 
 
 def _parse_kb_verdict(raw) -> dict:
@@ -377,19 +554,27 @@ async def _judge_answer(
     actual_answer: str,
     model_name: str,
     retrieved_context: str | None = None,
+    category: str | None = None,
 ) -> dict:
     """Run the LLM judge on a single (expected, actual) pair. Returns a parsed verdict.
 
     ``retrieved_context`` is included for the with-KB judge so the model can
     distinguish hallucination from grounded paraphrase. The baseline judge omits it.
+
+    ``category`` (from ``KBTestQuery.category``) selects a per-query-type
+    rubric — factoid, summarization, multi_hop, partial_coverage,
+    hallucination_trap, absence. None / unknown falls back to factoid.
+    The agent is cached per (category, model_name) so each rubric gets a stable
+    pydantic-ai client across queries.
     """
     # Lazy import to keep module import cheap.
     from app.services.workflow_validator import _extract_json
 
+    rubric_key = (category or "").strip().lower().replace("-", "_") or "factoid"
     agent = _get_or_build_agent(
-        "kb_judge",
+        f"kb_judge:{rubric_key}",
         model_name,
-        KB_JUDGE_SYSTEM_PROMPT,
+        _kb_judge_prompt_for_category(category),
         model_settings={"temperature": 0.0},
     )
 
@@ -418,9 +603,13 @@ async def _judge_answer(
             "missing_facts": [],
             "hallucinated_facts": [],
             "tokens_used": 0,
+            "comparator": "llm_error",
+            "rubric": rubric_key,
         }
     verdict = _parse_kb_verdict(raw)
     verdict["tokens_used"] = tokens
+    verdict["comparator"] = "llm"
+    verdict["rubric"] = rubric_key
     return verdict
 
 
@@ -445,11 +634,25 @@ async def judge_test_queries(
     *,
     mode: str = "judge",
     concurrency: int = 4,
+    judge_model: str | None = None,
+    early_stop_callback: "Callable[[list[float]], bool] | None" = None,
 ) -> dict:
     """Run RAG (and optionally baseline) + judge per query in parallel.
 
     Returns a dict with per-query details and aggregates suitable for merging
     into the retrieval_precision result block.
+
+    ``judge_model`` decouples the answer-generator model from the judge model.
+    When None (legacy default) the judge uses ``model_name`` — same as before.
+    The KB optimizer passes a pinned judge model so that sweeping ``cfg.model``
+    across trials doesn't let each trial judge itself (self-confirmation bias).
+
+    ``early_stop_callback`` is invoked after each per-query judgement completes
+    with the partial list of scores so far. Return True to cancel remaining
+    work — useful for optimizer trials that have already fallen below the no-KB
+    baseline at 25% of queries. When None (default) all queries always run.
+    Cancelled queries are recorded with verdict=``SKIPPED`` so the per-query
+    table still has one row per input query.
 
     Skips queries with no ``expected_answer`` (records ``judge: None``). Catches
     per-query exceptions so one bad query doesn't fail the whole run.
@@ -457,6 +660,8 @@ async def judge_test_queries(
     await _ensure_system_config_loaded()
     judgeable = [tq for tq in test_queries if getattr(tq, "expected_answer", None)]
     skipped = [tq for tq in test_queries if not getattr(tq, "expected_answer", None)]
+
+    effective_judge = judge_model or model_name
 
     sem = asyncio.Semaphore(max(1, concurrency))
     include_baseline = mode == "judge+baseline"
@@ -478,8 +683,9 @@ async def judge_test_queries(
                     query=tq.query,
                     expected_answer=tq.expected_answer,
                     actual_answer=actual_answer,
-                    model_name=model_name,
+                    model_name=effective_judge,
                     retrieved_context=context,
+                    category=getattr(tq, "category", None),
                 )
 
                 baseline_answer = None
@@ -496,8 +702,9 @@ async def judge_test_queries(
                         query=tq.query,
                         expected_answer=tq.expected_answer,
                         actual_answer=baseline_answer,
-                        model_name=model_name,
+                        model_name=effective_judge,
                         retrieved_context=None,
+                        category=getattr(tq, "category", None),
                     )
                     lift = with_judge["score"] - baseline_judge["score"]
 
@@ -549,12 +756,91 @@ async def judge_test_queries(
                     "tokens_used": 0,
                 }
 
-    judged_results = await asyncio.gather(*(judge_one(tq) for tq in judgeable))
+    judged_results: list[dict] = []
+    early_stopped = False
+    if early_stop_callback is None:
+        # Legacy fast path — no early-stop, no per-query callback overhead.
+        judged_results = list(
+            await asyncio.gather(*(judge_one(tq) for tq in judgeable))
+        )
+    else:
+        # Launch all judges; consume as they complete so we can run the
+        # callback after each completion and cancel the rest when it returns
+        # True. Cancelled tasks become SKIPPED entries so the per-query table
+        # still has one row per input query.
+        tasks: list[tuple[object, asyncio.Task]] = [
+            (tq, asyncio.create_task(judge_one(tq))) for tq in judgeable
+        ]
+        task_to_tq = {t: tq for tq, t in tasks}
+        pending = {t for _, t in tasks}
+        try:
+            for fut in asyncio.as_completed([t for _, t in tasks]):
+                try:
+                    result = await fut
+                except asyncio.CancelledError:
+                    continue
+                judged_results.append(result)
+                pending.discard(getattr(result, "_task", None))  # best-effort
+                partial_scores = [
+                    r["judge"]["score"] for r in judged_results
+                    if r.get("judge") and r["judge"].get("verdict") != "SKIPPED"
+                ]
+                try:
+                    should_stop = bool(early_stop_callback(partial_scores))
+                except Exception as e:  # pragma: no cover - defensive
+                    logger.warning("early_stop_callback raised, ignoring: %s", e)
+                    should_stop = False
+                if should_stop:
+                    early_stopped = True
+                    break
+        finally:
+            # Cancel anything still in flight and record those queries as
+            # SKIPPED so the run document keeps a per-query row for each one.
+            seen_uuids = {r.get("query_uuid") for r in judged_results}
+            for tq, t in tasks:
+                if not t.done():
+                    t.cancel()
+            # Drain cancellations so we don't leak warnings; ignore results.
+            for tq, t in tasks:
+                if t.cancelled() or not t.done():
+                    try:
+                        await t
+                    except (asyncio.CancelledError, Exception):
+                        pass
+                qid = getattr(tq, "uuid", "")
+                if qid in seen_uuids:
+                    continue
+                judged_results.append({
+                    "query_uuid": qid,
+                    "query": getattr(tq, "query", ""),
+                    "category": getattr(tq, "category", None),
+                    "actual_answer": "",
+                    "baseline_answer": None,
+                    "judge": {
+                        "score": 0.0,
+                        "verdict": "SKIPPED",
+                        "confidence": 0.0,
+                        "reasoning": "early-stop: trial cancelled below baseline",
+                        "evidence": "",
+                        "missing_facts": [],
+                        "hallucinated_facts": [],
+                        "tokens_used": 0,
+                    },
+                    "baseline_judge": None,
+                    "lift": None,
+                    "discrimination": None,
+                    "tokens_used": 0,
+                })
 
     # Persist last_judged_score / last_judged_at on each judged query (best-effort).
+    # Only for queries we actually scored (skip SKIPPED entries from early-stop).
     import datetime as _dt
     now = _dt.datetime.now(tz=_dt.timezone.utc)
-    for tq, jr in zip(judgeable, judged_results):
+    by_uuid = {r.get("query_uuid"): r for r in judged_results}
+    for tq in judgeable:
+        jr = by_uuid.get(getattr(tq, "uuid", ""))
+        if not jr or not jr.get("judge") or jr["judge"].get("verdict") == "SKIPPED":
+            continue
         try:
             tq.last_judged_score = float(jr["judge"]["score"])
             tq.last_judged_at = now
@@ -608,6 +894,7 @@ async def judge_test_queries(
         "avg_lift": round(avg_lift, 3) if avg_lift is not None else None,
         "discrimination_summary": summary_counts,
         "tokens_used": tokens_used,
+        "early_stopped": early_stopped,
     }
 
 
@@ -683,12 +970,39 @@ async def _sample_judge_variance(
     test_queries_by_uuid: dict,
     model_name: str,
 ) -> tuple[float | None, int]:
-    """Re-judge a small sample to estimate judge nondeterminism (KB-specific wrapper).
+    """Legacy tuple-returning wrapper. Prefer ``_sample_judge_variance_detailed``
+    in new code so UIs can show n and the sampled query uuids."""
+    result = await _sample_judge_variance_detailed(
+        kb_uuid, judged_details, test_queries_by_uuid, model_name,
+    )
+    return (result.sigma, result.tokens_used)
 
-    Filters out SKIPPED verdicts and queries with no expected_answer, then
-    delegates to ``judge_variance.sample_judge_variance`` for the loop + math.
+
+async def _sample_judge_variance_detailed(
+    kb_uuid: str,
+    judged_details: list[dict],
+    test_queries_by_uuid: dict,
+    model_name: str,
+    max_samples: int | None = None,
+):
+    """Re-judge a small sample to estimate judge nondeterminism (KB-specific).
+
+    Returns ``JudgeVarianceResult`` with sigma, n, sampled_query_uuids, tokens.
+
+    ``max_samples`` defaults to ``DEFAULT_VARIANCE_SAMPLES`` (5): enough
+    degrees of freedom that the sample-stddev estimate is informative rather
+    than a one-point measurement, at a cost of ~25k extra judge tokens —
+    within Conservative-tier budgets and required for the variance-aware
+    winner selection in the optimizer to mean anything. Items are biased
+    toward the PARTIAL band (0.4–0.7) where judge nondeterminism actually
+    lives; clean PASS/FAIL items would underestimate σ.
     """
-    from app.services.judge_variance import sample_judge_variance
+    from app.services.judge_variance import (
+        DEFAULT_VARIANCE_SAMPLES,
+        sample_judge_variance_detailed,
+    )
+    if max_samples is None:
+        max_samples = DEFAULT_VARIANCE_SAMPLES
 
     await _ensure_system_config_loaded()
 
@@ -714,11 +1028,12 @@ async def _sample_judge_variance(
         )
         return float(replay["score"]), int(replay.get("tokens_used", 0) or 0)
 
-    return await sample_judge_variance(
+    return await sample_judge_variance_detailed(
         samples=samples,
         judge_fn=judge_one,
         original_score=lambda s: float(s[0]["judge"]["score"]),
-        max_samples=2,
+        sample_uuid=lambda s: str(s[0].get("query_uuid") or ""),
+        max_samples=max_samples,
     )
 
 
@@ -943,9 +1258,18 @@ async def run_kb_validation(
                 )
                 if prior is None:
                     by_uuid = {q.uuid: q for q in test_queries}
-                    judge_variance, _variance_tokens = await _sample_judge_variance(
+                    variance_result = await _sample_judge_variance_detailed(
                         kb_uuid, judge_payload["details"], by_uuid, judge_model_used,
                     )
+                    judge_variance = variance_result.sigma
+                    _variance_tokens = variance_result.tokens_used
+                    # Pass the richer metadata downstream — the manual-run UI
+                    # uses ``judge_variance_meta`` to say "σ from n=2 on Q3, Q7".
+                    judge_payload["judge_variance_meta"] = {
+                        "sigma": variance_result.sigma,
+                        "n": variance_result.n,
+                        "sampled_query_uuids": list(variance_result.sampled_query_uuids),
+                    }
                     # Variance sampling tokens add to the run's accounting so
                     # the persisted ValidationRun reflects all token spend.
                     judge_payload["tokens_used"] = (
@@ -989,6 +1313,8 @@ async def run_kb_validation(
         retrieval["num_queries_baselined"] = judge_payload.get("num_queries_baselined", 0)
         retrieval["discrimination_summary"] = judge_payload.get("discrimination_summary")
         retrieval["judge_variance"] = judge_variance
+        if judge_payload.get("judge_variance_meta"):
+            retrieval["judge_variance_meta"] = judge_payload["judge_variance_meta"]
 
     # Scoring.
     retrieval_score = retrieval["avg_precision"] * 100

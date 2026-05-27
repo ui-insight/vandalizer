@@ -177,10 +177,11 @@ async def test_nonzero_variance_when_verdicts_flip():
             plan=_plan(), last_result=_last_result(), wf_data={},
             original_checks_per_run=[original],
         )
-    # Deltas are [0, 1.0, 0]. mean = 0.333; variance = (0.111 + 0.444 + 0.111)/3 = 0.222
-    # stddev = sqrt(0.222) ≈ 0.471
+    # Signed deltas (replay − original) are [0, -1.0, 0]. mean = -0.333;
+    # sample variance (n-1) = (0.111 + 0.444 + 0.111) / 2 = 0.333;
+    # stddev = sqrt(0.333) ≈ 0.577.
     assert out is not None
-    assert 0.4 < out < 0.5
+    assert 0.5 < out < 0.65
 
 
 @pytest.mark.asyncio

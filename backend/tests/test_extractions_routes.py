@@ -64,6 +64,9 @@ def _mock_search_set(**overrides):
     ss.fillable_pdf_url = overrides.get("fillable_pdf_url", None)
     ss.item_count = AsyncMock(return_value=overrides.get("item_count", 3))
     ss.cross_field_rules = overrides.get("cross_field_rules", [])
+    # Mirror the real SearchSet helper: by default the normalized view returns
+    # the raw rules unchanged. Tests that want migration behavior can override.
+    ss.normalized_cross_field_rules = MagicMock(return_value=ss.cross_field_rules)
     ss.tuning_result = overrides.get("tuning_result", None)
     ss.extraction_config_override = overrides.get("extraction_config_override", None)
     ss.extraction_config_override_set_at = overrides.get("extraction_config_override_set_at", None)
@@ -372,7 +375,9 @@ class TestExtractionsRoutes:
     async def test_get_cross_field_rules_success(self, client):
         user = _make_user()
         cookies, headers = _auth()
-        ss = _mock_search_set(cross_field_rules=[{"rule": "a > b"}])
+        ss = _mock_search_set(cross_field_rules=[
+            {"id": "r1", "type": "range_check", "field": "Score", "min": 0, "max": 100},
+        ])
 
         with (
             patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
@@ -389,7 +394,10 @@ class TestExtractionsRoutes:
             )
 
         assert resp.status_code == 200
-        assert resp.json()["rules"] == [{"rule": "a > b"}]
+        rules = resp.json()["rules"]
+        assert len(rules) == 1
+        assert rules[0]["type"] == "range_check"
+        assert rules[0]["field"] == "Score"
 
     @pytest.mark.asyncio
     async def test_update_cross_field_rules_success(self, client):
@@ -408,7 +416,9 @@ class TestExtractionsRoutes:
 
             resp = await client.put(
                 "/api/extractions/search-sets/ss-uuid-1/cross-field-rules",
-                json={"rules": [{"rule": "x == y"}]},
+                json={"rules": [
+                    {"type": "range_check", "field": "Score", "min": 0, "max": 100},
+                ]},
                 cookies=cookies,
                 headers=headers,
             )
@@ -1022,3 +1032,118 @@ class TestExtractionsRoutes:
 
         assert resp.status_code == 200
         assert resp.json()["ok"] is True
+
+
+class TestExtractionBaselineProbe:
+    """Cover the cheap no-settings probe used by the tuning wizard."""
+
+    @pytest.mark.asyncio
+    async def test_returns_404_when_search_set_missing(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.extractions.access_control") as mock_ac,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_ac.get_authorized_search_set = AsyncMock(return_value=None)
+            resp = await client.post(
+                "/api/extractions/search-sets/missing/baseline-probe",
+                json={}, cookies=cookies, headers=headers,
+            )
+        assert resp.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_rejects_invalid_sample_size(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+        ss = _mock_search_set()
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.extractions.access_control") as mock_ac,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_ac.get_authorized_search_set = AsyncMock(return_value=ss)
+            resp = await client.post(
+                "/api/extractions/search-sets/ss-uuid-1/baseline-probe",
+                json={"sample_size": 999},
+                cookies=cookies, headers=headers,
+            )
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_returns_score_for_judgeable_cases(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+        ss = _mock_search_set()
+
+        judgeable = MagicMock(uuid="tc1", expected_values={"PI Name": "Smith"})
+        unjudgeable = MagicMock(uuid="tc2", expected_values={})
+
+        find_result = MagicMock()
+        find_result.to_list = AsyncMock(return_value=[judgeable, unjudgeable])
+
+        sys_cfg = MagicMock()
+        sys_cfg.model_dump = MagicMock(return_value={})
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.extractions.access_control") as mock_ac,
+            patch("app.models.extraction_test_case.ExtractionTestCase.find", return_value=find_result),
+            patch("app.services.config_service.get_user_model_name", new_callable=AsyncMock) as mock_model,
+            patch("app.services.search_set_service.get_extraction_keys", new_callable=AsyncMock) as mock_keys,
+            patch("app.services.search_set_service.get_extraction_field_metadata", new_callable=AsyncMock) as mock_meta,
+            patch("app.models.system_config.SystemConfig.get_config", new_callable=AsyncMock) as mock_sys,
+            patch("app.services.extraction_tuning_service._run_single_config", new_callable=AsyncMock) as mock_run,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_ac.get_authorized_search_set = AsyncMock(return_value=ss)
+            mock_model.return_value = "claude-haiku"
+            mock_keys.return_value = ["PI Name"]
+            mock_meta.return_value = []
+            mock_sys.return_value = sys_cfg
+            mock_run.return_value = {"score": 42.0, "judge_tokens": 1500}
+
+            resp = await client.post(
+                "/api/extractions/search-sets/ss-uuid-1/baseline-probe",
+                json={"sample_size": 5},
+                cookies=cookies, headers=headers,
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["no_settings_score"] == 0.42
+        assert body["num_cases_judged"] == 1
+        assert body["sample_case_ids"] == ["tc1"]
+        assert body["tokens_used"] == 1500
+        assert "duration_ms" in body
+
+    @pytest.mark.asyncio
+    async def test_returns_null_score_when_no_judgeable_cases(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+        ss = _mock_search_set()
+        find_result = MagicMock()
+        find_result.to_list = AsyncMock(return_value=[])
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.extractions.access_control") as mock_ac,
+            patch("app.models.extraction_test_case.ExtractionTestCase.find", return_value=find_result),
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_ac.get_authorized_search_set = AsyncMock(return_value=ss)
+            resp = await client.post(
+                "/api/extractions/search-sets/ss-uuid-1/baseline-probe",
+                json={}, cookies=cookies, headers=headers,
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["no_settings_score"] is None
+        assert body["num_cases_judged"] == 0
+        assert body["sample_case_ids"] == []

@@ -829,7 +829,7 @@ async def get_extraction_plan(
     return ExtractionPlanResponse(
         search_set_uuid=ss.uuid,
         title=ss.title,
-        cross_field_rules=ss.cross_field_rules,
+        cross_field_rules=ss.normalized_cross_field_rules(),
         test_cases=[_testcase_to_item(c) for c in cases],
     )
 
@@ -975,10 +975,28 @@ async def update_cross_field_rules(
     body: UpdateCrossFieldRulesBody,
     _: ApiKey = Depends(require_mgmt_scope("validation:write")),
 ):
+    from app.services.cross_field_rules import normalize_rules, validate_rule_shape
+
     ss = await SearchSet.find_one(SearchSet.uuid == search_set_uuid)
     if not ss:
         raise HTTPException(status_code=404, detail="Search set not found")
-    ss.cross_field_rules = body.rules
+
+    for r in body.rules:
+        ok, err = validate_rule_shape(r)
+        if not ok:
+            raise HTTPException(status_code=400, detail=err)
+
+    existing_by_id = {r.get("id"): r for r in ss.cross_field_rules if r.get("id")}
+    merged: list[dict] = []
+    for incoming in body.rules:
+        rid = incoming.get("id")
+        if rid and rid in existing_by_id:
+            base = dict(existing_by_id[rid])
+            base.update(incoming)
+            merged.append(base)
+        else:
+            merged.append(incoming)
+    ss.cross_field_rules = normalize_rules(merged)
     await ss.save()
     return {"search_set_uuid": ss.uuid, "rules": ss.cross_field_rules}
 

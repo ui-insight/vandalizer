@@ -72,3 +72,12 @@ class SearchSet(Document):
         return await SearchSetItem.find(
             SearchSetItem.searchset == self.uuid
         ).count()
+
+    def normalized_cross_field_rules(self) -> list[dict]:
+        """Return cross-field rules with ids/counters stamped in.
+
+        Lazy import — avoids a circular at module load between
+        `app.models.search_set` and `app.services.cross_field_rules`.
+        """
+        from app.services.cross_field_rules import normalize_rules
+        return normalize_rules(self.cross_field_rules)

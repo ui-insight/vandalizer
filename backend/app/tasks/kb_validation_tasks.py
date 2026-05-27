@@ -213,3 +213,131 @@ async def _kb_optimization_janitor_async() -> dict:
     if reaped:
         logger.info("KB optimization janitor reaped %d orphan run(s)", reaped)
     return {"reaped": reaped, "scanned": len(stuck)}
+
+
+# ---------------------------------------------------------------------------
+# Passive monthly re-validation of applied KB tunings.
+#
+# Closes the feedback loop after Apply: once a config is live on a KB, no
+# part of the system re-checks whether it still wins on fresh queries. KB
+# content drifts and the applied config may quietly stop helping. This task
+# re-runs the validation judge on every KB with a live ``rag_config_override``
+# and emits a ``regression`` QualityAlert when the headline score has fallen
+# more than 10pts vs the originally applied optimization run's optimized score.
+# ---------------------------------------------------------------------------
+
+
+# Regression detection thresholds for the passive sweep.
+REGRESSION_DELTA_THRESHOLD = -0.10  # 10pts drop on 0..1 scale
+CRITICAL_DELTA_THRESHOLD = -0.20    # 20pts drop → critical instead of warning
+REGRESSION_MIN_QUERIES = 5          # require at least this many judged queries
+
+
+@celery.task(
+    bind=True,
+    name="tasks.passive.kb_revalidate_applied",
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
+    max_retries=1,
+)
+def kb_revalidate_applied(self):
+    """Monthly: re-judge KBs with live ``rag_config_override`` and alert on regressions."""
+    return _run_async(_kb_revalidate_applied_async())
+
+
+async def _kb_revalidate_applied_async() -> dict:
+    from app.config import Settings
+    from app.database import init_db
+
+    await init_db(Settings())
+
+    from app.models.kb_optimization_run import KBOptimizationRun
+    from app.models.knowledge import KnowledgeBase
+    from app.models.quality_alert import QualityAlert
+    from app.models.validation_run import ValidationRun
+    from app.services.kb_validation_service import run_kb_validation
+
+    tuned_kbs = await KnowledgeBase.find(
+        {
+            "rag_config_override": {"$ne": None},
+            "rag_config_override_run_uuid": {"$ne": None},
+        },
+    ).to_list()
+
+    rechecked = 0
+    regressions = 0
+    for kb in tuned_kbs:
+        run = await KBOptimizationRun.find_one(
+            {"uuid": kb.rag_config_override_run_uuid},
+        )
+        if run is None or run.optimized_score is None:
+            continue
+        try:
+            result = await run_kb_validation(kb.uuid, kb.user_id, mode="judge")
+        except Exception as e:
+            logger.warning("Passive re-validate failed for KB %s: %s", kb.uuid, e)
+            continue
+        rechecked += 1
+        # ``raw_score`` is 0..100 (validation header units); persist the same
+        # scale on ValidationRun so the existing quality-timeline chart needs
+        # no special-case branch for passive rows.
+        current_score_pct = float(result.get("raw_score") or 0.0)
+        current_score = current_score_pct / 100.0
+        applied_score = float(run.optimized_score or 0.0)
+        delta = current_score - applied_score
+        retrieval = result.get("retrieval_precision") or {}
+        n_judged = int(retrieval.get("num_queries_judged") or 0)
+
+        try:
+            await ValidationRun(
+                item_kind="knowledge_base",
+                item_id=kb.uuid,
+                item_name=kb.title or "",
+                run_type="kb_validation",
+                score=current_score_pct,
+                score_breakdown={
+                    "applied_score": round(applied_score, 4),
+                    "current_score": round(current_score, 4),
+                    "delta": round(delta, 4),
+                    "n_judged": n_judged,
+                },
+                result_snapshot={"raw_score": current_score_pct},
+                num_test_cases=n_judged,
+                user_id=kb.user_id,
+                source="passive_monthly",
+                source_run_uuid=run.uuid,
+            ).insert()
+        except Exception as e:  # pragma: no cover — defensive
+            logger.warning("Could not persist ValidationRun for KB %s: %s", kb.uuid, e)
+
+        if delta < REGRESSION_DELTA_THRESHOLD and n_judged >= REGRESSION_MIN_QUERIES:
+            regressions += 1
+            severity = "critical" if delta < CRITICAL_DELTA_THRESHOLD else "warning"
+            try:
+                await QualityAlert(
+                    alert_type="regression",
+                    item_kind="knowledge_base",
+                    item_id=kb.uuid,
+                    item_name=kb.title or "",
+                    severity=severity,
+                    message=(
+                        f"Applied KB tuning dropped {abs(delta) * 100:.0f}pts since apply "
+                        f"({applied_score * 100:.0f}% → {current_score * 100:.0f}%, "
+                        f"n={n_judged} queries). Re-run Autovalidate to find a fresh winner."
+                    ),
+                    previous_score=round(applied_score * 100.0, 1),
+                    current_score=round(current_score_pct, 1),
+                ).insert()
+            except Exception as e:  # pragma: no cover — defensive
+                logger.warning("Could not persist QualityAlert for KB %s: %s", kb.uuid, e)
+
+    if rechecked:
+        logger.info(
+            "Passive KB re-validation: rechecked %d, regressions %d, total tuned KBs %d",
+            rechecked, regressions, len(tuned_kbs),
+        )
+    return {
+        "rechecked": rechecked,
+        "regressions": regressions,
+        "scanned": len(tuned_kbs),
+    }

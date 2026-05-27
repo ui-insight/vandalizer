@@ -9,6 +9,7 @@ import {
   Circle, Hand, Keyboard, Sparkles, ShieldCheck, Type,
   ArrowRight, Pause, TrendingUp, RefreshCw,
   Upload, Clock, Copy, Check, FolderInput, Link2,
+  AlertTriangle, Info,
 } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
@@ -21,10 +22,13 @@ import {
   getWorkflowQualityHistory, getWorkflowImprovementSuggestions, getWorkflowQualityStatus,
   getValidationPlan, updateValidationPlan, generateValidationPlan,
   getValidationInputs, updateValidationInputs,
+  proposeTestCases, synthesizeTestCase, acceptTestCases,
+  getExpectedOutputs, deleteExpectedOutput,
   exportWorkflowUrl, importIntoWorkflow, getWorkflowHistory, duplicateWorkflow,
   improvePrompt,
 } from '../../api/workflows'
 import { RunHistoryTab } from './RunHistoryTab'
+import { WorkflowAutovalidatePanel } from './WorkflowAutovalidatePanel'
 import type { ValidationCheck, ValidationCheckDefinition, ValidationInputDefinition, QualityHistoryRun, BatchStatus, WorkflowQualityStatus, PromptImprovement } from '../../api/workflows'
 import { ItemPickerModal } from './ItemPickerModal'
 import { getModels } from '../../api/config'
@@ -51,6 +55,8 @@ import { relativeTime } from '../../utils/time'
 import { VerificationSubmitDialog } from '../shared/VerificationSubmitDialog'
 import { getReview, approveReview, rejectReview } from '../../api/reviews'
 import type { ReviewDetail } from '../../api/reviews'
+import { ColdStartHero } from '../shared/ColdStartHero'
+import { TermDef } from '../shared/TermDef'
 
 // ---------------------------------------------------------------------------
 // Types & constants
@@ -5164,6 +5170,37 @@ function ValidateTab({
   const [inputsLoading, setInputsLoading] = useState(false)
   const [showDocPicker, setShowDocPicker] = useState(false)
 
+  // Expected-output (test case) state — these are the workflow OUTPUTS that
+  // the optimizer scores trial configurations against. Without them, the
+  // optimizer hard-errors with "No test inputs available". The generator
+  // proposes candidates from past runs so users don't have to mark each one
+  // manually.
+  type ExpectedOutputEntry = {
+    id: string
+    session_id?: string
+    label?: string
+    output_text?: string
+    source?: string
+  }
+  type TestCaseProposalView = {
+    session_id: string
+    suggested_label: string
+    output_preview: string
+    output_length: number
+    confidence: number
+    why: string
+    created_at: string | null
+    selected: boolean
+    editedLabel: string
+  }
+  const [expectedOutputs, setExpectedOutputs] = useState<ExpectedOutputEntry[]>([])
+  const [proposalsOpen, setProposalsOpen] = useState(false)
+  const [proposalsLoading, setProposalsLoading] = useState(false)
+  const [proposals, setProposals] = useState<TestCaseProposalView[]>([])
+  const [proposalsNote, setProposalsNote] = useState<string | null>(null)
+  const [proposalsError, setProposalsError] = useState<string | null>(null)
+  const [synthesizing, setSynthesizing] = useState(false)
+
   // Combined run & validate state
   const [runPhase, setRunPhase] = useState<'idle' | 'running' | 'validating'>('idle')
   const [runProgress, setRunProgress] = useState('')
@@ -5191,6 +5228,17 @@ function ValidateTab({
     skip: number
     total: number
     evaluated: number
+    variance?: number | null
+  }>>([])
+  // Deterministic structural + runtime diagnostics — surfaced as a card
+  // above the LLM-judged scoring so blockers (dangling refs, hallucinations,
+  // empty steps) jump out before users debate the grade.
+  const [staticDiagnostics, setStaticDiagnostics] = useState<Array<{
+    code: string
+    level: 'error' | 'warning' | 'info'
+    message: string
+    target_step?: string | null
+    details?: Record<string, unknown>
   }>>([])
   const [error, setError] = useState<string | null>(null)
 
@@ -5272,7 +5320,105 @@ function ValidateTab({
     getWorkflowQualityHistory(workflowId)
       .then(r => setQualityHistory(r.runs))
       .catch(() => {})
+    refreshExpectedOutputs()
   }, [workflowId])
+
+  const refreshExpectedOutputs = useCallback(async () => {
+    if (!workflowId) return
+    try {
+      const data = await getExpectedOutputs(workflowId)
+      setExpectedOutputs(data.expected_outputs || [])
+    } catch {
+      /* non-fatal — empty list */
+    }
+  }, [workflowId])
+
+  const handleProposeTestCases = async () => {
+    if (!workflowId) return
+    setProposalsOpen(true)
+    setProposalsLoading(true)
+    setProposalsError(null)
+    setProposalsNote(null)
+    try {
+      const res = await proposeTestCases(workflowId, 5)
+      setProposalsNote(res.note ?? null)
+      setProposals(
+        res.proposals.map(p => ({
+          session_id: p.session_id,
+          suggested_label: p.suggested_label,
+          output_preview: p.output_preview,
+          output_length: p.output_length,
+          confidence: p.confidence,
+          why: p.why,
+          created_at: p.created_at,
+          selected: p.confidence >= 0.6,  // pre-select the ones the LLM was confident about
+          editedLabel: p.suggested_label,
+        })),
+      )
+    } catch (err) {
+      setProposalsError(err instanceof Error ? err.message : 'Failed to propose test cases')
+    } finally {
+      setProposalsLoading(false)
+    }
+  }
+
+  const handleAcceptProposals = async () => {
+    if (!workflowId) return
+    const picked = proposals.filter(p => p.selected)
+    if (picked.length === 0) {
+      setProposalsOpen(false)
+      return
+    }
+    setProposalsLoading(true)
+    setProposalsError(null)
+    try {
+      const labels: Record<string, string> = {}
+      for (const p of picked) {
+        if (p.editedLabel && p.editedLabel !== p.suggested_label) {
+          labels[p.session_id] = p.editedLabel
+        } else {
+          labels[p.session_id] = p.suggested_label
+        }
+      }
+      await acceptTestCases(workflowId, picked.map(p => p.session_id), labels)
+      await refreshExpectedOutputs()
+      setProposalsOpen(false)
+    } catch (err) {
+      setProposalsError(err instanceof Error ? err.message : 'Failed to save test cases')
+    } finally {
+      setProposalsLoading(false)
+    }
+  }
+
+  const handleSynthesizeSeed = async () => {
+    if (!workflowId) return
+    setSynthesizing(true)
+    setError(null)
+    try {
+      const res = await synthesizeTestCase(workflowId)
+      const newInput: ValidationInputDefinition = {
+        id: `synth-${Date.now()}`,
+        type: 'text',
+        label: res.label,
+        text: res.text,
+      }
+      saveInputs([...inputs, newInput])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to synthesize seed input')
+    } finally {
+      setSynthesizing(false)
+    }
+  }
+
+  const handleDeleteExpectedOutput = async (expectedId: string) => {
+    if (!workflowId) return
+    try {
+      await deleteExpectedOutput(workflowId, expectedId)
+      await refreshExpectedOutputs()
+    } catch {
+      /* non-fatal */
+    }
+  }
 
   // Cleanup SSE stream on unmount
   useEffect(() => {
@@ -5318,6 +5464,7 @@ function ValidateTab({
           : null
       )
       setStepBreakdown(res.step_breakdown ?? [])
+      setStaticDiagnostics(res.static_diagnostics ?? [])
       getWorkflowQualityHistory(workflowId)
         .then(r => setQualityHistory(r.runs))
         .catch(() => {})
@@ -5422,6 +5569,7 @@ function ValidateTab({
           : null
       )
       setStepBreakdown(res.step_breakdown ?? [])
+      setStaticDiagnostics(res.static_diagnostics ?? [])
       getWorkflowQualityHistory(workflowId)
         .then(r => setQualityHistory(r.runs))
         .catch(() => {})
@@ -5608,6 +5756,23 @@ function ValidateTab({
               >
                 <Type style={{ width: 11, height: 11 }} /> Add Text
               </button>
+              <button
+                onClick={handleSynthesizeSeed}
+                disabled={synthesizing}
+                title="Have the LLM draft a realistic seed input for this workflow"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  padding: '4px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+                  borderRadius: 5, border: '1px solid #d1d5db', backgroundColor: '#fff',
+                  color: synthesizing ? '#9ca3af' : '#374151', cursor: synthesizing ? 'wait' : 'pointer',
+                  opacity: synthesizing ? 0.7 : 1,
+                }}
+              >
+                {synthesizing
+                  ? <Loader2 style={{ width: 11, height: 11, animation: 'spin 1s linear infinite' }} />
+                  : <Sparkles style={{ width: 11, height: 11 }} />
+                } Synthesize
+              </button>
             </div>
           </div>
 
@@ -5710,6 +5875,92 @@ function ValidateTab({
           )}
         </div>
 
+        {/* ---- Expected Outputs Section ---- */}
+        {/* These are the workflow OUTPUTS that the optimizer scores trial
+            configurations against. The optimizer hard-errors with "No test
+            inputs available" until at least one is saved — the generator
+            removes that gate by proposing past runs as candidates. */}
+        <div style={{
+          border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, backgroundColor: '#fafafa',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>Expected Outputs</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+                Saved outputs from past runs. The optimizer compares trial configurations against these.
+              </div>
+            </div>
+            <button
+              onClick={handleProposeTestCases}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                padding: '4px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+                borderRadius: 5, border: '1px solid #d1d5db', backgroundColor: '#fff',
+                color: '#374151', cursor: 'pointer',
+              }}
+            >
+              <Sparkles style={{ width: 11, height: 11 }} /> Suggest from history
+            </button>
+          </div>
+
+          {expectedOutputs.length === 0 ? (
+            <div style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+              padding: '14px 16px', border: '2px dashed #e5e7eb', borderRadius: 8, marginTop: 4,
+            }}>
+              <div style={{ fontSize: 12, color: '#9ca3af', textAlign: 'center' }}>
+                None saved yet. Run the workflow at least once, then "Suggest from history" to nominate candidates.
+              </div>
+            </div>
+          ) : (
+            <div style={{
+              border: '1px solid #e5e7eb', borderRadius: 6, overflow: 'hidden', marginTop: 4,
+              backgroundColor: '#fff',
+            }}>
+              {expectedOutputs.map((eo, idx) => (
+                <div
+                  key={eo.id}
+                  style={{
+                    display: 'flex', alignItems: 'flex-start', gap: 10, padding: '8px 12px',
+                    borderBottom: idx < expectedOutputs.length - 1 ? '1px solid #f3f4f6' : 'none',
+                  }}
+                >
+                  <span style={{
+                    padding: '1px 6px', borderRadius: 4, fontSize: 9, fontWeight: 700,
+                    letterSpacing: '0.05em', textTransform: 'uppercase',
+                    backgroundColor: eo.source === 'test_case_generator' ? '#dcfce7' : '#dbeafe',
+                    color: eo.source === 'test_case_generator' ? '#15803d' : '#2563eb',
+                    whiteSpace: 'nowrap', marginTop: 3,
+                  }}>
+                    {eo.source === 'test_case_generator' ? 'AUTO' : 'GOLD'}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500, color: '#202124' }}>
+                      {eo.label || `Test case ${eo.id.slice(0, 8)}`}
+                    </div>
+                    {eo.output_text && (
+                      <div style={{
+                        fontSize: 11, color: '#6b7280', marginTop: 2,
+                        overflow: 'hidden', textOverflow: 'ellipsis',
+                        display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                      }}>
+                        {eo.output_text.slice(0, 200)}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => handleDeleteExpectedOutput(eo.id)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#9ca3af', display: 'flex', flexShrink: 0 }}
+                    title="Remove expected output"
+                  >
+                    <Trash2 style={{ width: 13, height: 13 }} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* ---- Validation Plan Section ---- */}
         <div style={{
           border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, backgroundColor: '#fafafa',
@@ -5744,27 +5995,32 @@ function ValidateTab({
               <span style={{ fontSize: 12, color: '#6b7280' }}>Loading plan...</span>
             </div>
           ) : planChecks.length === 0 && !generating ? (
-            <div style={{
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
-              padding: '24px 16px', border: '2px dashed #d1d5db', borderRadius: 8, marginTop: 8,
-            }}>
-              <ShieldCheck style={{ width: 28, height: 28, color: '#9ca3af' }} />
-              <div style={{ fontSize: 13, color: '#6b7280', textAlign: 'center' }}>
-                No validation plan yet. Generate one from your workflow structure.
-              </div>
-              <button
-                onClick={handleGenerate}
+            <div style={{ marginTop: 8 }}>
+              <ColdStartHero
+                theme="light"
+                headline="Get a quality grade for this workflow — and a checklist of fixes"
+                body={
+                  <>
+                    A validation plan is a checklist of things the output should
+                    get right. We propose it from your workflow's structure;
+                    you review and edit before any grading runs. <b>Nothing about
+                    your workflow changes.</b>
+                  </>
+                }
+                whatHappensNext={[
+                  "We'll propose a checklist of quality checks from your steps",
+                  'You review, edit, or remove any check you disagree with',
+                  "When you run the workflow, each check gets a pass / warn / fail — plus structural diagnostics that don't need a judge",
+                ]}
+                benefits={[
+                  'See which step is the weakest link',
+                  'Catch structural mistakes (missing data, broken JSON) automatically',
+                  'Compare against a no-workflow baseline to prove the workflow earns its complexity',
+                ]}
+                ctaLabel="Generate Plan"
+                onStart={handleGenerate}
                 disabled={generating}
-                style={{
-                  padding: '8px 20px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
-                  border: 'none', borderRadius: 6, cursor: 'pointer',
-                  backgroundColor: 'var(--highlight-color, #eab308)',
-                  color: 'var(--highlight-text-color, #000)',
-                  display: 'flex', alignItems: 'center', gap: 6,
-                }}
-              >
-                <Sparkles style={{ width: 14, height: 14 }} /> Generate Plan
-              </button>
+              />
             </div>
           ) : generating ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 16, justifyContent: 'center' }}>
@@ -6067,6 +6323,9 @@ function ValidateTab({
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 600, color: '#202124' }}>Validation Grade</div>
                 <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{gradeInfo.summary}</div>
+                <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4, lineHeight: 1.4 }}>
+                  A <TermDef term="judge" theme="light">judge</TermDef> compared each step's output to your expected answers. Lower grade = more checks failed or scored low.
+                </div>
               </div>
               {gradeInfo.variancePts != null && (
                 <div style={{
@@ -6080,6 +6339,14 @@ function ValidateTab({
               )}
             </div>
 
+            {/* Deterministic diagnostics — surface structural problems the
+                LLM judge can't reliably catch BEFORE the user debates the
+                grade. Rendered above the LLM-derived cards so blockers
+                jump out first. */}
+            {staticDiagnostics.length > 0 && (
+              <StaticDiagnosticsCard diagnostics={staticDiagnostics} />
+            )}
+
             {/* No-workflow baseline lift — answers "is this workflow worth its complexity?" */}
             {baselineInfo && (
               <NoWorkflowLiftCard info={baselineInfo} />
@@ -6087,7 +6354,9 @@ function ValidateTab({
 
             {/* Per-step breakdown — answers "which step is dragging the score?" */}
             {stepBreakdown.length > 0 && (
-              <StepBreakdownCard steps={stepBreakdown} />
+              <div id="step-breakdown">
+                <StepBreakdownCard steps={stepBreakdown} />
+              </div>
             )}
 
             {/* Improvement Suggestions */}
@@ -6354,6 +6623,175 @@ function ValidateTab({
           onClose={() => setShowDocPicker(false)}
           excludeUuids={inputs.filter(i => i.document_uuid).map(i => i.document_uuid!)}
         />
+      )}
+
+      {/* Workflow autovalidate (wizard-driven optimizer). Lives at the bottom
+         of the Validate tab so users see diagnostics first and reach for the
+         optimizer only when they want a closed-loop fix. */}
+      {workflowId && <WorkflowAutovalidatePanel workflowId={workflowId} />}
+
+      {/* ---- Test-case proposal modal ---- */}
+      {proposalsOpen && (
+        <div
+          onClick={() => !proposalsLoading && setProposalsOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 100,
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: '#fff', borderRadius: 10, padding: 24,
+              maxWidth: 720, width: '90%', maxHeight: '85vh', overflowY: 'auto',
+              boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 600, color: '#111827' }}>
+                  Suggest test cases from past runs
+                </div>
+                <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>
+                  Select the runs you want to keep as expected outputs. The optimizer will
+                  score trial configurations against each one.
+                </div>
+              </div>
+              <button
+                onClick={() => !proposalsLoading && setProposalsOpen(false)}
+                disabled={proposalsLoading}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4 }}
+              >
+                <X style={{ width: 18, height: 18 }} />
+              </button>
+            </div>
+
+            {proposalsError && (
+              <div style={{
+                padding: '8px 12px', background: '#fee2e2', color: '#991b1b',
+                borderRadius: 6, fontSize: 13, marginBottom: 12,
+              }}>
+                {proposalsError}
+              </div>
+            )}
+
+            {proposalsLoading && proposals.length === 0 ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32, gap: 8, color: '#6b7280' }}>
+                <Loader2 style={{ width: 16, height: 16, animation: 'spin 1s linear infinite' }} />
+                <span style={{ fontSize: 13 }}>Scoring candidates…</span>
+              </div>
+            ) : proposalsNote ? (
+              <div style={{
+                padding: 16, background: '#f9fafb', borderRadius: 8,
+                fontSize: 13, color: '#6b7280',
+              }}>
+                {proposalsNote}
+              </div>
+            ) : proposals.length === 0 ? (
+              <div style={{ padding: 16, fontSize: 13, color: '#6b7280' }}>
+                No candidates found.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {proposals.map((p, idx) => (
+                  <div
+                    key={p.session_id}
+                    style={{
+                      border: '1px solid #e5e7eb', borderRadius: 6, padding: 12,
+                      backgroundColor: p.selected ? '#f0fdf4' : '#fff',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                      <input
+                        type="checkbox"
+                        checked={p.selected}
+                        onChange={e => {
+                          const next = [...proposals]
+                          next[idx] = { ...p, selected: e.target.checked }
+                          setProposals(next)
+                        }}
+                        style={{ marginTop: 4 }}
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4 }}>
+                          <input
+                            value={p.editedLabel}
+                            onChange={e => {
+                              const next = [...proposals]
+                              next[idx] = { ...p, editedLabel: e.target.value }
+                              setProposals(next)
+                            }}
+                            style={{
+                              flex: 1, fontSize: 13, fontWeight: 500, color: '#111827',
+                              border: '1px solid #e5e7eb', borderRadius: 4, padding: '4px 8px',
+                              fontFamily: 'inherit', outline: 'none',
+                            }}
+                          />
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase',
+                            padding: '2px 6px', borderRadius: 4,
+                            background: p.confidence >= 0.7 ? '#dcfce7' : p.confidence >= 0.4 ? '#fef3c7' : '#fee2e2',
+                            color: p.confidence >= 0.7 ? '#15803d' : p.confidence >= 0.4 ? '#92400e' : '#991b1b',
+                          }}>
+                            {Math.round(p.confidence * 100)}% confidence
+                          </span>
+                        </div>
+                        {p.why && (
+                          <div style={{ fontSize: 11, color: '#6b7280', fontStyle: 'italic', marginBottom: 6 }}>
+                            {p.why}
+                          </div>
+                        )}
+                        <div style={{
+                          fontSize: 11, color: '#374151', background: '#f9fafb',
+                          padding: '6px 8px', borderRadius: 4, fontFamily: 'monospace',
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'pre-wrap',
+                          display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical',
+                        }}>
+                          {p.output_preview.slice(0, 400)}
+                        </div>
+                        <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 4 }}>
+                          {p.output_length} chars · session {p.session_id.slice(0, 8)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+              <button
+                onClick={() => setProposalsOpen(false)}
+                disabled={proposalsLoading}
+                style={{
+                  padding: '6px 14px', borderRadius: 6,
+                  background: '#fff', color: '#374151', border: '1px solid #d1d5db',
+                  fontSize: 13, fontWeight: 500, cursor: proposalsLoading ? 'wait' : 'pointer',
+                }}
+              >
+                Cancel
+              </button>
+              {proposals.length > 0 && (
+                <button
+                  onClick={handleAcceptProposals}
+                  disabled={proposalsLoading || proposals.filter(p => p.selected).length === 0}
+                  style={{
+                    padding: '6px 14px', borderRadius: 6,
+                    background: '#16a34a', color: '#fff', border: 'none',
+                    fontSize: 13, fontWeight: 600,
+                    cursor: proposalsLoading || proposals.filter(p => p.selected).length === 0 ? 'not-allowed' : 'pointer',
+                    opacity: proposalsLoading || proposals.filter(p => p.selected).length === 0 ? 0.6 : 1,
+                  }}
+                >
+                  {proposalsLoading
+                    ? 'Saving…'
+                    : `Save ${proposals.filter(p => p.selected).length} test case${proposals.filter(p => p.selected).length === 1 ? '' : 's'}`}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
@@ -6641,9 +7079,23 @@ function NoWorkflowLiftCard({
         <ScoreRow label="Your workflow" score={workflowScore} color="#3b82f6" />
         <ScoreRow label="No workflow (single prompt)" score={baselineScore} color="#9ca3af" />
       </div>
-      <p style={{ margin: 0, fontSize: 12, color: '#4b5563', lineHeight: 1.5 }}>
+      <p style={{ margin: '0 0 10px 0', fontSize: 12, color: '#4b5563', lineHeight: 1.5 }}>
         {explanation}
       </p>
+      <button
+        onClick={() => {
+          const el = document.getElementById('step-breakdown')
+          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }}
+        style={{
+          background: 'transparent', border: 'none', padding: 0,
+          fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+          color: liftColor, cursor: 'pointer',
+          textDecoration: 'underline dotted', textUnderlineOffset: 3,
+        }}
+      >
+        See per-step quality →
+      </button>
     </div>
   )
 }
@@ -6669,6 +7121,181 @@ function ScoreRow({ label, score, color }: { label: string; score: number; color
  * Each row: step name + score bar + status counts (pass / warn / fail / skip).
  * Score color follows the same green / amber / red banding as the overall grade.
  */
+
+/**
+ * Deterministic diagnostics card — structural and runtime issues the LLM
+ * judge can't reliably catch (dangling search-set refs, prompt-references-
+ * unproduced-field, empty / error-shaped step outputs, claimed-JSON that
+ * doesn't parse, plan staleness, hallucinated extractions).
+ *
+ * Ordered: errors first (blockers), warnings second (drift / advisories).
+ * Each item shows the level, the message, and the affected step when
+ * available. Friendlier copy than the raw code so the panel reads like
+ * a checklist instead of a log dump.
+ */
+function StaticDiagnosticsCard({
+  diagnostics,
+}: {
+  diagnostics: Array<{
+    code: string
+    level: 'error' | 'warning' | 'info'
+    message: string
+    target_step?: string | null
+  }>
+}) {
+  const errors = diagnostics.filter(d => d.level === 'error')
+  const warnings = diagnostics.filter(d => d.level === 'warning')
+  const info = diagnostics.filter(d => d.level === 'info')
+  const ordered = [...errors, ...warnings, ...info]
+  const headerColor = errors.length > 0 ? '#dc2626' : warnings.length > 0 ? '#d97706' : '#6b7280'
+  const headerBg = errors.length > 0 ? '#fef2f2' : warnings.length > 0 ? '#fffbeb' : '#f9fafb'
+  const headerBorder = errors.length > 0 ? '#fecaca' : warnings.length > 0 ? '#fde68a' : '#e5e7eb'
+  const headerText = errors.length > 0
+    ? `${errors.length} blocker${errors.length === 1 ? '' : 's'}${warnings.length ? `, ${warnings.length} warning${warnings.length === 1 ? '' : 's'}` : ''}`
+    : warnings.length > 0
+      ? `${warnings.length} warning${warnings.length === 1 ? '' : 's'}`
+      : `${info.length} note${info.length === 1 ? '' : 's'}`
+
+  return (
+    <div style={{
+      padding: 16, border: `1px solid ${headerBorder}`, borderRadius: 8,
+      backgroundColor: headerBg,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 12 }}>
+        <span style={{ fontSize: 14, fontWeight: 600, color: headerColor }}>
+          Structural diagnostics
+        </span>
+        <span style={{ fontSize: 12, color: headerColor }}>
+          {headerText} — these are deterministic checks, independent of the LLM judge.
+        </span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {ordered.map((d, i) => (
+          <DiagnosticRow key={`${d.code}-${i}`} diagnostic={d} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+
+// Plain-language title + suggested fix for each diagnostic code. The backend
+// emits prose messages that are already specific (step names, field names);
+// these complement that with a short label the eye lands on first, and a
+// concrete "what to do" so a beginner has a forward path beyond "ask AI".
+const DIAGNOSTIC_GUIDE: Record<string, { title: string; howToFix: string }> = {
+  dangling_search_set: {
+    title: 'Step points at a search set that no longer exists',
+    howToFix: 'Open the extraction step and re-select a current search set, or remove the step.',
+  },
+  prompt_unproduced_field: {
+    title: "Step references data that isn't created yet",
+    howToFix: 'Add or reorder an extraction step earlier in the workflow that produces these fields, or remove the reference from the prompt.',
+  },
+  invalid_json_output: {
+    title: "Step said it returned JSON, but the output isn't valid JSON",
+    howToFix: 'Tighten the prompt to insist on raw JSON only (no prose, no markdown fences), or switch to a model better at structured output.',
+  },
+  ungrounded_extracted_value: {
+    title: "Output value doesn't appear in the source document",
+    howToFix: 'Spot-check this field against the source. If the value is wrong, the model is guessing — try a stricter prompt or a more capable model.',
+  },
+  low_source_grounding: {
+    title: 'Many output values are missing from the source — likely guessing',
+    howToFix: 'Treat this step as unreliable until investigated. Inspect a few documents, then tighten the prompt or change the model.',
+  },
+  plan_stale_target_step: {
+    title: 'Validation plan was written for an older version of this workflow',
+    howToFix: 'Click Regenerate to refresh the plan against your current steps.',
+  },
+  plan_substantially_stale: {
+    title: 'Validation plan is out of date with the workflow',
+    howToFix: 'Click Regenerate. Most of your checks point at steps that no longer exist.',
+  },
+  empty_step_output: {
+    title: 'Step produced an empty output',
+    howToFix: 'Re-run the workflow with logging on, or test the step in isolation. The judge cannot tell empty from missing.',
+  },
+  error_shaped_step_output: {
+    title: 'Step output looks like an error message, not a real result',
+    howToFix: 'Check the model or API for failures — the step almost certainly errored at runtime.',
+  },
+}
+
+function DiagnosticRow({
+  diagnostic,
+}: {
+  diagnostic: {
+    code: string
+    level: 'error' | 'warning' | 'info'
+    message: string
+    target_step?: string | null
+  }
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const color = diagnostic.level === 'error' ? '#dc2626' : diagnostic.level === 'warning' ? '#d97706' : '#2563eb'
+  const Icon = diagnostic.level === 'error' ? XCircle : diagnostic.level === 'warning' ? AlertTriangle : Info
+  const guide = DIAGNOSTIC_GUIDE[diagnostic.code]
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'flex-start', gap: 10,
+      padding: '8px 10px', backgroundColor: '#fff',
+      border: `1px solid ${color}33`, borderRadius: 6,
+    }}>
+      <Icon style={{ width: 16, height: 16, color, flexShrink: 0, marginTop: 2 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        {guide ? (
+          <>
+            <div style={{ fontSize: 13, color: '#1f2937', fontWeight: 600, lineHeight: 1.4 }}>
+              {guide.title}
+            </div>
+            <div style={{ fontSize: 12, color: '#4b5563', marginTop: 3, lineHeight: 1.5 }}>
+              {diagnostic.message}
+            </div>
+          </>
+        ) : (
+          <div style={{ fontSize: 13, color: '#1f2937', lineHeight: 1.5 }}>
+            {diagnostic.message}
+          </div>
+        )}
+        {diagnostic.target_step && (
+          <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+            Step: {diagnostic.target_step}
+          </div>
+        )}
+        {guide && (
+          <>
+            <button
+              type="button"
+              onClick={() => setExpanded(v => !v)}
+              style={{
+                marginTop: 6, padding: 0, background: 'transparent', border: 'none',
+                color: '#7c3aed', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+                cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4,
+              }}
+              aria-expanded={expanded}
+            >
+              {expanded ? <ChevronDown style={{ width: 11, height: 11 }} /> : <ChevronRight style={{ width: 11, height: 11 }} />}
+              How to fix
+            </button>
+            {expanded && (
+              <div style={{
+                marginTop: 4, padding: '6px 10px',
+                fontSize: 12, color: '#374151', lineHeight: 1.5,
+                background: '#f9fafb', borderRadius: 4,
+                border: '1px solid #e5e7eb',
+              }}>
+                {guide.howToFix}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+
 function StepBreakdownCard({
   steps,
 }: {
@@ -6681,6 +7308,7 @@ function StepBreakdownCard({
     skip: number
     total: number
     evaluated: number
+    variance?: number | null
   }>
 }) {
   // Highlight the worst step so the user knows where to look first
@@ -6715,10 +7343,12 @@ function StepBreakdownCard({
 function StepRow({
   step, isWorst,
 }: {
-  step: { step: string; score: number; pass: number; warn: number; fail: number; skip: number; evaluated: number }
+  step: { step: string; score: number; pass: number; warn: number; fail: number; skip: number; evaluated: number; variance?: number | null }
   isWorst: boolean
 }) {
   const color = scoreColorForStep(step.score)
+  // 95% CI in points — same conversion as the workflow-level badge.
+  const variancePts = step.variance != null ? step.variance * 1.96 * 100 : null
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 12,
@@ -6740,6 +7370,19 @@ function StepRow({
       <div style={{ minWidth: 42, fontSize: 13, fontWeight: 700, color, textAlign: 'right' }}>
         {step.score.toFixed(0)}%
       </div>
+      {/* Per-step CI: how much this step's score could swing on a re-judge */}
+      {variancePts != null && variancePts > 0 && (
+        <div
+          style={{
+            fontSize: 10, color: '#6b7280', whiteSpace: 'nowrap',
+            padding: '2px 6px', backgroundColor: '#f3f4f6', borderRadius: 4,
+            minWidth: 50, textAlign: 'center',
+          }}
+          title="95% confidence interval for this step — how much its score could swing on a re-evaluation."
+        >
+          ±{variancePts.toFixed(1)}
+        </div>
+      )}
       {/* Status counts */}
       <div style={{ display: 'flex', gap: 4, minWidth: 110, fontSize: 11, color: '#6b7280' }}>
         {step.pass > 0 && <Pill label={`${step.pass} pass`} color="#16a34a" />}

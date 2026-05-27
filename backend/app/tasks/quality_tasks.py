@@ -151,6 +151,25 @@ async def _quality_monitor_async():
                                 current_tier=meta.quality_tier,
                                 created_at=now,
                             ).insert()
+                            # Phase 6: auto-enqueue a shadow KB optimizer so the
+                            # candidate fix lands in the inbox alongside the alert.
+                            try:
+                                from app.services import optimizer_signal_service
+                                await optimizer_signal_service.enqueue_kb_shadow_run(
+                                    kb_uuid=meta.item_id,
+                                    user_id="system",
+                                    trigger="quality_alert",
+                                    trigger_detail={
+                                        "delta": round(float(delta), 2),
+                                        "prev_score": round(float(prev_score), 2),
+                                        "current_score": round(float(meta.quality_score), 2),
+                                    },
+                                )
+                            except Exception:
+                                logger.warning(
+                                    "Phase 6 shadow KB run trigger failed for %s",
+                                    meta.item_id, exc_info=True,
+                                )
                 except Exception as e:
                     logger.warning(
                         "Auto-revalidation failed for knowledge_base %s: %s",
@@ -194,6 +213,25 @@ async def _quality_monitor_async():
                                 current_tier=meta.quality_tier,
                                 created_at=now,
                             ).insert()
+
+                            # Phase 6: shadow workflow optimizer.
+                            try:
+                                from app.services import optimizer_signal_service
+                                await optimizer_signal_service.enqueue_workflow_shadow_run(
+                                    workflow_id=meta.item_id,
+                                    user_id="system",
+                                    trigger="quality_alert",
+                                    trigger_detail={
+                                        "delta": round(float(delta), 2),
+                                        "prev_score": round(float(prev_score), 2),
+                                        "current_score": round(float(meta.quality_score), 2),
+                                    },
+                                )
+                            except Exception:
+                                logger.warning(
+                                    "Phase 6 shadow workflow run trigger failed for %s",
+                                    meta.item_id, exc_info=True,
+                                )
 
                             if monitoring.get("auto_review_on_degradation", False):
                                 from app.models.verification import VerificationRequest
@@ -247,6 +285,25 @@ async def _quality_monitor_async():
                             current_tier=meta.quality_tier,
                             created_at=now,
                         ).insert()
+
+                        # Phase 6: shadow extraction optimizer.
+                        try:
+                            from app.services import optimizer_signal_service
+                            await optimizer_signal_service.enqueue_extraction_shadow_run(
+                                search_set_uuid=meta.item_id,
+                                user_id="system",
+                                trigger="quality_alert",
+                                trigger_detail={
+                                    "delta": round(float(delta), 2),
+                                    "prev_score": round(float(prev_score), 2),
+                                    "current_score": round(float(meta.quality_score), 2),
+                                },
+                            )
+                        except Exception:
+                            logger.warning(
+                                "Phase 6 shadow extraction run trigger failed for %s",
+                                meta.item_id, exc_info=True,
+                            )
 
                         # Auto-create verification request if configured
                         if monitoring.get("auto_review_on_degradation", False):

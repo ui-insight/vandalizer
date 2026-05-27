@@ -256,6 +256,9 @@ export interface ValidationV2Result {
   aggregate_consistency: number
   challenging_fields: ChallengingField[]
   error_type_summary: Record<string, number>
+  cross_field_score?: number | null
+  cross_field_summary?: CrossFieldSummary | null
+  cross_field_results?: CrossFieldRuleResult[]
 }
 
 export function runValidationV2(data: {
@@ -453,6 +456,29 @@ export interface ExtractionTrial {
   status: 'completed' | 'failed' | 'early_stopped' | string
   duration_seconds?: number
   error?: string
+  /** Cross-field rule outcome for this trial. Null when no rules are
+   *  configured on the SearchSet. Shape matches CrossFieldSummary. */
+  cross_field_summary?: CrossFieldSummary | null
+}
+
+export interface OptimizationCrossFieldRuleRow {
+  rule_id: string
+  type?: string | null
+  label?: string | null
+  pass: number
+  fail: number
+  unparseable: number
+  pass_rate: number | null
+}
+
+export interface PostApplyValidation {
+  accuracy: number | null
+  consistency: number | null
+  cross_field_pass_rate?: number | null
+  score?: number | null
+  ran_at: string
+  test_case_count: number
+  source: 'apply_on_finish' | 'explicit_apply'
 }
 
 export interface ExtractionOptimizationRun {
@@ -472,18 +498,72 @@ export interface ExtractionOptimizationRun {
   baseline_no_tool_score: number | null
   baseline_default_score: number | null
   optimized_score: number | null
+  /** Per-item LLM-judge nondeterminism (sample stddev of replay - original deltas). */
   judge_variance: number | null
+  /** σ / √N_items — the standard error on the per-trial mean score. The
+   *  significance gate compares trial-score deltas to 2 × this value. */
+  judge_score_se: number | null
+  /** True when no trial beat the user's current config by more than 2 × SE.
+   *  Suppresses apply_on_finish — surface as "no significant improvement". */
+  tied_with_baseline: boolean
+  /** Reason tag from variance-aware winner selection. One of:
+   *  highest_score, default_in_cluster, closest_to_default,
+   *  tied_with_baseline_no_default_in_cluster, no_judge_variance. */
+  winner_selection_reason: string | null
+  /** Candidate models excluded from the sweep because they share a family
+   *  with the judge_model (self-preference guard). */
+  excluded_models: string[]
   judge_model: string | null
   best_config: Record<string, unknown> | null
   trials: ExtractionTrial[]
   field_breakdown: Array<{ field: string; accuracy: number; consistency: number }>
-  suggestions: Array<{ severity: 'info' | 'warning' | 'critical'; message: string; kind?: string }>
+  /** Cross-field rule outcome on the winning config. Null when no rules. */
+  winner_cross_field_summary?: CrossFieldSummary | null
+  /** Per-rule pass/fail breakdown on the winning config (worst-first). */
+  winner_cross_field_rule_breakdown?: OptimizationCrossFieldRuleRow[]
+  /** Snapshot of the validation run executed after the winning config was
+   *  applied — drives the "the optimizer's lift held up on a real run" delta
+   *  shown on the completed panel. Null until apply runs. */
+  post_apply_validation?: PostApplyValidation | null
+  suggestions: Array<{
+    severity: 'info' | 'warning' | 'critical'
+    message: string
+    kind?: string
+    rule_id?: string
+    rule_type?: string
+    field?: string
+  }>
   previous_override: Record<string, unknown> | null
+  /** Apply-preview rollup (Phase 2 loop closure). Per-FIELD baseline-vs-winner
+   *  accuracy deltas — drives the Apply confirmation modal. */
+  apply_preview?: ApplyPreview | null
   options: Record<string, unknown>
   error_message: string | null
   started_at: string | null
   completed_at: string | null
   cancel_requested: boolean
+}
+
+export type ApplyPreviewItem = {
+  item_id: string | null
+  label: string | null
+  baseline: number
+  winner: number
+  delta: number
+  within_noise: boolean
+  is_regression: boolean
+  significant: boolean
+}
+
+export type ApplyPreview = {
+  total: number
+  will_change: number
+  improvements: number
+  regressions: number
+  significant_regressions: number
+  net_delta: number
+  noise_sigma: number | null
+  items: ApplyPreviewItem[]
 }
 
 export interface StartExtractionOptimizationOptions {
@@ -492,6 +572,33 @@ export interface StartExtractionOptimizationOptions {
   apply_on_finish?: boolean
   /** Phase 1B: when true, use semantic LLM judge instead of strict-match scoring. */
   include_judge?: boolean
+}
+
+/** Cheap no-settings baseline probe used by the tuning wizard. Mirrors KB's
+ * `/baseline-probe` — runs extraction with `config_override={}` against a
+ * sample of judgeable test cases, judged by the user's model. */
+export interface ExtractionBaselineProbeResult {
+  no_settings_score: number | null
+  num_cases_judged: number
+  sample_case_ids: string[]
+  tokens_used: number
+  duration_ms: number
+}
+
+export function getExtractionBaselineProbe(
+  uuid: string,
+  opts: { case_uuids?: string[]; sample_size?: number } = {},
+) {
+  return apiFetch<ExtractionBaselineProbeResult>(
+    `/api/extractions/search-sets/${uuid}/baseline-probe`,
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        sample_size: opts.sample_size ?? 5,
+        case_uuids: opts.case_uuids ?? null,
+      }),
+    },
+  )
 }
 
 export function startExtractionOptimization(uuid: string, opts: StartExtractionOptimizationOptions = {}) {
@@ -763,4 +870,94 @@ export async function exportExtractionPdf(
   a.click()
   a.remove()
   URL.revokeObjectURL(url)
+}
+
+// ---------------------------------------------------------------------------
+// Cross-field validation rules
+// ---------------------------------------------------------------------------
+
+export type CrossFieldRuleType =
+  | 'sum_equals'
+  | 'conditional_required'
+  | 'range_check'
+  | 'cross_reference'
+  | 'date_order'
+  | 'custom_expression'
+
+export interface CrossFieldRule {
+  id?: string
+  type: CrossFieldRuleType
+  enabled?: boolean
+  auto_disabled?: boolean
+  auto_disabled_reason?: string | null
+  eval_count?: number
+  pass_count?: number
+  fail_count?: number
+  fp_count?: number
+  source?: 'user' | 'suggested' | 'imported'
+  // type-specific params
+  source_fields?: string[]
+  target_field?: string
+  tolerance?: number
+  condition_field?: string
+  condition_value?: string
+  required_field?: string
+  field?: string
+  min?: number | null
+  max?: number | null
+  field_a?: string
+  field_b?: string
+  match_type?: 'contains' | 'equals'
+  expression?: string
+}
+
+export interface CrossFieldRuleResult {
+  rule: CrossFieldRule
+  rule_id?: string
+  status: 'pass' | 'fail' | 'unparseable'
+  passed: boolean
+  message: string
+  test_case_uuid?: string
+  test_case_label?: string
+  source_label?: string
+}
+
+export interface CrossFieldSummary {
+  pass: number
+  fail: number
+  unparseable: number
+  violation_rate: number
+  pass_rate: number | null
+  total: number
+}
+
+export function getCrossFieldRules(uuid: string) {
+  return apiFetch<{ rules: CrossFieldRule[] }>(
+    `/api/extractions/search-sets/${uuid}/cross-field-rules`
+  )
+}
+
+export function updateCrossFieldRules(uuid: string, rules: CrossFieldRule[]) {
+  return apiFetch<{ rules: CrossFieldRule[] }>(
+    `/api/extractions/search-sets/${uuid}/cross-field-rules`,
+    {
+      method: 'PUT',
+      headers: csrfHeaders(),
+      body: JSON.stringify({ rules }),
+    }
+  )
+}
+
+export function suggestCrossFieldRules(uuid: string) {
+  return apiFetch<{ suggestions: CrossFieldRule[] }>(
+    `/api/extractions/search-sets/${uuid}/cross-field-rules/suggest`,
+    { method: 'POST', headers: csrfHeaders() }
+  )
+}
+
+export function markRuleFalsePositive(uuid: string, ruleId: string) {
+  return apiFetch<{ rule: CrossFieldRule }>(
+    `/api/extractions/search-sets/${uuid}/cross-field-rules/${ruleId}/mark-false-positive`,
+    { method: 'POST', headers: csrfHeaders() }
+  )
 }

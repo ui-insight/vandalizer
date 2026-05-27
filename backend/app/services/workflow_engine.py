@@ -1187,6 +1187,14 @@ class WorkflowEngine:
                         )
                 output = node.process(latest_output or {})
 
+            # Retry-on-empty / fallback-model. Optimizer-set hook: if the
+            # node's first task has ``_fallback_model`` and the output looks
+            # empty or error-shaped, re-run once with the fallback. Catches
+            # transient model failures (rate limits, partial outages) that
+            # would otherwise silently degrade the trial.
+            if _should_retry_with_fallback(node, output):
+                output = _retry_node_with_fallback(node, latest_output or {})
+
             latest_output = output
 
             # Check for approval pause signal
@@ -1252,12 +1260,167 @@ class WorkflowEngine:
 # Factory
 # ---------------------------------------------------------------------------
 
+# Task names whose ``data.prompt`` (or analogous free-text field) the
+# prompt-variant wrapper applies to. Extraction-style tasks have structured
+# instructions and are excluded.
+_PROMPT_VARIANT_TASKS = {"Prompt", "Formatter", "ResearchNode", "FormFiller"}
+
+
+_RETRY_ERROR_PATTERN = re.compile(
+    r"^\s*(error|exception|failed|timeout|rate.?limit)\b", re.IGNORECASE,
+)
+
+
+def _output_looks_empty_or_error(output: dict | None) -> bool:
+    """True when an output dict represents a no-result or an error stub.
+
+    Used by the engine's retry-on-empty hook. Conservative — only fires on
+    obviously dead outputs so we don't pay a retry on every borderline run.
+    """
+    if not output:
+        return True
+    val = output.get("output")
+    if val is None:
+        return True
+    if isinstance(val, str):
+        stripped = val.strip()
+        if not stripped:
+            return True
+        if len(stripped) <= 500 and _RETRY_ERROR_PATTERN.match(stripped):
+            return True
+        return False
+    if isinstance(val, (list, dict)):
+        return not val
+    return False
+
+
+def _should_retry_with_fallback(node, output: dict | None) -> bool:
+    """Decide whether to retry this node with its fallback model.
+
+    Returns True only when:
+    - The node has at least one task with both ``_retry_on_empty`` and
+      ``_fallback_model`` set (single-task LLM steps — the common case),
+    - AND the produced output is empty or error-shaped per
+      :func:`_output_looks_empty_or_error`,
+    - AND the fallback model differs from the current model (otherwise the
+      retry would just repeat the same call).
+    """
+    tasks = getattr(node, "tasks", None)
+    if not tasks:
+        return False
+    # Only single-task nodes — multi-task retry would need per-task isolation
+    # which gets noisy fast.
+    if len(tasks) != 1:
+        return False
+    task = tasks[0]
+    data = getattr(task, "data", None) or getattr(task, "node_data", None) or {}
+    if not isinstance(data, dict):
+        return False
+    if not data.get("_retry_on_empty"):
+        return False
+    fallback = data.get("_fallback_model")
+    if not fallback:
+        return False
+    current = data.get("model")
+    if current and current == fallback:
+        return False
+    return _output_looks_empty_or_error(output)
+
+
+def _retry_node_with_fallback(node, prev_output: dict) -> dict:
+    """Mutate the node's task to use its fallback model and re-run process().
+
+    The mutation is intentionally permanent on the task instance — re-running
+    this trial / step with the same node again would hit the same broken
+    primary model, so the fallback should stick. The previous (failed) output
+    is logged so debugging signal isn't lost.
+    """
+    task = node.tasks[0]
+    data = getattr(task, "data", None) or {}
+    fallback = data.get("_fallback_model")
+    if not fallback:
+        return None  # type: ignore[return-value]
+    original_model = data.get("model")
+    data["model"] = fallback
+    logger.info(
+        "Workflow engine: retrying node '%s' with fallback model %r (was %r)",
+        getattr(node, "name", "?"), fallback, original_model,
+    )
+    return node.process(prev_output)
+
+
+def _apply_step_override(
+    task_name: str,
+    task_data: dict,
+    step_override: dict | None,
+) -> dict:
+    """Mutate ``task_data`` in place with the optimizer's per-step override.
+
+    Returns the same dict for call-site readability. ``model`` swaps apply to
+    every LLM task; ``prompt_variant`` wraps the free-text instruction field
+    used by the matching task type.
+    """
+    if not step_override:
+        return task_data
+
+    model_override = step_override.get("model")
+    if model_override:
+        task_data["model"] = model_override
+
+    # Retry / fallback hooks — consumed by the engine's execute loop, not by
+    # the task itself. ``_retry_on_empty`` + ``_fallback_model`` together mean
+    # "if this step's output is empty or error-shaped, re-run it once with
+    # the fallback model." Prefixed with _ so they don't collide with any
+    # task-meaningful config key.
+    if step_override.get("retry_on_empty"):
+        task_data["_retry_on_empty"] = True
+    fallback = step_override.get("fallback_model")
+    if fallback:
+        task_data["_fallback_model"] = str(fallback)
+
+    variant = step_override.get("prompt_variant")
+    rewrite = step_override.get("prompt_rewrite")
+    if (variant or rewrite) and task_name in _PROMPT_VARIANT_TASKS:
+        from app.services.workflow_prompt_variants import apply_prompt_variant
+
+        # Field name depends on task type — keep this map aligned with the
+        # concrete Node classes' .process() reads.
+        prompt_fields_by_task = {
+            "Prompt": "prompt",
+            "Formatter": "format_template",
+            "ResearchNode": "question",
+            "FormFiller": "template",
+        }
+        field = prompt_fields_by_task.get(task_name)
+        if field:
+            original = task_data.get(field) or ""
+            if rewrite:
+                # Full rewrite — pre-generated by the optimizer once per step
+                # and threaded through as a literal replacement. Bypasses the
+                # variant wrapper entirely.
+                task_data[field] = rewrite
+            elif original:
+                task_data[field] = apply_prompt_variant(original, variant)
+            # Formatter falls back to ``prompt`` when ``format_template`` is
+            # empty (see FormatNode); wrap that too so the variant takes
+            # effect regardless of which field is populated.
+            if task_name == "Formatter" and not (task_data.get("format_template") or "").strip():
+                fallback = task_data.get("prompt") or ""
+                if rewrite:
+                    task_data["prompt"] = rewrite
+                elif fallback:
+                    task_data["prompt"] = apply_prompt_variant(fallback, variant)
+
+    return task_data
+
+
 def build_workflow_engine(
     steps_data: list[dict],
     model: str,
     user_id: str | None = None,
     system_config_doc: dict | None = None,
     allow_code_execution: bool = False,
+    config_override: dict | None = None,
 ) -> WorkflowEngine:
     """Build a WorkflowEngine from step data dicts.
 
@@ -1268,13 +1431,27 @@ def build_workflow_engine(
         user_id: User ID for extraction nodes.
         system_config_doc: Pre-fetched SystemConfig as dict.
         allow_code_execution: If False, CodeNode tasks are rejected. Only admins should set True.
+        config_override: Optional optimizer-applied override of shape
+            ``{"step_overrides": {step_name: {"model": str, "prompt_variant": str | None}}}``.
+            When supplied, per-step model + prompt-variant overrides are merged
+            into each task's ``data`` before node construction.
     """
     engine = WorkflowEngine()
     nodes = []
 
+    # Resolve overrides to a flat {step_name: override_dict} map. The optimizer
+    # writes ``step_overrides`` as a dict keyed by sanitized OR human-readable
+    # step name; we keep both so callers can refer to whichever they have.
+    step_overrides: dict[str, dict] = {}
+    if isinstance(config_override, dict):
+        raw = config_override.get("step_overrides") or {}
+        if isinstance(raw, dict):
+            step_overrides = {str(k): v for k, v in raw.items() if isinstance(v, dict)}
+
     for idx, step in enumerate(steps_data):
         step_name = step.get("name", "")
         step_data = step.get("data", {})
+        step_override = step_overrides.get(step_name) or step_overrides.get(sanitize_step_name(step_name))
 
         if step_name == "Document":
             node = DocumentNode(step_data)
@@ -1286,6 +1463,8 @@ def build_workflow_engine(
                 task_data = task.get("data", {})
                 task_data["user_id"] = user_id
                 task_data["model"] = task_data.get("model") or model
+                # Optimizer-applied per-step override (model swap + prompt variant).
+                _apply_step_override(task_name, task_data, step_override)
 
                 if task_name == "Extraction":
                     n = ExtractionNode(data=task_data)

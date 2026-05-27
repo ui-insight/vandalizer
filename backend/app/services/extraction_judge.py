@@ -31,20 +31,36 @@ logger = logging.getLogger(__name__)
 
 
 EXTRACTION_JUDGE_SYSTEM_PROMPT = (
-    "You are evaluating a single extracted field value against its expected "
-    "value. Be lenient on phrasing/format, strict on facts.\n"
-    "Return ONLY JSON (no markdown, no extra text) with this shape:\n"
+    "You evaluate ONE extracted field value against its expected value.\n"
+    "Be lenient on phrasing/format, strict on facts. Length is not quality:\n"
+    "a longer answer is NOT a better answer — never credit verbosity.\n"
+    "Return ONLY JSON (no markdown, no extra text):\n"
     '{"score": 0.0..1.0, "verdict": "PASS|PARTIAL|FAIL", "reasoning": "..."}\n'
-    "Scoring guide:\n"
-    "- 1.0 = same fact, any reasonable formatting variation\n"
-    "      (e.g. 'Jan 5, 2026' ≡ '2026-01-05'; 'Smith, John' ≡ 'John Smith'; '$1,000' ≡ '1000')\n"
-    "- 0.5 = partial match (right answer with extra cruft, or one of several "
-    "        equally-valid forms when the field has multiple right answers)\n"
-    "- 0.0 = wrong fact, hallucinated value, or empty when a value was expected\n"
-    "Verdict mapping: score >= 0.7 -> PASS, 0.4..0.7 -> PARTIAL, < 0.4 -> FAIL.\n"
-    "If the expected value indicates 'not found' (e.g. '', 'N/A', 'not present') "
-    "AND the actual value is similarly empty/not-found, score 1.0 (both correctly "
-    "report absence).\n"
+    "\n"
+    "Scoring anchors:\n"
+    "  1.0 — Same fact, any reasonable formatting variation. Examples:\n"
+    "    'Jan 5, 2026' ≡ '2026-01-05'\n"
+    "    'Smith, John' ≡ 'John Smith'\n"
+    "    '$1,000' ≡ '1000' ≡ '1,000.00'\n"
+    "    'USA' ≡ 'United States'\n"
+    "  0.5 — Right fact buried in extra text that adds NO information\n"
+    "        (a label, restating the question, or unit annotation), OR\n"
+    "        one of several equally-valid forms when the field genuinely\n"
+    "        has multiple right answers. Mere wordiness alone is not 0.5.\n"
+    "  0.0 — Wrong fact, hallucinated value, contradicts expected, or\n"
+    "        contains both the right answer and a contradicting wrong answer.\n"
+    "\n"
+    "Multi-valued fields (lists, sets, comma-separated): order does NOT\n"
+    "matter. If actual is missing required elements OR contains extras\n"
+    "not in expected, score 0.5 (PARTIAL). All elements match → 1.0.\n"
+    "\n"
+    "Absence equality: if BOTH expected and actual indicate 'not found'\n"
+    "(empty, 'N/A', 'not present', '-', 'unknown'), score 1.0. If only\n"
+    "one is absent, score 0.0.\n"
+    "\n"
+    "Verdict mapping: score ≥ 0.7 → PASS, 0.4–0.7 → PARTIAL, < 0.4 → FAIL.\n"
+    "Reasoning must be ≤ 30 words and cite the specific discrepancy, not\n"
+    "restate the values.\n"
 )
 
 
@@ -142,14 +158,31 @@ async def judge_field_value(
     expected: str,
     actual: str | None,
     model_name: str,
+    field_metadata: dict | None = None,
 ) -> dict:
     """Judge a single (expected, actual) pair for one field.
 
-    Returns ``{score, verdict, reasoning, tokens_used}``. On judge failure
-    returns ``verdict='FAIL', score=0.0`` rather than raising — the caller is
-    typically inside a per-trial loop and one judge error shouldn't crash the
-    whole trial.
+    Returns ``{score, verdict, reasoning, tokens_used, comparator}``. On judge
+    failure returns ``verdict='FAIL', score=0.0`` rather than raising — the
+    caller is typically inside a per-trial loop and one judge error shouldn't
+    crash the whole trial.
+
+    For dates/numbers/enums/exact-string matches, the deterministic pre-judge
+    router resolves the comparison without an LLM call (``comparator="deterministic"``).
+    Only ambiguous cases reach the LLM (``comparator="llm"``).
     """
+    # Deterministic short-circuit first — saves an LLM call when the comparison
+    # is unambiguous (dates, numbers, enums, exact-or-normalized matches).
+    from app.services.extraction_judge_router import prejudge
+    prejudged = prejudge(
+        field_name=field_name,
+        expected=expected,
+        actual=actual,
+        field_metadata=field_metadata,
+    )
+    if prejudged is not None:
+        return prejudged
+
     await _ensure_system_config_loaded()
     agent = _get_agent(model_name)
 
@@ -170,10 +203,12 @@ async def judge_field_value(
             "verdict": "FAIL",
             "reasoning": f"judge error: {str(e)[:200]}",
             "tokens_used": 0,
+            "comparator": "llm_error",
         }
 
     verdict = _parse_verdict(raw)
     verdict["tokens_used"] = tokens
+    verdict["comparator"] = "llm"
     return verdict
 
 
@@ -184,6 +219,7 @@ async def judge_test_case_extraction(
     actual: dict[str, Any],
     model_name: str,
     concurrency: int = 4,
+    field_metadata_by_key: dict[str, dict] | None = None,
 ) -> dict:
     """Judge every expected-valued field for one test-case extraction.
 
@@ -210,6 +246,7 @@ async def judge_test_case_extraction(
                 expected=str(exp),
                 actual=str(actual.get(field, "")) if actual.get(field) is not None else "",
                 model_name=model_name,
+                field_metadata=(field_metadata_by_key or {}).get(field),
             )
         return {
             "field": field,

@@ -20,8 +20,10 @@ interface AutovalidateWizardProps<TOptions> {
   onConfirm: (options: TOptions) => void
   onClose: () => void
   title?: string
-  /** Label on the final step's primary button. Default "Start optimization". */
-  confirmLabel?: string
+  /** Label on the final step's primary button. Default "Start optimization".
+   * Pass a function to compute the label from current options (e.g. to bake
+   * the selected tier's cost into the button: "Start tuning — $2.40, ~15 min"). */
+  confirmLabel?: string | ((options: TOptions) => string)
 }
 
 /**
@@ -99,7 +101,7 @@ export function AutovalidateWizard<TOptions>({
           ) : (
             <button onClick={confirm} disabled={!canAdvance} style={btn(canAdvance, '#7c3aed')}>
               <Sparkles size={12} />
-              {confirmLabel}
+              {typeof confirmLabel === 'function' ? confirmLabel(options) : confirmLabel}
             </button>
           )}
         </div>

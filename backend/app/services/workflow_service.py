@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+import re
 import uuid as uuid_mod
 from typing import TYPE_CHECKING
 
@@ -924,6 +925,121 @@ async def delete_expected_output(workflow_id: str, expected_id: str, user: User)
     return True
 
 
+async def _extract_workflow_intents(wf_data: dict) -> list[str]:
+    """Stage-1 of plan generation: enumerate end-user intents from name + description only.
+
+    Deliberately excludes step config — the goal is to capture what a consumer
+    of the output expects, not what the current implementation happens to
+    produce. Returns a fallback intent list when name/description are too thin
+    or the LLM fails (better than blocking plan generation entirely).
+    """
+    from app.services.llm_service import create_chat_agent
+    from app.models.system_config import SystemConfig
+
+    name = (wf_data.get("name") or "").strip()
+    desc = (wf_data.get("description") or "").strip()
+    user_id = wf_data.get("user_id") or ""
+
+    # Fallback when there's nothing to reason about — emit a generic intent so
+    # stage 2 still has something to anchor on.
+    if not name and not desc:
+        return [
+            "The output should be coherent, complete, and faithfully derived from the input.",
+            "Any extracted or computed values should appear in the final output.",
+        ]
+
+    intent_system_prompt = (
+        "You are reasoning about what a consumer of an automated workflow's output expects "
+        "from it — independent of how the workflow happens to produce that output today.\n\n"
+        "Given ONLY a workflow's name and description, enumerate 3-6 concrete intents an "
+        "end-user has when they read this workflow's output. Each intent should be:\n"
+        "- USER-FACING: phrased as what the reader of the output expects\n"
+        "- CONCRETE: name the kind of content, format, or fact that should be present\n"
+        "- IMPLEMENTATION-INDEPENDENT: don't mention specific steps, fields, or models — "
+        "those describe the current implementation, not the user's expectation\n\n"
+        "Return ONLY a JSON object: {\"intents\": [\"intent 1\", \"intent 2\", ...]}. "
+        "No markdown, no extra text."
+    )
+
+    user_prompt = (
+        f"Workflow name: {name or '(unnamed)'}\n"
+        f"Description: {desc or '(no description)'}\n\n"
+        "Enumerate what an end-user expects from this output."
+    )
+
+    try:
+        model = await get_user_model_name(user_id)
+        sys_config = await SystemConfig.get_config()
+        sys_config_doc = sys_config.model_dump() if sys_config else {}
+        agent = create_chat_agent(
+            model, system_prompt=intent_system_prompt, system_config_doc=sys_config_doc,
+        )
+        result = await agent.run(user_prompt)
+    except Exception as e:
+        logger.warning("Intent extraction LLM call failed: %s — using fallback intents", e)
+        return _fallback_intents(name, desc)
+
+    raw = _parse_json_object(result.output or "")
+    if not raw or "intents" not in raw:
+        return _fallback_intents(name, desc)
+
+    items = raw.get("intents") or []
+    if not isinstance(items, list):
+        return _fallback_intents(name, desc)
+
+    cleaned = [str(x).strip() for x in items if isinstance(x, (str, int, float)) and str(x).strip()]
+    return cleaned[:6] if cleaned else _fallback_intents(name, desc)
+
+
+def _fallback_intents(name: str, desc: str) -> list[str]:
+    """Deterministic fallback when the intent extractor can't run.
+
+    Keeps stage-2 anchored on *something* user-facing instead of letting it
+    silently revert to "checks what the workflow already does."
+    """
+    parts: list[str] = []
+    if name:
+        parts.append(f"The output should fulfill the stated task: \"{name}\".")
+    if desc:
+        parts.append(f"The output should match the described purpose: \"{desc[:200]}\".")
+    parts.append("All claims in the output should be grounded in the input — no hallucination.")
+    parts.append("The output should be complete: nothing the description promises is missing.")
+    return parts
+
+
+def _parse_json_object(text: str) -> dict | None:
+    """Best-effort JSON object extraction. Mirrors the helper in the test-case
+    generator service; kept inline so this module stays self-contained."""
+    import json as _json
+
+    if not text:
+        return None
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        stripped = re.sub(r"^```\w*\n?", "", stripped)
+        if stripped.endswith("```"):
+            stripped = stripped[:-3]
+        stripped = stripped.strip()
+
+    try:
+        parsed = _json.loads(stripped)
+        if isinstance(parsed, dict):
+            return parsed
+    except _json.JSONDecodeError:
+        pass
+
+    start = stripped.find("{")
+    end = stripped.rfind("}") + 1
+    if start >= 0 and end > start:
+        try:
+            parsed = _json.loads(stripped[start:end])
+            if isinstance(parsed, dict):
+                return parsed
+        except _json.JSONDecodeError:
+            pass
+    return None
+
+
 async def generate_validation_plan(workflow_id: str, user: User) -> list[dict]:
     """Use an LLM to auto-generate quality check definitions from the workflow structure."""
     from app.services.llm_service import create_chat_agent
@@ -1079,47 +1195,60 @@ async def generate_validation_plan(workflow_id: str, user: User) -> list[dict]:
         + data_flow_section
     )
 
-    system_prompt = (
-        "You are a workflow output quality analyst. Your job is to generate validation "
-        "checks that will be evaluated against the ACTUAL OUTPUT of a workflow — not the "
-        "workflow definition itself.\n\n"
-        "You will be given a detailed data flow analysis of a workflow: what each step "
-        "extracts or transforms, how data flows between steps, and what the final output "
-        "should contain.\n\n"
-        "Generate 4-8 quality check DEFINITIONS. Each check must be something that can be "
-        "verified by reading the workflow's output text.\n\n"
-        "IMPORTANT — focus on these aspects:\n"
-        "- **completeness**: Does the output contain ALL the specific data points that were "
-        "extracted or computed upstream? Name the specific fields/values that must be present. "
-        "For example, if the workflow extracts 4 fields, check that all 4 appear in the output.\n"
-        "- **accuracy**: Does the extracted data appear to be faithfully carried through? "
-        "Are values reasonable and consistent with what was asked for? Are any values "
-        "hallucinated or contradictory?\n"
-        "- **content**: Does the output fulfill the purpose described in the prompt/formatting "
-        "instructions? If the workflow says 'format into human readable language', is it "
-        "actually readable and well-written?\n"
-        "- **formatting**: Does the output match the requested format (e.g., if the prompt "
-        "asks for a paragraph, is it a paragraph and not a JSON blob)?\n\n"
-        "DO NOT generate checks about:\n"
-        "- The workflow definition's structure (YAML syntax, step headers, indentation)\n"
-        "- Whether the workflow has a name or description\n"
-        "- Step naming conventions or task formatting\n"
-        "These checks are about the WORKFLOW OUTPUT, not the workflow definition.\n\n"
-        "Make each check description SPECIFIC to this workflow. Reference the actual field "
-        "names, prompt instructions, and expected data. A good check is one where a human "
-        "reading just the check description would know exactly what to look for in the output.\n\n"
-        "Return ONLY a JSON array of check definition objects. Each object must have:\n"
-        '- "name": short check name (string, max 60 chars)\n'
-        '- "description": detailed description of what the evaluator should look for in the '
-        "output — be specific, name the fields and values (string)\n"
-        '- "category": one of "completeness", "formatting", "content", "accuracy" (string)\n\n'
-        "Return ONLY the JSON array, no other text."
-    )
+    # ── Stage 1: intent extraction ──
+    # Read ONLY name + description. The point is to capture what an end-user
+    # expects from the output, independent of how the current implementation
+    # tries to produce it. Without this separation, the model anchors on
+    # "checks the workflow's existing fields appear" — which means a broken
+    # workflow that outputs the same wrong shape every time would pass.
+    intents = await _extract_workflow_intents(wf_data)
 
+    # ── Stage 2: check drafting from intents + step structure ──
+    # Step structure is provided as context (so target_step can be mapped) but
+    # the intent list — not the step config — is the basis for what to check.
     model = await get_user_model_name(wf_data.get("user_id", ""))
 
     sys_config = await SystemConfig.get_config()
     sys_config_doc = sys_config.model_dump() if sys_config else {}
+
+    system_prompt = (
+        "You are a workflow output quality analyst. Generate validation checks that will be "
+        "evaluated against the ACTUAL OUTPUT of a workflow.\n\n"
+        "You will be given:\n"
+        "1. A list of END-USER INTENTS — what someone consuming this workflow's output "
+        "actually expects, derived independently of the workflow's implementation.\n"
+        "2. A data-flow analysis — used to map each check to its responsible step, "
+        "NOT as the basis for what to check.\n\n"
+        "Generate 4-8 quality check DEFINITIONS, each grounded in one or more INTENTS. "
+        "Each check must be verifiable by reading the workflow's output text.\n\n"
+        "Categories:\n"
+        "- **completeness**: every named field / data point the intent calls for is present.\n"
+        "- **accuracy**: values are faithfully grounded in the source — no hallucination, "
+        "no internal contradictions.\n"
+        "- **content**: the output serves the intent's stated purpose (e.g. 'a human-readable "
+        "summary' really reads like one).\n"
+        "- **formatting**: the output matches the format the intent calls for.\n\n"
+        "DO NOT generate checks about:\n"
+        "- The workflow definition's structure (YAML, step headers)\n"
+        "- Step naming conventions\n"
+        "- Whether the workflow has a name/description\n\n"
+        "Anchor each check to an intent. A good check description names the specific intent "
+        "it serves AND the fields/values an evaluator would need to look for in the output. "
+        "A bad check restates a step's role (\"checks Extraction step ran\").\n\n"
+        "Return ONLY a JSON array of check definition objects. Each must have:\n"
+        '- "name": short check name (string, max 60 chars)\n'
+        '- "description": detailed description naming the intent + what to look for (string)\n'
+        '- "category": one of "completeness", "formatting", "content", "accuracy" (string)\n'
+        '- "target_step": EXACT name of the step this check covers — pick from the step '
+        "headers in the data-flow analysis. Use the final step name for whole-output checks. "
+        "NEVER omit (string).\n\n"
+        "Return ONLY the JSON array, no other text."
+    )
+
+    intents_block = (
+        "## End-User Intents (what consumers of this output actually expect)\n"
+        + "\n".join(f"- {i}" for i in intents)
+    )
 
     agent = create_chat_agent(
         model,
@@ -1128,7 +1257,9 @@ async def generate_validation_plan(workflow_id: str, user: User) -> list[dict]:
     )
 
     try:
-        result = await agent.run(f"## Workflow\n{workflow_desc}")
+        result = await agent.run(
+            f"{intents_block}\n\n## Workflow (data-flow context for target_step)\n{workflow_desc}"
+        )
     except Exception:
         raise ValueError("LLM call failed - could not generate validation plan")
 
@@ -1136,7 +1267,16 @@ async def generate_validation_plan(workflow_id: str, user: User) -> list[dict]:
     if parsed is None:
         raise ValueError("Could not parse LLM response into a validation plan")
 
-    # Normalize into check definitions with UUIDs
+    # Normalize into check definitions with UUIDs.
+    # target_step is normalized against the workflow's actual step names so a
+    # typo or paraphrase in the LLM output still produces a valid breakdown
+    # bucket — we fall back to the final step (the most useful default for
+    # output-shape checks) rather than "Unassigned", which suppresses the
+    # step_breakdown diagnostic downstream.
+    actual_step_names = [s["name"] for s in steps if isinstance(s, dict) and s.get("name")]
+    final_step_name = actual_step_names[-1] if actual_step_names else ""
+    norm_lookup = {n.lower().strip(): n for n in actual_step_names}
+
     checks: list[dict] = []
     valid_categories = {"completeness", "formatting", "content", "accuracy"}
     for item in parsed:
@@ -1145,12 +1285,23 @@ async def generate_validation_plan(workflow_id: str, user: User) -> list[dict]:
         cat = str(item.get("category", "content")).lower()
         if cat not in valid_categories:
             cat = "content"
+        raw_target = str(item.get("target_step", "") or "").strip()
+        target_step = norm_lookup.get(raw_target.lower(), "") or final_step_name
         checks.append({
             "id": str(uuid_mod.uuid4()),
             "name": str(item["name"])[:60],
             "description": str(item.get("description", "")),
             "category": cat,
+            "target_step": target_step,
         })
+
+    # ── Meta-check filter ──
+    # Discard checks that would pass even on a broken output. Reason: a check
+    # like "the output contains text" passes for any non-empty workflow result,
+    # so it doesn't actually distinguish good from bad. Best-effort — if the
+    # meta-check LLM call fails, keep all checks (we'd rather over-include than
+    # silently drop everything).
+    checks = await _filter_unselective_checks(checks, intents, user_id=wf_data.get("user_id", ""))
 
     # Persist
     wf = await Workflow.get(PydanticObjectId(workflow_id))
@@ -1160,6 +1311,116 @@ async def generate_validation_plan(workflow_id: str, user: User) -> list[dict]:
         await wf.save()
 
     return checks
+
+
+async def _filter_unselective_checks(
+    checks: list[dict],
+    intents: list[str],
+    *,
+    user_id: str,
+) -> list[dict]:
+    """Drop checks that pass on a typical broken output.
+
+    Strategy: ask the LLM to predict, for each check, whether a "broken-shape"
+    output (empty, error-stub, hallucinated, wrong-format) would still pass.
+    Checks that pass on broken outputs aren't useful for the optimizer because
+    they can't distinguish good trials from bad ones.
+
+    Conservative: a check is dropped only when the LLM says it would pass on
+    AT LEAST 2 of the 3 broken-shape probes — single false-positives are
+    plausible for a real-but-loose check.
+    """
+    from app.services.llm_service import create_chat_agent
+    from app.models.system_config import SystemConfig
+
+    if not checks or len(checks) <= 2:
+        # Too few checks to risk filtering — keep them all.
+        return checks
+
+    broken_probes = [
+        "(EMPTY OUTPUT)",
+        "Error: Unable to process the request. Please try again.",
+        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. The quick brown fox jumps over the lazy dog.",
+    ]
+
+    checks_block = "\n".join(
+        f"{i + 1}. [{c['category']}] {c['name']}: {c['description'][:200]}"
+        for i, c in enumerate(checks)
+    )
+    intents_block = "\n".join(f"- {i}" for i in intents)
+    probes_block = "\n".join(f"PROBE {i + 1}: {p}" for i, p in enumerate(broken_probes))
+
+    system_prompt = (
+        "You are auditing a list of validation checks for selectivity. A good check fails on "
+        "BROKEN workflow output and passes on GOOD output. A bad check passes regardless — "
+        "it doesn't distinguish good from broken and just inflates the score.\n\n"
+        "You will be given:\n"
+        "1. End-user intents — what good output should serve\n"
+        "2. A numbered list of validation checks\n"
+        "3. Three BROKEN-SHAPE probes — outputs that obviously don't serve the intents\n\n"
+        "For each check, decide for each probe: would this check PASS or FAIL on this probe?\n"
+        "Return ONLY a JSON object: "
+        '{"verdicts": [{"check_index": 1, "probe_passes": [false, false, false]}, ...]}.'
+    )
+
+    user_prompt = (
+        f"## Intents\n{intents_block}\n\n"
+        f"## Checks\n{checks_block}\n\n"
+        f"## Broken-shape probes\n{probes_block}\n\n"
+        "For each check, indicate which probes would PASS it (true) vs FAIL it (false)."
+    )
+
+    try:
+        model = await get_user_model_name(user_id)
+        sys_config = await SystemConfig.get_config()
+        sys_config_doc = sys_config.model_dump() if sys_config else {}
+        agent = create_chat_agent(
+            model, system_prompt=system_prompt, system_config_doc=sys_config_doc,
+        )
+        result = await agent.run(user_prompt)
+    except Exception as e:
+        logger.warning("Meta-check filter LLM call failed: %s — keeping all checks", e)
+        return checks
+
+    raw = _parse_json_object(result.output or "")
+    if not raw:
+        return checks
+    verdicts = raw.get("verdicts")
+    if not isinstance(verdicts, list):
+        return checks
+
+    # Map check_index → number of probes it passed (false negatives).
+    pass_count_by_index: dict[int, int] = {}
+    for v in verdicts:
+        if not isinstance(v, dict):
+            continue
+        try:
+            idx = int(v.get("check_index", 0))
+        except (TypeError, ValueError):
+            continue
+        passes = v.get("probe_passes")
+        if not isinstance(passes, list):
+            continue
+        pass_count_by_index[idx] = sum(1 for p in passes if bool(p))
+
+    # Drop checks that passed on ≥2 of 3 probes — clearly unselective.
+    kept: list[dict] = []
+    dropped: list[str] = []
+    for i, c in enumerate(checks, start=1):
+        if pass_count_by_index.get(i, 0) >= 2:
+            dropped.append(c.get("name", ""))
+            continue
+        kept.append(c)
+
+    # Safety: if filtering would nuke everything, keep all and log. Better to
+    # show the user a noisy plan than nothing.
+    if not kept:
+        logger.warning("Meta-check filter would drop all %d checks — keeping all", len(checks))
+        return checks
+
+    if dropped:
+        logger.info("Meta-check filter dropped %d unselective check(s): %s", len(dropped), dropped)
+    return kept
 
 
 # ---------------------------------------------------------------------------
@@ -1186,18 +1447,52 @@ def _text_similarity(a: str, b: str) -> float:
     return len(tokens_a & tokens_b) / len(tokens_a | tokens_b)
 
 
+def _input_doc_key(result) -> str:
+    """Stable key for the input document set a WorkflowResult ran against.
+
+    Two runs share a key only when they ran on the exact same set of input
+    documents — so comparing their outputs measures workflow nondeterminism,
+    not document variance.
+    """
+    ctx = getattr(result, "input_context", None) or {}
+    uuids = ctx.get("doc_uuids") or []
+    if not isinstance(uuids, list):
+        return ""
+    return "|".join(sorted(str(u) for u in uuids))
+
+
 def _compute_output_stability(results: list) -> dict:
     """Compare actual workflow outputs across multiple executions.
 
-    Returns a stability dict with a 0-1 score representing how similar the
-    outputs are to each other, plus diagnostic details.
+    Only compares runs that shared the SAME input document set — otherwise
+    we'd be measuring per-document variance, not workflow nondeterminism.
+    Returns a stability dict with a 0-1 score, or ``stability_score=None``
+    with a diagnostic detail when there aren't enough same-input runs.
     """
     if len(results) < 2:
         return {"stability_score": None, "detail": "Need 2+ runs for stability measurement"}
 
-    # Serialize all outputs to text
-    text_outputs = []
+    # Bucket by input doc set; pick the largest group that has 2+ runs.
+    by_input: dict[str, list] = {}
     for r in results:
+        by_input.setdefault(_input_doc_key(r), []).append(r)
+    same_input_group = max(by_input.values(), key=len) if by_input else []
+
+    if len(same_input_group) < 2:
+        return {
+            "stability_score": None,
+            "detail": (
+                "Stability requires 2+ runs against the same input documents; "
+                f"the last {len(results)} runs all used different inputs. "
+                "Re-run the workflow on the same input to measure nondeterminism."
+            ),
+            "num_outputs_compared": 0,
+            "num_input_groups": len(by_input),
+        }
+
+    # Serialize the same-input group to text
+    text_outputs = []
+    for r in same_input_group:
         text = _serialize_output(r.final_output)
         if text is not None:
             text_outputs.append(text)
@@ -1214,7 +1509,7 @@ def _compute_output_stability(results: list) -> dict:
     text_stability = sum(similarities) / len(similarities)
 
     # Structured field-level stability (if outputs are dicts)
-    structured_stability = _structured_field_stability(results)
+    structured_stability = _structured_field_stability(same_input_group)
 
     # Use structured stability when available (more precise), blend with text
     if structured_stability is not None:
@@ -1230,6 +1525,8 @@ def _compute_output_stability(results: list) -> dict:
         ),
         "num_outputs_compared": len(text_outputs),
         "pairwise_similarities": [round(s, 4) for s in similarities],
+        "num_input_groups": len(by_input),
+        "compared_same_input": True,
     }
 
 
@@ -1271,29 +1568,20 @@ def _structured_field_stability(results: list) -> float | None:
 _STATUS_TO_SCORE = {"PASS": 1.0, "WARN": 0.5, "FAIL": 0.0}
 
 
-async def _sample_workflow_judge_variance(
+async def _run_judge_replay(
     *,
     plan: list[dict],
     last_result,
     wf_data: dict,
     original_checks_per_run: list[list[dict]],
-) -> float | None:
-    """Re-evaluate one workflow run and measure verdict stability.
+) -> list[tuple[dict, dict]] | None:
+    """Re-evaluate the most-recent run once and return matched (orig, replay)
+    verdict pairs. Returns ``None`` when not measurable.
 
-    The workflow validator runs ``_evaluate_checks_against_output`` once per
-    completed execution. To estimate judge nondeterminism, we replay that
-    evaluation against the most-recent run and compare per-check verdicts to
-    the original ones.
-
-    Returns:
-        stddev of per-check score deltas (0-1 scale, matches the shared
-        ``judge_variance`` semantics), or None when not measurable. Tokens used
-        by the replay are implicit (one extra LLM call per validation).
-
-    Why one re-eval, not more: the workflow's overall score is already an
-    aggregate over N runs, so the noise floor doesn't need many samples to be
-    useful. One replay catches verdict-flip frequency; more replays cost a lot
-    for marginal precision improvement.
+    Centralizes the one expensive LLM call so both the overall variance and
+    the per-step variance derive from the same replay rather than each
+    doing its own. SKIP verdicts on either side are filtered — they mean
+    the judge couldn't evaluate that check in one or both passes.
     """
     if not plan or not original_checks_per_run or not last_result:
         return None
@@ -1302,8 +1590,6 @@ async def _sample_workflow_judge_variance(
     if output_text is None:
         return None
 
-    # Pick the run whose checks we'll compare against. Most-recent matches what
-    # `validate_workflow` displays as the primary state.
     original_checks = original_checks_per_run[0]
     if not original_checks:
         return None
@@ -1324,29 +1610,86 @@ async def _sample_workflow_judge_variance(
         if not rep:
             continue
         if orig.get("status") == "SKIP" or rep.get("status") == "SKIP":
-            # SKIP isn't a signal — judge couldn't evaluate this check in one
-            # or both passes (likely binary output or evaluator error).
             continue
         samples.append((orig, rep))
+    return samples
 
-    if len(samples) < 2:
-        return None  # Not enough comparable verdicts to compute stddev
 
-    from app.services.judge_variance import sample_judge_variance
+async def _sample_workflow_judge_variance(
+    *,
+    plan: list[dict],
+    last_result,
+    wf_data: dict,
+    original_checks_per_run: list[list[dict]],
+) -> float | None:
+    """Re-evaluate one workflow run and measure verdict stability.
 
-    async def _judge_replay(sample: tuple[dict, dict]) -> tuple[float, int]:
-        # The replay score is already computed — just return it.
-        rep = sample[1]
-        score = _STATUS_TO_SCORE.get(rep.get("status", ""), 0.0)
-        return score, 0  # tokens already counted in the replay LLM call
-
-    variance, _tokens = await sample_judge_variance(
-        samples=samples,
-        judge_fn=_judge_replay,
-        original_score=lambda s: _STATUS_TO_SCORE.get(s[0].get("status", ""), 0.0),
-        max_samples=len(samples),  # use everything — we already have all replay verdicts
+    Returns stddev of per-check score deltas (0-1 scale), or None when not
+    measurable. Kept as a stable entry point for callers and tests that
+    only need the overall scalar.
+    """
+    samples = await _run_judge_replay(
+        plan=plan, last_result=last_result, wf_data=wf_data,
+        original_checks_per_run=original_checks_per_run,
     )
-    return variance
+    return _stddev_of_deltas(samples)
+
+
+def _stddev_of_deltas(
+    samples: list[tuple[dict, dict]] | None,
+) -> float | None:
+    """Sample stddev of (replay − original) verdict scores across pairs.
+
+    Synchronous arithmetic on already-collected replay verdicts — no LLM
+    call. Returns None when fewer than 2 comparable pairs are available.
+    Matches the semantics of the shared ``sample_judge_variance`` helper
+    so badges driven by it can use the same ±1.96σ scaling.
+    """
+    if not samples or len(samples) < 2:
+        return None
+    deltas = [
+        _STATUS_TO_SCORE.get(rep.get("status", ""), 0.0)
+        - _STATUS_TO_SCORE.get(orig.get("status", ""), 0.0)
+        for orig, rep in samples
+    ]
+    mean = sum(deltas) / len(deltas)
+    var = sum((d - mean) ** 2 for d in deltas) / (len(deltas) - 1)
+    return var ** 0.5
+
+
+def _compute_per_step_variance(
+    samples: list[tuple[dict, dict]] | None,
+    plan: list[dict] | None,
+) -> dict[str, float]:
+    """Per-target_step stddev of score deltas.
+
+    Buckets the (orig, replay) sample pairs by each check's ``target_step``
+    in the plan, then computes per-bucket stddev. Buckets with fewer than 2
+    samples are omitted (no signal). The result feeds into
+    ``step_breakdown`` so the UI can show ±N pts on each step's score.
+    """
+    if not samples or not plan:
+        return {}
+
+    target_lookup = {
+        str(p.get("id", "")): (p.get("target_step") or "").strip()
+        for p in plan
+    }
+
+    by_step: dict[str, list[tuple[dict, dict]]] = {}
+    for orig, rep in samples:
+        cid = str(orig.get("check_id", ""))
+        target = target_lookup.get(cid) or ""
+        if not target:
+            continue
+        by_step.setdefault(target, []).append((orig, rep))
+
+    out: dict[str, float] = {}
+    for step, step_samples in by_step.items():
+        stddev = _stddev_of_deltas(step_samples)
+        if stddev is not None:
+            out[step] = stddev
+    return out
 
 
 def _compute_step_breakdown(plan: list[dict], checks: list[dict]) -> list[dict]:
@@ -1595,6 +1938,86 @@ async def _measure_no_workflow_baseline(
     }
 
 
+async def _gather_static_diagnostics(
+    wf_data: dict | None,
+    steps_output: dict | None = None,
+    validation_plan: list[dict] | None = None,
+) -> list[dict]:
+    """Run deterministic structural + runtime diagnostics on a workflow.
+
+    Looks up valid search_set UUIDs so the dangling-reference check has a
+    real allow-list. If the lookup fails we pass ``None`` so the check
+    silently skips rather than false-flagging every workflow.
+    """
+    from app.services import workflow_diagnostics as wdiag
+    from app.models.search_set import SearchSet
+
+    valid_uuids: set[str] | None
+    try:
+        all_sets = await SearchSet.find_all().to_list()
+        valid_uuids = {str(s.uuid) for s in all_sets if getattr(s, "uuid", None)}
+    except Exception as e:
+        logger.warning("Static diagnostics: search_set lookup failed: %s", e)
+        valid_uuids = None
+
+    return [
+        dict(d) for d in wdiag.run_diagnostics(
+            wf_data, steps_output,
+            valid_search_set_uuids=valid_uuids,
+            validation_plan=validation_plan,
+        )
+    ]
+
+
+_STRUCTURAL_FAIL_CODES: dict[str, str] = {
+    "empty_step_output": "produced an empty output",
+    "error_shaped_step_output": "produced an error-shaped output",
+    "invalid_json_output": "claimed JSON but the output does not parse",
+    "low_source_grounding": "extracted values that don't appear in the source document",
+}
+
+
+def _inject_step_output_fails(
+    checks: list[dict],
+    plan: list[dict],
+    diagnostics: list[dict],
+) -> None:
+    """Mutate `checks` to FAIL any check whose target_step has a structural
+    error-level diagnostic against it. The judge often misses these (the
+    LLM sees "" or a hallucinated value and has nothing concrete to
+    disagree with), so we override its verdict here.
+
+    The check's existing detail is preserved alongside the diagnostic
+    message so users can see both the judge's read and the structural
+    reason. SKIP verdicts stay SKIP — "we don't know" shouldn't be
+    promoted to a confident FAIL.
+    """
+    # step name → reason it's considered broken (first diagnostic wins)
+    broken_steps: dict[str, str] = {}
+    for d in diagnostics:
+        code = d.get("code", "")
+        if code not in _STRUCTURAL_FAIL_CODES:
+            continue
+        target = d.get("target_step")
+        if target and target not in broken_steps:
+            broken_steps[target] = _STRUCTURAL_FAIL_CODES[code]
+    if not broken_steps:
+        return
+
+    plan_by_id = {p.get("id"): p for p in plan or []}
+    for c in checks:
+        plan_check = plan_by_id.get(c.get("check_id")) or {}
+        target = (plan_check.get("target_step") or "").strip()
+        reason = broken_steps.get(target)
+        if reason and c.get("status") != "SKIP":
+            existing = c.get("detail", "") or ""
+            c["status"] = "FAIL"
+            c["detail"] = (
+                f"Step '{target}' {reason} (deterministic check). "
+                + (f"Judge said: {existing}" if existing else "")
+            ).strip()
+
+
 async def validate_workflow(workflow_id: str, user: User | None = None) -> dict:
     """Evaluate the last N executions' output against the persisted validation plan."""
     if user is not None:
@@ -1625,6 +2048,15 @@ async def validate_workflow(workflow_id: str, user: User | None = None) -> dict:
         WorkflowResult.status == "completed",
     ).sort("-_id").limit(max(num_runs, 1)).to_list()
 
+    # Static diagnostics — these run independent of the validation plan and
+    # the LLM judge. Computed once up-front so the no-results path can still
+    # surface dangling refs / prompt-field mismatches.
+    static_diagnostics = await _gather_static_diagnostics(
+        wf_data,
+        steps_output=last_results[0].steps_output if last_results else None,
+        validation_plan=plan,
+    )
+
     if not last_results:
         # All checks SKIP
         checks = [
@@ -1639,6 +2071,7 @@ async def validate_workflow(workflow_id: str, user: User | None = None) -> dict:
         return await _build_result(
             checks, workflow_id, wf_data, num_runs=0,
             output_comparison=None, stability_data=None,
+            static_diagnostics=static_diagnostics,
         )
 
     # Compute output-to-output stability (compares actual outputs across runs)
@@ -1680,12 +2113,22 @@ async def validate_workflow(workflow_id: str, user: User | None = None) -> dict:
     # Judge variance (Phase 2A): re-evaluate the most-recent run and measure
     # how often verdicts flip. Drives the "± N pts" CI on the grade so users
     # know whether a borderline PASS could swing to FAIL on the next run.
-    judge_variance = await _sample_workflow_judge_variance(
+    # We run the replay ONCE and derive both overall and per-step variance
+    # from the same (orig, replay) sample pairs — no second LLM call.
+    replay_samples = await _run_judge_replay(
         plan=plan,
         last_result=last_results[0],
         wf_data=wf_data,
         original_checks_per_run=all_run_checks,
     )
+    judge_variance = _stddev_of_deltas(replay_samples)
+    per_step_variance = _compute_per_step_variance(replay_samples, plan)
+
+    # Deterministic step-output errors get promoted to FAIL checks tied to
+    # the offending step. Without this, the LLM judge has been observed to
+    # silently rate empty / "Error: rate limit" outputs as PASS for any
+    # check the model couldn't parse a target for.
+    _inject_step_output_fails(checks, plan, static_diagnostics)
 
     return await _build_result(
         checks, workflow_id, wf_data,
@@ -1694,6 +2137,8 @@ async def validate_workflow(workflow_id: str, user: User | None = None) -> dict:
         stability_data=stability_data,
         baseline_no_workflow=baseline_no_workflow,
         judge_variance=judge_variance,
+        per_step_variance=per_step_variance,
+        static_diagnostics=static_diagnostics,
     )
 
 
@@ -1785,12 +2230,47 @@ async def _evaluate_checks_against_output(
             + _json.dumps(steps_output, indent=2, default=str)[:20_000]
         )
 
+    # Detect whether the output is structured JSON. When it is, tell the judge
+    # explicitly so it reasons about field-level presence rather than searching
+    # free text for the values — a known failure mode for completeness checks.
+    output_is_structured = False
+    output_shape_hint = ""
+    stripped_output = (output_text or "").strip()
+    if stripped_output.startswith("{") or stripped_output.startswith("["):
+        try:
+            parsed_struct = _json.loads(stripped_output)
+            if isinstance(parsed_struct, dict):
+                output_is_structured = True
+                top_keys = list(parsed_struct.keys())[:20]
+                output_shape_hint = (
+                    f"\n\n## Output Shape Hint\n"
+                    f"The final output is a JSON object with keys: {top_keys}. "
+                    "When checking completeness, reason about which keys/values are present."
+                )
+            elif isinstance(parsed_struct, list):
+                output_is_structured = True
+                output_shape_hint = (
+                    f"\n\n## Output Shape Hint\n"
+                    f"The final output is a JSON array of length {len(parsed_struct)}. "
+                    "When checking completeness, verify expected elements are present."
+                )
+        except _json.JSONDecodeError:
+            pass
+
+    structured_note = (
+        "Note: the workflow output is STRUCTURED JSON. Reason about it as data "
+        "(specific keys/values) — don't fall back to free-text matching when a key "
+        "is named explicitly in the check description.\n\n"
+        if output_is_structured else ""
+    )
+
     system_prompt = (
         "You are a strict quality evaluator for workflow outputs. You will be given:\n"
         "1. A list of quality checks to evaluate\n"
         "2. The final output of a workflow execution\n"
         "3. The source document text (when available) — this is ground truth\n"
         "4. Intermediate step outputs (to cross-reference data flow)\n\n"
+        + structured_note +
         "Your job is to determine whether the FINAL OUTPUT satisfies each check.\n\n"
         "Key evaluation principles:\n"
         "- For COMPLETENESS checks: verify that specific named data points actually appear "
@@ -1804,21 +2284,23 @@ async def _evaluate_checks_against_output(
         "- For CONTENT checks: assess whether the output fulfills its stated purpose "
         "(e.g., 'human readable summary' should be a coherent narrative, not raw data).\n"
         "- For FORMATTING checks: verify the output matches the requested format.\n\n"
-        "For EACH check, determine: PASS, FAIL, or WARN.\n"
-        "Cite specific evidence from the output (quote actual text/values) to justify "
-        "your assessment. When checking accuracy, quote both the output value and the "
-        "source document value for comparison.\n\n"
+        "For EACH check, determine: PASS, FAIL, or WARN.\n\n"
+        "EVIDENCE REQUIREMENT (strict):\n"
+        "- Every FAIL verdict MUST quote the specific output value (or named absence) that failed.\n"
+        "- Every PASS verdict MUST cite at least one concrete supporting value from the output.\n"
+        "- For accuracy checks, quote BOTH the output value and the source document value.\n"
+        "- Verdicts without concrete quoted evidence should be marked WARN, not PASS.\n\n"
         "Return ONLY a JSON array of result objects. Each object must have:\n"
         '- "check_id": the check ID from the input (string)\n'
         '- "status": one of "PASS", "FAIL", "WARN" (string)\n'
-        '- "detail": specific evidence from the output justifying the status — quote '
-        "actual values and text (string)\n\n"
+        '- "detail": specific evidence — quote actual values in double quotes (string)\n\n'
         "Return ONLY the JSON array, no other text."
     )
 
     user_prompt = (
         f"## Quality Checks to Evaluate\n{checks_desc}\n\n"
         f"## Workflow Final Output\n{output_text}"
+        f"{output_shape_hint}"
         f"{source_text}"
         f"{steps_text}"
     )
@@ -2045,6 +2527,8 @@ async def _build_result(
     stability_data: dict | None = None,
     baseline_no_workflow: dict | None = None,
     judge_variance: float | None = None,
+    per_step_variance: dict[str, float] | None = None,
+    static_diagnostics: list[dict] | None = None,
 ) -> dict:
     """Compute separate quality / stability scores, combined score, grade, and persist."""
     statuses = [c["status"] for c in checks]
@@ -2140,6 +2624,13 @@ async def _build_result(
     # Empty list when all checks target the same step (or no target_step set)
     # — the breakdown wouldn't add information vs. the overall grade.
     step_breakdown = _compute_step_breakdown(plan, checks)
+    # Layer per-step variance onto each row so the UI can render a ±N pts
+    # CI on each step's score. None when no per-step samples were available
+    # (single-step plan or judge replay produced too few comparable verdicts).
+    if per_step_variance:
+        for row in step_breakdown:
+            v = per_step_variance.get(row["step"])
+            row["variance"] = v
 
     result_dict = {
         "grade": grade,
@@ -2160,6 +2651,7 @@ async def _build_result(
         "baseline_no_workflow_detail": baseline_no_workflow,
         "step_breakdown": step_breakdown,
         "judge_variance": judge_variance,
+        "static_diagnostics": static_diagnostics or [],
     }
 
     from app.services.quality_service import persist_validation_run

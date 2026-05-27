@@ -139,6 +139,112 @@ async def persist_validation_run(
     # Update quality metadata on verified item
     await update_quality_metadata(item_kind, item_id, item_name=item_name)
 
+    # Phase 5: when a workflow validation result shows elevated cross-field
+    # failure, auto-enqueue a shadow workflow optimizer run so the user has
+    # a candidate fix waiting next time they open the workflow. Best-effort
+    # — never blocks the validation insert on a trigger failure.
+    if item_kind == "workflow" and run_type == "workflow":
+        try:
+            await _maybe_trigger_workflow_shadow_run(
+                workflow_id=item_id, user_id=user_id, result=result,
+            )
+        except Exception:
+            logger.warning(
+                "Workflow shadow-run trigger failed for workflow=%s",
+                item_id, exc_info=True,
+            )
+
+    return vr
+
+
+# Phase 5: workflow score threshold below which a cross-field-failure
+# validation result auto-fires a shadow optimizer run. Tuned conservatively
+# — only the runs that would clearly benefit from re-tuning.
+WORKFLOW_SHADOW_TRIGGER_SCORE = 70.0
+
+
+async def _maybe_trigger_workflow_shadow_run(
+    *, workflow_id: str, user_id: str, result: dict,
+) -> None:
+    """Inspect a freshly-persisted workflow validation result; if it shows
+    significant cross-field-style failure on a low overall score, fire a
+    shadow workflow optimizer run."""
+    score = result.get("score")
+    checks = result.get("checks") or []
+    if not isinstance(score, (int, float)) or score >= WORKFLOW_SHADOW_TRIGGER_SCORE:
+        return
+    if not checks:
+        return
+    fails = sum(1 for c in checks if str(c.get("status", "")).upper() == "FAIL")
+    if fails == 0:
+        return
+    fail_rate = fails / len(checks)
+    if fail_rate < 0.25:
+        # Below the noise floor for "the workflow is broken vs the test
+        # cases are flaky". Don't burn shadow runs on flaky inputs.
+        return
+    from app.services import optimizer_signal_service
+    await optimizer_signal_service.enqueue_workflow_shadow_run(
+        workflow_id=workflow_id,
+        user_id=user_id,
+        trigger="cross_field_failure",
+        trigger_detail={
+            "score": round(float(score), 1),
+            "fail_rate": round(fail_rate, 3),
+            "checks_failed": fails,
+            "checks_total": len(checks),
+        },
+    )
+
+
+async def record_optimizer_apply(
+    *,
+    item_kind: str,
+    item_id: str,
+    item_name: str,
+    run_type: str,
+    score: float,
+    user_id: str,
+    source_run_uuid: str,
+    applied_config: dict | None = None,
+    judge_model: str | None = None,
+    judge_variance: float | None = None,
+) -> ValidationRun:
+    """Record a ``ValidationRun`` for an optimizer apply (Phase 4 unification).
+
+    Each apply produces a timeline entry tagged ``source="optimizer_apply"``
+    so the shared QualityTimeline can show "we applied a new config here"
+    alongside the validation runs that *measured* quality. ``score`` is the
+    optimizer's headline score for the winning config (0..100 scale to
+    match validation runs).
+
+    This is intentionally lightweight — it doesn't re-evaluate, just records
+    the fact that an apply occurred and what the optimizer's measurement
+    was at the time. The next real validation run will overwrite quality
+    metadata; this row exists to make the apply visible in the timeline.
+    """
+    snapshot = {
+        "source": "optimizer_apply",
+        "source_run_uuid": source_run_uuid,
+        "score": score,
+        "applied_config": applied_config or {},
+        "judge_model": judge_model,
+        "judge_variance": judge_variance,
+    }
+    vr = ValidationRun(
+        item_kind=item_kind,
+        item_id=item_id,
+        item_name=item_name,
+        run_type=run_type,
+        score=score,
+        model=judge_model,
+        result_snapshot=snapshot,
+        user_id=user_id,
+        source="optimizer_apply",
+        source_run_uuid=source_run_uuid,
+        created_at=datetime.datetime.now(tz=datetime.timezone.utc),
+    )
+    await vr.insert()
     return vr
 
 
@@ -817,6 +923,15 @@ async def _get_latest_run(item_kind: str, item_id: str) -> Optional[ValidationRu
 
 
 def _run_to_dict(r: ValidationRun) -> dict:
+    # Surface judge-side trust signals out of result_snapshot so the sparkline
+    # tooltip and KB quality header don't need to peek inside the blob. These
+    # mirror the fields KB validation now writes into retrieval_precision.
+    rp = (r.result_snapshot or {}).get("retrieval_precision") if isinstance(r.result_snapshot, dict) else None
+    judge_variance = rp.get("judge_variance") if isinstance(rp, dict) else None
+    judge_variance_meta = rp.get("judge_variance_meta") if isinstance(rp, dict) else None
+    num_queries_judged = rp.get("num_queries_judged") if isinstance(rp, dict) else None
+    judge_model = (r.result_snapshot or {}).get("judge_model") if isinstance(r.result_snapshot, dict) else None
+    eval_mode = (r.result_snapshot or {}).get("mode") if isinstance(r.result_snapshot, dict) else None
     return {
         "uuid": r.uuid,
         "item_kind": r.item_kind,
@@ -838,4 +953,13 @@ def _run_to_dict(r: ValidationRun) -> dict:
         "extraction_config": r.extraction_config,
         "user_id": r.user_id,
         "created_at": r.created_at.isoformat() if r.created_at else None,
+        # Surfaced trust signals (None when missing — older runs).
+        "judge_model": judge_model,
+        "judge_variance": judge_variance,
+        "judge_variance_meta": judge_variance_meta,
+        "num_queries_judged": num_queries_judged,
+        "mode": eval_mode,
+        # Provenance — Phase 4 unification. None for legacy runs.
+        "source": getattr(r, "source", None),
+        "source_run_uuid": getattr(r, "source_run_uuid", None),
     }

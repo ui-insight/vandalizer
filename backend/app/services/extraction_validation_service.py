@@ -313,25 +313,42 @@ async def run_validation(
             for err_type, count in f.get("error_types", {}).items():
                 error_type_summary[err_type] = error_type_summary.get(err_type, 0) + count
 
-    # Run cross-field validation on most-common values from each test case
+    # Run cross-field validation on most-common values from each test case.
+    # Uses the structured validator: tri-state status, persists rule counters,
+    # auto-demotes false-positive-heavy rules.
     cross_field_score = None
+    cross_field_summary = None
+    cross_field_results: list[dict] = []
     if ss and ss.cross_field_rules:
-        from app.services.cross_field_validation import CrossFieldValidator
+        from app.services.cross_field_validation import (
+            CrossFieldValidator,
+            summarize_results,
+        )
+        from app.services.cross_field_rules import apply_evaluation_counters
+
+        rules = ss.normalized_cross_field_rules()
         cf_validator = CrossFieldValidator()
-        cf_pass_total = 0
-        cf_rule_total = 0
         for tcr in tc_results:
-            # Build data dict from most_common_value per field
             cf_data = {}
             for fr in tcr.get("fields", []):
                 if fr.get("most_common_value") is not None:
                     cf_data[fr["field_name"]] = fr["most_common_value"]
             if cf_data:
-                cf_results = cf_validator.validate(cf_data, ss.cross_field_rules)
-                cf_pass_total += sum(1 for r in cf_results if r["passed"])
-                cf_rule_total += len(cf_results)
-        if cf_rule_total > 0:
-            cross_field_score = cf_pass_total / cf_rule_total
+                tc_cf_results = cf_validator.validate(cf_data, rules)
+                # Stamp the source test case onto each result so the UI can
+                # show "rule X failed on test case Y" — needed for the FP
+                # mark-as-false-alarm flow.
+                for r in tc_cf_results:
+                    r["test_case_uuid"] = tcr.get("uuid")
+                    r["test_case_label"] = tcr.get("label")
+                cross_field_results.extend(tc_cf_results)
+
+        cross_field_summary = summarize_results(cross_field_results)
+        cross_field_score = cross_field_summary["pass_rate"]
+
+        if apply_evaluation_counters(rules, cross_field_results):
+            ss.cross_field_rules = rules
+            await ss.save()
 
     result_dict = {
         "search_set_uuid": search_set_uuid,
@@ -347,6 +364,8 @@ async def run_validation(
         "challenging_fields": challenging_fields,
         "error_type_summary": error_type_summary,
         "cross_field_score": cross_field_score,
+        "cross_field_summary": cross_field_summary,
+        "cross_field_results": cross_field_results,
     }
 
     # Persist validation run for quality tracking
@@ -550,6 +569,8 @@ _NOT_FOUND_VARIANTS = frozenset({
     "", "n/a", "na", "n.a.", "not found", "not available",
     "not applicable", "none", "null", "nil", "unknown", "-", "--", "---",
     "nan", "no data", "no value", "not provided", "not specified",
+    "not present", "not stated", "not mentioned", "not given",
+    "no information", "no entry", "missing", "empty", "blank",
 })
 
 
@@ -1031,25 +1052,38 @@ async def run_validation_v2(
             for err_type, count in f.get("error_types", {}).items():
                 error_type_summary[err_type] = error_type_summary.get(err_type, 0) + count
 
-    # Run cross-field validation on most-common values from each source
+    # Run cross-field validation on most-common values from each source.
+    # Same structured path as the test-case validator above — see that branch
+    # for rationale on tri-state status and counter persistence.
     cross_field_score = None
+    cross_field_summary = None
+    cross_field_results: list[dict] = []
     if ss and ss.cross_field_rules:
-        from app.services.cross_field_validation import CrossFieldValidator
+        from app.services.cross_field_validation import (
+            CrossFieldValidator,
+            summarize_results,
+        )
+        from app.services.cross_field_rules import apply_evaluation_counters
+
+        rules = ss.normalized_cross_field_rules()
         cf_validator = CrossFieldValidator()
-        cf_pass_total = 0
-        cf_rule_total = 0
         for sr in source_results:
-            # Build data dict from most_common_value per field
             cf_data = {}
             for fr in sr.get("fields", []):
                 if fr.get("most_common_value") is not None:
                     cf_data[fr["field_name"]] = fr["most_common_value"]
             if cf_data:
-                cf_results = cf_validator.validate(cf_data, ss.cross_field_rules)
-                cf_pass_total += sum(1 for r in cf_results if r["passed"])
-                cf_rule_total += len(cf_results)
-        if cf_rule_total > 0:
-            cross_field_score = cf_pass_total / cf_rule_total
+                sr_cf_results = cf_validator.validate(cf_data, rules)
+                for r in sr_cf_results:
+                    r["source_label"] = sr.get("source_label")
+                cross_field_results.extend(sr_cf_results)
+
+        cross_field_summary = summarize_results(cross_field_results)
+        cross_field_score = cross_field_summary["pass_rate"]
+
+        if apply_evaluation_counters(rules, cross_field_results):
+            ss.cross_field_rules = rules
+            await ss.save()
 
     result_dict = {
         "search_set_uuid": search_set_uuid,
@@ -1067,6 +1101,8 @@ async def run_validation_v2(
         "challenging_fields": challenging_fields,
         "error_type_summary": error_type_summary,
         "cross_field_score": cross_field_score,
+        "cross_field_summary": cross_field_summary,
+        "cross_field_results": cross_field_results,
     }
 
     # Persist validation run for quality tracking

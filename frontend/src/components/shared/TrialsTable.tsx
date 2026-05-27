@@ -8,6 +8,86 @@ export interface SortOption<TTrial> {
   compare: (a: TTrial, b: TTrial) => number
 }
 
+/**
+ * Fields every domain's trial type shares, used by the standard sort options
+ * and the standard row renderer. KB and extraction both populate these; a
+ * future workflow trial would too.
+ */
+export interface StandardTrialFields {
+  score?: number | null
+  lift_vs_default?: number | null
+  duration_seconds?: number | null
+  status?: string
+}
+
+/** Score → dot color. Green ≥0.7, amber ≥0.4, red otherwise. */
+export function scoreColor(s: number): string {
+  if (s >= 0.7) return '#22c55e'
+  if (s >= 0.4) return '#f59e0b'
+  return '#ef4444'
+}
+
+/**
+ * The score/lift/duration sort triad both KB and extraction use. Each domain
+ * can extend with its own options if it has extra columns worth sorting by.
+ */
+export function makeStandardSortOptions<T extends StandardTrialFields>(): SortOption<T>[] {
+  return [
+    { key: 'score', label: 'Score', compare: (a, b) => (b.score ?? 0) - (a.score ?? 0) },
+    { key: 'lift', label: 'Lift', compare: (a, b) => (b.lift_vs_default ?? 0) - (a.lift_vs_default ?? 0) },
+    { key: 'duration', label: 'Duration', compare: (a, b) => (b.duration_seconds ?? 0) - (a.duration_seconds ?? 0) },
+  ]
+}
+
+/**
+ * Standard trial-row layout: score dot · config summary · lift delta · score %.
+ *
+ * Domain consumers pass a `summariseConfig` callback to format their config
+ * shape — that's the only domain-specific bit. Everything else (layout,
+ * colors, padding, lift sign coloring) is identical across domains.
+ */
+export function TrialRow<TConfig>({
+  trial, summariseConfig,
+}: {
+  trial: StandardTrialFields & { config: TConfig }
+  summariseConfig: (config: TConfig) => string
+}) {
+  const score = trial.score ?? 0
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 8,
+      padding: '6px 10px', fontSize: 11, color: '#ddd',
+      backgroundColor: trial.status === 'failed' ? 'rgba(239, 68, 68, 0.05)' : 'rgba(0,0,0,0.2)',
+      borderRadius: 4,
+    }}>
+      <span style={{
+        width: 6, height: 6, borderRadius: '50%',
+        backgroundColor: scoreColor(score),
+      }} />
+      <span style={{
+        flex: 1, overflow: 'hidden', textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap', color: '#aaa',
+      }}>
+        {summariseConfig(trial.config)}
+      </span>
+      {trial.lift_vs_default != null && (
+        <span style={{
+          fontSize: 10,
+          color: trial.lift_vs_default > 0 ? '#22c55e'
+            : trial.lift_vs_default < 0 ? '#ef4444' : '#666',
+        }}>
+          {trial.lift_vs_default > 0 ? '+' : ''}{(trial.lift_vs_default * 100).toFixed(0)}pts
+        </span>
+      )}
+      <span style={{
+        width: 50, textAlign: 'right', fontWeight: 600, color: '#e5e5e5',
+      }}>
+        {(score * 100).toFixed(0)}%
+      </span>
+    </div>
+  )
+}
+
 interface TrialsTableProps<TTrial> {
   trials: TTrial[]
   sortOptions: SortOption<TTrial>[]

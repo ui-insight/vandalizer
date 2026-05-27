@@ -14,6 +14,12 @@ interface BudgetTierPickerProps {
   costLabel: string | null
   /** Per-tier display formatter — caller decides how to render tokens/cost on each row. */
   formatTierRow: (tier: BudgetTier) => { tokensLabel: string; costLabel: string | null }
+  /** When set, the matching tier renders a "Recommended for you" badge so
+   * cold-start users have a sensible default based on their baseline probe. */
+  recommendedTierId?: string
+  /** Short caption shown alongside the recommendation badge, e.g. "Your model
+   * already does well without the KB — a smaller budget is enough." */
+  recommendationReason?: string
   title?: string
   description?: string
 }
@@ -21,16 +27,28 @@ interface BudgetTierPickerProps {
 export function BudgetTierPicker({
   tiers, selected, onSelect, customTokens, onCustomTokens,
   tokensLabel, costLabel, formatTierRow,
+  recommendedTierId, recommendationReason,
   title = 'Token budget',
-  description = 'Optimization stops once it would exceed this budget. More budget = more configurations tried = higher chance of finding the best.',
+  description = 'Each setup costs LLM tokens to test. The smaller tiers confirm whether tuning helps at all; larger tiers find a more confident winner.',
 }: BudgetTierPickerProps) {
   return (
     <div style={{ fontSize: 13, color: '#ccc' }}>
       <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: '#fff' }}>{title}</h4>
       <p style={{ margin: '0 0 12px 0', color: '#bbb', lineHeight: 1.5 }}>{description}</p>
+      {recommendedTierId && recommendationReason && (
+        <div style={{
+          marginBottom: 10, padding: '8px 10px',
+          backgroundColor: 'rgba(124, 58, 237, 0.08)',
+          border: '1px solid rgba(124, 58, 237, 0.3)', borderRadius: 6,
+          fontSize: 11, color: '#c4b5fd', lineHeight: 1.5,
+        }}>
+          {recommendationReason}
+        </div>
+      )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {tiers.map(t => {
           const active = selected === t.id
+          const recommended = recommendedTierId === t.id
           const { tokensLabel: rowTokens, costLabel: rowCost } = formatTierRow(t)
           return (
             <button
@@ -46,7 +64,19 @@ export function BudgetTierPicker({
             >
               <Radio active={active} />
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>{t.label}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>{t.label}</div>
+                  {recommended && (
+                    <span style={{
+                      fontSize: 9, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase',
+                      padding: '2px 6px', borderRadius: 10,
+                      color: '#a78bfa', backgroundColor: 'rgba(124, 58, 237, 0.18)',
+                      border: '1px solid rgba(124, 58, 237, 0.45)',
+                    }}>
+                      Recommended for you
+                    </span>
+                  )}
+                </div>
                 <div style={{ fontSize: 11, color: '#888' }}>
                   {rowTokens}
                   {rowCost && <> · {rowCost}</>}

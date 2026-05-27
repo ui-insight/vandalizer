@@ -74,8 +74,8 @@ export function KBValidationRunTab({ kbUuid, kbReady, canManage, numQueries, lat
               borderRadius: 4, padding: '3px 6px', fontSize: 11, fontFamily: 'inherit',
             }}
           >
-            <option value="judge+baseline">Judge + baseline (lift)</option>
-            <option value="judge">Judge only</option>
+            <option value="judge+baseline">Score vs. no-KB (recommended)</option>
+            <option value="judge">Score only</option>
           </select>
         </label>
         <span style={{ fontSize: 11, color: '#666' }}>

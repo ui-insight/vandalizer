@@ -69,3 +69,92 @@ class BudgetEnforcer:
         pool = list(search_space)
         rng.shuffle(pool)
         return pool[:target]
+
+    def stratified_sample_trials(
+        self,
+        search_space: list[dict[str, Any]],
+        axes: list[str],
+        rng: random.Random | None = None,
+    ) -> list[dict[str, Any]]:
+        """Stratified sample without replacement — guarantees axis coverage.
+
+        Pure uniform random sampling at small N can leave entire axis values
+        unexplored (e.g. 5 trials all happen to be ``k=4``). Stratified
+        sampling first picks one config per axis value (so every value gets
+        tried at least once), then fills the remainder with random draws.
+
+        The shuffled pool order makes within-axis-value selection random,
+        and the axis iteration order is shuffled too, so no axis is
+        systematically prioritized over another when the target count is
+        small enough that not every axis fits.
+        """
+        rng = rng or random.Random()
+        target = min(
+            self.max_trial_count,
+            max(0, self.total_budget // self.per_trial_estimate),
+        )
+        if target <= 0:
+            return []
+        if not axes:
+            return self.sample_trials(search_space, rng=rng)
+
+        pool = list(search_space)
+        rng.shuffle(pool)
+
+        # Collect unique values per axis from the actual search space.
+        axis_values: dict[str, list[Any]] = {a: [] for a in axes}
+        seen_per_axis: dict[str, set] = {a: set() for a in axes}
+        for cfg in pool:
+            for a in axes:
+                v = cfg.get(a, _MISSING)
+                if v is _MISSING:
+                    continue
+                # Set uses hashable types only; model can be None which is hashable.
+                try:
+                    if v not in seen_per_axis[a]:
+                        seen_per_axis[a].add(v)
+                        axis_values[a].append(v)
+                except TypeError:
+                    # Unhashable axis value — skip stratification for it.
+                    continue
+
+        chosen: list[dict[str, Any]] = []
+        chosen_keys: set = set()
+
+        def _key(cfg: dict[str, Any]) -> tuple:
+            return tuple(sorted(cfg.items(), key=lambda kv: kv[0]))
+
+        # Phase 1: at least one trial per axis value. Shuffle axis order so a
+        # tight budget doesn't always favour the first-listed axis.
+        ordered_axes = list(axes)
+        rng.shuffle(ordered_axes)
+        for axis in ordered_axes:
+            for value in axis_values[axis]:
+                if len(chosen) >= target:
+                    return chosen
+                # Prefer pool entries that match this axis value AND fill
+                # axes we've under-sampled. For v1, a simple match is enough.
+                for cfg in pool:
+                    if cfg.get(axis) != value:
+                        continue
+                    k = _key(cfg)
+                    if k in chosen_keys:
+                        continue
+                    chosen.append(cfg)
+                    chosen_keys.add(k)
+                    break
+
+        # Phase 2: random fill the remainder from the unsampled pool.
+        for cfg in pool:
+            if len(chosen) >= target:
+                break
+            k = _key(cfg)
+            if k in chosen_keys:
+                continue
+            chosen.append(cfg)
+            chosen_keys.add(k)
+
+        return chosen
+
+
+_MISSING = object()

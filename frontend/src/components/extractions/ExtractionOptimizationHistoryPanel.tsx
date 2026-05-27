@@ -1,11 +1,10 @@
 /**
- * Collapsible list of past optimization runs for a SearchSet.
+ * Collapsible list of past tuning runs for a SearchSet.
  *
  * Lazy-loads history on first open. Clicking a row notifies the parent so
  * it can fetch the full run document and flip into a read-only "viewing past
- * run" state. Light-mode styling — matches the Validate-tab surrounding UI
- * (KB's equivalent is dark-mode; the structure here is intentionally
- * parallel but the chrome differs).
+ * run" state. Dark-mode chrome to match the shared trust primitives that
+ * dominate the Autovalidate surface.
  */
 import { useEffect, useState } from 'react'
 import { ChevronDown, ChevronRight, History, Loader2 } from 'lucide-react'
@@ -47,8 +46,8 @@ export function ExtractionOptimizationHistoryPanel({
 
   return (
     <div style={{
-      backgroundColor: '#fafafa',
-      border: '1px solid #e5e7eb', borderRadius: 8,
+      backgroundColor: '#1f1f1f',
+      border: '1px solid #2e2e2e', borderRadius: 8,
       overflow: 'hidden',
     }}>
       <button
@@ -56,15 +55,15 @@ export function ExtractionOptimizationHistoryPanel({
         style={{
           display: 'flex', alignItems: 'center', gap: 8, width: '100%',
           padding: '10px 14px', background: 'transparent', border: 'none',
-          fontFamily: 'inherit', cursor: 'pointer', color: '#1f2937',
+          fontFamily: 'inherit', cursor: 'pointer', color: '#e5e5e5',
           textAlign: 'left',
         }}
       >
-        {open ? <ChevronDown size={14} style={{ color: '#6b7280' }} /> : <ChevronRight size={14} style={{ color: '#6b7280' }} />}
-        <History size={14} style={{ color: '#6b7280' }} />
+        {open ? <ChevronDown size={14} style={{ color: '#888' }} /> : <ChevronRight size={14} style={{ color: '#888' }} />}
+        <History size={14} style={{ color: '#888' }} />
         <span style={{ fontSize: 13, fontWeight: 600 }}>Previous runs</span>
         {items != null && (
-          <span style={{ marginLeft: 'auto', fontSize: 11, color: '#9ca3af' }}>
+          <span style={{ marginLeft: 'auto', fontSize: 11, color: '#666' }}>
             {filtered.length} {filtered.length === 1 ? 'run' : 'runs'}
           </span>
         )}
@@ -73,16 +72,25 @@ export function ExtractionOptimizationHistoryPanel({
       {open && (
         <div style={{ padding: '0 12px 12px 12px' }}>
           {loading && (
-            <div style={{ textAlign: 'center', padding: 16, color: '#6b7280' }}>
+            <div style={{ textAlign: 'center', padding: 16, color: '#888' }}>
               <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
             </div>
           )}
           {error && (
-            <div style={{ fontSize: 12, color: '#b91c1c', padding: 8 }}>{error}</div>
+            <div style={{ fontSize: 12, color: '#fca5a5', padding: 8 }}>{error}</div>
           )}
           {items != null && !loading && filtered.length === 0 && (
-            <div style={{ fontSize: 12, color: '#6b7280', padding: '12px 8px' }}>
-              No prior optimization runs for this extraction.
+            <div style={{ padding: '12px 8px' }}>
+              <div style={{ fontSize: 13, color: '#ddd', fontWeight: 600, marginBottom: 6 }}>
+                No prior tuning runs for this extraction
+              </div>
+              <div style={{ fontSize: 12, color: '#999', lineHeight: 1.55 }}>
+                Each run scores your extraction against test cases and lands here, so
+                you can see whether model or strategy changes are actually helping.
+                A run takes <b style={{ color: '#bbb' }}>5–15 minutes</b> and costs
+                about <b style={{ color: '#bbb' }}>$1–$5</b> — nothing changes until
+                you click Apply on a recipe.
+              </div>
             </div>
           )}
           {items != null && filtered.length > 0 && (
@@ -112,24 +120,35 @@ function HistoryRow({
       style={{
         display: 'flex', alignItems: 'center', gap: 8,
         padding: '7px 10px', textAlign: 'left',
-        background: '#fff', border: '1px solid #e5e7eb',
+        background: '#1a1a1a', border: '1px solid #2a2a2a',
         borderRadius: 5, cursor: onSelect ? 'pointer' : 'default',
-        fontFamily: 'inherit', color: '#1f2937',
+        fontFamily: 'inherit', color: '#e5e5e5',
       }}
-      onMouseEnter={e => onSelect && (e.currentTarget.style.borderColor = '#c4b5fd')}
-      onMouseLeave={e => onSelect && (e.currentTarget.style.borderColor = '#e5e7eb')}
+      onMouseEnter={e => onSelect && (e.currentTarget.style.borderColor = 'rgba(124, 58, 237, 0.4)')}
+      onMouseLeave={e => onSelect && (e.currentTarget.style.borderColor = '#2a2a2a')}
     >
       <StatusDot status={run.status} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12, color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <div style={{
+          fontSize: 12, color: '#ddd',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
           {run.started_at ? new Date(run.started_at).toLocaleString() : 'Unknown date'}
-          <span style={{ color: '#9ca3af' }}> · {run.num_trials} trial{run.num_trials !== 1 ? 's' : ''}</span>
-          {run.options?.apply_on_finish ? <span style={{ color: '#7c3aed' }}> · auto-applied</span> : null}
+          <span style={{ color: '#666' }}> · {run.num_trials} trial{run.num_trials !== 1 ? 's' : ''}</span>
+          {run.options?.apply_on_finish ? <span style={{ color: '#a78bfa' }}> · auto-applied</span> : null}
         </div>
+        {run.judge_model && (
+          <div style={{
+            fontSize: 10, color: '#666',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1,
+          }}>
+            judge: {run.judge_model}
+          </div>
+        )}
         {run.error_message && run.status === 'failed' && (
           <div style={{
-            fontSize: 10, color: '#b91c1c', overflow: 'hidden',
-            textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1,
+            fontSize: 10, color: '#fca5a5',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 1,
           }}>
             {run.error_message}
           </div>
@@ -143,7 +162,7 @@ function HistoryRow({
       {lift != null && (
         <span style={{
           fontSize: 10,
-          color: lift > 0 ? '#16a34a' : lift < 0 ? '#dc2626' : '#9ca3af',
+          color: lift > 0 ? '#22c55e' : lift < 0 ? '#ef4444' : '#666',
           minWidth: 50, textAlign: 'right',
         }}>
           {lift > 0 ? '+' : ''}{lift.toFixed(0)}pts
@@ -154,7 +173,7 @@ function HistoryRow({
 }
 
 function scoreColor(s: number) {
-  if (s >= 0.7) return '#16a34a'
-  if (s >= 0.4) return '#d97706'
-  return '#dc2626'
+  if (s >= 0.7) return '#22c55e'
+  if (s >= 0.4) return '#f59e0b'
+  return '#ef4444'
 }

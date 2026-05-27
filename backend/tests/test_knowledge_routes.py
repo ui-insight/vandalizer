@@ -1184,3 +1184,142 @@ class TestKBListQueryBuilder:
         base, search = q["$and"]
         assert base == {"user_id": "user1", "team_owned": {"$ne": True}}
         assert search["$or"][0]["title"]["$regex"] == "needle"
+
+
+class TestBaselineProbe:
+    """Cover the cheap no-KB probe used by the tuning wizard."""
+
+    @pytest.mark.asyncio
+    async def test_returns_404_when_kb_missing(self, client):
+        user = _make_user("viewer")
+        cookies, headers = _auth("viewer")
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "viewer", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.routers.knowledge.organization_service.get_user_org_ancestry",
+                new_callable=AsyncMock,
+            ) as mock_org_ancestry,
+            patch("app.routers.knowledge.svc.get_knowledge_base", new_callable=AsyncMock) as mock_get_kb,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org_ancestry.return_value = []
+            mock_get_kb.return_value = None
+            resp = await client.post(
+                "/api/knowledge/kb-1/baseline-probe", json={}, cookies=cookies, headers=headers,
+            )
+        assert resp.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_rejects_invalid_sample_size(self, client):
+        user = _make_user("manager")
+        cookies, headers = _auth("manager")
+        kb = MagicMock(uuid="kb-1")
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "manager", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.routers.knowledge.organization_service.get_user_org_ancestry",
+                new_callable=AsyncMock,
+            ) as mock_org_ancestry,
+            patch("app.routers.knowledge.svc.get_knowledge_base", new_callable=AsyncMock) as mock_get_kb,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org_ancestry.return_value = []
+            mock_get_kb.return_value = kb
+            resp = await client.post(
+                "/api/knowledge/kb-1/baseline-probe",
+                json={"sample_size": 999},
+                cookies=cookies,
+                headers=headers,
+            )
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_returns_score_for_judgeable_queries(self, client):
+        user = _make_user("manager")
+        cookies, headers = _auth("manager")
+        kb = MagicMock(uuid="kb-1")
+
+        # Two test queries: one judgeable, one without expected_answer.
+        judgeable = MagicMock(uuid="q1", query="What is X?", expected_answer="X is foo.")
+        unjudgeable = MagicMock(uuid="q2", query="What about Y?", expected_answer=None)
+
+        # Beanie's chained `find().to_list()` — mock the find result to return
+        # an awaitable list when ``to_list`` is called.
+        find_result = MagicMock()
+        find_result.to_list = AsyncMock(return_value=[judgeable, unjudgeable])
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "manager", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.routers.knowledge.organization_service.get_user_org_ancestry",
+                new_callable=AsyncMock,
+            ) as mock_org_ancestry,
+            patch("app.routers.knowledge.svc.get_knowledge_base", new_callable=AsyncMock) as mock_get_kb,
+            patch("app.models.kb_test_query.KBTestQuery.find", return_value=find_result),
+            patch(
+                "app.services.workflow_validator._resolve_model_name",
+                return_value="gpt-4o-mini",
+            ),
+            patch(
+                "app.services.kb_validation_service.judge_baselines_only",
+                new_callable=AsyncMock,
+            ) as mock_judge,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org_ancestry.return_value = []
+            mock_get_kb.return_value = kb
+            mock_judge.return_value = {
+                "avg_baseline_score": 0.72,
+                "num_baselines_judged": 1,
+                "tokens_used": 1500,
+                "details": [],
+            }
+
+            resp = await client.post(
+                "/api/knowledge/kb-1/baseline-probe",
+                json={"sample_size": 5},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["no_kb_score"] == 0.72
+        assert body["num_queries_judged"] == 1
+        assert body["sample_query_ids"] == ["q1"]
+        assert body["tokens_used"] == 1500
+        assert "duration_ms" in body
+
+    @pytest.mark.asyncio
+    async def test_returns_null_score_when_no_judgeable_queries(self, client):
+        user = _make_user("manager")
+        cookies, headers = _auth("manager")
+        kb = MagicMock(uuid="kb-1")
+        find_result = MagicMock()
+        find_result.to_list = AsyncMock(return_value=[])  # no queries at all
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "manager", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.routers.knowledge.organization_service.get_user_org_ancestry",
+                new_callable=AsyncMock,
+            ) as mock_org_ancestry,
+            patch("app.routers.knowledge.svc.get_knowledge_base", new_callable=AsyncMock) as mock_get_kb,
+            patch("app.models.kb_test_query.KBTestQuery.find", return_value=find_result),
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org_ancestry.return_value = []
+            mock_get_kb.return_value = kb
+            resp = await client.post(
+                "/api/knowledge/kb-1/baseline-probe", json={}, cookies=cookies, headers=headers,
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["no_kb_score"] is None
+        assert body["num_queries_judged"] == 0
+        assert body["sample_query_ids"] == []

@@ -148,6 +148,7 @@ async def _run_single_config(
     num_runs: int,
     *,
     judge_model: str | None = None,
+    cross_field_rules: list[dict] | None = None,
 ) -> dict:
     """Run extraction with a specific config against all test cases, measure quality.
 
@@ -218,6 +219,9 @@ async def _run_single_config(
     judge_tokens = 0
     if judge_model:
         from app.services.extraction_judge import judge_field_value
+        field_metadata_by_key: dict[str, dict] = {
+            fm.get("key", ""): fm for fm in (field_metadata or []) if fm.get("key")
+        }
         judge_tasks: list[tuple[tuple[str, str, int], asyncio.Task]] = []
         for tc, run_results in tc_run_results:
             for run_idx, r in enumerate(run_results):
@@ -234,6 +238,7 @@ async def _run_single_config(
                             expected=str(expected),
                             actual=actual,
                             model_name=judge_model,
+                            field_metadata=field_metadata_by_key.get(field_name),
                         )),
                     ))
         # Await all judges concurrently
@@ -256,6 +261,10 @@ async def _run_single_config(
                         "expected": str(tc.expected_values.get(field_name, "") or ""),
                         "actual": str(run_result.get(field_name, "") or ""),
                         "score": score,
+                        # ``deterministic`` items have σ=0 by construction;
+                        # variance sampling should skip them.
+                        "comparator": verdict.get("comparator", "llm"),
+                        "field_metadata": field_metadata_by_key.get(field_name),
                     })
             except Exception as e:
                 logger.warning("Judge failed for %s: %s", key, e)
@@ -334,11 +343,38 @@ async def _run_single_config(
             "samples": agg["samples"],
         })
 
+    # Cross-field evaluation. Runs the configured rules against every
+    # (test_case, run) extraction. We need every run, not just the
+    # most-common-value, because optimizer trials are about output stability —
+    # a config whose rules pass on the modal value but fail on 4 of 5 runs is
+    # less safe than one where they pass on all 5.
+    cf_summary = None
+    cf_results_flat: list[dict] = []
+    if cross_field_rules:
+        from app.services.cross_field_validation import (
+            CrossFieldValidator,
+            summarize_results,
+        )
+        cf_validator = CrossFieldValidator()
+        for tc, run_results in tc_run_results:
+            for r in run_results:
+                cf_results_flat.extend(cf_validator.validate(r, cross_field_rules))
+        cf_summary = summarize_results(cf_results_flat)
+
     elapsed = time.monotonic() - start
 
     avg_accuracy = sum(all_field_accuracies) / len(all_field_accuracies) if all_field_accuracies else 0.0
     avg_consistency = sum(all_field_consistencies) / len(all_field_consistencies) if all_field_consistencies else 0.0
-    score = min(100.0, max(0.0, avg_accuracy * 60 + avg_consistency * 40))
+
+    # Score: with cross-field rules that actually produced a decisive verdict,
+    # use a 50/30/20 split. Otherwise the original 60/40. Treating unparseable
+    # rules as a violation would penalize the model for our parser's blind
+    # spots — see cross_field_validation.summarize_results for the rationale.
+    if cf_summary and cf_summary["pass_rate"] is not None:
+        cf_component = cf_summary["pass_rate"]
+        score = min(100.0, max(0.0, avg_accuracy * 50 + avg_consistency * 30 + cf_component * 20))
+    else:
+        score = min(100.0, max(0.0, avg_accuracy * 60 + avg_consistency * 40))
 
     return {
         "label": label,
@@ -346,6 +382,8 @@ async def _run_single_config(
         "config_override": config_override,
         "accuracy": round(avg_accuracy, 4),
         "consistency": round(avg_consistency, 4),
+        "cross_field_summary": cf_summary,
+        "cross_field_results": cf_results_flat,
         "score": round(score, 1),
         "elapsed_seconds": round(elapsed, 1),
         "fields_evaluated": len(all_field_accuracies),
@@ -390,6 +428,9 @@ async def find_best_settings_stream(
     sys_config_doc = sys_config.model_dump() if sys_config else {}
     field_metadata = await get_extraction_field_metadata(search_set_uuid)
 
+    ss_for_rules = await SearchSet.find_one(SearchSet.uuid == search_set_uuid)
+    cross_field_rules = ss_for_rules.normalized_cross_field_rules() if ss_for_rules else []
+
     candidates = _build_candidate_configs(sys_config.available_models, len(keys))
     if not candidates:
         raise ValueError("No models available for tuning")
@@ -409,6 +450,7 @@ async def find_best_settings_stream(
         try:
             result = await _run_single_config(
                 candidate, keys, test_cases, sys_config_doc, field_metadata, num_runs,
+                cross_field_rules=cross_field_rules,
             )
             results.append(result)
         except Exception as e:

@@ -398,9 +398,13 @@ async def test_run_optimization_with_judge_threads_model_through_and_samples_var
     assert captured_judge_models == ["claude-haiku", "claude-haiku", "claude-haiku"]
     # judge_model recorded on the run doc
     assert result.judge_model == "claude-haiku"
-    # Variance was sampled from the default baseline's judge_samples
+    # Variance was sampled from the default baseline's judge_samples. The
+    # max_samples is the shared DEFAULT_VARIANCE_SAMPLES (5) — n=2 was a
+    # point-measurement, not a noise estimate; the new default gives the
+    # sample-stddev estimator enough degrees of freedom to mean anything.
+    from app.services.judge_variance import DEFAULT_VARIANCE_SAMPLES
     assert fake_variance_call["samples_count"] == 2
-    assert fake_variance_call["max_samples"] == 2
+    assert fake_variance_call["max_samples"] == DEFAULT_VARIANCE_SAMPLES
     # Variance value persisted
     assert result.judge_variance == 0.025
     assert result.status == "completed"

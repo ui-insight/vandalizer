@@ -232,6 +232,7 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
         user_id=user_id,
         system_config_doc=sys_config,
         allow_code_execution=is_admin,
+        config_override=workflow_doc.get("config_override"),
     )
 
     # Pre-flight oversize check: refuse the run cleanly when an attached

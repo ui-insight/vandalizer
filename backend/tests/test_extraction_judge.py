@@ -79,12 +79,44 @@ def test_parse_verdict_handles_list_wrapper():
 
 @pytest.mark.asyncio
 async def test_judge_field_value_returns_parsed_verdict():
+    """LLM-judge path: free-text equivalence case the deterministic router
+    can't resolve (paraphrase). The judge should be called and its verdict
+    returned."""
     mock_run_result = MagicMock()
-    mock_run_result.output = '{"score": 0.95, "verdict": "PASS", "reasoning": "same date, different format"}'
+    mock_run_result.output = '{"score": 0.95, "verdict": "PASS", "reasoning": "paraphrase, same fact"}'
     mock_run_result.usage = MagicMock(return_value=MagicMock(total_tokens=42))
 
     mock_agent = MagicMock()
     mock_agent.run = AsyncMock(return_value=mock_run_result)
+
+    with (
+        patch.object(extraction_judge, "_ensure_system_config_loaded", new=AsyncMock(return_value=None)),
+        patch.object(extraction_judge, "_get_agent", return_value=mock_agent),
+    ):
+        out = await judge_field_value(
+            field_name="Summary",
+            expected="Quarterly revenue grew 12%",
+            actual="Revenue increased by twelve percent this quarter",
+            model_name="claude-haiku-4-5",
+        )
+
+    assert out["score"] == 0.95
+    assert out["verdict"] == "PASS"
+    assert out["tokens_used"] == 42
+    assert out["comparator"] == "llm"
+    # Prompt assembly: field name + expected + actual all surface to the model
+    call_args = mock_agent.run.call_args[0][0]
+    assert "Summary" in call_args
+    assert "Quarterly revenue grew 12%" in call_args
+    assert "Revenue increased by twelve percent" in call_args
+
+
+@pytest.mark.asyncio
+async def test_judge_field_value_deterministic_router_short_circuits_dates():
+    """Same date in two formats → deterministic comparator resolves; LLM
+    isn't touched. Guards the optimization that motivated the router."""
+    mock_agent = MagicMock()
+    mock_agent.run = AsyncMock()  # would raise if called via assert below
 
     with (
         patch.object(extraction_judge, "_ensure_system_config_loaded", new=AsyncMock(return_value=None)),
@@ -97,39 +129,34 @@ async def test_judge_field_value_returns_parsed_verdict():
             model_name="claude-haiku-4-5",
         )
 
-    assert out["score"] == 0.95
+    assert out["score"] == 1.0
     assert out["verdict"] == "PASS"
-    assert out["tokens_used"] == 42
-    # Prompt assembly: field name + expected + actual all surface to the model
-    call_args = mock_agent.run.call_args[0][0]
-    assert "Award Date" in call_args
-    assert "2026-01-05" in call_args
-    assert "Jan 5, 2026" in call_args
+    assert out["comparator"] == "deterministic"
+    mock_agent.run.assert_not_called()
 
 
 @pytest.mark.asyncio
-async def test_judge_field_value_substitutes_empty_marker_for_missing_actual():
-    """When actual is empty, the prompt shows '(empty)' so the judge can score 0."""
-    mock_run_result = MagicMock()
-    mock_run_result.output = '{"score": 0.0, "verdict": "FAIL"}'
-    mock_run_result.usage = MagicMock(return_value=MagicMock(total_tokens=10))
-
+async def test_judge_field_value_deterministic_router_fails_missing_actual():
+    """Expected has a value, actual is empty → deterministic FAIL (no LLM).
+    The 'not found' sentinel detection lives in extraction_validation_service."""
     mock_agent = MagicMock()
-    mock_agent.run = AsyncMock(return_value=mock_run_result)
+    mock_agent.run = AsyncMock()
 
     with (
         patch.object(extraction_judge, "_ensure_system_config_loaded", new=AsyncMock(return_value=None)),
         patch.object(extraction_judge, "_get_agent", return_value=mock_agent),
     ):
-        await judge_field_value(
+        out = await judge_field_value(
             field_name="PI Name",
             expected="Dr. Smith",
             actual="",
             model_name="claude-haiku-4-5",
         )
 
-    call_args = mock_agent.run.call_args[0][0]
-    assert "(empty)" in call_args
+    assert out["score"] == 0.0
+    assert out["verdict"] == "FAIL"
+    assert out["comparator"] == "deterministic"
+    mock_agent.run.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -166,7 +193,7 @@ async def test_judge_test_case_extraction_aggregates_per_field():
         "Amount": 0.0,
     }
 
-    async def fake_judge(field_name, expected, actual, model_name):
+    async def fake_judge(field_name, expected, actual, model_name, field_metadata=None):
         return {
             "score": field_scores[field_name],
             "verdict": "PASS" if field_scores[field_name] >= 0.7 else "FAIL",
@@ -192,7 +219,7 @@ async def test_judge_test_case_extraction_aggregates_per_field():
 @pytest.mark.asyncio
 async def test_judge_test_case_extraction_skips_fields_without_expected():
     """Fields with no expected value aren't judged (can't compare to nothing)."""
-    async def fake_judge(field_name, expected, actual, model_name):
+    async def fake_judge(field_name, expected, actual, model_name, field_metadata=None):
         return {"score": 0.8, "verdict": "PASS", "reasoning": "", "tokens_used": 5}
 
     with patch.object(extraction_judge, "judge_field_value", new=AsyncMock(side_effect=fake_judge)):

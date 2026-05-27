@@ -228,6 +228,7 @@ export type KBValidationResult = {
     num_queries_judged?: number
     num_queries_baselined?: number
     judge_variance?: number | null
+    judge_variance_meta?: { sigma: number | null; n: number; sampled_query_uuids: string[] } | null
     discrimination_summary?: { useful: number; redundant: number; failing: number; other: number }
     details: KBValidationDetail[]
   }
@@ -268,6 +269,25 @@ export function getKBQuality(uuid: string) {
     history: Record<string, unknown>[]
     contract: Record<string, unknown>
   }>(`/api/knowledge/${uuid}/quality`)
+}
+
+export type KBFeedbackImpact = {
+  /** ISO timestamp of the most recent ``applied_at`` on a winning run. Null
+   * when no optimization has been applied to this KB yet (no before/after split). */
+  applied_at: string | null
+  /** 0..1 thumbs-up rate over chat answers grounded in this KB BEFORE apply. */
+  thumbs_up_rate_before: number | null
+  /** 0..1 thumbs-up rate AFTER apply. */
+  thumbs_up_rate_after: number | null
+  n_before: number
+  n_after: number
+  /** Overall thumbs-up rate (used pre-apply when there's no before/after to split). */
+  thumbs_up_rate_overall: number | null
+  n_overall: number
+}
+
+export function getKBFeedbackImpact(uuid: string) {
+  return apiFetch<KBFeedbackImpact>(`/api/knowledge/${uuid}/feedback-impact`)
 }
 
 // Test queries
@@ -331,6 +351,20 @@ export function generateKBTestQueries(
 export type OptimizationStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled'
 export type OptimizationCoverage = 'quick' | 'standard' | 'exhaustive'
 
+export type PerQueryResult = {
+  query_uuid: string
+  query: string
+  category?: string | null
+  score: number
+  verdict?: 'PASS' | 'WARN' | 'FAIL' | 'SKIPPED' | null
+  confidence?: number | null
+  reasoning?: string
+  missing_facts?: string[]
+  hallucinated_facts?: string[]
+  actual_answer?: string
+  retrieved_sources?: string[]
+}
+
 export type OptimizationTrial = {
   trial_id: string
   config: {
@@ -340,15 +374,57 @@ export type OptimizationTrial = {
     query_rewriting: boolean
     source_label_visibility: boolean
   }
+  // Blended quality score (judge 0.40 + retrieval 0.25 + health 0.20 + coverage 0.15)
+  // on the same 0..1 scale the validation header reports.
   score: number
+  // Raw judge mean for this trial — kept separately so lift CI and cross-judge
+  // audit operate on judge units (the blended score's variance is dominated by
+  // the judge component since retrieval/health/coverage are config-invariant).
+  judge_score?: number | null
   lift_vs_default: number | null
   num_queries_judged?: number
   discrimination_summary?: { useful: number; redundant: number; failing: number; other: number } | null
+  per_query_results?: PerQueryResult[]
   tokens_used: number
   status: 'completed' | 'early_stopped' | 'failed'
   error?: string
   started_at?: string
   duration_seconds?: number
+}
+
+export type TestQuerySnapshot = {
+  total: number
+  query_uuids: string[]
+  expected_answer_hashes: Record<string, string>
+  auto_generated_count: number
+  user_authored_count: number
+  categories: Record<string, number>
+  sources_covered: string[]
+  total_sources: number
+}
+
+export type JudgeVarianceMeta = {
+  sigma: number | null
+  n: number
+  sampled_query_uuids: string[]
+}
+
+export type LiftCI = {
+  lift: number
+  lower: number
+  upper: number
+  p_value: number
+  n_queries: number
+  n_iterations: number
+  method: 'paired_bootstrap'
+  confidence_level: number
+}
+
+export type CrossJudge = {
+  model: string
+  score: number
+  delta: number
+  tokens_used: number
 }
 
 export type OptimizationSuggestion = {
@@ -372,19 +448,83 @@ export type KBOptimizationRun = {
   tokens_used: number
   estimated_cost_usd: number | null
   actual_cost_usd: number | null
+  // All "score" fields below are on the blended quality scale (judge 40% +
+  // retrieval 25% + health 20% + coverage 15%) — same as the validation header.
+  // Exception: baseline_no_kb_score is raw judge (no KB → nothing to blend).
   baseline_no_kb_score: number | null
   baseline_default_score: number | null
   optimized_score: number | null
+  // Config-invariant components cached once per run; surfacing them lets the UI
+  // show "blended = judge × 0.40 + invariants × 0.60" breakdowns.
+  baseline_retrieval_score?: number | null
+  baseline_health_score?: number | null
+  baseline_coverage_score?: number | null
+  // Raw default-config judge score (pre-blending) — used by per-query lift CI
+  // displays that need to stay in judge units.
+  baseline_default_judge_score?: number | null
   judge_variance: number | null
   judge_model: string | null
+  // Snapshot of the default RAGConfig (incl. any live override) used to compute
+  // baseline_default_score. Surfaced so BestConfigCard can render a diff vs winner.
+  default_config?: OptimizationTrial['config'] | null
   best_config: OptimizationTrial['config'] | null
   trials: OptimizationTrial[]
+  default_per_query_results?: PerQueryResult[]
+  no_kb_per_query_results?: PerQueryResult[]
+  rng_seed?: number | null
+  judge_prompt_version?: string | null
+  judge_temperature?: number | null
+  test_query_snapshot?: TestQuerySnapshot | null
+  judge_variance_meta?: JudgeVarianceMeta | null
+  lift_ci?: LiftCI | null
+  cross_judge?: CrossJudge | null
+  optimized_score_train?: number | null
+  holdout_default_score?: number | null
+  train_query_uuids?: string[]
+  holdout_query_uuids?: string[]
+  overfitting_warning?: boolean
+  stopped_reason?: string | null
   data_source_suggestions: OptimizationSuggestion[]
   options: Record<string, unknown>
   error_message: string | null
+  // Structured failure code for actionable banner remediation. Stable codes
+  // mirror the backend (kb_not_found, test_set_too_small, judge_unavailable,
+  // baselines_failed, budget_exhausted, unknown). Older runs without
+  // classification leave this null and the banner falls back to error_message.
+  error_code?: string | null
+  error_context?: Record<string, unknown> | null
   started_at: string | null
   completed_at: string | null
   cancel_requested: boolean
+  // Apply/revert lifecycle (Phase 1 loop closure).
+  previous_override?: OptimizationTrial['config'] | null
+  applied_at?: string | null
+  reverted_at?: string | null
+  tied_with_baseline?: boolean
+  // Apply-preview rollup (Phase 2 loop closure).
+  apply_preview?: ApplyPreview | null
+}
+
+export type ApplyPreviewItem = {
+  item_id: string | null
+  label: string | null
+  baseline: number
+  winner: number
+  delta: number
+  within_noise: boolean
+  is_regression: boolean
+  significant: boolean
+}
+
+export type ApplyPreview = {
+  total: number
+  will_change: number
+  improvements: number
+  regressions: number
+  significant_regressions: number
+  net_delta: number
+  noise_sigma: number | null
+  items: ApplyPreviewItem[]
 }
 
 export type StartOptimizationOptions = {
@@ -417,10 +557,46 @@ export function cancelKBOptimization(uuid: string, runUuid: string) {
 }
 
 export function applyKBOptimization(uuid: string, runUuid: string) {
-  return apiFetch<{ ok: boolean; applied_config: OptimizationTrial['config'] }>(
+  return apiFetch<{
+    ok: boolean
+    applied_config: OptimizationTrial['config']
+    previous_override: OptimizationTrial['config'] | null
+    applied_at: string
+  }>(
     `/api/knowledge/${uuid}/optimize/${runUuid}/apply`,
     { method: 'POST' },
   )
+}
+
+export function revertKBOptimization(uuid: string, runUuid: string) {
+  return apiFetch<{
+    ok: boolean
+    restored_config: OptimizationTrial['config'] | null
+    reverted_at: string
+  }>(
+    `/api/knowledge/${uuid}/optimize/${runUuid}/revert`,
+    { method: 'POST' },
+  )
+}
+
+export type KBBaselineProbeResult = {
+  no_kb_score: number | null
+  num_queries_judged: number
+  sample_query_ids: string[]
+  tokens_used: number
+  duration_ms: number
+}
+
+/** Cheap pre-flight: run no-KB judge on a small sample of test queries so the
+ * tuning wizard can show the user the floor before committing a budget. */
+export function getKBBaselineProbe(
+  uuid: string,
+  opts?: { sample_size?: number; query_uuids?: string[] },
+) {
+  return apiFetch<KBBaselineProbeResult>(`/api/knowledge/${uuid}/baseline-probe`, {
+    method: 'POST',
+    body: JSON.stringify(opts ?? {}),
+  })
 }
 
 export type KBOptimizationRunSummary = {
@@ -439,6 +615,9 @@ export type KBOptimizationRunSummary = {
   best_config: OptimizationTrial['config'] | null
   options: Record<string, unknown>
   error_message: string | null
+  eval_set_size?: number | null
+  judge_prompt_version?: string | null
+  lift_ci?: LiftCI | null
 }
 
 export function listKBOptimizationHistory(

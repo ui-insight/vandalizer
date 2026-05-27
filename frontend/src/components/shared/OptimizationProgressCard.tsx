@@ -1,5 +1,6 @@
 import { Loader2, X, Sparkles, Target } from 'lucide-react'
 import { ProgressRow } from './ProgressRow'
+import { scoreColor } from './TrialsTable'
 
 /** Shape the card needs from a run. Caller maps domain types into this. */
 export interface ProgressRunShape<TConfig> {
@@ -34,6 +35,10 @@ interface OptimizationProgressCardProps<TConfig> {
   scoreFloorDescription?: string
   /** Suffix on best-so-far lift readout. Default "vs baseline". */
   liftLabel?: string
+  /** Heading on the token-spend progress bar. Default "Token budget". Set to
+   *  e.g. "Judge spend" when the tracked tokens are only one slice of the
+   *  total cost so users aren't misled into reading the bar as total spend. */
+  tokensBarLabel?: string
 }
 
 export function OptimizationProgressCard<TConfig>({
@@ -43,6 +48,7 @@ export function OptimizationProgressCard<TConfig>({
   scoreFloorLabel = 'Score to beat (baseline)',
   scoreFloorDescription = 'How well the system performs without this optimization — the result needs to clear this bar.',
   liftLabel = 'vs baseline',
+  tokensBarLabel = 'Token budget',
 }: OptimizationProgressCardProps<TConfig>) {
   const trialPct = run.total_trials_planned > 0
     ? (run.current_trial_index / run.total_trials_planned) * 100
@@ -89,12 +95,17 @@ export function OptimizationProgressCard<TConfig>({
           color="#a78bfa"
         />
       )}
-      <ProgressRow
-        label="Token budget"
-        subtitle={`${formatTokens(run.tokens_used)} / ${formatTokens(run.token_budget)}`}
-        pct={tokenPct}
-        color={tokenPct > 90 ? '#f59e0b' : '#3b82f6'}
-      />
+      {/* Tokens bar — only when a budget was set. Without a budget the bar
+          carries no information (0 / 0) and the previous unconditional render
+          implied an accounting that wasn't happening. */}
+      {run.token_budget > 0 && (
+        <ProgressRow
+          label={tokensBarLabel}
+          subtitle={`${formatTokens(run.tokens_used)} / ${formatTokens(run.token_budget)}`}
+          pct={tokenPct}
+          color={tokenPct > 90 ? '#f59e0b' : '#3b82f6'}
+        />
+      )}
 
       {/* Score floor (no-tool / no-KB / no-workflow baseline) */}
       {scoreFloor != null && (
@@ -204,12 +215,6 @@ export function OptimizationProgressCard<TConfig>({
       </div>
     </div>
   )
-}
-
-function scoreColor(s: number) {
-  if (s >= 0.7) return '#22c55e'
-  if (s >= 0.4) return '#f59e0b'
-  return '#ef4444'
 }
 
 function formatTokens(n: number) {

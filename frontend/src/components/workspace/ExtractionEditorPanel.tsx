@@ -38,6 +38,8 @@ import { findBestSettingsStream } from '../../api/extractions'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
 import { VerificationSubmitDialog } from '../shared/VerificationSubmitDialog'
 import { ExtractionAutovalidatePanel } from '../extractions/ExtractionAutovalidatePanel'
+import { CrossFieldRulesSection } from '../extractions/CrossFieldRulesSection'
+import { CrossFieldViolationsPanel } from '../extractions/CrossFieldViolationsPanel'
 import { getModels } from '../../api/config'
 import type { SearchSet, ModelInfo } from '../../types/workflow'
 import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from 'recharts'
@@ -2720,11 +2722,18 @@ function ValidateTab({
 
   return (
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Improve quality (autovalidate optimizer) */}
+      {/* Tune this extraction (autovalidate optimizer) */}
       <ExtractionAutovalidatePanel
         searchSetUuid={searchSetUuid}
         canManage={true}
         onApplied={() => { onValidationComplete?.() }}
+      />
+
+      {/* Cross-field rules — feed into the optimizer's fitness function */}
+      <CrossFieldRulesSection
+        searchSetUuid={searchSetUuid}
+        canManage={true}
+        fieldNames={items.map(i => i.searchphrase)}
       />
 
       {/* 1. Source Management */}
@@ -3543,6 +3552,14 @@ function ValidateTab({
               </div>
             </div>
           </div>
+
+          {/* Cross-Field rule outcomes — shows fails inline with "False alarm" mark-up */}
+          <CrossFieldViolationsPanel
+            searchSetUuid={searchSetUuid}
+            canManage={true}
+            summary={results.cross_field_summary}
+            results={results.cross_field_results}
+          />
 
           {/* LLM Improvement Suggestions */}
           {(suggestions || loadingSuggestions || (

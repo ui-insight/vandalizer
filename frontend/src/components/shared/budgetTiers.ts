@@ -43,3 +43,20 @@ export const EXTRACTION_BUDGET_TIERS: readonly ExtractionBudgetTier[] = [
   { id: 'standard', label: 'Standard', maxCandidates: 8, tokens: 600_000, trialsEstimate: '~8 trials', timeEstimate: '8–15 min' },
   { id: 'thorough', label: 'Thorough', maxCandidates: 12, tokens: 1_500_000, trialsEstimate: '~12 trials', timeEstimate: '20–35 min' },
 ] as const
+
+
+/**
+ * Workflow tiers — wider per-trial cost than extraction because each workflow
+ * trial runs the full multi-step engine (one per test input). The per-trial
+ * token ceiling in the backend (WORKFLOW_PER_TRIAL_TOKEN_ESTIMATE) is 200k;
+ * the tier-level tokens estimate assumes ~3 test inputs.
+ */
+export interface WorkflowBudgetTier extends BudgetTier {
+  maxCandidates: number
+}
+
+export const WORKFLOW_BUDGET_TIERS: readonly WorkflowBudgetTier[] = [
+  { id: 'quick', label: 'Quick', maxCandidates: 4, tokens: 2_400_000, trialsEstimate: '~4 trials', timeEstimate: '6–12 min' },
+  { id: 'standard', label: 'Standard', maxCandidates: 8, tokens: 4_800_000, trialsEstimate: '~8 trials', timeEstimate: '15–30 min' },
+  { id: 'thorough', label: 'Thorough', maxCandidates: 14, tokens: 8_400_000, trialsEstimate: '~14 trials', timeEstimate: '40–75 min' },
+] as const

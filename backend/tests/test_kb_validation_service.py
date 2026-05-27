@@ -392,7 +392,7 @@ async def test_judge_test_queries_judge_only_mode():
     async def fake_kb_answer(kb_uuid, query, model_name, k=8):
         return ("The budget is $1.2M.", [{"content": "Budget: $1.2M", "metadata": {"source_name": "Doc"}}])
 
-    async def fake_judge(*, query, expected_answer, actual_answer, model_name, retrieved_context=None):
+    async def fake_judge(*, query, expected_answer, actual_answer, model_name, retrieved_context=None, category=None):
         return {
             "score": 0.9,
             "verdict": "PASS",
@@ -446,7 +446,7 @@ async def test_judge_test_queries_judge_plus_baseline_computes_lift_and_discrimi
 
     judge_calls = []
 
-    async def fake_judge(*, query, expected_answer, actual_answer, model_name, retrieved_context=None):
+    async def fake_judge(*, query, expected_answer, actual_answer, model_name, retrieved_context=None, category=None):
         judge_calls.append({"actual": actual_answer, "has_context": retrieved_context is not None})
         if "Project Gardenia" in actual_answer:
             return {"score": 0.95, "verdict": "PASS", "confidence": 0.95,
@@ -873,7 +873,7 @@ async def test_judge_test_queries_aggregates_real_tokens():
     async def fake_baseline_answer(*a, **kw):
         return ("baseline answer", 500)
 
-    async def fake_judge(*, query, expected_answer, actual_answer, model_name, retrieved_context=None):
+    async def fake_judge(*, query, expected_answer, actual_answer, model_name, retrieved_context=None, category=None):
         return {
             "score": 0.5, "verdict": "WARN", "confidence": 0.8,
             "reasoning": "...", "evidence": "", "missing_facts": [], "hallucinated_facts": [],

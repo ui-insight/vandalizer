@@ -3,7 +3,7 @@
 BACKEND_DIR := backend
 FRONTEND_DIR := frontend
 
-.PHONY: help backend-install backend-lint backend-typecheck backend-test backend-security backend-audit backend-static backend-backlog backend-ci backend-test-integration-t1 backend-test-integration-t2 backend-test-integration-t3 backend-test-integration-t4 frontend-install frontend-typecheck frontend-lint frontend-test frontend-build frontend-audit frontend-ci ci docker-build release-check
+.PHONY: help backend-install backend-lint backend-typecheck backend-test backend-security backend-audit backend-static backend-backlog backend-ci backend-test-integration-t1 backend-test-integration-t2 backend-test-integration-t3 backend-test-integration-t4 backend-judge-calibration frontend-install frontend-typecheck frontend-lint frontend-test frontend-build frontend-audit frontend-ci ci docker-build release-check
 
 help:
 	@printf "Common targets:\n"
@@ -57,6 +57,15 @@ backend-test-integration-t3:
 
 backend-test-integration-t4:
 	cd $(BACKEND_DIR) && INTEGRATION_CHROMA=1 uv run pytest tests/integration/test_tier4_chroma.py -x -q
+
+# Run the LLM-judge calibration suite against the fixture in
+# tests/fixtures/judge_calibration.json. Opt-in (INTEGRATION_LLM=1 required)
+# because it makes ~50 real LLM calls per run. Use to verify that the judge
+# meets agreement / accuracy / length-bias thresholds before relying on it as
+# an optimizer fitness function. Override thresholds via:
+#   JUDGE_CALIBRATION_MIN_KAPPA, MIN_ACCURACY, MAX_LENGTH_BIAS
+backend-judge-calibration:
+	cd $(BACKEND_DIR) && INTEGRATION_LLM=1 uv run pytest tests/integration/test_tier3_llm.py::TestExtractionJudgeCalibration -x -v
 
 backend-ci: backend-test backend-test-integration-t1
 
