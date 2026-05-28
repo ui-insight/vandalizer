@@ -77,6 +77,10 @@ def _make_verification_request(
     r.validation_snapshot = validation_snapshot
     r.validation_score = validation_score
     r.validation_tier = validation_tier
+    r.validation_origin = "validated_by_submitter"
+    r.examiner_baseline_additions = None
+    r.claimed_by_user_id = None
+    r.claimed_at = None
     r.return_guidance = return_guidance
     r.submitted_at = submitted_at or datetime.datetime(2025, 1, 1, tzinfo=datetime.timezone.utc)
     r.reviewed_at = reviewed_at

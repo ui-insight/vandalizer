@@ -36,12 +36,13 @@ class TestQualityMonitorAsync:
             patch("app.models.system_config.SystemConfig") as MockConfig,
             patch("app.models.quality_alert.QualityAlert") as MockAlert,
             patch("app.models.validation_run.ValidationRun") as MockValidationRun,
-            patch("app.models.verification.VerifiedItemMetadata"),
+            patch("app.models.verification.VerifiedItemMetadata") as MockMeta,
             patch("app.services.quality_service.compute_config_hash", return_value="new-hash"),
             patch("app.services.quality_service.detect_stale_items", new_callable=AsyncMock, return_value=[]),
         ):
             MockConfig.get_config = AsyncMock(return_value=mock_sys_cfg)
             MockValidationRun.find_all = MagicMock(return_value=mock_find_all)
+            MockMeta.find.return_value.to_list = AsyncMock(return_value=[])
             MockAlert.find_one = AsyncMock(return_value=None)  # no existing alert
 
             mock_alert_instance = MagicMock()
@@ -79,12 +80,13 @@ class TestQualityMonitorAsync:
             patch("app.models.system_config.SystemConfig") as MockConfig,
             patch("app.models.quality_alert.QualityAlert") as MockAlert,
             patch("app.models.validation_run.ValidationRun") as MockValidationRun,
-            patch("app.models.verification.VerifiedItemMetadata"),
+            patch("app.models.verification.VerifiedItemMetadata") as MockMeta,
             patch("app.services.quality_service.compute_config_hash", return_value="same-hash"),
             patch("app.services.quality_service.detect_stale_items", new_callable=AsyncMock, return_value=[]),
         ):
             MockConfig.get_config = AsyncMock(return_value=mock_sys_cfg)
             MockValidationRun.find_all = MagicMock(return_value=mock_find_all)
+            MockMeta.find.return_value.to_list = AsyncMock(return_value=[])
 
             from app.tasks.quality_tasks import _quality_monitor_async
 
@@ -121,12 +123,13 @@ class TestQualityMonitorAsync:
             patch("app.models.system_config.SystemConfig") as MockConfig,
             patch("app.models.quality_alert.QualityAlert") as MockAlert,
             patch("app.models.validation_run.ValidationRun") as MockValidationRun,
-            patch("app.models.verification.VerifiedItemMetadata"),
+            patch("app.models.verification.VerifiedItemMetadata") as MockMeta,
             patch("app.services.quality_service.compute_config_hash", return_value="hash"),
             patch("app.services.quality_service.detect_stale_items", new_callable=AsyncMock, return_value=stale_items),
         ):
             MockConfig.get_config = AsyncMock(return_value=mock_sys_cfg)
             MockValidationRun.find_all = MagicMock(return_value=mock_find_all)
+            MockMeta.find.return_value.to_list = AsyncMock(return_value=[])
             MockAlert.find_one = AsyncMock(return_value=None)
 
             mock_alert_instance = MagicMock()
@@ -161,12 +164,13 @@ class TestQualityMonitorAsync:
             patch("app.models.system_config.SystemConfig") as MockConfig,
             patch("app.models.quality_alert.QualityAlert") as MockAlert,
             patch("app.models.validation_run.ValidationRun") as MockValidationRun,
-            patch("app.models.verification.VerifiedItemMetadata"),
+            patch("app.models.verification.VerifiedItemMetadata") as MockMeta,
             patch("app.services.quality_service.compute_config_hash", return_value="hash"),
             patch("app.services.quality_service.detect_stale_items", new_callable=AsyncMock, return_value=stale_items),
         ):
             MockConfig.get_config = AsyncMock(return_value=mock_sys_cfg)
             MockValidationRun.find_all = MagicMock(return_value=mock_find_all)
+            MockMeta.find.return_value.to_list = AsyncMock(return_value=[])
             # Existing alert found — should not create duplicate
             MockAlert.find_one = AsyncMock(return_value=MagicMock())
 

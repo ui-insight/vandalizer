@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { ShieldCheck, Clock, Search, ChevronDown, ChevronRight, Tag, FileText, ExternalLink } from 'lucide-react'
+import { ShieldCheck, Clock, Search, ChevronDown, ChevronRight, Tag, FileText, ExternalLink, Pin, Wrench, UserCheck } from 'lucide-react'
 import { listVerificationQueue, myVerificationRequests, updateVerificationStatus, listCollections } from '../../api/library'
 import type { VerificationRequest, VerificationStatus, VerifiedCollection } from '../../types/library'
 import { AuthorChip } from '../shared/AuthorChip'
 import { listOrganizationsFlat } from '../../api/organizations'
 import type { Organization } from '../../api/organizations'
+import { useAuth } from '../../hooks/useAuth'
+import { ExaminerValidationDrawer } from './ExaminerValidationDrawer'
 
 type QueueView = 'pending' | 'mine'
-type StatusFilter = '' | 'submitted' | 'in_review' | 'returned'
+type StatusFilter = '' | 'submitted' | 'in_review' | 'returned' | 'pending_admin_validation'
 
 function statusBadge(status: VerificationStatus) {
   switch (status) {
@@ -60,6 +62,7 @@ function ListDetail({ label, items }: { label: string; items?: string[] }) {
 
 export function VerificationQueue() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [view, setView] = useState<QueueView>('pending')
   const [requests, setRequests] = useState<VerificationRequest[]>([])
   const [loading, setLoading] = useState(true)
@@ -72,6 +75,7 @@ export function VerificationQueue() {
   const [collections, setCollections] = useState<VerifiedCollection[]>([])
   const [reviewOrgIds, setReviewOrgIds] = useState<string[]>([])
   const [reviewCollectionIds, setReviewCollectionIds] = useState<string[]>([])
+  const [drawerRequest, setDrawerRequest] = useState<VerificationRequest | null>(null)
 
   // Load orgs and collections for assignment at approval time
   useEffect(() => {
@@ -82,9 +86,11 @@ export function VerificationQueue() {
   const refresh = useCallback(async () => {
     setLoading(true)
     try {
+      // pending_admin_validation is a client-side filter on validation_origin, not a status
+      const serverStatus = statusFilter === 'pending_admin_validation' ? undefined : statusFilter || undefined
       const data =
         view === 'pending'
-          ? await listVerificationQueue(statusFilter || undefined)
+          ? await listVerificationQueue(serverStatus)
           : await myVerificationRequests()
       setRequests(data.requests)
     } catch {
@@ -140,8 +146,13 @@ export function VerificationQueue() {
   }
 
   const filtered = requests.filter(r => {
-    // Client-side status filtering for "mine" view
-    if (view === 'mine' && statusFilter && r.status !== statusFilter) return false
+    // Client-side validation_origin filter (Phase B)
+    if (statusFilter === 'pending_admin_validation') {
+      if (r.validation_origin !== 'pending_admin_validation') return false
+    } else if (view === 'mine' && statusFilter && r.status !== statusFilter) {
+      // Client-side status filtering for "mine" view
+      return false
+    }
     // Search filtering
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
@@ -197,8 +208,14 @@ export function VerificationQueue() {
 
       {/* Status filter chips */}
       {(view === 'pending' || view === 'mine') && (
-        <div className="flex items-center gap-2 mb-4">
-          {([['', 'All'], ['submitted', 'Submitted'], ['in_review', 'In Review'], ...(view === 'mine' ? [['returned' as StatusFilter, 'Returned'] as [StatusFilter, string]] : [])] as [StatusFilter, string][]).map(([val, label]) => (
+        <div className="flex items-center gap-2 mb-4 flex-wrap">
+          {([
+            ['', 'All'],
+            ['submitted', 'Submitted'],
+            ['in_review', 'In Review'],
+            ...(view === 'pending' ? [['pending_admin_validation' as StatusFilter, 'Needs validation help'] as [StatusFilter, string]] : []),
+            ...(view === 'mine' ? [['returned' as StatusFilter, 'Returned'] as [StatusFilter, string]] : []),
+          ] as [StatusFilter, string][]).map(([val, label]) => (
             <button
               key={val}
               onClick={() => setStatusFilter(val)}
@@ -263,6 +280,22 @@ export function VerificationQueue() {
                             {Math.round(req.validation_score)}%
                           </span>
                         )}
+                        {req.validation_origin === 'pending_admin_validation' && (
+                          <span className="text-xs px-2 py-0.5 rounded border shrink-0 bg-amber-50 text-amber-700 border-amber-200" title="Submitter requested admin help with validation">
+                            Needs validation
+                          </span>
+                        )}
+                        {req.examiner_baseline_additions && (
+                          <span className="text-xs px-2 py-0.5 rounded border shrink-0 bg-purple-50 text-purple-700 border-purple-200" title="Examiner has added baseline cases">
+                            Curated
+                          </span>
+                        )}
+                        {req.claimed_by_user_id && req.claimed_by_user_id !== user?.user_id && (
+                          <span className="text-xs px-2 py-0.5 rounded border shrink-0 bg-gray-50 text-gray-600 border-gray-200 inline-flex items-center gap-1" title="Another reviewer is currently working on this">
+                            <UserCheck className="h-3 w-3" />
+                            In progress
+                          </span>
+                        )}
                       </div>
                       <div className="text-xs text-gray-500 ml-9 flex items-center gap-3 flex-wrap">
                         <span>{req.item_kind === 'workflow' ? 'Workflow' : req.item_kind === 'knowledge_base' ? 'Knowledge Base' : 'Extraction'}</span>
@@ -296,12 +329,22 @@ export function VerificationQueue() {
                       (req.status === 'submitted' || req.status === 'in_review') && (
                         <div className="flex items-center gap-1 shrink-0">
                           {!isReviewing ? (
-                            <button
-                              onClick={() => { setReviewingId(req.uuid); setReviewOrgIds([]); setReviewCollectionIds([]) }}
-                              className="px-3 py-1.5 text-xs font-medium rounded-md bg-gray-900 text-white hover:bg-gray-800"
-                            >
-                              Review
-                            </button>
+                            <>
+                              <button
+                                onClick={() => setDrawerRequest(req)}
+                                className="px-2 py-1.5 text-xs font-medium rounded-md bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 inline-flex items-center gap-1"
+                                title="Open Validation Workshop"
+                              >
+                                <Wrench className="h-3 w-3" />
+                                Workshop
+                              </button>
+                              <button
+                                onClick={() => { setReviewingId(req.uuid); setReviewOrgIds([]); setReviewCollectionIds([]) }}
+                                className="px-3 py-1.5 text-xs font-medium rounded-md bg-gray-900 text-white hover:bg-gray-800"
+                              >
+                                Review
+                              </button>
+                            </>
                           ) : (
                             <div className="flex flex-col gap-2 w-64">
                               <textarea
@@ -355,6 +398,17 @@ export function VerificationQueue() {
                                       </label>
                                     ))}
                                   </div>
+                                </div>
+                              )}
+                              {(req.validation_snapshot || req.examiner_baseline_additions) ? (
+                                <div className="text-[10px] text-gray-500 inline-flex items-center gap-1">
+                                  <Pin className="h-3 w-3" />
+                                  Approving will pin {req.examiner_baseline_additions && req.validation_snapshot ? 'merged' : req.examiner_baseline_additions ? 'examiner-curated' : 'submitter'} baseline.
+                                </div>
+                              ) : (
+                                <div className="text-[10px] text-amber-700 inline-flex items-center gap-1">
+                                  <Pin className="h-3 w-3" />
+                                  No baseline to pin — approving leaves catalog entry without a drift contract.
                                 </div>
                               )}
                               <div className="flex gap-1">
@@ -505,6 +559,15 @@ export function VerificationQueue() {
             )
           })}
         </div>
+      )}
+
+      {drawerRequest && user?.user_id && (
+        <ExaminerValidationDrawer
+          request={drawerRequest}
+          currentUserId={user.user_id}
+          onClose={() => setDrawerRequest(null)}
+          onSaved={() => refresh()}
+        />
       )}
     </div>
   )

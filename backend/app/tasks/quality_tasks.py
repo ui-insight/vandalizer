@@ -48,8 +48,9 @@ async def _quality_monitor_async():
     from app.models.quality_alert import QualityAlert
     from app.models.system_config import SystemConfig
     from app.models.validation_run import ValidationRun
-    from app.models.verification import VerifiedItemMetadata
+    from app.models.verification import VerificationRequest, VerificationStatus, VerifiedItemMetadata
     from app.services.quality_service import compute_config_hash, detect_stale_items
+    from beanie import PydanticObjectId
 
     sys_cfg = await SystemConfig.get_config()
     qc = sys_cfg.get_quality_config()
@@ -321,6 +322,85 @@ async def _quality_monitor_async():
                     "Auto-revalidation failed for %s %s: %s",
                     meta.item_kind, meta.item_id, e,
                 )
+
+    # 4. Phase E: Baseline drift monitoring.
+    # For each verified item with a pinned official_baseline_score, compare the
+    # current quality_score against the pinned score. If drift exceeds threshold,
+    # raise a baseline_drift alert. Stamps last_drift_check_at so the UI can show
+    # "checked X ago" even when there's no drift.
+    pinned_metas = await VerifiedItemMetadata.find(
+        VerifiedItemMetadata.official_baseline_score != None,  # noqa: E711
+    ).to_list()
+
+    for meta in pinned_metas:
+        try:
+            current = meta.quality_score
+            pinned = meta.official_baseline_score
+            meta.last_drift_check_at = now
+            meta.last_drift_score = current
+            if current is not None and pinned is not None:
+                drift = pinned - current
+                if drift >= degradation_threshold:
+                    existing = await QualityAlert.find_one(
+                        QualityAlert.alert_type == "baseline_drift",
+                        QualityAlert.item_kind == meta.item_kind,
+                        QualityAlert.item_id == meta.item_id,
+                        QualityAlert.acknowledged == False,  # noqa: E712
+                    )
+                    if not existing:
+                        await QualityAlert(
+                            alert_type="baseline_drift",
+                            item_kind=meta.item_kind,
+                            item_id=meta.item_id,
+                            item_name=meta.display_name or meta.item_id,
+                            severity="critical" if drift >= 20 else "warning",
+                            message=(
+                                f"Quality has drifted {drift:.1f} pts below the official baseline "
+                                f"({pinned:.1f} pinned -> {current:.1f} now)."
+                            ),
+                            previous_score=pinned,
+                            current_score=current,
+                            previous_tier=None,
+                            current_tier=meta.quality_tier,
+                            created_at=now,
+                        ).insert()
+
+                        # Optional: auto-flag for re-review if configured.
+                        # Does NOT un-verify — admin still has to act.
+                        if monitoring.get("auto_review_on_degradation", False):
+                            try:
+                                item_obj_id = PydanticObjectId(meta.item_id)
+                            except Exception:
+                                item_obj_id = None
+                            if item_obj_id is not None:
+                                existing_req = await VerificationRequest.find_one(
+                                    {
+                                        "item_kind": meta.item_kind,
+                                        "item_id": item_obj_id,
+                                        "status": {"$in": [
+                                            VerificationStatus.SUBMITTED.value,
+                                            VerificationStatus.IN_REVIEW.value,
+                                        ]},
+                                    }
+                                )
+                                if not existing_req:
+                                    await VerificationRequest(
+                                        item_kind=meta.item_kind,
+                                        item_id=item_obj_id,
+                                        submitter_user_id="system",
+                                        summary=(
+                                            f"Auto re-review: baseline drift {drift:.1f} pts "
+                                            f"({pinned:.1f} -> {current:.1f})"
+                                        ),
+                                        validation_origin="unvalidated_legacy",
+                                        submitted_at=now,
+                                    ).insert()
+            await meta.save()
+        except Exception as e:
+            logger.warning(
+                "Baseline drift check failed for %s %s: %s",
+                meta.item_kind, meta.item_id, e,
+            )
 
 
 # ---------------------------------------------------------------------------

@@ -36,11 +36,11 @@ export function VerificationSubmitDialog({ itemKind, itemId, itemTitle, onClose,
   const [evaluationNotes, setEvaluationNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [skipValidation, setSkipValidation] = useState(false)
 
   const kindLabel = itemKind === 'workflow' ? 'workflow' : 'extraction'
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const submitInternal = async (skip: boolean) => {
     if (!summary.trim()) return
     setSubmitting(true)
     setError(null)
@@ -58,6 +58,7 @@ export function VerificationSubmitDialog({ itemKind, itemId, itemTitle, onClose,
         known_limitations: knownLimitations.trim() || undefined,
         evaluation_notes: evaluationNotes.trim() || undefined,
         intended_use_tags: tags.length ? tags : undefined,
+        skip_validation: skip,
       })
       onSuccess()
     } catch (err) {
@@ -65,6 +66,11 @@ export function VerificationSubmitDialog({ itemKind, itemId, itemTitle, onClose,
     } finally {
       setSubmitting(false)
     }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    await submitInternal(skipValidation)
   }
 
   const inputStyle: React.CSSProperties = {
@@ -225,6 +231,29 @@ export function VerificationSubmitDialog({ itemKind, itemId, itemTitle, onClose,
               />
             </div>
 
+            {/* Submit-without-validation opt-in (Phase B) */}
+            <div style={{
+              padding: '10px 14px', borderRadius: 8,
+              background: '#fffbeb', border: '1px solid #fde68a',
+            }}>
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={skipValidation}
+                  onChange={(e) => setSkipValidation(e.target.checked)}
+                  style={{ marginTop: 2 }}
+                />
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#78350f' }}>
+                    Submit without validation — request reviewer help
+                  </div>
+                  <div style={{ fontSize: 11, color: '#92400e', marginTop: 2, lineHeight: 1.4 }}>
+                    Reviewer will establish a validation baseline before approval. May take longer to review and could be returned for rework. Most submissions should be validated by the submitter first.
+                  </div>
+                </div>
+              </label>
+            </div>
+
             {error && (
               <div style={{
                 padding: '10px 14px', borderRadius: 8,
@@ -263,7 +292,7 @@ export function VerificationSubmitDialog({ itemKind, itemId, itemTitle, onClose,
               }}
             >
               <Send size={14} />
-              {submitting ? 'Submitting...' : 'Submit for Review'}
+              {submitting ? 'Submitting...' : skipValidation ? 'Submit (admin will validate)' : 'Submit for Review'}
             </button>
           </div>
         </form>
