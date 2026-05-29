@@ -49,7 +49,7 @@ import { QualitySparkline } from '../library/QualitySparkline'
 import { SaveWorkflowOutputDialog } from './SaveWorkflowOutputDialog'
 import { useQualitySparkline } from '../../hooks/useQualitySparkline'
 import { relativeTime } from '../../utils/time'
-import { VerificationSubmitDialog } from '../shared/VerificationSubmitDialog'
+import { VerificationSubmitModal } from '../library/VerificationSubmitModal'
 import { getReview, approveReview, rejectReview } from '../../api/reviews'
 import type { ReviewDetail } from '../../api/reviews'
 
@@ -6271,15 +6271,12 @@ function ValidateTab({
                     </button>
                   )}
                   {showSubmitDialog && workflowId && (
-                    <VerificationSubmitDialog
+                    <VerificationSubmitModal
                       itemKind="workflow"
                       itemId={workflowId}
                       itemTitle={itemTitle}
                       onClose={() => setShowSubmitDialog(false)}
-                      onSuccess={() => {
-                        setShowSubmitDialog(false)
-                        setSubmitLibraryResult('success')
-                      }}
+                      onSubmitted={() => setSubmitLibraryResult('success')}
                     />
                   )}
                 </div>

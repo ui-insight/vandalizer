@@ -494,7 +494,9 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
       )}
       {showVerifyModal && (
         <VerificationSubmitModal
-          item={item}
+          itemKind={item.kind}
+          itemId={item.item_id}
+          itemTitle={item.name}
           onClose={() => setShowVerifyModal(false)}
           onSubmitted={() => setShowVerifyModal(false)}
         />
