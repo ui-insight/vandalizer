@@ -26,6 +26,17 @@ CSRF_EXEMPT_PREFIXES = (
     # works here. The endpoint validates the signed SAML assertion itself.
     "/api/auth/saml/",
     "/api/auth/config",
+    # Team invite / public join-link acceptance. The POST fires immediately
+    # after a cross-site SSO redirect (Azure/SAML), the exact window where the
+    # freshly-set CSRF cookie can be briefly unreadable by document.cookie — so
+    # the double-submit header is unreliable here and produces spurious 403s.
+    # Exemption is safe: the unguessable URL token is the actual authorization
+    # (accept_invite/accept_join_link authorize on the token, not the session),
+    # so a forged cross-site POST gains nothing an attacker holding the token
+    # couldn't already do directly. Same reasoning as the SAML ACS exemption.
+    # Scoped to the accept sub-routes only, not all of /api/teams.
+    "/api/teams/invite/accept/",
+    "/api/teams/join-link/accept/",
     "/api/webhooks/",
     "/api/demo/apply",
     "/api/demo/status/",
