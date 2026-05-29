@@ -198,6 +198,11 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
                 <label style={labelStyle}>Header value</label>
                 <input
                   type="password"
+                  autoComplete="new-password"
+                  data-1p-ignore
+                  data-lpignore="true"
+                  data-bwignore
+                  name="vandalizer-credential-header-value"
                   value={form.header_value}
                   onChange={e => setForm({ ...form, header_value: e.target.value })}
                   placeholder="secret"

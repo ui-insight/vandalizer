@@ -223,6 +223,11 @@ export default function Credentials() {
                   <label className="block text-xs font-medium uppercase text-gray-400 mb-1">Header value</label>
                   <input
                     type="password"
+                    autoComplete="new-password"
+                    data-1p-ignore
+                    data-lpignore="true"
+                    data-bwignore
+                    name="vandalizer-credential-header-value-page"
                     value={form.header_value}
                     onChange={e => setForm({ ...form, header_value: e.target.value })}
                     className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm font-mono focus:border-highlight focus:outline-none focus:ring-1 focus:ring-highlight"

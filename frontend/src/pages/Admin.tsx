@@ -2970,7 +2970,7 @@ function ConfigTab() {
                 </div>
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label style={labelStyle}>API Key (optional)</label>
-                  <input type="password" value={newModel.api_key} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, api_key: v })) }} placeholder="sk-..." style={inputStyle} />
+                  <input type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore name="vandalizer-model-api-key" value={newModel.api_key} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, api_key: v })) }} placeholder="sk-..." style={inputStyle} />
                 </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 12 }}>
@@ -3213,7 +3213,7 @@ function ConfigTab() {
                           </div>
                           <div>
                             <label style={labelStyle}>Client Secret</label>
-                            <input type="password" value={editingProvider.client_secret} onChange={e => setEditingProvider({ ...editingProvider, client_secret: e.target.value })} style={inputStyle} placeholder="Leave as *** to keep existing" />
+                            <input type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore name="vandalizer-oauth-client-secret-edit" value={editingProvider.client_secret} onChange={e => setEditingProvider({ ...editingProvider, client_secret: e.target.value })} style={inputStyle} placeholder="Leave as *** to keep existing" />
                           </div>
                           <div style={{ gridColumn: '1 / -1' }}>
                             <label style={labelStyle}>Redirect URI</label>
@@ -3281,7 +3281,7 @@ function ConfigTab() {
                   </div>
                   <div>
                     <label style={labelStyle}>Client Secret</label>
-                    <input type="password" value={newProvider.client_secret} onChange={e => setNewProvider({ ...newProvider, client_secret: e.target.value })} style={inputStyle} />
+                    <input type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore name="vandalizer-oauth-client-secret-new" value={newProvider.client_secret} onChange={e => setNewProvider({ ...newProvider, client_secret: e.target.value })} style={inputStyle} />
                   </div>
                   <div style={{ gridColumn: '1 / -1' }}>
                     <label style={labelStyle}>Redirect URI (set automatically; register this in your identity provider)</label>
@@ -3336,7 +3336,9 @@ function ConfigTab() {
           <div style={{ marginTop: 12 }}>
             <label style={labelStyle}>OCR API Key (optional)</label>
             <input
-              type="password" value={ocrApiKey} onChange={e => setOcrApiKey(e.target.value)}
+              type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore
+              name="vandalizer-ocr-api-key"
+              value={ocrApiKey} onChange={e => setOcrApiKey(e.target.value)}
               placeholder="Bearer token..." style={{ ...inputStyle, maxWidth: 500 }}
             />
           </div>
