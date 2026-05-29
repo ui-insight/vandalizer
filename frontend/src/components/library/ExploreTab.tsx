@@ -5,7 +5,7 @@ import { marked } from 'marked'
 import {
   Search, ShieldCheck, BookOpen, Workflow, FileSearch,
   FolderOpen, Star, X, Plus, ArrowUpDown,
-  Bookmark, ArrowLeft, Loader2, Tag, Sparkles, ExternalLink, Link2,
+  Bookmark, ArrowLeft, Loader2, Tag, Sparkles, ExternalLink, Link2, Users,
 } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
 import { QualityBadge } from './QualityBadge'
@@ -16,6 +16,7 @@ import {
   listLibraries,
 } from '../../api/library'
 import { adoptKnowledgeBase } from '../../api/knowledge'
+import { listTeams } from '../../api/teams'
 import type { VerifiedCatalogItem, VerifiedCollection, Library, LibraryItemKind } from '../../types/library'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../contexts/ToastContext'
@@ -103,12 +104,16 @@ export function ItemDetailModal({
   onAddToLibrary,
   onAdoptKB,
   onTryIt,
+  currentTeamId,
+  currentTeamName,
 }: {
   item: VerifiedCatalogItem
   onClose: () => void
   onAddToLibrary: (item: VerifiedCatalogItem) => void
-  onAdoptKB?: (kbUuid: string) => void
+  onAdoptKB?: (kbUuid: string, teamId?: string | null) => void
   onTryIt?: (item: VerifiedCatalogItem) => void
+  currentTeamId?: string | null
+  currentTeamName?: string | null
 }) {
   const tierStyle = TIER_STYLES[(item.quality_tier || '') as keyof typeof TIER_STYLES]
   const kindConf = KIND_CONFIG[item.kind as keyof typeof KIND_CONFIG]
@@ -188,11 +193,21 @@ export function ItemDetailModal({
           <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
             {item.kind === 'knowledge_base' && onAdoptKB && item.source_uuid && (
               <button
-                onClick={() => onAdoptKB(item.source_uuid!)}
+                onClick={() => onAdoptKB(item.source_uuid!, null)}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
               >
                 <Bookmark className="h-4 w-4" />
                 Add to My Knowledge Bases
+              </button>
+            )}
+            {item.kind === 'knowledge_base' && onAdoptKB && item.source_uuid && currentTeamId && (
+              <button
+                onClick={() => onAdoptKB(item.source_uuid!, currentTeamId)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
+                title={`Share with ${currentTeamName || 'your team'}`}
+              >
+                <Users className="h-4 w-4" />
+                Add to {currentTeamName || 'Team'} Knowledge Bases
               </button>
             )}
             {item.kind === 'knowledge_base' && item.source_uuid && onTryIt && (
@@ -403,6 +418,7 @@ export function ExploreTab() {
   const [collections, setCollections] = useState<VerifiedCollection[]>([])
   const [featuredCollections, setFeaturedCollections] = useState<VerifiedCollection[]>([])
   const [libraries, setLibraries] = useState<Library[]>([])
+  const [currentTeamName, setCurrentTeamName] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -444,6 +460,17 @@ export function ExploreTab() {
     const teamId = user?.current_team ?? undefined
     listLibraries(teamId).then(setLibraries).catch(() => {})
   }, [user?.current_team])
+
+  // Resolve the current team's name, used to label the "Add to Team" action
+  useEffect(() => {
+    if (!user?.current_team_uuid) {
+      setCurrentTeamName(null)
+      return
+    }
+    listTeams()
+      .then(teams => setCurrentTeamName(teams.find(t => t.uuid === user.current_team_uuid)?.name ?? null))
+      .catch(() => {})
+  }, [user?.current_team_uuid])
 
   // Fetch items when filters change
   const refresh = useCallback(async () => {
@@ -522,10 +549,13 @@ export function ExploreTab() {
     setAddToLibraryItem(item)
   }
 
-  const handleAdoptKB = async (kbUuid: string) => {
+  const handleAdoptKB = async (kbUuid: string, teamId?: string | null) => {
     try {
-      await adoptKnowledgeBase(kbUuid)
-      toast('Added to your knowledge bases', 'success')
+      await adoptKnowledgeBase(kbUuid, undefined, teamId ?? undefined)
+      toast(
+        teamId ? 'Added to your team’s knowledge bases' : 'Added to your knowledge bases',
+        'success',
+      )
     } catch {
       toast('Already in your knowledge bases', 'info')
     }
@@ -862,6 +892,8 @@ export function ExploreTab() {
           onAddToLibrary={(itm) => { setDetailItem(null); handleAddToLibrary(itm) }}
           onAdoptKB={handleAdoptKB}
           onTryIt={handleTryIt}
+          currentTeamId={user?.current_team ?? null}
+          currentTeamName={currentTeamName}
         />
       )}
 
