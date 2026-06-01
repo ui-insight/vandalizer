@@ -70,6 +70,7 @@ async def submit_application(
     if settings is None:
         settings = Settings()
 
+    email = email.strip().lower()
     existing = await DemoApplication.find_one(DemoApplication.email == email)
     if existing:
         raise ValueError("An application with this email already exists")
@@ -167,11 +168,13 @@ async def _activate_application(app: DemoApplication, settings: Settings) -> Non
     expires_at = now + datetime.timedelta(days=TRIAL_DAYS)
     password = _generate_demo_password()
 
-    # Create user
-    user_id = app.email
+    # Create user. Normalize the identity to lowercase to match register()'s
+    # convention — login lowercases the typed identity before a case-sensitive
+    # lookup, so a mixed-case stored email would never be found.
+    user_id = app.email.strip().lower()
     user = User(
         user_id=user_id,
-        email=app.email,
+        email=user_id,
         name=app.name,
         password_hash=hash_password(password),
         is_demo_user=True,
@@ -457,6 +460,7 @@ async def admin_add_demo_user(
     if settings is None:
         settings = Settings()
 
+    email = email.strip().lower()
     existing = await DemoApplication.find_one(DemoApplication.email == email)
     if existing:
         raise ValueError("An application with this email already exists")
