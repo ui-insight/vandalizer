@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from typing import Optional
 
+import httpx
 from pydantic_ai.agent import Agent
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.profiles import ModelProfile
@@ -51,9 +52,20 @@ class RagDeps:
 class InsightAIProvider(OpenRouterProvider):
     """Custom OpenRouter provider for UIdaho Insight AI server."""
 
-    def __init__(self, api_key: str, endpoint: Optional[str] = None):
+    def __init__(self, api_key: str, endpoint: Optional[str] = None,
+                 http_client: Optional[httpx.AsyncClient] = None):
         self._endpoint = endpoint
-        super().__init__(api_key=api_key)
+        # Passing a dedicated http_client makes pydantic-ai build a per-instance
+        # AsyncOpenAI rather than fall back to the process-wide
+        # cached_async_http_client. The shared cached client is unsafe under the
+        # workflow MultiTaskNode, whose ThreadPoolExecutor runs each task on its
+        # own event loop — reusing one client's connection pool across loops
+        # raises "bound to a different event loop", surfacing as a zero-token
+        # "Connection error".
+        if http_client is not None:
+            super().__init__(api_key=api_key, http_client=http_client)
+        else:
+            super().__init__(api_key=api_key)
 
     @property
     def name(self) -> str:
@@ -77,9 +89,13 @@ class InsightAIProvider(OpenRouterProvider):
 class OllamaProvider(OpenRouterProvider):
     """Provider for Ollama API-compatible servers."""
 
-    def __init__(self, api_key: str, endpoint: str):
+    def __init__(self, api_key: str, endpoint: str,
+                 http_client: Optional[httpx.AsyncClient] = None):
         self._endpoint = endpoint
-        super().__init__(api_key=api_key)
+        if http_client is not None:
+            super().__init__(api_key=api_key, http_client=http_client)
+        else:
+            super().__init__(api_key=api_key)
 
     @property
     def name(self) -> str:
@@ -103,9 +119,13 @@ class OllamaProvider(OpenRouterProvider):
 class VLLMProvider(OpenRouterProvider):
     """Provider for VLLM API-compatible servers."""
 
-    def __init__(self, api_key: str, endpoint: str):
+    def __init__(self, api_key: str, endpoint: str,
+                 http_client: Optional[httpx.AsyncClient] = None):
         self._endpoint = endpoint
-        super().__init__(api_key=api_key)
+        if http_client is not None:
+            super().__init__(api_key=api_key, http_client=http_client)
+        else:
+            super().__init__(api_key=api_key)
 
     @property
     def name(self) -> str:
@@ -299,12 +319,25 @@ def get_agent_model(
         client = AsyncOpenAI(**client_kwargs)
         return OpenAIModel(model_name=model_name, openai_client=client)
 
+    # Build a dedicated httpx client per call instead of letting the provider
+    # fall back to pydantic-ai's process-wide cached_async_http_client. The
+    # cached client is shared across the workflow MultiTaskNode's
+    # ThreadPoolExecutor threads, each of which runs pydantic-ai's run_sync()
+    # on its own event loop; reusing one client's connection pool across loops
+    # raises "RuntimeError: bound to a different event loop", which the OpenAI
+    # SDK re-wraps as a zero-token "Connection error". A fresh client per call
+    # binds only to the loop that uses it.
+    from app.config import Settings
+    read_timeout = max(30, Settings().workflow_llm_timeout_seconds)
+    dedicated_client = httpx.AsyncClient(
+        timeout=httpx.Timeout(read_timeout, connect=10.0)
+    )
     if api_protocol == "ollama":
-        provider = OllamaProvider(api_key=api_key, endpoint=endpoint)
+        provider = OllamaProvider(api_key=api_key, endpoint=endpoint, http_client=dedicated_client)
     elif api_protocol == "vllm":
-        provider = VLLMProvider(api_key=api_key, endpoint=endpoint)
+        provider = VLLMProvider(api_key=api_key, endpoint=endpoint, http_client=dedicated_client)
     else:
-        provider = InsightAIProvider(api_key=api_key, endpoint=endpoint)
+        provider = InsightAIProvider(api_key=api_key, endpoint=endpoint, http_client=dedicated_client)
 
     return OpenAIModel(model_name=agent_model, provider=provider)
 
