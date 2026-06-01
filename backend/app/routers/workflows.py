@@ -991,6 +991,15 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
         raise HTTPException(status_code=404, detail=str(e))
 
 
+@router.post("/sessions/{session_id}/cancel")
+async def cancel_workflow_run(session_id: str, user: User = Depends(get_current_user)):
+    """Stop an in-flight workflow run (single-run sessions)."""
+    result = await svc.cancel_workflow(session_id, user)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Workflow run not found")
+    return result
+
+
 @router.post("/steps/test")
 @limiter.limit("20/minute")
 async def test_step(request: Request, req: TestStepRequest, user: User = Depends(get_current_user)):

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import {
-  X, Play, Loader2, Plus, Trash2, Pencil, SlidersHorizontal,
+  X, Play, Square, Loader2, Plus, Trash2, Pencil, SlidersHorizontal,
   FileText, Filter, Outdent, Globe, Image, Code,
   Bug, Search, Zap, Download, Package, CheckCircle, XCircle,
   MousePointerClick, PenTool, ClipboardCheck, Flag,
@@ -846,32 +846,63 @@ export function WorkflowEditorPanel() {
             Select a document to run this workflow
           </div>
         )}
-        <button
-          onClick={handleRun}
-          disabled={runner.running || (isTextInput ? !textInput.trim() : selectedDocUuids.length === 0)}
-          style={{
-            width: '100%', padding: '12px 16px', fontSize: 14, fontWeight: 700,
-            fontFamily: 'inherit', borderRadius: 'var(--ui-radius, 8px)', border: 'none',
-            backgroundColor: 'var(--highlight-color, #eab308)',
-            color: 'var(--highlight-text-color, #000)',
-            cursor: runner.running || (isTextInput ? !textInput.trim() : selectedDocUuids.length === 0) ? 'not-allowed' : 'pointer',
-            opacity: (isTextInput ? !textInput.trim() : selectedDocUuids.length === 0) && !runner.running ? 0.5 : 1,
-            textTransform: 'uppercase', letterSpacing: '0.05em',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-          }}
-        >
-          {runner.running ? (
-            <>
-              <Loader2 style={{ width: 16, height: 16, animation: 'spin 1s linear infinite' }} />
-              WORKFLOW RUNNING
-            </>
-          ) : (
-            <>
-              <Play style={{ width: 16, height: 16 }} />
-              RUN
-            </>
-          )}
-        </button>
+        {runner.running && !runner.batchId ? (
+          // Single run in progress — offer an active STOP (red, matches the
+          // app's destructive-action convention; same geometry as RUN).
+          <button
+            onClick={runner.stop}
+            disabled={runner.cancelling}
+            style={{
+              width: '100%', padding: '12px 16px', fontSize: 14, fontWeight: 700,
+              fontFamily: 'inherit', borderRadius: 'var(--ui-radius, 8px)', border: 'none',
+              backgroundColor: '#dc2626', color: '#fff',
+              cursor: runner.cancelling ? 'wait' : 'pointer',
+              opacity: runner.cancelling ? 0.7 : 1,
+              textTransform: 'uppercase', letterSpacing: '0.05em',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}
+          >
+            {runner.cancelling ? (
+              <>
+                <Loader2 style={{ width: 16, height: 16, animation: 'spin 1s linear infinite' }} />
+                STOPPING
+              </>
+            ) : (
+              <>
+                <Square style={{ width: 14, height: 14, fill: '#fff' }} />
+                STOP
+              </>
+            )}
+          </button>
+        ) : (
+          <button
+            onClick={handleRun}
+            disabled={runner.running || (isTextInput ? !textInput.trim() : selectedDocUuids.length === 0)}
+            title={runner.running && runner.batchId ? 'Stop is not yet available for batch runs' : undefined}
+            style={{
+              width: '100%', padding: '12px 16px', fontSize: 14, fontWeight: 700,
+              fontFamily: 'inherit', borderRadius: 'var(--ui-radius, 8px)', border: 'none',
+              backgroundColor: 'var(--highlight-color, #eab308)',
+              color: 'var(--highlight-text-color, #000)',
+              cursor: runner.running || (isTextInput ? !textInput.trim() : selectedDocUuids.length === 0) ? 'not-allowed' : 'pointer',
+              opacity: (isTextInput ? !textInput.trim() : selectedDocUuids.length === 0) && !runner.running ? 0.5 : 1,
+              textTransform: 'uppercase', letterSpacing: '0.05em',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}
+          >
+            {runner.running ? (
+              <>
+                <Loader2 style={{ width: 16, height: 16, animation: 'spin 1s linear infinite' }} />
+                {runner.batchId ? 'BATCH RUNNING' : 'WORKFLOW RUNNING'}
+              </>
+            ) : (
+              <>
+                <Play style={{ width: 16, height: 16 }} />
+                RUN
+              </>
+            )}
+          </button>
+        )}
       </div>
 
       {/* ===== EDIT STEP OVERLAY ===== */}
@@ -3893,8 +3924,9 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
 }) {
   const isCompleted = status?.status === 'completed'
   const isError = status?.status === 'error' || status?.status === 'failed'
+  const isCanceled = status?.status === 'canceled'
   const isPendingApproval = status?.status === 'pending_approval'
-  const isDone = isCompleted || isError
+  const isDone = isCompleted || isError || isCanceled
 
   const [approval, setApproval] = useState<ReviewDetail | null>(null)
   const [approvalComments, setApprovalComments] = useState('')
@@ -3955,13 +3987,13 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
       backgroundColor: '#fff', borderRadius: 'var(--ui-radius, 8px)',
       boxShadow: '0 6px 18px rgba(0,0,0,0.05)', padding: 20,
       border: isDone
-        ? (isError ? '2px solid #fca5a5' : '2px solid #86efac')
+        ? (isError ? '2px solid #fca5a5' : isCanceled ? '2px solid #d1d5db' : '2px solid #86efac')
         : isPendingApproval ? '2px solid #fbbf24'
         : '2px solid #e5e7eb',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 8 }}>
         <div style={{ fontWeight: 600, fontSize: 14, color: '#202124' }}>
-          {running ? 'Workflow Running' : isCompleted ? 'Output' : isError ? 'Error' : isPendingApproval ? 'Awaiting Approval' : 'View Output'}
+          {running ? 'Workflow Running' : isCompleted ? 'Output' : isCanceled ? 'Stopped' : isError ? 'Error' : isPendingApproval ? 'Awaiting Approval' : 'View Output'}
         </div>
         {isPendingApproval && status?.approval_request_id && (
           <a

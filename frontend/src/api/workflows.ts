@@ -121,6 +121,15 @@ export function getWorkflowStatus(sessionId: string) {
   return apiFetch<WorkflowStatus>(`/api/workflows/status?session_id=${encodeURIComponent(sessionId)}`)
 }
 
+// Stop an in-flight single run. The backend flips the result to "canceled" and
+// revokes the Celery task (terminate) so a mid-step run is interrupted.
+export function cancelWorkflow(sessionId: string) {
+  return apiFetch<{ session_id: string; status: string }>(
+    `/api/workflows/sessions/${encodeURIComponent(sessionId)}/cancel`,
+    { method: 'POST' },
+  )
+}
+
 export interface BatchStatusItem {
   session_id: string
   document_title: string | null
@@ -185,7 +194,12 @@ export function streamWorkflowStatus(
               return
             }
             onStatus(data as WorkflowStatus)
-            if (data.status === 'completed' || data.status === 'error' || data.status === 'failed') {
+            if (
+              data.status === 'completed' ||
+              data.status === 'error' ||
+              data.status === 'failed' ||
+              data.status === 'canceled'
+            ) {
               return
             }
           } catch {

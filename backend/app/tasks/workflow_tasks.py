@@ -102,7 +102,11 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
     """
     from bson import ObjectId
 
-    from app.services.workflow_engine import build_workflow_engine, sanitize_step_name
+    from app.services.workflow_engine import (
+        WorkflowCancelled,
+        build_workflow_engine,
+        sanitize_step_name,
+    )
 
     db = _get_db()
 
@@ -330,8 +334,46 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
         except Exception as e:
             logger.warning("Could not update activity to running: %s", e)
 
+    # Polled by the engine between steps. The cancel endpoint flips the result
+    # status to "canceled"; this lets a run that is between steps stop cleanly
+    # (a mid-step stop is handled out-of-band by Celery task revocation).
+    def should_cancel() -> bool:
+        try:
+            doc = db.workflow_result.find_one(
+                {"_id": ObjectId(workflow_result_id)}, {"status": 1},
+            )
+            return bool(doc and doc.get("status") == "canceled")
+        except Exception:
+            return False
+
     try:
-        final_output, data = engine.execute(workflow_result_updater=update_progress)
+        final_output, data = engine.execute(
+            workflow_result_updater=update_progress,
+            should_cancel=should_cancel,
+        )
+    except WorkflowCancelled:
+        logger.info(
+            "Workflow %s canceled by user (result %s)", workflow_id, workflow_result_id,
+        )
+        db.workflow_result.update_one(
+            {"_id": ObjectId(workflow_result_id)},
+            {"$set": {"status": "canceled", "error": "Canceled by user"}},
+        )
+        if activity_id:
+            try:
+                from datetime import datetime, timezone
+                db.activity_event.update_one(
+                    {"_id": ObjectId(activity_id)},
+                    {"$set": {
+                        "status": "canceled",
+                        "error": "Canceled by user",
+                        "finished_at": datetime.now(timezone.utc),
+                    }},
+                )
+            except Exception:
+                pass
+        # Clean terminal stop — do not re-raise (no retry).
+        return {"status": "canceled", "result_id": workflow_result_id}
     except Exception as e:
         logger.error("Workflow execution failed for %s: %s", workflow_id, e)
         db.workflow_result.update_one(
