@@ -164,12 +164,13 @@ const TEST_MESSAGES = [
 ]
 
 // Task types where Test Step is meaningful and safe. Excludes:
-//   - Approval, KnowledgeBaseQuery: backend test handler doesn't support them
+//   - Approval: backend test handler doesn't support it
 //   - APINode, BrowserAutomation, CodeNode: real side effects make "test" misleading
+// KnowledgeBaseQuery is read-only (a vector lookup), so it is safe to test.
 const TEST_STEP_SUPPORTED_TYPES = new Set([
   'Extraction', 'Prompt', 'Formatter', 'Format', 'AddWebsite', 'AddDocument',
   'DescribeImage', 'CrawlerNode', 'ResearchNode', 'DocumentRenderer',
-  'FormFiller', 'DataExport', 'PackageBuilder',
+  'FormFiller', 'DataExport', 'PackageBuilder', 'KnowledgeBaseQuery',
 ])
 
 const TEST_STEP_TOOLTIP = [
