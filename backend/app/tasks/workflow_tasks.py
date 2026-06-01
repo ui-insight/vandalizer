@@ -588,6 +588,7 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
         ExtractionNode,
         FormatNode,
         FormFillerNode,
+        KnowledgeBaseQueryNode,
         MultiTaskNode,
         PackageBuilderNode,
         PromptNode,
@@ -650,6 +651,8 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
         process_node = PackageBuilderNode(data=task_data)
     elif task_name == "BrowserAutomation":
         process_node = BrowserAutomationNode(data=task_data)
+    elif task_name == "KnowledgeBaseQuery":
+        process_node = KnowledgeBaseQueryNode(data=task_data)
     else:
         raise ValueError(f"Unknown task type: {task_name}")
 
