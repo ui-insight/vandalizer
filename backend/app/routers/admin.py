@@ -2061,6 +2061,74 @@ async def test_model(index: int, user: User = Depends(get_current_user)):
         raise HTTPException(status_code=502, detail=f"Model test failed: {e}")
 
 
+class TestPromptRequest(BaseModel):
+    model_name: str = ""
+    system_prompt: str = ""
+    user_prompt: str
+
+
+@router.post("/config/test-prompt")
+async def test_prompt(body: TestPromptRequest, user: User = Depends(get_current_user)):
+    """Send an ad-hoc prompt to a configured model and return the raw round-trip.
+
+    Powers the admin "Prompt Playground" — admins paste a system/user prompt,
+    pick a model, and see exactly what came back. Errors are returned in-band
+    (HTTP 200 with ok=false) so the UI can render the failure alongside the
+    request that produced it.
+    """
+    await _require_superadmin(user)
+
+    cfg = await SystemConfig.get_config()
+    requested = (body.model_name or "").strip()
+    model_name = requested or (cfg.default_model or "").strip()
+    if not model_name:
+        raise HTTPException(status_code=400, detail="No model specified and no default model configured")
+
+    if not body.user_prompt.strip():
+        raise HTTPException(status_code=400, detail="user_prompt cannot be empty")
+
+    model_entry = next((m for m in cfg.available_models if m.get("name") == model_name), None)
+    if not model_entry:
+        raise HTTPException(status_code=404, detail=f"Model '{model_name}' is not in available_models")
+
+    import time as _time
+    from pydantic_ai import Agent
+
+    started = _time.perf_counter()
+    request_echo = {
+        "model": model_name,
+        "system_prompt": body.system_prompt,
+        "user_prompt": body.user_prompt,
+    }
+    try:
+        model = get_agent_model(model_name, system_config_doc=cfg.model_dump())
+        system = body.system_prompt.strip()
+        agent = Agent(model, system_prompt=system) if system else Agent(model)
+        result = await agent.run(body.user_prompt)
+        elapsed_ms = int((_time.perf_counter() - started) * 1000)
+        usage = result.usage()
+        return {
+            "ok": True,
+            "request": request_echo,
+            "response_text": result.output or "",
+            "latency_ms": elapsed_ms,
+            "tokens": {
+                "request": getattr(usage, "request_tokens", None),
+                "response": getattr(usage, "response_tokens", None),
+                "total": getattr(usage, "total_tokens", None),
+            },
+        }
+    except Exception as e:
+        elapsed_ms = int((_time.perf_counter() - started) * 1000)
+        return {
+            "ok": False,
+            "request": request_echo,
+            "response_text": "",
+            "latency_ms": elapsed_ms,
+            "error": str(e),
+        }
+
+
 class ModelProbeRequest(BaseModel):
     name: str
     endpoint: Optional[str] = ""

@@ -364,6 +364,22 @@ export function testModel(index: number) {
   return apiFetch<{ status: string; model: string; message: string }>(`/api/admin/config/test-model/${index}`, { method: 'POST' })
 }
 
+export type TestPromptResult = {
+  ok: boolean
+  request: { model: string; system_prompt: string; user_prompt: string }
+  response_text: string
+  latency_ms: number
+  tokens?: { request: number | null; response: number | null; total: number | null }
+  error?: string
+}
+
+export function testPrompt(data: { model_name: string; system_prompt: string; user_prompt: string }) {
+  return apiFetch<TestPromptResult>('/api/admin/config/test-prompt', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
 // Auth
 
 export function addOAuthProvider(data: Record<string, string>) {

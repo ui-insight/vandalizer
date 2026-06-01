@@ -24,7 +24,7 @@ import {
   getUsageStats, getUsageTimeseries, getUserLeaderboard, getTeamLeaderboard,
   getTeamDetail, getUserDetail,
   getWorkflowEvents, getSystemConfig, updateSystemConfig, updateCompliancePolicyConfig,
-  addModel, updateModel, deleteModel, setDefaultModel, testOcr, testModel, probeModel, addOAuthProvider,
+  addModel, updateModel, deleteModel, setDefaultModel, testOcr, testModel, testPrompt, probeModel, addOAuthProvider,
   updateOAuthProvider, deleteOAuthProvider, updateAuthMethods,
   getQualitySummary, getQualityTimeline, runRegressionSuite,
   getQualityAlerts, acknowledgeAlert, getQualityItems, getQualityItemDetail,
@@ -42,6 +42,7 @@ import {
   getPostExperienceResponses, sendTestEmail, adminResendCredentials, adminGetMagicLink,
   adminAddDemoUser,
 } from '../api/demo'
+import type { TestPromptResult } from '../api/admin'
 import { getAdminPromptOverview, adminUpdatePrompt, type PromptOverview } from '../api/feedbackPrompt'
 import * as supportApi from '../api/support'
 import type { SupportTicket, SupportTicketSummary } from '../types/support'
@@ -2364,6 +2365,14 @@ function ConfigTab() {
   const [modelTesting, setModelTesting] = useState<number | null>(null)
   const [modelTestResults, setModelTestResults] = useState<Record<number, { ok: boolean; message: string }>>({})
 
+  // Prompt playground
+  const [playgroundModel, setPlaygroundModel] = useState('')
+  const [playgroundSystem, setPlaygroundSystem] = useState('')
+  const [playgroundUser, setPlaygroundUser] = useState('')
+  const [playgroundSending, setPlaygroundSending] = useState(false)
+  const [playgroundResult, setPlaygroundResult] = useState<TestPromptResult | null>(null)
+  const [playgroundError, setPlaygroundError] = useState<string | null>(null)
+
   // Auth
   const [authMethods, setAuthMethods] = useState<string[]>(['password'])
   const [authSaving, setAuthSaving] = useState(false)
@@ -2702,6 +2711,25 @@ function ConfigTab() {
       setModelTestResults(prev => ({ ...prev, [index]: { ok: false, message: e instanceof Error ? e.message : 'Test failed' } }))
     } finally {
       setModelTesting(null)
+    }
+  }
+
+  const handleSendPlaygroundPrompt = async () => {
+    if (!playgroundUser.trim()) return
+    setPlaygroundSending(true)
+    setPlaygroundError(null)
+    setPlaygroundResult(null)
+    try {
+      const res = await testPrompt({
+        model_name: playgroundModel || cfg?.default_model || '',
+        system_prompt: playgroundSystem,
+        user_prompt: playgroundUser,
+      })
+      setPlaygroundResult(res)
+    } catch (e) {
+      setPlaygroundError(e instanceof Error ? e.message : 'Request failed')
+    } finally {
+      setPlaygroundSending(false)
     }
   }
 
@@ -3106,6 +3134,132 @@ function ConfigTab() {
                 >
                   Cancel
                 </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Prompt Playground */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}>
+          <Play size={18} color="#6b7280" /> Prompt Playground
+          <span style={{ fontSize: 12, fontWeight: 400, color: '#6b7280' }}>
+            — send a prompt to a configured model and see the raw round-trip
+          </span>
+        </div>
+        <div style={sectionBodyStyle}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 220px', gap: 16, alignItems: 'start' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={labelStyle}>System Prompt (optional)</label>
+                <textarea
+                  value={playgroundSystem}
+                  onChange={e => setPlaygroundSystem(e.target.value)}
+                  placeholder="e.g. You are a helpful assistant. Reply concisely."
+                  rows={3}
+                  style={{ ...inputStyle, fontFamily: 'ui-monospace, monospace', fontSize: 13, resize: 'vertical' }}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>User Prompt</label>
+                <textarea
+                  value={playgroundUser}
+                  onChange={e => setPlaygroundUser(e.target.value)}
+                  placeholder="Ask anything. The text below will be sent verbatim to the selected model."
+                  rows={5}
+                  style={{ ...inputStyle, fontFamily: 'ui-monospace, monospace', fontSize: 13, resize: 'vertical' }}
+                />
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={labelStyle}>Model</label>
+                <select
+                  value={playgroundModel}
+                  onChange={e => setPlaygroundModel(e.target.value)}
+                  style={inputStyle}
+                >
+                  <option value="">
+                    {cfg?.default_model ? `Default (${cfg.default_model})` : 'Default'}
+                  </option>
+                  {cfg?.available_models?.map((m, i) => (
+                    <option key={i} value={m.name}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
+              <button
+                onClick={handleSendPlaygroundPrompt}
+                disabled={playgroundSending || !playgroundUser.trim()}
+                style={{
+                  padding: '10px 16px', borderRadius: 'var(--ui-radius, 12px)', border: 'none',
+                  backgroundColor: '#111827', color: '#fff', fontSize: 13, fontWeight: 600,
+                  cursor: playgroundSending || !playgroundUser.trim() ? 'not-allowed' : 'pointer',
+                  opacity: playgroundSending || !playgroundUser.trim() ? 0.6 : 1,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                }}
+              >
+                <Play size={14} /> {playgroundSending ? 'Sending...' : 'Send'}
+              </button>
+              {playgroundResult && (
+                <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.6 }}>
+                  <div>Model: <span style={{ color: '#111', fontFamily: 'ui-monospace, monospace' }}>{playgroundResult.request.model}</span></div>
+                  <div>Latency: {playgroundResult.latency_ms} ms</div>
+                  {playgroundResult.tokens && (
+                    <div>
+                      Tokens: {playgroundResult.tokens.request ?? '?'} in / {playgroundResult.tokens.response ?? '?'} out
+                      {playgroundResult.tokens.total != null && ` / ${playgroundResult.tokens.total} total`}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {playgroundError && (
+            <div style={{ marginTop: 16, padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--ui-radius, 12px)', color: '#991b1b', fontSize: 13 }}>
+              {playgroundError}
+            </div>
+          )}
+
+          {playgroundResult && (
+            <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  Request sent
+                </div>
+                <pre style={{
+                  margin: 0, padding: 12, background: '#f9fafb', border: '1px solid #e5e7eb',
+                  borderRadius: 'var(--ui-radius, 12px)', fontSize: 12, lineHeight: 1.5,
+                  fontFamily: 'ui-monospace, monospace', color: '#111',
+                  whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 400, overflow: 'auto',
+                }}>
+{`[system]
+${playgroundResult.request.system_prompt || '(none)'}
+
+[user]
+${playgroundResult.request.user_prompt}`}
+                </pre>
+              </div>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {playgroundResult.ok ? (
+                    <><CheckCircle2 size={13} color="#059669" /> Response</>
+                  ) : (
+                    <><XCircle size={13} color="#dc2626" /> Error</>
+                  )}
+                </div>
+                <pre style={{
+                  margin: 0, padding: 12,
+                  background: playgroundResult.ok ? '#f9fafb' : '#fef2f2',
+                  border: `1px solid ${playgroundResult.ok ? '#e5e7eb' : '#fecaca'}`,
+                  borderRadius: 'var(--ui-radius, 12px)', fontSize: 12, lineHeight: 1.5,
+                  fontFamily: 'ui-monospace, monospace',
+                  color: playgroundResult.ok ? '#111' : '#991b1b',
+                  whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 400, overflow: 'auto',
+                }}>
+                  {playgroundResult.ok ? (playgroundResult.response_text || '(empty response)') : (playgroundResult.error || 'Unknown error')}
+                </pre>
               </div>
             </div>
           )}

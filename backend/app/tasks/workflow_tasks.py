@@ -145,6 +145,18 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
                             "searchtype": "extraction",
                         }))
                         task_data["keys"] = [item["searchphrase"] for item in items]
+                        # Preserve per-field validation (enum_values) and optional
+                        # designations (is_optional) so workflow extraction honors the
+                        # same constraints as a standalone run. Without this, the saved
+                        # set's optional/enum metadata is silently dropped at execution.
+                        task_data["field_metadata"] = [
+                            {
+                                "key": item["searchphrase"],
+                                "is_optional": item.get("is_optional", False),
+                                "enum_values": item.get("enum_values", []),
+                            }
+                            for item in items
+                        ]
                         # UI is mutually exclusive between saved-set and manual fields,
                         # but older workflows may have both persisted. Drop stale manual
                         # fields so the saved set is unambiguously the source of truth.

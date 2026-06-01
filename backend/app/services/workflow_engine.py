@@ -279,7 +279,8 @@ def llm_chat_model(model: str, prompt: str, data=None, progress_callback=None,
 
 def data_extraction_model(model: str, keys: list[str], doc_texts: list[str] | None = None,
                           full_text: str | None = None, system_config_doc: dict | None = None,
-                          usage_acc: UsageAccumulator | None = None):
+                          usage_acc: UsageAccumulator | None = None,
+                          field_metadata: list[dict] | None = None):
     """Run extraction and return {raw, formatted}. Sync context."""
     engine = ExtractionEngine(system_config_doc=system_config_doc)
     output = engine.extract(
@@ -287,6 +288,7 @@ def data_extraction_model(model: str, keys: list[str], doc_texts: list[str] | No
         model=model,
         full_text=full_text,
         doc_texts=doc_texts,
+        field_metadata=field_metadata,
     )
     if usage_acc:
         usage_acc.add(engine.tokens_in, engine.tokens_out)
@@ -458,6 +460,13 @@ class ExtractionNode(Node):
             kwargs["doc_texts"] = texts
         elif texts:
             kwargs["full_text"] = texts[0]
+
+        # Carry per-field validation / optional designations resolved from the
+        # saved set (see workflow_tasks resolution) so enum and optional rules
+        # are honored at extraction time.
+        field_metadata = self.data.get("field_metadata")
+        if field_metadata:
+            kwargs["field_metadata"] = field_metadata
 
         extraction_response = data_extraction_model(self.model, keys, **kwargs)
 
