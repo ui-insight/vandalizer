@@ -54,11 +54,17 @@ export function useWorkflowRunner() {
     setBatchId(null)
     setSessionId(null)
 
-    const result = await runWorkflow(workflowId, {
-      document_uuids: documentUuids,
-      model,
-      batch_mode: batchMode,
-    })
+    let result: Awaited<ReturnType<typeof runWorkflow>>
+    try {
+      result = await runWorkflow(workflowId, {
+        document_uuids: documentUuids,
+        model,
+        batch_mode: batchMode,
+      })
+    } catch (err) {
+      setRunning(false)
+      throw err
+    }
     bumpActivitySignal()
 
     if (result.batch_id) {
@@ -69,6 +75,8 @@ export function useWorkflowRunner() {
       setSessionId(result.session_id)
       poll(result.session_id)
       intervalRef.current = setInterval(() => poll(result.session_id!), 2000)
+    } else {
+      setRunning(false)
     }
   }, [poll, pollBatch, bumpActivitySignal])
 

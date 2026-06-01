@@ -39,6 +39,7 @@ import { listAllFolders } from '../../api/folders'
 import type { KnowledgeBase } from '../../types/knowledge'
 import { listItems as listSearchSetItems, suggestFields } from '../../api/extractions'
 import { useWorkflowRunner } from '../../hooks/useWorkflowRunner'
+import { ApiError } from '../../api/client'
 import type { Workflow, WorkflowStep, WorkflowTask, WorkflowStatus, WorkflowCitation, ModelInfo, SearchSetItem } from '../../types/workflow'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
 import DOMPurify from 'dompurify'
@@ -427,20 +428,30 @@ export function WorkflowEditorPanel() {
   const handleRun = async () => {
     if (!openWorkflowId) return
 
-    if (isTextInput) {
-      if (!textInput.trim()) return
-      // Convert text to temp document, then combine with any selected docs
-      const { document_uuids: textUuids } = await createTempDocuments(openWorkflowId, [
-        { text: textInput.trim(), label: 'Text input' },
-      ])
-      const allUuids = [...textUuids, ...selectedDocUuids]
-      setActiveTab('design')
-      await runner.start(openWorkflowId, allUuids, undefined, false)
-    } else {
-      const uuids = selectedDocUuids.length > 0 ? selectedDocUuids : []
-      if (uuids.length === 0) return
-      setActiveTab('design')
-      await runner.start(openWorkflowId, uuids, undefined, batchMode)
+    try {
+      if (isTextInput) {
+        if (!textInput.trim()) return
+        // Convert text to temp document, then combine with any selected docs
+        const { document_uuids: textUuids } = await createTempDocuments(openWorkflowId, [
+          { text: textInput.trim(), label: 'Text input' },
+        ])
+        const allUuids = [...textUuids, ...selectedDocUuids]
+        setActiveTab('design')
+        await runner.start(openWorkflowId, allUuids, undefined, false)
+      } else {
+        const uuids = selectedDocUuids.length > 0 ? selectedDocUuids : []
+        if (uuids.length === 0) return
+        setActiveTab('design')
+        await runner.start(openWorkflowId, uuids, undefined, batchMode)
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to run workflow'
+      toast(msg, 'error')
+      // If the workflow was deleted out from under us, refresh so the panel
+      // flips to its "Workflow not found." state instead of acting alive.
+      if (err instanceof ApiError && err.status === 404) {
+        refresh()
+      }
     }
   }
 
