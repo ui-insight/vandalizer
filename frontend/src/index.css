@@ -599,3 +599,63 @@ html {
     animation: none !important;
   }
 }
+
+/* ===== Present & Pitch (deck / read / print prose) ===== */
+.deck-prose {
+  font-size: 1.05rem;
+  line-height: 1.7;
+}
+.deck-prose p { margin: 0.75em 0; }
+.deck-prose ul { margin: 0.75em 0; padding-left: 0; list-style: none; }
+.deck-prose ul li { position: relative; padding-left: 1.4em; margin: 0.4em 0; }
+.deck-prose ul li::before { content: "\25B8"; position: absolute; left: 0; color: #f1b300; }
+.deck-prose ol { margin: 0.75em 0; padding-left: 1.4em; }
+.deck-prose strong { color: #fff; font-weight: 700; }
+.deck-prose em { color: #d1d5db; }
+.deck-prose a { color: #f1b300; text-decoration: underline; }
+.deck-prose code {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f1b300;
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+.deck-prose pre {
+  background: #18181b;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 1em;
+  overflow-x: auto;
+  margin: 1em 0;
+}
+.deck-prose pre code { background: none; color: #d4d4d8; padding: 0; font-size: 0.85em; line-height: 1.5; }
+.deck-prose table { width: 100%; border-collapse: collapse; margin: 1em 0; font-size: 0.95em; }
+.deck-prose th, .deck-prose td { border: 1px solid rgba(255, 255, 255, 0.12); padding: 0.5em 0.75em; text-align: left; }
+.deck-prose th { background: rgba(241, 179, 0, 0.1); color: #fff; }
+
+/* Deck (projector) — larger type when no read/print modifier is present */
+.deck-prose:not(.deck-prose--read):not(.deck-prose--print) { font-size: 1.5rem; }
+@media (min-width: 640px) {
+  .deck-prose:not(.deck-prose--read):not(.deck-prose--print) { font-size: 1.9rem; }
+}
+
+/* Print handout — dark text on white */
+.deck-prose--print { color: #1a1a1a; font-size: 1rem; }
+.deck-prose--print strong { color: #000; }
+.deck-prose--print em { color: #333; }
+.deck-prose--print a { color: #1a1a1a; }
+.deck-prose--print ul li::before { color: #b8860b; }
+.deck-prose--print code { background: #f0f0f0; color: #b8860b; }
+.deck-prose--print pre { background: #f6f6f6; border-color: #ddd; }
+.deck-prose--print pre code { color: #333; }
+.deck-prose--print th { background: #f3f3f3; color: #000; }
+.deck-prose--print th, .deck-prose--print td { border-color: #ccc; }
+
+/* ===== Print ===== */
+@media print {
+  .no-print { display: none !important; }
+  html, body { background: #fff !important; }
+  .print-handout { display: block !important; background: #fff !important; color: #000 !important; }
+  .print-slide { break-after: page; page-break-after: always; padding: 1.5rem 0; }
+  .print-slide:last-child { break-after: auto; page-break-after: auto; }
+}
