@@ -21,11 +21,9 @@ logger = logging.getLogger(__name__)
 
 
 def _get_db():
-    from pymongo import MongoClient
+    from app.tasks import get_sync_db
 
-    from app.config import Settings
-    settings = Settings()
-    return MongoClient(settings.mongo_host)[settings.mongo_db]
+    return get_sync_db()
 
 
 def _audit(db, action: str, **kwargs) -> None:

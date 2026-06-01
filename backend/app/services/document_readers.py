@@ -100,12 +100,9 @@ def ocr_extract_text_from_pdf(pdf_path: str, retries: int = 3) -> str:
     Falls back gracefully if the OCR service is unavailable.
     """
     # OCR endpoint is stored in the database via admin config (SystemConfig)
-    from pymongo import MongoClient
-    from app.config import Settings
+    from app.tasks import get_sync_db
     from app.utils.encryption import decrypt_value
-    settings = Settings()
-    client = MongoClient(settings.mongo_host)
-    db = client[settings.mongo_db]
+    db = get_sync_db()
     cfg = db.system_config.find_one({})
     ocr_endpoint = (cfg or {}).get("ocr_endpoint", "")
     raw_api_key = (cfg or {}).get("ocr_api_key", "")

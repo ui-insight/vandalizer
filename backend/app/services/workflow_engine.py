@@ -734,12 +734,9 @@ class ResearchNode(Node):
 
 def _open_sync_db():
     """Open a pymongo handle for in-node credential lookups (sync context)."""
-    from pymongo import MongoClient
+    from app.tasks import get_sync_db
 
-    from app.config import Settings
-    settings = Settings()
-    client = MongoClient(settings.mongo_host)
-    return client[settings.mongo_db]
+    return get_sync_db()
 
 
 class APICallNode(Node):
