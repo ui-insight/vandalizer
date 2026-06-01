@@ -72,13 +72,10 @@ def _notify_approval_reviewers_sync(
 
 
 def _get_db():
-    """Get sync pymongo database handle."""
-    from pymongo import MongoClient
+    """Get sync pymongo database handle (shared per-process client)."""
+    from app.tasks import get_sync_db
 
-    from app.config import Settings
-    settings = Settings()
-    client = MongoClient(settings.mongo_host)
-    return client[settings.mongo_db]
+    return get_sync_db()
 
 
 @celery_app.task(

@@ -107,8 +107,23 @@ ALL_MODELS = [
 ]
 
 
+# Process-wide Motor client, created once in init_db() and reused everywhere
+# (e.g. the health check). Never construct a new AsyncIOMotorClient per request:
+# each one opens sockets + a topology-monitor thread that are not promptly
+# reclaimed, exhausting file descriptors in a long-running process.
+_client: AsyncIOMotorClient | None = None
+
+
+def get_client() -> AsyncIOMotorClient:
+    """Return the shared Motor client. Raises if init_db() hasn't run yet."""
+    if _client is None:
+        raise RuntimeError("Database not initialized; init_db() must run first")
+    return _client
+
+
 async def init_db(settings: Settings) -> None:
-    client = AsyncIOMotorClient(
+    global _client
+    _client = AsyncIOMotorClient(
         settings.mongo_host,
         maxPoolSize=100,
         minPoolSize=10,
@@ -118,6 +133,6 @@ async def init_db(settings: Settings) -> None:
         socketTimeoutMS=30000,
     )
     await init_beanie(
-        database=client[settings.mongo_db],
+        database=_client[settings.mongo_db],
         document_models=ALL_MODELS,
     )
