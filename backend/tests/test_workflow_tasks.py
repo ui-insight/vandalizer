@@ -203,6 +203,85 @@ class TestExecuteWorkflowTask:
 
     @patch("app.tasks.workflow_tasks._get_db")
     @patch("app.services.workflow_engine.build_workflow_engine")
+    def test_approval_pause_failure_sets_error_status(self, mock_build, mock_get_db):
+        """A failure while persisting the approval must surface as an error
+        status, not leave the run frozen in 'running' (the original bug)."""
+        from app.tasks.workflow_tasks import execute_workflow_task
+
+        wf_id, result_id = _fake_oid(), _fake_oid()
+        db = _mock_db(
+            workflow_doc=_make_workflow_doc(wf_id=wf_id),
+            result_doc=_make_result_doc(result_id=result_id, workflow_id=wf_id),
+        )
+        # Simulate pymongo rejecting the artifact (e.g. non-BSON payload).
+        db.approval_request.insert_one.side_effect = RuntimeError("cannot encode object")
+        mock_get_db.return_value = db
+
+        mock_engine = MagicMock()
+        mock_engine.execute.return_value = ({
+            "_approval_pause": True,
+            "_assigned_to_user_ids": ["reviewer1"],
+            "_data_for_review": {"key": "value"},
+            "output": {"key": "value"},
+        }, [])
+        mock_node = MagicMock()
+        mock_node.name = "Approval"
+        mock_engine.get_topological_order.return_value = [MagicMock(), mock_node]
+        mock_build.return_value = mock_engine
+
+        with pytest.raises(RuntimeError):
+            execute_workflow_task(
+                workflow_result_id=str(result_id),
+                workflow_id=str(wf_id),
+                trigger_step_data={"doc_uuids": []},
+                model="gpt-4o",
+            )
+
+        error_calls = [c for c in db.workflow_result.update_one.call_args_list
+                       if c[0][1].get("$set", {}).get("status") == "error"]
+        assert len(error_calls) >= 1
+
+    @patch("app.tasks.workflow_tasks._get_db")
+    @patch("app.services.workflow_engine.build_workflow_engine")
+    def test_approval_pause_sanitizes_non_bson_artifact(self, mock_build, mock_get_db):
+        """Non-BSON review artifacts (e.g. bytes) are coerced before insert so
+        the pause never crashes on an unencodable payload."""
+        from app.tasks.workflow_tasks import execute_workflow_task
+
+        wf_id, result_id = _fake_oid(), _fake_oid()
+        db = _mock_db(
+            workflow_doc=_make_workflow_doc(wf_id=wf_id),
+            result_doc=_make_result_doc(result_id=result_id, workflow_id=wf_id),
+        )
+        mock_get_db.return_value = db
+
+        mock_engine = MagicMock()
+        mock_engine.execute.return_value = ({
+            "_approval_pause": True,
+            "_assigned_to_user_ids": ["reviewer1"],
+            "_data_for_review": {"file": b"\x89PNG\x01\x02", "nested": [b"raw", {1, 2}]},
+            "output": {"file": "x"},
+        }, [])
+        mock_node = MagicMock()
+        mock_node.name = "Approval"
+        mock_engine.get_topological_order.return_value = [MagicMock(), mock_node]
+        mock_build.return_value = mock_engine
+
+        result = execute_workflow_task(
+            workflow_result_id=str(result_id),
+            workflow_id=str(wf_id),
+            trigger_step_data={"doc_uuids": []},
+            model="gpt-4o",
+        )
+
+        assert result["status"] == "pending_approval"
+        stored = db.approval_request.insert_one.call_args[0][0]["data_for_review"]
+        assert isinstance(stored["file"], str)
+        # No bytes or sets survive anywhere in the stored artifact.
+        assert all(not isinstance(v, (bytes, set)) for v in stored["nested"])
+
+    @patch("app.tasks.workflow_tasks._get_db")
+    @patch("app.services.workflow_engine.build_workflow_engine")
     def test_activity_tracking(self, mock_build, mock_get_db):
         from app.tasks.workflow_tasks import execute_workflow_task
 
