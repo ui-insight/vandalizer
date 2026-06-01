@@ -10,7 +10,10 @@ export function Sidebar() {
   const { currentTeam } = useTeams()
 
   const isTeamAdmin = currentTeam?.role === 'owner' || currentTeam?.role === 'admin'
-  const showAdmin = !!user?.is_admin || !!user?.is_examiner || isTeamAdmin
+  // Mirror the admin panel's own access rule (Admin.tsx hasAccess): admin, staff, or
+  // team admin. Examiners are excluded — their workspace is the Verification queue
+  // below, and every admin-panel endpoint would 403 them.
+  const showAdmin = !!user?.is_admin || !!user?.is_staff || isTeamAdmin
 
   const links = [
     { href: '/', label: 'Documents', icon: FileText },

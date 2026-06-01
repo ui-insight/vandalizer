@@ -359,11 +359,14 @@ function UsageTab() {
   const [timeseries, setTimeseries] = useState<TimeseriesResponse | null>(null)
   const [days, setDays] = useState(30)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(() => {
     setLoading(true)
+    setError(null)
     Promise.all([getUsageStats(days), getUsageTimeseries(days)])
       .then(([s, ts]) => { setStats(s); setTimeseries(ts) })
+      .catch(e => setError(e?.message || 'Failed to load usage data'))
       .finally(() => setLoading(false))
   }, [days])
 
@@ -413,6 +416,13 @@ function UsageTab() {
   }
 
   if (loading && !stats) return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading usage data...</div>
+
+  if (error && !stats) return (
+    <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
+      <AlertCircle size={28} color="#d1d5db" style={{ marginBottom: 12 }} />
+      <div style={{ fontSize: 14, color: '#374151' }}>{error}</div>
+    </div>
+  )
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -746,7 +756,7 @@ function UsersTab() {
   const load = useCallback(() => {
     setLoading(true)
     const arg = typeof days === 'number' ? days : undefined
-    getUserLeaderboard(arg).then(setUsers).finally(() => setLoading(false))
+    getUserLeaderboard(arg).then(setUsers).catch(() => setUsers([])).finally(() => setLoading(false))
   }, [days])
 
   useEffect(() => { load() }, [load])
@@ -1112,7 +1122,7 @@ function TeamsTab() {
       setAllTeams(t)
       const def = t.find(x => x.is_default)
       if (def) setDefaultTeamUuid(def.uuid)
-    }).finally(() => setLoadingAll(false))
+    }).catch(() => setAllTeams([])).finally(() => setLoadingAll(false))
   }, [])
 
   const refreshIsolated = useCallback(() => {
@@ -1120,7 +1130,7 @@ function TeamsTab() {
     getIsolatedUsers().then(users => {
       setIsolated(users)
       setIsolatedLoaded(true)
-    }).finally(() => setLoadingIsolated(false))
+    }).catch(() => setIsolatedLoaded(true)).finally(() => setLoadingIsolated(false))
   }, [])
 
   useEffect(() => {
@@ -1134,7 +1144,7 @@ function TeamsTab() {
   const refreshStats = useCallback(() => {
     setLoadingStats(true)
     const arg = typeof statsDays === 'number' ? statsDays : undefined
-    getTeamLeaderboard(arg).then(setStatsTeams).finally(() => setLoadingStats(false))
+    getTeamLeaderboard(arg).then(setStatsTeams).catch(() => setStatsTeams([])).finally(() => setLoadingStats(false))
   }, [statsDays])
 
   useEffect(() => {
@@ -1569,7 +1579,7 @@ function WorkflowsTab() {
 
   const load = useCallback(() => {
     setLoading(true)
-    getWorkflowEvents(page, status || undefined, search || undefined).then(setData).finally(() => setLoading(false))
+    getWorkflowEvents(page, status || undefined, search || undefined).then(setData).catch(() => setData(null)).finally(() => setLoading(false))
   }, [page, status, search])
 
   useEffect(() => { load() }, [load])
@@ -6470,12 +6480,17 @@ export default function Admin() {
 
   const isGlobalAdmin = !!user?.is_admin
   const isStaff = !!user?.is_staff
-  const isExaminer = !!user?.is_examiner
   const isTeamAdmin = currentTeam?.role === 'owner' || currentTeam?.role === 'admin'
-  const hasAccess = isGlobalAdmin || isStaff || isExaminer || isTeamAdmin
+  // Examiners are intentionally excluded: every admin-panel endpoint gates on
+  // admin/staff/team-admin (see _require_admin_or_team_admin), so examiners would
+  // only hit 403s here. Their workspace is the Verification queue (/verification).
+  const hasAccess = isGlobalAdmin || isStaff || isTeamAdmin
 
-  // Staff see everything except config; examiners see analytics tabs only
-  const hiddenForNonAdmin = ['config', 'quality', 'compliance', 'demo', 'organizations', 'approvals', 'audit', 'certifications', 'apikeys']
+  // Staff see everything except config; team admins see only team-scoped tabs whose
+  // endpoints accept a team scope. Tabs whose backends require admin/staff (email,
+  // plus everything in hiddenForNonAdmin) stay hidden so we never render a tab that
+  // can only 403.
+  const hiddenForNonAdmin = ['config', 'quality', 'compliance', 'demo', 'organizations', 'approvals', 'audit', 'certifications', 'apikeys', 'email', 'teams']
   let visibleTabs = isGlobalAdmin
     ? TABS
     : isStaff
@@ -6514,7 +6529,7 @@ export default function Admin() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 20px', marginBottom: 20 }}>
             <Shield size={20} color="#6b7280" />
             <h1 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>
-              {isGlobalAdmin ? 'Admin' : isStaff ? 'Admin' : isExaminer ? 'Analytics' : 'Team Admin'}
+              {isGlobalAdmin || isStaff ? 'Admin' : 'Team Admin'}
             </h1>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '0 8px' }}>
