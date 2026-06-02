@@ -379,6 +379,95 @@ class TestRuleSuggester:
         # The three part-named fields land in source_fields
         assert len(sum_rules[0]["source_fields"]) >= 2
 
+    def test_per_category_totals_do_not_double_count(self):
+        """A budget matrix (Year 1/2/3 + Total per category) must yield one
+        rule *per category* summing only that category's years into its own
+        total — never mixing categories or summing totals together."""
+        from app.services.cross_field_rules import suggest_rules
+
+        categories = ["Equipment", "Travel", "Supplies", "Indirect Costs"]
+        fields = []
+        for cat in categories:
+            for yr in (1, 2, 3):
+                fields.append({"key": f"Budget {cat} Year {yr}"})
+            fields.append({"key": f"Budget {cat} Total"})
+
+        sum_rules = [s for s in suggest_rules(fields, []) if s["type"] == "sum_equals"]
+
+        # Exactly one rule per category, each summing its own three years.
+        assert len(sum_rules) == len(categories), sum_rules
+        for cat in categories:
+            rule = next(r for r in sum_rules if r["target_field"] == f"Budget {cat} Total")
+            assert sorted(rule["source_fields"]) == sorted(
+                f"Budget {cat} Year {yr}" for yr in (1, 2, 3)
+            ), rule
+            # No total field is ever used as a source (would double-count).
+            assert not any("Total" in f for f in rule["source_fields"]), rule
+
+    def test_text_field_excluded_from_sum_by_name(self):
+        """A text-named field that happens to share a part token ("materials")
+        must not be summed into a numeric total — the ticket bug."""
+        from app.services.cross_field_rules import suggest_rules
+
+        fields = [
+            {"key": "Direct Costs"},
+            {"key": "Indirect Costs"},
+            {"key": "Equipment"},
+            {"key": "Total Budget"},
+            {"key": "Educational Materials Target Audience"},
+        ]
+        sum_rules = [s for s in suggest_rules(fields, []) if s["type"] == "sum_equals"]
+        assert sum_rules, sum_rules
+        for rule in sum_rules:
+            assert "Educational Materials Target Audience" not in rule["source_fields"], rule
+            assert rule["target_field"] != "Educational Materials Target Audience", rule
+
+    def test_enum_field_excluded_from_sum(self):
+        """A field with enum_values is categorical and must stay out of sums."""
+        from app.services.cross_field_rules import suggest_rules
+
+        fields = [
+            {"key": "Direct Costs"},
+            {"key": "Indirect Costs"},
+            {"key": "Total Budget"},
+            {"key": "Materials Status", "enum_values": ["Ordered", "Received"]},
+        ]
+        sum_rules = [s for s in suggest_rules(fields, []) if s["type"] == "sum_equals"]
+        assert sum_rules, sum_rules
+        assert all("Materials Status" not in r["source_fields"] for r in sum_rules), sum_rules
+
+    def test_is_numeric_false_overrides_part_name(self):
+        """A data-driven is_numeric=False verdict keeps a part-named field out
+        of the sum even though its name looks numeric."""
+        from app.services.cross_field_rules import suggest_rules
+
+        fields = [
+            {"key": "Direct Costs", "is_numeric": True},
+            {"key": "Indirect Costs", "is_numeric": True},
+            {"key": "Equipment Supplies", "is_numeric": False},
+            {"key": "Total Budget", "is_numeric": True},
+        ]
+        sum_rules = [s for s in suggest_rules(fields, []) if s["type"] == "sum_equals"]
+        assert sum_rules, sum_rules
+        assert all("Equipment Supplies" not in r["source_fields"] for r in sum_rules), sum_rules
+
+    def test_is_numeric_true_rescues_text_named_field(self):
+        """A data-driven is_numeric=True verdict lets an otherwise text-named
+        field participate — the sampled values say it's really a number."""
+        from app.services.cross_field_rules import suggest_rules
+
+        fields = [
+            {"key": "Direct Costs", "is_numeric": True},
+            {"key": "Indirect Costs", "is_numeric": True},
+            # "description" would normally mark this text; the verdict overrides.
+            {"key": "Supplies Description Cost", "is_numeric": True},
+            {"key": "Total Budget", "is_numeric": True},
+        ]
+        sum_rules = [s for s in suggest_rules(fields, []) if s["type"] == "sum_equals"]
+        assert any(
+            "Supplies Description Cost" in r["source_fields"] for r in sum_rules
+        ), sum_rules
+
     def test_suggests_date_order_pairs(self):
         from app.services.cross_field_rules import suggest_rules
 
@@ -409,6 +498,102 @@ class TestRuleSuggester:
         assert ranges
         assert ranges[0]["min"] == 0
         assert ranges[0]["max"] == 100
+
+
+class TestSanitizeSumEqualsRules:
+    def test_strips_text_operand_keeps_rule(self):
+        from app.services.cross_field_rules import sanitize_sum_equals_rules
+
+        meta = [
+            {"key": "Direct Costs"},
+            {"key": "Indirect Costs"},
+            {"key": "Equipment"},
+            {"key": "Total Budget"},
+            {"key": "Educational Materials Target Audience"},
+        ]
+        rules = [{
+            "type": "sum_equals",
+            "source_fields": [
+                "Direct Costs", "Indirect Costs", "Equipment",
+                "Educational Materials Target Audience",
+            ],
+            "target_field": "Total Budget",
+        }]
+        cleaned, notes = sanitize_sum_equals_rules(meta, rules)
+        assert len(cleaned) == 1
+        assert "Educational Materials Target Audience" not in cleaned[0]["source_fields"]
+        assert sorted(cleaned[0]["source_fields"]) == [
+            "Direct Costs", "Equipment", "Indirect Costs",
+        ]
+        assert notes and "Educational Materials Target Audience" in notes[0]
+
+    def test_drops_rule_when_too_few_numeric_operands(self):
+        from app.services.cross_field_rules import sanitize_sum_equals_rules
+
+        meta = [
+            {"key": "Direct Costs"},
+            {"key": "Total Budget"},
+            {"key": "Audience Name"},
+        ]
+        rules = [{
+            "type": "sum_equals",
+            "source_fields": ["Direct Costs", "Audience Name"],
+            "target_field": "Total Budget",
+        }]
+        cleaned, notes = sanitize_sum_equals_rules(meta, rules)
+        assert cleaned == []
+        assert notes and "dropped" in notes[0]
+
+    def test_drops_rule_with_non_numeric_target(self):
+        from app.services.cross_field_rules import sanitize_sum_equals_rules
+
+        meta = [
+            {"key": "Direct Costs"},
+            {"key": "Indirect Costs"},
+            {"key": "Project Category", "enum_values": ["A", "B"]},
+        ]
+        rules = [{
+            "type": "sum_equals",
+            "source_fields": ["Direct Costs", "Indirect Costs"],
+            "target_field": "Project Category",
+        }]
+        cleaned, notes = sanitize_sum_equals_rules(meta, rules)
+        assert cleaned == []
+        assert notes and "non-numeric target" in notes[0]
+
+    def test_leaves_clean_rule_and_other_types_untouched(self):
+        from app.services.cross_field_rules import sanitize_sum_equals_rules
+
+        meta = [
+            {"key": "Direct Costs"},
+            {"key": "Indirect Costs"},
+            {"key": "Total Budget"},
+        ]
+        rules = [
+            {
+                "type": "sum_equals",
+                "source_fields": ["Direct Costs", "Indirect Costs"],
+                "target_field": "Total Budget",
+            },
+            {"type": "date_order", "field_a": "Start Date", "field_b": "End Date"},
+        ]
+        cleaned, notes = sanitize_sum_equals_rules(meta, rules)
+        assert cleaned == rules
+        assert notes == []
+
+    def test_unknown_field_left_in_place(self):
+        from app.services.cross_field_rules import sanitize_sum_equals_rules
+
+        # "Renamed Field" isn't in metadata — we can't judge it, so keep it.
+        meta = [{"key": "Direct Costs"}, {"key": "Total Budget"}]
+        rules = [{
+            "type": "sum_equals",
+            "source_fields": ["Direct Costs", "Renamed Field"],
+            "target_field": "Total Budget",
+        }]
+        cleaned, notes = sanitize_sum_equals_rules(meta, rules)
+        assert cleaned == rules
+        assert notes == []
 
 
 class TestRuleShapeValidation:

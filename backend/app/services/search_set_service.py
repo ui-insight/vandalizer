@@ -288,6 +288,76 @@ async def get_extraction_field_metadata(search_set_uuid: str) -> list[dict]:
     ]
 
 
+# Values that mean "the model found nothing", not a real data point. Excluded
+# from the numeric/text vote so a numeric field that is often blank isn't
+# misread as text.
+_NUMERIC_SAMPLE_SENTINELS = {"", "n/a", "na", "none", "null", "-", "—",
+                             "not found", "not applicable", "unknown"}
+
+
+async def infer_numeric_fields(search_set_uuid: str, sample_runs: int = 5) -> dict[str, bool]:
+    """Classify each field as numeric or not from recently-validated values.
+
+    Walks the most recent validation runs for this search set and tallies, per
+    field, how many real extracted values parse as numbers (reusing the same
+    parser the cross-field validator uses). Returns ``{field_name: bool}`` only
+    for fields with a confident verdict — fields never validated, or whose
+    sample is too small or too mixed to call, are omitted so the caller falls
+    back to name/enum heuristics.
+
+    Used by the cross-field rule suggester to keep text fields out of numeric
+    sum_equals rules.
+    """
+    from app.models.validation_run import ValidationRun
+    from app.services.cross_field_validation import _try_parse_number
+
+    runs = (
+        await ValidationRun.find(
+            ValidationRun.item_kind == "search_set",
+            ValidationRun.item_id == search_set_uuid,
+            ValidationRun.run_type == "extraction",
+        )
+        .sort("-created_at")
+        .limit(sample_runs)
+        .to_list()
+    )
+
+    # field_name -> [numeric_count, total_count]
+    tallies: dict[str, list[int]] = {}
+    for run in runs:
+        snapshot = run.result_snapshot or {}
+        for tc in snapshot.get("test_cases", []):
+            for fr in tc.get("fields", []) or []:
+                name = fr.get("field_name")
+                if not name:
+                    continue
+                values = list(fr.get("extracted_values") or [])
+                mcv = fr.get("most_common_value")
+                if mcv is not None:
+                    values.append(mcv)
+                for v in values:
+                    if v is None:
+                        continue
+                    s = str(v).strip()
+                    if not s or s.lower() in _NUMERIC_SAMPLE_SENTINELS:
+                        continue
+                    tally = tallies.setdefault(name, [0, 0])
+                    tally[1] += 1
+                    if _try_parse_number(v) is not None:
+                        tally[0] += 1
+
+    verdicts: dict[str, bool] = {}
+    for name, (numeric, total) in tallies.items():
+        if total < 3:
+            continue  # too few samples to call confidently
+        frac = numeric / total
+        if frac >= 0.8:
+            verdicts[name] = True
+        elif frac <= 0.2:
+            verdicts[name] = False
+    return verdicts
+
+
 # ---------------------------------------------------------------------------
 # Build from document (AI-powered field generation)
 # ---------------------------------------------------------------------------

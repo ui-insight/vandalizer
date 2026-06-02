@@ -160,19 +160,95 @@ async def persist_rules(ss: SearchSet, rules: list[dict]) -> None:
 # Rule suggester
 # ---------------------------------------------------------------------------
 
-_TOTAL_TOKENS = {"total", "sum", "amount", "grand total"}
+_TOTAL_TOKENS = {"total", "sum", "amount", "subtotal"}
 _PART_TOKENS = {"subtotal", "direct", "indirect", "labor", "materials", "supplies",
                 "travel", "equipment", "fringe", "tax"}
+# Tokens stripped when deriving a field's "category stem" — markers that
+# distinguish line items of the same category (Year 1 / Year 2 / Total) without
+# changing which category they belong to.
+_STEM_STRIP_TOKENS = {"total", "sum", "amount", "subtotal", "grand", "gross", "net",
+                      "year", "yr", "fy", "fiscal", "quarter", "qtr", "period"}
+_NUMBER_WORDS = {"one", "two", "three", "four", "five", "six", "seven", "eight",
+                 "nine", "ten", "eleven", "twelve",
+                 "first", "second", "third", "fourth", "fifth", "sixth", "seventh",
+                 "eighth", "ninth", "tenth"}
 _DATE_PAIRS = [
     ({"start", "begin", "from"}, {"end", "finish", "to", "thru", "through"}),
     ({"effective"}, {"expiration", "expiry", "expire"}),
     ({"issue", "issued"}, {"due"}),
 ]
 _PERCENT_TOKENS = {"percent", "percentage", "rate", "%"}
+# Name tokens that mark a field as free-text / categorical, so it must never be
+# pulled into a numeric sum_equals — even when another token in the name looks
+# part-like. E.g. "Educational Materials Target Audience" matches the part token
+# "materials" but is plainly text, caught here by "audience". This is the
+# name-only fallback; a data-driven `is_numeric` signal (when present) wins.
+_TEXT_TOKENS = {"audience", "name", "title", "description", "summary", "purpose",
+                "objective", "scope", "comment", "comments", "note", "notes",
+                "type", "category", "status", "address", "email", "phone",
+                "narrative", "abstract", "keywords", "discipline", "department",
+                "investigator", "contact", "institution", "sponsor", "program",
+                "country", "state", "city", "url", "website"}
 
 
 def _tokens(name: str) -> set[str]:
     return set(re.findall(r"[a-z]+", name.lower()))
+
+
+def _is_numeric_field(field_meta: dict) -> bool:
+    """Whether a field may participate in a numeric sum_equals rule.
+
+    A text field summed into a numeric total can never be parsed, so every such
+    evaluation is dropped as "unparseable" and silently erodes the pass rate —
+    exactly the ticket symptom. We gate operands here instead of trusting field
+    names alone.
+
+    Prefers a data-driven signal: `is_numeric` is stamped onto the metadata by
+    the caller from sampled extracted values (see
+    ``search_set_service.infer_numeric_fields``). When that signal is absent
+    (field never validated), fall back to name/enum heuristics so we still avoid
+    the obvious mistakes — enumerated/categorical fields and text-named fields
+    like "... Target Audience".
+    """
+    is_numeric = field_meta.get("is_numeric")
+    if is_numeric is True:
+        return True
+    if is_numeric is False:
+        return False
+    # Unknown — fall back to heuristics.
+    if field_meta.get("enum_values"):
+        return False  # an enumerated/categorical field is not numeric
+    return not (_tokens(field_meta.get("key", "")) & _TEXT_TOKENS)
+
+
+def _is_total(name: str) -> bool:
+    """A field whose name marks it as the sum of other fields (a total/subtotal)."""
+    return bool(_tokens(name) & _TOTAL_TOKENS)
+
+
+def _stem(name: str) -> str:
+    """Category stem of a field name: the name with total/period markers and
+    numbers stripped, so line items of the same category collapse together.
+
+        "Budget Equipment Year 1" -> "budget equipment"
+        "Budget Equipment Total"  -> "budget equipment"
+        "Budget Travel Year 2"    -> "budget travel"
+
+    This lets the suggester sum a category's components into *its own* total
+    instead of mixing categories (and their totals) into one rule.
+    """
+    out: list[str] = []
+    for raw in re.split(r"[^a-z0-9]+", name.lower()):
+        if not raw:
+            continue
+        if raw.isdigit():
+            continue
+        # Drop a trailing index glued to a label, e.g. "q1" -> "q".
+        tok = raw.rstrip("0123456789")
+        if not tok or tok in _STEM_STRIP_TOKENS or tok in _NUMBER_WORDS:
+            continue
+        out.append(tok)
+    return " ".join(out)
 
 
 def suggest_rules(field_metadata: list[dict], existing_rules: list[dict]) -> list[dict]:
@@ -194,11 +270,55 @@ def suggest_rules(field_metadata: list[dict], existing_rules: list[dict]) -> lis
     existing_keys = {_rule_dedupe_key(r) for r in existing_rules}
 
     # 1. sum_equals
-    total_fields = [n for n in field_names if _tokens(n) & _TOTAL_TOKENS]
-    for total_field in total_fields:
+    #
+    # A "total" field sums its *own* category's components — never another
+    # category's, and never another total. Mixing those double-counts (e.g.
+    # Equipment Y1+Y2+Y3 already equals Equipment Total, so a rule that adds
+    # both the yearly values and the total is mathematically wrong).
+    #
+    # Only numeric fields may take part in a sum. A text/categorical field
+    # (e.g. "Educational Materials Target Audience") summed into a numeric total
+    # produces unparseable evaluations that quietly drag down the pass rate.
+    meta_by_name = {f.get("key"): f for f in field_metadata if f.get("key")}
+    numeric_names = [n for n in field_names if _is_numeric_field(meta_by_name[n])]
+
+    # Strategy A — structured families: group fields by category stem
+    # ("Budget Equipment Year 1/2/3/Total" all share stem "budget equipment").
+    # A family with exactly one total and >=2 non-total components yields a
+    # clean per-category rule. This is what budget matrices look like.
+    families: dict[str, dict[str, list[str]]] = {}
+    for n in numeric_names:
+        fam = families.setdefault(_stem(n), {"totals": [], "components": []})
+        (fam["totals"] if _is_total(n) else fam["components"]).append(n)
+
+    structured = False
+    for fam in families.values():
+        if len(fam["totals"]) == 1 and len(fam["components"]) >= 2:
+            rule = normalize_rule({
+                "type": "sum_equals",
+                "source_fields": list(fam["components"]),
+                "target_field": fam["totals"][0],
+                "tolerance": 0.01,
+                "source": "suggested",
+            })
+            if _rule_dedupe_key(rule) not in existing_keys:
+                suggestions.append(rule)
+                existing_keys.add(_rule_dedupe_key(rule))
+                structured = True
+
+    # Strategy B — flat fallback: a single grand total summed from
+    # differently-named part fields (e.g. Total Budget = Direct + Indirect +
+    # Equipment). Only when no structured families fired and exactly one total
+    # exists, so we can't recreate the cross-category double-count above.
+    # (Summing subtotals into a grand total is a deliberate non-goal: detecting
+    # the hierarchy reliably is error-prone, and false suggestions train users
+    # to ignore the suggester.)
+    total_fields = [n for n in numeric_names if _is_total(n)]
+    if not structured and len(total_fields) == 1:
+        total_field = total_fields[0]
         parts = [
-            n for n in field_names
-            if n != total_field and (_tokens(n) & _PART_TOKENS)
+            n for n in numeric_names
+            if n != total_field and not _is_total(n) and (_tokens(n) & _PART_TOKENS)
         ]
         if len(parts) >= 2:
             rule = normalize_rule({
@@ -210,6 +330,7 @@ def suggest_rules(field_metadata: list[dict], existing_rules: list[dict]) -> lis
             })
             if _rule_dedupe_key(rule) not in existing_keys:
                 suggestions.append(rule)
+                existing_keys.add(_rule_dedupe_key(rule))
 
     # 2. date_order
     date_like = [n for n in field_names if "date" in n.lower() or _tokens(n) & {
@@ -248,6 +369,60 @@ def suggest_rules(field_metadata: list[dict], existing_rules: list[dict]) -> lis
                 existing_keys.add(_rule_dedupe_key(rule))
 
     return suggestions
+
+
+def sanitize_sum_equals_rules(
+    field_metadata: list[dict], rules: list[dict]
+) -> tuple[list[dict], list[str]]:
+    """Strip non-numeric operands from existing sum_equals rules.
+
+    Repairs rules created before the suggester gained a numeric gate — e.g. a
+    text field ("Educational Materials Target Audience") summed into a numeric
+    total, where every evaluation is silently dropped as unparseable.
+
+    Returns ``(cleaned_rules, notes)`` where ``notes`` is a human-readable list
+    of what changed. A sum_equals rule whose target is non-numeric, or which
+    drops below two numeric source fields, is removed entirely (a sum needs at
+    least two operands). Non-sum rules pass through untouched.
+
+    Fields absent from ``field_metadata`` (renamed/deleted) are left in place —
+    we can't judge their type, and the validator already tolerates them.
+    """
+    meta_by_name = {f.get("key"): f for f in field_metadata if f.get("key")}
+
+    def _numeric(name: str) -> bool:
+        meta = meta_by_name.get(name)
+        if meta is None:
+            return True  # unknown field — don't touch
+        return _is_numeric_field(meta)
+
+    cleaned: list[dict] = []
+    notes: list[str] = []
+    for rule in rules:
+        if rule.get("type") != "sum_equals":
+            cleaned.append(rule)
+            continue
+        target = rule.get("target_field")
+        sources = list(rule.get("source_fields") or [])
+        if target and not _numeric(target):
+            notes.append(f"dropped sum_equals (non-numeric target '{target}')")
+            continue
+        removed = [s for s in sources if not _numeric(s)]
+        if not removed:
+            cleaned.append(rule)
+            continue
+        kept = [s for s in sources if _numeric(s)]
+        if len(kept) < 2:
+            notes.append(
+                f"dropped sum_equals -> '{target}' (only {len(kept)} numeric "
+                f"operand(s) left after removing {removed})"
+            )
+            continue
+        new_rule = dict(rule)
+        new_rule["source_fields"] = kept
+        cleaned.append(new_rule)
+        notes.append(f"removed {removed} from sum_equals -> '{target}'")
+    return cleaned, notes
 
 
 def _rule_dedupe_key(rule: dict) -> tuple:

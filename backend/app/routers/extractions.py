@@ -2108,9 +2108,18 @@ async def mark_rule_false_positive(
 async def suggest_cross_field_rules(uuid: str, user: User = Depends(get_current_user)) -> dict:
     """Propose cross-field rules from the search set's field metadata."""
     from app.services.cross_field_rules import suggest_rules
-    from app.services.search_set_service import get_extraction_field_metadata
+    from app.services.search_set_service import (
+        get_extraction_field_metadata,
+        infer_numeric_fields,
+    )
 
     ss = await _get_search_set_or_404(uuid, user)
     field_metadata = await get_extraction_field_metadata(ss.uuid)
+    # Stamp a data-driven numeric/text verdict (from past validation runs) onto
+    # each field so the suggester won't sum a text field into a numeric total.
+    numeric_by_field = await infer_numeric_fields(ss.uuid)
+    for fm in field_metadata:
+        if fm.get("key") in numeric_by_field:
+            fm["is_numeric"] = numeric_by_field[fm["key"]]
     suggestions = suggest_rules(field_metadata, ss.normalized_cross_field_rules())
     return {"suggestions": suggestions}
