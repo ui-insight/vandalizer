@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, type ComponentType } from 'react'
 import { Link } from '@tanstack/react-router'
 import { Footer } from '../components/layout/Footer'
+import { PresentSidebar } from './present/components/PresentSidebar'
 import {
   BookOpen,
   Server,
@@ -657,6 +658,9 @@ export default function Docs() {
             className="absolute top-16 right-0 w-72 bg-[#0a0a0a] border-l border-white/10 h-full overflow-y-auto p-6"
             onClick={(e) => e.stopPropagation()}
           >
+            <div className="mb-4">
+              <PresentSidebar onNavigate={() => setMobileMenuOpen(false)} />
+            </div>
             <nav className="space-y-1">
               {sections.map((s) => {
                 const Icon = s.icon
@@ -684,8 +688,11 @@ export default function Docs() {
       <div className="pt-16 flex max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Sticky sidebar TOC — desktop only */}
         <aside className="hidden lg:block w-64 shrink-0 pr-8">
-          <nav className="sticky top-24 space-y-1">
-            {sections.map((s) => {
+          <div className="sticky top-24 space-y-4">
+            <PresentSidebar />
+            <hr className="border-white/10" />
+            <nav className="space-y-1">
+              {sections.map((s) => {
               const Icon = s.icon
               return (
                 <a
@@ -701,8 +708,9 @@ export default function Docs() {
                   {s.label}
                 </a>
               )
-            })}
-          </nav>
+              })}
+            </nav>
+          </div>
         </aside>
 
         {/* Content */}

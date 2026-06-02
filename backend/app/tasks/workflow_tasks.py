@@ -71,6 +71,128 @@ def _notify_approval_reviewers_sync(
                 logger.exception("Failed to send approval email to %s", user_id)
 
 
+def _bson_safe(value):
+    """Coerce arbitrary step output into a MongoDB-storable shape.
+
+    `data_for_review` is whatever the previous step emitted, which can include
+    bytes, sets, tuples, or custom objects that pymongo cannot encode. A failed
+    insert used to escape uncaught and leave the run frozen in "running" with no
+    approval record, so anything we can't confidently store is stringified
+    rather than allowed to raise.
+    """
+    import datetime as _dt
+
+    from bson import ObjectId
+
+    if value is None or isinstance(value, (str, bool, int, float, _dt.datetime, ObjectId)):
+        return value
+    if isinstance(value, dict):
+        return {str(k): _bson_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_bson_safe(v) for v in value]
+    if isinstance(value, bytes):
+        return value.decode("utf-8", "replace")
+    return str(value)
+
+
+def _pause_for_approval(db, final_output, engine, workflow_id, workflow_result_id):
+    """Persist the approval request and flip the run to ``pending_approval``.
+
+    Extracted from :func:`execute_workflow_task` so the whole sequence runs
+    under a single guard in the caller: any failure here must surface as an
+    error status instead of silently freezing the run.
+    """
+    import uuid as uuid_mod
+    from datetime import datetime, timedelta, timezone
+
+    from bson import ObjectId
+
+    from app.services.approval_service import (
+        detect_artifact_kind,
+        resolve_assignees_sync,
+    )
+
+    # Find the step index (count of executed steps)
+    nodes = engine.get_topological_order()
+    step_index = 0
+    for idx, node in enumerate(nodes):
+        if node.name == "Approval":
+            step_index = idx
+            break
+
+    approval_uuid = str(uuid_mod.uuid4())
+    workflow_doc = db.workflow.find_one({"_id": ObjectId(workflow_id)})
+    workflow_name = workflow_doc.get("name", "Workflow") if workflow_doc else "Workflow"
+    result_doc = db.workflow_result.find_one({"_id": ObjectId(workflow_result_id)}) or {}
+    source_doc_uuids = (result_doc.get("input_context") or {}).get("doc_uuids", [])
+
+    assignee_role = final_output.get("_assignee_role", "specific_users")
+    explicit_users = final_output.get("_assigned_to_user_ids", []) or []
+    resolved_assignees = resolve_assignees_sync(
+        db, assignee_role, workflow_doc or {}, explicit_users,
+    )
+
+    sla_days = final_output.get("_sla_days")
+    expires_at = None
+    if isinstance(sla_days, (int, float)) and sla_days > 0:
+        expires_at = datetime.now(timezone.utc) + timedelta(days=float(sla_days))
+
+    artifact_data = final_output.get("_data_for_review")
+    artifact_kind = detect_artifact_kind(artifact_data)
+    safe_artifact = _bson_safe(artifact_data)
+
+    db.approval_request.insert_one({
+        "uuid": approval_uuid,
+        "workflow_result_id": ObjectId(workflow_result_id),
+        "workflow_id": ObjectId(workflow_id),
+        "step_index": step_index,
+        "step_name": "Approval",
+        "workflow_name": workflow_name,
+        "requester_user_id": (workflow_doc or {}).get("user_id"),
+        "team_id": (workflow_doc or {}).get("team_id"),
+        "source_doc_uuids": source_doc_uuids,
+        "artifact_kind": artifact_kind,
+        "data_for_review": safe_artifact if isinstance(safe_artifact, dict) else {"value": safe_artifact},
+        "edited_artifact": None,
+        "review_instructions": final_output.get("_review_instructions", ""),
+        "assignee_role": assignee_role,
+        "assigned_to_user_ids": resolved_assignees,
+        "expires_at": expires_at,
+        "timeout_action": final_output.get("_timeout_action", "none"),
+        "escalation_user_ids": final_output.get("_escalation_user_ids", []),
+        "status": "pending",
+        "reviewer_user_id": None,
+        "reviewer_comments": "",
+        "decision_at": None,
+        "expired_at": None,
+        "escalated_at": None,
+        "created_at": datetime.now(timezone.utc),
+    })
+
+    db.workflow_result.update_one(
+        {"_id": ObjectId(workflow_result_id)},
+        {"$set": {
+            "status": "pending_approval",
+            "paused_at_step_index": step_index,
+            "approval_request_id": approval_uuid,
+            "current_step_name": "Approval",
+            "current_step_detail": "Waiting for human review",
+        }},
+    )
+
+    review_instructions = final_output.get("_review_instructions", "")
+    _notify_approval_reviewers_sync(
+        db, resolved_assignees, workflow_name, "Approval",
+        review_instructions, approval_uuid,
+    )
+
+    return {
+        "status": "pending_approval",
+        "approval_uuid": approval_uuid,
+        "result_id": workflow_result_id,
+    }
+
+
 def _get_db():
     """Get sync pymongo database handle (shared per-process client)."""
     from app.tasks import get_sync_db
@@ -145,6 +267,18 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
                             "searchtype": "extraction",
                         }))
                         task_data["keys"] = [item["searchphrase"] for item in items]
+                        # Preserve per-field validation (enum_values) and optional
+                        # designations (is_optional) so workflow extraction honors the
+                        # same constraints as a standalone run. Without this, the saved
+                        # set's optional/enum metadata is silently dropped at execution.
+                        task_data["field_metadata"] = [
+                            {
+                                "key": item["searchphrase"],
+                                "is_optional": item.get("is_optional", False),
+                                "enum_values": item.get("enum_values", []),
+                            }
+                            for item in items
+                        ]
                         # UI is mutually exclusive between saved-set and manual fields,
                         # but older workflows may have both persisted. Drop stale manual
                         # fields so the saved set is unambiguously the source of truth.
@@ -388,94 +522,35 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
                 pass
         raise
 
-    # Check if workflow paused for approval
+    # Check if workflow paused for approval. The handling below must run under a
+    # guard: it used to sit outside any try/except, so a single failure (a
+    # non-BSON-serializable review artifact, a notifier error, etc.) escaped
+    # uncaught and left the run frozen in "running" with no approval record and
+    # no notification. Surface any failure as an error status instead.
     if isinstance(final_output, dict) and final_output.get("_approval_pause"):
-        import uuid as uuid_mod
-        from datetime import datetime, timedelta, timezone
-
-        from app.services.approval_service import (
-            detect_artifact_kind,
-            resolve_assignees_sync,
-        )
-
-        # Find the step index (count of executed steps)
-        nodes = engine.get_topological_order()
-        step_index = 0
-        for idx, node in enumerate(nodes):
-            if node.name == "Approval":
-                step_index = idx
-                break
-
-        approval_uuid = str(uuid_mod.uuid4())
-        workflow_doc = db.workflow.find_one({"_id": ObjectId(workflow_id)})
-        workflow_name = workflow_doc.get("name", "Workflow") if workflow_doc else "Workflow"
-        result_doc = db.workflow_result.find_one({"_id": ObjectId(workflow_result_id)}) or {}
-        source_doc_uuids = (result_doc.get("input_context") or {}).get("doc_uuids", [])
-
-        assignee_role = final_output.get("_assignee_role", "specific_users")
-        explicit_users = final_output.get("_assigned_to_user_ids", []) or []
-        resolved_assignees = resolve_assignees_sync(
-            db, assignee_role, workflow_doc or {}, explicit_users,
-        )
-
-        sla_days = final_output.get("_sla_days")
-        expires_at = None
-        if isinstance(sla_days, (int, float)) and sla_days > 0:
-            expires_at = datetime.now(timezone.utc) + timedelta(days=float(sla_days))
-
-        artifact_data = final_output.get("_data_for_review")
-        artifact_kind = detect_artifact_kind(artifact_data)
-
-        db.approval_request.insert_one({
-            "uuid": approval_uuid,
-            "workflow_result_id": ObjectId(workflow_result_id),
-            "workflow_id": ObjectId(workflow_id),
-            "step_index": step_index,
-            "step_name": "Approval",
-            "workflow_name": workflow_name,
-            "requester_user_id": (workflow_doc or {}).get("user_id"),
-            "team_id": (workflow_doc or {}).get("team_id"),
-            "source_doc_uuids": source_doc_uuids,
-            "artifact_kind": artifact_kind,
-            "data_for_review": artifact_data if isinstance(artifact_data, dict) else {"value": artifact_data},
-            "edited_artifact": None,
-            "review_instructions": final_output.get("_review_instructions", ""),
-            "assignee_role": assignee_role,
-            "assigned_to_user_ids": resolved_assignees,
-            "expires_at": expires_at,
-            "timeout_action": final_output.get("_timeout_action", "none"),
-            "escalation_user_ids": final_output.get("_escalation_user_ids", []),
-            "status": "pending",
-            "reviewer_user_id": None,
-            "reviewer_comments": "",
-            "decision_at": None,
-            "expired_at": None,
-            "escalated_at": None,
-            "created_at": datetime.now(timezone.utc),
-        })
-
-        db.workflow_result.update_one(
-            {"_id": ObjectId(workflow_result_id)},
-            {"$set": {
-                "status": "pending_approval",
-                "paused_at_step_index": step_index,
-                "approval_request_id": approval_uuid,
-                "current_step_name": "Approval",
-                "current_step_detail": "Waiting for human review",
-            }},
-        )
-
-        review_instructions = final_output.get("_review_instructions", "")
-        _notify_approval_reviewers_sync(
-            db, resolved_assignees, workflow_name, "Approval",
-            review_instructions, approval_uuid,
-        )
-
-        return {
-            "status": "pending_approval",
-            "approval_uuid": approval_uuid,
-            "result_id": workflow_result_id,
-        }
+        try:
+            return _pause_for_approval(
+                db, final_output, engine, workflow_id, workflow_result_id,
+            )
+        except Exception as e:
+            logger.exception(
+                "Approval gate handling failed for workflow %s (result %s)",
+                workflow_id, workflow_result_id,
+            )
+            db.workflow_result.update_one(
+                {"_id": ObjectId(workflow_result_id)},
+                {"$set": {"status": "error", "error": f"Approval gate failed: {e}"}},
+            )
+            if activity_id:
+                try:
+                    from datetime import datetime, timezone
+                    db.activity_event.update_one(
+                        {"_id": ObjectId(activity_id)},
+                        {"$set": {"status": "failed", "error": str(e)[:2000], "finished_at": datetime.now(timezone.utc)}},
+                    )
+                except Exception:
+                    pass
+            raise
 
     # Aggregate citations from every step that produced retrieved_sources so
     # the frontend can render them next to the workflow output without

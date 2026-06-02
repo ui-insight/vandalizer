@@ -154,6 +154,32 @@ export function getUserDetail(userId: string, days: number = 30) {
   return apiFetch<UserDetailResponse>(`/api/admin/users/${encodeURIComponent(userId)}/detail?days=${days}`)
 }
 
+// User Activity History (combined audit trail + activity telemetry)
+
+export interface UserHistoryItem {
+  timestamp: string | null
+  source: 'audit' | 'activity'
+  action: string
+  title: string | null
+  resource_type: string | null
+  resource_id: string | null
+  status: string | null
+  ip_address: string | null
+  detail: Record<string, unknown>
+}
+
+export interface UserHistoryResponse {
+  items: UserHistoryItem[]
+  total: number
+  capped: boolean
+}
+
+export function getUserHistory(userId: string, days: number = 90, skip: number = 0, limit: number = 50) {
+  return apiFetch<UserHistoryResponse>(
+    `/api/admin/users/${encodeURIComponent(userId)}/history?days=${days}&skip=${skip}&limit=${limit}`,
+  )
+}
+
 // Workflows
 
 export interface WorkflowEventItem {

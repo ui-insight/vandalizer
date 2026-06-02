@@ -1,6 +1,7 @@
 """Admin API routes  - usage stats, leaderboards, system config management."""
 
 import datetime
+import logging
 import math
 import re
 from typing import Optional
@@ -14,12 +15,15 @@ from app.dependencies import get_current_user
 from app.models.activity import ActivityEvent
 from app.models.audit_log import AdminAuditLog
 from app.models.system_config import SystemConfig
+from app.services import audit_service
 from app.services.llm_service import clear_agent_caches, get_agent_model
 from app.services.version_service import get_update_status
 from app.utils.encryption import decrypt_value, encrypt_value
 from app.models.team import Team, TeamMembership
 from app.models.user import User
 from app.models.document import SmartDocument
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -1062,6 +1066,135 @@ async def user_detail(
         previous_period=previous_period,
         recent_workflows=recent_workflows,
     )
+
+
+# ---------------------------------------------------------------------------
+# 3d. GET /users/{user_id}/history  - Full per-user activity timeline
+# ---------------------------------------------------------------------------
+
+# Max rows pulled from each store before merging. A single user's audit +
+# activity rows within any reasonable window stay well under this; if either
+# store hits the cap we flag `capped` so the UI can prompt a narrower range
+# rather than silently dropping older events.
+HISTORY_FETCH_CAP = 1000
+
+
+class UserHistoryItem(BaseModel):
+    timestamp: Optional[datetime.datetime] = None
+    source: str  # "audit" | "activity"
+    action: str  # audit: e.g. "user.login"; activity: e.g. "workflow_run"
+    title: Optional[str] = None
+    resource_type: Optional[str] = None
+    resource_id: Optional[str] = None
+    status: Optional[str] = None  # activity status; None for audit rows
+    ip_address: Optional[str] = None
+    detail: dict = {}
+
+
+class UserHistoryResponse(BaseModel):
+    items: list[UserHistoryItem]
+    total: int
+    capped: bool
+
+
+@router.get("/users/{user_id}/history", response_model=UserHistoryResponse)
+async def user_history(
+    user_id: str,
+    days: int = Query(default=90, ge=1, le=MAX_ANALYTICS_DAYS),
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=200),
+    user: User = Depends(get_current_user),
+):
+    """Full chronological activity history for a single user.
+
+    Merges the immutable audit trail (``AuditLog``, who-did-what) with feature
+    telemetry (``ActivityEvent``, conversations/searches/workflow runs) into one
+    reverse-chronological feed. Super-admin only, for leadership auditing.
+    """
+    await _require_superadmin(user)
+
+    target_user = await User.find_one(User.user_id == user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    cutoff = datetime.datetime.utcnow() - datetime.timedelta(days=days)
+
+    # Immutable audit trail (who-did-what), filtered to this actor.
+    audit_entries, _ = await audit_service.query_audit_log(
+        actor_user_id=user_id,
+        start_time=cutoff,
+        skip=0,
+        limit=HISTORY_FETCH_CAP,
+    )
+
+    # Feature telemetry for this user.
+    activity_events = (
+        await ActivityEvent.find(
+            {"user_id": user_id, "started_at": {"$gte": cutoff}}
+        )
+        .sort(-ActivityEvent.started_at)
+        .limit(HISTORY_FETCH_CAP)
+        .to_list()
+    )
+
+    capped = (
+        len(audit_entries) >= HISTORY_FETCH_CAP
+        or len(activity_events) >= HISTORY_FETCH_CAP
+    )
+    if capped:
+        logger.warning(
+            "user_history hit fetch cap for user_id=%s (audit=%d activity=%d, days=%d)",
+            user_id,
+            len(audit_entries),
+            len(activity_events),
+            days,
+        )
+
+    items: list[UserHistoryItem] = []
+    for e in audit_entries:
+        items.append(
+            UserHistoryItem(
+                timestamp=e.timestamp,
+                source="audit",
+                action=e.action,
+                title=e.resource_name,
+                resource_type=e.resource_type,
+                resource_id=e.resource_id,
+                status=None,
+                ip_address=e.ip_address,
+                detail=e.detail or {},
+            )
+        )
+    for ev in activity_events:
+        items.append(
+            UserHistoryItem(
+                timestamp=ev.started_at,
+                source="activity",
+                action=ev.type,
+                title=ev.title,
+                resource_type=ev.type,
+                resource_id=str(ev.id),
+                status=ev.status,
+                ip_address=None,
+                detail={
+                    "tokens_input": ev.tokens_input or 0,
+                    "tokens_output": ev.tokens_output or 0,
+                    "steps_completed": ev.steps_completed or 0,
+                    "steps_total": ev.steps_total or 0,
+                    "error": ev.error,
+                },
+            )
+        )
+
+    # Newest first; rows with no timestamp sort to the end.
+    items.sort(
+        key=lambda r: r.timestamp or datetime.datetime.min,
+        reverse=True,
+    )
+    total = len(items)
+    page = items[skip : skip + limit]
+
+    return UserHistoryResponse(items=page, total=total, capped=capped)
 
 
 # ---------------------------------------------------------------------------

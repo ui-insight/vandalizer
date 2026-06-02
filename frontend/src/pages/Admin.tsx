@@ -22,7 +22,7 @@ import type { ThemeConfig } from '../api/config'
 import { useBranding, DEFAULT_ORG_NAME } from '../contexts/BrandingContext'
 import {
   getUsageStats, getUsageTimeseries, getUserLeaderboard, getTeamLeaderboard,
-  getTeamDetail, getUserDetail,
+  getTeamDetail, getUserDetail, getUserHistory,
   getWorkflowEvents, getSystemConfig, updateSystemConfig, updateCompliancePolicyConfig,
   addModel, updateModel, deleteModel, setDefaultModel, testOcr, testModel, testPrompt, probeModel, addOAuthProvider,
   updateOAuthProvider, deleteOAuthProvider, updateAuthMethods,
@@ -52,7 +52,7 @@ import { PRE_SURVEY_FIELDS } from './Demo'
 import { SurveyFieldRenderer } from '../components/survey/SurveyFieldRenderer'
 import type {
   UsageStats, TimeseriesResponse, UserLeaderboardItem, TeamLeaderboardItem,
-  TeamDetailResponse, UserDetailResponse,
+  TeamDetailResponse, UserDetailResponse, UserHistoryItem,
   PaginatedWorkflows, SystemConfigData,
   QualitySummary, QualityTimelinePoint, RegressionResult,
   QualityAlert, QualityItem, QualityItemDetail,
@@ -741,6 +741,152 @@ function UserDrillDown({ userId, onBack }: { userId: string; onBack: () => void 
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* Full activity history (audit trail + activity telemetry) */}
+      <UserActivityHistory userId={userId} email={data.email} />
+    </div>
+  )
+}
+
+const HISTORY_PAGE_SIZE = 50
+
+function SourceBadge({ source }: { source: 'audit' | 'activity' }) {
+  const c = source === 'audit'
+    ? { bg: '#e2e8f0', text: '#334155', label: 'Audit' }
+    : { bg: '#dbeafe', text: '#1e40af', label: 'Activity' }
+  return (
+    <span style={{
+      display: 'inline-block', padding: '1px 8px', borderRadius: 9999,
+      fontSize: 10, fontWeight: 700, backgroundColor: c.bg, color: c.text,
+      textTransform: 'uppercase', letterSpacing: 0.5,
+    }}>
+      {c.label}
+    </span>
+  )
+}
+
+function UserActivityHistory({ userId, email }: { userId: string; email: string | null }) {
+  const [items, setItems] = useState<UserHistoryItem[]>([])
+  const [total, setTotal] = useState(0)
+  const [capped, setCapped] = useState(false)
+  const [days, setDays] = useState(90)
+  const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Reload from scratch whenever the time range changes.
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+    getUserHistory(userId, days, 0, HISTORY_PAGE_SIZE)
+      .then(res => {
+        if (cancelled) return
+        setItems(res.items)
+        setTotal(res.total)
+        setCapped(res.capped)
+      })
+      .catch(e => { if (!cancelled) setError(e?.message || 'Failed to load history') })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [userId, days])
+
+  const loadMore = useCallback(() => {
+    setLoadingMore(true)
+    getUserHistory(userId, days, items.length, HISTORY_PAGE_SIZE)
+      .then(res => {
+        setItems(prev => [...prev, ...res.items])
+        setTotal(res.total)
+        setCapped(res.capped)
+      })
+      .catch(e => setError(e?.message || 'Failed to load history'))
+      .finally(() => setLoadingMore(false))
+  }, [userId, days, items.length])
+
+  const startTime = useMemo(
+    () => new Date(Date.now() - days * 86400000).toISOString(),
+    [days],
+  )
+
+  return (
+    <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
+      <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 15, fontWeight: 600 }}>Activity History</div>
+        <div style={{ flex: 1 }} />
+        <TimeRangeSelector value={days} onChange={v => setDays(typeof v === 'number' ? v : 90)} />
+        <a
+          href={auditApi.exportAuditLog({ actor_user_id: userId, start_time: startTime })}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '6px 12px', borderRadius: 'var(--ui-radius, 12px)',
+            border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer',
+            fontSize: 13, fontWeight: 600, color: '#374151', textDecoration: 'none',
+          }}
+          title="Download this user's immutable audit trail as CSV"
+        >
+          <Download size={14} /> Export audit trail
+        </a>
+      </div>
+
+      {capped && (
+        <div style={{ padding: '10px 20px', background: '#fffbeb', borderBottom: '1px solid #fde68a', fontSize: 13, color: '#92400e', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <AlertCircle size={14} /> Showing the most recent events only — narrow the time range to see older history.
+        </div>
+      )}
+
+      {loading ? (
+        <div style={{ padding: 32, textAlign: 'center', color: '#6b7280', fontSize: 14 }}>Loading activity history...</div>
+      ) : error ? (
+        <div style={{ padding: 32, textAlign: 'center', color: '#dc2626', fontSize: 14 }}>Error: {error}</div>
+      ) : items.length === 0 ? (
+        <div style={{ padding: 32, textAlign: 'center', color: '#6b7280', fontSize: 14 }}>No recorded activity in this period.</div>
+      ) : (
+        <>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>When</th>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Source</th>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Action</th>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Resource</th>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Status</th>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>IP</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((it, i) => (
+                <tr key={`${it.source}-${it.resource_id ?? ''}-${it.timestamp ?? ''}-${i}`} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                  <td style={{ padding: '10px 16px', fontSize: 13, color: '#6b7280', whiteSpace: 'nowrap' }}>{formatDateTime(it.timestamp)}</td>
+                  <td style={{ padding: '10px 16px' }}><SourceBadge source={it.source} /></td>
+                  <td style={{ padding: '10px 16px', fontSize: 13, fontFamily: 'ui-monospace, monospace' }}>{it.action}</td>
+                  <td style={{ padding: '10px 16px', fontSize: 13 }}>
+                    {it.title || (it.resource_type ? <span style={{ color: '#9ca3af' }}>{it.resource_type}</span> : '-')}
+                  </td>
+                  <td style={{ padding: '10px 16px' }}>{it.status ? <StatusBadge status={it.status} /> : <span style={{ color: '#d1d5db' }}>—</span>}</td>
+                  <td style={{ padding: '10px 16px', fontSize: 12, color: '#6b7280', fontFamily: 'ui-monospace, monospace' }}>{it.ip_address || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div style={{ padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 12, borderTop: '1px solid #f3f4f6' }}>
+            <span style={{ fontSize: 12, color: '#9ca3af' }}>Showing {items.length} of {total}{email ? ` · ${email}` : ''}</span>
+            <div style={{ flex: 1 }} />
+            {items.length < total && (
+              <button
+                onClick={loadMore}
+                disabled={loadingMore}
+                style={{
+                  padding: '6px 14px', borderRadius: 'var(--ui-radius, 12px)',
+                  border: '1px solid #e5e7eb', background: '#fff',
+                  cursor: loadingMore ? 'wait' : 'pointer', fontSize: 13, fontWeight: 600, color: '#374151',
+                }}
+              >
+                {loadingMore ? 'Loading...' : 'Load more'}
+              </button>
+            )}
+          </div>
+        </>
       )}
     </div>
   )
