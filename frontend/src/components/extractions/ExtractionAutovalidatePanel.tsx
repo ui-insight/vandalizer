@@ -36,6 +36,8 @@ import { WhenToRunDisclosure } from '../shared/WhenToRunDisclosure'
 import { useToast } from '../../contexts/ToastContext'
 import { ExtractionAutovalidateWizard } from './ExtractionAutovalidateWizard'
 import { ExtractionOptimizationHistoryPanel } from './ExtractionOptimizationHistoryPanel'
+import { ExtractionTrialExplainerModal } from './ExtractionTrialExplainerModal'
+import { summariseExtractionTrialConfig } from './extractionTrialExplanations'
 import { TermDef } from '../shared/TermDef'
 import { DOMAIN_LABELS } from '../shared/labels'
 
@@ -167,6 +169,8 @@ export function ExtractionAutovalidatePanel({ searchSetUuid, canManage, onApplie
   // Falls back to the legacy direct-apply path when the run lacks preview
   // data (older runs that pre-date the rollup).
   const [showApplyPreview, setShowApplyPreview] = useState(false)
+  // Trial tapped open in the plain-English explainer modal.
+  const [selectedTrial, setSelectedTrial] = useState<ExtractionTrial | null>(null)
 
   const handleApply = () => {
     if (!run) return
@@ -445,8 +449,13 @@ export function ExtractionAutovalidatePanel({ searchSetUuid, canManage, onApplie
             <ExtractionTrialRow trial={t} />
           )}
           getRowKey={(t) => t.trial_id}
+          onRowClick={setSelectedTrial}
+          title="Trials — tap any for a plain-English breakdown"
         />
       )}
+
+      {/* Plain-English explainer for a tapped trial. */}
+      <ExtractionTrialExplainerModal trial={selectedTrial} onClose={() => setSelectedTrial(null)} />
       <ReproducibilityPanel
         run={{
           judge_model: displayedRun.judge_model,
@@ -903,9 +912,19 @@ function PostApplyDelta({
   after: NonNullable<ExtractionOptimizationRun['post_apply_validation']>
 }) {
   const beforePct = before != null ? Math.round(before * 100) : null
-  const afterScore = after.score ?? after.accuracy
-  const afterPct = afterScore != null ? Math.round(afterScore * 100) : null
-  const delta = (beforePct != null && afterPct != null) ? afterPct - beforePct : null
+  // Certified score = the authoritative, sample-size–penalized number that
+  // also drives the official quality tile. This is the headline — once it's
+  // here the user never needs the standalone validation panel for a score.
+  const certified = after.score ?? after.accuracy
+  const certifiedPct = certified != null ? Math.round(certified * 100) : null
+  // Delta vs the optimizer's (un-penalized) estimate uses the un-penalized
+  // measured score, so a tiny test set's discount doesn't masquerade as a
+  // quality regression in the comparison.
+  const comparable = after.raw_score ?? after.score ?? after.accuracy
+  const comparablePct = comparable != null ? Math.round(comparable * 100) : null
+  const delta = (beforePct != null && comparablePct != null) ? comparablePct - beforePct : null
+  const penalty = after.score_breakdown
+  const penalized = penalty != null && penalty.sample_size_penalty > 0
   return (
     <div style={{
       padding: 12, borderRadius: 8,
@@ -916,18 +935,26 @@ function PostApplyDelta({
         fontSize: 10, color: '#60a5fa', textTransform: 'uppercase', letterSpacing: 0.5,
         fontWeight: 600, marginBottom: 6,
       }}>
-        Re-validated after apply
+        Certified score · measured after apply
       </div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-        {beforePct != null && (
+        {certifiedPct != null && (
           <span style={{ fontSize: 12, color: '#aaa' }}>
-            Optimizer score: <b style={{ color: '#e5e5e5' }}>{beforePct}%</b>
+            Quality score:{' '}
+            <b style={{ color: '#fff', fontSize: 16 }}>{certifiedPct}%</b>
+            {after.quality_tier && (
+              <span style={{
+                marginLeft: 6, fontSize: 10, textTransform: 'capitalize',
+                color: '#9ca3af', border: '1px solid #3a3a3a', borderRadius: 4, padding: '1px 5px',
+              }}>
+                {after.quality_tier}
+              </span>
+            )}
           </span>
         )}
-        {afterPct != null && (
+        {beforePct != null && (
           <span style={{ fontSize: 12, color: '#aaa' }}>
-            On full test set after apply:{' '}
-            <b style={{ color: '#fff', fontSize: 16 }}>{afterPct}%</b>
+            Optimizer estimate: <b style={{ color: '#e5e5e5' }}>{beforePct}%</b>
           </span>
         )}
         {delta != null && (
@@ -935,15 +962,26 @@ function PostApplyDelta({
             marginLeft: 'auto', fontSize: 12, fontWeight: 600,
             color: delta >= 0 ? '#22c55e' : '#ef4444',
           }}>
-            {delta >= 0 ? '+' : ''}{delta}pp vs optimizer score
+            {delta >= 0 ? '+' : ''}{delta}pp vs estimate
           </span>
         )}
       </div>
       <div style={{ marginTop: 6, fontSize: 11, color: '#888' }}>
-        Run against {after.test_case_count} test case{after.test_case_count === 1 ? '' : 's'} on{' '}
+        This is the official quality score — no need to run validation separately.
+        Measured on {after.test_case_count} test case{after.test_case_count === 1 ? '' : 's'}
+        {after.num_runs ? ` × ${after.num_runs} runs` : ''} on{' '}
         {new Date(after.ran_at).toLocaleString()}.
         {after.source === 'apply_on_finish' && ' Triggered by "apply on finish".'}
       </div>
+      {penalized && penalty && (
+        <div style={{ marginTop: 6, fontSize: 11, color: '#fbbf24' }}>
+          Discounted for small sample size ({Math.round(penalty.raw_score)}% → {Math.round(penalty.final_score)}%).
+          Add{penalty.test_cases_needed > 0 ? ` ${penalty.test_cases_needed} more test case${penalty.test_cases_needed === 1 ? '' : 's'}` : ''}
+          {penalty.test_cases_needed > 0 && penalty.runs_needed > 0 ? ' and' : ''}
+          {penalty.runs_needed > 0 ? ` ${penalty.runs_needed} more run${penalty.runs_needed === 1 ? '' : 's'}` : ''}
+          {' '}to certify at full confidence.
+        </div>
+      )}
     </div>
   )
 }

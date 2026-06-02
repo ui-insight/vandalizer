@@ -1103,15 +1103,23 @@ async def run_post_apply_validation(
     search_set_uuid: str,
     user_id: str,
     source: str,
-    num_runs: int = 1,
+    num_runs: int = 3,
 ) -> None:
     """Re-validate the test set with the freshly-applied config and persist a
     snapshot on ``run_doc.post_apply_validation``.
 
-    Closes the loop back to the user: they see the optimizer's in-run lift
-    AND the validation score on the full test set after the config was
-    applied. Without this they'd have to manually re-run validation to
-    confirm the lift held up.
+    This is the loop closure that lets the user trust the tuner without ever
+    touching the standalone validation panel. ``run_validation`` already
+    inserts the *authoritative* ``ValidationRun`` (the unified 0..100 score
+    with the low-sample-size discount applied) and updates the item's official
+    quality tier — so after this runs, the optimizer card and the quality tile
+    are reading the same measurement. We mirror that certified number onto the
+    run doc (converted to the 0..1 unit scale the panel's baselines use) rather
+    than the raw accuracy we used to store, so the two surfaces never disagree.
+
+    Defaults to ``num_runs=3`` so the certified score isn't dragged down by the
+    sample-size penalty (which only fully clears at 3 runs); a 1-run check would
+    look artificially worse than the optimizer's own headline.
 
     Failures are logged and swallowed — apply already succeeded; the delta
     is a nice-to-have, not a precondition for the run being valid.
@@ -1123,14 +1131,29 @@ async def run_post_apply_validation(
             user_id=user_id,
             num_runs=num_runs,
         )
+        # ``score``/``score_breakdown``/``quality_tier`` are stamped onto the
+        # result by run_validation from the authoritative ValidationRun it just
+        # persisted. ``score`` is 0..100; the panel works in 0..1, so divide.
+        breakdown = result.get("score_breakdown") or {}
+        certified_pct = result.get("score")
+        raw_pct = breakdown.get("raw_score", certified_pct)
         run_doc.post_apply_validation = {
             "accuracy": result.get("aggregate_accuracy"),
             "consistency": result.get("aggregate_consistency"),
             "cross_field_pass_rate": result.get("cross_field_score"),
-            # Use aggregate accuracy as the headline score — same signal that
-            # ``optimized_score`` ultimately reflects (a 0..1 "how often did
-            # the model get the right answer"), so the delta is apples-to-apples.
-            "score": result.get("aggregate_accuracy"),
+            # Authoritative, sample-size–penalized score (0..1 unit) — identical
+            # to the official quality tile so the two surfaces never disagree.
+            "score": (
+                certified_pct / 100.0 if certified_pct is not None
+                else result.get("aggregate_accuracy")
+            ),
+            # Un-penalized score (0..1 unit). The optimizer's headline carries no
+            # sample-size penalty, so the delta-vs-optimizer comparison uses this
+            # to stay apples-to-apples; the penalty is disclosed separately.
+            "raw_score": (raw_pct / 100.0) if raw_pct is not None else None,
+            "score_breakdown": breakdown or None,
+            "quality_tier": result.get("quality_tier"),
+            "num_runs": num_runs,
             "test_case_count": len(result.get("test_cases") or []),
             "ran_at": datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
             "source": source,

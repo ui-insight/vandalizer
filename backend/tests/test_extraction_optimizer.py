@@ -822,3 +822,69 @@ async def test_reap_one_handles_naive_timestamps():
     run = _reapable_run(status="running", started_at=naive_old)
     out = await reap_one(run)
     assert out.status == "failed"
+
+
+@pytest.mark.asyncio
+async def test_run_post_apply_validation_stores_certified_score():
+    """Post-apply validation mirrors the authoritative (sample-size–penalized)
+    score onto the run doc in 0..1 unit scale, alongside the un-penalized raw
+    score, the tier, and the penalty breakdown — so the optimizer card and the
+    official quality tile read the same number."""
+    run_doc = MagicMock()
+    run_doc.uuid = "run1"
+    run_doc.save = AsyncMock()
+
+    fake_result = {
+        "aggregate_accuracy": 0.9,
+        "aggregate_consistency": 0.8,
+        "cross_field_score": 0.75,
+        "score": 70.0,  # 0..100, sample-size penalized (the certified score)
+        "score_breakdown": {
+            "raw_score": 88.0, "final_score": 70.0, "sample_size_penalty": 18.0,
+            "sample_size_factor": 0.67, "num_test_cases": 2, "num_runs": 3,
+            "test_cases_needed": 1, "runs_needed": 0,
+        },
+        "quality_tier": "good",
+        "test_cases": [{"a": 1}, {"b": 2}],
+    }
+
+    with patch(
+        "app.services.extraction_validation_service.run_validation",
+        new=AsyncMock(return_value=fake_result),
+    ):
+        await extraction_optimizer.run_post_apply_validation(
+            run_doc=run_doc,
+            search_set_uuid="ss1",
+            user_id="u1",
+            source="explicit_apply",
+        )
+
+    pav = run_doc.post_apply_validation
+    assert pav["score"] == pytest.approx(0.70)       # certified, unit scale
+    assert pav["raw_score"] == pytest.approx(0.88)   # un-penalized, unit scale
+    assert pav["quality_tier"] == "good"
+    assert pav["score_breakdown"]["sample_size_penalty"] == 18.0
+    assert pav["test_case_count"] == 2
+    assert pav["num_runs"] == 3
+    assert pav["source"] == "explicit_apply"
+    run_doc.save.assert_awaited()
+
+
+@pytest.mark.asyncio
+async def test_run_post_apply_validation_falls_back_to_accuracy_without_score():
+    """If run_validation somehow returns no unified score, fall back to raw
+    aggregate accuracy rather than persisting a null headline."""
+    run_doc = MagicMock()
+    run_doc.save = AsyncMock()
+
+    fake_result = {"aggregate_accuracy": 0.6, "aggregate_consistency": 0.5, "test_cases": []}
+
+    with patch(
+        "app.services.extraction_validation_service.run_validation",
+        new=AsyncMock(return_value=fake_result),
+    ):
+        await extraction_optimizer.run_post_apply_validation(
+            run_doc=run_doc, search_set_uuid="ss1", user_id="u1", source="apply_on_finish",
+        )
+
+    assert run_doc.post_apply_validation["score"] == pytest.approx(0.6)

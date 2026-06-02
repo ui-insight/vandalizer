@@ -1934,10 +1934,19 @@ async def apply_extraction_optimization(
         source="explicit_apply",
     )
 
-    # Phase 4: record this apply on the unified quality timeline.
+    # Phase 4: record this apply on the unified quality timeline. Prefer the
+    # authoritative post-apply score (0..1 unit, just stamped onto the run by
+    # run_post_apply_validation) so the timeline marker agrees with the certified
+    # quality tile; fall back to the optimizer's in-run headline only if the
+    # post-apply validation didn't run.
     try:
         from app.services import quality_service as _qs
-        score_pct = float((run.optimized_score or 0.0) * 100.0)
+        _post = run.post_apply_validation or {}
+        _post_unit = _post.get("score")
+        score_pct = (
+            float(_post_unit * 100.0) if _post_unit is not None
+            else float((run.optimized_score or 0.0) * 100.0)
+        )
         await _qs.record_optimizer_apply(
             item_kind="search_set",
             item_id=ss.uuid,

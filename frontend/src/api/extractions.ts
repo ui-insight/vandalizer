@@ -259,6 +259,11 @@ export interface ValidationV2Result {
   cross_field_score?: number | null
   cross_field_summary?: CrossFieldSummary | null
   cross_field_results?: CrossFieldRuleResult[]
+  // Certified quality score (raw aggregates after the low-sample-size
+  // discount), matching the persisted quality tile shown later.
+  score?: number | null
+  score_breakdown?: ScoreBreakdown | null
+  quality_tier?: string | null
 }
 
 export function runValidationV2(data: {
@@ -474,7 +479,28 @@ export interface PostApplyValidation {
   accuracy: number | null
   consistency: number | null
   cross_field_pass_rate?: number | null
+  /** Authoritative, sample-size–penalized score (0..1 unit) — the SAME value as
+   *  the official quality tile/grade. This is the certified post-tune score. */
   score?: number | null
+  /** Un-penalized score (0..1 unit). Used for the apples-to-apples delta vs the
+   *  optimizer's (also un-penalized) headline, so a small test set doesn't make
+   *  the certified number look like a regression. */
+  raw_score?: number | null
+  /** Penalty disclosure from quality_service (raw vs final score, how many more
+   *  test cases / runs are needed to clear the discount). Null when no penalty. */
+  score_breakdown?: {
+    raw_score: number
+    final_score: number
+    sample_size_factor: number
+    sample_size_penalty: number
+    num_test_cases: number
+    num_runs: number
+    test_cases_needed: number
+    runs_needed: number
+  } | null
+  /** Quality tier computed from the certified score (e.g. "excellent"|"good"…). */
+  quality_tier?: string | null
+  num_runs?: number
   ran_at: string
   test_case_count: number
   source: 'apply_on_finish' | 'explicit_apply'
