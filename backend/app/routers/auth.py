@@ -60,14 +60,8 @@ async def _user_response(user: User) -> UserResponse:
             current_team_uuid = team.uuid
 
     # Resolve support agent status from system config
-    is_support_agent = False
-    if user.is_admin:
-        is_support_agent = True
-    else:
-        from app.models.system_config import SystemConfig
-        config = await SystemConfig.get_config()
-        contacts = config.support_contacts or []
-        is_support_agent = any(c.get("user_id") == user.user_id for c in contacts)
+    from app.services import support_service
+    is_support_agent = await support_service.is_support_user(user)
 
     return UserResponse(
         id=str(user.id),
