@@ -1,4 +1,4 @@
-import { apiFetch, csrfHeaders } from './client'
+import { apiFetch, rawFetch } from './client'
 import type { Workflow, WorkflowStatus } from '../types/workflow'
 
 // Workflow CRUD
@@ -23,7 +23,7 @@ export function getWorkflow(id: string, shareToken?: string) {
 export function mintWorkflowShareToken(id: string) {
   return apiFetch<{ share_token: string }>(
     `/api/workflows/${id}/share-token`,
-    { method: 'POST', headers: csrfHeaders() },
+    { method: 'POST' },
   )
 }
 
@@ -121,6 +121,15 @@ export function getWorkflowStatus(sessionId: string) {
   return apiFetch<WorkflowStatus>(`/api/workflows/status?session_id=${encodeURIComponent(sessionId)}`)
 }
 
+// Stop an in-flight single run. The backend flips the result to "canceled" and
+// revokes the Celery task (terminate) so a mid-step run is interrupted.
+export function cancelWorkflow(sessionId: string) {
+  return apiFetch<{ session_id: string; status: string }>(
+    `/api/workflows/sessions/${encodeURIComponent(sessionId)}/cancel`,
+    { method: 'POST' },
+  )
+}
+
 export interface BatchStatusItem {
   session_id: string
   document_title: string | null
@@ -185,7 +194,12 @@ export function streamWorkflowStatus(
               return
             }
             onStatus(data as WorkflowStatus)
-            if (data.status === 'completed' || data.status === 'error' || data.status === 'failed') {
+            if (
+              data.status === 'completed' ||
+              data.status === 'error' ||
+              data.status === 'failed' ||
+              data.status === 'canceled'
+            ) {
               return
             }
           } catch {
@@ -243,10 +257,8 @@ export function exportWorkflowUrl(id: string) {
 export async function importWorkflow(file: File): Promise<Workflow> {
   const form = new FormData()
   form.append('file', file)
-  const res = await fetch('/api/workflows/import', {
+  const res = await rawFetch('/api/workflows/import', {
     method: 'POST',
-    credentials: 'include',
-    headers: csrfHeaders(),
     body: form,
   })
   if (!res.ok) {
@@ -259,10 +271,8 @@ export async function importWorkflow(file: File): Promise<Workflow> {
 export async function importIntoWorkflow(workflowId: string, file: File): Promise<Workflow> {
   const form = new FormData()
   form.append('file', file)
-  const res = await fetch(`/api/workflows/${workflowId}/import`, {
+  const res = await rawFetch(`/api/workflows/${workflowId}/import`, {
     method: 'POST',
-    credentials: 'include',
-    headers: csrfHeaders(),
     body: form,
   })
   if (!res.ok) {

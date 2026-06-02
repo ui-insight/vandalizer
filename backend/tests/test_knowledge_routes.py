@@ -891,6 +891,108 @@ class TestKnowledgeReference:
 
         assert resp.status_code == 404
 
+    @staticmethod
+    def _fake_ref(team_id=None):
+        ref = MagicMock()
+        ref.uuid = "ref-1"
+        ref.source_kb_uuid = "kb-1"
+        ref.user_id = "user1"
+        ref.team_id = team_id
+        ref.note = None
+        ref.pinned = False
+        ref.created_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        return ref
+
+    @pytest.mark.asyncio
+    async def test_adopt_personal_passes_no_team(self, client):
+        """Omitting team_id bookmarks the KB privately (team_id=None)."""
+        user = _make_user()
+        user.current_team = "team-abc"  # has a team, but didn't pick it
+        cookies, headers = _auth()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.routers.knowledge.organization_service.get_user_org_ancestry",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch("app.routers.knowledge.svc.adopt_knowledge_base", new_callable=AsyncMock) as mock_adopt,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_adopt.return_value = self._fake_ref(team_id=None)
+
+            resp = await client.post(
+                "/api/knowledge/kb-1/adopt",
+                json={},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert mock_adopt.await_args.kwargs["team_id"] is None
+
+    @pytest.mark.asyncio
+    async def test_adopt_to_current_team(self, client):
+        """Passing the caller's current team shares the bookmark with that team."""
+        user = _make_user()
+        user.current_team = "team-abc"
+        cookies, headers = _auth()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.routers.knowledge.organization_service.get_user_org_ancestry",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch("app.routers.knowledge.svc.adopt_knowledge_base", new_callable=AsyncMock) as mock_adopt,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_adopt.return_value = self._fake_ref(team_id="team-abc")
+
+            resp = await client.post(
+                "/api/knowledge/kb-1/adopt",
+                json={"team_id": "team-abc"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["team_id"] == "team-abc"
+        assert mock_adopt.await_args.kwargs["team_id"] == "team-abc"
+
+    @pytest.mark.asyncio
+    async def test_adopt_to_foreign_team_rejected(self, client):
+        """A team_id that isn't the caller's current team is refused before adopting."""
+        user = _make_user()
+        user.current_team = "team-abc"
+        cookies, headers = _auth()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.routers.knowledge.organization_service.get_user_org_ancestry",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch("app.routers.knowledge.svc.adopt_knowledge_base", new_callable=AsyncMock) as mock_adopt,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+
+            resp = await client.post(
+                "/api/knowledge/kb-1/adopt",
+                json={"team_id": "team-other"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 403
+        mock_adopt.assert_not_awaited()
+
 
 class TestConvertDocumentsToKB:
     @pytest.mark.asyncio

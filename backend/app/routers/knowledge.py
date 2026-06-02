@@ -1486,9 +1486,19 @@ async def review_suggestion(uuid: str, suggestion_uuid: str, request: Request, u
 
 @router.post("/{uuid}/adopt", response_model=KBReferenceResponse)
 async def adopt_knowledge_base(uuid: str, req: AdoptKBRequest, user: User = Depends(get_current_user)):
-    """Create a lightweight bookmark to a verified/shared KB."""
+    """Create a lightweight bookmark to a verified/shared KB.
+
+    ``team_id`` selects the destination: omit it (or pass null) to bookmark the
+    KB privately, or pass the caller's current team to share it with that team.
+    A team_id that isn't the caller's current team is rejected.
+    """
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
-    team_id = req.team_id or (str(user.current_team) if user.current_team else None)
+    team_id = req.team_id
+    if team_id and team_id != (str(user.current_team) if user.current_team else None):
+        raise HTTPException(
+            status_code=403,
+            detail="You can only add a knowledge base to your current team.",
+        )
     try:
         ref = await svc.adopt_knowledge_base(
             uuid, user,

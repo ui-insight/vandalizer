@@ -29,11 +29,9 @@ __all__ = ["_extract_json", "_resolve_model_name"]
 
 
 def _get_db():
-    from pymongo import MongoClient
+    from app.tasks import get_sync_db
 
-    from app.config import Settings
-    settings = Settings()
-    return MongoClient(settings.mongo_host)[settings.mongo_db]
+    return get_sync_db()
 
 
 def _resolve_model_name(user_id: str | None = None) -> str:

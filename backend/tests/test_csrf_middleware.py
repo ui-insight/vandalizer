@@ -202,6 +202,43 @@ class TestCSRFMiddleware:
         assert resp.status_code != 403, resp.text
 
     @pytest.mark.asyncio
+    async def test_invite_accept_bypasses_csrf(self, client):
+        """POST to /api/teams/invite/accept/{token} bypasses CSRF.
+
+        The accept POST fires right after a cross-site SSO redirect, the window
+        where the freshly-set CSRF cookie can be briefly unreadable by JS, so the
+        double-submit header is unreliable. The unguessable URL token is the real
+        authorization, so the route is exempt (same reasoning as SAML ACS). With
+        no auth cookie the request should fall through to a 401 — never a 403
+        from the CSRF middleware.
+        """
+        resp = await client.post("/api/teams/invite/accept/sometoken")
+        assert resp.status_code != 403, resp.text
+
+    @pytest.mark.asyncio
+    async def test_join_link_accept_bypasses_csrf(self, client):
+        """POST to /api/teams/join-link/accept/{token} bypasses CSRF.
+
+        Same rationale as the direct-invite accept route: token-authorized, and
+        runs in the post-SSO-redirect window where the CSRF cookie is fragile.
+        """
+        resp = await client.post("/api/teams/join-link/accept/sometoken")
+        assert resp.status_code != 403, resp.text
+
+    @pytest.mark.asyncio
+    async def test_teams_non_accept_route_still_requires_csrf(self, client):
+        """The exemption is scoped: other /api/teams POSTs still need CSRF.
+
+        Guards against the prefix being widened to all of /api/teams.
+        """
+        resp = await client.post(
+            "/api/teams/invite",
+            json={"team_uuid": "x", "email": "a@b.com", "role": "member"},
+        )
+        assert resp.status_code == 403
+        assert resp.json()["detail"] == "CSRF validation failed"
+
+    @pytest.mark.asyncio
     async def test_legacy_cookie_still_accepted(self, client):
         """A user holding only the legacy csrf_token cookie can still validate.
 

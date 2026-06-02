@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { getBatchStatus, getWorkflowStatus, runWorkflow } from '../api/workflows'
+import { cancelWorkflow, getBatchStatus, getWorkflowStatus, runWorkflow } from '../api/workflows'
 import type { BatchStatus } from '../api/workflows'
 import { useWorkspace } from '../contexts/WorkspaceContext'
 import type { WorkflowStatus } from '../types/workflow'
@@ -11,6 +11,7 @@ export function useWorkflowRunner() {
   const [status, setStatus] = useState<WorkflowStatus | null>(null)
   const [batchStatus, setBatchStatus] = useState<BatchStatus | null>(null)
   const [running, setRunning] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const stopPolling = useCallback(() => {
@@ -24,7 +25,7 @@ export function useWorkflowRunner() {
     try {
       const s = await getWorkflowStatus(sid)
       setStatus(s)
-      const terminal = s.status === 'completed' || s.status === 'error' || s.status === 'failed'
+      const terminal = s.status === 'completed' || s.status === 'error' || s.status === 'failed' || s.status === 'canceled'
       const paused = s.status === 'pending_approval'
       setRunning(!terminal && !paused)
       if (terminal) stopPolling()
@@ -53,11 +54,17 @@ export function useWorkflowRunner() {
     setBatchId(null)
     setSessionId(null)
 
-    const result = await runWorkflow(workflowId, {
-      document_uuids: documentUuids,
-      model,
-      batch_mode: batchMode,
-    })
+    let result: Awaited<ReturnType<typeof runWorkflow>>
+    try {
+      result = await runWorkflow(workflowId, {
+        document_uuids: documentUuids,
+        model,
+        batch_mode: batchMode,
+      })
+    } catch (err) {
+      setRunning(false)
+      throw err
+    }
     bumpActivitySignal()
 
     if (result.batch_id) {
@@ -68,8 +75,26 @@ export function useWorkflowRunner() {
       setSessionId(result.session_id)
       poll(result.session_id)
       intervalRef.current = setInterval(() => poll(result.session_id!), 2000)
+    } else {
+      setRunning(false)
     }
   }, [poll, pollBatch, bumpActivitySignal])
+
+  // Stop an in-flight single run. Batch runs are not cancellable yet, so this
+  // no-ops when only a batch is active. After the request returns, poll once so
+  // the UI flips to "canceled" immediately rather than waiting for the next tick.
+  const stop = useCallback(async () => {
+    if (!sessionId || batchId) return
+    setCancelling(true)
+    try {
+      await cancelWorkflow(sessionId)
+      await poll(sessionId)
+    } catch {
+      // Leave the run as-is on failure; the poller keeps the UI honest.
+    } finally {
+      setCancelling(false)
+    }
+  }, [sessionId, batchId, poll])
 
   const loadSession = useCallback(async (sid: string) => {
     stopPolling()
@@ -79,7 +104,7 @@ export function useWorkflowRunner() {
     try {
       const s = await getWorkflowStatus(sid)
       setStatus(s)
-      const isTerminal = s.status === 'completed' || s.status === 'error' || s.status === 'failed'
+      const isTerminal = s.status === 'completed' || s.status === 'error' || s.status === 'failed' || s.status === 'canceled'
       const isPaused = s.status === 'pending_approval'
       setRunning(!isTerminal && !isPaused)
       if (!isTerminal) {
@@ -97,6 +122,7 @@ export function useWorkflowRunner() {
     setStatus(null)
     setBatchStatus(null)
     setRunning(false)
+    setCancelling(false)
     stopPolling()
   }, [stopPolling])
 
@@ -105,5 +131,5 @@ export function useWorkflowRunner() {
     return () => stopPolling()
   }, [stopPolling])
 
-  return { sessionId, batchId, status, batchStatus, running, start, loadSession, reset }
+  return { sessionId, batchId, status, batchStatus, running, cancelling, start, stop, loadSession, reset }
 }

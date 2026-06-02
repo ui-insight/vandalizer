@@ -38,6 +38,11 @@ export function useLibraryItems(libraryId: string | null, filters?: { kind?: str
     try {
       const data = await api.listItems(libraryId, filters)
       setItems(data)
+    } catch {
+      // Items fetch failed (transient backend error). refresh() runs
+      // fire-and-forget from the mount effect, so an uncaught rejection here
+      // would surface as a global "Request failed" unhandled rejection. Keep
+      // the current items and let the next refresh recover.
     } finally {
       setLoading(false)
     }

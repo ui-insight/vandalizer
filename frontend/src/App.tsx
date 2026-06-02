@@ -5,13 +5,12 @@ import { AuthProvider } from './contexts/AuthContext'
 import { TeamProvider } from './contexts/TeamContext'
 import { ToastProvider } from './contexts/ToastContext'
 import { CertificationPanelProvider } from './contexts/CertificationPanelContext'
+import { BrandingProvider } from './contexts/BrandingContext'
 import { CertificationPanel } from './components/certification/CertificationPanel'
 import { ConfirmProvider } from './components/shared/useConfirm'
 import { queryClient } from './lib/queryClient'
 import { Sentry } from './lib/sentry'
 import { router } from './router'
-import { getThemeConfig } from './api/config'
-import { getContrastTextColor, getComplementaryColor, getHoverColor } from './utils/color'
 
 class ErrorBoundary extends Component<
   { children: ReactNode },
@@ -78,42 +77,26 @@ function useGlobalDropPrevention() {
   }, [])
 }
 
-function useThemeLoader() {
-  useEffect(() => {
-    getThemeConfig()
-      .then((theme) => {
-        const root = document.documentElement
-        root.style.setProperty('--highlight-color', theme.highlight_color)
-        root.style.setProperty('--ui-radius', theme.ui_radius)
-        root.style.setProperty('--highlight-text-color', getContrastTextColor(theme.highlight_color))
-        root.style.setProperty('--highlight-complement', getComplementaryColor(theme.highlight_color))
-        root.style.setProperty('--highlight-hover', getHoverColor(theme.highlight_color))
-      })
-      .catch(() => {
-        // Use CSS defaults if theme fetch fails (e.g. not logged in)
-      })
-  }, [])
-}
-
 export default function App() {
   useGlobalDropPrevention()
-  useThemeLoader()
 
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <TeamProvider>
-            <ToastProvider>
-              <ConfirmProvider>
-                <CertificationPanelProvider>
-                  <RouterProvider router={router} />
-                  <CertificationPanel />
-                </CertificationPanelProvider>
-              </ConfirmProvider>
-            </ToastProvider>
-          </TeamProvider>
-        </AuthProvider>
+        <BrandingProvider>
+          <AuthProvider>
+            <TeamProvider>
+              <ToastProvider>
+                <ConfirmProvider>
+                  <CertificationPanelProvider>
+                    <RouterProvider router={router} />
+                    <CertificationPanel />
+                  </CertificationPanelProvider>
+                </ConfirmProvider>
+              </ToastProvider>
+            </TeamProvider>
+          </AuthProvider>
+        </BrandingProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   )

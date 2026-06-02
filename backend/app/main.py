@@ -250,14 +250,12 @@ async def health() -> JSONResponse:
     checks: dict[str, str] = {}
     settings = get_settings()
 
-    # MongoDB
+    # MongoDB — reuse the app's pooled client; never open a new one per probe
+    # (that leaks file descriptors over the life of the process).
     try:
-        from motor.motor_asyncio import AsyncIOMotorClient
+        from app.database import get_client
 
-        client = AsyncIOMotorClient(
-            settings.mongo_host, serverSelectionTimeoutMS=2000
-        )
-        await client[settings.mongo_db].command("ping")
+        await get_client()[settings.mongo_db].command("ping")
         checks["mongodb"] = "ok"
     except Exception as e:
         checks["mongodb"] = f"error: {e}"

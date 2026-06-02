@@ -36,7 +36,7 @@ import { RunHistoryTab } from './RunHistoryTab'
 import type { ValidationV2Result, QualityHistoryRun, ValidationSource, TuningResult, TuningStreamEvent } from '../../api/extractions'
 import { findBestSettingsStream } from '../../api/extractions'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
-import { VerificationSubmitDialog } from '../shared/VerificationSubmitDialog'
+import { VerificationSubmitModal } from '../library/VerificationSubmitModal'
 import { ExtractionAutovalidatePanel } from '../extractions/ExtractionAutovalidatePanel'
 import { CrossFieldRulesSection } from '../extractions/CrossFieldRulesSection'
 import { CrossFieldViolationsPanel } from '../extractions/CrossFieldViolationsPanel'
@@ -3476,15 +3476,12 @@ function ValidateTab({
               </button>
             )}
             {showSubmitDialog && (
-              <VerificationSubmitDialog
+              <VerificationSubmitModal
                 itemKind="search_set"
                 itemId={searchSetUuid!}
                 itemTitle={itemTitle}
                 onClose={() => setShowSubmitDialog(false)}
-                onSuccess={() => {
-                  setShowSubmitDialog(false)
-                  setSubmitLibraryResult('success')
-                }}
+                onSubmitted={() => setSubmitLibraryResult('success')}
               />
             )}
           </div>

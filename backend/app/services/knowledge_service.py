@@ -698,12 +698,17 @@ async def adopt_knowledge_base(
     if source_kb.user_id == user.user_id and not source_kb.verified and not source_kb.shared_with_team:
         raise ValueError("Cannot bookmark your own private knowledge base")
 
-    # Check for existing reference
+    # Check for existing reference. A user has at most one reference per source
+    # KB, so re-adopting with a different destination moves it (personal <-> team)
+    # rather than creating a duplicate or silently keeping the old destination.
     existing = await KnowledgeBaseReference.find_one(
         KnowledgeBaseReference.source_kb_uuid == source_kb_uuid,
         KnowledgeBaseReference.user_id == user.user_id,
     )
     if existing:
+        if existing.team_id != team_id:
+            existing.team_id = team_id
+            await existing.save()
         return existing
 
     ref = KnowledgeBaseReference(

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+import logging
 import uuid as uuid_mod
 from typing import TYPE_CHECKING
 
@@ -26,6 +27,9 @@ if TYPE_CHECKING:
     from app.models.user import User
 
 
+logger = logging.getLogger(__name__)
+
+
 class ShareError(Exception):
     """Raised by share_to_team to identify which step failed.
 
@@ -37,6 +41,15 @@ class ShareError(Exception):
         self.code = code
         self.status = status
         super().__init__(code)
+
+
+class CloneSourceMissingError(Exception):
+    """Raised when the workflow/extraction backing a LibraryItem no longer exists.
+
+    Distinct from a generic clone failure so the API can return a precise
+    "the original was deleted — refresh and try again" message instead of a
+    confusing internal-error string.
+    """
 
 
 async def _resolve_team_oid(team_id: str) -> PydanticObjectId:
@@ -406,8 +419,16 @@ async def clone_to_personal(item_id: str, user: User) -> dict | None:
     if not item:
         return None
 
-    new_obj_id = await _clone_underlying_object(item, user.user_id, team_id=None)
-    if not new_obj_id:
+    try:
+        new_obj_id = await _clone_underlying_object(item, user.user_id, team_id=None)
+    except CloneSourceMissingError as exc:
+        logger.warning("Clone-to-personal source missing: %s", exc)
+        return None
+    except Exception:
+        logger.exception(
+            "Unexpected error cloning library item %s (kind=%s) to personal library",
+            item.id, item.kind.value,
+        )
         return None
 
     personal_lib = await get_or_create_personal_library(user.user_id)
@@ -440,18 +461,38 @@ async def share_to_team(
     if not access_control.can_view_team(str(team_oid), team_access):
         raise ShareError("not_team_member", 403)
 
-    new_obj_id = await _clone_underlying_object(item, user.user_id, team_id=team_id)
-    if not new_obj_id:
+    try:
+        new_obj_id = await _clone_underlying_object(item, user.user_id, team_id=team_id)
+    except CloneSourceMissingError as exc:
+        logger.warning("Share-to-team source missing for item %s: %s", item.id, exc)
+        raise ShareError("original_missing", 404)
+    except Exception:
+        logger.exception(
+            "Unexpected error cloning library item %s (kind=%s) for team %s",
+            item.id, item.kind.value, team_id,
+        )
         raise ShareError("clone_failed", 500)
 
     team_lib = await get_or_create_team_library(user.user_id, team_id)
-    result = await add_item(
-        library_id=str(team_lib.id),
-        user=user,
-        item_id=str(new_obj_id),
-        kind=item.kind.value,
-    )
+    try:
+        result = await add_item(
+            library_id=str(team_lib.id),
+            user=user,
+            item_id=str(new_obj_id),
+            kind=item.kind.value,
+        )
+    except Exception:
+        logger.exception(
+            "Unexpected error adding cloned object %s to team library %s",
+            new_obj_id, team_lib.id,
+        )
+        raise ShareError("clone_failed", 500)
     if not result:
+        logger.warning(
+            "add_item returned None for cloned object %s (kind=%s) in team library %s — "
+            "user %s likely failed an access check on the new object or the team library",
+            new_obj_id, item.kind.value, team_lib.id, user.user_id,
+        )
         raise ShareError("clone_failed", 500)
 
     try:
@@ -470,8 +511,7 @@ async def share_to_team(
             )
     except Exception:
         # Notification failure should never break the share itself.
-        import logging
-        logging.getLogger(__name__).exception("Failed to notify team of library share")
+        logger.exception("Failed to notify team of library share")
 
     return result
 
@@ -750,23 +790,39 @@ async def _attach_author(item: dict | None) -> dict | None:
     return item
 
 
-async def _clone_underlying_object(item: LibraryItem, user_id: str, *, team_id: str | None = None) -> PydanticObjectId | None:
-    """Clone the underlying workflow or search set. Returns new object ID."""
+async def _clone_underlying_object(
+    item: LibraryItem, user_id: str, *, team_id: str | None = None
+) -> PydanticObjectId:
+    """Clone the workflow or extraction backing a LibraryItem.
+
+    Returns the new object's id. Raises:
+      - ``CloneSourceMissingError`` if the original or the item's kind
+        cannot be resolved.
+      - Any underlying database/validation error otherwise. Callers should
+        log these with full tracebacks before translating to a user error.
+
+    All mutable nested values (config dicts, validation lists, step/task
+    payloads) are deep-copied so the new object never shares mutable state
+    with the original — and so legacy documents stored with ``None`` in
+    those fields don't blow up during the copy.
+    """
     if item.kind == LibraryItemKind.WORKFLOW:
         original = await Workflow.get(item.item_id)
         if not original:
-            return None
+            raise CloneSourceMissingError(
+                f"Workflow {item.item_id} not found for library item {item.id}"
+            )
         new_wf = Workflow(
             name=f"{original.name} (Copy)",
             description=original.description,
             user_id=user_id,
             team_id=team_id,
             created_by_user_id=user_id,
-            input_config=original.input_config,
-            output_config=original.output_config,
-            resource_config=original.resource_config,
-            validation_plan=list(original.validation_plan or []),
-            validation_inputs=list(original.validation_inputs or []),
+            input_config=dict(original.input_config or {}),
+            output_config=dict(original.output_config or {}),
+            resource_config=dict(original.resource_config or {}),
+            validation_plan=[dict(p) for p in (original.validation_plan or [])],
+            validation_inputs=[dict(i) for i in (original.validation_inputs or [])],
         )
         await new_wf.insert()
 
@@ -780,13 +836,16 @@ async def _clone_underlying_object(item: LibraryItem, user_id: str, *, team_id: 
             for task_id in step.tasks:
                 task = await WorkflowStepTask.get(task_id)
                 if task:
-                    new_task = WorkflowStepTask(name=task.name, data=dict(task.data))
+                    new_task = WorkflowStepTask(
+                        name=task.name,
+                        data=dict(task.data or {}),
+                    )
                     await new_task.insert()
                     new_task_ids.append(new_task.id)
             new_step = WorkflowStep(
                 name=step.name,
                 tasks=new_task_ids,
-                data=dict(step.data),
+                data=dict(step.data or {}),
                 is_output=step.is_output,
             )
             await new_step.insert()
@@ -801,7 +860,9 @@ async def _clone_underlying_object(item: LibraryItem, user_id: str, *, team_id: 
 
         original = await SearchSet.get(item.item_id)
         if not original:
-            return None
+            raise CloneSourceMissingError(
+                f"SearchSet {item.item_id} not found for library item {item.id}"
+            )
         new_uuid = str(uuid_mod.uuid4())
         new_ss = SearchSet(
             title=f"{original.title} (Copy)",
@@ -810,7 +871,7 @@ async def _clone_underlying_object(item: LibraryItem, user_id: str, *, team_id: 
             set_type=original.set_type,
             user_id=user_id,
             team_id=team_id,
-            extraction_config=dict(original.extraction_config),
+            extraction_config=dict(original.extraction_config or {}),
             cross_field_rules=[dict(r) for r in (original.cross_field_rules or [])],
             tuning_result=dict(original.tuning_result) if original.tuning_result else None,
             domain=original.domain,
@@ -857,7 +918,9 @@ async def _clone_underlying_object(item: LibraryItem, user_id: str, *, team_id: 
 
         return new_ss.id
 
-    return None
+    raise CloneSourceMissingError(
+        f"Library item {item.id} has unsupported kind: {item.kind!r}"
+    )
 
 
 def _library_to_dict(lib: Library) -> dict:

@@ -35,6 +35,8 @@ from app.services.config_service import get_user_model_name
 if TYPE_CHECKING:
     from app.models.user import User
 
+logger = logging.getLogger(__name__)
+
 
 # ---------------------------------------------------------------------------
 # Workflow CRUD
@@ -506,6 +508,10 @@ async def run_workflow(
         model = await get_user_model_name(user_id)
 
     session_id = str(uuid_mod.uuid4())[:8]
+    # Generate the Celery task id up front so we can persist it before the task
+    # is dispatched (no race where the task finishes before we record the id).
+    # It is the handle the cancel endpoint uses to revoke/terminate the run.
+    celery_task_id = str(uuid_mod.uuid4())
 
     result = WorkflowResult(
         workflow=wf.id,
@@ -513,6 +519,7 @@ async def run_workflow(
         status="queued",
         num_steps_total=len(wf.steps),
         input_context={"doc_uuids": document_uuids},
+        celery_task_id=celery_task_id,
     )
     await result.insert()
 
@@ -528,6 +535,7 @@ async def run_workflow(
             "activity_id": activity_id,
         },
         queue="workflows",
+        task_id=celery_task_id,
     )
 
     return session_id
@@ -579,6 +587,66 @@ async def get_workflow_status(session_id: str, user: User | None = None) -> dict
         "workflow_name": workflow_name,
         "document_title": result.document_title,
     }
+
+
+async def cancel_workflow(session_id: str, user: User) -> dict | None:
+    """Cancel an in-flight workflow run.
+
+    Flips the result to ``canceled`` (which the engine's between-steps check and
+    the frontend poller both treat as terminal) and revokes the Celery task with
+    ``terminate=True`` so a step that is mid-LLM-call is interrupted rather than
+    running to completion. Idempotent: a run that already reached a terminal
+    state is returned unchanged. Returns ``None`` when the run is not found or
+    the user is not authorized for it.
+    """
+    result = await _get_authorized_workflow_result(session_id, user)
+    if not result:
+        return None
+
+    terminal = {"completed", "error", "failed", "canceled"}
+    if result.status in terminal:
+        return {"session_id": session_id, "status": result.status}
+
+    # Set the terminal state first so the UI reflects the stop immediately and
+    # the engine's cooperative check (if it happens to be between steps) bails.
+    result.status = "canceled"
+    result.error = "Canceled by user"
+    await result.save()
+
+    # Interrupt the worker. revoke(terminate=True) kills the prefork child
+    # running this task id; if the task is still queued it is dropped before it
+    # starts. Best-effort — the DB flip above is the source of truth for the UI.
+    if result.celery_task_id:
+        try:
+            celery_app.control.revoke(
+                result.celery_task_id, terminate=True, signal="SIGTERM",
+            )
+        except Exception:
+            logger.warning(
+                "Failed to revoke Celery task %s for session %s",
+                result.celery_task_id, session_id, exc_info=True,
+            )
+
+    # Best-effort: mark the matching activity-rail entry canceled too, so the
+    # run doesn't linger as "running" in the activity feed.
+    try:
+        from app.models.activity import ActivityEvent, ActivityStatus
+
+        act = await ActivityEvent.find_one(
+            ActivityEvent.workflow_session_id == session_id,
+        )
+        if act and act.is_running:
+            act.status = ActivityStatus.CANCELED.value
+            act.error = "Canceled by user"
+            act.finished_at = datetime.datetime.now(datetime.timezone.utc)
+            await act.save()
+    except Exception:
+        logger.warning(
+            "Failed to mark activity canceled for session %s",
+            session_id, exc_info=True,
+        )
+
+    return {"session_id": session_id, "status": result.status}
 
 
 async def run_workflow_batch(

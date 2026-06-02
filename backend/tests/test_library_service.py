@@ -657,21 +657,83 @@ class TestShareToTeamErrors:
             assert exc.value.status == 403
 
     @pytest.mark.asyncio
-    async def test_raises_clone_failed_when_underlying_object_missing(self):
+    async def test_raises_original_missing_when_source_object_gone(self):
+        from app.services.library_service import (
+            CloneSourceMissingError,
+            ShareError,
+            share_to_team,
+        )
+
+        item = _make_library_item()
+        team_oid = PydanticObjectId()
+        with patch("app.services.library_service.access_control") as ac, \
+             patch("app.services.library_service._resolve_team_oid", AsyncMock(return_value=team_oid)), \
+             patch(
+                 "app.services.library_service._clone_underlying_object",
+                 AsyncMock(side_effect=CloneSourceMissingError("Workflow gone")),
+             ):
+            ac.get_authorized_library_item = AsyncMock(return_value=item)
+            ac.get_team_access_context = AsyncMock(return_value=MagicMock())
+            ac.can_view_team = MagicMock(return_value=True)
+            with pytest.raises(ShareError) as exc:
+                await share_to_team("item-1", _make_user(), str(team_oid))
+            assert exc.value.code == "original_missing"
+            assert exc.value.status == 404
+
+    @pytest.mark.asyncio
+    async def test_raises_clone_failed_when_clone_raises_unexpected(self, caplog):
+        """Unexpected errors during clone must be caught, logged with a traceback,
+        and surfaced as clone_failed (500) — not a bare 500 with no detail."""
         from app.services.library_service import ShareError, share_to_team
 
         item = _make_library_item()
         team_oid = PydanticObjectId()
         with patch("app.services.library_service.access_control") as ac, \
              patch("app.services.library_service._resolve_team_oid", AsyncMock(return_value=team_oid)), \
-             patch("app.services.library_service._clone_underlying_object", AsyncMock(return_value=None)):
+             patch(
+                 "app.services.library_service._clone_underlying_object",
+                 AsyncMock(side_effect=RuntimeError("db blew up")),
+             ):
             ac.get_authorized_library_item = AsyncMock(return_value=item)
             ac.get_team_access_context = AsyncMock(return_value=MagicMock())
             ac.can_view_team = MagicMock(return_value=True)
-            with pytest.raises(ShareError) as exc:
-                await share_to_team("item-1", _make_user(), str(team_oid))
+            with caplog.at_level("ERROR"):
+                with pytest.raises(ShareError) as exc:
+                    await share_to_team("item-1", _make_user(), str(team_oid))
             assert exc.value.code == "clone_failed"
             assert exc.value.status == 500
+            assert any("Unexpected error cloning" in r.message for r in caplog.records)
+
+    @pytest.mark.asyncio
+    async def test_raises_clone_failed_when_add_item_raises(self, caplog):
+        from app.services.library_service import ShareError, share_to_team
+
+        item = _make_library_item()
+        team_oid = PydanticObjectId()
+        team_lib = MagicMock(id="team-lib-id")
+        with patch("app.services.library_service.access_control") as ac, \
+             patch("app.services.library_service._resolve_team_oid", AsyncMock(return_value=team_oid)), \
+             patch(
+                 "app.services.library_service._clone_underlying_object",
+                 AsyncMock(return_value=PydanticObjectId()),
+             ), \
+             patch(
+                 "app.services.library_service.get_or_create_team_library",
+                 AsyncMock(return_value=team_lib),
+             ), \
+             patch(
+                 "app.services.library_service.add_item",
+                 AsyncMock(side_effect=RuntimeError("indexing failed")),
+             ):
+            ac.get_authorized_library_item = AsyncMock(return_value=item)
+            ac.get_team_access_context = AsyncMock(return_value=MagicMock())
+            ac.can_view_team = MagicMock(return_value=True)
+            with caplog.at_level("ERROR"):
+                with pytest.raises(ShareError) as exc:
+                    await share_to_team("item-1", _make_user(), str(team_oid))
+            assert exc.value.code == "clone_failed"
+            assert exc.value.status == 500
+            assert any("adding cloned object" in r.message for r in caplog.records)
 
 
 # ---------------------------------------------------------------------------

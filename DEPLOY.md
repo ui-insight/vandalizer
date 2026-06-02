@@ -1,8 +1,8 @@
 # Deploying Vandalizer (FastAPI + React)
 
-## Quick Start
+## Recommended: the interactive setup wizard
 
-The fastest way to get Vandalizer running locally is the interactive setup wizard. It walks you through environment configuration, secret generation, service startup, admin account creation, and database seeding:
+`./setup.sh` is the supported install path for **both** local evaluation and production deployments on a real server. It handles environment configuration, secret generation (`JWT_SECRET_KEY`, `CONFIG_ENCRYPTION_KEY`), Docker builds, service startup, admin account creation, and verified-catalog seeding in one session. When you run it on a server, choose the **production** profile when prompted and give it your public URL and web port — everything else is filled in for you.
 
 ```bash
 git clone https://github.com/ui-insight/vandalizer.git
@@ -10,9 +10,13 @@ cd vandalizer
 ./setup.sh
 ```
 
-### Manual Docker Compose Setup
+After the first run, the same script is the entry point for ongoing operations: `./setup.sh --repair`, `--upgrade`, `--redeploy`. See the [README](README.md#interactive-setup-recommended) for the full menu of maintenance commands.
 
-If you prefer to run each step yourself:
+The frontend is available at the URL you configured (defaults to `http://localhost`) and the API at `http://localhost:8001` when setup completes.
+
+### Escape hatch: manual Docker Compose
+
+This path exists for operators who need to script each step themselves (CI builds, golden images, configuration-management tools). The interactive wizard above is the supported path for everyone else.
 
 ```bash
 # 1. Clone the repository
@@ -89,6 +93,8 @@ docker compose up -d redis mongo chromadb
 
 This section covers what you need to know when deploying Vandalizer for real users in a university environment.
 
+**Install path:** use `./setup.sh` from the project root and select the **production** profile when prompted. It will ask for your public URL (e.g. `https://vandalizer.example.edu`) and web port, then generate `JWT_SECRET_KEY` and `CONFIG_ENCRYPTION_KEY`, build images, bring up Mongo / Redis / ChromaDB / API / Celery / frontend, create your admin account, and seed the verified catalog. The remaining subsections here cover production-specific decisions (sizing, optional self-hosted LLM/OCR, TLS termination, scaling) that sit *around* setup.sh — they don't replace it.
+
 ### Resource Requirements
 
 Vandalizer is designed to be lightweight. The application itself (all Docker services plus the OS) consumes roughly **8 GB of RAM** in production. A machine with **16 GB of RAM** comfortably handles a departmental deployment; smaller teams can run on as little as **10 GB**.
@@ -141,9 +147,9 @@ For OCR, self-hosted options include [Marker](https://github.com/VikParuchuri/ma
 
 The MongoDB database is named `vandalizer` by default. The name is configurable via the `MONGO_DB` environment variable and has no effect on functionality.
 
-### Production Configuration
+### Production Configuration (reference)
 
-Create `backend/.env` with the following variables:
+`./setup.sh` writes the production `backend/.env` for you. This subsection is a **reference** for what those variables mean — useful when you need to edit `.env` later, externalize a database, or rebuild the file by hand on the manual path.
 
 ```env
 MONGO_HOST=mongodb://mongo:27017/

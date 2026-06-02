@@ -1,4 +1,4 @@
-import { apiFetch, ApiError, csrfHeaders } from './client'
+import { apiFetch, ApiError, rawFetch } from './client'
 import type { SupportTicket, SupportTicketSummary, SupportContact } from '../types/support'
 
 export async function createTicket(
@@ -13,10 +13,8 @@ export async function createTicket(
   form.append('priority', priority)
   for (const f of files) form.append('files', f)
 
-  const res = await fetch('/api/support/tickets', {
+  const res = await rawFetch('/api/support/tickets', {
     method: 'POST',
-    credentials: 'include',
-    headers: csrfHeaders(),
     body: form,
   })
   if (!res.ok) {
@@ -91,10 +89,8 @@ export async function addAttachment(
   const form = new FormData()
   for (const f of list) form.append('files', f)
 
-  const res = await fetch(`/api/support/tickets/${ticketUuid}/attachments`, {
+  const res = await rawFetch(`/api/support/tickets/${ticketUuid}/attachments`, {
     method: 'POST',
-    credentials: 'include',
-    headers: csrfHeaders(),
     body: form,
   })
   if (!res.ok) {

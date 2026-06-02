@@ -131,7 +131,7 @@ export function LibraryTab() {
   const { items, loading: itemsLoading, refresh: refreshItems, update, remove } = useLibraryItems(
     activeLibrary?.id ?? null,
     {
-      kind: kindFilter === 'all' ? undefined : kindFilter,
+      // Kind is filtered client-side so we can show per-kind counts on the filter chips.
       search: search || undefined,
       folder: selectedFolder,
     },
@@ -185,6 +185,7 @@ export function LibraryTab() {
     })
     if (!ok) return
     await remove(itemId)
+    refreshFolders()
   }
   const handleMoveToFolder = async (itemId: string, folderUuid: string | null) => {
     await moveFolderItems([itemId], folderUuid)
@@ -199,11 +200,18 @@ export function LibraryTab() {
   const collectionItemIds = selectedCollection ? new Set(selectedCollection.item_ids) : null
 
   const filtered = items.filter((item) => {
+    if (kindFilter !== 'all' && item.kind !== kindFilter) return false
     if (viewFilter === 'favorites') return item.favorited
     if (viewFilter === 'pinned') return item.pinned
     if (collectionItemIds) return collectionItemIds.has(item.item_id)
     return true
   })
+
+  const kindCounts = {
+    all: items.length,
+    workflow: items.filter((i) => i.kind === 'workflow').length,
+    search_set: items.filter((i) => i.kind === 'search_set').length,
+  }
 
   const sorted = [...filtered].sort((a, b) => {
     if (sortOption === 'az') return a.name.localeCompare(b.name)
@@ -604,6 +612,7 @@ export function LibraryTab() {
               { value: 'search_set' as const, label: 'Tasks' },
             ]).map(({ value, label }) => {
               const active = kindFilter === value
+              const count = kindCounts[value]
               return (
                 <button
                   key={value}
@@ -611,6 +620,7 @@ export function LibraryTab() {
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
+                    gap: 6,
                     height: 32,
                     padding: '0 12px',
                     borderRadius: 16,
@@ -624,7 +634,17 @@ export function LibraryTab() {
                     transition: 'all 0.15s',
                   }}
                 >
-                  {label}
+                  <span>{label}</span>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 500,
+                      color: active ? 'var(--library-highlight-ink)' : '#888',
+                      opacity: active ? 0.85 : 1,
+                    }}
+                  >
+                    {count}
+                  </span>
                 </button>
               )
             })}
@@ -961,6 +981,20 @@ export function LibraryTab() {
                         <button
                           onClick={async (e) => {
                             e.stopPropagation()
+                            const ok = await confirm({
+                              title: 'Delete folder?',
+                              message: (
+                                <>
+                                  Are you sure you want to delete the folder <strong>{folder.name}</strong>? Items inside will be moved out of the folder (not deleted). This action cannot be undone.
+                                </>
+                              ),
+                              confirmLabel: 'Delete',
+                              destructive: true,
+                            })
+                            if (!ok) {
+                              setFolderMenuOpen(null)
+                              return
+                            }
                             await removeFolder(folder.uuid)
                             if (viewFilter === folder.uuid) setViewFilter('all')
                             setFolderMenuOpen(null)

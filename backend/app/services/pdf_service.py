@@ -203,7 +203,9 @@ _MD_NUMBERED_RE = re.compile(r"^(\s*)(\d+)\.\s+(.+)$")
 _MD_BLOCKQUOTE_RE = re.compile(r"^>\s?(.*)$")
 _MD_HR_RE = re.compile(r"^\s{0,3}([-*_])(\s*\1){2,}\s*$")
 _MD_FENCE_RE = re.compile(r"^\s{0,3}(```+|~~~+)\s*([\w+-]*)\s*$")
-_MD_TABLE_SEP_RE = re.compile(r"^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$")
+# One-or-more dashes per column matches the GFM spec (and remark-gfm, which the
+# UI renders with), so a model emitting ``|--|--|`` still yields a real table.
+_MD_TABLE_SEP_RE = re.compile(r"^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$")
 
 
 # Unicode characters outside Helvetica's WinAnsi encoding render as ■ boxes.
@@ -299,7 +301,7 @@ def _styles() -> dict:
             fontSize=22,
             leading=26,
             spaceAfter=4,
-            textColor=colors.HexColor("#0f172a"),
+            textColor=colors.HexColor("#191919"),
             alignment=0,
         ),
         "meta": ParagraphStyle(
@@ -318,7 +320,7 @@ def _styles() -> dict:
             leading=22,
             spaceBefore=14,
             spaceAfter=6,
-            textColor=colors.HexColor("#0f172a"),
+            textColor=colors.HexColor("#191919"),
         ),
         "h2": ParagraphStyle(
             "WfH2",
@@ -328,7 +330,7 @@ def _styles() -> dict:
             leading=19,
             spaceBefore=12,
             spaceAfter=5,
-            textColor=colors.HexColor("#0f172a"),
+            textColor=colors.HexColor("#191919"),
         ),
         "h3": ParagraphStyle(
             "WfH3",
@@ -442,7 +444,8 @@ def _styles() -> dict:
             fontName="Helvetica-Bold",
             fontSize=9.5,
             leading=12,
-            textColor=colors.white,
+            # Black text on the gold (#eab308) header — see _build_table_flowable.
+            textColor=colors.HexColor("#111827"),
         ),
     }
     return s
@@ -497,13 +500,15 @@ def _build_table_flowable(headers: list[str], rows: list[list[str]], styles: dic
     table = Table(data, colWidths=col_widths, repeatRows=1)
     row_count = len(data)
     table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e3a5f")),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        # Vandalizer brand gold header (#eab308) with black text.
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#eab308")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#111827")),
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
         ("FONTSIZE", (0, 0), (-1, 0), 9.5),
         ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
         ("TOPPADDING", (0, 0), (-1, 0), 8),
-        ("ROWBACKGROUNDS", (0, 1), (-1, row_count - 1), [colors.white, colors.HexColor("#f9fafb")]),
+        # Faint gold-tinted zebra striping on body rows.
+        ("ROWBACKGROUNDS", (0, 1), (-1, row_count - 1), [colors.white, colors.HexColor("#fdf9eb")]),
         ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e5e7eb")),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("LEFTPADDING", (0, 0), (-1, -1), 8),
@@ -703,13 +708,15 @@ def _kv_table_flowable(data: dict, styles: dict, usable_width: float):
     table = Table(data_rows, colWidths=col_widths, repeatRows=1)
     row_count = len(data_rows)
     table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e3a5f")),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        # Vandalizer brand gold header (#eab308) with black text.
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#eab308")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#111827")),
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
         ("FONTSIZE", (0, 0), (-1, 0), 9.5),
         ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
         ("TOPPADDING", (0, 0), (-1, 0), 8),
-        ("ROWBACKGROUNDS", (0, 1), (-1, row_count - 1), [colors.white, colors.HexColor("#f9fafb")]),
+        # Faint gold-tinted zebra striping on body rows.
+        ("ROWBACKGROUNDS", (0, 1), (-1, row_count - 1), [colors.white, colors.HexColor("#fdf9eb")]),
         ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e5e7eb")),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("LEFTPADDING", (0, 0), (-1, -1), 8),

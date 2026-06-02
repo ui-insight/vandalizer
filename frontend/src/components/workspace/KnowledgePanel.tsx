@@ -1415,6 +1415,17 @@ export function KnowledgePanel() {
               : undefined}
             onRemoveRef={activeTab === 'mine'
               ? async (refUuid) => {
+                  const kb = scopedMine.knowledgeBases.find((k: KnowledgeBase) => k.reference_uuid === refUuid)
+                  const ok = await confirm({
+                    title: 'Remove from My KBs?',
+                    message: (
+                      <>
+                        Remove <strong>{kb?.title || 'this knowledge base'}</strong> from My KBs? This only removes your bookmark — the original knowledge base is unaffected, and you can add it again from Explore.
+                      </>
+                    ),
+                    confirmLabel: 'Remove',
+                  })
+                  if (!ok) return
                   try {
                     await scopedMine.removeRef(refUuid)
                     toast('Removed from My KBs', 'success')

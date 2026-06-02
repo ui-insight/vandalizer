@@ -1,18 +1,35 @@
 import { Link } from '@tanstack/react-router'
 import { ExternalLink } from 'lucide-react'
+import { useBranding } from '../../contexts/BrandingContext'
 
 export function Footer() {
+  const branding = useBranding()
   return (
     <footer className="bg-[#0a0a0a] border-t border-white/10 text-gray-400">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
           {/* Col 1: Brand */}
           <div>
-            <h3 className="text-xl font-bold text-white mb-3">Vandalizer</h3>
+            <h3 className="text-xl font-bold text-white mb-3">{branding.orgName}</h3>
             <p className="text-sm leading-relaxed mb-4">
               AI-powered document intelligence for research administration.
             </p>
-            <p className="text-sm text-gray-500">&copy; 2024&ndash;2026 Vandalizer Contributors</p>
+            {branding.isCustomized ? (
+              <p className="text-sm text-gray-500">
+                Powered by{' '}
+                <a
+                  href="https://github.com/ui-insight/vandalizer"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hover:text-[#f1b300] transition-colors"
+                >
+                  Vandalizer
+                </a>
+                {' '}&middot; &copy; 2024&ndash;2026 Vandalizer Contributors
+              </p>
+            ) : (
+              <p className="text-sm text-gray-500">&copy; 2024&ndash;2026 Vandalizer Contributors</p>
+            )}
           </div>
 
           {/* Col 2: Links */}

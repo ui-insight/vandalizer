@@ -9,7 +9,7 @@ from pathlib import Path
 
 from app.models.certification import CertificationProgress
 from app.models.workflow import Workflow, WorkflowStep, WorkflowStepTask, WorkflowResult
-from app.models.search_set import SearchSetItem
+from app.models.search_set import SearchSet, SearchSetItem
 from app.models.folder import SmartFolder
 from app.models.document import SmartDocument
 
@@ -417,6 +417,47 @@ async def _collect_extraction_fields(workflows: list) -> tuple[list[str], int]:
     return combined, largest
 
 
+async def _collect_searchset_fields(user_id: str) -> list[str]:
+    """Field names from the user's own standalone Extractions (SearchSets).
+
+    The extraction challenge is built in the Extraction editor, which saves a
+    SearchSet — not necessarily a workflow. Counting those items directly means
+    a user is credited for the extraction they actually built, even if they
+    haven't wired it into a workflow yet (or the workflow task didn't carry every
+    field across). Each item counts once, by its display title (falling back to
+    the searchphrase). Deduped case-insensitively.
+    """
+    seen: set[str] = set()
+    names: list[str] = []
+    sets = await SearchSet.find(
+        {"$or": [{"user_id": user_id}, {"created_by_user_id": user_id}]}
+    ).to_list()
+    for ss in sets:
+        items = await SearchSetItem.find(SearchSetItem.searchset == ss.uuid).to_list()
+        for it in items:
+            name = (it.title or it.searchphrase or "").strip()
+            if not name:
+                continue
+            key = name.lower()
+            if key not in seen:
+                seen.add(key)
+                names.append(name)
+    return names
+
+
+def _union_fields(*field_lists: list[str]) -> list[str]:
+    """Case-insensitive union of several field-name lists, preserving order."""
+    seen: set[str] = set()
+    combined: list[str] = []
+    for fields in field_lists:
+        for name in fields:
+            key = name.lower()
+            if key not in seen:
+                seen.add(key)
+                combined.append(name)
+    return combined
+
+
 # ---------------------------------------------------------------------------
 # Self-assessment storage
 # ---------------------------------------------------------------------------
@@ -489,7 +530,9 @@ async def _validate_foundations(user_id: str) -> dict:
     expected_fields = exercise.get("expected_fields", []) if exercise else []
 
     workflows = await Workflow.find(Workflow.user_id == user_id).to_list()
-    combined_fields, _largest = await _collect_extraction_fields(workflows)
+    workflow_fields, _largest = await _collect_extraction_fields(workflows)
+    standalone_fields = await _collect_searchset_fields(user_id)
+    combined_fields = _union_fields(workflow_fields, standalone_fields)
 
     has_extraction_workflow = False
     has_execution = False
@@ -536,7 +579,12 @@ async def _validate_extraction_engine(user_id: str) -> dict:
     expected_fields = exercise.get("expected_fields", []) if exercise else []
 
     workflows = await Workflow.find(Workflow.user_id == user_id).to_list()
-    combined_fields, _largest = await _collect_extraction_fields(workflows)
+    workflow_fields, _largest = await _collect_extraction_fields(workflows)
+    standalone_fields = await _collect_searchset_fields(user_id)
+    # Credit fields the user defined in a standalone Extraction OR in a workflow
+    # Extraction task — the challenge is "fields across your extraction tasks",
+    # and most users build the Extraction directly in the editor.
+    combined_fields = _union_fields(workflow_fields, standalone_fields)
     total_fields = len(combined_fields)
 
     matched_fields = [

@@ -237,7 +237,11 @@ async def accept_invite(token: str, user: User) -> Team:
             team=team.id, user_id=user.user_id, role=invite.role
         )
         await membership.insert()
-    elif existing.role != invite.role:
+    elif ROLE_RANK.get(invite.role, 99) < ROLE_RANK.get(existing.role, 99):
+        # Only ever promote — never demote an existing member. An owner/admin
+        # who accepts a lower-role invite (e.g. testing their own team's
+        # invite link) must keep their higher permissions. Mirrors the
+        # "a join link must not demote an admin" guard in accept_join_link.
         existing.role = invite.role
         await existing.save()
 

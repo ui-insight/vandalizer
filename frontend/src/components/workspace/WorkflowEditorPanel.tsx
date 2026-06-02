@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import {
-  X, Play, Loader2, Plus, Trash2, Pencil, SlidersHorizontal,
+  X, Play, Square, Loader2, Plus, Trash2, Pencil, SlidersHorizontal,
   FileText, Filter, Outdent, Globe, Image, Code,
   Bug, Search, Zap, Download, Package, CheckCircle, XCircle,
   MousePointerClick, PenTool, ClipboardCheck, Flag,
@@ -35,13 +35,15 @@ import { getModels } from '../../api/config'
 import { searchDocuments, pollStatus as pollDocumentStatus } from '../../api/documents'
 import { convertDocumentsToKB } from '../../api/knowledge'
 import { listCredentials } from '../../api/credentials'
-import type { Credential } from '../../types/credential'
+import type { Credential, CredentialType } from '../../types/credential'
+import { CredentialQuickCreateModal } from './CredentialQuickCreateModal'
 import { uploadFile } from '../../api/files'
 import { listKnowledgeBases } from '../../api/knowledge'
 import { listAllFolders } from '../../api/folders'
 import type { KnowledgeBase } from '../../types/knowledge'
 import { listItems as listSearchSetItems, suggestFields } from '../../api/extractions'
 import { useWorkflowRunner } from '../../hooks/useWorkflowRunner'
+import { ApiError } from '../../api/client'
 import type { Workflow, WorkflowStep, WorkflowTask, WorkflowStatus, WorkflowCitation, ModelInfo, SearchSetItem } from '../../types/workflow'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
 import DOMPurify from 'dompurify'
@@ -52,7 +54,7 @@ import { QualitySparkline } from '../library/QualitySparkline'
 import { SaveWorkflowOutputDialog } from './SaveWorkflowOutputDialog'
 import { useQualitySparkline } from '../../hooks/useQualitySparkline'
 import { relativeTime } from '../../utils/time'
-import { VerificationSubmitDialog } from '../shared/VerificationSubmitDialog'
+import { VerificationSubmitModal } from '../library/VerificationSubmitModal'
 import { getReview, approveReview, rejectReview } from '../../api/reviews'
 import type { ReviewDetail } from '../../api/reviews'
 import { ColdStartHero } from '../shared/ColdStartHero'
@@ -169,12 +171,13 @@ const TEST_MESSAGES = [
 ]
 
 // Task types where Test Step is meaningful and safe. Excludes:
-//   - Approval, KnowledgeBaseQuery: backend test handler doesn't support them
+//   - Approval: backend test handler doesn't support it
 //   - APINode, BrowserAutomation, CodeNode: real side effects make "test" misleading
+// KnowledgeBaseQuery is read-only (a vector lookup), so it is safe to test.
 const TEST_STEP_SUPPORTED_TYPES = new Set([
   'Extraction', 'Prompt', 'Formatter', 'Format', 'AddWebsite', 'AddDocument',
   'DescribeImage', 'CrawlerNode', 'ResearchNode', 'DocumentRenderer',
-  'FormFiller', 'DataExport', 'PackageBuilder',
+  'FormFiller', 'DataExport', 'PackageBuilder', 'KnowledgeBaseQuery',
 ])
 
 const TEST_STEP_TOOLTIP = [
@@ -431,20 +434,30 @@ export function WorkflowEditorPanel() {
   const handleRun = async () => {
     if (!openWorkflowId) return
 
-    if (isTextInput) {
-      if (!textInput.trim()) return
-      // Convert text to temp document, then combine with any selected docs
-      const { document_uuids: textUuids } = await createTempDocuments(openWorkflowId, [
-        { text: textInput.trim(), label: 'Text input' },
-      ])
-      const allUuids = [...textUuids, ...selectedDocUuids]
-      setActiveTab('design')
-      await runner.start(openWorkflowId, allUuids, undefined, false)
-    } else {
-      const uuids = selectedDocUuids.length > 0 ? selectedDocUuids : []
-      if (uuids.length === 0) return
-      setActiveTab('design')
-      await runner.start(openWorkflowId, uuids, undefined, batchMode)
+    try {
+      if (isTextInput) {
+        if (!textInput.trim()) return
+        // Convert text to temp document, then combine with any selected docs
+        const { document_uuids: textUuids } = await createTempDocuments(openWorkflowId, [
+          { text: textInput.trim(), label: 'Text input' },
+        ])
+        const allUuids = [...textUuids, ...selectedDocUuids]
+        setActiveTab('design')
+        await runner.start(openWorkflowId, allUuids, undefined, false)
+      } else {
+        const uuids = selectedDocUuids.length > 0 ? selectedDocUuids : []
+        if (uuids.length === 0) return
+        setActiveTab('design')
+        await runner.start(openWorkflowId, uuids, undefined, batchMode)
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to run workflow'
+      toast(msg, 'error')
+      // If the workflow was deleted out from under us, refresh so the panel
+      // flips to its "Workflow not found." state instead of acting alive.
+      if (err instanceof ApiError && err.status === 404) {
+        refresh()
+      }
     }
   }
 
@@ -851,32 +864,63 @@ export function WorkflowEditorPanel() {
             Select a document to run this workflow
           </div>
         )}
-        <button
-          onClick={handleRun}
-          disabled={runner.running || (isTextInput ? !textInput.trim() : selectedDocUuids.length === 0)}
-          style={{
-            width: '100%', padding: '12px 16px', fontSize: 14, fontWeight: 700,
-            fontFamily: 'inherit', borderRadius: 'var(--ui-radius, 8px)', border: 'none',
-            backgroundColor: 'var(--highlight-color, #eab308)',
-            color: 'var(--highlight-text-color, #000)',
-            cursor: runner.running || (isTextInput ? !textInput.trim() : selectedDocUuids.length === 0) ? 'not-allowed' : 'pointer',
-            opacity: (isTextInput ? !textInput.trim() : selectedDocUuids.length === 0) && !runner.running ? 0.5 : 1,
-            textTransform: 'uppercase', letterSpacing: '0.05em',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-          }}
-        >
-          {runner.running ? (
-            <>
-              <Loader2 style={{ width: 16, height: 16, animation: 'spin 1s linear infinite' }} />
-              WORKFLOW RUNNING
-            </>
-          ) : (
-            <>
-              <Play style={{ width: 16, height: 16 }} />
-              RUN
-            </>
-          )}
-        </button>
+        {runner.running && !runner.batchId ? (
+          // Single run in progress — offer an active STOP (red, matches the
+          // app's destructive-action convention; same geometry as RUN).
+          <button
+            onClick={runner.stop}
+            disabled={runner.cancelling}
+            style={{
+              width: '100%', padding: '12px 16px', fontSize: 14, fontWeight: 700,
+              fontFamily: 'inherit', borderRadius: 'var(--ui-radius, 8px)', border: 'none',
+              backgroundColor: '#dc2626', color: '#fff',
+              cursor: runner.cancelling ? 'wait' : 'pointer',
+              opacity: runner.cancelling ? 0.7 : 1,
+              textTransform: 'uppercase', letterSpacing: '0.05em',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}
+          >
+            {runner.cancelling ? (
+              <>
+                <Loader2 style={{ width: 16, height: 16, animation: 'spin 1s linear infinite' }} />
+                STOPPING
+              </>
+            ) : (
+              <>
+                <Square style={{ width: 14, height: 14, fill: '#fff' }} />
+                STOP
+              </>
+            )}
+          </button>
+        ) : (
+          <button
+            onClick={handleRun}
+            disabled={runner.running || (isTextInput ? !textInput.trim() : selectedDocUuids.length === 0)}
+            title={runner.running && runner.batchId ? 'Stop is not yet available for batch runs' : undefined}
+            style={{
+              width: '100%', padding: '12px 16px', fontSize: 14, fontWeight: 700,
+              fontFamily: 'inherit', borderRadius: 'var(--ui-radius, 8px)', border: 'none',
+              backgroundColor: 'var(--highlight-color, #eab308)',
+              color: 'var(--highlight-text-color, #000)',
+              cursor: runner.running || (isTextInput ? !textInput.trim() : selectedDocUuids.length === 0) ? 'not-allowed' : 'pointer',
+              opacity: (isTextInput ? !textInput.trim() : selectedDocUuids.length === 0) && !runner.running ? 0.5 : 1,
+              textTransform: 'uppercase', letterSpacing: '0.05em',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}
+          >
+            {runner.running ? (
+              <>
+                <Loader2 style={{ width: 16, height: 16, animation: 'spin 1s linear infinite' }} />
+                {runner.batchId ? 'BATCH RUNNING' : 'WORKFLOW RUNNING'}
+              </>
+            ) : (
+              <>
+                <Play style={{ width: 16, height: 16 }} />
+                RUN
+              </>
+            )}
+          </button>
+        )}
       </div>
 
       {/* ===== EDIT STEP OVERLAY ===== */}
@@ -1927,6 +1971,12 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
 
   // Credentials (API Node auth_strategy picker)
   const [credentials, setCredentials] = useState<Credential[] | null>(null)
+  const [credentialModalOpen, setCredentialModalOpen] = useState(false)
+  const reloadCredentials = useCallback(() => {
+    return listCredentials()
+      .then(list => { setCredentials(list); return list })
+      .catch(() => { setCredentials([]); return [] as Credential[] })
+  }, [])
   useEffect(() => {
     if (task.name !== 'APINode') return
     let cancelled = false
@@ -2985,35 +3035,66 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                       width: 14, height: 14, color: '#9ca3af', pointerEvents: 'none',
                     }} />
                   </div>
-                  {getTextValue('auth_strategy') && getTextValue('auth_strategy') !== 'none' && (
-                    <div style={{ position: 'relative' }}>
-                      <select
-                        value={getTextValue('credential_id') || ''}
-                        onChange={e => setTextValue('credential_id', e.target.value)}
-                        style={{
-                          width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
-                          border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#fff',
-                          color: '#374151', appearance: 'none', paddingRight: 32,
-                        }}
-                      >
-                        <option value="">Select a credential...</option>
-                        {(credentials || [])
-                          .filter(c => c.type === getTextValue('auth_strategy'))
-                          .map(c => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
-                          ))}
-                      </select>
-                      <ChevronDown style={{
-                        position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-                        width: 14, height: 14, color: '#9ca3af', pointerEvents: 'none',
-                      }} />
-                      {credentials && credentials.filter(c => c.type === getTextValue('auth_strategy')).length === 0 && (
-                        <p style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
-                          No matching credentials. Create one in Credentials.
-                        </p>
-                      )}
-                    </div>
-                  )}
+                  {getTextValue('auth_strategy') && getTextValue('auth_strategy') !== 'none' && (() => {
+                    const strategy = getTextValue('auth_strategy') as CredentialType
+                    const matching = (credentials || []).filter(c => c.type === strategy)
+                    return (
+                      <div>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
+                          <div style={{ position: 'relative', flex: 1 }}>
+                            <select
+                              value={getTextValue('credential_id') || ''}
+                              onChange={e => setTextValue('credential_id', e.target.value)}
+                              style={{
+                                width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
+                                border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#fff',
+                                color: '#374151', appearance: 'none', paddingRight: 32,
+                              }}
+                            >
+                              <option value="">Select a credential...</option>
+                              {matching.map(c => (
+                                <option key={c.id} value={c.id}>{c.name}</option>
+                              ))}
+                            </select>
+                            <ChevronDown style={{
+                              position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                              width: 14, height: 14, color: '#9ca3af', pointerEvents: 'none',
+                            }} />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setCredentialModalOpen(true)}
+                            title="Create a new credential for this API"
+                            style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 4,
+                              padding: '0 12px', fontSize: 13, fontWeight: 500,
+                              border: '1px solid #d1d5db', borderRadius: 6,
+                              background: '#fff', color: '#374151', cursor: 'pointer',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            <Plus style={{ width: 14, height: 14 }} />
+                            New
+                          </button>
+                        </div>
+                        {credentials && matching.length === 0 && (
+                          <p style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
+                            No matching credentials yet — click <strong>New</strong> to create one.
+                          </p>
+                        )}
+                      </div>
+                    )
+                  })()}
+                  <CredentialQuickCreateModal
+                    open={credentialModalOpen}
+                    initialType={(getTextValue('auth_strategy') as CredentialType) || 'static_header'}
+                    onClose={() => setCredentialModalOpen(false)}
+                    onCreated={async (cred) => {
+                      setCredentialModalOpen(false)
+                      await reloadCredentials()
+                      setTextValue('credential_id', cred.id)
+                    }}
+                  />
                 </div>
                 <div style={{ marginBottom: 16 }}>
                   <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
@@ -3400,6 +3481,20 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
         {/* ===== INPUT SUB-TAB ===== */}
         {subTab === 'input' && (
           <div>
+            <div style={{
+              display: 'flex', alignItems: 'flex-start', gap: 8,
+              padding: '10px 12px', marginBottom: 16,
+              backgroundColor: '#f3f4f6', borderRadius: 6,
+              border: '1px solid #e5e7eb',
+            }}>
+              <Info style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0, marginTop: 1 }} />
+              <div style={{ fontSize: 12, color: '#374151', lineHeight: 1.5 }}>
+                <strong>This step runs once per workflow run.</strong> Selected inputs are
+                combined into a single call — there's no fan-out over upstream items. If an
+                upstream step produced 5 results, this step receives one combined payload (not
+                five separate executions). Lists are stringified before reaching prompts.
+              </div>
+            </div>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
               Data Sources
             </div>
@@ -3847,8 +3942,9 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
 }) {
   const isCompleted = status?.status === 'completed'
   const isError = status?.status === 'error' || status?.status === 'failed'
+  const isCanceled = status?.status === 'canceled'
   const isPendingApproval = status?.status === 'pending_approval'
-  const isDone = isCompleted || isError
+  const isDone = isCompleted || isError || isCanceled
 
   const [approval, setApproval] = useState<ReviewDetail | null>(null)
   const [approvalComments, setApprovalComments] = useState('')
@@ -3909,13 +4005,13 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
       backgroundColor: '#fff', borderRadius: 'var(--ui-radius, 8px)',
       boxShadow: '0 6px 18px rgba(0,0,0,0.05)', padding: 20,
       border: isDone
-        ? (isError ? '2px solid #fca5a5' : '2px solid #86efac')
+        ? (isError ? '2px solid #fca5a5' : isCanceled ? '2px solid #d1d5db' : '2px solid #86efac')
         : isPendingApproval ? '2px solid #fbbf24'
         : '2px solid #e5e7eb',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 8 }}>
         <div style={{ fontWeight: 600, fontSize: 14, color: '#202124' }}>
-          {running ? 'Workflow Running' : isCompleted ? 'Output' : isError ? 'Error' : isPendingApproval ? 'Awaiting Approval' : 'View Output'}
+          {running ? 'Workflow Running' : isCompleted ? 'Output' : isCanceled ? 'Stopped' : isError ? 'Error' : isPendingApproval ? 'Awaiting Approval' : 'View Output'}
         </div>
         {isPendingApproval && status?.approval_request_id && (
           <a
@@ -6559,15 +6655,12 @@ function ValidateTab({
                     </button>
                   )}
                   {showSubmitDialog && workflowId && (
-                    <VerificationSubmitDialog
+                    <VerificationSubmitModal
                       itemKind="workflow"
                       itemId={workflowId}
                       itemTitle={itemTitle}
                       onClose={() => setShowSubmitDialog(false)}
-                      onSuccess={() => {
-                        setShowSubmitDialog(false)
-                        setSubmitLibraryResult('success')
-                      }}
+                      onSubmitted={() => setSubmitLibraryResult('success')}
                     />
                   )}
                 </div>

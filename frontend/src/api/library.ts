@@ -1,4 +1,4 @@
-import { apiFetch, csrfHeaders } from './client'
+import { apiFetch, rawFetch } from './client'
 import type {
   Library, LibraryItem, LibraryFolder, LibraryItemKind,
   VerificationRequest, VerifiedCatalogItem, VerifiedItemMetadata,
@@ -118,10 +118,8 @@ export interface CatalogPreviewItem {
 export async function previewCatalogImport(file: File): Promise<CatalogPreviewItem[]> {
   const form = new FormData()
   form.append('file', file)
-  const res = await fetch('/api/verification/catalog/preview-import', {
+  const res = await rawFetch('/api/verification/catalog/preview-import', {
     method: 'POST',
-    credentials: 'include',
-    headers: csrfHeaders(),
     body: form,
   })
   if (!res.ok) {
@@ -139,10 +137,8 @@ export async function importCatalogItems(
   const form = new FormData()
   form.append('file', file)
   form.append('selected_indices', JSON.stringify(selectedIndices))
-  const res = await fetch('/api/verification/catalog/import', {
+  const res = await rawFetch('/api/verification/catalog/import', {
     method: 'POST',
-    credentials: 'include',
-    headers: csrfHeaders(),
     body: form,
   })
   if (!res.ok) {

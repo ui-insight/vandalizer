@@ -203,7 +203,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                 e.stopPropagation()
                 onFavorite(item.id, !item.favorited)
               }}
-              title="Favorite"
+              title={item.favorited ? 'Unfavorite' : 'Favorite (shows in all views)'}
               style={{
                 background: 'none',
                 border: 'none',
@@ -226,7 +226,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                 e.stopPropagation()
                 onPin(item.id, !item.pinned)
               }}
-              title="Pin"
+              title={item.pinned ? 'Unpin' : 'Pin (shows in all views)'}
               style={{
                 background: 'none',
                 border: 'none',
@@ -494,7 +494,9 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
       )}
       {showVerifyModal && (
         <VerificationSubmitModal
-          item={item}
+          itemKind={item.kind}
+          itemId={item.item_id}
+          itemTitle={item.name}
           onClose={() => setShowVerifyModal(false)}
           onSubmitted={() => setShowVerifyModal(false)}
         />

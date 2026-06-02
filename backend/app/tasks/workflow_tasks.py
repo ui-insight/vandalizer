@@ -72,13 +72,10 @@ def _notify_approval_reviewers_sync(
 
 
 def _get_db():
-    """Get sync pymongo database handle."""
-    from pymongo import MongoClient
+    """Get sync pymongo database handle (shared per-process client)."""
+    from app.tasks import get_sync_db
 
-    from app.config import Settings
-    settings = Settings()
-    client = MongoClient(settings.mongo_host)
-    return client[settings.mongo_db]
+    return get_sync_db()
 
 
 @celery_app.task(
@@ -102,7 +99,11 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
     """
     from bson import ObjectId
 
-    from app.services.workflow_engine import build_workflow_engine, sanitize_step_name
+    from app.services.workflow_engine import (
+        WorkflowCancelled,
+        build_workflow_engine,
+        sanitize_step_name,
+    )
 
     db = _get_db()
 
@@ -331,8 +332,46 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
         except Exception as e:
             logger.warning("Could not update activity to running: %s", e)
 
+    # Polled by the engine between steps. The cancel endpoint flips the result
+    # status to "canceled"; this lets a run that is between steps stop cleanly
+    # (a mid-step stop is handled out-of-band by Celery task revocation).
+    def should_cancel() -> bool:
+        try:
+            doc = db.workflow_result.find_one(
+                {"_id": ObjectId(workflow_result_id)}, {"status": 1},
+            )
+            return bool(doc and doc.get("status") == "canceled")
+        except Exception:
+            return False
+
     try:
-        final_output, data = engine.execute(workflow_result_updater=update_progress)
+        final_output, data = engine.execute(
+            workflow_result_updater=update_progress,
+            should_cancel=should_cancel,
+        )
+    except WorkflowCancelled:
+        logger.info(
+            "Workflow %s canceled by user (result %s)", workflow_id, workflow_result_id,
+        )
+        db.workflow_result.update_one(
+            {"_id": ObjectId(workflow_result_id)},
+            {"$set": {"status": "canceled", "error": "Canceled by user"}},
+        )
+        if activity_id:
+            try:
+                from datetime import datetime, timezone
+                db.activity_event.update_one(
+                    {"_id": ObjectId(activity_id)},
+                    {"$set": {
+                        "status": "canceled",
+                        "error": "Canceled by user",
+                        "finished_at": datetime.now(timezone.utc),
+                    }},
+                )
+            except Exception:
+                pass
+        # Clean terminal stop — do not re-raise (no retry).
+        return {"status": "canceled", "result_id": workflow_result_id}
     except Exception as e:
         logger.error("Workflow execution failed for %s: %s", workflow_id, e)
         db.workflow_result.update_one(
@@ -547,6 +586,7 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
         ExtractionNode,
         FormatNode,
         FormFillerNode,
+        KnowledgeBaseQueryNode,
         MultiTaskNode,
         PackageBuilderNode,
         PromptNode,
@@ -609,6 +649,8 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
         process_node = PackageBuilderNode(data=task_data)
     elif task_name == "BrowserAutomation":
         process_node = BrowserAutomationNode(data=task_data)
+    elif task_name == "KnowledgeBaseQuery":
+        process_node = KnowledgeBaseQueryNode(data=task_data)
     else:
         raise ValueError(f"Unknown task type: {task_name}")
 

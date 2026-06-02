@@ -66,7 +66,9 @@ export function LibraryItemDetails({ item, onClose, onRemove }: Props) {
     <>
     {showSubmitModal && (
       <VerificationSubmitModal
-        item={item}
+        itemKind={item.kind}
+        itemId={item.item_id}
+        itemTitle={item.name}
         onClose={() => setShowSubmitModal(false)}
         onSubmitted={() => setSubmitResult('success')}
       />

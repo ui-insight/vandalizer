@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 from typing import Optional
 
+import httpx
 from pydantic_ai.agent import Agent
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.profiles import ModelProfile
@@ -51,9 +52,20 @@ class RagDeps:
 class InsightAIProvider(OpenRouterProvider):
     """Custom OpenRouter provider for UIdaho Insight AI server."""
 
-    def __init__(self, api_key: str, endpoint: Optional[str] = None):
+    def __init__(self, api_key: str, endpoint: Optional[str] = None,
+                 http_client: Optional[httpx.AsyncClient] = None):
         self._endpoint = endpoint
-        super().__init__(api_key=api_key)
+        # Passing a dedicated http_client makes pydantic-ai build a per-instance
+        # AsyncOpenAI rather than fall back to the process-wide
+        # cached_async_http_client. The shared cached client is unsafe under the
+        # workflow MultiTaskNode, whose ThreadPoolExecutor runs each task on its
+        # own event loop — reusing one client's connection pool across loops
+        # raises "bound to a different event loop", surfacing as a zero-token
+        # "Connection error".
+        if http_client is not None:
+            super().__init__(api_key=api_key, http_client=http_client)
+        else:
+            super().__init__(api_key=api_key)
 
     @property
     def name(self) -> str:
@@ -77,9 +89,13 @@ class InsightAIProvider(OpenRouterProvider):
 class OllamaProvider(OpenRouterProvider):
     """Provider for Ollama API-compatible servers."""
 
-    def __init__(self, api_key: str, endpoint: str):
+    def __init__(self, api_key: str, endpoint: str,
+                 http_client: Optional[httpx.AsyncClient] = None):
         self._endpoint = endpoint
-        super().__init__(api_key=api_key)
+        if http_client is not None:
+            super().__init__(api_key=api_key, http_client=http_client)
+        else:
+            super().__init__(api_key=api_key)
 
     @property
     def name(self) -> str:
@@ -103,9 +119,13 @@ class OllamaProvider(OpenRouterProvider):
 class VLLMProvider(OpenRouterProvider):
     """Provider for VLLM API-compatible servers."""
 
-    def __init__(self, api_key: str, endpoint: str):
+    def __init__(self, api_key: str, endpoint: str,
+                 http_client: Optional[httpx.AsyncClient] = None):
         self._endpoint = endpoint
-        super().__init__(api_key=api_key)
+        if http_client is not None:
+            super().__init__(api_key=api_key, http_client=http_client)
+        else:
+            super().__init__(api_key=api_key)
 
     @property
     def name(self) -> str:
@@ -299,12 +319,25 @@ def get_agent_model(
         client = AsyncOpenAI(**client_kwargs)
         return OpenAIModel(model_name=model_name, openai_client=client)
 
+    # Build a dedicated httpx client per call instead of letting the provider
+    # fall back to pydantic-ai's process-wide cached_async_http_client. The
+    # cached client is shared across the workflow MultiTaskNode's
+    # ThreadPoolExecutor threads, each of which runs pydantic-ai's run_sync()
+    # on its own event loop; reusing one client's connection pool across loops
+    # raises "RuntimeError: bound to a different event loop", which the OpenAI
+    # SDK re-wraps as a zero-token "Connection error". A fresh client per call
+    # binds only to the loop that uses it.
+    from app.config import Settings
+    read_timeout = max(30, Settings().workflow_llm_timeout_seconds)
+    dedicated_client = httpx.AsyncClient(
+        timeout=httpx.Timeout(read_timeout, connect=10.0)
+    )
     if api_protocol == "ollama":
-        provider = OllamaProvider(api_key=api_key, endpoint=endpoint)
+        provider = OllamaProvider(api_key=api_key, endpoint=endpoint, http_client=dedicated_client)
     elif api_protocol == "vllm":
-        provider = VLLMProvider(api_key=api_key, endpoint=endpoint)
+        provider = VLLMProvider(api_key=api_key, endpoint=endpoint, http_client=dedicated_client)
     else:
-        provider = InsightAIProvider(api_key=api_key, endpoint=endpoint)
+        provider = InsightAIProvider(api_key=api_key, endpoint=endpoint, http_client=dedicated_client)
 
     return OpenAIModel(model_name=agent_model, provider=provider)
 
@@ -368,6 +401,41 @@ DOCUMENT_CHAT_SYSTEM_PROMPT = VANDALIZER_IDENTITY_PREAMBLE + (
     "- Citations: refer to provided context naturally; no raw links unless asked.\n"
     "- Keep answers under 150 words unless the user explicitly asks for detail.\n"
     "- If the documents do not contain enough information to answer, say so clearly.\n"
+)
+
+KB_CHAT_SYSTEM_PROMPT = VANDALIZER_IDENTITY_PREAMBLE + (
+    "You are a knowledge-base research assistant. The user has connected a Knowledge "
+    "Base (a searchable corpus of their documents). For each question, the system "
+    "retrieves a small set of snippets that look relevant — but those snippets are not "
+    "the user's whole library, and the best answer may not be in the retrieved set at all.\n\n"
+    "## Retrieval reality — read carefully\n"
+    "- The snippets in the context are **partial excerpts**, not full documents.\n"
+    "- A snippet being included only means it was lexically or semantically similar to "
+    "the question. It does not mean it actually supports an answer.\n"
+    "- Snippets can be off-topic, contradictory, or stale. Read each one before relying on it.\n\n"
+    "## How to answer\n"
+    "- **Cite every factual claim inline** with the source filename that supports it, "
+    "e.g. `[Source: contract_v3.pdf]` or `[Source: budget.xlsx, Sheet1]`. The filename "
+    "must match a `Source:` line shown in the retrieved snippets — never invent, "
+    "paraphrase, or guess source names.\n"
+    "- **Synthesize across snippets** when the answer needs to combine multiple facts. "
+    "Cite each snippet you draw from.\n"
+    "- **If a retrieved snippet is clearly off-topic, ignore it** — do not force-fit "
+    "irrelevant context into the answer just because it was retrieved.\n"
+    "- **If you supplement with general knowledge** (definitions, background, common "
+    "practice) that is NOT in the snippets, mark that portion with the prefix "
+    "`_Beyond the retrieved sources:_` so the reader can see where grounded information "
+    "ends and general reasoning begins.\n"
+    "- **If the snippets don't contain a clear answer, say so explicitly.** Suggest the "
+    "user rephrase the question, broaden the KB, or open the original documents — do "
+    "not paper over the gap with a confident-sounding guess.\n"
+    "- **Never attribute a claim to a source that doesn't support it.** If you can't "
+    "point to a specific snippet for a fact, either drop the fact or mark it as general "
+    "knowledge using the prefix above.\n\n"
+    "## Format\n"
+    "- Be concise. Short Markdown bullets and headings — no walls of text.\n"
+    "- Do NOT restate the question.\n"
+    "- Keep answers under 150 words unless the user asks for detail.\n"
 )
 
 HELP_CHAT_SYSTEM_PROMPT = VANDALIZER_IDENTITY_PREAMBLE + (

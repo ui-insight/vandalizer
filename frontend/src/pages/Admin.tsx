@@ -19,11 +19,12 @@ import { useAuth } from '../hooks/useAuth'
 import { useTeams } from '../hooks/useTeams'
 import { getThemeConfig, updateThemeConfig } from '../api/config'
 import type { ThemeConfig } from '../api/config'
+import { useBranding, DEFAULT_ORG_NAME } from '../contexts/BrandingContext'
 import {
   getUsageStats, getUsageTimeseries, getUserLeaderboard, getTeamLeaderboard,
   getTeamDetail, getUserDetail,
   getWorkflowEvents, getSystemConfig, updateSystemConfig, updateCompliancePolicyConfig,
-  addModel, updateModel, deleteModel, setDefaultModel, testOcr, testModel, probeModel, addOAuthProvider,
+  addModel, updateModel, deleteModel, setDefaultModel, testOcr, testModel, testPrompt, probeModel, addOAuthProvider,
   updateOAuthProvider, deleteOAuthProvider, updateAuthMethods,
   getQualitySummary, getQualityTimeline, runRegressionSuite,
   getQualityAlerts, acknowledgeAlert, getQualityItems, getQualityItemDetail,
@@ -41,6 +42,7 @@ import {
   getPostExperienceResponses, sendTestEmail, adminResendCredentials, adminGetMagicLink,
   adminAddDemoUser,
 } from '../api/demo'
+import type { TestPromptResult } from '../api/admin'
 import { getAdminPromptOverview, adminUpdatePrompt, type PromptOverview } from '../api/feedbackPrompt'
 import * as supportApi from '../api/support'
 import type { SupportTicket, SupportTicketSummary } from '../types/support'
@@ -72,6 +74,17 @@ function applyThemeToDOM(theme: ThemeConfig) {
   const root = document.documentElement
   root.style.setProperty('--highlight-color', theme.highlight_color)
   root.style.setProperty('--ui-radius', theme.ui_radius)
+}
+
+const MAX_LOGO_BYTES = 500_000 // matches backend cap on the encoded data URL
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
+    reader.onerror = () => reject(reader.error || new Error('Failed to read file'))
+    reader.readAsDataURL(file)
+  })
 }
 
 type Tab = 'usage' | 'users' | 'teams' | 'organizations' | 'workflows' | 'quality' | 'compliance' | 'audit' | 'demo' | 'email' | 'certifications' | 'apikeys' | 'config'
@@ -347,11 +360,14 @@ function UsageTab() {
   const [timeseries, setTimeseries] = useState<TimeseriesResponse | null>(null)
   const [days, setDays] = useState(30)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(() => {
     setLoading(true)
+    setError(null)
     Promise.all([getUsageStats(days), getUsageTimeseries(days)])
       .then(([s, ts]) => { setStats(s); setTimeseries(ts) })
+      .catch(e => setError(e?.message || 'Failed to load usage data'))
       .finally(() => setLoading(false))
   }, [days])
 
@@ -401,6 +417,13 @@ function UsageTab() {
   }
 
   if (loading && !stats) return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading usage data...</div>
+
+  if (error && !stats) return (
+    <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
+      <AlertCircle size={28} color="#d1d5db" style={{ marginBottom: 12 }} />
+      <div style={{ fontSize: 14, color: '#374151' }}>{error}</div>
+    </div>
+  )
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -734,7 +757,7 @@ function UsersTab() {
   const load = useCallback(() => {
     setLoading(true)
     const arg = typeof days === 'number' ? days : undefined
-    getUserLeaderboard(arg).then(setUsers).finally(() => setLoading(false))
+    getUserLeaderboard(arg).then(setUsers).catch(() => setUsers([])).finally(() => setLoading(false))
   }, [days])
 
   useEffect(() => { load() }, [load])
@@ -1100,7 +1123,7 @@ function TeamsTab() {
       setAllTeams(t)
       const def = t.find(x => x.is_default)
       if (def) setDefaultTeamUuid(def.uuid)
-    }).finally(() => setLoadingAll(false))
+    }).catch(() => setAllTeams([])).finally(() => setLoadingAll(false))
   }, [])
 
   const refreshIsolated = useCallback(() => {
@@ -1108,7 +1131,7 @@ function TeamsTab() {
     getIsolatedUsers().then(users => {
       setIsolated(users)
       setIsolatedLoaded(true)
-    }).finally(() => setLoadingIsolated(false))
+    }).catch(() => setIsolatedLoaded(true)).finally(() => setLoadingIsolated(false))
   }, [])
 
   useEffect(() => {
@@ -1122,7 +1145,7 @@ function TeamsTab() {
   const refreshStats = useCallback(() => {
     setLoadingStats(true)
     const arg = typeof statsDays === 'number' ? statsDays : undefined
-    getTeamLeaderboard(arg).then(setStatsTeams).finally(() => setLoadingStats(false))
+    getTeamLeaderboard(arg).then(setStatsTeams).catch(() => setStatsTeams([])).finally(() => setLoadingStats(false))
   }, [statsDays])
 
   useEffect(() => {
@@ -1557,7 +1580,7 @@ function WorkflowsTab() {
 
   const load = useCallback(() => {
     setLoading(true)
-    getWorkflowEvents(page, status || undefined, search || undefined).then(setData).finally(() => setLoading(false))
+    getWorkflowEvents(page, status || undefined, search || undefined).then(setData).catch(() => setData(null)).finally(() => setLoading(false))
   }, [page, status, search])
 
   useEffect(() => { load() }, [load])
@@ -2309,8 +2332,12 @@ function ConfigTab() {
   const [error, setError] = useState<string | null>(null)
 
   // Theme state
+  const branding = useBranding()
   const [themeColor, setThemeColor] = useState('#eab308')
   const [themeRadius, setThemeRadius] = useState(12)
+  const [themeOrgName, setThemeOrgName] = useState('')
+  const [themeLogo, setThemeLogo] = useState('')
+  const [themeLogoError, setThemeLogoError] = useState<string | null>(null)
   const [themeSaving, setThemeSaving] = useState(false)
   const [themeSaved, setThemeSaved] = useState(false)
 
@@ -2346,6 +2373,14 @@ function ConfigTab() {
   const [ocrTestResult, setOcrTestResult] = useState<{ ok: boolean; message: string } | null>(null)
   const [modelTesting, setModelTesting] = useState<number | null>(null)
   const [modelTestResults, setModelTestResults] = useState<Record<number, { ok: boolean; message: string }>>({})
+
+  // Prompt playground
+  const [playgroundModel, setPlaygroundModel] = useState('')
+  const [playgroundSystem, setPlaygroundSystem] = useState('')
+  const [playgroundUser, setPlaygroundUser] = useState('')
+  const [playgroundSending, setPlaygroundSending] = useState(false)
+  const [playgroundResult, setPlaygroundResult] = useState<TestPromptResult | null>(null)
+  const [playgroundError, setPlaygroundError] = useState<string | null>(null)
 
   // Auth
   const [authMethods, setAuthMethods] = useState<string[]>(['password'])
@@ -2452,6 +2487,8 @@ function ConfigTab() {
     getThemeConfig().then(t => {
       setThemeColor(t.highlight_color)
       setThemeRadius(parseInt(t.ui_radius) || 12)
+      setThemeOrgName(t.org_name || '')
+      setThemeLogo(t.logo_data_url || '')
     }).catch(() => {})
   }, [])
 
@@ -2501,12 +2538,37 @@ function ConfigTab() {
     setThemeSaving(true)
     setThemeSaved(false)
     try {
-      const updated = await updateThemeConfig({ highlight_color: themeColor, ui_radius: `${themeRadius}px` })
+      const updated = await updateThemeConfig({
+        highlight_color: themeColor,
+        ui_radius: `${themeRadius}px`,
+        org_name: themeOrgName.trim(),
+        logo_data_url: themeLogo,
+      })
       applyThemeToDOM(updated)
+      await branding.refresh()
       setThemeSaved(true)
       setTimeout(() => setThemeSaved(false), 3000)
     } finally {
       setThemeSaving(false)
+    }
+  }
+
+  const handleLogoFile = async (file: File | null) => {
+    setThemeLogoError(null)
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setThemeLogoError('Please choose an image file (PNG, SVG, JPG).')
+      return
+    }
+    try {
+      const dataUrl = await readFileAsDataUrl(file)
+      if (dataUrl.length > MAX_LOGO_BYTES) {
+        setThemeLogoError(`Image too large — keep encoded size under ${Math.round(MAX_LOGO_BYTES / 1024)} KB.`)
+        return
+      }
+      setThemeLogo(dataUrl)
+    } catch {
+      setThemeLogoError('Could not read the selected file.')
     }
   }
 
@@ -2658,6 +2720,25 @@ function ConfigTab() {
       setModelTestResults(prev => ({ ...prev, [index]: { ok: false, message: e instanceof Error ? e.message : 'Test failed' } }))
     } finally {
       setModelTesting(null)
+    }
+  }
+
+  const handleSendPlaygroundPrompt = async () => {
+    if (!playgroundUser.trim()) return
+    setPlaygroundSending(true)
+    setPlaygroundError(null)
+    setPlaygroundResult(null)
+    try {
+      const res = await testPrompt({
+        model_name: playgroundModel || cfg?.default_model || '',
+        system_prompt: playgroundSystem,
+        user_prompt: playgroundUser,
+      })
+      setPlaygroundResult(res)
+    } catch (e) {
+      setPlaygroundError(e instanceof Error ? e.message : 'Request failed')
+    } finally {
+      setPlaygroundSending(false)
     }
   }
 
@@ -2936,7 +3017,7 @@ function ConfigTab() {
                 </div>
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label style={labelStyle}>API Key (optional)</label>
-                  <input type="password" value={newModel.api_key} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, api_key: v })) }} placeholder="sk-..." style={inputStyle} />
+                  <input type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore name="vandalizer-model-api-key" value={newModel.api_key} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, api_key: v })) }} placeholder="sk-..." style={inputStyle} />
                 </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 12 }}>
@@ -3068,6 +3149,132 @@ function ConfigTab() {
         </div>
       </div>
 
+      {/* Prompt Playground */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}>
+          <Play size={18} color="#6b7280" /> Prompt Playground
+          <span style={{ fontSize: 12, fontWeight: 400, color: '#6b7280' }}>
+            — send a prompt to a configured model and see the raw round-trip
+          </span>
+        </div>
+        <div style={sectionBodyStyle}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 220px', gap: 16, alignItems: 'start' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={labelStyle}>System Prompt (optional)</label>
+                <textarea
+                  value={playgroundSystem}
+                  onChange={e => setPlaygroundSystem(e.target.value)}
+                  placeholder="e.g. You are a helpful assistant. Reply concisely."
+                  rows={3}
+                  style={{ ...inputStyle, fontFamily: 'ui-monospace, monospace', fontSize: 13, resize: 'vertical' }}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>User Prompt</label>
+                <textarea
+                  value={playgroundUser}
+                  onChange={e => setPlaygroundUser(e.target.value)}
+                  placeholder="Ask anything. The text below will be sent verbatim to the selected model."
+                  rows={5}
+                  style={{ ...inputStyle, fontFamily: 'ui-monospace, monospace', fontSize: 13, resize: 'vertical' }}
+                />
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={labelStyle}>Model</label>
+                <select
+                  value={playgroundModel}
+                  onChange={e => setPlaygroundModel(e.target.value)}
+                  style={inputStyle}
+                >
+                  <option value="">
+                    {cfg?.default_model ? `Default (${cfg.default_model})` : 'Default'}
+                  </option>
+                  {cfg?.available_models?.map((m, i) => (
+                    <option key={i} value={m.name}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
+              <button
+                onClick={handleSendPlaygroundPrompt}
+                disabled={playgroundSending || !playgroundUser.trim()}
+                style={{
+                  padding: '10px 16px', borderRadius: 'var(--ui-radius, 12px)', border: 'none',
+                  backgroundColor: '#111827', color: '#fff', fontSize: 13, fontWeight: 600,
+                  cursor: playgroundSending || !playgroundUser.trim() ? 'not-allowed' : 'pointer',
+                  opacity: playgroundSending || !playgroundUser.trim() ? 0.6 : 1,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                }}
+              >
+                <Play size={14} /> {playgroundSending ? 'Sending...' : 'Send'}
+              </button>
+              {playgroundResult && (
+                <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.6 }}>
+                  <div>Model: <span style={{ color: '#111', fontFamily: 'ui-monospace, monospace' }}>{playgroundResult.request.model}</span></div>
+                  <div>Latency: {playgroundResult.latency_ms} ms</div>
+                  {playgroundResult.tokens && (
+                    <div>
+                      Tokens: {playgroundResult.tokens.request ?? '?'} in / {playgroundResult.tokens.response ?? '?'} out
+                      {playgroundResult.tokens.total != null && ` / ${playgroundResult.tokens.total} total`}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {playgroundError && (
+            <div style={{ marginTop: 16, padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--ui-radius, 12px)', color: '#991b1b', fontSize: 13 }}>
+              {playgroundError}
+            </div>
+          )}
+
+          {playgroundResult && (
+            <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  Request sent
+                </div>
+                <pre style={{
+                  margin: 0, padding: 12, background: '#f9fafb', border: '1px solid #e5e7eb',
+                  borderRadius: 'var(--ui-radius, 12px)', fontSize: 12, lineHeight: 1.5,
+                  fontFamily: 'ui-monospace, monospace', color: '#111',
+                  whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 400, overflow: 'auto',
+                }}>
+{`[system]
+${playgroundResult.request.system_prompt || '(none)'}
+
+[user]
+${playgroundResult.request.user_prompt}`}
+                </pre>
+              </div>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {playgroundResult.ok ? (
+                    <><CheckCircle2 size={13} color="#059669" /> Response</>
+                  ) : (
+                    <><XCircle size={13} color="#dc2626" /> Error</>
+                  )}
+                </div>
+                <pre style={{
+                  margin: 0, padding: 12,
+                  background: playgroundResult.ok ? '#f9fafb' : '#fef2f2',
+                  border: `1px solid ${playgroundResult.ok ? '#e5e7eb' : '#fecaca'}`,
+                  borderRadius: 'var(--ui-radius, 12px)', fontSize: 12, lineHeight: 1.5,
+                  fontFamily: 'ui-monospace, monospace',
+                  color: playgroundResult.ok ? '#111' : '#991b1b',
+                  whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 400, overflow: 'auto',
+                }}>
+                  {playgroundResult.ok ? (playgroundResult.response_text || '(empty response)') : (playgroundResult.error || 'Unknown error')}
+                </pre>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Authentication */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
@@ -3179,7 +3386,7 @@ function ConfigTab() {
                           </div>
                           <div>
                             <label style={labelStyle}>Client Secret</label>
-                            <input type="password" value={editingProvider.client_secret} onChange={e => setEditingProvider({ ...editingProvider, client_secret: e.target.value })} style={inputStyle} placeholder="Leave as *** to keep existing" />
+                            <input type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore name="vandalizer-oauth-client-secret-edit" value={editingProvider.client_secret} onChange={e => setEditingProvider({ ...editingProvider, client_secret: e.target.value })} style={inputStyle} placeholder="Leave as *** to keep existing" />
                           </div>
                           <div style={{ gridColumn: '1 / -1' }}>
                             <label style={labelStyle}>Redirect URI</label>
@@ -3247,7 +3454,7 @@ function ConfigTab() {
                   </div>
                   <div>
                     <label style={labelStyle}>Client Secret</label>
-                    <input type="password" value={newProvider.client_secret} onChange={e => setNewProvider({ ...newProvider, client_secret: e.target.value })} style={inputStyle} />
+                    <input type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore name="vandalizer-oauth-client-secret-new" value={newProvider.client_secret} onChange={e => setNewProvider({ ...newProvider, client_secret: e.target.value })} style={inputStyle} />
                   </div>
                   <div style={{ gridColumn: '1 / -1' }}>
                     <label style={labelStyle}>Redirect URI (set automatically; register this in your identity provider)</label>
@@ -3302,7 +3509,9 @@ function ConfigTab() {
           <div style={{ marginTop: 12 }}>
             <label style={labelStyle}>OCR API Key (optional)</label>
             <input
-              type="password" value={ocrApiKey} onChange={e => setOcrApiKey(e.target.value)}
+              type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore
+              name="vandalizer-ocr-api-key"
+              value={ocrApiKey} onChange={e => setOcrApiKey(e.target.value)}
               placeholder="Bearer token..." style={{ ...inputStyle, maxWidth: 500 }}
             />
           </div>
@@ -3332,7 +3541,7 @@ function ConfigTab() {
       {/* UI Theme */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          <Palette size={18} color="#6b7280" /> UI Theme
+          <Palette size={18} color="#6b7280" /> UI Theme &amp; Branding
         </div>
         <div style={sectionBodyStyle}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
@@ -3352,6 +3561,81 @@ function ConfigTab() {
               </div>
             </div>
           </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginTop: 20 }}>
+            <div>
+              <label style={labelStyle}>Organization Name</label>
+              <input
+                type="text"
+                value={themeOrgName}
+                onChange={e => setThemeOrgName(e.target.value)}
+                placeholder={DEFAULT_ORG_NAME}
+                style={inputStyle}
+              />
+              <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>
+                Shown in the header, login page, browser tab, and chat greeting. Leave blank to keep "Vandalizer".
+              </div>
+            </div>
+            <div>
+              <label style={labelStyle}>Logo</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                  width: 180, height: 56, borderRadius: 'var(--ui-radius, 12px)',
+                  border: '1px solid #e5e7eb', background: '#f9fafb',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+                }}>
+                  {themeLogo ? (
+                    <img src={themeLogo} alt="Logo preview" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                  ) : (
+                    <img src="/images/Vandalizer_Wordmark_RGB.png" alt="Default Vandalizer logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', opacity: 0.7 }} />
+                  )}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <label style={{
+                    padding: '6px 12px', borderRadius: 'var(--ui-radius, 12px)',
+                    border: '1px solid #d1d5db', background: '#fff',
+                    fontSize: 12, fontWeight: 500, cursor: 'pointer', textAlign: 'center',
+                  }}>
+                    {themeLogo ? 'Replace' : 'Upload'}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                      onChange={e => handleLogoFile(e.target.files?.[0] || null)}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+                  {themeLogo && (
+                    <button
+                      type="button"
+                      onClick={() => { setThemeLogo(''); setThemeLogoError(null) }}
+                      style={{
+                        padding: '6px 12px', borderRadius: 'var(--ui-radius, 12px)',
+                        border: '1px solid #fee2e2', background: '#fff',
+                        color: '#b91c1c', fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                      }}
+                    >
+                      Use default
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>
+                Wordmark-style image works best. PNG with transparency recommended. Max ~{Math.round(MAX_LOGO_BYTES / 1024)} KB encoded.
+              </div>
+              {themeLogoError && (
+                <div style={{ fontSize: 12, color: '#b91c1c', marginTop: 6 }}>{themeLogoError}</div>
+              )}
+            </div>
+          </div>
+
+          <div style={{
+            marginTop: 16, padding: 12, background: '#f9fafb',
+            borderRadius: 'var(--ui-radius, 12px)', border: '1px dashed #e5e7eb',
+            fontSize: 12, color: '#6b7280', lineHeight: 1.5,
+          }}>
+            Vandalizer is open source under the GPL v3 license and developed at the University of Idaho with support from the NSF GRANTED program (Award #2427549). Even with your custom branding applied, the footer will continue to credit the Vandalizer project and acknowledge NSF funding.
+          </div>
+
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16 }}>
             <div style={{ backgroundColor: themeColor, borderRadius: `${themeRadius}px`, padding: '8px 20px', color: 'var(--highlight-text-color, #000)', fontWeight: 600, fontSize: 13 }}>
               Sample Button
@@ -6359,12 +6643,17 @@ export default function Admin() {
 
   const isGlobalAdmin = !!user?.is_admin
   const isStaff = !!user?.is_staff
-  const isExaminer = !!user?.is_examiner
   const isTeamAdmin = currentTeam?.role === 'owner' || currentTeam?.role === 'admin'
-  const hasAccess = isGlobalAdmin || isStaff || isExaminer || isTeamAdmin
+  // Examiners are intentionally excluded: every admin-panel endpoint gates on
+  // admin/staff/team-admin (see _require_admin_or_team_admin), so examiners would
+  // only hit 403s here. Their workspace is the Verification queue (/verification).
+  const hasAccess = isGlobalAdmin || isStaff || isTeamAdmin
 
-  // Staff see everything except config; examiners see analytics tabs only
-  const hiddenForNonAdmin = ['config', 'quality', 'compliance', 'demo', 'organizations', 'approvals', 'audit', 'certifications', 'apikeys']
+  // Staff see everything except config; team admins see only team-scoped tabs whose
+  // endpoints accept a team scope. Tabs whose backends require admin/staff (email,
+  // plus everything in hiddenForNonAdmin) stay hidden so we never render a tab that
+  // can only 403.
+  const hiddenForNonAdmin = ['config', 'quality', 'compliance', 'demo', 'organizations', 'approvals', 'audit', 'certifications', 'apikeys', 'email', 'teams']
   let visibleTabs = isGlobalAdmin
     ? TABS
     : isStaff
@@ -6403,7 +6692,7 @@ export default function Admin() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 20px', marginBottom: 20 }}>
             <Shield size={20} color="#6b7280" />
             <h1 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>
-              {isGlobalAdmin ? 'Admin' : isStaff ? 'Admin' : isExaminer ? 'Analytics' : 'Team Admin'}
+              {isGlobalAdmin || isStaff ? 'Admin' : 'Team Admin'}
             </h1>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '0 8px' }}>

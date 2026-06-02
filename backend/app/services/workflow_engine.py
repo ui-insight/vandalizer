@@ -734,12 +734,9 @@ class ResearchNode(Node):
 
 def _open_sync_db():
     """Open a pymongo handle for in-node credential lookups (sync context)."""
-    from pymongo import MongoClient
+    from app.tasks import get_sync_db
 
-    from app.config import Settings
-    settings = Settings()
-    client = MongoClient(settings.mongo_host)
-    return client[settings.mongo_db]
+    return get_sync_db()
 
 
 class APICallNode(Node):
@@ -1133,6 +1130,12 @@ class KnowledgeBaseQueryNode(Node):
 # Workflow Engine
 # ---------------------------------------------------------------------------
 
+class WorkflowCancelled(Exception):
+    """Raised inside execute() when a user-requested cancel is detected between
+    steps. Callers should treat this as a clean terminal stop (status
+    ``canceled``), not an error, and must not retry the task."""
+
+
 class WorkflowEngine:
     def __init__(self) -> None:
         self.nodes: list[Node] = []
@@ -1149,13 +1152,18 @@ class WorkflowEngine:
     def get_topological_order(self) -> list[Node]:
         return list(reversed(tuple(self.graph.static_order())))
 
-    def execute(self, workflow_result_updater=None, start_index=0, initial_output=None):
+    def execute(self, workflow_result_updater=None, start_index=0, initial_output=None,
+                should_cancel=None):
         """Execute workflow. Returns (final_output, step_data_list).
 
         Args:
             workflow_result_updater: Optional callable(update_dict) for progress.
             start_index: Index to start execution from (for resumption after approval).
             initial_output: Output to feed into the first node when resuming.
+            should_cancel: Optional callable() -> bool, polled before each step.
+                When it returns True the run is aborted with WorkflowCancelled.
+                This is the cooperative backstop for the between-steps case; an
+                in-flight step is interrupted out-of-band via Celery revocation.
         """
         data = []
         nodes = self.get_topological_order()
@@ -1165,6 +1173,11 @@ class WorkflowEngine:
             # Skip already-executed nodes when resuming
             if idx < start_index:
                 continue
+
+            # Cooperative cancellation: bail before starting the next step if the
+            # user requested a stop while we were between steps.
+            if should_cancel is not None and should_cancel():
+                raise WorkflowCancelled()
 
             if workflow_result_updater:
                 workflow_result_updater({

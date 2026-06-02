@@ -85,7 +85,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 4G
+          memory: 8G
           cpus: "4.0"
 
   celery:
@@ -118,7 +118,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 8G
+          memory: 12G
           cpus: "4.0"
 
   frontend:

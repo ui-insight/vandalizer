@@ -103,6 +103,10 @@ class WorkflowResult(Document):
     #          "oversize_documents": [{"uuid": ..., "title": ..., "token_count": ...}]}
     error_payload: Optional[dict] = None
     session_id: str
+    # Celery task id of the execution job, captured at enqueue time so a user
+    # can cancel an in-flight run (revoke + terminate). None for runs created
+    # before this field existed or for runs that never enqueued a task.
+    celery_task_id: Optional[str] = None
     current_step_name: Optional[str] = None
     current_step_detail: Optional[str] = None
     current_step_preview: Optional[str] = None
