@@ -1991,7 +1991,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
       getTeamMembers(teamUuid)
         .then(list => { if (!cancelled) setApprovalTeamMembers(list) })
         .catch(() => { if (!cancelled) setApprovalTeamMembers([]) })
-    )
+    ).catch(() => { if (!cancelled) setApprovalTeamMembers([]) })
     return () => { cancelled = true }
   }, [task.name, user?.current_team_uuid])
 

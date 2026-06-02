@@ -460,7 +460,7 @@ function ChatView({
     supportApi.markTicketRead(ticketUuid).catch(() => {})
     import('../../api/notifications').then(({ markReadForItem }) => {
       markReadForItem('support_ticket', ticketUuid).catch(() => {})
-    })
+    }).catch(() => {})
     const interval = setInterval(loadTicket, 15000)
     return () => clearInterval(interval)
   }, [loadTicket, ticketUuid])

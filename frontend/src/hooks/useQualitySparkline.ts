@@ -27,7 +27,9 @@ export function useQualitySparkline(kind: 'search_set' | 'workflow', itemId: str
           .then(r => setScores(r.scores))
           .catch(() => {})
           .finally(() => setLoading(false))
-      })
+        // If the lazy import itself fails, clear loading so we don't spin
+        // forever and don't leak an unhandled rejection.
+      }).catch(() => setLoading(false))
     }
   }, [kind, itemId, refreshKey])
 

@@ -281,7 +281,14 @@ export default function Landing() {
   const nextPath = safeNextPath(search?.next)
 
   useEffect(() => {
-    getAuthConfig().then(setAuthConfig)
+    // A network-level fetch failure (Safari reports these as "Load failed")
+    // rejects the promise; without a .catch() it surfaces as an unhandled
+    // rejection in Sentry and leaves AuthBlock spinning forever. Fall back to
+    // the same default getAuthConfig() uses for non-OK responses so the
+    // password form still renders.
+    getAuthConfig()
+      .then(setAuthConfig)
+      .catch(() => setAuthConfig({ auth_methods: ['password'], oauth_providers: [] }))
   }, [])
 
   useEffect(() => {
