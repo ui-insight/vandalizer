@@ -17,6 +17,7 @@ from app.services.support_service import (
     _iso_utc,
     _ticket_summary,
     _ticket_to_dict,
+    user_matches_support_contact,
 )
 from app.routers.support import (
     _drop_visible_helpers,
@@ -225,6 +226,55 @@ class TestInternalNotesSerialization:
         assert s["last_visible_message_preview"] is None
         assert s["last_visible_message_at"] is None
         assert s["visible_message_count"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Support-contact matching — decides who counts as a support agent
+# ---------------------------------------------------------------------------
+
+
+class TestUserMatchesSupportContact:
+    """Support contacts are typed by hand in the admin UI, so the matcher must
+    tolerate the admin entering the email instead of the user_id, or using
+    different casing — otherwise a configured agent silently can't see tickets.
+    """
+
+    def _user(self, user_id: str, email: str = "") -> SimpleNamespace:
+        return SimpleNamespace(user_id=user_id, email=email)
+
+    def test_exact_user_id_match(self):
+        contact = {"user_id": "jdoe", "email": "jdoe@uidaho.edu", "name": "J Doe"}
+        assert user_matches_support_contact(contact, self._user("jdoe"))
+
+    def test_match_is_case_insensitive(self):
+        # Registration lowercases user_id; an admin typing "JDoe" must still match.
+        contact = {"user_id": "JDoe", "email": "", "name": "J Doe"}
+        assert user_matches_support_contact(contact, self._user("jdoe"))
+
+    def test_contact_entered_by_email_matches_on_email(self):
+        # Admin typed the email into the user_id box (a common mistake) — still
+        # resolves because we compare emails too.
+        contact = {"user_id": "", "email": "jdoe@uidaho.edu", "name": "J Doe"}
+        user = self._user("jdoe", email="jdoe@uidaho.edu")
+        assert user_matches_support_contact(contact, user)
+
+    def test_short_username_contact_matches_oauth_upn_via_email(self):
+        # OAuth account: user_id is the full UPN, but the contact's email lines
+        # up with the account email.
+        contact = {"user_id": "jdoe", "email": "jdoe@uidaho.edu", "name": "J Doe"}
+        user = self._user("jdoe@uidaho.edu", email="jdoe@uidaho.edu")
+        assert user_matches_support_contact(contact, user)
+
+    def test_no_match_for_unrelated_user(self):
+        contact = {"user_id": "jdoe", "email": "jdoe@uidaho.edu", "name": "J Doe"}
+        assert not user_matches_support_contact(
+            contact, self._user("eve", email="eve@uidaho.edu")
+        )
+
+    def test_blank_contact_fields_do_not_match_blank_user_fields(self):
+        # Empty strings must not collapse into a match (both sides drop blanks).
+        contact = {"user_id": "", "email": "", "name": "Nobody"}
+        assert not user_matches_support_contact(contact, self._user("", email=""))
 
 
 # ---------------------------------------------------------------------------

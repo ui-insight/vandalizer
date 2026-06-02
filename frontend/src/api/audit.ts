@@ -42,6 +42,7 @@ export function queryAuditLog(params: {
 
 export function exportAuditLog(params?: {
   action?: string
+  actor_user_id?: string
   resource_type?: string
   start_time?: string
   end_time?: string

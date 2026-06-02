@@ -31,6 +31,7 @@ const Reviews = lazy(() => import('./pages/Reviews'))
 const ReviewDetail = lazy(() => import('./pages/ReviewDetail'))
 const Login = lazy(() => import('./pages/Login'))
 const ResetPassword = lazy(() => import('./pages/ResetPassword'))
+const Present = lazy(() => import('./pages/present/Present'))
 
 // Certification is now a dockable panel — this redirect opens it from old bookmarks
 function CertificationRedirect() {
@@ -255,6 +256,30 @@ const docsRoute = createRoute({
   component: Docs,
 })
 
+// Present & Pitch — public communications surface, lives under /docs
+const presentHubRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/docs/present',
+  component: Present,
+})
+
+const presentTrackRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/docs/present/$audience',
+  validateSearch: (search: Record<string, unknown>) => ({
+    mode: (search.mode === 'deck' ? 'deck' : undefined) as 'deck' | undefined,
+    slide: (typeof search.slide === 'number'
+      ? search.slide
+      : typeof search.slide === 'string' && search.slide.trim() !== ''
+        ? Number(search.slide) || undefined
+        : undefined),
+    pitch: (search.pitch === 'spoken' || search.pitch === 'written'
+      ? (search.pitch as 'spoken' | 'written')
+      : undefined),
+  }),
+  component: Present,
+})
+
 const demoRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/demo',
@@ -374,6 +399,8 @@ const routeTree = rootRoute.addChildren([
   verificationRoute,
   supportRoute,
   docsRoute,
+  presentHubRoute,
+  presentTrackRoute,
   certificationRoute,
   demoRoute,
   demoFeedbackRoute,

@@ -906,6 +906,39 @@ async def _notify_watchers_status(
         )
 
 
+def user_matches_support_contact(contact: dict, user: User) -> bool:
+    """Whether a configured support contact refers to ``user``.
+
+    Support contacts are entered by hand in the admin UI, so we can't assume
+    the admin typed the exact stored ``user_id``. Match on either ``user_id``
+    or ``email``, normalized (trimmed + lowercased), so a contact added by
+    email, by short username, or with different casing still resolves to the
+    right account.
+    """
+    contact_keys = {
+        (contact.get("user_id") or "").strip().lower(),
+        (contact.get("email") or "").strip().lower(),
+    }
+    contact_keys.discard("")
+    user_keys = {
+        (user.user_id or "").strip().lower(),
+        (user.email or "").strip().lower(),
+    }
+    user_keys.discard("")
+    return bool(contact_keys & user_keys)
+
+
+async def is_support_user(user: User) -> bool:
+    """True if ``user`` is an admin or a configured support contact."""
+    if user.is_admin:
+        return True
+    config = await SystemConfig.get_config()
+    return any(
+        user_matches_support_contact(c, user)
+        for c in (config.support_contacts or [])
+    )
+
+
 async def get_support_contacts() -> list[dict]:
     """Return the list of support contacts from system config."""
     config = await SystemConfig.get_config()

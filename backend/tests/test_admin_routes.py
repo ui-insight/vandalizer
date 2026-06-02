@@ -1,5 +1,6 @@
 """Route tests for admin analytics scoping."""
 
+import datetime
 import secrets
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -394,3 +395,137 @@ class TestAdminAnalyticsScoping:
             "0123456789abcdef01234567",
             "team-uuid",
         ]
+
+
+class TestUserActivityHistory:
+    """The per-user audit drill-down (GET /users/{id}/history)."""
+
+    @staticmethod
+    def _activity_query_mock(events):
+        find = MagicMock()
+        find.sort.return_value.limit.return_value.to_list = AsyncMock(return_value=events)
+        return find
+
+    @pytest.mark.asyncio
+    async def test_staff_without_admin_rejected(self, client):
+        """Super-admin only: is_staff (require_admin elsewhere) must get 403."""
+        user = _make_user("staffer", is_admin=False)
+        user.is_staff = True
+        cookies, headers = _auth("staffer")
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "staffer", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            resp = await client.get("/api/admin/users/member-1/history", cookies=cookies, headers=headers)
+
+        assert resp.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_merges_and_sorts_newest_first(self, client):
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+
+        t1 = datetime.datetime(2026, 1, 1, 9, 0, 0)   # oldest  (activity)
+        t2 = datetime.datetime(2026, 1, 1, 10, 0, 0)  # middle  (audit)
+        t3 = datetime.datetime(2026, 1, 1, 11, 0, 0)  # newest  (activity)
+
+        audit_entry = SimpleNamespace(
+            timestamp=t2, action="user.login", resource_name=None,
+            resource_type="user", resource_id="member-1",
+            ip_address="10.0.0.1", detail={"method": "password"},
+        )
+        older_activity = SimpleNamespace(
+            started_at=t1, type="conversation", title="Chat A", status="completed",
+            id="act-1", tokens_input=1, tokens_output=2, steps_completed=0, steps_total=0, error=None,
+        )
+        newer_activity = SimpleNamespace(
+            started_at=t3, type="workflow_run", title="WF B", status="failed",
+            id="act-2", tokens_input=3, tokens_output=4, steps_completed=1, steps_total=2, error="boom",
+        )
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.User") as MockRouteUser,
+            patch("app.routers.admin.audit_service") as MockAudit,
+            patch("app.routers.admin.ActivityEvent") as MockActivity,
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockRouteUser.find_one = AsyncMock(
+                return_value=SimpleNamespace(user_id="member-1", name="Member One", email="m1@example.com")
+            )
+            MockAudit.query_audit_log = AsyncMock(return_value=([audit_entry], 1))
+            MockActivity.find.return_value = self._activity_query_mock([newer_activity, older_activity])
+
+            resp = await client.get("/api/admin/users/member-1/history", cookies=cookies, headers=headers)
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 3
+        assert data["capped"] is False
+        # Newest-first across both sources.
+        assert [it["source"] for it in data["items"]] == ["activity", "audit", "activity"]
+        assert data["items"][0]["action"] == "workflow_run"
+        assert data["items"][0]["status"] == "failed"
+        assert data["items"][1]["action"] == "user.login"
+        assert data["items"][1]["ip_address"] == "10.0.0.1"
+        # The audit query was scoped to the target user.
+        assert MockAudit.query_audit_log.call_args.kwargs["actor_user_id"] == "member-1"
+
+    @pytest.mark.asyncio
+    async def test_pagination_slices_merged_feed(self, client):
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+
+        events = [
+            SimpleNamespace(
+                started_at=datetime.datetime(2026, 1, 1, h, 0, 0), type="conversation",
+                title=f"Chat {h}", status="completed", id=f"act-{h}",
+                tokens_input=0, tokens_output=0, steps_completed=0, steps_total=0, error=None,
+            )
+            for h in range(5)
+        ]
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.User") as MockRouteUser,
+            patch("app.routers.admin.audit_service") as MockAudit,
+            patch("app.routers.admin.ActivityEvent") as MockActivity,
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockRouteUser.find_one = AsyncMock(
+                return_value=SimpleNamespace(user_id="member-1", name="M", email="m@example.com")
+            )
+            MockAudit.query_audit_log = AsyncMock(return_value=([], 0))
+            MockActivity.find.return_value = self._activity_query_mock(events)
+
+            resp = await client.get(
+                "/api/admin/users/member-1/history?skip=2&limit=2", cookies=cookies, headers=headers
+            )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 5
+        assert len(data["items"]) == 2
+        # Newest-first => hours 4,3,2,1,0; skip=2,limit=2 => hours 2 then 1.
+        assert data["items"][0]["title"] == "Chat 2"
+        assert data["items"][1]["title"] == "Chat 1"
+
+    @pytest.mark.asyncio
+    async def test_missing_user_returns_404(self, client):
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.User") as MockRouteUser,
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockRouteUser.find_one = AsyncMock(return_value=None)
+            resp = await client.get("/api/admin/users/ghost/history", cookies=cookies, headers=headers)
+
+        assert resp.status_code == 404

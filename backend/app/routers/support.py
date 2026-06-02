@@ -9,7 +9,6 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 
 from app.dependencies import get_current_user
-from app.models.system_config import SystemConfig
 from app.models.user import User
 from app.services import support_service
 
@@ -136,11 +135,7 @@ def _can_delete_attachment(attachment: dict, user: User, is_support: bool) -> bo
 
 async def _is_support_user(user: User) -> bool:
     """Check if user is a support contact or admin."""
-    if user.is_admin:
-        return True
-    config = await SystemConfig.get_config()
-    contacts = config.support_contacts or []
-    return any(c.get("user_id") == user.user_id for c in contacts)
+    return await support_service.is_support_user(user)
 
 
 # ---------------------------------------------------------------------------

@@ -63,6 +63,31 @@ class TestExtractionNode:
         assert args[0][1] == ["Title"]
 
     @patch("app.services.workflow_engine.data_extraction_model")
+    def test_extraction_forwards_field_metadata(self, mock_extract):
+        """Optional designations + enum validation resolved from a saved set
+        must reach the engine when an extraction runs inside a workflow."""
+        mock_extract.return_value = {"raw": [], "formatted": ""}
+        field_metadata = [
+            {"key": "Status", "is_optional": False, "enum_values": ["Open", "Closed"]},
+            {"key": "Notes", "is_optional": True, "enum_values": []},
+        ]
+        node = ExtractionNode({
+            "model": "gpt-4o",
+            "keys": ["Status", "Notes"],
+            "field_metadata": field_metadata,
+        })
+        node.process({"output": ["uuid1"], "step_name": "Document"})
+        assert mock_extract.call_args.kwargs.get("field_metadata") == field_metadata
+
+    @patch("app.services.workflow_engine.data_extraction_model")
+    def test_extraction_omits_field_metadata_when_absent(self, mock_extract):
+        """Manual-field extractions (no saved set) pass no field_metadata."""
+        mock_extract.return_value = {"raw": [], "formatted": ""}
+        node = ExtractionNode({"model": "gpt-4o", "keys": ["X"]})
+        node.process({"output": ["uuid1"], "step_name": "Document"})
+        assert "field_metadata" not in mock_extract.call_args.kwargs
+
+    @patch("app.services.workflow_engine.data_extraction_model")
     def test_extraction_from_selected_document(self, mock_extract):
         mock_extract.return_value = {"raw": [{"Name": "Bob"}], "formatted": ""}
         node = ExtractionNode({

@@ -334,6 +334,12 @@ export default function Landing() {
           <img src="/images/Vandalizer_Wordmark_Color_RGB+W.png" alt="Vandalizer" className="h-10" />
           <div className="flex items-center gap-4">
             <Link
+              to="/docs/present"
+              className="text-sm text-gray-400 hover:text-highlight transition-colors"
+            >
+              Overview
+            </Link>
+            <Link
               to="/docs"
               className="text-sm text-gray-400 hover:text-highlight transition-colors"
             >
