@@ -347,7 +347,21 @@ export function ExtractionAutovalidatePanel({ searchSetUuid, canManage, onApplie
   }))
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    // Cohesive dark surface for the whole completed view. Every child here
+    // (QualityComparisonCard, BestConfigCard, the trials/reproducibility/history
+    // panels, and the tinted result banners) is dark-themed with light text —
+    // they assume a dark backdrop. This panel renders inside the extraction
+    // editor's Validate tab, which is a white (#fff) page, so without this
+    // wrapper the dark cards float as washed-out islands and the translucent
+    // tint banners composite over white into near-invisible pastels. The
+    // wrapper mirrors the sibling WorkflowAutovalidatePanel, which solves the
+    // same problem the same way in the workflow editor's Validate tab. #1a1a1a
+    // (a hair darker than the #1f1f1f cards) gives them subtle elevation.
+    <div style={{
+      display: 'flex', flexDirection: 'column', gap: 12,
+      padding: 16, borderRadius: 8,
+      background: '#1a1a1a', border: '1px solid #2a2a2a',
+    }}>
       {isPast && (
         <PastRunBanner
           startedAt={displayedRun.started_at}

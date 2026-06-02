@@ -329,13 +329,14 @@ def optimize_extraction_task(
     apply_on_finish: bool = False,
     max_candidates: int = 8,
     include_judge: bool = False,
+    test_case_uuids: list[str] | None = None,
 ):
     """Drive an ExtractionOptimizationRun. The pre-allocated run doc is passed
     in so the API route can return its UUID immediately.
     """
     return _run_async(_optimize_extraction_async(
         search_set_uuid, user_id, run_uuid, budget_tokens, apply_on_finish,
-        max_candidates, include_judge,
+        max_candidates, include_judge, test_case_uuids,
     ))
 
 
@@ -347,6 +348,7 @@ async def _optimize_extraction_async(
     apply_on_finish: bool,
     max_candidates: int,
     include_judge: bool,
+    test_case_uuids: list[str] | None = None,
 ):
     from app.config import Settings
     from app.database import init_db
@@ -361,6 +363,7 @@ async def _optimize_extraction_async(
         apply_on_finish=apply_on_finish,
         max_candidates=max_candidates,
         include_judge=include_judge,
+        test_case_uuids=test_case_uuids,
     )
     return {
         "run_uuid": run_uuid,

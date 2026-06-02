@@ -180,6 +180,7 @@ async def run_optimization(
     max_candidates: int = 8,
     num_runs: int = DEFAULT_NUM_RUNS_PER_TRIAL,
     include_judge: bool = False,
+    test_case_uuids: list[str] | None = None,
 ) -> ExtractionOptimizationRun:
     """Execute the full optimization loop. Caller pre-allocates the run doc.
 
@@ -212,6 +213,11 @@ async def run_optimization(
         test_cases = await ExtractionTestCase.find(
             ExtractionTestCase.search_set_uuid == search_set_uuid,
         ).to_list()
+        # Honor the wizard's checkbox selection: when a subset was chosen, tune
+        # against exactly those cases. None/empty = every case for the set.
+        if test_case_uuids:
+            wanted = set(test_case_uuids)
+            test_cases = [tc for tc in test_cases if tc.uuid in wanted]
         test_cases = [tc for tc in test_cases if tc.expected_values
                       and any(v for v in tc.expected_values.values())]
         if not test_cases:

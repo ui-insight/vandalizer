@@ -571,6 +571,9 @@ export interface StartExtractionOptimizationOptions {
   apply_on_finish?: boolean
   /** Phase 1B: when true, use semantic LLM judge instead of strict-match scoring. */
   include_judge?: boolean
+  /** Wizard checkbox selection — only these test cases participate in the run.
+   *  Omitted/empty means tune against every test case for the set. */
+  test_case_uuids?: string[]
 }
 
 /** Cheap no-settings baseline probe used by the tuning wizard. Mirrors KB's
@@ -610,6 +613,9 @@ export function startExtractionOptimization(uuid: string, opts: StartExtractionO
         max_candidates: opts.max_candidates ?? 8,
         apply_on_finish: opts.apply_on_finish ?? false,
         include_judge: opts.include_judge ?? false,
+        ...(opts.test_case_uuids && opts.test_case_uuids.length
+          ? { test_case_uuids: opts.test_case_uuids }
+          : {}),
       }),
     }
   )

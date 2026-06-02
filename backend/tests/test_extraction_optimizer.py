@@ -263,6 +263,69 @@ async def test_run_optimization_applies_on_finish_when_requested():
 
 
 @pytest.mark.asyncio
+async def test_run_optimization_honors_test_case_selection():
+    """When test_case_uuids is passed, only those cases reach the scorer."""
+    run_doc = _make_run_doc()
+    ss = _make_search_set()
+    cases = [
+        _make_test_case("tc-1"),
+        _make_test_case("tc-2"),
+        _make_test_case("tc-3"),
+    ]
+
+    results = [
+        {"label": "baseline-no-tool", "model": "m", "config_override": {},
+         "accuracy": 0.2, "consistency": 0.6, "score": 36.0, "elapsed_seconds": 1.0},
+        {"label": "baseline-default", "model": "claude-haiku", "config_override": {"model": "claude-haiku"},
+         "accuracy": 0.5, "consistency": 0.8, "score": 62.0, "elapsed_seconds": 1.0},
+        {"label": "winner", "model": "m1", "config_override": {"strategy": "one-pass"},
+         "accuracy": 0.9, "consistency": 0.95, "score": 92.0, "elapsed_seconds": 1.5},
+    ]
+    call_iter = iter(results)
+    seen_case_uuids: list[set[str]] = []
+
+    async def fake_run_single_config(**kwargs):
+        seen_case_uuids.append({tc.uuid for tc in kwargs["test_cases"]})
+        return next(call_iter)
+
+    candidates = [{"label": "winner", "model": "m1", "config_override": {"strategy": "one-pass"}}]
+
+    with (
+        patch.object(extraction_optimizer, "ExtractionOptimizationRun") as MockRun,
+        patch.object(extraction_optimizer, "ExtractionTestCase") as MockTC,
+        patch.object(extraction_optimizer, "SearchSet") as MockSS,
+        patch.object(extraction_optimizer, "SystemConfig") as MockSC,
+        patch.object(extraction_optimizer, "get_extraction_keys",
+                     new=AsyncMock(return_value=["PI Name"])),
+        patch.object(extraction_optimizer, "get_extraction_field_metadata",
+                     new=AsyncMock(return_value=[])),
+        patch.object(extraction_optimizer, "get_user_model_name",
+                     new=AsyncMock(return_value="claude-haiku")),
+        patch.object(extraction_optimizer, "_build_candidate_configs",
+                     return_value=candidates),
+        patch.object(extraction_optimizer, "_run_single_config",
+                     new=AsyncMock(side_effect=fake_run_single_config)),
+    ):
+        MockRun.find_one = AsyncMock(return_value=run_doc)
+        find_call = MagicMock(); find_call.to_list = AsyncMock(return_value=cases)
+        MockTC.find = MagicMock(return_value=find_call)
+        MockSS.find_one = AsyncMock(return_value=ss)
+        sys_cfg = MagicMock(); sys_cfg.available_models = []
+        sys_cfg.model_dump = MagicMock(return_value={})
+        MockSC.get_config = AsyncMock(return_value=sys_cfg)
+
+        result = await extraction_optimizer.run_optimization(
+            search_set_uuid="ss-1", user_id="u1", run_uuid="opt-1",
+            max_candidates=1, test_case_uuids=["tc-2"],
+        )
+
+    assert result.status == "completed"
+    # Every scorer call (baselines + trial) saw only the selected case.
+    assert seen_case_uuids and all(s == {"tc-2"} for s in seen_case_uuids)
+    assert run_doc.train_test_case_uuids == ["tc-2"]
+
+
+@pytest.mark.asyncio
 async def test_run_optimization_fails_with_no_test_cases():
     """Missing test cases must surface as a clear error, not a silent pass."""
     run_doc = _make_run_doc()

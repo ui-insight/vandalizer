@@ -1498,6 +1498,9 @@ class StartExtractionOptimizationRequest(BaseModel):
     # scoring instead of strict string matching. Costs more tokens; produces
     # less false-failure noise on date/name/format variation.
     include_judge: bool = False
+    # Wizard checkbox selection: when provided, the run uses exactly these test
+    # cases. None/empty means "use every test case for the set" (legacy behavior).
+    test_case_uuids: list[str] | None = None
 
 
 @router.post("/search-sets/{uuid}/baseline-probe")
@@ -1654,6 +1657,9 @@ async def start_extraction_optimization(
             detail=f"Optimization already in progress (run {active.uuid})",
         )
 
+    # Drop blanks/dupes; None means "use every test case" downstream.
+    selected_case_uuids = list(dict.fromkeys(u for u in (req.test_case_uuids or []) if u)) or None
+
     run = ExtractionOptimizationRun(
         search_set_uuid=ss.uuid,
         user_id=user.user_id,
@@ -1663,6 +1669,7 @@ async def start_extraction_optimization(
             "apply_on_finish": req.apply_on_finish,
             "max_candidates": req.max_candidates,
             "include_judge": req.include_judge,
+            "test_case_uuids": selected_case_uuids,
         },
     )
     await run.insert()
@@ -1674,6 +1681,7 @@ async def start_extraction_optimization(
         bool(req.apply_on_finish),
         max(1, int(req.max_candidates)),
         bool(req.include_judge),
+        selected_case_uuids,
     )
     return {"run_uuid": run.uuid, "status": "queued"}
 
