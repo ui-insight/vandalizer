@@ -1487,6 +1487,7 @@ def _serialize_extraction_optimization_run(run) -> dict:
         "started_at": run.started_at.isoformat() if run.started_at else None,
         "completed_at": run.completed_at.isoformat() if run.completed_at else None,
         "cancel_requested": run.cancel_requested,
+        "cancel_requested_at": run.cancel_requested_at.isoformat() if getattr(run, "cancel_requested_at", None) else None,
     }
 
 
@@ -1642,9 +1643,16 @@ async def start_extraction_optimization(
     Returns ``{run_uuid, status: "queued"}``. The UI polls
     ``GET /search-sets/{uuid}/optimize/{run_uuid}`` for progress.
     """
+    import uuid as _uuid
+
     from app.models.extraction_optimization_run import ExtractionOptimizationRun
+    from app.services.extraction_optimizer import reap_stale_runs
 
     ss = await _get_search_set_or_404(uuid, user, manage=True)
+
+    # Recover any orphaned run first so a dead worker's "running" doc can't
+    # permanently block new runs via the 409 below.
+    await reap_stale_runs(ss.uuid)
 
     # Reject if a non-terminal run already exists.
     active = await ExtractionOptimizationRun.find_one(
@@ -1660,11 +1668,17 @@ async def start_extraction_optimization(
     # Drop blanks/dupes; None means "use every test case" downstream.
     selected_case_uuids = list(dict.fromkeys(u for u in (req.test_case_uuids or []) if u)) or None
 
+    # Generate the Celery task id up front so it's persisted before dispatch —
+    # no race where the task finishes before we record the id. It's the handle
+    # the cancel endpoint + stale-run watchdog use to hard-revoke a wedged run.
+    celery_task_id = _uuid.uuid4().hex
+
     run = ExtractionOptimizationRun(
         search_set_uuid=ss.uuid,
         user_id=user.user_id,
         status="queued",
         token_budget=max(0, int(req.token_budget)),
+        celery_task_id=celery_task_id,
         options={
             "apply_on_finish": req.apply_on_finish,
             "max_candidates": req.max_candidates,
@@ -1675,13 +1689,16 @@ async def start_extraction_optimization(
     await run.insert()
 
     from app.tasks.extraction_tasks import optimize_extraction_task
-    optimize_extraction_task.delay(
-        ss.uuid, user.user_id, run.uuid,
-        max(0, int(req.token_budget)),
-        bool(req.apply_on_finish),
-        max(1, int(req.max_candidates)),
-        bool(req.include_judge),
-        selected_case_uuids,
+    optimize_extraction_task.apply_async(
+        args=[
+            ss.uuid, user.user_id, run.uuid,
+            max(0, int(req.token_budget)),
+            bool(req.apply_on_finish),
+            max(1, int(req.max_candidates)),
+            bool(req.include_judge),
+            selected_case_uuids,
+        ],
+        task_id=celery_task_id,
     )
     return {"run_uuid": run.uuid, "status": "queued"}
 
@@ -1693,12 +1710,17 @@ async def get_active_extraction_optimization(
 ) -> dict:
     """Return the active (queued/running) optimization run, or null."""
     from app.models.extraction_optimization_run import ExtractionOptimizationRun
+    from app.services.extraction_optimizer import reap_one
 
     ss = await _get_search_set_or_404(uuid, user)
     run = await ExtractionOptimizationRun.find_one(
         ExtractionOptimizationRun.search_set_uuid == ss.uuid,
         {"status": {"$in": ["queued", "running"]}},
     )
+    # Self-heal an orphaned run on read; if reaped it's no longer active.
+    run = await reap_one(run)
+    if run is not None and run.status not in ("queued", "running"):
+        run = None
     return {"run": _serialize_extraction_optimization_run(run) if run else None}
 
 
@@ -1765,6 +1787,7 @@ async def get_extraction_optimization(
 ) -> dict:
     """Full state of an optimization run (for polling)."""
     from app.models.extraction_optimization_run import ExtractionOptimizationRun
+    from app.services.extraction_optimizer import reap_one
 
     ss = await _get_search_set_or_404(uuid, user)
     run = await ExtractionOptimizationRun.find_one(
@@ -1773,6 +1796,8 @@ async def get_extraction_optimization(
     )
     if not run:
         raise HTTPException(status_code=404, detail="Optimization run not found")
+    # Self-heal a forever-"Cancelling…"/"Running…" run the next time it's polled.
+    run = await reap_one(run)
     return _serialize_extraction_optimization_run(run)
 
 
@@ -1782,8 +1807,15 @@ async def cancel_extraction_optimization(
     run_uuid: str,
     user: User = Depends(get_current_user),
 ) -> dict:
-    """Request cancellation. The worker checks this flag between trials."""
+    """Request cancellation.
+
+    The worker re-reads this flag every few seconds and finalizes promptly. We
+    also hard-revoke the Celery task as a fallback for a worker too wedged to
+    reach its next poll; if even that fails, the stale-run watchdog finalizes
+    the run on the next read.
+    """
     from app.models.extraction_optimization_run import ExtractionOptimizationRun
+    from app.services.extraction_optimizer import _revoke_task
 
     ss = await _get_search_set_or_404(uuid, user, manage=True)
     run = await ExtractionOptimizationRun.find_one(
@@ -1795,7 +1827,9 @@ async def cancel_extraction_optimization(
     if run.status not in ("queued", "running"):
         return {"ok": True, "status": run.status, "note": "not running"}
     run.cancel_requested = True
+    run.cancel_requested_at = datetime.datetime.now(tz=datetime.timezone.utc)
     await run.save()
+    _revoke_task(run)
     return {"ok": True, "status": "cancel_requested"}
 
 

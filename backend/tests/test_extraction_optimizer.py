@@ -702,3 +702,123 @@ def test_suggestions_skip_fields_with_no_accuracy():
     fields_flagged = {s.get("field") for s in out if s.get("field")}
     assert "Y" in fields_flagged
     assert "X" not in fields_flagged
+
+
+# ---------------------------------------------------------------------------
+# Cancellation fix — re-fetch cancel flag + stale-run watchdog
+# ---------------------------------------------------------------------------
+
+
+import datetime as _dt  # noqa: E402
+
+from app.services.extraction_optimizer import (  # noqa: E402
+    CANCEL_REAP_GRACE_SECONDS,
+    STALE_RUN_TIMEOUT_SECONDS,
+    _is_cancelled,
+    reap_one,
+)
+
+
+def _reapable_run(**kw) -> MagicMock:
+    now = _dt.datetime.now(tz=_dt.timezone.utc)
+    rd = MagicMock()
+    rd.uuid = kw.get("uuid", "opt-1")
+    rd.status = kw.get("status", "running")
+    rd.phase = kw.get("phase", "sweep")
+    rd.cancel_requested = kw.get("cancel_requested", False)
+    rd.cancel_requested_at = kw.get("cancel_requested_at", None)
+    rd.started_at = kw.get("started_at", now)
+    rd.celery_task_id = kw.get("celery_task_id", None)
+    rd.progress_message = kw.get("progress_message", "")
+    rd.save = AsyncMock()
+    return rd
+
+
+@pytest.mark.asyncio
+async def test_is_cancelled_refetches_flag_from_db():
+    """The worker's in-memory doc is stale; cancel is read fresh from Mongo."""
+    run = _reapable_run(cancel_requested=False)
+    fresh = _reapable_run(
+        cancel_requested=True,
+        cancel_requested_at=_dt.datetime.now(tz=_dt.timezone.utc),
+    )
+    with patch.object(extraction_optimizer, "ExtractionOptimizationRun") as MockRun:
+        MockRun.find_one = AsyncMock(return_value=fresh)
+        assert await _is_cancelled(run) is True
+    # The fresh flag is copied onto the in-memory doc so finalize stays consistent.
+    assert run.cancel_requested is True
+
+
+@pytest.mark.asyncio
+async def test_is_cancelled_false_when_db_flag_unset():
+    run = _reapable_run(cancel_requested=False)
+    fresh = _reapable_run(cancel_requested=False)
+    with patch.object(extraction_optimizer, "ExtractionOptimizationRun") as MockRun:
+        MockRun.find_one = AsyncMock(return_value=fresh)
+        assert await _is_cancelled(run) is False
+
+
+@pytest.mark.asyncio
+async def test_reap_one_noop_for_fresh_running_run():
+    run = _reapable_run(status="running")
+    out = await reap_one(run)
+    assert out.status == "running"
+    run.save.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_reap_one_noop_for_terminal_run():
+    run = _reapable_run(status="completed")
+    out = await reap_one(run)
+    assert out.status == "completed"
+    run.save.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_reap_one_fails_stale_running_run():
+    old = _dt.datetime.now(tz=_dt.timezone.utc) - _dt.timedelta(
+        seconds=STALE_RUN_TIMEOUT_SECONDS + 60
+    )
+    run = _reapable_run(status="running", started_at=old)
+    out = await reap_one(run)
+    assert out.status == "failed"
+    assert out.stopped_reason == "stale"
+    run.save.assert_awaited()
+
+
+@pytest.mark.asyncio
+async def test_reap_one_cancels_when_grace_exceeded():
+    now = _dt.datetime.now(tz=_dt.timezone.utc)
+    run = _reapable_run(
+        status="running",
+        cancel_requested=True,
+        cancel_requested_at=now - _dt.timedelta(seconds=CANCEL_REAP_GRACE_SECONDS + 10),
+        started_at=now,  # not stale by age — only the cancel grace fires
+    )
+    out = await reap_one(run)
+    assert out.status == "cancelled"
+    assert out.stopped_reason == "cancelled"
+
+
+@pytest.mark.asyncio
+async def test_reap_one_keeps_recent_cancel_pending():
+    """A just-requested cancel is left for the live worker to finalize."""
+    now = _dt.datetime.now(tz=_dt.timezone.utc)
+    run = _reapable_run(
+        status="running",
+        cancel_requested=True,
+        cancel_requested_at=now - _dt.timedelta(seconds=5),
+        started_at=now,
+    )
+    out = await reap_one(run)
+    assert out.status == "running"
+    run.save.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_reap_one_handles_naive_timestamps():
+    """Mongo round-trips can drop tzinfo; the watchdog must still compute age."""
+    naive_old = _dt.datetime.utcnow() - _dt.timedelta(seconds=STALE_RUN_TIMEOUT_SECONDS + 60)
+    run = _reapable_run(status="running", started_at=naive_old)
+    out = await reap_one(run)
+    assert out.status == "failed"

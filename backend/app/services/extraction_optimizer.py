@@ -20,6 +20,7 @@ Phase 1A: strict-match scoring only (no LLM judge — that's Phase 1B).
 
 from __future__ import annotations
 
+import asyncio
 import datetime
 import hashlib
 import logging
@@ -70,6 +71,36 @@ CONVERGENCE_MIN_TRIALS = 6
 # Patience window: trials in a row without improving the leader before we
 # consider stopping. Larger = more conservative.
 CONVERGENCE_PATIENCE = 4
+
+# How often the trial guard wakes to re-check ``cancel_requested`` while a
+# single config runs in the background. Small enough that a UI cancel feels
+# instant; large enough not to hammer Mongo.
+CANCEL_POLL_INTERVAL_SECONDS = 5.0
+
+# Per-config wall-clock ceiling. A single hung / rate-limited LLM call must not
+# wedge the whole run past this — we cancel that config, record it failed, and
+# move on. Generous enough that a legitimately slow judged config (many cases ×
+# fields × runs) finishes well within it.
+PER_TRIAL_TIMEOUT_SECONDS = 900.0
+
+# A run still "running"/"queued" this long after ``started_at`` has almost
+# certainly lost its worker (Celery's hard time_limit on the task is 5460s).
+# The watchdog flips such orphans to failed so the UI stops spinning forever
+# and a fresh run can start.
+STALE_RUN_TIMEOUT_SECONDS = 5460 + 240  # task hard time_limit + 4 min buffer
+
+# A cancel the worker hasn't honored within this window means the worker is
+# gone — a live worker honors cancel within one CANCEL_POLL_INTERVAL. The
+# watchdog then finalizes the run as cancelled on the user's behalf.
+CANCEL_REAP_GRACE_SECONDS = 180
+
+
+class _TrialCancelled(Exception):
+    """Raised inside the optimization loop when a user cancel lands mid-config.
+
+    Distinct from a normal trial failure: the caller must finalize the whole
+    run as cancelled rather than record a failed trial and continue.
+    """
 
 
 def _split_train_holdout(
@@ -260,39 +291,47 @@ async def run_optimization(
         await _update(run_doc, phase="baselines",
                       progress_message="Measuring baselines…")
 
-        no_tool_result = await _run_single_config(
-            candidate={
-                "label": "baseline-no-tool",
-                "model": baseline_model,
-                "config_override": {},
-            },
-            keys=keys,
-            test_cases=train_cases,
-            sys_config_doc=sys_config_doc,
-            field_metadata=field_metadata,
-            num_runs=num_runs,
-            judge_model=judge_model,
-            cross_field_rules=cross_field_rules,
-        )
+        try:
+            no_tool_result = await _run_config_guarded(
+                run_doc,
+                candidate={
+                    "label": "baseline-no-tool",
+                    "model": baseline_model,
+                    "config_override": {},
+                },
+                keys=keys,
+                test_cases=train_cases,
+                sys_config_doc=sys_config_doc,
+                field_metadata=field_metadata,
+                num_runs=num_runs,
+                judge_model=judge_model,
+                cross_field_rules=cross_field_rules,
+            )
+        except _TrialCancelled:
+            return await _finalize_cancelled(run_doc)
         run_doc.baseline_no_tool_score = _score_to_unit(no_tool_result.get("score"))
         run_doc.tokens_used += int(no_tool_result.get("judge_tokens", 0) or 0)
         await run_doc.save()
 
         default_cfg = effective_extraction_config(ss)
-        default_result = await _run_single_config(
-            candidate={
-                "label": "baseline-default",
-                "model": default_cfg.get("model") or baseline_model,
-                "config_override": default_cfg or {},
-            },
-            keys=keys,
-            test_cases=train_cases,
-            sys_config_doc=sys_config_doc,
-            field_metadata=field_metadata,
-            num_runs=num_runs,
-            judge_model=judge_model,
-            cross_field_rules=cross_field_rules,
-        )
+        try:
+            default_result = await _run_config_guarded(
+                run_doc,
+                candidate={
+                    "label": "baseline-default",
+                    "model": default_cfg.get("model") or baseline_model,
+                    "config_override": default_cfg or {},
+                },
+                keys=keys,
+                test_cases=train_cases,
+                sys_config_doc=sys_config_doc,
+                field_metadata=field_metadata,
+                num_runs=num_runs,
+                judge_model=judge_model,
+                cross_field_rules=cross_field_rules,
+            )
+        except _TrialCancelled:
+            return await _finalize_cancelled(run_doc)
         run_doc.baseline_default_score = _score_to_unit(default_result.get("score"))
         run_doc.tokens_used += int(default_result.get("judge_tokens", 0) or 0)
         await run_doc.save()
@@ -342,7 +381,7 @@ async def run_optimization(
                 else:
                     await run_doc.save()
 
-        if _is_cancelled(run_doc):
+        if await _is_cancelled(run_doc):
             return await _finalize_cancelled(run_doc)
 
         # --- Phase 2: trial sweep ---
@@ -392,7 +431,7 @@ async def run_optimization(
         trials_since_best_changed = 0
         stopped_reason: str | None = None
         for i, candidate in enumerate(candidates):
-            if _is_cancelled(run_doc):
+            if await _is_cancelled(run_doc):
                 return await _finalize_cancelled(run_doc)
 
             # Convergence check (mirrors KB). Requires variance to have been
@@ -429,7 +468,8 @@ async def run_optimization(
             )
 
             try:
-                result = await _run_single_config(
+                result = await _run_config_guarded(
+                    run_doc,
                     candidate=candidate,
                     keys=keys,
                     test_cases=train_cases,
@@ -439,7 +479,13 @@ async def run_optimization(
                     judge_model=judge_model,
                     cross_field_rules=cross_field_rules,
                 )
+            except _TrialCancelled:
+                # Cancel landed mid-trial — stop the whole run now rather than
+                # finishing this config first.
+                return await _finalize_cancelled(run_doc)
             except Exception as e:
+                # Includes TimeoutError from the per-trial guard: a hung config
+                # becomes a failed trial, not a wedged run.
                 logger.warning("Trial %s failed: %s", candidate["label"], e)
                 result = {
                     "label": candidate["label"],
@@ -568,21 +614,24 @@ async def run_optimization(
                     )
                     winner_cfg = winner.get("config") or {}
                     try:
-                        holdout_winner = await _run_single_config(
-                            candidate={
-                                "label": "holdout-winner",
-                                "model": winner_cfg.get("model") or baseline_model,
-                                "config_override": {
-                                    k: v for k, v in winner_cfg.items() if k != "model"
+                        holdout_winner = await asyncio.wait_for(
+                            _run_single_config(
+                                candidate={
+                                    "label": "holdout-winner",
+                                    "model": winner_cfg.get("model") or baseline_model,
+                                    "config_override": {
+                                        k: v for k, v in winner_cfg.items() if k != "model"
+                                    },
                                 },
-                            },
-                            keys=keys,
-                            test_cases=holdout_cases,
-                            sys_config_doc=sys_config_doc,
-                            field_metadata=field_metadata,
-                            num_runs=num_runs,
-                            judge_model=judge_model,
-                            cross_field_rules=cross_field_rules,
+                                keys=keys,
+                                test_cases=holdout_cases,
+                                sys_config_doc=sys_config_doc,
+                                field_metadata=field_metadata,
+                                num_runs=num_runs,
+                                judge_model=judge_model,
+                                cross_field_rules=cross_field_rules,
+                            ),
+                            timeout=PER_TRIAL_TIMEOUT_SECONDS,
                         )
                         holdout_winner_score = _score_to_unit(holdout_winner.get("score"))
                         if holdout_winner_score is not None:
@@ -591,19 +640,22 @@ async def run_optimization(
                         logger.warning("Holdout re-score (winner) failed: %s", e)
 
                     try:
-                        holdout_default = await _run_single_config(
-                            candidate={
-                                "label": "holdout-default",
-                                "model": default_cfg.get("model") or baseline_model,
-                                "config_override": default_cfg or {},
-                            },
-                            keys=keys,
-                            test_cases=holdout_cases,
-                            sys_config_doc=sys_config_doc,
-                            field_metadata=field_metadata,
-                            num_runs=num_runs,
-                            judge_model=judge_model,
-                            cross_field_rules=cross_field_rules,
+                        holdout_default = await asyncio.wait_for(
+                            _run_single_config(
+                                candidate={
+                                    "label": "holdout-default",
+                                    "model": default_cfg.get("model") or baseline_model,
+                                    "config_override": default_cfg or {},
+                                },
+                                keys=keys,
+                                test_cases=holdout_cases,
+                                sys_config_doc=sys_config_doc,
+                                field_metadata=field_metadata,
+                                num_runs=num_runs,
+                                judge_model=judge_model,
+                                cross_field_rules=cross_field_rules,
+                            ),
+                            timeout=PER_TRIAL_TIMEOUT_SECONDS,
                         )
                         run_doc.holdout_default_score = _score_to_unit(holdout_default.get("score"))
                     except Exception as e:
@@ -678,18 +730,173 @@ async def _update(run_doc: ExtractionOptimizationRun, **fields: Any) -> None:
     await run_doc.save()
 
 
-def _is_cancelled(run_doc: ExtractionOptimizationRun) -> bool:
-    return bool(run_doc.cancel_requested)
+async def _is_cancelled(run_doc: ExtractionOptimizationRun) -> bool:
+    """Re-read the cancel flag from Mongo.
+
+    The worker loads ``run_doc`` once at startup and reuses it for the whole
+    run, but the Cancel endpoint writes ``cancel_requested`` on a *different*
+    request — so the in-memory flag never flips on its own. Re-fetching the
+    field each check is what makes Cancel actually take effect (mirrors the KB
+    optimizer's per-trial re-fetch). We copy the fresh flag onto the in-memory
+    doc so the subsequent ``_finalize_cancelled`` save stays consistent.
+    """
+    fresh = await ExtractionOptimizationRun.find_one(
+        ExtractionOptimizationRun.uuid == run_doc.uuid,
+    )
+    if fresh and fresh.cancel_requested:
+        run_doc.cancel_requested = True
+        if fresh.cancel_requested_at and not run_doc.cancel_requested_at:
+            run_doc.cancel_requested_at = fresh.cancel_requested_at
+        return True
+    return False
+
+
+async def _abort_task(task: asyncio.Task) -> None:
+    """Cancel a backgrounded config task and absorb whatever it raises.
+
+    The underlying extraction may be parked in ``asyncio.to_thread`` whose
+    OS thread can't be interrupted; cancelling here unblocks the awaiter and
+    lets the worker proceed while that thread finishes and is discarded.
+    """
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+    except Exception:
+        pass
+
+
+async def _run_config_guarded(
+    run_doc: ExtractionOptimizationRun,
+    **single_config_kwargs: Any,
+) -> dict:
+    """Run one ``_run_single_config`` while staying cancel-responsive and bounded.
+
+    Backgrounds the config and polls ``cancel_requested`` every
+    ``CANCEL_POLL_INTERVAL_SECONDS`` so a UI cancel interrupts even a long
+    in-flight config. Two early exits:
+
+      * user cancel landed → raise ``_TrialCancelled`` (caller finalizes the run)
+      * ``PER_TRIAL_TIMEOUT_SECONDS`` elapsed → raise ``TimeoutError`` (caller
+        records a failed trial / fails the run)
+
+    Otherwise returns the config result, re-raising any error it raised.
+    """
+    task: asyncio.Task[dict] = asyncio.ensure_future(_run_single_config(**single_config_kwargs))
+    waited = 0.0
+    while True:
+        done, _pending = await asyncio.wait({task}, timeout=CANCEL_POLL_INTERVAL_SECONDS)
+        if task in done:
+            return task.result()
+        waited += CANCEL_POLL_INTERVAL_SECONDS
+        if await _is_cancelled(run_doc):
+            await _abort_task(task)
+            raise _TrialCancelled()
+        if waited >= PER_TRIAL_TIMEOUT_SECONDS:
+            await _abort_task(task)
+            raise TimeoutError(
+                f"Config exceeded the {int(PER_TRIAL_TIMEOUT_SECONDS)}s per-trial timeout"
+            )
 
 
 async def _finalize_cancelled(run_doc: ExtractionOptimizationRun) -> ExtractionOptimizationRun:
     run_doc.status = "cancelled"
     run_doc.phase = "cancelled"
-    run_doc.progress_message = "Cancelled by user"
+    # Preserve a caller-set reason (e.g. the watchdog's "worker did not
+    # respond"); otherwise use the default user-initiated message.
+    if not run_doc.progress_message or not run_doc.progress_message.lower().startswith("cancel"):
+        run_doc.progress_message = "Cancelled by user"
     run_doc.stopped_reason = "cancelled"
     run_doc.completed_at = datetime.datetime.now(tz=datetime.timezone.utc)
     await run_doc.save()
     return run_doc
+
+
+def _as_aware(dt: datetime.datetime | None) -> datetime.datetime | None:
+    """Normalize to a tz-aware UTC datetime (Mongo round-trips can drop tzinfo)."""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=datetime.timezone.utc)
+    return dt
+
+
+def _revoke_task(run_doc: ExtractionOptimizationRun) -> None:
+    """Best-effort hard-kill of the run's Celery task.
+
+    Mirrors ``workflow_service`` — ``revoke(terminate=True)`` kills the prefork
+    child running this task id, or drops it from the queue if still pending.
+    Cooperative cancel (the DB flag) remains the source of truth; this is the
+    fallback for a worker too wedged to reach its next poll.
+    """
+    task_id = getattr(run_doc, "celery_task_id", None)
+    if not task_id:
+        return
+    try:
+        from app.celery_app import celery_app
+        celery_app.control.revoke(task_id, terminate=True, signal="SIGTERM")
+    except Exception:
+        logger.warning(
+            "Failed to revoke Celery task %s for optimization run %s",
+            task_id, run_doc.uuid, exc_info=True,
+        )
+
+
+async def reap_one(run_doc: ExtractionOptimizationRun | None) -> ExtractionOptimizationRun | None:
+    """Recover a single orphaned run; no-op unless it's genuinely stuck.
+
+    Two stuck shapes (items #3/#4 of the cancellation fix):
+
+      * ``cancel_requested`` but no worker ever finalized it (dead worker) →
+        once the grace window passes, revoke + finalize as cancelled.
+      * running/queued well past the worker's hard time_limit (worker killed or
+        crashed) → revoke + finalize as failed.
+
+    Called opportunistically from the read endpoints so a forever-"Cancelling…"
+    or forever-"Running…" run self-heals the next time the UI polls it. Returns
+    the (possibly updated) run.
+    """
+    if run_doc is None or run_doc.status not in ("queued", "running"):
+        return run_doc
+
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+
+    cancelled_at = _as_aware(getattr(run_doc, "cancel_requested_at", None))
+    if run_doc.cancel_requested and cancelled_at is not None:
+        if (now - cancelled_at).total_seconds() > CANCEL_REAP_GRACE_SECONDS:
+            _revoke_task(run_doc)
+            run_doc.progress_message = "Cancelled (the worker did not respond)."
+            return await _finalize_cancelled(run_doc)
+
+    started = _as_aware(run_doc.started_at)
+    if started is not None and (now - started).total_seconds() > STALE_RUN_TIMEOUT_SECONDS:
+        _revoke_task(run_doc)
+        run_doc.status = "failed"
+        run_doc.phase = "failed"
+        run_doc.stopped_reason = "stale"
+        run_doc.error_message = (
+            "The optimization worker stopped responding (timed out or was "
+            "killed). Start a new run to try again."
+        )
+        run_doc.completed_at = now
+        await run_doc.save()
+
+    return run_doc
+
+
+async def reap_stale_runs(search_set_uuid: str) -> None:
+    """Reap every orphaned run for a SearchSet.
+
+    Called before starting a new run: the start endpoint 409s on any
+    non-terminal run, so a dead run would otherwise block new runs forever.
+    """
+    runs = await ExtractionOptimizationRun.find(
+        ExtractionOptimizationRun.search_set_uuid == search_set_uuid,
+        {"status": {"$in": ["queued", "running"]}},
+    ).to_list()
+    for run in runs:
+        await reap_one(run)
 
 
 def _score_to_unit(score: float | None) -> float | None:

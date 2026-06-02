@@ -610,14 +610,15 @@ class TestExtractionsRoutes:
             patch("app.dependencies.User") as MockUser,
             patch("app.routers.extractions.access_control") as mock_ac,
             patch("app.models.extraction_optimization_run.ExtractionOptimizationRun") as MockRun,
+            patch("app.services.extraction_optimizer.reap_stale_runs", new=AsyncMock()),
             patch("app.tasks.extraction_tasks.optimize_extraction_task") as mock_task,
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_ac.get_authorized_search_set = AsyncMock(return_value=ss)
-            # No active run blocking
+            # No active run blocking (the stale-run watchdog is stubbed above).
             MockRun.find_one = AsyncMock(return_value=None)
             MockRun.return_value = run_doc
-            mock_task.delay = MagicMock()
+            mock_task.apply_async = MagicMock()
 
             resp = await client.post(
                 "/api/extractions/search-sets/ss-uuid-1/optimize",
@@ -631,7 +632,11 @@ class TestExtractionsRoutes:
         assert body["run_uuid"] == "opt-uuid-1"
         assert body["status"] == "queued"
         run_doc.insert.assert_awaited_once()
-        mock_task.delay.assert_called_once()
+        mock_task.apply_async.assert_called_once()
+        # Task id is generated up front and passed through to the dispatch so
+        # the cancel endpoint / watchdog can revoke it.
+        _, kwargs = mock_task.apply_async.call_args
+        assert kwargs.get("task_id")
 
     @pytest.mark.asyncio
     async def test_start_extraction_optimization_rejects_when_already_running(self, client):
@@ -647,6 +652,7 @@ class TestExtractionsRoutes:
             patch("app.dependencies.User") as MockUser,
             patch("app.routers.extractions.access_control") as mock_ac,
             patch("app.models.extraction_optimization_run.ExtractionOptimizationRun") as MockRun,
+            patch("app.services.extraction_optimizer.reap_stale_runs", new=AsyncMock()),
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_ac.get_authorized_search_set = AsyncMock(return_value=ss)

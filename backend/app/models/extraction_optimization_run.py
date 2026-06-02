@@ -45,6 +45,14 @@ class ExtractionOptimizationRun(Document):
     actual_cost_usd: Optional[float] = None
 
     cancel_requested: bool = False
+    # When the cancel was requested (UTC). The optimizer watchdog uses this to
+    # decide that a worker which never honored the cancel is dead, and finalize
+    # the run on the user's behalf instead of leaving it "Cancelling…" forever.
+    cancel_requested_at: Optional[datetime.datetime] = None
+    # Celery task id, recorded at dispatch so the cancel endpoint (and the
+    # stale-run watchdog) can hard-revoke a wedged worker as a fallback to the
+    # cooperative cancel flag.
+    celery_task_id: Optional[str] = None
 
     # Live progress — UI polls these
     phase: str = "queued"
