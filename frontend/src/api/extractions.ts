@@ -932,7 +932,6 @@ export function updateCrossFieldRules(uuid: string, rules: CrossFieldRule[]) {
     `/api/extractions/search-sets/${uuid}/cross-field-rules`,
     {
       method: 'PUT',
-      headers: csrfHeaders(),
       body: JSON.stringify({ rules }),
     }
   )
@@ -941,13 +940,13 @@ export function updateCrossFieldRules(uuid: string, rules: CrossFieldRule[]) {
 export function suggestCrossFieldRules(uuid: string) {
   return apiFetch<{ suggestions: CrossFieldRule[] }>(
     `/api/extractions/search-sets/${uuid}/cross-field-rules/suggest`,
-    { method: 'POST', headers: csrfHeaders() }
+    { method: 'POST' }
   )
 }
 
 export function markRuleFalsePositive(uuid: string, ruleId: string) {
   return apiFetch<{ rule: CrossFieldRule }>(
     `/api/extractions/search-sets/${uuid}/cross-field-rules/${ruleId}/mark-false-positive`,
-    { method: 'POST', headers: csrfHeaders() }
+    { method: 'POST' }
   )
 }
