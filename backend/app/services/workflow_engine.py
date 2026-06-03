@@ -853,6 +853,7 @@ class APICallNode(Node):
                 }
 
         body = None
+        body_is_json = False
         if method in ("POST", "PUT", "PATCH"):
             if body_raw and body_raw.strip():
                 # Render {{ inputs.output }} placeholders with JSON-encoding so
@@ -877,17 +878,31 @@ class APICallNode(Node):
                     # is still a body the author configured, so send its raw
                     # JSON text rather than silently transmitting zero bytes.
                     body = parsed if isinstance(parsed, (dict, list)) else rendered_body
+                    body_is_json = True
             else:
                 # Implicit passthrough: an empty body on a write request sends
                 # the previous step's output as-is. This is what lets a
                 # [generate] -> [POST] workflow store its result without the
                 # author wiring up a template at all.
                 upstream = inputs.get("output")
-                if isinstance(upstream, (dict, list, str)):
+                if isinstance(upstream, (dict, list)):
+                    body = upstream
+                    body_is_json = True
+                elif isinstance(upstream, str):
+                    # Raw text — its type is unknown, so don't claim it's JSON.
                     body = upstream
                 elif upstream is not None:
                     # Scalars (number/bool) — send a JSON literal as the body.
                     body = json.dumps(upstream)
+                    body_is_json = True
+
+        # When we're sending a JSON body, tag it as such so servers that route
+        # on Content-Type (e.g. Flask's request.json, which 415s without it)
+        # parse it. httpx only sets this automatically on the json= path, not
+        # for JSON we send as a string (scalars/null) — and the author may not
+        # have added the header themselves. Never override an explicit choice.
+        if body_is_json and not any(k.lower() == "content-type" for k in headers):
+            headers["Content-Type"] = "application/json"
 
         try:
             with httpx.Client(timeout=30, follow_redirects=True) as client:

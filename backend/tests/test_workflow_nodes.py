@@ -801,6 +801,70 @@ class TestAPICallNode:
 
     @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
     @patch("app.services.workflow_engine.httpx.Client")
+    def test_json_object_body_defaults_content_type(self, mock_client_cls, _mock_validate):
+        mock_client = self._ok_client(mock_client_cls)
+        node = APICallNode({
+            "url": "https://api.example.com/submit",
+            "method": "POST",
+            "body": '{"a": 1}',
+        })
+        node.process({"output": "prev"})
+        assert mock_client.request.call_args[1]["headers"]["Content-Type"] == "application/json"
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_scalar_body_sent_as_content_defaults_content_type(self, mock_client_cls, _mock_validate):
+        # The string/content send path doesn't get httpx's automatic JSON
+        # content-type — we must add it ourselves so Flask's request.json works.
+        mock_client = self._ok_client(mock_client_cls)
+        node = APICallNode({
+            "url": "https://api.example.com/submit",
+            "method": "POST",
+            "body": "123",
+        })
+        node.process({"output": "prev"})
+        call_kwargs = mock_client.request.call_args[1]
+        assert call_kwargs["content"] == "123"
+        assert call_kwargs["headers"]["Content-Type"] == "application/json"
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_passthrough_dict_defaults_content_type(self, mock_client_cls, _mock_validate):
+        mock_client = self._ok_client(mock_client_cls)
+        node = APICallNode({"url": "https://api.example.com/submit", "method": "POST"})
+        node.process({"output": {"id": 1}})
+        assert mock_client.request.call_args[1]["headers"]["Content-Type"] == "application/json"
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_explicit_content_type_not_overridden(self, mock_client_cls, _mock_validate):
+        # User picked a different content type (and a different casing) — respect it.
+        mock_client = self._ok_client(mock_client_cls)
+        node = APICallNode({
+            "url": "https://api.example.com/submit",
+            "method": "POST",
+            "headers": '{"content-type": "application/vnd.api+json"}',
+            "body": '{"a": 1}',
+        })
+        node.process({"output": "prev"})
+        sent = mock_client.request.call_args[1]["headers"]
+        assert sent["content-type"] == "application/vnd.api+json"
+        assert "Content-Type" not in sent
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_non_json_text_body_gets_no_content_type(self, mock_client_cls, _mock_validate):
+        mock_client = self._ok_client(mock_client_cls)
+        node = APICallNode({
+            "url": "https://api.example.com/submit",
+            "method": "POST",
+            "body": "plain text body",
+        })
+        node.process({"output": "prev"})
+        assert "Content-Type" not in mock_client.request.call_args[1]["headers"]
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    @patch("app.services.workflow_engine.httpx.Client")
     def test_url_template_interpolates_upstream_id(self, mock_client_cls, _mock_validate):
         mock_client = self._ok_client(mock_client_cls)
         node = APICallNode({

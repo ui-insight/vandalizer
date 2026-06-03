@@ -3113,6 +3113,9 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                       outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.5,
                     }}
                   />
+                  <p style={{ fontSize: 12, color: '#6b7280', marginTop: 6, lineHeight: 1.5 }}>
+                    A JSON Request Body is sent with <code style={{ fontFamily: 'monospace', background: '#f3f4f6', padding: '1px 4px', borderRadius: 4 }}>Content-Type: application/json</code> automatically — add it here only to override.
+                  </p>
                 </div>
                 <div>
                   <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
