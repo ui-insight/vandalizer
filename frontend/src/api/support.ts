@@ -5,12 +5,14 @@ export async function createTicket(
   subject: string,
   message: string,
   priority = 'normal',
+  classification: string | null = null,
   files: File[] = [],
 ) {
   const form = new FormData()
   form.append('subject', subject)
   form.append('message', message)
   form.append('priority', priority)
+  if (classification) form.append('classification', classification)
   for (const f of files) form.append('files', f)
 
   const res = await rawFetch('/api/support/tickets', {
@@ -33,6 +35,7 @@ export function listTickets(
   category?: string,
   search?: string,
   priority?: string,
+  classification?: string,
 ) {
   const params = new URLSearchParams()
   if (status) params.set('status', status)
@@ -43,6 +46,7 @@ export function listTickets(
   if (category) params.set('category', category)
   if (search) params.set('search', search)
   if (priority) params.set('priority', priority)
+  if (classification) params.set('classification', classification)
   return apiFetch<{ tickets: SupportTicketSummary[] }>(
     `/api/support/tickets?${params}`,
   )

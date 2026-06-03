@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { Navigate, useNavigate, useSearch } from '@tanstack/react-router'
 import {
   ArrowLeft, Check, MessageSquare, Send, Plus, Paperclip, Pencil, X, Loader2, Link2, Tag,
-  Eye, UserPlus, Search, Flag, Lock,
+  Eye, UserPlus, Search, Flag, Lock, Layers,
 } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
 import { useAuth } from '../hooks/useAuth'
@@ -15,6 +15,7 @@ import type {
 type View = 'list' | 'new' | 'chat'
 type StatusFilter = 'all' | 'open' | 'in_progress' | 'closed'
 type PriorityFilter = 'all' | 'low' | 'normal' | 'high'
+type ClassificationFilter = 'all' | 'bug' | 'enhancement' | 'feature_request'
 
 const MAX_BYTES = 10 * 1024 * 1024
 
@@ -37,6 +38,16 @@ const PRIORITY_COLORS: Record<string, string> = {
   normal: '#3b82f6',
   high: '#ef4444',
 }
+const CLASSIFICATION_COLORS: Record<string, string> = {
+  bug: '#ef4444',
+  enhancement: '#8b5cf6',
+  feature_request: '#0ea5e9',
+}
+const CLASSIFICATION_LABELS: Record<string, string> = {
+  bug: 'Bug',
+  enhancement: 'Enhancement',
+  feature_request: 'Feature Request',
+}
 
 type Stats = { total: number; open: number; in_progress: number; closed: number }
 
@@ -52,6 +63,7 @@ export default function SupportCenter() {
   // Default to "open" — agents care about the active queue, not the archive.
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('open')
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all')
+  const [classificationFilter, setClassificationFilter] = useState<ClassificationFilter>('all')
   const [tagFilter, setTagFilter] = useState<string>('')
   // `searchInput` is the live text in the box; `search` is the debounced value
   // we actually query with, so typing doesn't fire a request on every keystroke.
@@ -71,13 +83,14 @@ export default function SupportCenter() {
     try {
       const statusParam = statusFilter === 'all' ? undefined : statusFilter
       const priorityParam = priorityFilter === 'all' ? undefined : priorityFilter
+      const classificationParam = classificationFilter === 'all' ? undefined : classificationFilter
       const tagParam = tagFilter || undefined
       const searchParam = search || undefined
       const [s, t, tagList] = await Promise.all([
         supportApi.getTicketStats(),
         supportApi.listTickets(
           statusParam, 200, 0, undefined, tagParam, undefined,
-          searchParam, priorityParam,
+          searchParam, priorityParam, classificationParam,
         ),
         supportApi.listAllTags(),
       ])
@@ -89,7 +102,7 @@ export default function SupportCenter() {
     } finally {
       setLoading(false)
     }
-  }, [toast, statusFilter, priorityFilter, tagFilter, search])
+  }, [toast, statusFilter, priorityFilter, classificationFilter, tagFilter, search])
 
   useEffect(() => { load() }, [load])
 
@@ -133,6 +146,8 @@ export default function SupportCenter() {
           onStatusFilterChange={setStatusFilter}
           priorityFilter={priorityFilter}
           onPriorityFilterChange={setPriorityFilter}
+          classificationFilter={classificationFilter}
+          onClassificationFilterChange={setClassificationFilter}
           tagFilter={tagFilter}
           onTagFilterChange={setTagFilter}
           allTags={allTags}
@@ -171,6 +186,7 @@ export default function SupportCenter() {
 function ListView({
   tickets, stats, loading, statusFilter, onStatusFilterChange,
   priorityFilter, onPriorityFilterChange,
+  classificationFilter, onClassificationFilterChange,
   tagFilter, onTagFilterChange, allTags,
   searchInput, onSearchInputChange, activeSearch,
   currentUserId, onNew, onSelect,
@@ -182,6 +198,8 @@ function ListView({
   onStatusFilterChange: (s: StatusFilter) => void
   priorityFilter: PriorityFilter
   onPriorityFilterChange: (p: PriorityFilter) => void
+  classificationFilter: ClassificationFilter
+  onClassificationFilterChange: (c: ClassificationFilter) => void
   tagFilter: string
   onTagFilterChange: (t: string) => void
   allTags: string[]
@@ -193,10 +211,12 @@ function ListView({
   onSelect: (uuid: string) => void
 }) {
   const hasFilters =
-    statusFilter !== 'open' || priorityFilter !== 'all' || tagFilter !== '' || activeSearch !== ''
+    statusFilter !== 'open' || priorityFilter !== 'all' ||
+    classificationFilter !== 'all' || tagFilter !== '' || activeSearch !== ''
   const clearAll = () => {
     onStatusFilterChange('open')
     onPriorityFilterChange('all')
+    onClassificationFilterChange('all')
     onTagFilterChange('')
     onSearchInputChange('')
   }
@@ -338,6 +358,24 @@ function ListView({
               </select>
             </div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <Layers size={12} color="#6b7280" />
+              <select
+                value={classificationFilter}
+                onChange={(e) => onClassificationFilterChange(e.target.value as ClassificationFilter)}
+                style={{
+                  padding: '4px 8px', fontSize: 12, border: '1px solid #e5e7eb',
+                  borderRadius: 9999, background: '#fff',
+                  color: classificationFilter !== 'all' ? '#111827' : '#6b7280',
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}
+              >
+                <option value="all">All types</option>
+                <option value="bug">Bug</option>
+                <option value="enhancement">Enhancement</option>
+                <option value="feature_request">Feature Request</option>
+              </select>
+            </div>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
               <Tag size={12} color="#6b7280" />
               <select
                 value={tagFilter}
@@ -434,6 +472,15 @@ function ListView({
                       }}>
                         {t.priority}
                       </span>
+                      {t.classification && (
+                        <span style={{
+                          fontSize: 11, padding: '1px 6px', borderRadius: 9999,
+                          background: `${CLASSIFICATION_COLORS[t.classification]}20`,
+                          color: CLASSIFICATION_COLORS[t.classification], fontWeight: 600,
+                        }}>
+                          {CLASSIFICATION_LABELS[t.classification]}
+                        </span>
+                      )}
                       {(t.tags ?? []).map((tag) => (
                         <span
                           key={tag}
@@ -490,6 +537,7 @@ function NewTicketView({
   const [subject, setSubject] = useState('')
   const [message, setMessage] = useState('')
   const [priority, setPriority] = useState('normal')
+  const [classification, setClassification] = useState('bug')
   const [files, setFiles] = useState<File[]>([])
   const [submitting, setSubmitting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -509,7 +557,7 @@ function NewTicketView({
     if (!subject.trim() || !message.trim()) return
     setSubmitting(true)
     try {
-      const ticket = await supportApi.createTicket(subject.trim(), message.trim(), priority, files)
+      const ticket = await supportApi.createTicket(subject.trim(), message.trim(), priority, classification, files)
       toast('Ticket created', 'success')
       onCreated(ticket)
     } catch (err) {
@@ -566,6 +614,18 @@ function NewTicketView({
               <option value="low">Low</option>
               <option value="normal">Normal</option>
               <option value="high">High</option>
+            </select>
+          </div>
+          <div>
+            <label style={labelStyle}>Type</label>
+            <select
+              value={classification}
+              onChange={(e) => setClassification(e.target.value)}
+              style={inputStyle}
+            >
+              <option value="bug">Bug</option>
+              <option value="enhancement">Enhancement</option>
+              <option value="feature_request">Feature Request</option>
             </select>
           </div>
           <div>
@@ -884,6 +944,16 @@ function ChatView({
             }}>
               {ticket.priority}
             </span>
+            {ticket.classification && (
+              <span style={{
+                fontSize: 11, padding: '2px 8px', borderRadius: 9999,
+                background: `${CLASSIFICATION_COLORS[ticket.classification]}20`,
+                color: CLASSIFICATION_COLORS[ticket.classification],
+                fontWeight: 600, textTransform: 'uppercase',
+              }}>
+                {CLASSIFICATION_LABELS[ticket.classification]}
+              </span>
+            )}
             <span style={{
               fontSize: 11, padding: '2px 8px', borderRadius: 9999,
               background: `${STATUS_COLORS[ticket.status]}20`,

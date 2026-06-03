@@ -35,6 +35,9 @@ export interface SupportTicket {
   subject: string
   status: 'open' | 'in_progress' | 'closed'
   priority: 'low' | 'normal' | 'high'
+  // What kind of request this is. Null for legacy tickets created before
+  // classification shipped, or when the requester didn't pick one.
+  classification: 'bug' | 'enhancement' | 'feature_request' | null
   user_id: string
   user_name: string | null
   user_email: string | null
@@ -59,6 +62,7 @@ export interface SupportTicketSummary {
   subject: string
   status: 'open' | 'in_progress' | 'closed'
   priority: 'low' | 'normal' | 'high'
+  classification: 'bug' | 'enhancement' | 'feature_request' | null
   user_id: string
   user_name: string | null
   assigned_to: string | null

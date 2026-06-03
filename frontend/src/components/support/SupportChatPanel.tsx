@@ -43,6 +43,12 @@ const PRIORITY_COLORS = {
   high: 'text-red-500',
 } as const
 
+const CLASSIFICATION_LABELS = {
+  bug: 'Bug',
+  enhancement: 'Enhancement',
+  feature_request: 'Feature Request',
+} as const
+
 // ---------------------------------------------------------------------------
 // Views
 // ---------------------------------------------------------------------------
@@ -214,6 +220,7 @@ function NewTicketView({
   const [subject, setSubject] = useState('')
   const [message, setMessage] = useState('')
   const [priority, setPriority] = useState('normal')
+  const [classification, setClassification] = useState('bug')
   const [files, setFiles] = useState<File[]>([])
   const [submitting, setSubmitting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -247,6 +254,7 @@ function NewTicketView({
         subject.trim(),
         message.trim(),
         priority,
+        classification,
         files,
       )
       toast('Ticket created', 'success')
@@ -288,6 +296,18 @@ function NewTicketView({
             <option value="low">Low</option>
             <option value="normal">Normal</option>
             <option value="high">High</option>
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-600">Type</label>
+          <select
+            value={classification}
+            onChange={(e) => setClassification(e.target.value)}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+          >
+            <option value="bug">Bug</option>
+            <option value="enhancement">Enhancement</option>
+            <option value="feature_request">Feature Request</option>
           </select>
         </div>
         <div>
@@ -635,6 +655,14 @@ function ChatView({
                   <span className={`text-[10px] font-medium ${PRIORITY_COLORS[ticket.priority]}`}>
                     {ticket.priority}
                   </span>
+                  {ticket.classification && (
+                    <>
+                      <span className="text-[10px] text-gray-300">|</span>
+                      <span className="text-[10px] font-medium text-indigo-500">
+                        {CLASSIFICATION_LABELS[ticket.classification]}
+                      </span>
+                    </>
+                  )}
                   <span className="text-[10px] text-gray-300">|</span>
                   <span className="text-[10px] text-gray-400">{ticket.user_name || ticket.user_id}</span>
                 </>
