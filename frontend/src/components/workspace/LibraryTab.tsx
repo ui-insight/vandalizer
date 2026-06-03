@@ -16,6 +16,7 @@ const KIND_LABEL: Record<string, string> = {
 }
 import { cloneToPersonal, shareToTeam, addItem as addItemToLibrary, touchItem, listCollections } from '../../api/library'
 import { ApiError } from '../../api/client'
+import { MAX_NAME_LENGTH, getNameError, normalizeName } from '../../utils/nameValidation'
 import { createWorkflow, importWorkflow } from '../../api/workflows'
 import { createSearchSet, importSearchSet, listItems as listSearchSetItems, updateSearchSet, updateItem as updateSearchSetItem, addItem as addSearchSetItem } from '../../api/extractions'
 import {
@@ -60,6 +61,41 @@ export function LibraryTab() {
   const [sortOption, setSortOption] = useState<SortOption>('recent')
   const [newMenuOpen, setNewMenuOpen] = useState(false)
   const newMenuRef = useRef<HTMLDivElement>(null)
+
+  // Resizable sidebar — width persists across sessions via localStorage.
+  const SIDEBAR_MIN = 148
+  const SIDEBAR_MAX = 420
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const stored = Number(localStorage.getItem('library:sidebarWidth'))
+    return stored >= SIDEBAR_MIN && stored <= SIDEBAR_MAX ? stored : SIDEBAR_MIN
+  })
+  const [resizing, setResizing] = useState(false)
+  useEffect(() => {
+    if (!resizing) return
+    const onMove = (e: MouseEvent) => {
+      const next = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, e.clientX - sidebarLeftRef.current))
+      setSidebarWidth(next)
+    }
+    const onUp = () => setResizing(false)
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+    // Stop text selection / cursor flicker while dragging.
+    const prevUserSelect = document.body.style.userSelect
+    const prevCursor = document.body.style.cursor
+    document.body.style.userSelect = 'none'
+    document.body.style.cursor = 'col-resize'
+    return () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      document.body.style.userSelect = prevUserSelect
+      document.body.style.cursor = prevCursor
+    }
+  }, [resizing])
+  useEffect(() => {
+    localStorage.setItem('library:sidebarWidth', String(sidebarWidth))
+  }, [sidebarWidth])
+  const sidebarRef = useRef<HTMLDivElement>(null)
+  const sidebarLeftRef = useRef(0)
 
   // Folder system
   const folderScope = scope === 'team' ? 'team' : 'personal'
@@ -199,7 +235,13 @@ export function LibraryTab() {
     : null
   const collectionItemIds = selectedCollection ? new Set(selectedCollection.item_ids) : null
 
-  const filtered = items.filter((item) => {
+  // In the default "All Items" view, an item that has been moved into a folder
+  // belongs to that folder only — it should not also appear in the root list.
+  // Favorites/Pinned and folder views are intentionally left untouched: the
+  // first two span folders, and folder views are already server-side scoped.
+  const scopedItems = viewFilter === 'all' ? items.filter((i) => !i.folder) : items
+
+  const filtered = scopedItems.filter((item) => {
     if (kindFilter !== 'all' && item.kind !== kindFilter) return false
     if (viewFilter === 'favorites') return item.favorited
     if (viewFilter === 'pinned') return item.pinned
@@ -208,9 +250,9 @@ export function LibraryTab() {
   })
 
   const kindCounts = {
-    all: items.length,
-    workflow: items.filter((i) => i.kind === 'workflow').length,
-    search_set: items.filter((i) => i.kind === 'search_set').length,
+    all: scopedItems.length,
+    workflow: scopedItems.filter((i) => i.kind === 'workflow').length,
+    search_set: scopedItems.filter((i) => i.kind === 'search_set').length,
   }
 
   const sorted = [...filtered].sort((a, b) => {
@@ -321,19 +363,25 @@ export function LibraryTab() {
 
   const handleEditSave = async () => {
     if (!editingItem?.item_uuid) return
+    const titleError = getNameError(editTitle, 'Title')
+    if (titleError) {
+      setEditError(titleError)
+      return
+    }
+    const cleanTitle = normalizeName(editTitle)
     setEditSaving(true)
     setEditError(null)
     try {
-      await updateSearchSet(editingItem.item_uuid, { title: editTitle.trim() })
+      await updateSearchSet(editingItem.item_uuid, { title: cleanTitle })
       if (editItemId) {
-        await updateSearchSetItem(editItemId, { searchphrase: editContent, title: editTitle.trim() })
+        await updateSearchSetItem(editItemId, { searchphrase: editContent, title: cleanTitle })
       } else {
         // Prompts created via the create modal don't have a SearchSetItem yet —
         // their body lives only in extraction_config.content. Materialize one so
         // the body persists through edits and is readable everywhere.
         await addSearchSetItem(editingItem.item_uuid, {
           searchphrase: editContent,
-          title: editTitle.trim(),
+          title: cleanTitle,
         })
       }
       closeEditModal()
@@ -346,13 +394,18 @@ export function LibraryTab() {
   }
 
   const handleCreate = async () => {
-    if (!createName.trim()) return
+    const nameError = getNameError(createName)
+    if (nameError) {
+      setCreateError(nameError)
+      return
+    }
+    const cleanName = normalizeName(createName)
     setCreating(true)
     setCreateError(null)
     const personalLib = libraries.find((l) => l.scope === 'personal')
     try {
       if (createModalType === 'workflow') {
-        const wf = await createWorkflow({ name: createName.trim(), description: createDesc.trim() || undefined })
+        const wf = await createWorkflow({ name: cleanName, description: createDesc.trim() || undefined })
         if (personalLib) {
           await addItemToLibrary(personalLib.id, { item_id: wf.id, kind: 'workflow' })
         }
@@ -362,7 +415,7 @@ export function LibraryTab() {
       } else {
         // extraction, prompt, or formatter — all stored as SearchSets
         const config = createDesc.trim() ? { content: createDesc.trim() } : undefined
-        const ss = await createSearchSet({ title: createName.trim(), set_type: createModalType ?? 'extraction', extraction_config: config })
+        const ss = await createSearchSet({ title: cleanName, set_type: createModalType ?? 'extraction', extraction_config: config })
         if (personalLib) {
           await addItemToLibrary(personalLib.id, { item_id: ss.id, kind: 'search_set' })
         }
@@ -681,8 +734,9 @@ export function LibraryTab() {
       <div style={{ display: 'flex', flexGrow: 1, minHeight: 0, overflow: 'hidden' }}>
         {/* Sidebar */}
         <div
+          ref={sidebarRef}
           style={{
-            width: 148,
+            width: sidebarWidth,
             flexShrink: 0,
             minHeight: 0,
             borderRight: '1px solid #f0f0f0',
@@ -788,11 +842,12 @@ export function LibraryTab() {
                     autoFocus
                     type="text"
                     value={newFolderName}
+                    maxLength={MAX_NAME_LENGTH}
                     onChange={(e) => setNewFolderName(e.target.value)}
                     placeholder="Folder name"
                     onKeyDown={async (e) => {
                       if (e.key === 'Enter' && newFolderName.trim()) {
-                        await createFolder(newFolderName.trim())
+                        await createFolder(normalizeName(newFolderName))
                         setNewFolderMode(false)
                         setNewFolderName('')
                       } else if (e.key === 'Escape') {
@@ -839,10 +894,11 @@ export function LibraryTab() {
                           autoFocus
                           type="text"
                           value={renameValue}
+                          maxLength={MAX_NAME_LENGTH}
                           onChange={(e) => setRenameValue(e.target.value)}
                           onKeyDown={async (e) => {
                             if (e.key === 'Enter' && renameValue.trim()) {
-                              await renameFolder(folder.uuid, renameValue.trim())
+                              await renameFolder(folder.uuid, normalizeName(renameValue))
                               setRenamingFolder(null)
                             } else if (e.key === 'Escape') {
                               setRenamingFolder(null)
@@ -850,7 +906,7 @@ export function LibraryTab() {
                           }}
                           onBlur={async () => {
                             if (renameValue.trim()) {
-                              await renameFolder(folder.uuid, renameValue.trim())
+                              await renameFolder(folder.uuid, normalizeName(renameValue))
                             }
                             setRenamingFolder(null)
                           }}
@@ -1029,6 +1085,27 @@ export function LibraryTab() {
           )}
         </div>
 
+        {/* Drag handle — resize the sidebar */}
+        <div
+          onMouseDown={(e) => {
+            sidebarLeftRef.current = sidebarRef.current?.getBoundingClientRect().left ?? 0
+            setResizing(true)
+            e.preventDefault()
+          }}
+          onDoubleClick={() => setSidebarWidth(SIDEBAR_MIN)}
+          title="Drag to resize · double-click to reset"
+          style={{
+            width: 6,
+            flexShrink: 0,
+            cursor: 'col-resize',
+            backgroundColor: resizing ? 'var(--library-highlight)' : 'transparent',
+            transition: resizing ? 'none' : 'background 0.15s',
+            zIndex: 1,
+          }}
+          onMouseEnter={(e) => { if (!resizing) e.currentTarget.style.backgroundColor = '#e0e0e0' }}
+          onMouseLeave={(e) => { if (!resizing) e.currentTarget.style.backgroundColor = 'transparent' }}
+        />
+
         {/* Results pane */}
         <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', backgroundColor: '#fff', borderRight: '1px solid #f0f0f0' }}>
           {/* Collection filter banner */}
@@ -1191,9 +1268,10 @@ export function LibraryTab() {
               <input
                 type="text"
                 value={createName}
-                onChange={(e) => setCreateName(e.target.value)}
+                onChange={(e) => { setCreateName(e.target.value); if (createError) setCreateError(null) }}
                 placeholder={modalConfig[createModalType].namePlaceholder}
                 autoFocus
+                maxLength={MAX_NAME_LENGTH}
                 style={{
                   width: '100%',
                   padding: '10px 14px',
@@ -1206,6 +1284,9 @@ export function LibraryTab() {
                 }}
                 onKeyDown={(e) => e.key === 'Enter' && !modalConfig[createModalType].showDesc && handleCreate()}
               />
+              <div style={{ marginTop: 4, textAlign: 'right', fontSize: 11, color: createName.length >= MAX_NAME_LENGTH ? '#dc2626' : '#9aa0a6' }}>
+                {createName.length}/{MAX_NAME_LENGTH}
+              </div>
             </div>
             {modalConfig[createModalType].showDesc && (
               <div style={{ marginBottom: 20 }}>
@@ -1339,9 +1420,10 @@ export function LibraryTab() {
               <input
                 type="text"
                 value={editTitle}
-                onChange={(e) => setEditTitle(e.target.value)}
+                onChange={(e) => { setEditTitle(e.target.value); if (editError) setEditError(null) }}
                 placeholder="Title"
                 autoFocus
+                maxLength={MAX_NAME_LENGTH}
                 style={{
                   width: '100%',
                   padding: '10px 14px',

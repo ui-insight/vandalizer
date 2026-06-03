@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { X } from 'lucide-react'
+import { MAX_NAME_LENGTH, getNameError, normalizeName } from '../../utils/nameValidation'
 
 interface RenameDialogProps {
   currentName: string
@@ -9,10 +10,16 @@ interface RenameDialogProps {
 
 export function RenameDialog({ currentName, onSubmit, onClose }: RenameDialogProps) {
   const [name, setName] = useState(currentName)
+  const [error, setError] = useState<string | null>(null)
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (name.trim()) onSubmit(name.trim())
+    const err = getNameError(name)
+    if (err) {
+      setError(err)
+      return
+    }
+    onSubmit(normalizeName(name))
   }
 
   return (
@@ -42,9 +49,11 @@ export function RenameDialog({ currentName, onSubmit, onClose }: RenameDialogPro
             autoFocus
             type="text"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            maxLength={MAX_NAME_LENGTH}
+            onChange={(e) => { setName(e.target.value); if (error) setError(null) }}
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-highlight focus:outline-none focus:ring-1 focus:ring-highlight"
           />
+          {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
           <div className="mt-4 flex justify-end gap-2">
             <button
               type="button"

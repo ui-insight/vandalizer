@@ -40,6 +40,7 @@ import type { KnowledgeBase } from '../../types/knowledge'
 import { listItems as listSearchSetItems, suggestFields } from '../../api/extractions'
 import { useWorkflowRunner } from '../../hooks/useWorkflowRunner'
 import { ApiError } from '../../api/client'
+import { MAX_NAME_LENGTH, normalizeName } from '../../utils/nameValidation'
 import type { Workflow, WorkflowStep, WorkflowTask, WorkflowStatus, WorkflowCitation, ModelInfo, SearchSetItem } from '../../types/workflow'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
 import DOMPurify from 'dompurify'
@@ -324,7 +325,8 @@ export function WorkflowEditorPanel() {
   }
 
   const handleTitleSave = async () => {
-    if (!openWorkflowId || !titleValue.trim()) {
+    const cleanName = normalizeName(titleValue)
+    if (!openWorkflowId || !cleanName) {
       setEditingTitle(false)
       return
     }
@@ -332,7 +334,7 @@ export function WorkflowEditorPanel() {
       setEditingTitle(false)
       return
     }
-    await updateWorkflow(openWorkflowId, { name: titleValue.trim() })
+    await updateWorkflow(openWorkflowId, { name: cleanName })
     setEditingTitle(false)
     refresh()
   }
@@ -511,6 +513,7 @@ export function WorkflowEditorPanel() {
             <input
               ref={titleInputRef}
               value={titleValue}
+              maxLength={MAX_NAME_LENGTH}
               onChange={e => setTitleValue(e.target.value)}
               onBlur={handleTitleSave}
               onKeyDown={e => {

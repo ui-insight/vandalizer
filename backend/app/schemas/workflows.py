@@ -4,6 +4,7 @@ from typing import Any, Optional
 from pydantic import BaseModel
 
 from app.schemas.user import AuthorRef
+from app.utils.naming import EntityName, OptionalEntityName
 
 
 # ---------------------------------------------------------------------------
@@ -11,12 +12,12 @@ from app.schemas.user import AuthorRef
 # ---------------------------------------------------------------------------
 
 class CreateWorkflowRequest(BaseModel):
-    name: str
+    name: EntityName
     description: Optional[str] = None
 
 
 class UpdateWorkflowRequest(BaseModel):
-    name: Optional[str] = None
+    name: OptionalEntityName = None
     description: Optional[str] = None
     input_config: Optional[dict] = None
     output_config: Optional[dict] = None

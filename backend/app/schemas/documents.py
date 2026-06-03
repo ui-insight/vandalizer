@@ -1,6 +1,8 @@
 from typing import Optional
 from pydantic import BaseModel
 
+from app.utils.naming import EntityName
+
 
 class DocumentResponse(BaseModel):
     id: str
@@ -47,19 +49,19 @@ class PollStatusResponse(BaseModel):
 
 
 class CreateFolderRequest(BaseModel):
-    name: str
+    name: EntityName
     parent_id: str
     folder_type: str = "individual"
 
 
 class RenameFolderRequest(BaseModel):
     uuid: str
-    newName: str
+    newName: EntityName
 
 
 class RenameDocumentRequest(BaseModel):
     uuid: str
-    newName: str
+    newName: EntityName
 
 
 class MoveFileRequest(BaseModel):

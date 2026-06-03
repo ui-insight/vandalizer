@@ -398,8 +398,10 @@ class TestKnowledgeCRUD:
                 headers=headers,
             )
 
-        assert resp.status_code == 400
-        assert resp.json()["detail"] == "Title is required"
+        # A whitespace-only title is rejected by the EntityName validator on
+        # CreateKBRequest (422), before the handler runs.
+        assert resp.status_code == 422
+        assert "empty" in str(resp.json()["detail"]).lower()
 
     @pytest.mark.asyncio
     async def test_get_detail_success(self, client):

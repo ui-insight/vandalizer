@@ -4,14 +4,16 @@ from typing import Optional
 
 from pydantic import BaseModel
 
+from app.utils.naming import EntityName, OptionalEntityName
+
 
 class CreateKBRequest(BaseModel):
-    title: str
+    title: EntityName
     description: Optional[str] = None
 
 
 class UpdateKBRequest(BaseModel):
-    title: Optional[str] = None
+    title: OptionalEntityName = None
     description: Optional[str] = None
     shared_with_team: Optional[bool] = None
     organization_ids: Optional[list[str]] = None

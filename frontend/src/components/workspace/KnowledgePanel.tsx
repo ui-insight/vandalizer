@@ -6,6 +6,7 @@ import { useAuth } from '../../hooks/useAuth'
 import * as api from '../../api/knowledge'
 import { listOrganizationsFlat } from '../../api/organizations'
 import { getItemMetadata } from '../../api/library'
+import { MAX_NAME_LENGTH, normalizeName } from '../../utils/nameValidation'
 import type { Organization } from '../../api/organizations'
 import type { KnowledgeBaseDetail, KnowledgeBaseSource, KBScope, KnowledgeBase } from '../../types/knowledge'
 import type { VerifiedCatalogItem } from '../../types/library'
@@ -590,7 +591,7 @@ export function KnowledgePanel() {
               style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}
               onSubmit={async (e) => {
                 e.preventDefault()
-                const t = titleDraft.trim()
+                const t = normalizeName(titleDraft)
                 if (t && t !== selectedKB.title) {
                   try {
                     await api.updateKnowledgeBase(selectedKB.uuid, { title: t })
@@ -608,6 +609,7 @@ export function KnowledgePanel() {
               <input
                 autoFocus
                 value={titleDraft}
+                maxLength={MAX_NAME_LENGTH}
                 onChange={e => setTitleDraft(e.target.value)}
                 onBlur={() => setEditingTitle(false)}
                 onKeyDown={e => { if (e.key === 'Escape') setEditingTitle(false) }}

@@ -188,8 +188,7 @@ async def remove_reference(ref_uuid: str, user: User = Depends(get_current_user)
 
 @router.post("/create", response_model=KBResponse)
 async def create_knowledge_base(req: CreateKBRequest, user: User = Depends(get_current_user)):
-    if not req.title.strip():
-        raise HTTPException(status_code=400, detail="Title is required")
+    # Title is validated (required, length, normalized) by CreateKBRequest's EntityName field.
     team_id = str(user.current_team) if user.current_team else None
     kb = await svc.create_knowledge_base(
         title=req.title, user_id=user.user_id,

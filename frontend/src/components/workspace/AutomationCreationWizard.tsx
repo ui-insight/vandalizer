@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { X, FolderOpen, Globe, Loader2, Plus, ChevronRight, Mail } from 'lucide-react'
 import { createAutomation, updateAutomation } from '../../api/automations'
 import { createFolder } from '../../api/folders'
+import { MAX_NAME_LENGTH, normalizeName } from '../../utils/nameValidation'
 import { apiFetch } from '../../api/client'
 import { getFeatureFlags } from '../../api/config'
 import { ItemPickerModal } from './ItemPickerModal'
@@ -154,7 +155,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
       }
 
       const auto = await createAutomation({
-        name: name.trim(),
+        name: normalizeName(name),
         description: description.trim() || undefined,
         trigger_type: triggerType,
         trigger_config: triggerConfig,
@@ -288,6 +289,7 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                   ref={nameRef}
                   type="text"
                   value={name}
+                  maxLength={MAX_NAME_LENGTH}
                   onChange={e => setName(e.target.value)}
                   placeholder="e.g. Process grant applications"
                   style={inputStyle}
@@ -400,10 +402,11 @@ export function AutomationCreationWizard({ onClose, onCreate }: Props) {
                       autoFocus
                       type="text"
                       value={newFolderName}
+                      maxLength={MAX_NAME_LENGTH}
                       onChange={e => setNewFolderName(e.target.value)}
                       onKeyDown={async e => {
                         if (e.key === 'Enter' && newFolderName.trim()) {
-                          const folder = await createFolder({ name: newFolderName.trim(), parent_id: '0' })
+                          const folder = await createFolder({ name: normalizeName(newFolderName), parent_id: '0' })
                           setFolders(prev => [...prev, { uuid: folder.uuid, path: `/${folder.title}` }])
                           setWatchFolderId(folder.uuid)
                           setCreatingFolder(false)
