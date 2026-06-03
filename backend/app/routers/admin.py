@@ -2169,29 +2169,37 @@ async def test_ocr(user: User = Depends(get_current_user)):
 
 @router.post("/config/test-model/{index}")
 async def test_model(index: int, user: User = Depends(get_current_user)):
-    """Test an LLM model by sending a minimal completion request."""
+    """Run a real round-trip against a model and return full diagnostics.
+
+    Returns HTTP 200 with ``ok`` true/false (in-band, like the Prompt
+    Playground) so the UI can render a step-by-step breakdown — on success why
+    the model is healthy, on failure a classified error with a suggested fix —
+    instead of a bare error toast. A genuinely missing model still 404s.
+    """
     await _require_superadmin(user)
 
     cfg = await SystemConfig.get_config()
     if index < 0 or index >= len(cfg.available_models):
         raise HTTPException(status_code=404, detail="Model not found")
 
-    model_cfg = cfg.available_models[index]
-    model_name = model_cfg.get("name", "")
+    from app.services.system_diagnostics import diagnose_model
 
-    try:
-        from pydantic_ai import Agent
+    return await diagnose_model(cfg, index)
 
-        model = get_agent_model(model_name, system_config_doc=cfg.model_dump())
-        agent = Agent(model, system_prompt="Reply with exactly: ok")
-        result = await agent.run("Say ok")
-        return {
-            "status": "ok",
-            "model": model_name,
-            "message": f"Model responded: {result.output[:100]}",
-        }
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Model test failed: {e}")
+
+@router.get("/readiness")
+async def get_readiness(user: User = Depends(get_current_user)) -> dict:
+    """Report whether this install is set up: a graded setup checklist.
+
+    Drives the admin setup surface. ``ready`` is false while any blocker
+    (e.g. no language model) is unresolved.
+    """
+    await _require_admin(user)
+
+    from app.services.system_diagnostics import build_readiness
+
+    cfg = await SystemConfig.get_config()
+    return build_readiness(cfg)
 
 
 class TestPromptRequest(BaseModel):
