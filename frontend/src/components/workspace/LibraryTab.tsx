@@ -61,6 +61,41 @@ export function LibraryTab() {
   const [newMenuOpen, setNewMenuOpen] = useState(false)
   const newMenuRef = useRef<HTMLDivElement>(null)
 
+  // Resizable sidebar — width persists across sessions via localStorage.
+  const SIDEBAR_MIN = 148
+  const SIDEBAR_MAX = 420
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const stored = Number(localStorage.getItem('library:sidebarWidth'))
+    return stored >= SIDEBAR_MIN && stored <= SIDEBAR_MAX ? stored : SIDEBAR_MIN
+  })
+  const [resizing, setResizing] = useState(false)
+  useEffect(() => {
+    if (!resizing) return
+    const onMove = (e: MouseEvent) => {
+      const next = Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, e.clientX - sidebarLeftRef.current))
+      setSidebarWidth(next)
+    }
+    const onUp = () => setResizing(false)
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+    // Stop text selection / cursor flicker while dragging.
+    const prevUserSelect = document.body.style.userSelect
+    const prevCursor = document.body.style.cursor
+    document.body.style.userSelect = 'none'
+    document.body.style.cursor = 'col-resize'
+    return () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      document.body.style.userSelect = prevUserSelect
+      document.body.style.cursor = prevCursor
+    }
+  }, [resizing])
+  useEffect(() => {
+    localStorage.setItem('library:sidebarWidth', String(sidebarWidth))
+  }, [sidebarWidth])
+  const sidebarRef = useRef<HTMLDivElement>(null)
+  const sidebarLeftRef = useRef(0)
+
   // Folder system
   const folderScope = scope === 'team' ? 'team' : 'personal'
   const { folders, refresh: refreshFolders, create: createFolder, rename: renameFolder, remove: removeFolder, moveItems: moveFolderItems } = useLibraryFolders(folderScope, teamId)
@@ -199,7 +234,13 @@ export function LibraryTab() {
     : null
   const collectionItemIds = selectedCollection ? new Set(selectedCollection.item_ids) : null
 
-  const filtered = items.filter((item) => {
+  // In the default "All Items" view, an item that has been moved into a folder
+  // belongs to that folder only — it should not also appear in the root list.
+  // Favorites/Pinned and folder views are intentionally left untouched: the
+  // first two span folders, and folder views are already server-side scoped.
+  const scopedItems = viewFilter === 'all' ? items.filter((i) => !i.folder) : items
+
+  const filtered = scopedItems.filter((item) => {
     if (kindFilter !== 'all' && item.kind !== kindFilter) return false
     if (viewFilter === 'favorites') return item.favorited
     if (viewFilter === 'pinned') return item.pinned
@@ -208,9 +249,9 @@ export function LibraryTab() {
   })
 
   const kindCounts = {
-    all: items.length,
-    workflow: items.filter((i) => i.kind === 'workflow').length,
-    search_set: items.filter((i) => i.kind === 'search_set').length,
+    all: scopedItems.length,
+    workflow: scopedItems.filter((i) => i.kind === 'workflow').length,
+    search_set: scopedItems.filter((i) => i.kind === 'search_set').length,
   }
 
   const sorted = [...filtered].sort((a, b) => {
@@ -681,8 +722,9 @@ export function LibraryTab() {
       <div style={{ display: 'flex', flexGrow: 1, minHeight: 0, overflow: 'hidden' }}>
         {/* Sidebar */}
         <div
+          ref={sidebarRef}
           style={{
-            width: 148,
+            width: sidebarWidth,
             flexShrink: 0,
             minHeight: 0,
             borderRight: '1px solid #f0f0f0',
@@ -1028,6 +1070,27 @@ export function LibraryTab() {
             </div>
           )}
         </div>
+
+        {/* Drag handle — resize the sidebar */}
+        <div
+          onMouseDown={(e) => {
+            sidebarLeftRef.current = sidebarRef.current?.getBoundingClientRect().left ?? 0
+            setResizing(true)
+            e.preventDefault()
+          }}
+          onDoubleClick={() => setSidebarWidth(SIDEBAR_MIN)}
+          title="Drag to resize · double-click to reset"
+          style={{
+            width: 6,
+            flexShrink: 0,
+            cursor: 'col-resize',
+            backgroundColor: resizing ? 'var(--library-highlight)' : 'transparent',
+            transition: resizing ? 'none' : 'background 0.15s',
+            zIndex: 1,
+          }}
+          onMouseEnter={(e) => { if (!resizing) e.currentTarget.style.backgroundColor = '#e0e0e0' }}
+          onMouseLeave={(e) => { if (!resizing) e.currentTarget.style.backgroundColor = 'transparent' }}
+        />
 
         {/* Results pane */}
         <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', backgroundColor: '#fff', borderRight: '1px solid #f0f0f0' }}>
