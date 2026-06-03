@@ -867,9 +867,16 @@ class APICallNode(Node):
                         "step_name": self.name,
                     }
                 try:
-                    body = json.loads(rendered_body)
+                    parsed = json.loads(rendered_body)
                 except json.JSONDecodeError:
+                    # Not JSON — send the literal text as-is.
                     body = rendered_body
+                else:
+                    # Objects/arrays go out via httpx's json= (which also sets
+                    # Content-Type). Any other JSON type — a scalar or null —
+                    # is still a body the author configured, so send its raw
+                    # JSON text rather than silently transmitting zero bytes.
+                    body = parsed if isinstance(parsed, (dict, list)) else rendered_body
             else:
                 # Implicit passthrough: an empty body on a write request sends
                 # the previous step's output as-is. This is what lets a

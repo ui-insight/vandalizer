@@ -770,6 +770,37 @@ class TestAPICallNode:
 
     @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
     @patch("app.services.workflow_engine.httpx.Client")
+    def test_configured_scalar_body_is_not_dropped(self, mock_client_cls, _mock_validate):
+        # Regression: a populated body that parses to a JSON scalar (not an
+        # object/array) used to fall through to a zero-byte POST, which the
+        # remote rejected with a confusing 400. It must go out as raw JSON text.
+        mock_client = self._ok_client(mock_client_cls)
+        node = APICallNode({
+            "url": "https://api.example.com/submit",
+            "method": "POST",
+            "body": "123",
+        })
+        node.process({"output": "prev"})
+        call_kwargs = mock_client.request.call_args[1]
+        assert call_kwargs["content"] == "123"
+        assert call_kwargs["json"] is None
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_configured_null_body_is_not_dropped(self, mock_client_cls, _mock_validate):
+        mock_client = self._ok_client(mock_client_cls)
+        node = APICallNode({
+            "url": "https://api.example.com/submit",
+            "method": "POST",
+            "body": "null",
+        })
+        node.process({"output": "prev"})
+        call_kwargs = mock_client.request.call_args[1]
+        assert call_kwargs["content"] == "null"
+        assert call_kwargs["json"] is None
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    @patch("app.services.workflow_engine.httpx.Client")
     def test_url_template_interpolates_upstream_id(self, mock_client_cls, _mock_validate):
         mock_client = self._ok_client(mock_client_cls)
         node = APICallNode({
