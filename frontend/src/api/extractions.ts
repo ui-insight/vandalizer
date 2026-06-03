@@ -523,6 +523,15 @@ export interface ExtractionOptimizationRun {
   baseline_no_tool_score: number | null
   baseline_default_score: number | null
   optimized_score: number | null
+  /** Sample-size discount applied to the headline scores above so they live on
+   *  the same scale as the certified ValidationRun / quality tile (Option A).
+   *  Null on legacy runs (their scores were stored raw/un-discounted). */
+  score_sample_size?: {
+    sample_size_factor: number
+    num_test_cases: number
+    num_runs: number
+    test_cases_needed: number
+  } | null
   /** Per-item LLM-judge nondeterminism (sample stddev of replay - original deltas). */
   judge_variance: number | null
   /** σ / √N_items — the standard error on the per-trial mean score. The

@@ -700,6 +700,43 @@ async def run_optimization(
                 source="apply_on_finish",
             )
 
+        # --- Option A: put the headline on the certified score's scale ---
+        # The official quality tile comes from the ValidationRun persisted by
+        # ``persist_validation_run``, which discounts the score for small test
+        # sets. The optimizer's raw scores carry no such discount, so on a small
+        # set the card read HIGHER than the tile — and the moment apply kicked
+        # off a certified validation, that gap looked like a regression. We now
+        # apply the same discount here so "predicted" and "measured" live on one
+        # scale.
+        #
+        # We mirror the certified path's *test-case* discount only: the certified
+        # validation re-measures with >= 3 runs (see ``run_post_apply_validation``),
+        # which clears the run-count factor, leaving test-case count as the binding
+        # constraint. Discounting by the optimizer's own (smaller) num_runs would
+        # over-penalize and just invert the mismatch. Per-trial measurement noise
+        # is already accounted for separately by the judge-variance significance
+        # gate (``tied_with_baseline``), so folding run count in here would
+        # double-count it.
+        #
+        # This runs LAST, after winner selection + the significance gate, which
+        # must compare raw scores — discounting ``baseline_default_score`` earlier
+        # would corrupt ``tied_with_baseline``.
+        from app.services.quality_service import _sample_size_factor
+        _CERTIFIED_NUM_RUNS = 3  # run_post_apply_validation certifies with >= 3 runs
+        n_cases = len(test_cases)
+        ssf = _sample_size_factor(n_cases, _CERTIFIED_NUM_RUNS)
+        run_doc.optimized_score = _discount_unit_score(run_doc.optimized_score, ssf)
+        run_doc.optimized_score_train = _discount_unit_score(run_doc.optimized_score_train, ssf)
+        run_doc.baseline_default_score = _discount_unit_score(run_doc.baseline_default_score, ssf)
+        run_doc.baseline_no_tool_score = _discount_unit_score(run_doc.baseline_no_tool_score, ssf)
+        run_doc.holdout_default_score = _discount_unit_score(run_doc.holdout_default_score, ssf)
+        run_doc.score_sample_size = {
+            "sample_size_factor": round(ssf, 3),
+            "num_test_cases": n_cases,
+            "num_runs": _CERTIFIED_NUM_RUNS,
+            "test_cases_needed": max(0, 3 - n_cases),
+        }
+
         run_doc.status = "completed"
         run_doc.phase = "done"
         run_doc.progress_message = "Optimization complete"
@@ -906,6 +943,21 @@ def _score_to_unit(score: float | None) -> float | None:
     if score is None:
         return None
     return round(float(score) / 100.0, 4)
+
+
+def _discount_unit_score(score: float | None, ssf: float) -> float | None:
+    """Apply the certified ValidationRun's sample-size discount to a 0..1 score.
+
+    Mirrors ``quality_service.persist_validation_run`` exactly, only in unit
+    scale (its neutral midpoint of 50 is 0.5 here): pull the score toward 0.5 by
+    ``(1 - ssf)``, but never *up* — a weak score is never inflated to look
+    mediocre just because the sample was small. Returns the score unchanged when
+    the sample already clears the discount (``ssf >= 1``) or is ``None``.
+    """
+    if score is None or ssf >= 1.0:
+        return score
+    blended = score * ssf + 0.5 * (1.0 - ssf)
+    return round(min(score, blended), 4)
 
 
 def _build_field_apply_preview(

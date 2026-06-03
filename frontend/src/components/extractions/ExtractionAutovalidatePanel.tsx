@@ -385,6 +385,21 @@ export function ExtractionAutovalidatePanel({ searchSetUuid, canManage, onApplie
         variance={displayedRun.judge_score_se ?? displayedRun.judge_variance ?? 0}
         secondaryBaselineId="no-tool"
       />
+      {/* The scores above are discounted for a small test set so they sit on the
+          same scale as the official quality tile (which applies the same
+          discount). Without this, the card read higher than the certified score
+          and apply looked like a regression. Disclose the discount + how to
+          clear it. */}
+      {displayedRun.score_sample_size
+        && displayedRun.score_sample_size.sample_size_factor < 1
+        && displayedRun.score_sample_size.test_cases_needed > 0 && (
+        <div style={{ fontSize: 11, color: '#fbbf24', marginTop: -4 }}>
+          Scores are discounted for a small test set — measured on{' '}
+          {displayedRun.score_sample_size.num_test_cases} test case
+          {displayedRun.score_sample_size.num_test_cases === 1 ? '' : 's'}.
+          Add {displayedRun.score_sample_size.test_cases_needed} more to score at full confidence.
+        </div>
+      )}
       {/* Significance-gated outcome banner. When the optimizer's best trial
           is statistically tied with the user's current config (within 2 × SE
           of judge noise), apply is disabled and we explain why — otherwise
@@ -906,12 +921,11 @@ function PostApplyDelta({
   // here the user never needs the standalone validation panel for a score.
   const certified = after.score ?? after.accuracy
   const certifiedPct = certified != null ? Math.round(certified * 100) : null
-  // Delta vs the optimizer's (un-penalized) estimate uses the un-penalized
-  // measured score, so a tiny test set's discount doesn't masquerade as a
-  // quality regression in the comparison.
-  const comparable = after.raw_score ?? after.score ?? after.accuracy
-  const comparablePct = comparable != null ? Math.round(comparable * 100) : null
-  const delta = (beforePct != null && comparablePct != null) ? comparablePct - beforePct : null
+  // Both numbers now carry the same sample-size discount: the optimizer's
+  // headline (``before``) is discounted to the certified scale (Option A), and
+  // ``after.score`` is the certified, penalized measurement. Comparing like to
+  // like keeps a small test set's discount from masquerading as a regression.
+  const delta = (beforePct != null && certifiedPct != null) ? certifiedPct - beforePct : null
   const penalty = after.score_breakdown
   const penalized = penalty != null && penalty.sample_size_penalty > 0
   return (

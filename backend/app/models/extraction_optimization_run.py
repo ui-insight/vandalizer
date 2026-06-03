@@ -78,6 +78,12 @@ class ExtractionOptimizationRun(Document):
     # is set and the in-sample score is the headline.
     optimized_score_train: Optional[float] = None
     holdout_default_score: Optional[float] = None
+    # Sample-size discount applied to the headline scores above so the optimizer
+    # lives on the same scale as the certified ValidationRun / quality tile
+    # (Option A — see run_optimization). Shape: {sample_size_factor,
+    # num_test_cases, num_runs, test_cases_needed}. Null on legacy runs, whose
+    # scores were stored raw/un-discounted.
+    score_sample_size: Optional[dict] = None
     train_test_case_uuids: list[str] = Field(default_factory=list)
     holdout_test_case_uuids: list[str] = Field(default_factory=list)
     overfitting_warning: bool = False

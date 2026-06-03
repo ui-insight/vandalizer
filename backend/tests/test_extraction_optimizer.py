@@ -9,10 +9,12 @@ import pytest
 
 from app.services import extraction_optimizer
 from app.services.extraction_optimizer import (
+    _discount_unit_score,
     _generate_suggestions,
     _score_to_unit,
     _to_trial_summary,
 )
+from app.services.quality_service import _sample_size_factor
 
 
 # ---------------------------------------------------------------------------
@@ -28,6 +30,45 @@ def test_score_to_unit_scales_to_zero_to_one():
 
 def test_score_to_unit_handles_none():
     assert _score_to_unit(None) is None
+
+
+def test_discount_unit_score_noop_when_sample_clears_penalty():
+    # ssf >= 1 (>= 3 cases at >= 3 runs) leaves the score untouched.
+    ssf = _sample_size_factor(3, 3)
+    assert ssf == 1.0
+    assert _discount_unit_score(0.9, ssf) == 0.9
+    assert _discount_unit_score(0.42, ssf) == 0.42
+
+
+def test_discount_unit_score_pulls_high_scores_toward_midpoint():
+    # 1 test case at the certified 3 runs -> tc_factor 1/3.
+    ssf = _sample_size_factor(1, 3)
+    assert ssf == pytest.approx(1 / 3, abs=1e-6)
+    # 0.9 -> 0.9*(1/3) + 0.5*(2/3) = 0.6333
+    assert _discount_unit_score(0.9, ssf) == pytest.approx(0.6333, abs=1e-4)
+
+
+def test_discount_unit_score_never_inflates_weak_scores():
+    # A failing score stays failing — the discount only ever reduces.
+    ssf = _sample_size_factor(1, 3)
+    assert _discount_unit_score(0.2, ssf) == 0.2
+
+
+def test_discount_unit_score_handles_none():
+    assert _discount_unit_score(None, 0.5) is None
+
+
+def test_discount_matches_certified_validation_blend():
+    # The optimizer discount must reproduce persist_validation_run's blend
+    # (in unit scale) for the same inputs, so the headline and the certified
+    # ValidationRun land on one scale. Certified path: 50/0.5 midpoint.
+    num_test_cases, num_runs = 2, 3
+    ssf = _sample_size_factor(num_test_cases, num_runs)
+    raw_pct = 88.0  # what persist_validation_run would compute pre-discount
+    # quality_service: blended = score*ssf + 50*(1-ssf); score = min(score, blended)
+    certified_pct = min(raw_pct, raw_pct * ssf + 50.0 * (1.0 - ssf))
+    optimizer_unit = _discount_unit_score(raw_pct / 100.0, ssf)
+    assert optimizer_unit == pytest.approx(certified_pct / 100.0, abs=1e-4)
 
 
 def test_to_trial_summary_computes_lift_vs_default():
@@ -90,6 +131,9 @@ def _make_run_doc(uuid: str = "opt-1") -> MagicMock:
     rd.baseline_no_tool_score = None
     rd.baseline_default_score = None
     rd.optimized_score = None
+    rd.optimized_score_train = None
+    rd.holdout_default_score = None
+    rd.score_sample_size = None
     rd.judge_model = None
     rd.judge_variance = None
     rd.best_score_so_far = None
@@ -191,10 +235,16 @@ async def test_run_optimization_records_baselines_and_picks_winner():
         )
 
     assert result.status == "completed"
+    # Single test case → certified-scale discount (Option A) applies: ssf = 1/3,
+    # so scores above the 0.5 midpoint are pulled toward it (and never inflated).
+    # 0.36 stays (below midpoint); 0.62 → 0.54; winner 0.92 → 0.64.
     assert result.baseline_no_tool_score == 0.36
-    assert result.baseline_default_score == 0.62
-    assert result.optimized_score == 0.92  # trial-2 won
+    assert result.baseline_default_score == 0.54
+    assert result.optimized_score == 0.64  # trial-2 won (0.92 raw, discounted)
+    assert result.score_sample_size["sample_size_factor"] == pytest.approx(1 / 3, abs=1e-3)
+    assert result.score_sample_size["num_test_cases"] == 1
     assert len(result.trials) == 3
+    # best_score_so_far is the live in-progress leader — not discounted.
     assert result.best_score_so_far == 0.92
     # apply_on_finish=False → override not written
     assert ss.extraction_config_override is None
