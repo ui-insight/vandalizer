@@ -3467,7 +3467,10 @@ function ValidateTab({
                 itemId={searchSetUuid!}
                 itemTitle={itemTitle}
                 onClose={() => setShowSubmitDialog(false)}
-                onSubmitted={() => setSubmitLibraryResult('success')}
+                onSubmitted={() => {
+                  setSubmitLibraryResult('success')
+                  toast('Submitted for verification', 'success')
+                }}
               />
             )}
           </div>

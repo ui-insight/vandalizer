@@ -5244,6 +5244,8 @@ function ValidateTab({
   bumpActivitySignal: () => void
   onValidated?: () => void
 }) {
+  const { toast } = useToast()
+
   // Plan state
   const [planChecks, setPlanChecks] = useState<ValidationCheckDefinition[]>([])
   const [planLoading, setPlanLoading] = useState(false)
@@ -6323,7 +6325,10 @@ function ValidateTab({
                       itemId={workflowId}
                       itemTitle={itemTitle}
                       onClose={() => setShowSubmitDialog(false)}
-                      onSubmitted={() => setSubmitLibraryResult('success')}
+                      onSubmitted={() => {
+                        setSubmitLibraryResult('success')
+                        toast('Submitted for verification', 'success')
+                      }}
                     />
                   )}
                 </div>
