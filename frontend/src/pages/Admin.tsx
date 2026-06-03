@@ -2619,7 +2619,7 @@ function ConfigTab() {
       setChatRetentionDays((rc.chat_retention_days as number) ?? 365)
       setWorkflowResultRetentionDays((rc.workflow_result_retention_days as number) ?? 365)
       setStaleActivityMinutes((rc.activity_stale_threshold_minutes as number) ?? 30)
-    }).finally(() => setLoading(false))
+    }).catch(() => {}).finally(() => setLoading(false))
 
     getThemeConfig().then(t => {
       setThemeColor(t.highlight_color)
@@ -6775,7 +6775,7 @@ export default function Admin() {
   const [trialEnabled, setTrialEnabled] = useState(false)
 
   useEffect(() => {
-    getAuthConfig().then(c => setTrialEnabled(!!c.trial_system_enabled))
+    getAuthConfig().then(c => setTrialEnabled(!!c.trial_system_enabled)).catch(() => {})
   }, [])
 
   const isGlobalAdmin = !!user?.is_admin
