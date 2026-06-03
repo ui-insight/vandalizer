@@ -3999,6 +3999,55 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
   const finalOutput = status?.final_output as Record<string, unknown> | null
   const output = finalOutput?.output ?? finalOutput
 
+  // API nodes attach a redacted snapshot of the request they sent under
+  // steps_output[step].request. Surface it so authors can debug what actually
+  // went on the wire (malformed body, missing header, etc.).
+  const apiRequests = Object.entries((status?.steps_output ?? {}) as Record<string, unknown>)
+    .map(([step, val]) => {
+      const req = val && typeof val === 'object' ? (val as Record<string, unknown>).request : undefined
+      return req && typeof req === 'object' ? { step, req: req as Record<string, unknown> } : null
+    })
+    .filter((x): x is { step: string; req: Record<string, unknown> } => x !== null)
+
+  const formatApiRequest = (req: Record<string, unknown>): string => {
+    const headers = (req.headers ?? {}) as Record<string, unknown>
+    const headerLines = Object.entries(headers).map(([k, v]) => `  ${k}: ${String(v)}`).join('\n')
+    const body = String(req.body ?? '')
+    const bytes = typeof req.body_bytes === 'number' ? req.body_bytes : 0
+    return [
+      `${String(req.method ?? '')} ${String(req.url ?? '')}`.trim(),
+      headerLines ? `Headers:\n${headerLines}` : 'Headers: (none)',
+      `Body (${bytes} bytes):`,
+      body || '(empty)',
+    ].join('\n')
+  }
+
+  const apiRequestPanel = apiRequests.length > 0 ? (
+    <div style={{ marginTop: 12 }}>
+      {apiRequests.map(({ step, req }) => (
+        <details key={step} style={{
+          border: '1px solid #e5e7eb', borderRadius: 6, padding: '8px 12px',
+          marginBottom: 8, backgroundColor: '#fff',
+        }}>
+          <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#374151' }}>
+            API request sent — {step}
+          </summary>
+          <pre style={{
+            marginTop: 8, fontSize: 12, fontFamily: 'monospace', whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word', color: '#374151', backgroundColor: '#f9fafb',
+            border: '1px solid #e5e7eb', borderRadius: 6, padding: 10,
+            maxHeight: '40vh', overflow: 'auto',
+          }}>
+            {formatApiRequest(req)}
+          </pre>
+          <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>
+            Sensitive header values are redacted.
+          </p>
+        </details>
+      ))}
+    </div>
+  ) : null
+
   const renderOutput = (data: unknown): string => {
     if (data === null || data === undefined) return ''
     let md: string
@@ -4171,6 +4220,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
             }}
             dangerouslySetInnerHTML={{ __html: renderOutput(output) }}
           />
+          {apiRequestPanel}
           <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
           <div style={{ position: 'relative', display: 'inline-block' }}>
             <button
@@ -4260,6 +4310,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
               docs={status.error_payload?.oversize_documents ?? []}
             />
           )}
+          {apiRequestPanel}
         </div>
       )}
 

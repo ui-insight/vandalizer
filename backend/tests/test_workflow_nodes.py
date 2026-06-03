@@ -865,6 +865,68 @@ class TestAPICallNode:
 
     @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
     @patch("app.services.workflow_engine.httpx.Client")
+    def test_success_includes_request_preview(self, mock_client_cls, _mock_validate):
+        self._ok_client(mock_client_cls, json_return={"ok": True})
+        node = APICallNode({
+            "url": "https://api.example.com/submit",
+            "method": "POST",
+            "body": '{"a": 1}',
+        })
+        result = node.process({"output": "prev"})
+        req = result["request"]
+        assert req["method"] == "POST"
+        assert req["url"] == "https://api.example.com/submit"
+        assert req["body"] == '{"a": 1}'
+        assert req["body_bytes"] == len('{"a": 1}'.encode())
+        assert req["headers"]["Content-Type"] == "application/json"
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_request_preview_redacts_secrets(self, mock_client_cls, _mock_validate):
+        self._ok_client(mock_client_cls)
+        node = APICallNode({
+            "url": "https://api.example.com/submit",
+            "method": "POST",
+            "headers": '{"Authorization": "Bearer s3cr3t", "X-Api-Key": "abc", "X-Trace": "ok"}',
+            "body": '{"a": 1}',
+        })
+        result = node.process({"output": "prev"})
+        headers = result["request"]["headers"]
+        assert headers["Authorization"] == "<redacted>"
+        assert headers["X-Api-Key"] == "<redacted>"
+        assert headers["X-Trace"] == "ok"  # non-secret header passes through
+        # And the secret must not leak anywhere in the serialized result.
+        assert "s3cr3t" not in json.dumps(result)
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_http_error_embeds_request_in_output(self, mock_client_cls, _mock_validate):
+        import httpx
+        mock_response = MagicMock()
+        mock_response.status_code = 415
+        mock_response.text = "Unsupported Media Type"
+        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "415", request=MagicMock(), response=mock_response
+        )
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client.request.return_value = mock_response
+        mock_client_cls.return_value = mock_client
+
+        node = APICallNode({
+            "url": "https://marina.example.com/submit/foo",
+            "method": "POST",
+            "body": '{"records": [1, 2]}',
+        })
+        result = node.process({"output": "prev"})
+        assert "HTTP error: 415" in result["output"]
+        assert "--- Request sent ---" in result["output"]
+        assert "POST https://marina.example.com/submit/foo" in result["output"]
+        assert "request" in result and result["request"]["method"] == "POST"
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    @patch("app.services.workflow_engine.httpx.Client")
     def test_url_template_interpolates_upstream_id(self, mock_client_cls, _mock_validate):
         mock_client = self._ok_client(mock_client_cls)
         node = APICallNode({

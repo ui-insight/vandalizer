@@ -748,6 +748,75 @@ def _open_sync_db():
     return get_sync_db()
 
 
+# Header names whose values are secrets and must never appear in a debug
+# preview, a log line, or the step output. Matched as case-insensitive
+# substrings so e.g. "X-Api-Key" and "Proxy-Authorization" are both caught.
+_SENSITIVE_HEADER_HINTS = (
+    "authorization",
+    "cookie",
+    "token",
+    "secret",
+    "api-key",
+    "apikey",
+    "password",
+    "auth",
+)
+
+_REQUEST_BODY_PREVIEW_LIMIT = 4000
+
+
+def _redact_headers(headers: dict) -> dict:
+    """Copy *headers*, masking the values of any secret-bearing header."""
+    redacted: dict[str, str] = {}
+    for k, v in headers.items():
+        if any(hint in str(k).lower() for hint in _SENSITIVE_HEADER_HINTS):
+            redacted[str(k)] = "<redacted>"
+        else:
+            redacted[str(k)] = str(v)
+    return redacted
+
+
+def _build_request_preview(method: str, url: str, headers: dict, body) -> dict:
+    """A safe, structured snapshot of the request the API node is about to send.
+
+    Used for debugging — surfaced in the step output and logged — so authors can
+    see exactly what went on the wire (the recurring pain behind API-node
+    tickets). Secret header values are redacted; the body is the literal text
+    that will be transmitted, truncated if very large.
+    """
+    if isinstance(body, (dict, list)):
+        body_text = json.dumps(body)
+    elif isinstance(body, str):
+        body_text = body
+    else:
+        body_text = ""
+    byte_len = len(body_text.encode("utf-8"))
+    if len(body_text) > _REQUEST_BODY_PREVIEW_LIMIT:
+        body_text = body_text[:_REQUEST_BODY_PREVIEW_LIMIT] + "…(truncated)"
+    return {
+        "method": method,
+        "url": url,
+        "headers": _redact_headers(headers),
+        "body": body_text,
+        "body_bytes": byte_len,
+    }
+
+
+def _format_request_preview(preview: dict) -> str:
+    """Render a request preview as a readable block for inclusion in output."""
+    lines = [f"{preview.get('method', '')} {preview.get('url', '')}".strip()]
+    headers = preview.get("headers") or {}
+    if headers:
+        lines.append("Headers:")
+        lines.extend(f"  {k}: {v}" for k, v in headers.items())
+    else:
+        lines.append("Headers: (none)")
+    body = preview.get("body") or ""
+    lines.append(f"Body ({preview.get('body_bytes', 0)} bytes):")
+    lines.append(body if body else "(empty)")
+    return "\n".join(lines)
+
+
 class APICallNode(Node):
     def __init__(self, data: dict) -> None:
         super().__init__("APINode")
@@ -904,21 +973,52 @@ class APICallNode(Node):
         if body_is_json and not any(k.lower() == "content-type" for k in headers):
             headers["Content-Type"] = "application/json"
 
+        # Snapshot exactly what we're about to send (secrets redacted). This is
+        # attached to the step result so authors can inspect the request when
+        # debugging — and embedded into the error output when it fails, since
+        # that's when they most need to see it.
+        request_preview = _build_request_preview(method, url, headers, body)
+        logger.info(
+            "APINode sending %s %s (%d body bytes)",
+            method, url, request_preview["body_bytes"],
+        )
+
         try:
             with httpx.Client(timeout=30, follow_redirects=True) as client:
                 resp = client.request(method, url, headers=headers, json=body if isinstance(body, (dict, list)) else None, content=body if isinstance(body, str) else None)
                 resp.raise_for_status()
         except httpx.HTTPStatusError as e:
-            return {"output": f"HTTP error: {e.response.status_code} {e.response.text[:500]}", "input": inputs.get("output"), "step_name": self.name}
+            return {
+                "output": (
+                    f"HTTP error: {e.response.status_code} {e.response.text[:500]}\n\n"
+                    f"--- Request sent ---\n{_format_request_preview(request_preview)}"
+                ),
+                "input": inputs.get("output"),
+                "step_name": self.name,
+                "request": request_preview,
+            }
         except httpx.RequestError as e:
-            return {"output": f"Request error: {e}", "input": inputs.get("output"), "step_name": self.name}
+            return {
+                "output": (
+                    f"Request error: {e}\n\n"
+                    f"--- Request sent ---\n{_format_request_preview(request_preview)}"
+                ),
+                "input": inputs.get("output"),
+                "step_name": self.name,
+                "request": request_preview,
+            }
 
         try:
             output = resp.json()
         except Exception:
             output = resp.text
 
-        return {"output": output, "input": inputs.get("output"), "step_name": self.name}
+        return {
+            "output": output,
+            "input": inputs.get("output"),
+            "step_name": self.name,
+            "request": request_preview,
+        }
 
 
 class DocumentRendererNode(Node):
