@@ -98,7 +98,16 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
   const kindLabel = itemKind === 'workflow' ? 'Workflow' : itemKind === 'knowledge_base' ? 'Knowledge Base' : 'Extraction'
 
   return createPortal(
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4" style={{ zIndex: 700 }}>
+    // Stop propagation at the overlay: this modal is portaled to document.body, but
+    // React synthetic events bubble through the React tree (not the DOM tree), so a
+    // click on any field would otherwise reach the LibraryItemRow's onClick and
+    // navigate to the workflow. See LibraryItemRow row onClick={() => onOpen?.(item)}.
+    <div
+      className="fixed inset-0 bg-black/40 flex items-center justify-center p-4"
+      style={{ zIndex: 700 }}
+      onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
