@@ -296,12 +296,23 @@ export function VerificationQueue() {
                       (req.status === 'submitted' || req.status === 'in_review') && (
                         <div className="flex items-center gap-1 shrink-0">
                           {!isReviewing ? (
-                            <button
-                              onClick={() => { setReviewingId(req.uuid); setReviewOrgIds([]); setReviewCollectionIds([]) }}
-                              className="px-3 py-1.5 text-xs font-medium rounded-md bg-gray-900 text-white hover:bg-gray-800"
-                            >
-                              Review
-                            </button>
+                            <>
+                              {req.status === 'submitted' && (
+                                <button
+                                  onClick={() => handleAction(req.uuid, 'in_review')}
+                                  className="px-3 py-1.5 text-xs font-medium rounded-md bg-yellow-100 text-yellow-800 border border-yellow-300 hover:bg-yellow-200"
+                                  title="Claim this submission and mark it as actively under review"
+                                >
+                                  Mark In Review
+                                </button>
+                              )}
+                              <button
+                                onClick={() => { setReviewingId(req.uuid); setReviewOrgIds([]); setReviewCollectionIds([]) }}
+                                className="px-3 py-1.5 text-xs font-medium rounded-md bg-gray-900 text-white hover:bg-gray-800"
+                              >
+                                Review
+                              </button>
+                            </>
                           ) : (
                             <div className="flex flex-col gap-2 w-64">
                               <textarea
