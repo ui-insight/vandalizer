@@ -28,7 +28,7 @@
     "marked": "^18.0.4",
     "pdfjs-dist": "^5.6.205",
     "react": "^19.2.0",
-    "react-dom": "^19.2.6",
+    "react-dom": "^19.2.7",
     "recharts": "^3.8.1",
     "tailwind-merge": "^3.6.0",
     "tailwindcss": "^4.2.2",
