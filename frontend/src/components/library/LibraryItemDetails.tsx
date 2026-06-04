@@ -3,6 +3,7 @@ import { X, ExternalLink, Trash2, Calendar, Tag, ShieldCheck, AlertTriangle } fr
 import { useNavigate } from '@tanstack/react-router'
 import { QualityBadge } from './QualityBadge'
 import { VerificationSubmitModal } from './VerificationSubmitModal'
+import { useToast } from '../../contexts/ToastContext'
 import type { LibraryItem } from '../../types/library'
 
 interface Props {
@@ -13,6 +14,7 @@ interface Props {
 
 export function LibraryItemDetails({ item, onClose, onRemove }: Props) {
   const navigate = useNavigate()
+  const { toast } = useToast()
   const [showSubmitModal, setShowSubmitModal] = useState(false)
   const [submitResult, setSubmitResult] = useState<'success' | null>(null)
   const kindLabel =
@@ -70,7 +72,10 @@ export function LibraryItemDetails({ item, onClose, onRemove }: Props) {
         itemId={item.item_id}
         itemTitle={item.name}
         onClose={() => setShowSubmitModal(false)}
-        onSubmitted={() => setSubmitResult('success')}
+        onSubmitted={() => {
+          setSubmitResult('success')
+          toast('Submitted for verification', 'success')
+        }}
       />
     )}
     <div className="w-80 border-l border-gray-200 bg-white flex flex-col overflow-hidden">

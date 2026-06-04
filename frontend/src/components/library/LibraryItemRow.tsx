@@ -17,6 +17,7 @@ import { QualityBadge } from './QualityBadge'
 import { VerificationSubmitModal } from './VerificationSubmitModal'
 import { AuthorChip } from '../shared/AuthorChip'
 import { useAuth } from '../../hooks/useAuth'
+import { useToast } from '../../contexts/ToastContext'
 import { useShareLink } from '../../lib/shareLink'
 import { relativeTime } from '../../utils/time'
 import type { LibraryItem, LibraryFolder } from '../../types/library'
@@ -39,6 +40,7 @@ interface Props {
 
 export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShare, onRemove, onOpen, onEdit, onMoveToFolder, folders, qualityTier, qualityScore }: Props) {
   const { user } = useAuth()
+  const { toast } = useToast()
   const shareLink = useShareLink()
   const [hovered, setHovered] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -524,7 +526,10 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
           itemId={item.item_id}
           itemTitle={item.name}
           onClose={() => setShowVerifyModal(false)}
-          onSubmitted={() => setShowVerifyModal(false)}
+          onSubmitted={() => {
+            setShowVerifyModal(false)
+            toast('Submitted for verification', 'success')
+          }}
         />
       )}
     </div>
