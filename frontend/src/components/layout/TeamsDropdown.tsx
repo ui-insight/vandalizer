@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Award, User, Users, Settings, LogOut, IdCard, Shield, ClipboardCheck, ChevronDown, MessageSquare, Presentation, KeyRound } from 'lucide-react'
+import { Award, User, Users, Settings, LogOut, IdCard, Shield, ClipboardCheck, ChevronDown, MessageSquare, KeyRound } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { useTeams } from '../../hooks/useTeams'
 import { useAuth } from '../../hooks/useAuth'
@@ -100,16 +100,6 @@ export function TeamsDropdown() {
           >
             <KeyRound className="h-4 w-4 shrink-0" style={{ width: 18 }} />
             <span>Credentials</span>
-          </Link>
-
-          {/* Present & Pitch */}
-          <Link
-            to="/docs/present"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-2.5 rounded-md px-3.5 py-2.5 text-sm text-[#111] hover:bg-black/[.04] transition-colors"
-          >
-            <Presentation className="h-4 w-4 shrink-0" style={{ width: 18 }} />
-            <span>Present &amp; Pitch</span>
           </Link>
 
           {/* Certification */}
