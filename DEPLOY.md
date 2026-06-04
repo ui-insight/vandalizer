@@ -147,6 +147,19 @@ For OCR, self-hosted options include [Marker](https://github.com/VikParuchuri/ma
 
 The MongoDB database is named `vandalizer` by default. The name is configurable via the `MONGO_DB` environment variable and has no effect on functionality.
 
+### Branding your deployment
+
+Vandalizer white-labels to your institution. Sign in as an admin and open **System Config → UI Theme & Branding** (`/admin`) to set:
+
+- **Organization name** — replaces "Vandalizer" in the header, sign-in page, browser tab, and chat greeting.
+- **Logo** — a wordmark image (PNG with transparency works best) shown in the header, sign-in page, and the public landing page.
+- **Icon / mascot** — a small square mark shown beside the logo and used as the browser-tab favicon. Leave it blank on a branded deployment to hide the default Joe Vandal mark, or upload your own.
+- **Brand color** — the highlight color used throughout the UI, and in the styling of outgoing email.
+
+All of these are stored in the `SystemConfig` document in MongoDB and applied at runtime — **no rebuild or redeploy is needed**; changes take effect as soon as you save. Logos and icons are stored inline (as data URLs), so there is no separate asset bucket to provision or back up beyond the MongoDB volume you already back up.
+
+Because the project is open source under GPL v3, the footer keeps a small "Powered by Vandalizer" credit and the NSF GRANTED acknowledgement whenever custom branding is in effect, so creator and funder lineage stay visible.
+
 ### Production Configuration (reference)
 
 `./setup.sh` writes the production `backend/.env` for you. This subsection is a **reference** for what those variables mean — useful when you need to edit `.env` later, externalize a database, or rebuild the file by hand on the manual path.

@@ -292,6 +292,23 @@ function Administration() {
         without restarting the server.
       </p>
 
+      <h3 className="text-xl font-bold text-white mt-8">Customization &amp; Branding</h3>
+      <p className="text-gray-300 leading-relaxed">
+        Vandalizer white-labels to your institution. Under{' '}
+        <strong className="text-white">System Config &rarr; UI Theme &amp; Branding</strong>, an admin
+        can set the <strong className="text-white">organization name</strong> (shown in the header,
+        sign-in page, browser tab, and chat greeting), upload a{' '}
+        <strong className="text-white">logo</strong> and a square{' '}
+        <strong className="text-white">icon</strong> (the icon also becomes the browser-tab favicon),
+        and choose a <strong className="text-white">brand color</strong> that threads through the UI
+        and the styling of outgoing email. These values are stored in{' '}
+        <code className="bg-white/10 text-[#f1b300] px-1.5 py-0.5 rounded text-xs">SystemConfig</code>{' '}
+        and served by a public theme endpoint, so they apply at runtime with no rebuild or redeploy.
+        On a branded deployment the default Joe Vandal mark is hidden unless you upload your own icon,
+        and the footer keeps a small &ldquo;Powered by Vandalizer&rdquo; credit and the NSF GRANTED
+        acknowledgement, as required by the GPL v3 license.
+      </p>
+
       <h3 className="text-xl font-bold text-white mt-8">User & Team Management</h3>
       <p className="text-gray-300 leading-relaxed">
         Administrators can manage users, teams, and team memberships through the admin interface.
