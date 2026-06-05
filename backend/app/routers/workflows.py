@@ -24,6 +24,7 @@ from app.schemas.workflows import (
     BatchStatusResponse,
     CreateTempDocumentsRequest,
     CreateWorkflowRequest,
+    ImportValidationPlanRequest,
     ReorderStepsRequest,
     RunWorkflowRequest,
     TestStepRequest,
@@ -1383,6 +1384,24 @@ async def update_validation_plan(
 async def generate_validation_plan(request: Request, workflow_id: str, user: User = Depends(get_current_user)):
     try:
         checks = await svc.generate_validation_plan(workflow_id, user=user)
+        return ValidationPlanResponse(checks=checks)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{workflow_id}/validation-plan/import", response_model=ValidationPlanResponse)
+@limiter.limit("10/minute")
+async def import_validation_plan(
+    request: Request,
+    workflow_id: str,
+    req: ImportValidationPlanRequest,
+    user: User = Depends(get_current_user),
+):
+    """Import a user-uploaded validation plan. The payload is strictly
+    validated and sanitized server-side (see
+    workflow_service._sanitize_uploaded_checks) before it is persisted."""
+    try:
+        checks = await svc.import_validation_plan(workflow_id, req.checks, user=user)
         return ValidationPlanResponse(checks=checks)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

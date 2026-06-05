@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+import re
 import uuid as uuid_mod
 from typing import TYPE_CHECKING
 
@@ -855,6 +856,116 @@ async def update_validation_plan(workflow_id: str, checks: list[dict], user: Use
     wf = await get_authorized_workflow(workflow_id, user, manage=True)
     if not wf:
         raise ValueError("Workflow not found")
+    wf.validation_plan = checks
+    wf.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
+    await wf.save()
+    return wf.validation_plan
+
+
+# ---------------------------------------------------------------------------
+# Uploaded validation plans (user-supplied JSON — must be sanitized)
+# ---------------------------------------------------------------------------
+
+# Hard limits for an uploaded validation plan. These bound the stored size and
+# the text that later flows into the LLM judge prompt.
+_UPLOAD_MAX_CHECKS = 50
+_UPLOAD_NAME_MAX = 120
+_UPLOAD_DESC_MAX = 2000
+_UPLOAD_CATEGORIES = {"completeness", "accuracy", "content", "formatting"}
+_UPLOAD_CATEGORY_ALIASES = {
+    "format": "formatting",
+    "presence": "completeness",
+    "correctness": "accuracy",
+    "consistency": "accuracy",
+    "arithmetic": "accuracy",
+    "constraints": "accuracy",
+    "hallucination": "accuracy",
+}
+# C0 control chars + DEL. Stripped from all user text so an uploaded plan can't
+# smuggle terminal/log-injection sequences or structure a prompt-injection
+# payload with raw newlines/escapes.
+_UPLOAD_CONTROL_CHARS = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def _sanitize_uploaded_checks(raw_checks) -> list[dict]:
+    """Strictly validate and sanitize a user-uploaded validation plan.
+
+    Security-critical: the input is an untrusted file. This:
+    - requires a non-empty JSON array within a hard size cap;
+    - keeps ONLY the {id, name, description, category} fields (unknown keys are
+      dropped, so nothing extra is ever stored or evaluated);
+    - SYNTHESIZES the id server-side (client-supplied ids are ignored) so
+      checks can't collide or forge another check's identity;
+    - restricts category to the known enum (with a small alias map);
+    - strips control characters and caps every string length.
+
+    Raises ValueError with a user-facing message on the first problem. Returns
+    canonical check dicts. (XSS is additionally handled at render time — the
+    frontend renders these as text, never as HTML.)
+    """
+    if not isinstance(raw_checks, list):
+        raise ValueError("Validation plan must be a JSON array of checks.")
+    if not raw_checks:
+        raise ValueError("Validation plan is empty — include at least one check.")
+    if len(raw_checks) > _UPLOAD_MAX_CHECKS:
+        raise ValueError(
+            f"Too many checks: {len(raw_checks)} (maximum is {_UPLOAD_MAX_CHECKS})."
+        )
+
+    def _clean(value, field: str, idx: int, maxlen: int) -> str:
+        if not isinstance(value, str):
+            raise ValueError(f"Check #{idx + 1}: '{field}' must be a string.")
+        cleaned = _UPLOAD_CONTROL_CHARS.sub(" ", value)
+        cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
+        if len(cleaned) > maxlen:
+            raise ValueError(
+                f"Check #{idx + 1}: '{field}' exceeds {maxlen} characters."
+            )
+        return cleaned
+
+    sanitized: list[dict] = []
+    for idx, raw in enumerate(raw_checks):
+        if not isinstance(raw, dict):
+            raise ValueError(f"Check #{idx + 1} must be a JSON object.")
+
+        name = _clean(raw.get("name", ""), "name", idx, _UPLOAD_NAME_MAX)
+        if not name:
+            raise ValueError(f"Check #{idx + 1}: 'name' is required.")
+
+        description = _clean(raw.get("description", ""), "description", idx, _UPLOAD_DESC_MAX)
+        if not description:
+            raise ValueError(f"Check #{idx + 1}: 'description' is required.")
+
+        category_raw = raw.get("category", "content")
+        if not isinstance(category_raw, str):
+            raise ValueError(f"Check #{idx + 1}: 'category' must be a string.")
+        category = category_raw.lower().strip()
+        category = _UPLOAD_CATEGORY_ALIASES.get(category, category)
+        if category not in _UPLOAD_CATEGORIES:
+            raise ValueError(
+                f"Check #{idx + 1}: invalid category '{category_raw}'. "
+                f"Allowed: {', '.join(sorted(_UPLOAD_CATEGORIES))}."
+            )
+
+        sanitized.append({
+            "id": uuid_mod.uuid4().hex,  # server-synthesized; client id ignored
+            "name": name,
+            "description": description,
+            "category": category,
+        })
+    return sanitized
+
+
+async def import_validation_plan(workflow_id: str, raw_checks, user: User) -> list[dict]:
+    """Validate, sanitize, and persist a user-uploaded validation plan.
+
+    Requires manage rights on the workflow. Raises ValueError (-> 400) with a
+    user-facing message when the uploaded plan is malformed or unsafe.
+    """
+    wf = await get_authorized_workflow(workflow_id, user, manage=True)
+    if not wf:
+        raise ValueError("Workflow not found")
+    checks = _sanitize_uploaded_checks(raw_checks)
     wf.validation_plan = checks
     wf.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
     await wf.save()

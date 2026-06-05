@@ -814,3 +814,76 @@ class TestParseJsonArray:
         from app.services.workflow_service import _parse_json_array
         result = _parse_json_array("[]")
         assert result == []
+
+
+class TestSanitizeUploadedChecks:
+    """_sanitize_uploaded_checks hardens an untrusted uploaded validation plan:
+    caps count/length, restricts category, drops unknown keys, synthesizes ids,
+    strips control chars, and raises friendly ValueErrors on bad input.
+    """
+
+    def _valid(self):
+        return [{"name": "Sections present", "description": "All sections appear", "category": "completeness"}]
+
+    def test_valid_plan_passes_and_synthesizes_ids(self):
+        from app.services.workflow_service import _sanitize_uploaded_checks
+        out = _sanitize_uploaded_checks(self._valid())
+        assert len(out) == 1
+        assert set(out[0].keys()) == {"id", "name", "description", "category"}
+        assert out[0]["id"]  # server-synthesized, non-empty
+
+    def test_client_id_is_ignored(self):
+        from app.services.workflow_service import _sanitize_uploaded_checks
+        out = _sanitize_uploaded_checks([{"id": "attacker-id", "name": "n", "description": "d", "category": "content"}])
+        assert out[0]["id"] != "attacker-id"
+
+    def test_unknown_keys_are_dropped(self):
+        from app.services.workflow_service import _sanitize_uploaded_checks
+        out = _sanitize_uploaded_checks([{
+            "name": "n", "description": "d", "category": "content",
+            "evil": "<script>alert(1)</script>", "weight": 999, "__proto__": "x",
+        }])
+        assert set(out[0].keys()) == {"id", "name", "description", "category"}
+
+    def test_category_alias_and_invalid(self):
+        from app.services.workflow_service import _sanitize_uploaded_checks
+        out = _sanitize_uploaded_checks([{"name": "n", "description": "d", "category": "format"}])
+        assert out[0]["category"] == "formatting"
+        with pytest.raises(ValueError):
+            _sanitize_uploaded_checks([{"name": "n", "description": "d", "category": "totally-bogus"}])
+
+    def test_control_chars_stripped(self):
+        from app.services.workflow_service import _sanitize_uploaded_checks
+        out = _sanitize_uploaded_checks([{"name": "a\x00\x1bb", "description": "x\ny\tz", "category": "content"}])
+        assert "\x00" not in out[0]["name"] and "\x1b" not in out[0]["name"]
+        assert "\n" not in out[0]["description"] and "\t" not in out[0]["description"]
+
+    def test_rejects_non_list(self):
+        from app.services.workflow_service import _sanitize_uploaded_checks
+        for bad in ({"checks": []}, "string", 42, None):
+            with pytest.raises(ValueError):
+                _sanitize_uploaded_checks(bad)
+
+    def test_rejects_empty_and_oversize_count(self):
+        from app.services.workflow_service import _sanitize_uploaded_checks, _UPLOAD_MAX_CHECKS
+        with pytest.raises(ValueError):
+            _sanitize_uploaded_checks([])
+        too_many = [{"name": "n", "description": "d", "category": "content"}] * (_UPLOAD_MAX_CHECKS + 1)
+        with pytest.raises(ValueError):
+            _sanitize_uploaded_checks(too_many)
+
+    def test_rejects_missing_or_nonstring_fields(self):
+        from app.services.workflow_service import _sanitize_uploaded_checks
+        with pytest.raises(ValueError):
+            _sanitize_uploaded_checks([{"description": "d", "category": "content"}])  # no name
+        with pytest.raises(ValueError):
+            _sanitize_uploaded_checks([{"name": "n", "category": "content"}])  # no description
+        with pytest.raises(ValueError):
+            _sanitize_uploaded_checks([{"name": 123, "description": "d", "category": "content"}])
+        with pytest.raises(ValueError):
+            _sanitize_uploaded_checks(["not a dict"])
+
+    def test_rejects_oversize_strings(self):
+        from app.services.workflow_service import _sanitize_uploaded_checks, _UPLOAD_DESC_MAX
+        with pytest.raises(ValueError):
+            _sanitize_uploaded_checks([{"name": "n", "description": "x" * (_UPLOAD_DESC_MAX + 1), "category": "content"}])

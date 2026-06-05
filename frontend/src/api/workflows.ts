@@ -321,6 +321,16 @@ export function generateValidationPlan(workflowId: string) {
   })
 }
 
+// Upload a user-supplied validation plan. The server strictly validates and
+// sanitizes the checks before persisting; `checks` is sent as-is from the
+// parsed file (untyped on purpose — the backend is the source of truth).
+export function importValidationPlan(workflowId: string, checks: unknown[]) {
+  return apiFetch<ValidationPlanResponse>(`/api/workflows/${workflowId}/validation-plan/import`, {
+    method: 'POST',
+    body: JSON.stringify({ checks }),
+  })
+}
+
 // Validation Inputs
 
 export interface ValidationInputDefinition {

@@ -137,6 +137,14 @@ class UpdateValidationPlanRequest(BaseModel):
     checks: list[ValidationCheckDefinition]
 
 
+class ImportValidationPlanRequest(BaseModel):
+    # Raw, user-uploaded checks. Accepted as arbitrary objects so the service
+    # can strictly validate/sanitize them and return friendly per-check errors
+    # instead of opaque 422s. Never trusted as-is — see
+    # workflow_service._sanitize_uploaded_checks.
+    checks: list[Any]
+
+
 class ValidationPlanResponse(BaseModel):
     checks: list[ValidationCheckDefinition]
 

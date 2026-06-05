@@ -19,7 +19,7 @@ import {
   updateWorkflow, updateStep, downloadResults, testStep, getTestStepStatus,
   reorderSteps, validateWorkflow, runWorkflow, streamWorkflowStatus, createTempDocuments,
   getWorkflowQualityHistory, getWorkflowImprovementSuggestions, getWorkflowQualityStatus,
-  getValidationPlan, updateValidationPlan, generateValidationPlan,
+  getValidationPlan, updateValidationPlan, generateValidationPlan, importValidationPlan,
   getValidationInputs, updateValidationInputs,
   exportWorkflowUrl, importIntoWorkflow, getWorkflowHistory, duplicateWorkflow,
   improvePrompt,
@@ -5372,6 +5372,8 @@ function ValidateTab({
   const [planChecks, setPlanChecks] = useState<ValidationCheckDefinition[]>([])
   const [planLoading, setPlanLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const uploadInputRef = useRef<HTMLInputElement>(null)
 
   // Plan editing state
   const [editingIdx, setEditingIdx] = useState<number | null>(null)
@@ -5494,6 +5496,56 @@ function ValidateTab({
       setError(err instanceof Error ? err.message : 'Failed to generate plan')
     } finally {
       setGenerating(false)
+    }
+  }
+
+  const handleUploadClick = () => {
+    setError(null)
+    uploadInputRef.current?.click()
+  }
+
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    // Reset so re-selecting the same file fires onChange again.
+    e.target.value = ''
+    if (!file || !workflowId) return
+
+    const MAX_BYTES = 256 * 1024
+    if (file.size > MAX_BYTES) {
+      const msg = 'Validation plan file is too large (max 256 KB).'
+      setError(msg)
+      toast(msg, 'error')
+      return
+    }
+
+    setImporting(true)
+    setError(null)
+    try {
+      const text = await file.text()
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(text)
+      } catch {
+        throw new Error('File is not valid JSON.')
+      }
+      // Accept a bare array of checks or a { "checks": [...] } wrapper.
+      const checks: unknown[] | null = Array.isArray(parsed)
+        ? parsed
+        : parsed && typeof parsed === 'object' && Array.isArray((parsed as { checks?: unknown }).checks)
+          ? (parsed as { checks: unknown[] }).checks
+          : null
+      if (!checks) {
+        throw new Error('Expected a JSON array of checks, or a { "checks": [...] } object.')
+      }
+      const res = await importValidationPlan(workflowId, checks)
+      setPlanChecks(res.checks)
+      toast(`Imported ${res.checks.length} validation check${res.checks.length === 1 ? '' : 's'}.`, 'success')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to import validation plan'
+      setError(msg)
+      toast(msg, 'error')
+    } finally {
+      setImporting(false)
     }
   }
 
@@ -5894,21 +5946,47 @@ function ValidateTab({
               </div>
             </div>
             {planChecks.length > 0 && (
-              <button
-                onClick={handleGenerate}
-                disabled={generating}
-                style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                  padding: '4px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
-                  borderRadius: 5, border: '1px solid #d1d5db', backgroundColor: '#fff',
-                  color: '#6b7280', cursor: generating ? 'not-allowed' : 'pointer',
-                  opacity: generating ? 0.6 : 1,
-                }}
-              >
-                <RefreshCw style={{ width: 11, height: 11 }} /> Regenerate
-              </button>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <button
+                  onClick={handleUploadClick}
+                  disabled={importing}
+                  title="Upload a validation plan JSON file"
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    padding: '4px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+                    borderRadius: 5, border: '1px solid #d1d5db', backgroundColor: '#fff',
+                    color: '#6b7280', cursor: importing ? 'not-allowed' : 'pointer',
+                    opacity: importing ? 0.6 : 1,
+                  }}
+                >
+                  <Upload style={{ width: 11, height: 11 }} /> Upload
+                </button>
+                <button
+                  onClick={handleGenerate}
+                  disabled={generating}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    padding: '4px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+                    borderRadius: 5, border: '1px solid #d1d5db', backgroundColor: '#fff',
+                    color: '#6b7280', cursor: generating ? 'not-allowed' : 'pointer',
+                    opacity: generating ? 0.6 : 1,
+                  }}
+                >
+                  <RefreshCw style={{ width: 11, height: 11 }} /> Regenerate
+                </button>
+              </div>
             )}
           </div>
+
+          {/* Hidden file input for "Upload" — server strictly validates the
+              uploaded plan (see import_validation_plan). */}
+          <input
+            ref={uploadInputRef}
+            type="file"
+            accept="application/json,.json"
+            style={{ display: 'none' }}
+            onChange={handleFileSelected}
+          />
 
           {planLoading ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 16, justifyContent: 'center' }}>
@@ -5936,6 +6014,20 @@ function ValidateTab({
                 }}
               >
                 <Sparkles style={{ width: 14, height: 14 }} /> Generate Plan
+              </button>
+              <button
+                onClick={handleUploadClick}
+                disabled={importing}
+                title="Upload a validation plan JSON file"
+                style={{
+                  padding: '6px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                  border: '1px solid #d1d5db', borderRadius: 6,
+                  cursor: importing ? 'not-allowed' : 'pointer', backgroundColor: '#fff',
+                  color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6,
+                  opacity: importing ? 0.6 : 1,
+                }}
+              >
+                <Upload style={{ width: 12, height: 12 }} /> Upload a plan
               </button>
             </div>
           ) : generating ? (
