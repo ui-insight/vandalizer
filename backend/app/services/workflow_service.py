@@ -843,11 +843,13 @@ async def reorder_steps(workflow_id: str, step_ids: list[str], user: User) -> bo
 # ---------------------------------------------------------------------------
 
 async def get_validation_plan(workflow_id: str, user: User) -> list[dict]:
-    """Return the workflow's persisted validation plan."""
+    """Return the workflow's persisted validation plan (normalized to the
+    canonical runtime schema so imported/alternate-shaped plans display and
+    edit correctly)."""
     wf = await get_authorized_workflow(workflow_id, user)
     if not wf:
         raise ValueError("Workflow not found")
-    return wf.validation_plan
+    return _normalize_validation_plan(wf.validation_plan)
 
 
 async def update_validation_plan(workflow_id: str, checks: list[dict], user: User) -> list[dict]:
@@ -1240,6 +1242,58 @@ _CATEGORY_WEIGHTS = {
     "formatting": 0.7,
 }
 
+# Canonical runtime categories plus aliases for the alternate
+# {check_id, check_name, check_description, check_type} schema that some
+# workflow exports embed. Mapping check_type onto a canonical category lets a
+# mismatched plan validate instead of KeyError-ing the evaluator.
+_VALIDATION_CATEGORY_ALIASES = {
+    "completeness": "completeness",
+    "accuracy": "accuracy",
+    "content": "content",
+    "formatting": "formatting",
+    "format": "formatting",
+    "presence": "completeness",
+    "correctness": "accuracy",
+    "consistency": "accuracy",
+    "arithmetic": "accuracy",
+    "constraints": "accuracy",
+    "hallucination": "accuracy",
+}
+
+
+def _normalize_validation_plan(plan: list[dict] | None) -> list[dict]:
+    """Coerce a stored/imported validation plan into the canonical runtime
+    schema ``{id, name, description, category}``.
+
+    The editor and ``generate_validation_plan`` produce that shape, but some
+    workflow exports embed the alternate ``{check_id, check_name,
+    check_description, check_type, severity}`` shape. The evaluator and the
+    multi-run merge index checks by ``c["id"]`` / ``c["name"]``, so an
+    alternate-shaped plan would raise ``KeyError`` on Validate. Normalizing on
+    read makes either shape work and never raises on a malformed entry. The id
+    is derived from an existing ``id``/``check_id`` (stable across calls) and
+    only synthesized when neither is present.
+    """
+    normalized: list[dict] = []
+    for raw in plan or []:
+        if not isinstance(raw, dict):
+            continue
+        cid = raw.get("id") or raw.get("check_id")
+        cid = str(cid) if cid else uuid_mod.uuid4().hex
+        name = str(raw.get("name") or raw.get("check_name") or "")[:60]
+        description = str(raw.get("description") or raw.get("check_description") or "")
+        category_raw = str(
+            raw.get("category") or raw.get("check_type") or "content"
+        ).lower().strip()
+        category = _VALIDATION_CATEGORY_ALIASES.get(category_raw, "content")
+        normalized.append({
+            "id": cid,
+            "name": name,
+            "description": description,
+            "category": category,
+        })
+    return normalized
+
 
 def _text_similarity(a: str, b: str) -> float:
     """Jaccard similarity over whitespace-split tokens (case-insensitive)."""
@@ -1345,7 +1399,7 @@ async def validate_workflow(workflow_id: str, user: User | None = None) -> dict:
         if not wf:
             raise ValueError("Workflow not found")
 
-    plan = wf.validation_plan
+    plan = _normalize_validation_plan(wf.validation_plan)
     if not plan:
         raise ValueError("No validation plan - generate or add checks first")
 

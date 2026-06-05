@@ -814,3 +814,62 @@ class TestParseJsonArray:
         from app.services.workflow_service import _parse_json_array
         result = _parse_json_array("[]")
         assert result == []
+
+
+class TestNormalizeValidationPlan:
+    """_normalize_validation_plan must accept the canonical runtime schema AND
+    the alternate {check_id, check_name, check_description, check_type} export
+    schema, never raising KeyError on the evaluator's c["id"]/c["name"] access.
+    """
+
+    def test_canonical_schema_passthrough(self):
+        from app.services.workflow_service import _normalize_validation_plan
+        plan = [{"id": "abc", "name": "N", "description": "D", "category": "accuracy"}]
+        out = _normalize_validation_plan(plan)
+        assert out == [{"id": "abc", "name": "N", "description": "D", "category": "accuracy"}]
+
+    def test_alternate_schema_is_mapped(self):
+        from app.services.workflow_service import _normalize_validation_plan
+        plan = [{
+            "check_id": "CHK-01",
+            "check_name": "Monetary preservation",
+            "check_description": "Amounts match source",
+            "check_type": "format",
+            "severity": "error",
+        }]
+        out = _normalize_validation_plan(plan)
+        assert out[0]["id"] == "CHK-01"          # stable id from check_id
+        assert out[0]["name"] == "Monetary preservation"
+        assert out[0]["description"] == "Amounts match source"
+        assert out[0]["category"] == "formatting"  # check_type "format" -> "formatting"
+
+    def test_check_type_aliases(self):
+        from app.services.workflow_service import _normalize_validation_plan
+        for check_type, expected in [
+            ("arithmetic", "accuracy"),
+            ("consistency", "accuracy"),
+            ("correctness", "accuracy"),
+            ("presence", "completeness"),
+            ("completeness", "completeness"),
+            ("hallucination", "accuracy"),
+            ("totally-unknown", "content"),
+        ]:
+            out = _normalize_validation_plan([{"check_id": "x", "check_type": check_type}])
+            assert out[0]["category"] == expected, check_type
+
+    def test_synthesizes_id_when_absent(self):
+        from app.services.workflow_service import _normalize_validation_plan
+        out = _normalize_validation_plan([{"name": "no id here"}])
+        assert out[0]["id"]  # non-empty synthesized id
+        assert out[0]["category"] == "content"
+
+    def test_skips_malformed_entries_without_raising(self):
+        from app.services.workflow_service import _normalize_validation_plan
+        out = _normalize_validation_plan([None, "string", 42, {"id": "ok", "name": "n"}])
+        assert len(out) == 1
+        assert out[0]["id"] == "ok"
+
+    def test_none_and_empty(self):
+        from app.services.workflow_service import _normalize_validation_plan
+        assert _normalize_validation_plan(None) == []
+        assert _normalize_validation_plan([]) == []
