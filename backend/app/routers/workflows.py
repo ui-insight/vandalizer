@@ -1433,6 +1433,21 @@ async def validate_workflow(workflow_id: str, user: User = Depends(get_current_u
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.get("/{workflow_id}/validate-batch")
+async def validate_batch(
+    workflow_id: str,
+    batch_id: str = Query(...),
+    user: User = Depends(get_current_user),
+):
+    """Validate every completed run in a batch independently and return a
+    per-document breakdown plus a coverage aggregate (no cross-document
+    stability)."""
+    try:
+        return await svc.validate_batch(workflow_id, batch_id, user=user)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.post("/{workflow_id}/save-expected-output")
 async def save_expected_output(workflow_id: str, request: Request, user: User = Depends(get_current_user)):
     """Mark a completed workflow execution as expected output for validation."""

@@ -863,3 +863,75 @@ class TestResolveRunSourceText:
         result.retrieved_sources = []
         out = await _resolve_run_source_text(result)
         assert out == ""
+
+
+class TestScoreCheckResults:
+    """_score_check_results: quality-only weighted score + grade, no stability."""
+
+    _PLAN = [
+        {"id": "c1", "category": "completeness"},  # weight 1.5
+        {"id": "c2", "category": "accuracy"},      # weight 1.3
+        {"id": "c3", "category": "formatting"},    # weight 0.7
+    ]
+
+    def test_all_pass_is_A_100(self):
+        from app.services.workflow_service import _score_check_results
+        checks = [{"check_id": "c1", "status": "PASS"}, {"check_id": "c2", "status": "PASS"}, {"check_id": "c3", "status": "PASS"}]
+        score, grade = _score_check_results(checks, self._PLAN)
+        assert score == 100.0 and grade == "A"
+
+    def test_all_fail_is_F_0(self):
+        from app.services.workflow_service import _score_check_results
+        checks = [{"check_id": "c1", "status": "FAIL"}, {"check_id": "c2", "status": "FAIL"}, {"check_id": "c3", "status": "FAIL"}]
+        score, grade = _score_check_results(checks, self._PLAN)
+        assert score == 0.0 and grade == "F"
+
+    def test_weighting_penalizes_high_weight_failure_more(self):
+        from app.services.workflow_service import _score_check_results
+        # Fail the heaviest (completeness 1.5) vs fail the lightest (formatting 0.7)
+        fail_heavy = [{"check_id": "c1", "status": "FAIL"}, {"check_id": "c2", "status": "PASS"}, {"check_id": "c3", "status": "PASS"}]
+        fail_light = [{"check_id": "c1", "status": "PASS"}, {"check_id": "c2", "status": "PASS"}, {"check_id": "c3", "status": "FAIL"}]
+        heavy_score, _ = _score_check_results(fail_heavy, self._PLAN)
+        light_score, _ = _score_check_results(fail_light, self._PLAN)
+        assert heavy_score < light_score
+
+    def test_skip_excluded_from_score(self):
+        from app.services.workflow_service import _score_check_results
+        checks = [{"check_id": "c1", "status": "PASS"}, {"check_id": "c2", "status": "SKIP"}, {"check_id": "c3", "status": "SKIP"}]
+        score, grade = _score_check_results(checks, self._PLAN)
+        assert score == 100.0 and grade == "A"  # only the PASS counts
+
+    def test_no_evaluated_checks_is_zero(self):
+        from app.services.workflow_service import _score_check_results
+        checks = [{"check_id": "c1", "status": "SKIP"}]
+        score, grade = _score_check_results(checks, self._PLAN)
+        assert score == 0.0 and grade == "F"
+
+
+class TestAggregateBatch:
+    """_aggregate_batch: coverage metrics across a document set."""
+
+    def _docs(self):
+        return [
+            {"document_title": "a.pdf", "grade": "A", "score": 95.0, "num_failed": 0,
+             "checks": [{"name": "X", "status": "PASS"}]},
+            {"document_title": "b.pdf", "grade": "F", "score": 40.0, "num_failed": 2,
+             "checks": [{"name": "X", "status": "FAIL"}, {"name": "Y", "status": "FAIL"}]},
+            {"document_title": "c.pdf", "grade": "A", "score": 91.0, "num_failed": 0,
+             "checks": [{"name": "X", "status": "PASS"}]},
+        ]
+
+    def test_aggregate_metrics(self):
+        from app.services.workflow_service import _aggregate_batch
+        agg = _aggregate_batch(self._docs())
+        assert agg["num_documents"] == 3
+        assert agg["mean_score"] == round((95.0 + 40.0 + 91.0) / 3, 1)
+        assert agg["grade_distribution"] == {"A": 2, "F": 1}
+        assert agg["documents_all_passed"] == 2
+        assert agg["check_failure_counts"] == {"X": 1, "Y": 1}
+        assert agg["worst_document"]["document_title"] == "b.pdf"
+
+    def test_empty(self):
+        from app.services.workflow_service import _aggregate_batch
+        agg = _aggregate_batch([])
+        assert agg["num_documents"] == 0 and agg["worst_document"] is None

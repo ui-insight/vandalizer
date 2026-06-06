@@ -1922,6 +1922,134 @@ async def _build_result(
 
 
 # ---------------------------------------------------------------------------
+# Batch validation (grade a workflow across a document SET)
+# ---------------------------------------------------------------------------
+
+def _score_check_results(check_results: list[dict], plan: list[dict]) -> tuple[float, str]:
+    """Quality-only score (0-100) + letter grade for one run's check results.
+
+    Weighted by category like _build_result's quality_score, but WITHOUT any
+    cross-document stability term — that term is meaningless across different
+    documents and is what makes the rolling-window validator misgrade batches.
+    """
+    cat_lookup = {c.get("id"): (c.get("category") or "content") for c in (plan or [])}
+    weighted_sum = 0.0
+    weight_total = 0.0
+    for r in check_results:
+        status = r.get("status")
+        if status == "SKIP":
+            continue
+        weight = _CATEGORY_WEIGHTS.get(cat_lookup.get(r.get("check_id"), "content"), 1.0)
+        weighted_sum += {"PASS": 1.0, "WARN": 0.5, "FAIL": 0.0}.get(status, 0.0) * weight
+        weight_total += weight
+    score = (weighted_sum / weight_total * 100) if weight_total > 0 else 0.0
+    score = min(100.0, max(0.0, score))
+    if score >= 90:
+        grade = "A"
+    elif score >= 80:
+        grade = "B"
+    elif score >= 70:
+        grade = "C"
+    elif score >= 60:
+        grade = "D"
+    else:
+        grade = "F"
+    return round(score, 1), grade
+
+
+def _aggregate_batch(documents: list[dict]) -> dict:
+    """Aggregate per-document validation results into a batch summary.
+
+    Coverage metrics (how the workflow does across the SET), not consistency:
+    mean score, grade distribution, count of documents passing every check, the
+    weakest document, and how often each check fails across the set.
+    """
+    if not documents:
+        return {
+            "num_documents": 0, "mean_score": 0.0, "grade_distribution": {},
+            "documents_all_passed": 0, "check_failure_counts": {}, "worst_document": None,
+        }
+    grade_distribution: dict[str, int] = {}
+    check_failure_counts: dict[str, int] = {}
+    for d in documents:
+        grade_distribution[d["grade"]] = grade_distribution.get(d["grade"], 0) + 1
+        for c in d.get("checks", []):
+            if c.get("status") == "FAIL":
+                name = c.get("name", "?")
+                check_failure_counts[name] = check_failure_counts.get(name, 0) + 1
+    mean_score = round(sum(d["score"] for d in documents) / len(documents), 1)
+    worst = min(documents, key=lambda d: d["score"])
+    return {
+        "num_documents": len(documents),
+        "mean_score": mean_score,
+        "grade_distribution": grade_distribution,
+        "documents_all_passed": sum(1 for d in documents if d["num_failed"] == 0),
+        "check_failure_counts": check_failure_counts,
+        "worst_document": {
+            "document_title": worst.get("document_title"),
+            "grade": worst["grade"], "score": worst["score"],
+        },
+    }
+
+
+async def validate_batch(workflow_id: str, batch_id: str, user: User) -> dict:
+    """Validate every completed run in a batch INDEPENDENTLY and aggregate.
+
+    Unlike validate_workflow (which grades the rolling last-3 runs as a single
+    consensus with cross-document stability), this grades each document's run
+    on its own and returns a per-document breakdown plus a coverage aggregate.
+    Each run is grounded in its own source document (see _resolve_run_source_text).
+    """
+    wf = await get_authorized_workflow(workflow_id, user)
+    if not wf:
+        raise ValueError("Workflow not found")
+    plan = wf.validation_plan
+    if not plan:
+        raise ValueError("No validation plan - generate or add checks first")
+
+    runs = await WorkflowResult.find(
+        WorkflowResult.workflow == wf.id,
+        WorkflowResult.batch_id == batch_id,
+        WorkflowResult.status == "completed",
+    ).sort("+_id").to_list()
+    if not runs:
+        raise ValueError(f"No completed runs found for batch {batch_id}")
+
+    wf_data = await get_workflow(workflow_id)
+    documents: list[dict] = []
+    for wr in runs:
+        output_text = _serialize_output(wr.final_output)
+        if output_text is None:
+            checks = [
+                {"check_id": c.get("id"), "name": c.get("name"), "status": "SKIP",
+                 "detail": "Binary output cannot be evaluated as text."}
+                for c in plan
+            ]
+        else:
+            src = await _resolve_run_source_text(wr)
+            checks = await _evaluate_checks_against_output(
+                plan, output_text, wr.steps_output, wf_data, source_text_override=src,
+            )
+        score, grade = _score_check_results(checks, plan)
+        documents.append({
+            "document_title": wr.document_title or wr.session_id,
+            "session_id": wr.session_id,
+            "grade": grade,
+            "score": score,
+            "num_passed": sum(1 for c in checks if c.get("status") == "PASS"),
+            "num_failed": sum(1 for c in checks if c.get("status") == "FAIL"),
+            "checks": checks,
+        })
+
+    return {
+        "batch_id": batch_id,
+        "num_documents": len(documents),
+        "aggregate": _aggregate_batch(documents),
+        "documents": documents,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
