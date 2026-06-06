@@ -814,3 +814,52 @@ class TestParseJsonArray:
         from app.services.workflow_service import _parse_json_array
         result = _parse_json_array("[]")
         assert result == []
+
+
+class TestResolveRunSourceText:
+    """_resolve_run_source_text must turn a run's doc UUIDs into the real
+    SmartDocument.raw_text (the judge's missing ground truth), not leave the
+    judge looking at UUID 'hash strings'."""
+
+    @patch("app.services.workflow_service.SmartDocument")
+    async def test_resolves_doc_uuids_to_raw_text(self, mock_doc_cls):
+        from app.services.workflow_service import _resolve_run_source_text
+        doc1 = MagicMock(raw_text="BLM award total $96,673.48")
+        doc2 = MagicMock(raw_text="second doc text")
+        mock_doc_cls.find_one = AsyncMock(side_effect=[doc1, doc2])
+        result = MagicMock()
+        result.input_context = {"doc_uuids": ["u1", "u2"]}
+        result.retrieved_sources = []
+        out = await _resolve_run_source_text(result)
+        assert "BLM award total $96,673.48" in out
+        assert "second doc text" in out
+
+    @patch("app.services.workflow_service.SmartDocument")
+    async def test_skips_docs_without_raw_text(self, mock_doc_cls):
+        from app.services.workflow_service import _resolve_run_source_text
+        empty = MagicMock(raw_text="")
+        good = MagicMock(raw_text="real text")
+        mock_doc_cls.find_one = AsyncMock(side_effect=[empty, good])
+        result = MagicMock()
+        result.input_context = {"doc_uuids": ["u1", "u2"]}
+        result.retrieved_sources = []
+        out = await _resolve_run_source_text(result)
+        assert out == "real text"
+
+    @patch("app.services.workflow_service.SmartDocument")
+    async def test_includes_kb_retrieved_sources(self, mock_doc_cls):
+        from app.services.workflow_service import _resolve_run_source_text
+        mock_doc_cls.find_one = AsyncMock(return_value=None)
+        result = MagicMock()
+        result.input_context = {"doc_uuids": []}
+        result.retrieved_sources = [{"content_preview": "2 CFR 200 chunk"}]
+        out = await _resolve_run_source_text(result)
+        assert "2 CFR 200 chunk" in out
+
+    async def test_empty_when_no_sources(self):
+        from app.services.workflow_service import _resolve_run_source_text
+        result = MagicMock()
+        result.input_context = {}
+        result.retrieved_sources = []
+        out = await _resolve_run_source_text(result)
+        assert out == ""

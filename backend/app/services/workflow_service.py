@@ -1395,7 +1395,10 @@ async def validate_workflow(workflow_id: str, user: User | None = None) -> dict:
                 for c in plan
             ]
         else:
-            run_checks = await _evaluate_checks_against_output(plan, output_text, wr.steps_output, wf_data)
+            src = await _resolve_run_source_text(wr)
+            run_checks = await _evaluate_checks_against_output(
+                plan, output_text, wr.steps_output, wf_data, source_text_override=src,
+            )
         all_run_checks.append(run_checks)
 
     # Merge multi-run results with consistency tracking
@@ -1446,13 +1449,52 @@ def _serialize_output(final_output: dict | None) -> str | None:
     return str(output_data)[:50_000]
 
 
+async def _resolve_run_source_text(result) -> str:
+    """Resolve a run's ACTUAL source text for the validation judge.
+
+    The ``Document`` trigger step only stores document UUIDs (its output is a
+    list of uuid hex strings), so the judge's legacy steps_output extraction
+    feeds those UUIDs as "ground truth" — the judge then sees opaque hash
+    strings instead of the document and cannot verify grounding. Here we
+    resolve ``input_context.doc_uuids`` to ``SmartDocument.raw_text`` (the same
+    text the workflow itself ran on) and append any KB chunks the run
+    retrieved, so accuracy/completeness checks evaluate against the real
+    source. Returns "" when no source text is recoverable.
+    """
+    parts: list[str] = []
+    ic = getattr(result, "input_context", None) or {}
+    uuids = ic.get("doc_uuids") or [] if isinstance(ic, dict) else []
+    for u in uuids:
+        try:
+            doc = await SmartDocument.find_one(SmartDocument.uuid == u)
+        except Exception:
+            doc = None
+        if doc and getattr(doc, "raw_text", ""):
+            parts.append(doc.raw_text)
+    for s in (getattr(result, "retrieved_sources", None) or []):
+        cp = s.get("content_preview") if isinstance(s, dict) else None
+        if cp:
+            parts.append(str(cp))
+    if not parts:
+        return ""
+    if len(parts) == 1:
+        return parts[0]
+    return "\n\n=== Document ===\n".join(parts)
+
+
 async def _evaluate_checks_against_output(
     plan: list[dict],
     output_text: str,
     steps_output: dict,
     wf_data: dict,
+    source_text_override: str | None = None,
 ) -> list[dict]:
-    """Single LLM call to evaluate all checks against the actual output."""
+    """Single LLM call to evaluate all checks against the actual output.
+
+    When *source_text_override* is provided, it is used as the ground-truth
+    source document text (resolved from the run's uploaded documents) instead
+    of the legacy steps_output scan, which only sees document UUIDs.
+    """
     import json as _json
     from app.services.llm_service import create_chat_agent
     from app.models.system_config import SystemConfig
@@ -1466,7 +1508,16 @@ async def _evaluate_checks_against_output(
     # Extract source document text from steps_output so the evaluator can
     # verify extracted values actually come from the source (not hallucinated).
     source_text = ""
-    if steps_output:
+    if source_text_override is not None:
+        _gt = source_text_override.strip()
+        if _gt:
+            source_text = (
+                "\n\n## Source Document Text (ground truth)\n"
+                "Use this to verify that extracted values actually appear in the "
+                "source document. Values not grounded in this text may be hallucinated.\n"
+                + _gt[:15_000]
+            )
+    elif steps_output:
         for step_name, step_data in steps_output.items():
             # Document / AddDocument steps carry the raw source text
             if step_name.lower() in ("document", "adddocument") or (
