@@ -814,3 +814,75 @@ class TestParseJsonArray:
         from app.services.workflow_service import _parse_json_array
         result = _parse_json_array("[]")
         assert result == []
+
+
+class TestFormatValidationReport:
+    """_format_validation_report renders a downloadable report from a run
+    snapshot (pure function — no I/O)."""
+
+    def _snapshot(self):
+        return {
+            "grade": "D",
+            "summary": "4/6 checks passed, 0 warnings, 2 failures",
+            "num_runs": 3,
+            "num_checks": 2,
+            "stability_score": 56.0,
+            "checks": [
+                {"check_id": "c1", "name": "Sections present", "status": "PASS", "detail": "All present", "run_statuses": ["PASS", "PASS", "PASS"]},
+                {"check_id": "c2", "name": "Monetary fidelity", "status": "FAIL", "detail": "FAIN mismatch", "run_statuses": ["FAIL", "WARN", "FAIL"]},
+            ],
+        }
+
+    def _plan(self):
+        return [
+            {"id": "c1", "name": "Sections present", "category": "completeness"},
+            {"id": "c2", "name": "Monetary fidelity", "category": "accuracy"},
+        ]
+
+    def _call(self, fmt):
+        from app.services.workflow_service import _format_validation_report
+        return _format_validation_report(
+            workflow_name="Award Compliance", workflow_id="wf123",
+            plan=self._plan(), snapshot=self._snapshot(),
+            grade="D", score=64.0, checks_passed=4, checks_failed=2,
+            generated_at="2026-06-05T00:00:00+00:00", fmt=fmt,
+        )
+
+    def test_markdown_report(self):
+        filename, content, media = self._call("md")
+        assert filename == "award-compliance-validation-report.md"
+        assert media.startswith("text/markdown")
+        assert "# Validation Report — Award Compliance" in content
+        assert "**Grade:** D (score 64/100)" in content
+        assert "[PASS] Sections present" in content
+        assert "[FAIL] Monetary fidelity" in content
+        assert "FAIN mismatch" in content
+        assert "_completeness_" in content and "_accuracy_" in content
+        assert "Per-run:" in content
+
+    def test_json_report(self):
+        import json
+        filename, content, media = self._call("json")
+        assert filename == "award-compliance-validation-report.json"
+        assert media == "application/json"
+        data = json.loads(content)
+        assert data["grade"] == "D" and data["score"] == 64.0
+        assert data["checks_passed"] == 4 and data["checks_failed"] == 2
+        assert len(data["checks"]) == 2
+        assert data["checks"][1]["status"] == "FAIL"
+        assert data["checks"][0]["category"] == "completeness"
+
+    def test_empty_checks_markdown(self):
+        from app.services.workflow_service import _format_validation_report
+        _, content, _ = _format_validation_report(
+            workflow_name="WF", workflow_id="x", plan=[], snapshot={"checks": []},
+            grade="F", score=0.0, checks_passed=0, checks_failed=0,
+            generated_at="", fmt="md",
+        )
+        assert "_No check results recorded._" in content
+
+    def test_slugify_filename(self):
+        from app.services.workflow_service import _slugify_filename
+        assert _slugify_filename("Award Compliance & Financial!") == "award-compliance-financial"
+        assert _slugify_filename("") == "workflow"
+        assert _slugify_filename("   ") == "workflow"

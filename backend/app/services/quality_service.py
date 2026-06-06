@@ -816,6 +816,11 @@ async def _get_latest_run(item_kind: str, item_id: str) -> Optional[ValidationRu
     return runs[0] if runs else None
 
 
+async def get_latest_validation_run(item_kind: str, item_id: str) -> Optional[ValidationRun]:
+    """Public accessor for the most recent ValidationRun of an item."""
+    return await _get_latest_run(item_kind, item_id)
+
+
 def _run_to_dict(r: ValidationRun) -> dict:
     return {
         "uuid": r.uuid,

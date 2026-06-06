@@ -321,6 +321,12 @@ export function generateValidationPlan(workflowId: string) {
   })
 }
 
+// URL for downloading the latest validation run as a report file. Auth is
+// cookie-based, so window.open() carries credentials (mirrors exportWorkflowUrl).
+export function validationReportUrl(workflowId: string, format: 'md' | 'json' = 'md') {
+  return `/api/workflows/${workflowId}/validation-report?format=${encodeURIComponent(format)}`
+}
+
 // Validation Inputs
 
 export interface ValidationInputDefinition {

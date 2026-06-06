@@ -11,7 +11,7 @@ import zipfile
 
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
 from app.dependencies import get_api_key_user, get_current_user
@@ -1386,6 +1386,29 @@ async def generate_validation_plan(request: Request, workflow_id: str, user: Use
         return ValidationPlanResponse(checks=checks)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/{workflow_id}/validation-report")
+async def download_validation_report(
+    workflow_id: str,
+    format: str = Query("md"),
+    user: User = Depends(get_current_user),
+):
+    """Download the latest validation run as a report file (Markdown or JSON)."""
+    fmt = (format or "md").lower()
+    if fmt not in ("md", "json"):
+        raise HTTPException(status_code=400, detail="format must be 'md' or 'json'")
+    try:
+        filename, content, media_type = await svc.build_validation_report(
+            workflow_id, fmt, user=user,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/{workflow_id}/validation-inputs", response_model=ValidationInputsResponse)
