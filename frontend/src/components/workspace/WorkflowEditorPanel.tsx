@@ -21,9 +21,11 @@ import {
   getWorkflowQualityHistory, getWorkflowImprovementSuggestions, getWorkflowQualityStatus,
   getValidationPlan, updateValidationPlan, generateValidationPlan,
   getValidationInputs, updateValidationInputs,
+  getBatchStatus, validateBatch,
   exportWorkflowUrl, importIntoWorkflow, getWorkflowHistory, duplicateWorkflow,
   improvePrompt,
 } from '../../api/workflows'
+import type { BatchValidationResult } from '../../api/workflows'
 import { RunHistoryTab } from './RunHistoryTab'
 import type { ValidationCheck, ValidationCheckDefinition, ValidationInputDefinition, QualityHistoryRun, BatchStatus, WorkflowQualityStatus, PromptImprovement } from '../../api/workflows'
 import { ItemPickerModal } from './ItemPickerModal'
@@ -5392,6 +5394,11 @@ function ValidateTab({
   const [runProgress, setRunProgress] = useState('')
   const cleanupRef = useRef<(() => void) | null>(null)
 
+  // Batch validation state (grade each test-input document independently)
+  const [batchPhase, setBatchPhase] = useState<'idle' | 'running' | 'validating'>('idle')
+  const [batchProgress, setBatchProgress] = useState('')
+  const [batchResult, setBatchResult] = useState<BatchValidationResult | null>(null)
+
   // Validation results state
   const [validating, setValidating] = useState(false)
   const [checks, setChecks] = useState<ValidationCheck[]>([])
@@ -5615,6 +5622,67 @@ function ValidateTab({
     }
   }
 
+  // Batch validation: run the workflow once PER document (a batch), then grade
+  // each document independently and show a per-document breakdown.
+  const handleBatchValidate = async () => {
+    if (!workflowId || planChecks.length === 0 || inputs.length === 0) return
+    setError(null)
+    setBatchResult(null)
+    setBatchPhase('running')
+    setBatchProgress('Preparing inputs...')
+    try {
+      const docUuids: string[] = inputs
+        .filter(i => i.type === 'document' && i.document_uuid && i.document_exists !== false)
+        .map(i => i.document_uuid!)
+      const textInputs = inputs.filter(i => i.type === 'text' && i.text)
+      if (textInputs.length > 0) {
+        setBatchProgress('Creating temp documents...')
+        const tempResult = await createTempDocuments(
+          workflowId,
+          textInputs.map(i => ({ text: i.text!, label: i.label || 'Text input' })),
+        )
+        docUuids.push(...tempResult.document_uuids)
+      }
+      if (docUuids.length === 0) {
+        setError('No valid document inputs to run the workflow with.')
+        setBatchPhase('idle')
+        return
+      }
+
+      // One run per document (batch_mode), then poll until the batch finishes.
+      setBatchProgress('Starting batch run...')
+      const { batch_id } = await runWorkflow(workflowId, { document_uuids: docUuids, batch_mode: true })
+      if (!batch_id) throw new Error('Batch run did not start')
+      bumpActivitySignal()
+
+      await new Promise<void>((resolve, reject) => {
+        const poll = async () => {
+          try {
+            const s = await getBatchStatus(batch_id)
+            setBatchProgress(`Running ${s.completed + s.failed}/${s.total} documents...`)
+            if (s.completed + s.failed >= s.total) resolve()
+            else setTimeout(poll, 2000)
+          } catch (e) {
+            reject(e)
+          }
+        }
+        poll()
+      })
+
+      setBatchPhase('validating')
+      setBatchProgress('Grading each document...')
+      const res = await validateBatch(workflowId, batch_id)
+      setBatchResult(res)
+      getWorkflowQualityHistory(workflowId).then(r => setQualityHistory(r.runs)).catch(() => {})
+      onValidated?.()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Batch validation failed')
+    } finally {
+      setBatchPhase('idle')
+      setBatchProgress('')
+    }
+  }
+
   const handleGetSuggestions = async () => {
     if (!workflowId) return
     setLoadingSuggestions(true)
@@ -5724,7 +5792,9 @@ function ValidateTab({
   const gradeStyle = gradeInfo ? GRADE_COLORS[gradeInfo.grade] || GRADE_COLORS.F : null
   const hasInputs = inputs.length > 0
   const hasChecks = planChecks.length > 0
-  const isBusy = runPhase !== 'idle' || validating
+  const docInputCount = inputs.filter(i => i.type === 'document' && i.document_exists !== false).length
+  const batchBusy = batchPhase !== 'idle'
+  const isBusy = runPhase !== 'idle' || validating || batchBusy
 
   return (
     <div style={{ padding: 24 }}>
@@ -6151,6 +6221,26 @@ function ValidateTab({
               {validating ? 'Evaluating output...' : 'Run Validation'}
             </button>
           )}
+          {hasChecks && docInputCount >= 2 && (
+            <button
+              onClick={handleBatchValidate}
+              disabled={isBusy}
+              title="Run the workflow once per document and grade each one independently"
+              style={{
+                flex: 1, padding: '10px 20px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
+                borderRadius: 6, border: '1px solid #d1d5db',
+                cursor: isBusy ? 'not-allowed' : 'pointer',
+                backgroundColor: '#fff', color: '#374151',
+                opacity: isBusy ? 0.6 : 1,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              }}
+            >
+              {batchPhase !== 'idle' && <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />}
+              {batchPhase === 'running' ? (batchProgress || 'Running batch...')
+                : batchPhase === 'validating' ? 'Grading documents...'
+                : `Validate each (${docInputCount})`}
+            </button>
+          )}
         </div>
         {!hasChecks && !planLoading && !generating && (
           <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'center', marginTop: -8 }}>
@@ -6216,6 +6306,58 @@ function ValidateTab({
             <div style={{ marginTop: 10, fontSize: 11, color: '#6b7280' }}>
               Elapsed: {runElapsedValidate < 60 ? `${runElapsedValidate}s` : `${Math.floor(runElapsedValidate / 60)}m ${runElapsedValidate % 60}s`}
             </div>
+          </div>
+        )}
+
+        {/* ---- Batch Validation Results (per-document) ---- */}
+        {batchResult && (
+          <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, backgroundColor: '#fff' }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#202124', marginBottom: 4 }}>
+              Batch Validation — {batchResult.num_documents} document{batchResult.num_documents === 1 ? '' : 's'}
+            </div>
+            <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
+              Each document graded independently. Mean {batchResult.aggregate.mean_score}/100
+              {' · '}{batchResult.aggregate.documents_all_passed}/{batchResult.num_documents} passed every check
+              {Object.keys(batchResult.aggregate.grade_distribution).length > 0 && (
+                <> {' · '}{Object.entries(batchResult.aggregate.grade_distribution)
+                  .sort()
+                  .map(([g, n]) => `${n}×${g}`).join('  ')}</>
+              )}
+            </div>
+            {batchResult.aggregate.worst_document && (
+              <div style={{ fontSize: 12, color: '#9a3412', marginBottom: 10 }}>
+                Weakest: {batchResult.aggregate.worst_document.document_title}{' '}
+                ({batchResult.aggregate.worst_document.grade}, {batchResult.aggregate.worst_document.score})
+              </div>
+            )}
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+              <thead>
+                <tr style={{ textAlign: 'left', color: '#6b7280' }}>
+                  <th style={{ padding: '6px 8px', borderBottom: '1px solid #e5e7eb' }}>Document</th>
+                  <th style={{ padding: '6px 8px', borderBottom: '1px solid #e5e7eb' }}>Grade</th>
+                  <th style={{ padding: '6px 8px', borderBottom: '1px solid #e5e7eb' }}>Score</th>
+                  <th style={{ padding: '6px 8px', borderBottom: '1px solid #e5e7eb' }}>Passed</th>
+                  <th style={{ padding: '6px 8px', borderBottom: '1px solid #e5e7eb' }}>Failed checks</th>
+                </tr>
+              </thead>
+              <tbody>
+                {batchResult.documents.map((d) => {
+                  const gc = GRADE_COLORS[d.grade] || GRADE_COLORS.F
+                  const failed = d.checks.filter(c => c.status === 'FAIL').map(c => c.name)
+                  return (
+                    <tr key={d.session_id} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                      <td style={{ padding: '6px 8px', color: '#374151' }}>{d.document_title}</td>
+                      <td style={{ padding: '6px 8px' }}>
+                        <span style={{ fontWeight: 700, color: gc.text, backgroundColor: gc.bg, borderRadius: 4, padding: '1px 7px' }}>{d.grade}</span>
+                      </td>
+                      <td style={{ padding: '6px 8px', color: '#374151' }}>{d.score}</td>
+                      <td style={{ padding: '6px 8px', color: '#374151' }}>{d.num_passed}/{d.num_passed + d.num_failed}</td>
+                      <td style={{ padding: '6px 8px', color: '#b91c1c' }}>{failed.length ? failed.join(', ') : '—'}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
         )}
 

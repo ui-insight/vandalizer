@@ -152,6 +152,38 @@ export function getBatchStatus(batchId: string) {
   return apiFetch<BatchStatus>(`/api/workflows/batch-status?batch_id=${encodeURIComponent(batchId)}`)
 }
 
+// ---- Batch validation (grade each document in a batch independently) ----
+export interface BatchValidationCheck { check_id: string; name: string; status: string; detail: string }
+export interface BatchValidationDocument {
+  document_title: string
+  session_id: string
+  grade: string
+  score: number
+  num_passed: number
+  num_failed: number
+  checks: BatchValidationCheck[]
+}
+export interface BatchValidationAggregate {
+  num_documents: number
+  mean_score: number
+  grade_distribution: Record<string, number>
+  documents_all_passed: number
+  check_failure_counts: Record<string, number>
+  worst_document: { document_title: string; grade: string; score: number } | null
+}
+export interface BatchValidationResult {
+  batch_id: string
+  num_documents: number
+  aggregate: BatchValidationAggregate
+  documents: BatchValidationDocument[]
+}
+
+export function validateBatch(workflowId: string, batchId: string) {
+  return apiFetch<BatchValidationResult>(
+    `/api/workflows/${workflowId}/validate-batch?batch_id=${encodeURIComponent(batchId)}`,
+  )
+}
+
 export function streamWorkflowStatus(
   sessionId: string,
   onStatus: (status: WorkflowStatus) => void,
