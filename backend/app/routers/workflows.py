@@ -1125,6 +1125,7 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
                 workflow_id, document_uuids, user.user_id, req.model,
                 activity_id=str(activity.id),
                 user=user,
+                sequential=req.sequential,
             )
             return {"batch_id": batch_id, "activity_id": str(activity.id)}
         else:

@@ -75,6 +75,10 @@ class RunWorkflowRequest(BaseModel):
     document_uuids: list[str]
     model: Optional[str] = None
     batch_mode: bool = False
+    # When batch_mode is on, run the documents one at a time (chained) instead
+    # of concurrently — avoids overwhelming the model with simultaneous
+    # large-context runs (used by batch validation for reliability).
+    sequential: bool = False
 
 
 class WorkflowStatusResponse(BaseModel):
