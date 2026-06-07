@@ -5649,9 +5649,10 @@ function ValidateTab({
         return
       }
 
-      // One run per document (batch_mode), then poll until the batch finishes.
-      setBatchProgress('Starting batch run...')
-      const { batch_id } = await runWorkflow(workflowId, { document_uuids: docUuids, batch_mode: true })
+      // One run per document, executed sequentially (chained) so the model
+      // isn't hit with concurrent large-context runs; poll until finished.
+      setBatchProgress('Starting batch run (one document at a time)...')
+      const { batch_id } = await runWorkflow(workflowId, { document_uuids: docUuids, batch_mode: true, sequential: true })
       if (!batch_id) throw new Error('Batch run did not start')
       bumpActivitySignal()
 
