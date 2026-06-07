@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import datetime
 import logging
 import uuid as uuid_mod
@@ -2073,6 +2074,26 @@ async def _grade_one_run(wr, plan: list[dict], wf_data: dict) -> dict:
     }
 
 
+# Documents in a batch are graded concurrently (bounded) rather than one at a
+# time. The judge is an in-house LLM that serves concurrent requests via
+# continuous batching, so N documents finish in roughly the time of one or two;
+# the cap keeps us from flooding the GPU queue. Each document still runs its
+# _BATCH_JUDGE_REPEATS judge passes serially, so peak in-flight ~= this cap.
+_BATCH_GRADE_CONCURRENCY = 4
+
+
+async def _grade_runs_concurrently(runs, plan: list[dict], wf_data: dict) -> list[dict]:
+    """Grade WorkflowResults concurrently (bounded by _BATCH_GRADE_CONCURRENCY),
+    preserving input order in the returned list."""
+    sem = asyncio.Semaphore(_BATCH_GRADE_CONCURRENCY)
+
+    async def _one(wr):
+        async with sem:
+            return await _grade_one_run(wr, plan, wf_data)
+
+    return await asyncio.gather(*(_one(wr) for wr in runs))
+
+
 async def validate_batch(workflow_id: str, batch_id: str, user: User) -> dict:
     """Validate every run in a batch INDEPENDENTLY and aggregate.
 
@@ -2092,7 +2113,7 @@ async def validate_batch(workflow_id: str, batch_id: str, user: User) -> dict:
     if not runs:
         raise ValueError(f"No runs found for batch {batch_id}")
     wf_data = await get_workflow(workflow_id)
-    documents = [await _grade_one_run(wr, plan, wf_data) for wr in runs]
+    documents = await _grade_runs_concurrently(runs, plan, wf_data)
     return {
         "batch_id": batch_id,
         "num_documents": len(documents),
@@ -2126,7 +2147,7 @@ async def validate_runs(workflow_id: str, session_ids: list[str], user: User) ->
         raise ValueError("None of the provided runs were found for this workflow")
 
     wf_data = await get_workflow(workflow_id)
-    documents = [await _grade_one_run(wr, plan, wf_data) for wr in runs]
+    documents = await _grade_runs_concurrently(runs, plan, wf_data)
     return {
         "batch_id": None,
         "num_documents": len(documents),
