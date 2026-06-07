@@ -163,12 +163,14 @@ export interface BatchValidationDocument {
   num_failed: number
   checks: BatchValidationCheck[]
   output?: string
+  error?: string
 }
 export interface BatchValidationAggregate {
   num_documents: number
   mean_score: number
   grade_distribution: Record<string, number>
   documents_all_passed: number
+  documents_errored?: number
   check_failure_counts: Record<string, number>
   worst_document: { document_title: string; grade: string; score: number } | null
 }

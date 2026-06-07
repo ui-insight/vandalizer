@@ -5697,8 +5697,18 @@ function ValidateTab({
       `- **Batch:** ${batchResult?.batch_id ?? '—'}  ·  **Run:** ${d.session_id}`,
       `- **Generated:** ${new Date().toISOString()}`,
       '',
-      '## Check Results',
     ]
+    if (d.error) {
+      lines.push('## Run Failed')
+      lines.push('')
+      lines.push(`This document could not be graded because the workflow run did not complete:`)
+      lines.push('')
+      lines.push(`> ${d.error}`)
+      lines.push('')
+      lines.push('Common cause: the in-house model timed out under concurrent load. Re-run the batch (or a smaller batch), or run this document on its own.')
+    } else {
+      lines.push('## Check Results')
+    }
     for (const c of d.checks) {
       const pc = planById.get(c.check_id)
       const cat = pc?.category ? ` _(${pc.category})_` : ''
@@ -6367,6 +6377,9 @@ function ValidateTab({
                   .sort()
                   .map(([g, n]) => `${n}×${g}`).join('  ')}</>
               )}
+              {!!batchResult.aggregate.documents_errored && (
+                <span style={{ color: '#b91c1c' }}> {' · '}{batchResult.aggregate.documents_errored} failed to run</span>
+              )}
             </div>
             {batchResult.aggregate.worst_document && (
               <div style={{ fontSize: 12, color: '#9a3412', marginBottom: 10 }}>
@@ -6387,7 +6400,8 @@ function ValidateTab({
               </thead>
               <tbody>
                 {batchResult.documents.map((d) => {
-                  const gc = GRADE_COLORS[d.grade] || GRADE_COLORS.F
+                  const errored = !!d.error
+                  const gc = errored ? { bg: '#fee2e2', text: '#991b1b' } : (GRADE_COLORS[d.grade] || GRADE_COLORS.F)
                   const failed = d.checks.filter(c => c.status === 'FAIL').map(c => c.name)
                   return (
                     <tr key={d.session_id} style={{ borderBottom: '1px solid #f3f4f6' }}>
@@ -6395,9 +6409,9 @@ function ValidateTab({
                       <td style={{ padding: '6px 8px' }}>
                         <span style={{ fontWeight: 700, color: gc.text, backgroundColor: gc.bg, borderRadius: 4, padding: '1px 7px' }}>{d.grade}</span>
                       </td>
-                      <td style={{ padding: '6px 8px', color: '#374151' }}>{d.score}</td>
-                      <td style={{ padding: '6px 8px', color: '#374151' }}>{d.num_passed}/{d.num_passed + d.num_failed}</td>
-                      <td style={{ padding: '6px 8px', color: '#b91c1c' }}>{failed.length ? failed.join(', ') : '—'}</td>
+                      <td style={{ padding: '6px 8px', color: '#374151' }}>{errored ? '—' : d.score}</td>
+                      <td style={{ padding: '6px 8px', color: '#374151' }}>{errored ? '—' : `${d.num_passed}/${d.num_passed + d.num_failed}`}</td>
+                      <td style={{ padding: '6px 8px', color: '#b91c1c' }}>{errored ? `Run failed: ${d.error}` : (failed.length ? failed.join(', ') : '—')}</td>
                       <td style={{ padding: '6px 8px' }}>
                         <button
                           onClick={() => downloadDocReport(d)}
