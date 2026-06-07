@@ -1976,7 +1976,8 @@ def _aggregate_batch(documents: list[dict]) -> dict:
     if not documents:
         return {
             "num_documents": 0, "mean_score": 0.0, "grade_distribution": {},
-            "documents_all_passed": 0, "check_failure_counts": {}, "worst_document": None,
+            "documents_all_passed": 0, "documents_errored": 0,
+            "check_failure_counts": {}, "worst_document": None,
         }
     grade_distribution: dict[str, int] = {}
     check_failure_counts: dict[str, int] = {}
@@ -1992,7 +1993,8 @@ def _aggregate_batch(documents: list[dict]) -> dict:
         "num_documents": len(documents),
         "mean_score": mean_score,
         "grade_distribution": grade_distribution,
-        "documents_all_passed": sum(1 for d in documents if d["num_failed"] == 0),
+        "documents_all_passed": sum(1 for d in documents if d["num_failed"] == 0 and not d.get("error")),
+        "documents_errored": sum(1 for d in documents if d.get("error")),
         "check_failure_counts": check_failure_counts,
         "worst_document": {
             "document_title": worst.get("document_title"),
@@ -2019,14 +2021,29 @@ async def validate_batch(workflow_id: str, batch_id: str, user: User) -> dict:
     runs = await WorkflowResult.find(
         WorkflowResult.workflow == wf.id,
         WorkflowResult.batch_id == batch_id,
-        WorkflowResult.status == "completed",
     ).sort("+_id").to_list()
     if not runs:
-        raise ValueError(f"No completed runs found for batch {batch_id}")
+        raise ValueError(f"No runs found for batch {batch_id}")
 
     wf_data = await get_workflow(workflow_id)
     documents: list[dict] = []
     for wr in runs:
+        # A run that errored/was canceled (e.g. the LLM timed out) can't be
+        # graded — surface it as a failed row instead of dropping it, so the
+        # user sees which documents failed and why.
+        if wr.status != "completed":
+            documents.append({
+                "document_title": wr.document_title or wr.session_id,
+                "session_id": wr.session_id,
+                "grade": "ERR",
+                "score": 0.0,
+                "num_passed": 0,
+                "num_failed": 0,
+                "checks": [],
+                "error": wr.error or f"Run did not complete (status: {wr.status}).",
+                "output": "",
+            })
+            continue
         output_text = _serialize_output(wr.final_output)
         if output_text is None:
             checks = [
