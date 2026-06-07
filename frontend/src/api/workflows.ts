@@ -153,7 +153,7 @@ export function getBatchStatus(batchId: string) {
 }
 
 // ---- Batch validation (grade each document in a batch independently) ----
-export interface BatchValidationCheck { check_id: string; name: string; status: string; detail: string }
+export interface BatchValidationCheck { check_id: string; name: string; status: string; detail: string; consistency?: number }
 export interface BatchValidationDocument {
   document_title: string
   session_id: string
@@ -162,6 +162,7 @@ export interface BatchValidationDocument {
   num_passed: number
   num_failed: number
   checks: BatchValidationCheck[]
+  output?: string
 }
 export interface BatchValidationAggregate {
   num_documents: number
