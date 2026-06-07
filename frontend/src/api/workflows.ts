@@ -184,6 +184,7 @@ export interface BatchValidationResult {
 export function validateBatch(workflowId: string, batchId: string) {
   return apiFetch<BatchValidationResult>(
     `/api/workflows/${workflowId}/validate-batch?batch_id=${encodeURIComponent(batchId)}`,
+    { timeoutMs: 290_000 },
   )
 }
 
@@ -192,7 +193,7 @@ export function validateBatch(workflowId: string, batchId: string) {
 export function validateRuns(workflowId: string, sessionIds: string[]) {
   return apiFetch<BatchValidationResult>(
     `/api/workflows/${workflowId}/validate-runs`,
-    { method: 'POST', body: JSON.stringify({ session_ids: sessionIds }) },
+    { method: 'POST', body: JSON.stringify({ session_ids: sessionIds }), timeoutMs: 290_000 },
   )
 }
 
