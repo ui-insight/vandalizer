@@ -187,6 +187,15 @@ export function validateBatch(workflowId: string, batchId: string) {
   )
 }
 
+// Validate a specific set of runs (by session id). Used by the sequential
+// batch-validation flow, where each document is run on its own.
+export function validateRuns(workflowId: string, sessionIds: string[]) {
+  return apiFetch<BatchValidationResult>(
+    `/api/workflows/${workflowId}/validate-runs`,
+    { method: 'POST', body: JSON.stringify({ session_ids: sessionIds }) },
+  )
+}
+
 export function streamWorkflowStatus(
   sessionId: string,
   onStatus: (status: WorkflowStatus) => void,

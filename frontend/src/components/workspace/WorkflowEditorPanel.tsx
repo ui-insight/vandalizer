@@ -21,7 +21,7 @@ import {
   getWorkflowQualityHistory, getWorkflowImprovementSuggestions, getWorkflowQualityStatus,
   getValidationPlan, updateValidationPlan, generateValidationPlan,
   getValidationInputs, updateValidationInputs,
-  getBatchStatus, validateBatch,
+  validateRuns,
   exportWorkflowUrl, importIntoWorkflow, getWorkflowHistory, duplicateWorkflow,
   improvePrompt,
 } from '../../api/workflows'
@@ -5649,30 +5649,49 @@ function ValidateTab({
         return
       }
 
-      // One run per document, executed sequentially (chained) so the model
-      // isn't hit with concurrent large-context runs; poll until finished.
-      setBatchProgress('Starting batch run (one document at a time)...')
-      const { batch_id } = await runWorkflow(workflowId, { document_uuids: docUuids, batch_mode: true, sequential: true })
-      if (!batch_id) throw new Error('Batch run did not start')
+      // Run each document on its OWN, sequentially: wait for each run to reach
+      // a terminal state (completed OR error) before starting the next. This is
+      // failure-tolerant — one document timing out can't abandon the rest — and
+      // the UI can't hang, since every run terminates. Then grade by session.
       bumpActivitySignal()
-
-      await new Promise<void>((resolve, reject) => {
-        const poll = async () => {
-          try {
-            const s = await getBatchStatus(batch_id)
-            setBatchProgress(`Running ${s.completed + s.failed}/${s.total} documents...`)
-            if (s.completed + s.failed >= s.total) resolve()
-            else setTimeout(poll, 2000)
-          } catch (e) {
-            reject(e)
-          }
+      const sessionIds: string[] = []
+      for (let i = 0; i < docUuids.length; i++) {
+        setBatchProgress(`Running document ${i + 1} of ${docUuids.length}...`)
+        let sid: string | undefined
+        try {
+          const r = await runWorkflow(workflowId, { document_uuids: [docUuids[i]] })
+          sid = r.session_id
+        } catch {
+          continue  // couldn't dispatch this one; skip it
         }
-        poll()
-      })
+        if (!sid) continue
+        sessionIds.push(sid)
+        await new Promise<void>((resolve) => {
+          const cleanup = streamWorkflowStatus(
+            sid!,
+            (s) => {
+              const step = s.current_step_name || 'running'
+              setBatchProgress(`Document ${i + 1}/${docUuids.length}: ${step} (${s.num_steps_completed}/${s.num_steps_total})`)
+              if (s.status === 'completed' || s.status === 'error' || s.status === 'failed') {
+                cleanup?.()
+                resolve()
+              }
+            },
+            () => resolve(),  // stream error — treat run as done and move on
+          )
+          cleanupRef.current = cleanup
+        })
+      }
+
+      if (sessionIds.length === 0) {
+        setError('No documents could be run.')
+        setBatchPhase('idle')
+        return
+      }
 
       setBatchPhase('validating')
       setBatchProgress('Grading each document...')
-      const res = await validateBatch(workflowId, batch_id)
+      const res = await validateRuns(workflowId, sessionIds)
       setBatchResult(res)
       getWorkflowQualityHistory(workflowId).then(r => setQualityHistory(r.runs)).catch(() => {})
       onValidated?.()
@@ -5681,6 +5700,7 @@ function ValidateTab({
     } finally {
       setBatchPhase('idle')
       setBatchProgress('')
+      cleanupRef.current = null
     }
   }
 
