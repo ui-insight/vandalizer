@@ -653,10 +653,16 @@ async def run_workflow_batch(
     model: str | None = None,
     activity_id: str | None = None,
     user: User | None = None,
+    sequential: bool = False,
 ) -> str:
     """Start a batched workflow execution — one run per document.
 
     Returns a ``batch_id`` that can be polled via ``get_batch_status``.
+
+    When *sequential* is True the per-document executions are chained so they
+    run one at a time instead of concurrently. This avoids hitting the model
+    with many simultaneous large-context runs (which can time out); used by
+    batch validation for reliability at the cost of wall-clock time.
     """
     if user is not None:
         wf = await get_authorized_workflow(workflow_id, user)
@@ -684,6 +690,7 @@ async def run_workflow_batch(
         model = await get_user_model_name(user_id)
 
     batch_id = str(uuid_mod.uuid4())[:8]
+    signatures = []  # used only in sequential mode
 
     for doc_uuid in document_uuids:
         # Look up title for display
@@ -702,19 +709,35 @@ async def run_workflow_batch(
         )
         await result.insert()
 
-        trigger_step_data = {"doc_uuids": [doc_uuid]}
+        task_kwargs = {
+            "workflow_result_id": str(result.id),
+            "workflow_id": str(wf.id),
+            "trigger_step_data": {"doc_uuids": [doc_uuid]},
+            "model": model,
+            "activity_id": activity_id,
+        }
 
-        celery_app.send_task(
-            "tasks.workflow_next.execution",
-            kwargs={
-                "workflow_result_id": str(result.id),
-                "workflow_id": str(wf.id),
-                "trigger_step_data": trigger_step_data,
-                "model": model,
-                "activity_id": activity_id,
-            },
-            queue="workflows",
-        )
+        if sequential:
+            # Immutable signature so the previous task's return value isn't
+            # injected as an arg; collected into a chain below.
+            signatures.append(
+                celery_app.signature(
+                    "tasks.workflow_next.execution",
+                    kwargs=task_kwargs, immutable=True,
+                ).set(queue="workflows")
+            )
+        else:
+            celery_app.send_task(
+                "tasks.workflow_next.execution",
+                kwargs=task_kwargs,
+                queue="workflows",
+            )
+
+    if sequential and signatures:
+        from celery import chain
+        # Runs the documents one after another (each starts when the previous
+        # finishes), so the model isn't hit with concurrent large-context runs.
+        chain(*signatures).apply_async()
 
     return batch_id
 
