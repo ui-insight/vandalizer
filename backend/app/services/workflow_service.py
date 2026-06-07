@@ -1925,6 +1925,15 @@ async def _build_result(
 # Batch validation (grade a workflow across a document SET)
 # ---------------------------------------------------------------------------
 
+# Each document's output is judged this many times and the per-check verdict is
+# the majority, with a confidence = fraction of judge runs that agreed. The
+# LLM judge can flip a borderline check between identical calls; re-judging the
+# SAME output stabilizes the displayed verdict and surfaces uncertainty instead
+# of showing a different result each time. (This addresses judge variance only;
+# the workflow's own output can still vary run-to-run — that's a workflow
+# temperature/prompt concern, not a validation one.)
+_BATCH_JUDGE_REPEATS = 2
+
 def _score_check_results(check_results: list[dict], plan: list[dict]) -> tuple[float, str]:
     """Quality-only score (0-100) + letter grade for one run's check results.
 
@@ -2022,14 +2031,21 @@ async def validate_batch(workflow_id: str, batch_id: str, user: User) -> dict:
         if output_text is None:
             checks = [
                 {"check_id": c.get("id"), "name": c.get("name"), "status": "SKIP",
-                 "detail": "Binary output cannot be evaluated as text."}
+                 "detail": "Binary output cannot be evaluated as text.", "consistency": 1.0}
                 for c in plan
             ]
         else:
             src = await _resolve_run_source_text(wr)
-            checks = await _evaluate_checks_against_output(
-                plan, output_text, wr.steps_output, wf_data, source_text_override=src,
-            )
+            # Re-judge the SAME output a few times and take the per-check
+            # majority (consensus) so a borderline check doesn't flip between
+            # runs; _merge_multi_run_checks records a consistency/confidence.
+            judge_runs = [
+                await _evaluate_checks_against_output(
+                    plan, output_text, wr.steps_output, wf_data, source_text_override=src,
+                )
+                for _ in range(max(1, _BATCH_JUDGE_REPEATS))
+            ]
+            checks = _merge_multi_run_checks(plan, judge_runs)
         score, grade = _score_check_results(checks, plan)
         documents.append({
             "document_title": wr.document_title or wr.session_id,
@@ -2039,6 +2055,8 @@ async def validate_batch(workflow_id: str, batch_id: str, user: User) -> dict:
             "num_passed": sum(1 for c in checks if c.get("status") == "PASS"),
             "num_failed": sum(1 for c in checks if c.get("status") == "FAIL"),
             "checks": checks,
+            # Deliverable text, for the per-document downloadable report.
+            "output": (output_text or "")[:20_000],
         })
 
     return {
