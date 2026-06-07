@@ -2026,13 +2026,58 @@ def _aggregate_batch(documents: list[dict]) -> dict:
     }
 
 
-async def validate_batch(workflow_id: str, batch_id: str, user: User) -> dict:
-    """Validate every completed run in a batch INDEPENDENTLY and aggregate.
+async def _grade_one_run(wr, plan: list[dict], wf_data: dict) -> dict:
+    """Grade a single WorkflowResult into a per-document result dict.
 
-    Unlike validate_workflow (which grades the rolling last-3 runs as a single
-    consensus with cross-document stability), this grades each document's run
-    on its own and returns a per-document breakdown plus a coverage aggregate.
-    Each run is grounded in its own source document (see _resolve_run_source_text).
+    A run that didn't complete (e.g. the LLM timed out) becomes a failed row
+    (grade "ERR" + the error) instead of being dropped, so the user sees which
+    documents failed and why. A completed run is judged with consensus
+    (re-judged a few times, majority + confidence) and grounded in its own
+    source document.
+    """
+    if wr.status != "completed":
+        return {
+            "document_title": wr.document_title or wr.session_id,
+            "session_id": wr.session_id,
+            "grade": "ERR", "score": 0.0, "num_passed": 0, "num_failed": 0,
+            "checks": [],
+            "error": wr.error or f"Run did not complete (status: {wr.status}).",
+            "output": "",
+        }
+    output_text = _serialize_output(wr.final_output)
+    if output_text is None:
+        checks = [
+            {"check_id": c.get("id"), "name": c.get("name"), "status": "SKIP",
+             "detail": "Binary output cannot be evaluated as text.", "consistency": 1.0}
+            for c in plan
+        ]
+    else:
+        src = await _resolve_run_source_text(wr)
+        judge_runs = [
+            await _evaluate_checks_against_output(
+                plan, output_text, wr.steps_output, wf_data, source_text_override=src,
+            )
+            for _ in range(max(1, _BATCH_JUDGE_REPEATS))
+        ]
+        checks = _merge_multi_run_checks(plan, judge_runs)
+    score, grade = _score_check_results(checks, plan)
+    return {
+        "document_title": wr.document_title or wr.session_id,
+        "session_id": wr.session_id,
+        "grade": grade,
+        "score": score,
+        "num_passed": sum(1 for c in checks if c.get("status") == "PASS"),
+        "num_failed": sum(1 for c in checks if c.get("status") == "FAIL"),
+        "checks": checks,
+        "output": (output_text or "")[:20_000],
+    }
+
+
+async def validate_batch(workflow_id: str, batch_id: str, user: User) -> dict:
+    """Validate every run in a batch INDEPENDENTLY and aggregate.
+
+    Grades each document's run on its own (per-document breakdown + coverage
+    aggregate), unlike validate_workflow's rolling-window consensus.
     """
     wf = await get_authorized_workflow(workflow_id, user)
     if not wf:
@@ -2040,67 +2085,50 @@ async def validate_batch(workflow_id: str, batch_id: str, user: User) -> dict:
     plan = wf.validation_plan
     if not plan:
         raise ValueError("No validation plan - generate or add checks first")
-
     runs = await WorkflowResult.find(
         WorkflowResult.workflow == wf.id,
         WorkflowResult.batch_id == batch_id,
     ).sort("+_id").to_list()
     if not runs:
         raise ValueError(f"No runs found for batch {batch_id}")
-
     wf_data = await get_workflow(workflow_id)
-    documents: list[dict] = []
-    for wr in runs:
-        # A run that errored/was canceled (e.g. the LLM timed out) can't be
-        # graded — surface it as a failed row instead of dropping it, so the
-        # user sees which documents failed and why.
-        if wr.status != "completed":
-            documents.append({
-                "document_title": wr.document_title or wr.session_id,
-                "session_id": wr.session_id,
-                "grade": "ERR",
-                "score": 0.0,
-                "num_passed": 0,
-                "num_failed": 0,
-                "checks": [],
-                "error": wr.error or f"Run did not complete (status: {wr.status}).",
-                "output": "",
-            })
-            continue
-        output_text = _serialize_output(wr.final_output)
-        if output_text is None:
-            checks = [
-                {"check_id": c.get("id"), "name": c.get("name"), "status": "SKIP",
-                 "detail": "Binary output cannot be evaluated as text.", "consistency": 1.0}
-                for c in plan
-            ]
-        else:
-            src = await _resolve_run_source_text(wr)
-            # Re-judge the SAME output a few times and take the per-check
-            # majority (consensus) so a borderline check doesn't flip between
-            # runs; _merge_multi_run_checks records a consistency/confidence.
-            judge_runs = [
-                await _evaluate_checks_against_output(
-                    plan, output_text, wr.steps_output, wf_data, source_text_override=src,
-                )
-                for _ in range(max(1, _BATCH_JUDGE_REPEATS))
-            ]
-            checks = _merge_multi_run_checks(plan, judge_runs)
-        score, grade = _score_check_results(checks, plan)
-        documents.append({
-            "document_title": wr.document_title or wr.session_id,
-            "session_id": wr.session_id,
-            "grade": grade,
-            "score": score,
-            "num_passed": sum(1 for c in checks if c.get("status") == "PASS"),
-            "num_failed": sum(1 for c in checks if c.get("status") == "FAIL"),
-            "checks": checks,
-            # Deliverable text, for the per-document downloadable report.
-            "output": (output_text or "")[:20_000],
-        })
-
+    documents = [await _grade_one_run(wr, plan, wf_data) for wr in runs]
     return {
         "batch_id": batch_id,
+        "num_documents": len(documents),
+        "aggregate": _aggregate_batch(documents),
+        "documents": documents,
+    }
+
+
+async def validate_runs(workflow_id: str, session_ids: list[str], user: User) -> dict:
+    """Validate a specific set of runs (by session id) independently and
+    aggregate. Used by the UI's sequential batch flow: each document is run on
+    its own (so one timeout can't abandon the rest), then all are graded here.
+    Order follows *session_ids*; unknown/foreign sessions are skipped.
+    """
+    wf = await get_authorized_workflow(workflow_id, user)
+    if not wf:
+        raise ValueError("Workflow not found")
+    plan = wf.validation_plan
+    if not plan:
+        raise ValueError("No validation plan - generate or add checks first")
+    if not session_ids:
+        raise ValueError("No runs provided")
+
+    found = await WorkflowResult.find(
+        WorkflowResult.workflow == wf.id,
+        {"session_id": {"$in": list(session_ids)}},
+    ).to_list()
+    by_session = {r.session_id: r for r in found}
+    runs = [by_session[s] for s in session_ids if s in by_session]
+    if not runs:
+        raise ValueError("None of the provided runs were found for this workflow")
+
+    wf_data = await get_workflow(workflow_id)
+    documents = [await _grade_one_run(wr, plan, wf_data) for wr in runs]
+    return {
+        "batch_id": None,
         "num_documents": len(documents),
         "aggregate": _aggregate_batch(documents),
         "documents": documents,

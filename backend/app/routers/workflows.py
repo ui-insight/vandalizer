@@ -1449,6 +1449,20 @@ async def validate_batch(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.post("/{workflow_id}/validate-runs")
+async def validate_runs(workflow_id: str, request: Request, user: User = Depends(get_current_user)):
+    """Validate a specific set of runs (by session id) independently and return
+    a per-document breakdown plus aggregate. Used by the sequential batch flow."""
+    body = await request.json()
+    session_ids = body.get("session_ids") or []
+    if not isinstance(session_ids, list):
+        raise HTTPException(status_code=400, detail="session_ids must be a list")
+    try:
+        return await svc.validate_runs(workflow_id, [str(s) for s in session_ids], user=user)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.post("/{workflow_id}/save-expected-output")
 async def save_expected_output(workflow_id: str, request: Request, user: User = Depends(get_current_user)):
     """Mark a completed workflow execution as expected output for validation."""
