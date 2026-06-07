@@ -21,7 +21,7 @@ import {
   getWorkflowQualityHistory, getWorkflowImprovementSuggestions, getWorkflowQualityStatus,
   getValidationPlan, updateValidationPlan, generateValidationPlan,
   getValidationInputs, updateValidationInputs,
-  validateRuns,
+  getBatchStatus, validateBatch,
   exportWorkflowUrl, importIntoWorkflow, getWorkflowHistory, duplicateWorkflow,
   improvePrompt,
 } from '../../api/workflows'
@@ -5649,49 +5649,32 @@ function ValidateTab({
         return
       }
 
-      // Run each document on its OWN, sequentially: wait for each run to reach
-      // a terminal state (completed OR error) before starting the next. This is
-      // failure-tolerant — one document timing out can't abandon the rest — and
-      // the UI can't hang, since every run terminates. Then grade by session.
+      // One run per document, all dispatched at once (concurrent). Poll the
+      // batch until every run reaches a terminal state, then grade each
+      // independently. (completed + failed counts errored runs too, so a
+      // single failure can't make this hang.)
+      setBatchProgress('Starting batch run...')
+      const { batch_id } = await runWorkflow(workflowId, { document_uuids: docUuids, batch_mode: true })
+      if (!batch_id) throw new Error('Batch run did not start')
       bumpActivitySignal()
-      const sessionIds: string[] = []
-      for (let i = 0; i < docUuids.length; i++) {
-        setBatchProgress(`Running document ${i + 1} of ${docUuids.length}...`)
-        let sid: string | undefined
-        try {
-          const r = await runWorkflow(workflowId, { document_uuids: [docUuids[i]] })
-          sid = r.session_id
-        } catch {
-          continue  // couldn't dispatch this one; skip it
-        }
-        if (!sid) continue
-        sessionIds.push(sid)
-        await new Promise<void>((resolve) => {
-          const cleanup = streamWorkflowStatus(
-            sid!,
-            (s) => {
-              const step = s.current_step_name || 'running'
-              setBatchProgress(`Document ${i + 1}/${docUuids.length}: ${step} (${s.num_steps_completed}/${s.num_steps_total})`)
-              if (s.status === 'completed' || s.status === 'error' || s.status === 'failed') {
-                cleanup?.()
-                resolve()
-              }
-            },
-            () => resolve(),  // stream error — treat run as done and move on
-          )
-          cleanupRef.current = cleanup
-        })
-      }
 
-      if (sessionIds.length === 0) {
-        setError('No documents could be run.')
-        setBatchPhase('idle')
-        return
-      }
+      await new Promise<void>((resolve, reject) => {
+        const poll = async () => {
+          try {
+            const s = await getBatchStatus(batch_id)
+            setBatchProgress(`Running ${s.completed + s.failed}/${s.total} documents...`)
+            if (s.completed + s.failed >= s.total) resolve()
+            else setTimeout(poll, 2000)
+          } catch (e) {
+            reject(e)
+          }
+        }
+        poll()
+      })
 
       setBatchPhase('validating')
       setBatchProgress('Grading each document...')
-      const res = await validateRuns(workflowId, sessionIds)
+      const res = await validateBatch(workflowId, batch_id)
       setBatchResult(res)
       getWorkflowQualityHistory(workflowId).then(r => setQualityHistory(r.runs)).catch(() => {})
       onValidated?.()
