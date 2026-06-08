@@ -327,7 +327,9 @@ async def suggest_fields_from_documents(
 
     prompt = BUILD_FROM_DOC_USER_PROMPT.format(doc_text=doc_text[:100000])
     try:
-        result = await agent.run(prompt)
+        from app.services.metering import metered_async
+        async with metered_async("kb_field_suggest", user_id=user_id):
+            result = await agent.run(prompt)
     except Exception as e:
         raise RuntimeError(f"LLM call failed: {e}") from e
     response_text = result.output

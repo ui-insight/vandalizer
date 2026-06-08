@@ -42,6 +42,7 @@ from app.models.feedback_prompt import FeedbackPrompt, FeedbackPromptResponse
 from app.models.email_log import EmailLog
 from app.models.api_key import ApiKey
 from app.models.credential import Credential
+from app.models.llm_usage import LlmUsageRecord
 
 ALL_MODELS = [
     User,
@@ -104,6 +105,7 @@ ALL_MODELS = [
     EmailLog,
     ApiKey,
     Credential,
+    LlmUsageRecord,
 ]
 
 

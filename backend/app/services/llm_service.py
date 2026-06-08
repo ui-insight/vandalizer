@@ -6,8 +6,10 @@ from dataclasses import dataclass
 from typing import Optional
 
 import httpx
+from contextlib import asynccontextmanager
 from pydantic_ai.agent import Agent
 from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.models.wrapper import WrapperModel
 from pydantic_ai.profiles import ModelProfile
 from pydantic_ai.profiles.openai import (
     OpenAIJsonSchemaTransformer,
@@ -314,12 +316,92 @@ def build_thinking_model_settings(
     return settings
 
 
+class MeteredModel(WrapperModel):
+    """Transparent wrapper that records token usage on every model call.
+
+    This is the single chokepoint for LLM metering: every agent in the app is
+    built from a model produced by get_agent_model(), so wrapping here meters
+    100% of calls — including agentic-chat tool sub-calls, RAG's nested prompt
+    agent, and retries. Usage is reported to the active metering scope (see
+    app/services/metering.py); attribution (user/team/feature) is supplied by
+    the call site via metered()/metered_async().
+
+    When the provider/gateway returns no usage (some OpenAI-compatible gateways
+    omit it), tokens are estimated locally and flagged, so a real call never
+    records zero.
+    """
+
+    async def request(self, messages, model_settings, model_request_parameters):
+        resp = await self.wrapped.request(messages, model_settings, model_request_parameters)
+        self._record(messages, getattr(resp, "usage", None), getattr(resp, "parts", None))
+        return resp
+
+    @asynccontextmanager
+    async def request_stream(
+        self, messages, model_settings, model_request_parameters, run_context=None
+    ):
+        async with self.wrapped.request_stream(
+            messages, model_settings, model_request_parameters, run_context
+        ) as stream:
+            try:
+                yield stream
+            finally:
+                # Usage is final only after the consumer drains the stream, which
+                # happens inside the caller's `async with` block — i.e. before
+                # this finally runs.
+                usage = None
+                parts = None
+                try:
+                    usage = stream.usage()
+                except Exception:
+                    pass
+                try:
+                    parts = stream.get().parts
+                except Exception:
+                    pass
+                self._record(messages, usage, parts)
+
+    def _record(self, messages, usage, parts):
+        from app.services.metering import (
+            estimate_messages_tokens,
+            estimate_parts_tokens,
+            record_usage,
+        )
+
+        in_tok = int(getattr(usage, "input_tokens", 0) or 0)
+        out_tok = int(getattr(usage, "output_tokens", 0) or 0)
+        estimated = False
+        if in_tok + out_tok == 0:
+            in_tok = estimate_messages_tokens(messages)
+            out_tok = estimate_parts_tokens(parts)
+            estimated = True
+        try:
+            record_usage(self.model_name, in_tok, out_tok, estimated=estimated)
+        except Exception:
+            # Metering must never break an LLM call.
+            pass
+
+
 def get_agent_model(
     agent_model: str,
     thinking_override: Optional[bool] = None,
     system_config_doc: dict | None = None,
 ):
-    """Get the appropriate model instance. Sync  - safe for Celery workers."""
+    """Get the appropriate model instance, wrapped for token metering.
+
+    Sync  - safe for Celery workers. The returned MeteredModel is a drop-in
+    Model that Agent(...) accepts unchanged.
+    """
+    model = _build_agent_model(agent_model, thinking_override, system_config_doc)
+    return MeteredModel(model)
+
+
+def _build_agent_model(
+    agent_model: str,
+    thinking_override: Optional[bool] = None,
+    system_config_doc: dict | None = None,
+):
+    """Build the raw (unmetered) provider-specific model instance."""
     model_config = _get_model_config_sync(agent_model, system_config_doc)
 
     # Resolve per-model API key from system config (decrypt if encrypted)

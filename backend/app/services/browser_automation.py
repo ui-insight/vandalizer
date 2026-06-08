@@ -303,8 +303,10 @@ class BrowserAutomationService:
         )
 
         try:
+            from app.services.metering import metered
             agent = create_chat_agent(model, system_prompt=system_prompt)
-            response = agent.run_sync(user_prompt)
+            with metered("browser_automation", user_id=getattr(self.get_session(session_id), "user_id", None)):
+                response = agent.run_sync(user_prompt)
             if response.output:
                 json_match = re.search(r"\{.*\}", response.output, re.DOTALL)
                 if json_match:
@@ -332,8 +334,10 @@ class BrowserAutomationService:
         try:
             from app.services.llm_service import create_chat_agent
 
+            from app.services.metering import metered
             agent = create_chat_agent(model, system_prompt=system_prompt)
-            response = agent.run_sync(user_prompt)
+            with metered("browser_automation", user_id=getattr(self.get_session(session_id), "user_id", None)):
+                response = agent.run_sync(user_prompt)
             json_match = re.search(r"\[.*\]", response.output, re.DOTALL)
             if json_match:
                 return json.loads(json_match.group(0))
@@ -376,8 +380,10 @@ class BrowserAutomationService:
             "--- END PAGE HTML ---"
         )
 
+        from app.services.metering import metered
         agent = create_chat_agent(model, system_prompt=system_prompt)
-        response = agent.run_sync(user_prompt)
+        with metered("browser_automation", user_id=getattr(self.get_session(session_id), "user_id", None)):
+            response = agent.run_sync(user_prompt)
 
         content = response.output.strip()
         if content.startswith("```json"):

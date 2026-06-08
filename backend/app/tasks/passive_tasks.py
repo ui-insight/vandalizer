@@ -427,7 +427,9 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
             allow_code_execution=wf_is_admin,
         )
 
-        final_output, data = engine.execute()
+        from app.services.metering import metered
+        with metered("workflow_passive", user_id=wf_user_id, team_id=workflow.get("team_id")):
+            final_output, data = engine.execute()
 
         # Update result
         completed_at = datetime.now(timezone.utc)
@@ -908,12 +910,14 @@ def process_extraction_outputs(
                 continue
             try:
                 engine = ExtractionEngine(system_config_doc=sys_config, domain=domain)
-                doc_results = engine.extract(
-                    extract_keys=keys,
-                    full_text=doc["raw_text"],
-                    extraction_config_override=extraction_config,
-                    field_metadata=field_metadata,
-                )
+                from app.services.metering import metered
+                with metered("extraction_passive", user_id=user_id):
+                    doc_results = engine.extract(
+                        extract_keys=keys,
+                        full_text=doc["raw_text"],
+                        extraction_config_override=extraction_config,
+                        field_metadata=field_metadata,
+                    )
                 for entity in doc_results:
                     entity["document_id"] = doc_uuid
                     results.append(entity)

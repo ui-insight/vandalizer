@@ -1194,7 +1194,9 @@ async def generate_validation_plan(workflow_id: str, user: User) -> list[dict]:
     )
 
     try:
-        result = await agent.run(f"## Workflow\n{workflow_desc}")
+        from app.services.metering import metered_async
+        async with metered_async("validation", user_id=wf_data.get("user_id")):
+            result = await agent.run(f"## Workflow\n{workflow_desc}")
     except Exception:
         raise ValueError("LLM call failed - could not generate validation plan")
 
@@ -1553,7 +1555,9 @@ async def _evaluate_checks_against_output(
     )
 
     try:
-        result = await agent.run(user_prompt)
+        from app.services.metering import metered_async
+        async with metered_async("validation"):
+            result = await agent.run(user_prompt)
     except Exception:
         return [
             {"check_id": c["id"], "name": c["name"], "status": "SKIP", "detail": "LLM evaluation failed"}

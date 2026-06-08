@@ -101,7 +101,9 @@ def validate_chunk(
             f"Compliance Requirements:\n{compliance}\n"
             f"Document Text Chunk:\n{chunk_text}"
         )
-        result = agent.run_sync(prompt)
+        from app.services.metering import metered
+        with metered("upload_validation"):
+            result = agent.run_sync(prompt)
         output = result.output
 
         # Parse structured output or treat as text
@@ -157,14 +159,16 @@ def summarize_results(
     # Summarize via LLM
     try:
         agent = _get_secure_agent()
-        summary_result = agent.run_sync(
-            f"Analyze this validation feedback and return a structured response.\n"
-            f'Validation results: {"PASSED" if all_valid else "FAILED"}\n\n'
-            f"Validation feedback:\n{combined}\n\n"
-            f"Return:\n"
-            f"- valid: {str(all_valid).lower()}\n"
-            f'- feedback: {"Confirm all sections passed validation" if all_valid else "Concise summary of failures and required fixes"}'
-        )
+        from app.services.metering import metered
+        with metered("upload_validation"):
+            summary_result = agent.run_sync(
+                f"Analyze this validation feedback and return a structured response.\n"
+                f'Validation results: {"PASSED" if all_valid else "FAILED"}\n\n'
+                f"Validation feedback:\n{combined}\n\n"
+                f"Return:\n"
+                f"- valid: {str(all_valid).lower()}\n"
+                f'- feedback: {"Confirm all sections passed validation" if all_valid else "Concise summary of failures and required fixes"}'
+            )
         output = summary_result.output
 
         if hasattr(output, "model_dump"):

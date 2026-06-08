@@ -48,7 +48,11 @@ async def _classify(document_uuid: str):
             )
         return
 
-    result = await classify_document(doc)
+    from app.services.metering import metered_async
+    async with metered_async(
+        "classification", user_id=doc.user_id, team_id=doc.team_id
+    ):
+        result = await classify_document(doc)
     await apply_classification(
         doc,
         classification=result["classification"],

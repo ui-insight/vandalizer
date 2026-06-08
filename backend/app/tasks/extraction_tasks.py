@@ -143,12 +143,15 @@ def perform_extraction_task(
 
         # Perform extraction
         engine = ExtractionEngine(system_config_doc=sys_cfg)
-        results = engine.extract(
-            keys,
-            document_uuids,
-            model=model_name,
-            extraction_config_override=extraction_config_override,
-        )
+        from app.services.metering import metered
+        team_id = activity.get("team_id") if activity else None
+        with metered("extraction", user_id=user_id, team_id=team_id, activity_id=str(activity_id)):
+            results = engine.extract(
+                keys,
+                document_uuids,
+                model=model_name,
+                extraction_config_override=extraction_config_override,
+            )
         raw_results = deepcopy(results)
 
         result_count = (

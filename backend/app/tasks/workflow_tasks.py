@@ -482,10 +482,17 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
             return False
 
     try:
-        final_output, data = engine.execute(
-            workflow_result_updater=update_progress,
-            should_cancel=should_cancel,
-        )
+        from app.services.metering import metered
+        with metered(
+            "workflow",
+            user_id=user_id,
+            team_id=workflow_doc.get("team_id"),
+            activity_id=activity_id,
+        ):
+            final_output, data = engine.execute(
+                workflow_result_updater=update_progress,
+                should_cancel=should_cancel,
+            )
     except WorkflowCancelled:
         logger.info(
             "Workflow %s canceled by user (result %s)", workflow_id, workflow_result_id,
@@ -873,11 +880,21 @@ def resume_workflow_after_approval(self, approval_uuid):
     )
 
     try:
-        final_output, data = engine.execute(
-            workflow_result_updater=update_progress,
-            start_index=step_index + 1,
-            initial_output=initial_output,
+        from app.services.metering import metered
+        _act = db.activity_event.find_one(
+            {"workflow_result": ObjectId(workflow_result_id)}, {"_id": 1}
         )
+        with metered(
+            "workflow",
+            user_id=user_id,
+            team_id=workflow_doc.get("team_id"),
+            activity_id=str(_act["_id"]) if _act else None,
+        ):
+            final_output, data = engine.execute(
+                workflow_result_updater=update_progress,
+                start_index=step_index + 1,
+                initial_output=initial_output,
+            )
     except Exception as e:
         logger.error("Workflow resume failed for %s: %s", workflow_id, e)
         db.workflow_result.update_one(

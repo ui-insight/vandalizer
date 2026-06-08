@@ -178,7 +178,9 @@ async def diagnose_model(cfg: SystemConfig, index: int) -> dict[str, Any]:
 
         model = get_agent_model(model_name, system_config_doc=config_doc)
         agent = Agent(model, system_prompt="You are a connectivity probe. Reply with exactly: ok")
-        result = await agent.run("Say ok")
+        from app.services.metering import metered_async
+        async with metered_async("diagnostics"):
+            result = await agent.run("Say ok")
         elapsed_ms = int((time.perf_counter() - started) * 1000)
         reply = (result.output or "").strip()
         usage = result.usage()

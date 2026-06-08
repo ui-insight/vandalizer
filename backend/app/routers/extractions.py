@@ -449,7 +449,13 @@ async def upload_pdf_template(
         "Return a JSON object with key 'mappings' mapping each field name to a human-readable "
         "extraction prompt."
     )
-    result = await agent.run(prompt, output_type=FieldMapping)
+    from app.services.metering import metered_async
+    async with metered_async(
+        "extraction_template",
+        user_id=user.user_id,
+        team_id=str(user.current_team) if user.current_team else None,
+    ):
+        result = await agent.run(prompt, output_type=FieldMapping)
     mappings: dict[str, str] = result.output.mappings
 
     # Replace all existing items with new ones from the mapping
@@ -719,14 +725,21 @@ async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, u
     assert activity.id is not None
 
     try:
-        results = await svc.run_extraction_sync(
-            search_set_uuid=req.search_set_uuid,
-            document_uuids=document_uuids,
+        from app.services.metering import metered_async
+        async with metered_async(
+            "extraction",
             user_id=user.user_id,
-            model=req.model,
-            extraction_config_override=req.extraction_config_override,
-            combined_context=req.combined_context,
-        )
+            team_id=str(user.current_team) if user.current_team else None,
+            activity_id=str(activity.id),
+        ):
+            results = await svc.run_extraction_sync(
+                search_set_uuid=req.search_set_uuid,
+                document_uuids=document_uuids,
+                user_id=user.user_id,
+                model=req.model,
+                extraction_config_override=req.extraction_config_override,
+                combined_context=req.combined_context,
+            )
         await activity_service.activity_finish(activity.id, ActivityStatus.COMPLETED)
         # Merge all result entities into a single normalized map so the
         # activity rail can restore results when the user reopens the run.

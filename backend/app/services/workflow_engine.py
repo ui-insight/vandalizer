@@ -383,12 +383,19 @@ class MultiTaskNode(Node):
         return task._apply_post_process(result)
 
     def process(self, inputs):
+        import contextvars
         from copy import deepcopy
 
         for task in self.tasks:
             task.inputs = deepcopy(inputs)
+        # Run each node within a copy of the current context so contextvars set
+        # by the caller (notably the LLM metering scope) propagate into the
+        # worker threads — ThreadPoolExecutor does not copy contextvars itself.
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            task_futures = [executor.submit(self.process_task, task) for task in self.tasks]
+            task_futures = [
+                executor.submit(contextvars.copy_context().run, self.process_task, task)
+                for task in self.tasks
+            ]
             results = [future.result() for future in as_completed(task_futures)]
 
         collected = []

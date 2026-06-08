@@ -463,7 +463,9 @@ async def generate_improvement_suggestions(
             ),
             system_config_doc=sys_config_doc,
         )
-        res = await agent.run(prompt)
+        from app.services.metering import metered_async
+        async with metered_async("quality_suggestion"):
+            res = await agent.run(prompt)
         return res.output
     except Exception as exc:
         logger.exception("Failed to generate improvement suggestions for %s %s", item_kind, item_id)

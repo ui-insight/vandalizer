@@ -509,6 +509,17 @@ async def chat_stream(
     thinking_duration: float | None = None
     thinking_done_emitted = False
 
+    # Meter every token this chat consumes (see app/services/metering.py). Manual
+    # enter/exit avoids re-indenting the large streaming body; __aexit__ in the
+    # finally flushes whatever was accrued, even on cancellation mid-stream.
+    from app.services.metering import metered_async
+    _meter = metered_async(
+        "chat",
+        user_id=user_id,
+        team_id=getattr(conversation, "team_id", None),
+        activity_id=activity_id,
+    )
+    await _meter.__aenter__()
     try:
         think_parser = _ThinkTagParser()
 
@@ -630,6 +641,8 @@ async def chat_stream(
             )
         except Exception as save_err:
             logger.error("Failed to persist interrupted chat: %s", save_err)
+    finally:
+        await _meter.__aexit__(None, None, None)
 
 
 

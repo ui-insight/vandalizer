@@ -2245,7 +2245,9 @@ async def test_prompt(body: TestPromptRequest, user: User = Depends(get_current_
         model = get_agent_model(model_name, system_config_doc=cfg.model_dump())
         system = body.system_prompt.strip()
         agent = Agent(model, system_prompt=system) if system else Agent(model)
-        result = await agent.run(body.user_prompt)
+        from app.services.metering import metered_async
+        async with metered_async("diagnostics"):
+            result = await agent.run(body.user_prompt)
         elapsed_ms = int((_time.perf_counter() - started) * 1000)
         usage = result.usage()
         return {

@@ -235,7 +235,9 @@ class PlanGenerator:
         model = get_agent_model(model_name)
 
         agent = Agent(model, system_prompt=PLAN_GENERATION_SYSTEM_PROMPT)
-        result = agent.run_sync(user_prompt)
+        from app.services.metering import metered
+        with metered("validation", user_id=user_id):
+            result = agent.run_sync(user_prompt)
         raw = _extract_json(result.output)
         checks = _parse_checks(raw)
 
@@ -397,12 +399,21 @@ class CheckRunner:
             check_results.append(self._run_deterministic_check(check, step_output))
 
         if llm_checks:
+            import contextvars
+
+            from app.services.metering import metered
             worker_count = min(len(llm_checks), self.MAX_LLM_WORKERS)
-            with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            # One usage row for the whole evaluation run; copy_context so the
+            # metering scope reaches the check worker threads.
+            with metered("validation", user_id=user_id), \
+                    ThreadPoolExecutor(max_workers=worker_count) as executor:
                 futures = {}
                 for check in llm_checks:
                     step_output = self._resolve_step_output(check, step_outputs, final_output)
-                    future = executor.submit(self._run_llm_check, check, step_output, model_name)
+                    future = executor.submit(
+                        contextvars.copy_context().run,
+                        self._run_llm_check, check, step_output, model_name,
+                    )
                     futures[future] = check
 
                 for future in as_completed(futures):
