@@ -31,6 +31,26 @@ class PostExperienceResponseSchema(BaseModel):
     message: str
 
 
+class TrialEndInfoResponse(BaseModel):
+    name: str
+    organization: str
+    engagement: str  # "low" | "engaged"
+    extensions_used: int
+    max_extensions: int
+    can_self_extend: bool
+    already_extended: bool
+
+
+class TrialExtensionRequest(BaseModel):
+    notes: Optional[dict] = None
+
+
+class TrialExtensionResponse(BaseModel):
+    ok: bool
+    message: str
+    expires_at: Optional[str] = None
+
+
 class DemoApplicationResponse(BaseModel):
     uuid: str
     name: str

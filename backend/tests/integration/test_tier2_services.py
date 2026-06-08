@@ -409,3 +409,155 @@ class TestAuthConfigRouteWithRealDB:
         data = resp.json()
         assert "auth_methods" in data
         assert "local" in data["auth_methods"]
+
+
+# ---------------------------------------------------------------------------
+# demo_service trial extension — engagement classification + self-serve renewal
+# (counts/queries across Beanie models; needs Tier 2).
+# ---------------------------------------------------------------------------
+
+class TestTrialExtensionWithRealDB:
+    async def _make_locked_trial(self, suffix: str, *, extensions_used: int = 0):
+        """Create a locked demo application + user, return (app, user)."""
+        from app.models.demo import DemoApplication
+        from app.models.user import User
+
+        uid = f"trial_{suffix}@example.com"
+        past = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=1)
+        user = User(
+            user_id=uid,
+            email=uid,
+            name=f"Trial {suffix}",
+            is_demo_user=True,
+            demo_status="locked",
+            demo_expires_at=past,
+        )
+        await user.insert()
+        app = DemoApplication(
+            uuid=f"app_{suffix}",
+            name=f"Trial {suffix}",
+            email=uid,
+            organization="Test Org",
+            status="expired",
+            user_id=uid,
+            expires_at=past,
+            expired_at=past,
+            post_questionnaire_token=f"tok_{suffix}",
+            trial_extensions_used=extensions_used,
+        )
+        await app.insert()
+        return app, user
+
+    async def test_engagement_low_when_never_logged_in(self, mongo_client):
+        from app.services.demo_service import compute_trial_engagement
+
+        _app, _user = await self._make_locked_trial("nologin")
+        # last_login_at defaults to None
+        assert await compute_trial_engagement("trial_nologin@example.com") == "low"
+
+    async def test_engagement_low_with_few_artifacts(self, mongo_client):
+        from app.models.document import SmartDocument
+        from app.models.user import User
+        from app.services.demo_service import compute_trial_engagement
+
+        _app, user = await self._make_locked_trial("fewdocs")
+        user.last_login_at = datetime.datetime.now(datetime.timezone.utc)
+        await user.save()
+        # 2 docs is below the LOW_ENGAGEMENT_MAX_ARTIFACTS=3 threshold
+        for i in range(2):
+            await SmartDocument(
+                path="p", downloadpath="d", title=f"doc{i}",
+                uuid=f"fewdocs_doc_{i}", user_id=user.user_id,
+            ).insert()
+        assert await compute_trial_engagement(user.user_id) == "low"
+
+    async def test_engagement_engaged_at_threshold(self, mongo_client):
+        from app.models.document import SmartDocument
+        from app.models.user import User
+        from app.services.demo_service import compute_trial_engagement
+
+        _app, user = await self._make_locked_trial("engaged")
+        user.last_login_at = datetime.datetime.now(datetime.timezone.utc)
+        await user.save()
+        for i in range(3):
+            await SmartDocument(
+                path="p", downloadpath="d", title=f"doc{i}",
+                uuid=f"engaged_doc_{i}", user_id=user.user_id,
+            ).insert()
+        assert await compute_trial_engagement(user.user_id) == "engaged"
+
+    async def test_self_extend_unlocks_and_extends(self, mongo_client):
+        from app.config import Settings
+        from app.models.demo import DemoApplication
+        from app.models.user import User
+        from app.services import demo_service
+
+        app, _user = await self._make_locked_trial("extend")
+        with patch.object(demo_service, "send_email", new_callable=AsyncMock):
+            result = await demo_service.self_extend_trial(
+                "tok_extend", None, Settings()
+            )
+
+        assert result["ok"] is True
+        refreshed_app = await DemoApplication.find_one(DemoApplication.uuid == app.uuid)
+        refreshed_user = await User.find_one(User.user_id == "trial_extend@example.com")
+        assert refreshed_app.status == "active"
+        assert refreshed_app.trial_extensions_used == 1
+        assert refreshed_user.demo_status == "active"
+        now = datetime.datetime.now(datetime.timezone.utc)
+        # New expiry is ~14 days out
+        assert refreshed_app.expires_at.replace(tzinfo=datetime.timezone.utc) > now + datetime.timedelta(days=13)
+
+    async def test_self_extend_blocked_at_cap(self, mongo_client):
+        from app.config import Settings
+        from app.models.user import User
+        from app.services import demo_service
+
+        await self._make_locked_trial("capped", extensions_used=2)
+        with patch.object(demo_service, "send_email", new_callable=AsyncMock):
+            result = await demo_service.self_extend_trial(
+                "tok_capped", None, Settings()
+            )
+
+        assert result["ok"] is False
+        assert result["reason"] == "cap_reached"
+        # User stays locked
+        refreshed_user = await User.find_one(User.user_id == "trial_capped@example.com")
+        assert refreshed_user.demo_status == "locked"
+
+    async def test_self_extend_persists_notes(self, mongo_client):
+        from app.config import Settings
+        from app.models.demo import DemoApplication, PostExperienceResponse
+        from app.services import demo_service
+
+        app, _user = await self._make_locked_trial("notes")
+        with patch.object(demo_service, "send_email", new_callable=AsyncMock):
+            await demo_service.self_extend_trial(
+                "tok_notes", {"using_for": "grants"}, Settings()
+            )
+
+        stored = await DemoApplication.find_one(DemoApplication.uuid == app.uuid)
+        responses = await PostExperienceResponse.find(
+            PostExperienceResponse.demo_application_id == stored.id
+        ).to_list()
+        assert len(responses) == 1
+        assert responses[0].responses["kind"] == "renewal_notes"
+        assert responses[0].responses["using_for"] == "grants"
+
+    async def test_get_trial_end_info(self, mongo_client):
+        from app.services.demo_service import get_trial_end_info
+
+        await self._make_locked_trial("info", extensions_used=1)
+        info = await get_trial_end_info("tok_info")
+        assert info is not None
+        assert info["name"] == "Trial info"
+        assert info["extensions_used"] == 1
+        assert info["max_extensions"] == 2
+        assert info["can_self_extend"] is True
+        assert info["already_extended"] is True
+        assert info["engagement"] == "low"
+
+    async def test_get_trial_end_info_invalid_token(self, mongo_client):
+        from app.services.demo_service import get_trial_end_info
+
+        assert await get_trial_end_info("does_not_exist") is None

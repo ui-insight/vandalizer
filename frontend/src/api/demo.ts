@@ -4,6 +4,8 @@ import type {
   DemoSignupResponse,
   WaitlistStatusResponse,
   FeedbackInfo,
+  TrialEndInfo,
+  TrialExtensionResult,
   DemoAdminStats,
   DemoApplication,
   PostExperienceResponseAdmin,
@@ -38,6 +40,17 @@ export function submitPostQuestionnaire(token: string, responses: Record<string,
   return apiFetch<{ message: string }>(`/api/demo/feedback/${token}`, {
     method: 'POST',
     body: JSON.stringify({ responses }),
+  })
+}
+
+export function getTrialEndInfo(token: string) {
+  return apiFetch<TrialEndInfo>(`/api/demo/trial-end/${token}`)
+}
+
+export function requestTrialExtension(token: string, notes?: Record<string, unknown>) {
+  return apiFetch<TrialExtensionResult>(`/api/demo/trial-end/${token}/extend`, {
+    method: 'POST',
+    body: JSON.stringify({ notes: notes ?? null }),
   })
 }
 
