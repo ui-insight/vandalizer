@@ -133,12 +133,16 @@ async def get_update_status(settings: Settings) -> dict[str, Any]:
     if cached is None:
         cached = await _fetch_latest_release()
         if cached is not None:
+            redis = await _redis_client(settings)
             try:
-                redis = await _redis_client(settings)
                 await redis.set(CACHE_KEY, json.dumps(cached), ex=CACHE_TTL_SECONDS)
-                await redis.aclose()
             except aioredis.RedisError as exc:
                 logger.debug("Update-check cache write failed: %s", exc)
+            finally:
+                # aclose() must run even if set() raises, or the connection
+                # (and its fd) leaks on every RedisError — same leak class as
+                # the WS forwarder, just lower-frequency.
+                await redis.aclose()
 
     if cached is None:
         return {

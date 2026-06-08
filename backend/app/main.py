@@ -243,6 +243,38 @@ from prometheus_fastapi_instrumentator import Instrumentator  # noqa: E402
 Instrumentator().instrument(app).expose(app, endpoint="/api/metrics")
 
 
+def _fd_usage() -> dict[str, object]:
+    """Report this process's open file-descriptor count and soft limit.
+
+    A steadily climbing ``open_fds`` is the early signal of an fd leak — the
+    kind that has repeatedly surfaced only as a misleading Mongo
+    ``AutoReconnect`` once the table is already exhausted. Surfacing it here
+    lets monitoring alert on the rising line instead of the eventual crash.
+
+    ``open_fds`` is None on platforms without ``/proc`` (e.g. macOS dev); the
+    limit is still read via ``resource``. ``pct`` is the soft-limit usage so a
+    scrape/alert can threshold without re-deriving it.
+    """
+    import os
+    import resource
+
+    open_fds: int | None = None
+    try:
+        open_fds = len(os.listdir("/proc/self/fd"))
+    except OSError:
+        open_fds = None
+
+    limit: int | None = None
+    try:
+        soft, _hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+        limit = soft if soft != resource.RLIM_INFINITY else None
+    except (ValueError, OSError):
+        limit = None
+
+    pct = round(100 * open_fds / limit, 1) if open_fds is not None and limit else None
+    return {"open_fds": open_fds, "fd_limit": limit, "fd_pct": pct}
+
+
 @app.get("/api/health")
 async def health() -> JSONResponse:
     """Health check that verifies all critical dependencies."""
@@ -286,5 +318,9 @@ async def health() -> JSONResponse:
     status_code = 200 if all_ok else 503
     return JSONResponse(
         status_code=status_code,
-        content={"status": "ok" if all_ok else "degraded", "checks": checks},
+        content={
+            "status": "ok" if all_ok else "degraded",
+            "checks": checks,
+            "resources": _fd_usage(),
+        },
     )
