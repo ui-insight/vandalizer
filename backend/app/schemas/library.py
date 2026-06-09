@@ -4,6 +4,7 @@ from typing import Optional
 from pydantic import BaseModel
 
 from app.schemas.user import AuthorRef
+from app.utils.naming import EntityName
 
 
 # ---------------------------------------------------------------------------
@@ -76,14 +77,14 @@ class UpdateItemRequest(BaseModel):
 
 
 class CreateFolderRequest(BaseModel):
-    name: str
+    name: EntityName
     parent_id: Optional[str] = None
     scope: str
     team_id: Optional[str] = None
 
 
 class RenameFolderRequest(BaseModel):
-    name: str
+    name: EntityName
 
 
 class MoveItemsRequest(BaseModel):

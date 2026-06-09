@@ -1,4 +1,4 @@
-import { apiFetch, csrfHeaders } from './client'
+import { apiFetch, rawFetch } from './client'
 import type { ChatMessage, UrlAttachment, FileAttachment, StreamChunk } from '../types/chat'
 
 export async function streamChat(
@@ -14,10 +14,9 @@ export async function streamChat(
   runDemo?: boolean,
   signal?: AbortSignal,
 ): Promise<{ conversationUuid: string; activityId: string }> {
-  const res = await fetch('/api/chat', {
+  const res = await rawFetch('/api/chat', {
     method: 'POST',
-    credentials: 'include',
-    headers: csrfHeaders({ 'Content-Type': 'application/json' }),
+    headers: { 'Content-Type': 'application/json' },
     signal,
     body: JSON.stringify({
       message,
@@ -107,10 +106,8 @@ export async function addDocument(
   files.forEach((f) => formData.append('files', f))
   if (currentActivityId) formData.append('current_activity_id', currentActivityId)
 
-  const res = await fetch('/api/chat/add-document', {
+  const res = await rawFetch('/api/chat/add-document', {
     method: 'POST',
-    credentials: 'include',
-    headers: csrfHeaders(),
     body: formData,
   })
 

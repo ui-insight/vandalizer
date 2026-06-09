@@ -1,10 +1,12 @@
 import React, { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ExtractionTutorial } from './ExtractionTutorial'
-import { X, Pencil, Loader2, Copy, Trash2, GripVertical, Plus, ChevronDown, ChevronRight, Play, TrendingUp, Sparkles, FileText, AlertTriangle, Eye, Shield, ShieldCheck, Download, Check, PenTool, Wrench, ClipboardCheck, SlidersHorizontal, Clock } from 'lucide-react'
+import { X, Pencil, Loader2, Copy, Trash2, GripVertical, Plus, ChevronDown, ChevronRight, Play, TrendingUp, Sparkles, FileText, AlertTriangle, Eye, Shield, ShieldCheck, Download, Check, PenTool, Wrench, ClipboardCheck, SlidersHorizontal, Clock, Link2 } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
 import { useAuth } from '../../hooks/useAuth'
+import { useShareLink } from '../../lib/shareLink'
+import { useConfirm } from '../shared/useConfirm'
 import { useSearchSetItems } from '../../hooks/useExtractions'
 import {
   getSearchSet,
@@ -25,16 +27,17 @@ import {
   generateExampleTemplate,
   exportSearchSetUrl,
   importSearchSet,
-  getTuningResult,
-  clearTuningResult,
   getExtractionHistory,
 } from '../../api/extractions'
 import { RunHistoryTab } from './RunHistoryTab'
-import type { ValidationV2Result, QualityHistoryRun, ValidationSource, TuningResult, TuningStreamEvent } from '../../api/extractions'
-import { findBestSettingsStream } from '../../api/extractions'
+import type { ValidationV2Result, QualityHistoryRun, ValidationSource } from '../../api/extractions'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
-import { VerificationSubmitDialog } from '../shared/VerificationSubmitDialog'
+import { VerificationSubmitModal } from '../library/VerificationSubmitModal'
+import { ExtractionAutovalidatePanel } from '../extractions/ExtractionAutovalidatePanel'
+import { CrossFieldRulesSection } from '../extractions/CrossFieldRulesSection'
+import { CrossFieldViolationsPanel } from '../extractions/CrossFieldViolationsPanel'
 import { getModels } from '../../api/config'
+import { MAX_NAME_LENGTH, normalizeName } from '../../utils/nameValidation'
 import type { SearchSet, ModelInfo } from '../../types/workflow'
 import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from 'recharts'
 import { QualityBadge } from '../library/QualityBadge'
@@ -74,6 +77,8 @@ export function ExtractionEditorPanel() {
   const { openExtractionId, openExtraction, closeExtraction, selectedDocUuids, selectedDocNames, setHighlightTerms, bumpActivitySignal, consumeExtractionResults } = useWorkspace()
   const { toast } = useToast()
   const { user } = useAuth()
+  const shareLink = useShareLink()
+  const confirm = useConfirm()
   const [searchSet, setSearchSet] = useState<SearchSet | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('design')
@@ -169,9 +174,10 @@ export function ExtractionEditorPanel() {
 
   const saveTitle = async () => {
     setEditingTitle(false)
-    if (!openExtractionId || titleDraft === searchSet?.title) return
+    const cleanTitle = normalizeName(titleDraft)
+    if (!openExtractionId || cleanTitle === searchSet?.title) return
     if (blockedByVerified()) return
-    await updateSearchSet(openExtractionId, { title: titleDraft.trim() || searchSet?.title })
+    await updateSearchSet(openExtractionId, { title: cleanTitle || searchSet?.title })
     refresh()
   }
 
@@ -298,6 +304,17 @@ export function ExtractionEditorPanel() {
 
   const handleDelete = async () => {
     if (!openExtractionId) return
+    const ok = await confirm({
+      title: 'Delete extraction?',
+      message: (
+        <>
+          Are you sure you want to delete <strong>{searchSet?.title || 'this extraction'}</strong>? This action cannot be undone.
+        </>
+      ),
+      confirmLabel: 'Delete',
+      destructive: true,
+    })
+    if (!ok) return
     await deleteSearchSet(openExtractionId)
     closeExtraction()
   }
@@ -414,6 +431,7 @@ export function ExtractionEditorPanel() {
             <input
               autoFocus
               value={titleDraft}
+              maxLength={MAX_NAME_LENGTH}
               onChange={(e) => setTitleDraft(e.target.value)}
               onBlur={saveTitle}
               onKeyDown={(e) => e.key === 'Enter' && saveTitle()}
@@ -475,6 +493,22 @@ export function ExtractionEditorPanel() {
             {selectedDocUuids.length} document{selectedDocUuids.length !== 1 ? 's' : ''} selected
           </div>
         </div>
+        <button
+          onClick={() => shareLink('extraction', searchSet.uuid, searchSet.title)}
+          title="Copy share link"
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: 4,
+            borderRadius: 4,
+            color: '#5f6368',
+            display: 'flex',
+            flexShrink: 0,
+          }}
+        >
+          <Link2 style={{ width: 18, height: 18 }} />
+        </button>
         <button
           onClick={closeExtraction}
           style={{
@@ -659,6 +693,7 @@ export function ExtractionEditorPanel() {
             onUpdateItem={update}
             onValidationComplete={refresh}
             onSaveConfig={saveConfig}
+            portability={searchSet?.validation_portability ?? null}
           />
         </div>
       )}
@@ -2388,6 +2423,7 @@ interface SourceLocal {
   source_type: 'document' | 'text'
   document_uuid?: string
   document_title?: string
+  document_exists?: boolean | null
   source_text?: string
   expected_values: Record<string, string>
   expanded: boolean
@@ -2400,7 +2436,7 @@ function ValidateTab({
   extractionConfig,
   onUpdateItem,
   onValidationComplete,
-  onSaveConfig,
+  portability,
 }: {
   searchSetUuid: string
   itemTitle?: string
@@ -2409,9 +2445,10 @@ function ValidateTab({
   onUpdateItem: (id: string, data: { is_optional?: boolean; enum_values?: string[] }) => void
   onValidationComplete?: () => void
   onSaveConfig?: (config: ExtractionConfig) => Promise<void>
+  portability?: { test_case_count: number; text_count: number; document_count: number; missing_snapshot_count: number } | null
 }) {
-  const { toast } = useToast()
   const { selectedDocUuids, viewDocument } = useWorkspace()
+  const { toast } = useToast()
   const [sources, setSources] = useState<SourceLocal[]>([])
   const [loadingSources, setLoadingSources] = useState(true)
   const [numRuns, setNumRuns] = useState(3)
@@ -2427,10 +2464,6 @@ function ValidateTab({
   const [suggestions, setSuggestions] = useState<string | null>(null)
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
   const [sourcesCollapsed, setSourcesCollapsed] = useState(false)
-  const [tuning, setTuning] = useState(false)
-  const [tuningResults, setTuningResults] = useState<TuningResult[] | null>(null)
-  const [tuningRecommendation, setTuningRecommendation] = useState<string | null>(null)
-  const [tuningProgress, setTuningProgress] = useState<{ index: number; total: number; label: string } | null>(null)
   const [fillingSourceId, setFillingSourceId] = useState<string | null>(null)
   const [fillError, setFillError] = useState<string | null>(null)
   const fillAbortRef = useRef<AbortController | null>(null)
@@ -2451,6 +2484,7 @@ function ValidateTab({
           source_type: tc.source_type as 'document' | 'text',
           document_uuid: tc.document_uuid ?? undefined,
           document_title: tc.label || undefined,
+          document_exists: tc.document_exists ?? undefined,
           source_text: tc.source_text ?? undefined,
           expected_values: tc.expected_values,
           expanded: false,
@@ -2462,23 +2496,13 @@ function ValidateTab({
       .finally(() => setLoadingSources(false))
   }, [searchSetUuid])
 
-  useEffect(() => {
-    getExtractionQualityHistory(searchSetUuid)
+  const reloadQualityHistory = useCallback(() => {
+    return getExtractionQualityHistory(searchSetUuid)
       .then(r => setQualityHistory(r.runs))
       .catch(() => {})
   }, [searchSetUuid])
 
-  // Load persisted tuning results
-  useEffect(() => {
-    getTuningResult(searchSetUuid)
-      .then(r => {
-        if (r.tuning_result) {
-          setTuningResults(r.tuning_result.results)
-          setTuningRecommendation(r.tuning_result.recommendation)
-        }
-      })
-      .catch(() => {})
-  }, [searchSetUuid])
+  useEffect(() => { void reloadQualityHistory() }, [reloadQualityHistory])
 
   // Cleanup debounce timers on unmount
   useEffect(() => {
@@ -2516,6 +2540,7 @@ function ValidateTab({
       source_type: 'document' as const,
       document_uuid: docs[i].uuid,
       document_title: docs[i].title,
+      document_exists: tc.document_exists ?? true,
       expected_values: {},
       expanded: false,
     }))
@@ -2680,7 +2705,8 @@ function ValidateTab({
 
   return (
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* 1. Source Management */}
+      {/* 1. Test cases — the shared input to tuning + detailed validation. Kept
+          on top so the auto-tune flow below always has something to score. */}
       <div>
         <div
           style={{
@@ -2696,7 +2722,7 @@ function ValidateTab({
               : <ChevronDown style={{ width: 14, height: 14, color: '#9ca3af' }} />
           )}
           <span style={{ fontSize: 14, fontWeight: 600, color: '#202124' }}>
-            Validation Sources
+            Test cases
           </span>
           {sources.length > 0 && sourcesCollapsed && (
             <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 400 }}>
@@ -2704,6 +2730,34 @@ function ValidateTab({
             </span>
           )}
         </div>
+
+        {/* Portability note — surfaces when test cases reference documents. */}
+        {portability && portability.document_count > 0 && (
+          portability.missing_snapshot_count > 0 ? (
+            <div style={{
+              display: 'flex', alignItems: 'flex-start', gap: 10,
+              padding: '10px 14px', borderRadius: 8, marginBottom: 12,
+              backgroundColor: '#fef2f2', border: '1px solid #fecaca',
+            }}>
+              <AlertTriangle style={{ width: 16, height: 16, color: '#dc2626', flexShrink: 0, marginTop: 1 }} />
+              <div style={{ flex: 1, fontSize: 12, color: '#7f1d1d', lineHeight: 1.5 }}>
+                <strong>{portability.missing_snapshot_count} of {portability.document_count} document-bound test case{portability.document_count !== 1 ? 's' : ''} {portability.missing_snapshot_count === 1 ? 'has' : 'have'} no saved text snapshot.</strong>
+                {' '}They will only run for users with access to the original document.
+              </div>
+            </div>
+          ) : (
+            <div style={{
+              display: 'flex', alignItems: 'flex-start', gap: 10,
+              padding: '8px 14px', borderRadius: 8, marginBottom: 12,
+              backgroundColor: '#f0f9ff', border: '1px solid #bae6fd',
+            }}>
+              <Shield style={{ width: 14, height: 14, color: '#0369a1', flexShrink: 0, marginTop: 2 }} />
+              <div style={{ flex: 1, fontSize: 12, color: '#075985', lineHeight: 1.5 }}>
+                {portability.document_count} test case{portability.document_count !== 1 ? 's' : ''} reference{portability.document_count === 1 ? 's' : ''} a document. Validation runs from the saved text snapshot, so anyone who copies this extraction can re-run validation — they won't need the original documents.
+              </div>
+            </div>
+          )
+        )}
 
         {/* Sample size penalty alert — always visible, even when collapsed */}
         {qualityHistory.length > 0 && qualityHistory[0].score_breakdown && qualityHistory[0].score_breakdown.sample_size_penalty > 0 && (() => {
@@ -2795,6 +2849,7 @@ function ValidateTab({
             {sources.map((src, i) => {
               const isUuidLike = src.document_title && /^[0-9a-f-]{20,}$/i.test(src.document_title)
               const label = (!isUuidLike && src.document_title) || (src.source_type === 'text' ? `Text Chunk ${i + 1}` : `Document ${i + 1}`)
+              const docMissing = src.source_type === 'document' && src.document_uuid && src.document_exists === false
               return (
                 <div key={src.id} style={{ padding: '10px 0', borderBottom: '1px solid #f0f0f0' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -2802,6 +2857,14 @@ function ValidateTab({
                     <span style={{ fontSize: 13, color: '#202124', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {label}
                     </span>
+                    {docMissing && (
+                      <span
+                        style={{ fontSize: 11, color: '#9ca3af', fontStyle: 'italic', flexShrink: 0 }}
+                        title="The source document was deleted. Validation still runs against the saved snapshot."
+                      >
+                        source deleted
+                      </span>
+                    )}
                     <span style={{
                       fontSize: 11, padding: '2px 8px', borderRadius: 4,
                       backgroundColor: src.source_type === 'text' ? '#eff6ff' : '#fef3c7',
@@ -2809,7 +2872,7 @@ function ValidateTab({
                     }}>
                       {src.source_type}
                     </span>
-                    {src.source_type === 'document' && src.document_uuid && (
+                    {src.source_type === 'document' && src.document_uuid && src.document_exists !== false && (
                       <button
                         onClick={() => viewDocument(src.document_uuid!, src.document_title || label)}
                         style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#9ca3af', display: 'flex' }}
@@ -2858,7 +2921,7 @@ function ValidateTab({
                         <div style={{ fontSize: 11, fontWeight: 600, color: '#5f6368' }}>
                           Expected Values (optional)
                         </div>
-                        {src.source_type === 'document' && src.document_uuid && (
+                        {src.source_type === 'document' && src.document_uuid && src.document_exists !== false && (
                           <button
                             onClick={() => fillFromExtraction(src)}
                             disabled={fillingSourceId === src.id}
@@ -2986,8 +3049,32 @@ function ValidateTab({
         )}
       </div>
 
-      {/* 2. Run Controls */}
+      {/* Tune this extraction (autovalidate optimizer) — the single scoring
+          surface. Apply writes the certified ValidationRun / quality tile. */}
+      <ExtractionAutovalidatePanel
+        searchSetUuid={searchSetUuid}
+        canManage={true}
+        onApplied={() => { onValidationComplete?.(); void reloadQualityHistory() }}
+      />
+
+      {/* Cross-field rules — feed into the optimizer's fitness function */}
+      <CrossFieldRulesSection
+        searchSetUuid={searchSetUuid}
+        canManage={true}
+        fieldNames={items.map(i => i.searchphrase)}
+      />
+
+      {/* 2. Detailed validation (on demand) — optional per-source/per-field
+          deep-dive. The headline score lives in the tune panel above; this is
+          a diagnostic breakdown, not a competing score. */}
       <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: '#202124', marginBottom: 4 }}>
+          Detailed validation
+        </div>
+        <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
+          Run the test cases as-is and inspect expected vs. extracted values per source and field.
+          For the official score and tuning, use “Tune this extraction” above.
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <label style={{ fontSize: 13, color: '#5f6368' }}>Replicates:</label>
           <input
@@ -3016,171 +3103,10 @@ function ValidateTab({
             {validating ? (
               <><Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} /> Validating...</>
             ) : (
-              <><Play style={{ width: 14, height: 14 }} /> Run Validation</>
-            )}
-          </button>
-          <button
-            onClick={async () => {
-              setTuning(true)
-              setTuningResults(null)
-              setTuningRecommendation(null)
-              setTuningProgress(null)
-              try {
-                await findBestSettingsStream(searchSetUuid, numRuns, 8, (event: TuningStreamEvent) => {
-                  if (event.kind === 'testing') {
-                    setTuningProgress({ index: event.index, total: event.total, label: event.label })
-                  } else if (event.kind === 'result') {
-                    setTuningResults(prev => [...(prev || []), event.result])
-                  } else if (event.kind === 'done') {
-                    setTuningResults(event.results)
-                    setTuningRecommendation(event.recommendation)
-                    setTuningProgress(null)
-                  } else if (event.kind === 'error') {
-                    setTuningRecommendation(event.detail)
-                    setTuningProgress(null)
-                  }
-                })
-              } catch (e: unknown) {
-                const msg = e instanceof Error ? e.message : 'Failed to find best settings'
-                setTuningRecommendation(msg)
-              } finally {
-                setTuning(false)
-                setTuningProgress(null)
-              }
-            }}
-            disabled={tuning || validating || sources.length === 0}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '8px 16px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
-              borderRadius: 8, border: '1px solid #d1d5db', backgroundColor: '#fff',
-              color: '#374151',
-              cursor: tuning || validating || sources.length === 0 ? 'not-allowed' : 'pointer',
-              opacity: tuning || validating || sources.length === 0 ? 0.5 : 1,
-            }}
-          >
-            {tuning ? (
-              <><Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} /> {tuningProgress ? `Testing ${tuningProgress.index + 1}/${tuningProgress.total}` : 'Preparing...'}</>
-            ) : (
-              <><Sparkles style={{ width: 14, height: 14 }} /> Find Best Settings</>
+              <><Play style={{ width: 14, height: 14 }} /> Run detailed validation</>
             )}
           </button>
         </div>
-
-        {/* Tuning results — live streaming */}
-        {(tuningResults || tuningRecommendation || tuningProgress) && (
-          <div style={{
-            marginTop: 12, padding: 16, borderRadius: 8,
-            border: '1px solid #c4b5fd', backgroundColor: '#f5f3ff',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-              <Sparkles style={{ width: 14, height: 14, color: '#7c3aed' }} />
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#5b21b6' }}>Settings Comparison</span>
-              {!tuning && (
-                <button
-                  onClick={() => {
-                    setTuningResults(null); setTuningRecommendation(null); setTuningProgress(null)
-                    clearTuningResult(searchSetUuid).catch(() => {})
-                  }}
-                  style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 2 }}
-                >
-                  <X style={{ width: 12, height: 12 }} />
-                </button>
-              )}
-            </div>
-
-            {/* Progress bar while tuning */}
-            {tuningProgress && (
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                  <Loader2 style={{ width: 14, height: 14, color: '#7c3aed', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
-                  <span style={{ fontSize: 12, color: '#5b21b6', fontWeight: 500 }}>
-                    Testing: {tuningProgress.label}
-                  </span>
-                  <span style={{ fontSize: 11, color: '#8b5cf6', marginLeft: 'auto' }}>
-                    {tuningProgress.index + 1} of {tuningProgress.total}
-                  </span>
-                </div>
-                <div style={{ height: 4, borderRadius: 2, backgroundColor: '#ddd6fe', overflow: 'hidden' }}>
-                  <div style={{
-                    height: '100%', borderRadius: 2, backgroundColor: '#7c3aed',
-                    width: `${((tuningProgress.index + 0.5) / tuningProgress.total) * 100}%`,
-                    transition: 'width 0.3s ease',
-                  }} />
-                </div>
-              </div>
-            )}
-
-            {tuningResults && tuningResults.length > 0 && (
-              <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse', marginBottom: 10 }}>
-                <thead>
-                  <tr style={{ borderBottom: '2px solid #ddd6fe' }}>
-                    <th style={{ textAlign: 'left', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Config</th>
-                    <th style={{ textAlign: 'left', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Model</th>
-                    <th style={{ textAlign: 'right', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Score</th>
-                    <th style={{ textAlign: 'right', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Acc</th>
-                    <th style={{ textAlign: 'right', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Cons</th>
-                    <th style={{ textAlign: 'right', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Time</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tuningResults.map((r, i) => {
-                    const scoreColor = r.score >= 90 ? '#059669' : r.score >= 70 ? '#d97706' : '#dc2626'
-                    const isBest = !tuning && i === 0
-                    return (
-                      <tr key={r.label} style={{
-                        borderBottom: '1px solid #ede9fe',
-                        backgroundColor: isBest ? '#ede9fe' : 'transparent',
-                      }}>
-                        <td style={{ padding: '4px 6px', fontWeight: isBest ? 700 : 400 }}>
-                          {r.label}{isBest && ' *'}
-                        </td>
-                        <td style={{ padding: '4px 6px', color: '#6b7280', fontSize: 10 }}>{r.model}</td>
-                        <td style={{ padding: '4px 6px', textAlign: 'right', fontWeight: 600, color: scoreColor }}>
-                          {r.error ? '-' : Math.round(r.score)}
-                        </td>
-                        <td style={{ padding: '4px 6px', textAlign: 'right' }}>
-                          {r.error ? '-' : `${Math.round(r.accuracy * 100)}%`}
-                        </td>
-                        <td style={{ padding: '4px 6px', textAlign: 'right' }}>
-                          {r.error ? '-' : `${Math.round(r.consistency * 100)}%`}
-                        </td>
-                        <td style={{ padding: '4px 6px', textAlign: 'right', color: '#6b7280' }}>
-                          {r.error ? '-' : `${r.elapsed_seconds.toFixed(1)}s`}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            )}
-            {tuningRecommendation && (
-              <div style={{ fontSize: 12, color: '#5b21b6', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
-                {tuningRecommendation}
-              </div>
-            )}
-            {!tuning && tuningResults && tuningResults.length > 0 && !tuningResults[0].error && (
-              <button
-                onClick={async () => {
-                  const best = tuningResults[0]
-                  if (!best?.config_override) return
-                  await onSaveConfig?.(best.config_override as ExtractionConfig)
-                  setTuningResults(null)
-                  setTuningRecommendation(null)
-                  clearTuningResult(searchSetUuid).catch(() => {})
-                  toast(`Switched to ${best.label}`, 'success')
-                }}
-                style={{
-                  marginTop: 10, display: 'inline-flex', alignItems: 'center', gap: 6,
-                  padding: '7px 16px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                  borderRadius: 8, border: 'none', backgroundColor: '#7c3aed', color: '#fff',
-                  cursor: 'pointer',
-                }}
-              >
-                <Sparkles style={{ width: 13, height: 13 }} /> Apply Best Settings
-              </button>
-            )}
-          </div>
-        )}
 
         {/* Progress display */}
         {validating && (
@@ -3354,14 +3280,14 @@ function ValidateTab({
               </button>
             )}
             {showSubmitDialog && (
-              <VerificationSubmitDialog
+              <VerificationSubmitModal
                 itemKind="search_set"
                 itemId={searchSetUuid!}
                 itemTitle={itemTitle}
                 onClose={() => setShowSubmitDialog(false)}
-                onSuccess={() => {
-                  setShowSubmitDialog(false)
+                onSubmitted={() => {
                   setSubmitLibraryResult('success')
+                  toast('Submitted for verification', 'success')
                 }}
               />
             )}
@@ -3373,7 +3299,7 @@ function ValidateTab({
       {results && (
         <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: '#202124' }}>Results</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#202124' }}>Detailed breakdown</div>
             <button
               onClick={() => downloadValidationCSV(results)}
               style={{
@@ -3386,6 +3312,11 @@ function ValidateTab({
               <Download style={{ width: 13, height: 13 }} /> Download CSV
             </button>
           </div>
+
+          {/* The official, certified score lives in the auto-tune panel above
+              (and the quality tile). This block is a per-source/per-field
+              diagnostic only — no headline score here, so there's never a
+              second number that can disagree with the certified one. */}
 
           {/* Executive Summary Card */}
           <div style={{
@@ -3430,6 +3361,14 @@ function ValidateTab({
               </div>
             </div>
           </div>
+
+          {/* Cross-Field rule outcomes — shows fails inline with "False alarm" mark-up */}
+          <CrossFieldViolationsPanel
+            searchSetUuid={searchSetUuid}
+            canManage={true}
+            summary={results.cross_field_summary}
+            results={results.cross_field_results}
+          />
 
           {/* LLM Improvement Suggestions */}
           {(suggestions || loadingSuggestions || (

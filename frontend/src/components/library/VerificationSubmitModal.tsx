@@ -1,10 +1,26 @@
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { X, ShieldCheck, ChevronRight, ChevronLeft, Upload } from 'lucide-react'
 import { submitForVerification } from '../../api/library'
-import type { LibraryItem } from '../../types/library'
+import { useAuth } from '../../hooks/useAuth'
+import type { LibraryItemKind } from '../../types/library'
+
+const CATEGORIES = [
+  'Compliance & Regulatory',
+  'Financial & Budgeting',
+  'Research Administration',
+  'Contracts & Legal',
+  'Human Resources',
+  'Operations & Logistics',
+  'Data Extraction',
+  'Document Review',
+  'Other',
+]
 
 interface Props {
-  item: LibraryItem
+  itemKind: LibraryItemKind
+  itemId: string
+  itemTitle?: string
   onClose: () => void
   onSubmitted: () => void
 }
@@ -17,15 +33,17 @@ const STEPS: { key: Step; label: string }[] = [
   { key: 'review', label: 'Review' },
 ]
 
-export function VerificationSubmitModal({ item, onClose, onSubmitted }: Props) {
+export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, onSubmitted }: Props) {
+  const { user } = useAuth()
   const [step, setStep] = useState<Step>('basics')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
   // Form data
-  const [summary, setSummary] = useState(item.name)
+  const [summary, setSummary] = useState(itemTitle ?? '')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('')
+  const [submitterOrg, setSubmitterOrg] = useState('')
   const [runInstructions, setRunInstructions] = useState('')
   const [evaluationNotes, setEvaluationNotes] = useState('')
   const [knownLimitations, setKnownLimitations] = useState('')
@@ -33,6 +51,7 @@ export function VerificationSubmitModal({ item, onClose, onSubmitted }: Props) {
   const [expectedOutputs, setExpectedOutputs] = useState('')
   const [dependencies, setDependencies] = useState('')
   const [intendedUseTags, setIntendedUseTags] = useState('')
+  const [skipValidation, setSkipValidation] = useState(false)
 
   const stepIndex = STEPS.findIndex(s => s.key === step)
   const canGoBack = stepIndex > 0
@@ -53,9 +72,11 @@ export function VerificationSubmitModal({ item, onClose, onSubmitted }: Props) {
     setError('')
     try {
       await submitForVerification({
-        item_kind: item.kind,
-        item_id: item.item_id,
-        summary: summary || item.name,
+        item_kind: itemKind,
+        item_id: itemId,
+        submitter_name: user?.name || user?.email || undefined,
+        submitter_org: submitterOrg.trim() || undefined,
+        summary: summary || itemTitle || '',
         description: description || undefined,
         category: category || undefined,
         run_instructions: runInstructions || undefined,
@@ -65,6 +86,7 @@ export function VerificationSubmitModal({ item, onClose, onSubmitted }: Props) {
         expected_outputs: expectedOutputs ? splitLines(expectedOutputs) : undefined,
         dependencies: dependencies ? splitLines(dependencies) : undefined,
         intended_use_tags: intendedUseTags ? splitLines(intendedUseTags) : undefined,
+        skip_validation: skipValidation,
       })
       onSubmitted()
       onClose()
@@ -75,10 +97,19 @@ export function VerificationSubmitModal({ item, onClose, onSubmitted }: Props) {
     }
   }
 
-  const kindLabel = item.kind === 'workflow' ? 'Workflow' : item.kind === 'knowledge_base' ? 'Knowledge Base' : 'Extraction'
+  const kindLabel = itemKind === 'workflow' ? 'Workflow' : itemKind === 'knowledge_base' ? 'Knowledge Base' : 'Extraction'
 
-  return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4" style={{ zIndex: 700 }}>
+  return createPortal(
+    // Stop propagation at the overlay: this modal is portaled to document.body, but
+    // React synthetic events bubble through the React tree (not the DOM tree), so a
+    // click on any field would otherwise reach the LibraryItemRow's onClick and
+    // navigate to the workflow. See LibraryItemRow row onClick={() => onOpen?.(item)}.
+    <div
+      className="fixed inset-0 bg-black/40 flex items-center justify-center p-4"
+      style={{ zIndex: 700 }}
+      onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
@@ -116,7 +147,7 @@ export function VerificationSubmitModal({ item, onClose, onSubmitted }: Props) {
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           <div className="text-xs text-gray-500 flex items-center gap-2 mb-2">
             <span className="px-2 py-0.5 rounded bg-gray-100 text-gray-600">{kindLabel}</span>
-            <span className="font-medium text-gray-700">{item.name}</span>
+            {itemTitle && <span className="font-medium text-gray-700">{itemTitle}</span>}
           </div>
 
           {step === 'basics' && (
@@ -143,11 +174,22 @@ export function VerificationSubmitModal({ item, onClose, onSubmitted }: Props) {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                <input
-                  type="text"
+                <select
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
-                  placeholder="e.g., NSF proposals, HR documents, grant budgets"
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-gray-400"
+                >
+                  <option value="">Select a category...</option>
+                  {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Your Organization</label>
+                <input
+                  type="text"
+                  value={submitterOrg}
+                  onChange={(e) => setSubmitterOrg(e.target.value)}
+                  placeholder="e.g., University of Idaho"
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400"
                 />
               </div>
@@ -240,7 +282,7 @@ export function VerificationSubmitModal({ item, onClose, onSubmitted }: Props) {
               <dl className="space-y-2 text-sm">
                 <div>
                   <dt className="text-xs font-medium text-gray-400 uppercase">Summary</dt>
-                  <dd className="text-gray-700">{summary || item.name}</dd>
+                  <dd className="text-gray-700">{summary || itemTitle}</dd>
                 </div>
                 {description && (
                   <div>
@@ -252,6 +294,12 @@ export function VerificationSubmitModal({ item, onClose, onSubmitted }: Props) {
                   <div>
                     <dt className="text-xs font-medium text-gray-400 uppercase">Category</dt>
                     <dd className="text-gray-700">{category}</dd>
+                  </div>
+                )}
+                {submitterOrg.trim() && (
+                  <div>
+                    <dt className="text-xs font-medium text-gray-400 uppercase">Organization</dt>
+                    <dd className="text-gray-700">{submitterOrg}</dd>
                   </div>
                 )}
                 {runInstructions && (
@@ -297,6 +345,25 @@ export function VerificationSubmitModal({ item, onClose, onSubmitted }: Props) {
                   </div>
                 )}
               </dl>
+
+              {/* Submit-without-validation opt-in (Phase B) */}
+              <label className="flex items-start gap-2 cursor-pointer rounded-md bg-amber-50 border border-amber-200 px-3.5 py-2.5">
+                <input
+                  type="checkbox"
+                  checked={skipValidation}
+                  onChange={(e) => setSkipValidation(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>
+                  <span className="block text-xs font-semibold text-amber-900">
+                    Submit without validation — request reviewer help
+                  </span>
+                  <span className="block text-[11px] leading-snug text-amber-800 mt-0.5">
+                    Reviewer will establish a validation baseline before approval. May take longer to review and could be returned for rework. Most submissions should be validated by the submitter first.
+                  </span>
+                </span>
+              </label>
+
               {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{error}</p>}
             </div>
           )}
@@ -329,7 +396,7 @@ export function VerificationSubmitModal({ item, onClose, onSubmitted }: Props) {
                 className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
               >
                 <Upload className="h-4 w-4" />
-                {submitting ? 'Submitting...' : 'Submit for Verification'}
+                {submitting ? 'Submitting...' : skipValidation ? 'Submit (reviewer will validate)' : 'Submit for Verification'}
               </button>
             ) : (
               <button
@@ -343,6 +410,7 @@ export function VerificationSubmitModal({ item, onClose, onSubmitted }: Props) {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

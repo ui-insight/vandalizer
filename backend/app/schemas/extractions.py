@@ -3,19 +3,21 @@
 from typing import Optional
 from pydantic import BaseModel
 
+from app.utils.naming import EntityName, OptionalEntityName
+
 
 # ---------------------------------------------------------------------------
 # SearchSet
 # ---------------------------------------------------------------------------
 
 class CreateSearchSetRequest(BaseModel):
-    title: str
+    title: EntityName
     set_type: str = "extraction"
     extraction_config: Optional[dict] = None
 
 
 class UpdateSearchSetRequest(BaseModel):
-    title: Optional[str] = None
+    title: OptionalEntityName = None
     extraction_config: Optional[dict] = None
 
 
@@ -43,6 +45,18 @@ class BuildFromDocumentRequest(BaseModel):
     model: Optional[str] = None
 
 
+class SuggestFieldsRequest(BaseModel):
+    document_uuids: list[str]
+    model: Optional[str] = None
+
+
+class ValidationPortability(BaseModel):
+    test_case_count: int = 0
+    text_count: int = 0
+    document_count: int = 0
+    missing_snapshot_count: int = 0
+
+
 class SearchSetResponse(BaseModel):
     id: str
     title: str
@@ -60,6 +74,7 @@ class SearchSetResponse(BaseModel):
     quality_tier: Optional[str] = None
     last_validated_at: Optional[str] = None
     validation_run_count: int = 0
+    validation_portability: Optional[ValidationPortability] = None
 
 
 class SearchSetItemResponse(BaseModel):
@@ -132,6 +147,7 @@ class TestCaseResponse(BaseModel):
     source_type: str
     source_text: Optional[str] = None
     document_uuid: Optional[str] = None
+    document_exists: Optional[bool] = None
     expected_values: dict[str, str] = {}
     user_id: str
     created_at: str

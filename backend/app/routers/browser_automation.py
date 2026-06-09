@@ -4,6 +4,7 @@ Replaces Flask Socket.IO with FastAPI WebSockets.
 """
 
 import asyncio
+import contextlib
 import json
 import logging
 
@@ -165,6 +166,20 @@ async def browser_automation_ws(
     # Background task for forwarding Redis -> WebSocket
     forward_task: asyncio.Task | None = None
 
+    async def _stop_forwarder(task: asyncio.Task | None) -> None:
+        """Cancel the forwarder and wait for its finally-block cleanup to run.
+
+        Awaiting the cancelled task is essential: the task's own ``finally``
+        (pubsub.unsubscribe + r.aclose) is what releases the dedicated Redis
+        pub/sub socket. A bare ``cancel()`` returns before that cleanup runs,
+        leaking one file descriptor per orphaned forwarder.
+        """
+        if task is None:
+            return
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+
     async def _forward_redis_to_ws(uid: str):
         """Subscribe to Redis channel and forward messages to WebSocket."""
         import redis.asyncio as aioredis
@@ -184,8 +199,13 @@ async def browser_automation_ws(
         except Exception as e:
             logger.debug("WebSocket pubsub listener ended: %s", e)
         finally:
-            await pubsub.unsubscribe(channel)
-            await r.aclose()
+            # Always release the dedicated pub/sub socket. Guard each await
+            # separately so that if cancellation interrupts the unsubscribe,
+            # the client (and its file descriptor) is still closed.
+            with contextlib.suppress(Exception):
+                await pubsub.aclose()
+            with contextlib.suppress(Exception):
+                await r.aclose()
 
     try:
         while True:
@@ -200,7 +220,10 @@ async def browser_automation_ws(
                 service.register_websocket(user_id, websocket)
                 await websocket.send_json({"type": "auth_ok"})
 
-                # Start background forwarder
+                # Start background forwarder. A client may re-send `auth` on the
+                # same connection; tear down any prior forwarder first so its
+                # Redis pub/sub socket is released instead of being orphaned.
+                await _stop_forwarder(forward_task)
                 forward_task = asyncio.create_task(_forward_redis_to_ws(user_id))
 
             elif msg_type == "response":
@@ -230,5 +253,7 @@ async def browser_automation_ws(
     finally:
         if user_id:
             service.unregister_websocket(user_id)
-        if forward_task:
-            forward_task.cancel()
+        # Await the forwarder's cleanup so its Redis socket is closed before the
+        # handler returns — a bare cancel() leaves the fd to a non-deterministic
+        # cleanup that may never run.
+        await _stop_forwarder(forward_task)

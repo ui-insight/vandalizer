@@ -62,8 +62,23 @@ describe('FileRow', () => {
 
   it('shows processing spinner when doc.processing=true', () => {
     renderFileRow({ doc: makeDoc({ processing: true, task_status: 'readying' }) })
-    // The Loader2 icon has animate-spin class; check for the status text
-    expect(screen.getByText('readying')).toBeTruthy()
+    // The Loader2 icon has animate-spin class; the column shows a friendly
+    // label rather than the raw pipeline stage name.
+    expect(screen.getByText('Indexing…')).toBeTruthy()
+    expect(screen.queryByText('readying')).toBeNull()
+  })
+
+  it('shows spinner during RAG indexing even when processing flips off', () => {
+    // The backend pipeline flips `processing` off after text extraction but
+    // keeps `task_status` on "readying" while indexing for retrieval. The
+    // row must keep its spinner so users don't think the doc is fully ready.
+    renderFileRow({ doc: makeDoc({ processing: false, task_status: 'readying' }) })
+    expect(screen.getByText('Indexing…')).toBeTruthy()
+  })
+
+  it('treats task_status=complete with processing=false as ready', () => {
+    renderFileRow({ doc: makeDoc({ processing: false, task_status: 'complete' }) })
+    expect(screen.queryByText(/Indexing|Reading|Processing/)).toBeNull()
   })
 
   it('checkbox calls onToggleSelect', () => {

@@ -77,6 +77,10 @@ def _make_verification_request(
     r.validation_snapshot = validation_snapshot
     r.validation_score = validation_score
     r.validation_tier = validation_tier
+    r.validation_origin = "validated_by_submitter"
+    r.examiner_baseline_additions = None
+    r.claimed_by_user_id = None
+    r.claimed_at = None
     r.return_guidance = return_guidance
     r.submitted_at = submitted_at or datetime.datetime(2025, 1, 1, tzinfo=datetime.timezone.utc)
     r.reviewed_at = reviewed_at
@@ -179,6 +183,17 @@ def _chain_query(*items):
     chain.limit.return_value = chain
     chain.to_list = AsyncMock(return_value=list(items))
     return chain
+
+
+@pytest.fixture(autouse=True)
+def _stub_author_resolvers():
+    """The service module pulls in resolve_author/resolve_authors at import time
+    to attach submitter AuthorRefs to verification dicts. These require a live
+    Beanie-initialized User collection, which the unit tests don't provide. Stub
+    them out so the existing serialization tests stay focused on their subject."""
+    with patch(f"{MODULE}.resolve_author", new_callable=AsyncMock, return_value=None), \
+         patch(f"{MODULE}.resolve_authors", new_callable=AsyncMock, return_value={}):
+        yield
 
 
 # ---------------------------------------------------------------------------

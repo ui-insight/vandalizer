@@ -4,6 +4,8 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, model_validator
 
+from app.utils.naming import EntityName, OptionalEntityName
+
 TRIGGER_TYPES = ("folder_watch", "m365_intake", "api", "schedule")
 ACTION_TYPES = ("workflow", "extraction", "task")
 
@@ -12,7 +14,7 @@ ActionType = Literal["workflow", "extraction", "task"]
 
 
 class CreateAutomationRequest(BaseModel):
-    name: str
+    name: EntityName
     description: Optional[str] = None
     trigger_type: Optional[TriggerType] = None
     trigger_config: Optional[dict] = None
@@ -35,7 +37,7 @@ class CreateAutomationRequest(BaseModel):
 
 
 class UpdateAutomationRequest(BaseModel):
-    name: Optional[str] = None
+    name: OptionalEntityName = None
     description: Optional[str] = None
     enabled: Optional[bool] = None
     trigger_type: Optional[TriggerType] = None
@@ -47,14 +49,15 @@ class UpdateAutomationRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_trigger_config(self) -> "UpdateAutomationRequest":
-        if self.trigger_type == "schedule":
-            cfg = self.trigger_config or {}
-            if not cfg.get("cron_expression"):
-                raise ValueError("Schedule trigger requires 'cron_expression' in trigger_config")
-        if self.trigger_type == "folder_watch":
-            cfg = self.trigger_config or {}
-            if not cfg.get("folder_id"):
-                raise ValueError("Folder watch trigger requires 'folder_id' in trigger_config")
+        # Only enforce required fields when the caller actually provides config.
+        # Switching trigger_type with an empty trigger_config is the first step of a
+        # two-step UI flow: pick the new type, then fill in its required fields.
+        if not self.trigger_config:
+            return self
+        if self.trigger_type == "schedule" and not self.trigger_config.get("cron_expression"):
+            raise ValueError("Schedule trigger requires 'cron_expression' in trigger_config")
+        if self.trigger_type == "folder_watch" and not self.trigger_config.get("folder_id"):
+            raise ValueError("Folder watch trigger requires 'folder_id' in trigger_config")
         return self
 
 

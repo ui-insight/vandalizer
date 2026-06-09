@@ -10,6 +10,8 @@ Vandalizer is an AI-powered document intelligence platform for research administ
 
 ## Development Commands
 
+Full Dockerized install + admin account + catalog seed (the supported deploy path, for users asking how to deploy on a server): `./setup.sh` from the project root. See `DEPLOY.md`. The commands below are the hot-reload dev loop.
+
 ```bash
 # Backend
 cd backend

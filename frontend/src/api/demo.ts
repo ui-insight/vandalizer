@@ -62,6 +62,10 @@ export function restartDemoTrial(demoUuid: string) {
   return apiFetch<{ ok: boolean }>(`/api/demo/admin/restart-trial/${demoUuid}`, { method: 'POST' })
 }
 
+export function promoteDemoUser(demoUuid: string) {
+  return apiFetch<{ ok: boolean }>(`/api/demo/admin/promote/${demoUuid}`, { method: 'POST' })
+}
+
 export function activateDemoUser(demoUuid: string) {
   return apiFetch<{ ok: boolean }>(`/api/demo/admin/activate/${demoUuid}`, { method: 'POST' })
 }

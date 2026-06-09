@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { X } from 'lucide-react'
 import type { Library, LibraryItemKind } from '../../types/library'
 import { addItem } from '../../api/library'
+import { useToast } from '../../contexts/ToastContext'
 
 interface Props {
   libraries: Library[]
@@ -14,6 +15,7 @@ interface Props {
 export function AddToLibraryDialog({ libraries, itemId, kind, onClose, onAdded }: Props) {
   const [selectedLibraryId, setSelectedLibraryId] = useState(libraries[0]?.id ?? '')
   const [saving, setSaving] = useState(false)
+  const { toast } = useToast()
 
   const handleSubmit = async () => {
     if (!selectedLibraryId) return
@@ -22,6 +24,9 @@ export function AddToLibraryDialog({ libraries, itemId, kind, onClose, onAdded }
       await addItem(selectedLibraryId, { item_id: itemId, kind })
       onAdded()
       onClose()
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to add item'
+      toast(message, 'error')
     } finally {
       setSaving(false)
     }

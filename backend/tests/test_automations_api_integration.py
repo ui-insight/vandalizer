@@ -1043,6 +1043,63 @@ class TestAutomationCRUD:
         assert resp.json()["can_manage"] is True
 
     @pytest.mark.asyncio
+    async def test_update_switches_trigger_type_with_empty_config(self, client):
+        # Switching trigger_type is a two-step UI flow: pick the new type, then
+        # fill in required fields. The PATCH that flips the type sends an empty
+        # trigger_config and must succeed so the user can finish configuring it.
+        user = _make_user()
+        cookies, headers = _auth_cookies()
+        now = datetime.datetime.now(datetime.timezone.utc)
+        auto = _make_automation(trigger_type="folder_watch")
+        auto.trigger_config = {}
+        auto.created_at = now
+        auto.updated_at = now
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.automations._load_authorized_automation", new_callable=AsyncMock, return_value=(auto, TeamAccessContext())), \
+             patch("app.routers.automations._validate_action_target", new_callable=AsyncMock), \
+             patch("app.routers.automations.svc.apply_automation_update", new_callable=AsyncMock, return_value=auto):
+            MockUser.find_one = AsyncMock(return_value=user)
+
+            # API → Folder Watch
+            resp_fw = await client.patch(
+                "/api/automations/auto-1",
+                json={"trigger_type": "folder_watch", "trigger_config": {}},
+                cookies=cookies,
+                headers=headers,
+            )
+            # API → Schedule
+            resp_sched = await client.patch(
+                "/api/automations/auto-1",
+                json={"trigger_type": "schedule", "trigger_config": {}},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp_fw.status_code == 200
+        assert resp_sched.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_update_rejects_nonempty_trigger_config_missing_required(self, client):
+        # If the caller does supply trigger_config, required fields are still enforced.
+        user = _make_user()
+        cookies, headers = _auth_cookies()
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser:
+            MockUser.find_one = AsyncMock(return_value=user)
+
+            resp = await client.patch(
+                "/api/automations/auto-1",
+                json={"trigger_type": "folder_watch", "trigger_config": {"file_types": ["pdf"]}},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
     async def test_update_nonexistent_returns_404(self, client):
         user = _make_user()
         cookies, headers = _auth_cookies()

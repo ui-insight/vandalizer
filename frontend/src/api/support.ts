@@ -1,22 +1,22 @@
-import { apiFetch, ApiError, csrfHeaders } from './client'
+import { apiFetch, ApiError, rawFetch } from './client'
 import type { SupportTicket, SupportTicketSummary, SupportContact } from '../types/support'
 
 export async function createTicket(
   subject: string,
   message: string,
   priority = 'normal',
+  classification: string | null = null,
   files: File[] = [],
 ) {
   const form = new FormData()
   form.append('subject', subject)
   form.append('message', message)
   form.append('priority', priority)
+  if (classification) form.append('classification', classification)
   for (const f of files) form.append('files', f)
 
-  const res = await fetch('/api/support/tickets', {
+  const res = await rawFetch('/api/support/tickets', {
     method: 'POST',
-    credentials: 'include',
-    headers: csrfHeaders(),
     body: form,
   })
   if (!res.ok) {
@@ -33,6 +33,9 @@ export function listTickets(
   scope?: 'mine',
   tag?: string,
   category?: string,
+  search?: string,
+  priority?: string,
+  classification?: string,
 ) {
   const params = new URLSearchParams()
   if (status) params.set('status', status)
@@ -41,6 +44,9 @@ export function listTickets(
   if (scope) params.set('scope', scope)
   if (tag) params.set('tag', tag)
   if (category) params.set('category', category)
+  if (search) params.set('search', search)
+  if (priority) params.set('priority', priority)
+  if (classification) params.set('classification', classification)
   return apiFetch<{ tickets: SupportTicketSummary[] }>(
     `/api/support/tickets?${params}`,
   )
@@ -50,24 +56,45 @@ export function getTicket(ticketUuid: string) {
   return apiFetch<SupportTicket>(`/api/support/tickets/${ticketUuid}`)
 }
 
-export function addMessage(ticketUuid: string, content: string) {
+export function addMessage(
+  ticketUuid: string,
+  content: string,
+  options: { isInternalNote?: boolean } = {},
+) {
   return apiFetch<SupportTicket>(`/api/support/tickets/${ticketUuid}/messages`, {
     method: 'POST',
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({
+      content,
+      is_internal_note: options.isInternalNote ?? false,
+    }),
   })
+}
+
+export function editMessage(
+  ticketUuid: string,
+  messageUuid: string,
+  content: string,
+) {
+  return apiFetch<SupportTicket>(
+    `/api/support/tickets/${ticketUuid}/messages/${messageUuid}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ content }),
+    },
+  )
 }
 
 export async function addAttachment(
   ticketUuid: string,
-  file: File,
+  files: File | File[],
 ) {
+  const list = Array.isArray(files) ? files : [files]
+  if (list.length === 0) throw new ApiError(400, 'No files provided')
   const form = new FormData()
-  form.append('file', file)
+  for (const f of list) form.append('files', f)
 
-  const res = await fetch(`/api/support/tickets/${ticketUuid}/attachments`, {
+  const res = await rawFetch(`/api/support/tickets/${ticketUuid}/attachments`, {
     method: 'POST',
-    credentials: 'include',
-    headers: csrfHeaders(),
     body: form,
   })
   if (!res.ok) {
@@ -75,6 +102,13 @@ export async function addAttachment(
     throw new ApiError(res.status, body.detail || 'Upload failed')
   }
   return res.json() as Promise<SupportTicket>
+}
+
+export function deleteAttachment(ticketUuid: string, attachmentUuid: string) {
+  return apiFetch<SupportTicket>(
+    `/api/support/tickets/${ticketUuid}/attachments/${attachmentUuid}`,
+    { method: 'DELETE' },
+  )
 }
 
 export function updateTicket(
@@ -103,4 +137,18 @@ export function getSupportContacts() {
 
 export function listAllTags() {
   return apiFetch<{ tags: string[] }>('/api/support/tags')
+}
+
+export function addWatcher(ticketUuid: string, email: string) {
+  return apiFetch<SupportTicket>(`/api/support/tickets/${ticketUuid}/watchers`, {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  })
+}
+
+export function removeWatcher(ticketUuid: string, watcherUserId: string) {
+  return apiFetch<SupportTicket>(
+    `/api/support/tickets/${ticketUuid}/watchers/${encodeURIComponent(watcherUserId)}`,
+    { method: 'DELETE' },
+  )
 }

@@ -51,6 +51,16 @@ export interface LibraryFolder {
 }
 
 export type VerificationStatus = 'draft' | 'submitted' | 'in_review' | 'approved' | 'rejected' | 'returned'
+export type ValidationOrigin = 'validated_by_submitter' | 'pending_admin_validation' | 'unvalidated_legacy'
+
+export interface ExaminerBaselineAdditions {
+  test_cases?: Array<{ document_uuid?: string; expected?: Record<string, unknown>; note?: string }>
+  queries?: Array<{ query: string; expected_answer?: string; expected_chunks?: string[]; note?: string }>
+  regression_inputs?: Array<{ input: string; expected_output?: string; note?: string }>
+  checks?: Array<{ description: string; target_step?: string }>
+  run_uuid?: string
+  run_score?: number
+}
 
 export interface VerificationRequest {
   id: string
@@ -62,6 +72,7 @@ export interface VerificationRequest {
   status: VerificationStatus
   submitter_user_id: string
   submitter_name: string | null
+  submitter: AuthorRef | null
   submitter_org?: string | null
   submitter_role?: string | null
   summary: string | null
@@ -79,11 +90,31 @@ export interface VerificationRequest {
   validation_snapshot?: Record<string, unknown> | null
   validation_score?: number | null
   validation_tier?: string | null
+  validation_origin?: ValidationOrigin
+  examiner_baseline_additions?: ExaminerBaselineAdditions | null
+  claimed_by_user_id?: string | null
+  claimed_at?: string | null
   return_guidance?: string | null
   reviewer_user_id: string | null
   reviewer_notes: string | null
   submitted_at: string | null
   reviewed_at: string | null
+}
+
+export interface CatalogCoverageItem {
+  item_kind: string
+  item_id: string
+  name: string
+  coverage: 'none' | 'snapshot_only' | 'pinned_baseline' | 'drift_checked'
+  coverage_order: number
+  quality_score: number | null
+  quality_tier: string | null
+  last_validated_at: string | null
+  official_baseline_pinned_at: string | null
+  official_baseline_score: number | null
+  official_baseline_test_case_count: number
+  last_drift_check_at: string | null
+  last_drift_score: number | null
 }
 
 export interface VerifiedItemMetadata {
@@ -100,6 +131,15 @@ export interface VerifiedItemMetadata {
   quality_grade?: string | null
   last_validated_at?: string | null
   validation_run_count?: number
+  official_baseline?: Record<string, unknown> | null
+  official_baseline_pinned_at?: string | null
+  official_baseline_source_run_uuid?: string | null
+  official_baseline_score?: number | null
+  official_baseline_pinned_by_user_id?: string | null
+  official_baseline_history?: Record<string, unknown>[]
+  last_drift_check_at?: string | null
+  last_drift_score?: number | null
+  coverage?: 'none' | 'snapshot_only' | 'pinned_baseline' | 'drift_checked'
 }
 
 export interface VerifiedCatalogItem {
@@ -126,6 +166,7 @@ export interface VerifiedCatalogItem {
   kb_status?: string
   source_uuid?: string
   created_by?: AuthorRef | null
+  submitted_by?: AuthorRef | null
 }
 
 export interface VerifiedCollection {

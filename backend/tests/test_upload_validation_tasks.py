@@ -16,18 +16,35 @@ import pytest
 
 class TestGetComplianceRules:
     @patch("app.tasks.upload_validation_tasks._get_db")
-    def test_returns_custom_rules_from_config(self, mock_get_db):
+    def test_returns_custom_rules_from_compliance_config(self, mock_get_db):
         from app.tasks.upload_validation_tasks import _get_compliance_rules
 
         db = MagicMock()
         mock_get_db.return_value = db
         db.system_config.find_one.return_value = {
-            "upload_compliance": "Custom compliance rules for testing.",
+            "compliance_config": {
+                "enabled": True,
+                "rules": "Custom compliance rules for testing.",
+            },
         }
 
         result = _get_compliance_rules()
 
         assert result == "Custom compliance rules for testing."
+
+    @patch("app.tasks.upload_validation_tasks._get_db")
+    def test_returns_legacy_upload_compliance_when_no_new_config(self, mock_get_db):
+        from app.tasks.upload_validation_tasks import _get_compliance_rules
+
+        db = MagicMock()
+        mock_get_db.return_value = db
+        db.system_config.find_one.return_value = {
+            "upload_compliance": "Legacy rules.",
+        }
+
+        result = _get_compliance_rules()
+
+        assert result == "Legacy rules."
 
     @patch("app.tasks.upload_validation_tasks._get_db")
     def test_returns_default_rules_when_not_configured(self, mock_get_db):

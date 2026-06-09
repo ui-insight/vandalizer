@@ -46,6 +46,10 @@ def save_results_to_folder(result_doc: dict, storage_config: dict) -> str:
     populated from the markdown rendition, the workflow's team_id, and origin
     metadata identifying this run, so that downstream workflows can consume it
     as input and own-origin docs can be skipped to prevent loops.
+
+    ``storage_config["actor_user_id"]`` overrides the document owner; without
+    it, the doc is owned by the workflow's owner (the right default for passive
+    runs). Manual "save output to my folder" uses the override.
     """
     db = get_sync_db()
     folder_id = storage_config.get("destination_folder")
@@ -76,8 +80,8 @@ def save_results_to_folder(result_doc: dict, storage_config: dict) -> str:
     final_output = result_doc.get("final_output") or {}
     output_data = final_output.get("output")
 
-    user_id = workflow.get("user_id", "system")
-    team_id = workflow.get("team_id")
+    user_id = storage_config.get("actor_user_id") or workflow.get("user_id", "system")
+    team_id = folder.get("team_id") or workflow.get("team_id")
     from app.config import Settings as _Settings
     upload_dir = _Settings().upload_dir
     dir_path = Path(upload_dir) / user_id
@@ -228,69 +232,16 @@ def _save_workflow_as_markdown(file_path: Path, data, title: str = "Results") ->
 
 
 def _save_workflow_as_pdf(file_path: Path, data, title: str = "Results") -> None:
-    """Save workflow output as a PDF table with text wrapping and pagination."""
-    from fpdf import FPDF
-    from fpdf.fonts import FontFace
+    """Save workflow output as a beautifully formatted PDF.
 
-    pdf = FPDF()
-    pdf.set_auto_page_break(auto=True, margin=20)
-    pdf.add_page()
-    pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 12, title.replace("_", " "), new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(4)
+    String payloads are rendered as markdown (headings, lists, tables, bold,
+    italic, code). Dicts/lists are rendered as a table.
+    """
+    from app.services.pdf_service import render_workflow_pdf
 
-    heading_style = FontFace(color=255, fill_color=(55, 65, 81), emphasis="BOLD")
-
-    if isinstance(data, list) and data and isinstance(data[0], dict):
-        headers = list(dict.fromkeys(k for row in data for k in row.keys()))
-        usable = pdf.w - pdf.l_margin - pdf.r_margin
-        # Smart column widths proportional to max content length
-        max_lens = []
-        for h in headers:
-            col_max = len(str(h))
-            for row in data:
-                col_max = max(col_max, len(str(row.get(h, ""))))
-            max_lens.append(min(col_max, 80))
-        total = sum(max_lens) or 1
-        col_widths = tuple(max(usable * (ml / total), 20) for ml in max_lens)
-
-        pdf.set_font("Helvetica", "", 9)
-        with pdf.table(
-            col_widths=col_widths,
-            headings_style=heading_style,
-            text_align="LEFT",
-        ) as table:
-            header_row = table.row()
-            for h in headers:
-                header_row.cell(str(h))
-            for item in data:
-                row = table.row()
-                for h in headers:
-                    val = item.get(h, "")
-                    cell_text = json.dumps(val, default=str) if isinstance(val, (dict, list)) else str(val) if val is not None else ""
-                    row.cell(cell_text)
-
-    elif isinstance(data, dict):
-        usable = pdf.w - pdf.l_margin - pdf.r_margin
-        pdf.set_font("Helvetica", "", 10)
-        with pdf.table(
-            col_widths=(usable * 0.3, usable * 0.7),
-            headings_style=heading_style,
-            text_align="LEFT",
-        ) as table:
-            header_row = table.row()
-            header_row.cell("Field")
-            header_row.cell("Value")
-            for k, v in data.items():
-                row = table.row()
-                row.cell(str(k))
-                val_text = json.dumps(v, default=str) if isinstance(v, (dict, list)) else str(v)
-                row.cell(val_text)
-    else:
-        pdf.set_font("Helvetica", "", 11)
-        pdf.multi_cell(0, 6, str(data) if data else "")
-
-    pdf.output(str(file_path))
+    pdf_bytes = render_workflow_pdf(data, title=title.replace("_", " "))
+    with open(file_path, "wb") as f:
+        f.write(pdf_bytes)
 
 
 def _save_extraction_as_markdown(file_path: Path, data: dict, title: str = "Extraction Results") -> None:
@@ -305,35 +256,12 @@ def _save_extraction_as_markdown(file_path: Path, data: dict, title: str = "Extr
 
 
 def _save_extraction_as_pdf(file_path: Path, data: dict, title: str = "Extraction Results") -> None:
-    """Save extraction results as a PDF table with text wrapping."""
-    from fpdf import FPDF
-    from fpdf.fonts import FontFace
+    """Save extraction results as a Field/Value PDF table."""
+    from app.services.pdf_service import render_workflow_pdf
 
-    pdf = FPDF()
-    pdf.set_auto_page_break(auto=True, margin=20)
-    pdf.add_page()
-    pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 12, title.replace("_", " "), new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(4)
-
-    usable = pdf.w - pdf.l_margin - pdf.r_margin
-    heading_style = FontFace(color=255, fill_color=(55, 65, 81), emphasis="BOLD")
-    pdf.set_font("Helvetica", "", 10)
-    with pdf.table(
-        col_widths=(usable * 0.3, usable * 0.7),
-        headings_style=heading_style,
-        text_align="LEFT",
-    ) as table:
-        header_row = table.row()
-        header_row.cell("Field")
-        header_row.cell("Value")
-        for k, v in data.items():
-            row = table.row()
-            row.cell(str(k))
-            val_text = json.dumps(v, default=str) if isinstance(v, (dict, list)) else str(v)
-            row.cell(val_text)
-
-    pdf.output(str(file_path))
+    pdf_bytes = render_workflow_pdf(data, title=title.replace("_", " "))
+    with open(file_path, "wb") as f:
+        f.write(pdf_bytes)
 
 
 def should_send_notification(result_doc: dict, notification: dict) -> bool:

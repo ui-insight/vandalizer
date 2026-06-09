@@ -154,6 +154,32 @@ export function getUserDetail(userId: string, days: number = 30) {
   return apiFetch<UserDetailResponse>(`/api/admin/users/${encodeURIComponent(userId)}/detail?days=${days}`)
 }
 
+// User Activity History (combined audit trail + activity telemetry)
+
+export interface UserHistoryItem {
+  timestamp: string | null
+  source: 'audit' | 'activity'
+  action: string
+  title: string | null
+  resource_type: string | null
+  resource_id: string | null
+  status: string | null
+  ip_address: string | null
+  detail: Record<string, unknown>
+}
+
+export interface UserHistoryResponse {
+  items: UserHistoryItem[]
+  total: number
+  capped: boolean
+}
+
+export function getUserHistory(userId: string, days: number = 90, skip: number = 0, limit: number = 50) {
+  return apiFetch<UserHistoryResponse>(
+    `/api/admin/users/${encodeURIComponent(userId)}/history?days=${days}&skip=${skip}&limit=${limit}`,
+  )
+}
+
 // Workflows
 
 export interface WorkflowEventItem {
@@ -202,11 +228,12 @@ export function getWorkflowEvents(page: number = 1, status?: string, search?: st
 
 // Config
 
-export interface M365Config {
+export interface CompliancePolicyConfig {
   enabled: boolean
-  client_id: string
-  client_secret: string
-  tenant_id: string
+  check_on_upload: boolean
+  rules: string
+  chunk_size?: number
+  chunk_overlap?: number
 }
 
 export interface SystemConfigData {
@@ -214,7 +241,7 @@ export interface SystemConfigData {
   quality_config: Record<string, unknown>
   auth_methods: string[]
   oauth_providers: Record<string, unknown>[]
-  available_models: { name: string; tag: string; external: boolean; thinking: boolean; endpoint?: string; api_protocol?: string; api_key?: string; speed?: string; tier?: string; privacy?: string; supports_structured?: boolean; multimodal?: boolean; supports_pdf?: boolean }[]
+  available_models: { name: string; tag: string; external: boolean; thinking: boolean; endpoint?: string; api_protocol?: string; api_key?: string; speed?: string; tier?: string; privacy?: string; supports_structured?: boolean; multimodal?: boolean; supports_pdf?: boolean; context_window?: number }[]
   default_model: string
   ocr_endpoint: string
   ocr_api_key: string
@@ -222,23 +249,24 @@ export interface SystemConfigData {
   highlight_color: string
   ui_radius: string
   default_team_id: string
-  m365_config: M365Config
+  compliance_config: CompliancePolicyConfig
+  retention_config: Record<string, unknown>
 }
 
 export function getSystemConfig() {
   return apiFetch<SystemConfigData>('/api/admin/config')
 }
 
-export function updateSystemConfig(data: { extraction_config?: Record<string, unknown>; quality_config?: Record<string, unknown>; ocr_endpoint?: string; ocr_api_key?: string; llm_endpoint?: string; default_team_id?: string; support_contacts?: { user_id: string; email: string; name: string }[] }) {
+export function updateSystemConfig(data: { extraction_config?: Record<string, unknown>; quality_config?: Record<string, unknown>; retention_config?: Record<string, unknown>; ocr_endpoint?: string; ocr_api_key?: string; llm_endpoint?: string; default_team_id?: string; support_contacts?: { user_id: string; email: string; name: string }[] }) {
   return apiFetch<{ status: string }>('/api/admin/config', { method: 'PUT', body: JSON.stringify(data) })
 }
 
-export function getM365Config() {
-  return apiFetch<M365Config>('/api/admin/config/m365')
+export function getCompliancePolicyConfig() {
+  return apiFetch<CompliancePolicyConfig>('/api/admin/config/compliance')
 }
 
-export function updateM365Config(data: Partial<M365Config>) {
-  return apiFetch<M365Config>('/api/admin/config/m365', { method: 'PUT', body: JSON.stringify(data) })
+export function updateCompliancePolicyConfig(data: Partial<CompliancePolicyConfig>) {
+  return apiFetch<CompliancePolicyConfig>('/api/admin/config/compliance', { method: 'PUT', body: JSON.stringify(data) })
 }
 
 // Admin Team Management
@@ -290,16 +318,53 @@ export function updateUserRoles(userId: string, roles: { is_admin?: boolean; is_
 
 // Models
 
-export function addModel(data: { name: string; tag: string; external?: boolean; thinking?: boolean; endpoint?: string; api_protocol?: string; api_key?: string; speed?: string; tier?: string; privacy?: string; supports_structured?: boolean; multimodal?: boolean; supports_pdf?: boolean }) {
+export type ModelFormData = {
+  name: string
+  tag: string
+  external?: boolean
+  thinking?: boolean
+  endpoint?: string
+  api_protocol?: string
+  api_key?: string
+  speed?: string
+  tier?: string
+  privacy?: string
+  supports_structured?: boolean
+  multimodal?: boolean
+  supports_pdf?: boolean
+  context_window?: number
+}
+
+export function addModel(data: ModelFormData) {
   return apiFetch<{ status: string; models: SystemConfigData['available_models'] }>('/api/admin/config/models', {
     method: 'POST',
     body: JSON.stringify(data),
   })
 }
 
-export function updateModel(index: number, data: { name: string; tag: string; external?: boolean; thinking?: boolean; endpoint?: string; api_protocol?: string; api_key?: string; speed?: string; tier?: string; privacy?: string; supports_structured?: boolean; multimodal?: boolean; supports_pdf?: boolean }) {
+export function updateModel(index: number, data: ModelFormData) {
   return apiFetch<{ status: string; models: SystemConfigData['available_models'] }>(`/api/admin/config/models/${index}`, {
     method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export type ProbeModelResult = {
+  context_window: number | null
+  source: string
+  detail: string | null
+  raw: Record<string, unknown> | null
+}
+
+export function probeModel(data: {
+  name: string
+  endpoint?: string
+  api_protocol?: string
+  api_key?: string
+  existing_model_index?: number | null
+}) {
+  return apiFetch<ProbeModelResult>('/api/admin/config/probe-model', {
+    method: 'POST',
     body: JSON.stringify(data),
   })
 }
@@ -321,8 +386,74 @@ export function testOcr() {
   return apiFetch<{ status: string; status_code: number; message: string }>('/api/admin/config/test-ocr', { method: 'POST' })
 }
 
+export type ModelCheck = { label: string; ok: boolean; detail: string }
+
+export type ModelDiagnosticError = {
+  category: string
+  title: string
+  why: string
+  fix: string
+  raw: string
+}
+
+export type ModelTestResult = {
+  ok: boolean
+  model?: string
+  tag?: string
+  protocol?: string
+  endpoint?: string
+  checks: ModelCheck[]
+  latency_ms?: number
+  tokens?: { request: number | null; response: number | null; total: number | null } | null
+  response_preview?: string
+  error?: ModelDiagnosticError | null
+  summary: string
+}
+
 export function testModel(index: number) {
-  return apiFetch<{ status: string; model: string; message: string }>(`/api/admin/config/test-model/${index}`, { method: 'POST' })
+  return apiFetch<ModelTestResult>(`/api/admin/config/test-model/${index}`, { method: 'POST' })
+}
+
+// System readiness — the admin setup checklist
+
+export type ReadinessSeverity = 'blocker' | 'recommended' | 'optional'
+export type ReadinessStatus = 'missing' | 'incomplete' | 'configured'
+
+export type ReadinessItem = {
+  key: string
+  title: string
+  severity: ReadinessSeverity
+  status: ReadinessStatus
+  summary: string
+  unlocks: string
+  action_label: string
+  action_target: string
+}
+
+export type ReadinessReport = {
+  ready: boolean
+  blockers_remaining: number
+  items: ReadinessItem[]
+}
+
+export function getReadiness() {
+  return apiFetch<ReadinessReport>('/api/admin/readiness')
+}
+
+export type TestPromptResult = {
+  ok: boolean
+  request: { model: string; system_prompt: string; user_prompt: string }
+  response_text: string
+  latency_ms: number
+  tokens?: { request: number | null; response: number | null; total: number | null }
+  error?: string
+}
+
+export function testPrompt(data: { model_name: string; system_prompt: string; user_prompt: string }) {
+  return apiFetch<TestPromptResult>('/api/admin/config/test-prompt', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
 }
 
 // Auth
@@ -395,7 +526,7 @@ export function runRegressionSuite(model?: string) {
 
 export interface QualityAlert {
   uuid: string
-  alert_type: 'regression' | 'stale' | 'config_changed'
+  alert_type: 'regression' | 'stale' | 'config_changed' | 'baseline_drift'
   item_kind: string
   item_id: string
   item_name: string
@@ -566,6 +697,69 @@ export function setCertificationUnlock(userId: string, unlocked: boolean) {
   )
 }
 
+// Compliance: classification + retention
+
+export interface ClassificationLevel {
+  name: string
+  label: string
+  color: string
+  severity: number
+}
+
+export interface ClassificationConfig {
+  enabled: boolean
+  auto_classify_on_upload: boolean
+  default_classification: string
+  levels: ClassificationLevel[]
+}
+
+export interface RetentionPolicy {
+  retention_days?: number
+  soft_delete_grace_days?: number
+  warning_days_before?: number
+}
+
+export interface RetentionConfig {
+  enabled: boolean
+  policies: Record<string, RetentionPolicy>
+  activity_retention_days?: number
+  chat_retention_days?: number
+  workflow_result_retention_days?: number
+  activity_stale_threshold_minutes?: number
+}
+
+export interface RecentClassification {
+  uuid: string
+  title: string | null
+  classification: string | null
+  confidence: number | null
+  classified_at: string | null
+  classified_by: string | null
+}
+
+export interface ClassificationDashboard {
+  config: ClassificationConfig
+  counts: Record<string, number>
+  recent_classifications: RecentClassification[]
+}
+
+export interface RetentionDashboard {
+  retention_config: RetentionConfig
+  classification_config: ClassificationConfig
+  document_counts: Record<string, number>
+  pending_deletions: number
+  soft_deleted: number
+  retention_holds: number
+}
+
+export function getClassificationDashboard() {
+  return apiFetch<ClassificationDashboard>('/api/admin/classification/dashboard')
+}
+
+export function getRetentionDashboard() {
+  return apiFetch<RetentionDashboard>('/api/admin/retention/dashboard')
+}
+
 // Management API keys (/api/admin/api-keys)
 
 export interface ApiKeyListItem {
@@ -633,3 +827,10 @@ export function revokeApiKey(keyId: string) {
     { method: 'DELETE' },
   )
 }
+
+export function getApiKeyDocs() {
+  return apiFetch<{ markdown: string }>('/api/admin/api-keys/docs')
+}
+
+/** URL for the downloadable Claude Code skill file (admin-gated, cookie auth). */
+export const API_KEY_SKILL_DOWNLOAD_URL = '/api/admin/api-keys/skill'

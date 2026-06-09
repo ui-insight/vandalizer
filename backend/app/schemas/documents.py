@@ -1,6 +1,8 @@
 from typing import Optional
 from pydantic import BaseModel
 
+from app.utils.naming import EntityName
+
 
 class DocumentResponse(BaseModel):
     id: str
@@ -9,11 +11,15 @@ class DocumentResponse(BaseModel):
     extension: str
     processing: bool
     valid: bool
+    validation_feedback: Optional[str] = None
     task_status: Optional[str] = None
     folder: Optional[str] = None
     created_at: str
     token_count: int = 0
     num_pages: int = 0
+    chromadb_ready: bool = False
+    chunk_count: int = 0
+    ingest_error: Optional[str] = None
 
 
 class FolderResponse(BaseModel):
@@ -43,19 +49,19 @@ class PollStatusResponse(BaseModel):
 
 
 class CreateFolderRequest(BaseModel):
-    name: str
+    name: EntityName
     parent_id: str
     folder_type: str = "individual"
 
 
 class RenameFolderRequest(BaseModel):
     uuid: str
-    newName: str
+    newName: EntityName
 
 
 class RenameDocumentRequest(BaseModel):
     uuid: str
-    newName: str
+    newName: EntityName
 
 
 class MoveFileRequest(BaseModel):

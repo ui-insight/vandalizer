@@ -26,6 +26,7 @@ interface NavigationContextValue {
   activeRightTab: RightTab
   setActiveRightTab: (tab: RightTab) => void
   openWorkflowId: string | null
+  openWorkflowShareToken: string | null
   openWorkflow: (id: string, sessionId?: string) => void
   closeWorkflow: () => void
   consumeWorkflowSession: () => string | null
@@ -54,6 +55,11 @@ export interface PendingChatMessage {
 interface ChatStateContextValue {
   loadConversationId: string | null
   setLoadConversationId: (id: string | null) => void
+  // UUID of the conversation currently displayed in ChatPanel. Surfaced
+  // upward so other UI (e.g. ActivityRail delete) can tell whether a
+  // deleted activity is the one the user is looking at right now.
+  currentConversationUuid: string | null
+  setCurrentConversationUuid: (uuid: string | null) => void
   newChatSignal: number
   triggerNewChat: () => void
   pendingChatMessage: PendingChatMessage | null
@@ -68,6 +74,11 @@ interface ChatStateContextValue {
   deactivateKB: () => void
   processingDoc: { title: string; status: string | null } | null
   setProcessingDoc: (doc: { title: string; status: string | null } | null) => void
+  // Subset of selectedDocUuids that are still being processed by the upload
+  // pipeline. Populated by the file browser so the chat banner can avoid
+  // claiming "ready for analysis" while OCR/indexing is still running.
+  selectedDocsProcessing: Array<{ uuid: string; title: string; status: string | null }>
+  setSelectedDocsProcessing: (docs: Array<{ uuid: string; title: string; status: string | null }>) => void
 }
 
 const ChatStateContext = createContext<ChatStateContextValue | null>(null)
@@ -141,6 +152,7 @@ type WorkspaceSearchState = {
   mode: WorkspaceMode | undefined
   tab: RightTab | undefined
   workflow: string | undefined
+  workflow_share_token: string | undefined
   extraction: string | undefined
   automation: string | undefined
   kb: string | undefined
@@ -151,6 +163,7 @@ function emptyWorkspaceSearch(): WorkspaceSearchState {
     mode: undefined,
     tab: undefined,
     workflow: undefined,
+    workflow_share_token: undefined,
     extraction: undefined,
     automation: undefined,
     kb: undefined,
@@ -171,6 +184,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     getStoredString('workspace:mode', 'chat', ['chat', 'files', 'automations', 'knowledge'])
 
   const openWorkflowId: string | null = search.workflow ?? null
+  const openWorkflowShareToken: string | null = search.workflow_share_token ?? null
   const openExtractionId: string | null = search.extraction ?? null
   const openAutomationId: string | null = search.automation ?? null
   const activeRightTab: RightTab = search.tab ?? 'assistant'
@@ -182,11 +196,28 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [railDocked, setRailDocked] = useState(() => getStoredBool('workspace:railDocked', false))
   const [panelSplit, _setPanelSplit] = useState(() => getStoredNumber('workspace:panelSplit', 60))
   const [loadConversationId, setLoadConversationId] = useState<string | null>(null)
+  const [currentConversationUuid, setCurrentConversationUuid] = useState<string | null>(null)
   const [newChatSignal, setNewChatSignal] = useState(0)
   const [pendingChatMessage, setPendingChatMessage] = useState<PendingChatMessage | null>(null)
   const [highlightTerms, setHighlightTerms] = useState<string[]>([])
   const [activitySignal, setActivitySignal] = useState(0)
   const [processingDoc, setProcessingDoc] = useState<{ title: string; status: string | null } | null>(null)
+  const [selectedDocsProcessing, _setSelectedDocsProcessing] = useState<Array<{ uuid: string; title: string; status: string | null }>>([])
+  // Wrap the setter so consumers passing a fresh array each render don't
+  // trigger needless re-renders of every chat consumer when the contents
+  // are identical (this gets called on every documents poll).
+  const setSelectedDocsProcessing = useCallback(
+    (next: Array<{ uuid: string; title: string; status: string | null }>) => {
+      _setSelectedDocsProcessing(prev => {
+        if (prev.length !== next.length) return next
+        for (let i = 0; i < prev.length; i++) {
+          if (prev[i].uuid !== next[i].uuid || prev[i].status !== next[i].status) return next
+        }
+        return prev
+      })
+    },
+    [],
+  )
   const [activeKBUuid, setActiveKBUuid] = useState<string | null>(null)
   const [activeKBTitle, setActiveKBTitle] = useState<string | null>(null)
   const [viewDocumentRequest, setViewDocumentRequest] = useState<{ uuid: string; title: string } | null>(null)
@@ -218,12 +249,18 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const openWorkflow = useCallback((id: string, sessionId?: string) => {
     pendingWorkflowSessionRef.current = sessionId ?? null
-    updateSearch((prev) => ({ ...prev, workflow: id, extraction: undefined, automation: undefined }))
+    updateSearch((prev) => ({
+      ...prev,
+      workflow: id,
+      workflow_share_token: undefined,
+      extraction: undefined,
+      automation: undefined,
+    }))
   }, [updateSearch])
 
   const closeWorkflow = useCallback(() => {
     pendingWorkflowSessionRef.current = null
-    updateSearch((prev) => ({ ...prev, workflow: undefined }))
+    updateSearch((prev) => ({ ...prev, workflow: undefined, workflow_share_token: undefined }))
   }, [updateSearch])
 
   const consumeWorkflowSession = useCallback((): string | null => {
@@ -325,6 +362,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
             replace: true,
           })
         })
+    }).catch(() => {
+      // Chunk load failure for the lazy import — don't leak an unhandled
+      // rejection; clear the param so the URL doesn't keep retrying.
+      navigate({
+        search: (prev) => ({ ...emptyWorkspaceSearch(), ...prev, kb: undefined }),
+        replace: true,
+      })
     })
   }, [search.kb, navigate])
 
@@ -363,7 +407,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const navValue = useMemo<NavigationContextValue>(() => ({
     workspaceMode, setWorkspaceMode,
     activeRightTab, setActiveRightTab,
-    openWorkflowId, openWorkflow, closeWorkflow, consumeWorkflowSession,
+    openWorkflowId, openWorkflowShareToken, openWorkflow, closeWorkflow, consumeWorkflowSession,
     openExtractionId, openExtraction, closeExtraction,
     consumeExtractionResults,
     openAutomationId, openAutomation, closeAutomation,
@@ -371,7 +415,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }), [
     workspaceMode, setWorkspaceMode,
     activeRightTab, setActiveRightTab,
-    openWorkflowId, openWorkflow, closeWorkflow, consumeWorkflowSession,
+    openWorkflowId, openWorkflowShareToken, openWorkflow, closeWorkflow, consumeWorkflowSession,
     openExtractionId, openExtraction, closeExtraction,
     consumeExtractionResults,
     openAutomationId, openAutomation, closeAutomation,
@@ -380,15 +424,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   const chatValue = useMemo<ChatStateContextValue>(() => ({
     loadConversationId, setLoadConversationId,
+    currentConversationUuid, setCurrentConversationUuid,
     newChatSignal, triggerNewChat,
     pendingChatMessage, sendChatMessage, clearPendingChatMessage,
     activeKBUuid, activeKBTitle, activateKB, deactivateKB,
     processingDoc, setProcessingDoc,
+    selectedDocsProcessing, setSelectedDocsProcessing,
   }), [
-    loadConversationId, newChatSignal, triggerNewChat,
+    loadConversationId, currentConversationUuid,
+    newChatSignal, triggerNewChat,
     pendingChatMessage, sendChatMessage, clearPendingChatMessage,
     activeKBUuid, activeKBTitle, activateKB, deactivateKB,
     processingDoc,
+    selectedDocsProcessing, setSelectedDocsProcessing,
   ])
 
   const uiValue = useMemo<UIStateContextValue>(() => ({

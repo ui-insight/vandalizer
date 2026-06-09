@@ -4,8 +4,10 @@ import { AppLayout } from '../components/layout/AppLayout'
 import { ChatPanel } from '../components/chat/ChatPanel'
 import { listConversations, deleteHistory } from '../api/chat'
 import type { ConversationSummary } from '../api/chat'
+import { useConfirm } from '../components/shared/useConfirm'
 
 export function Chat() {
+  const confirm = useConfirm()
   const [conversations, setConversations] = useState<ConversationSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [activeConvo, setActiveConvo] = useState<string | null>(null)
@@ -30,7 +32,13 @@ export function Chat() {
 
   const handleDeleteConvo = async (uuid: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!confirm('Delete this conversation?')) return
+    const ok = await confirm({
+      title: 'Delete conversation?',
+      message: 'Are you sure you want to delete this conversation? This cannot be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    })
+    if (!ok) return
     await deleteHistory(uuid)
     setConversations(prev => prev.filter(c => c.uuid !== uuid))
     if (activeConvo === uuid) setActiveConvo(null)

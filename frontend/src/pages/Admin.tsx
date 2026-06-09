@@ -14,15 +14,17 @@ import {
   LineChart, Line,
 } from 'recharts'
 import { PageLayout } from '../components/layout/PageLayout'
+import { useConfirm } from '../components/shared/useConfirm'
 import { useAuth } from '../hooks/useAuth'
 import { useTeams } from '../hooks/useTeams'
 import { getThemeConfig, updateThemeConfig } from '../api/config'
 import type { ThemeConfig } from '../api/config'
+import { useBranding, DEFAULT_ORG_NAME, DEFAULT_ICON_URL } from '../contexts/BrandingContext'
 import {
   getUsageStats, getUsageTimeseries, getUserLeaderboard, getTeamLeaderboard,
-  getTeamDetail, getUserDetail,
-  getWorkflowEvents, getSystemConfig, updateSystemConfig, updateM365Config,
-  addModel, updateModel, deleteModel, setDefaultModel, testOcr, testModel, addOAuthProvider,
+  getTeamDetail, getUserDetail, getUserHistory,
+  getWorkflowEvents, getSystemConfig, updateSystemConfig, updateCompliancePolicyConfig,
+  addModel, updateModel, deleteModel, setDefaultModel, testOcr, testModel, testPrompt, probeModel, getReadiness, addOAuthProvider,
   updateOAuthProvider, deleteOAuthProvider, updateAuthMethods,
   getQualitySummary, getQualityTimeline, runRegressionSuite,
   getQualityAlerts, acknowledgeAlert, getQualityItems, getQualityItemDetail,
@@ -38,9 +40,11 @@ import * as orgApi from '../api/organizations'
 import type { Organization, OrgMember, OrgTeam } from '../api/organizations'
 import {
   getDemoStats, getDemoApplications, releaseDemoUser, activateDemoUser, restartDemoTrial,
+  promoteDemoUser,
   getPostExperienceResponses, sendTestEmail, adminResendCredentials, adminGetMagicLink,
   adminAddDemoUser,
 } from '../api/demo'
+import type { TestPromptResult, ModelTestResult, ReadinessReport, ReadinessItem } from '../api/admin'
 import { getAdminPromptOverview, adminUpdatePrompt, type PromptOverview } from '../api/feedbackPrompt'
 import * as supportApi from '../api/support'
 import type { SupportTicket, SupportTicketSummary } from '../types/support'
@@ -50,7 +54,7 @@ import { PRE_SURVEY_FIELDS } from './Demo'
 import { SurveyFieldRenderer } from '../components/survey/SurveyFieldRenderer'
 import type {
   UsageStats, TimeseriesResponse, UserLeaderboardItem, TeamLeaderboardItem,
-  TeamDetailResponse, UserDetailResponse,
+  TeamDetailResponse, UserDetailResponse, UserHistoryItem,
   PaginatedWorkflows, SystemConfigData,
   QualitySummary, QualityTimelinePoint, RegressionResult,
   QualityAlert, QualityItem, QualityItemDetail,
@@ -66,6 +70,7 @@ import type { AuditLogEntry } from '../api/audit'
 import { getAuthConfig } from '../api/auth'
 import { UpdateBanner } from '../components/admin/UpdateBanner'
 import { ApiKeysTab } from '../components/admin/ApiKeysTab'
+import { ComplianceTab } from '../components/admin/ComplianceTab'
 
 function applyThemeToDOM(theme: ThemeConfig) {
   const root = document.documentElement
@@ -73,7 +78,18 @@ function applyThemeToDOM(theme: ThemeConfig) {
   root.style.setProperty('--ui-radius', theme.ui_radius)
 }
 
-type Tab = 'usage' | 'users' | 'teams' | 'organizations' | 'workflows' | 'quality' | 'audit' | 'demo' | 'email' | 'certifications' | 'apikeys' | 'config'
+const MAX_LOGO_BYTES = 500_000 // matches backend cap on the encoded data URL
+
+function readFileAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
+    reader.onerror = () => reject(reader.error || new Error('Failed to read file'))
+    reader.readAsDataURL(file)
+  })
+}
+
+type Tab = 'usage' | 'users' | 'teams' | 'organizations' | 'workflows' | 'quality' | 'compliance' | 'audit' | 'demo' | 'email' | 'certifications' | 'apikeys' | 'config'
 
 const TABS: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'usage', label: 'Usage', icon: BarChart3 },
@@ -82,6 +98,7 @@ const TABS: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'organizations', label: 'Organizations', icon: FolderTree },
   { key: 'workflows', label: 'Workflows', icon: Workflow },
   { key: 'quality', label: 'Quality', icon: ShieldCheck },
+  { key: 'compliance', label: 'Compliance', icon: Lock },
   { key: 'audit', label: 'Audit Log', icon: FileText },
   { key: 'demo', label: 'Demo', icon: Zap },
   { key: 'email', label: 'Email', icon: Mail },
@@ -231,17 +248,18 @@ function UserAvatar({ name }: { name: string | null }) {
   )
 }
 
-function SortableHeader({ label, sortKey, currentSort, onSort }: {
+function SortableHeader({ label, sortKey, currentSort, onSort, align = 'left' }: {
   label: string; sortKey: string
   currentSort: { key: string; dir: 'asc' | 'desc' }
   onSort: (key: string) => void
+  align?: 'left' | 'right' | 'center'
 }) {
   const active = currentSort.key === sortKey
   return (
     <th
       onClick={() => onSort(sortKey)}
       style={{
-        padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280',
+        padding: '10px 16px', textAlign: align, fontSize: 11, fontWeight: 600, color: '#6b7280',
         textTransform: 'uppercase', cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap',
       }}
     >
@@ -344,11 +362,14 @@ function UsageTab() {
   const [timeseries, setTimeseries] = useState<TimeseriesResponse | null>(null)
   const [days, setDays] = useState(30)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(() => {
     setLoading(true)
+    setError(null)
     Promise.all([getUsageStats(days), getUsageTimeseries(days)])
       .then(([s, ts]) => { setStats(s); setTimeseries(ts) })
+      .catch(e => setError(e?.message || 'Failed to load usage data'))
       .finally(() => setLoading(false))
   }, [days])
 
@@ -398,6 +419,13 @@ function UsageTab() {
   }
 
   if (loading && !stats) return <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>Loading usage data...</div>
+
+  if (error && !stats) return (
+    <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
+      <AlertCircle size={28} color="#d1d5db" style={{ marginBottom: 12 }} />
+      <div style={{ fontSize: 14, color: '#374151' }}>{error}</div>
+    </div>
+  )
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -716,6 +744,152 @@ function UserDrillDown({ userId, onBack }: { userId: string; onBack: () => void 
           </table>
         </div>
       )}
+
+      {/* Full activity history (audit trail + activity telemetry) */}
+      <UserActivityHistory userId={userId} email={data.email} />
+    </div>
+  )
+}
+
+const HISTORY_PAGE_SIZE = 50
+
+function SourceBadge({ source }: { source: 'audit' | 'activity' }) {
+  const c = source === 'audit'
+    ? { bg: '#e2e8f0', text: '#334155', label: 'Audit' }
+    : { bg: '#dbeafe', text: '#1e40af', label: 'Activity' }
+  return (
+    <span style={{
+      display: 'inline-block', padding: '1px 8px', borderRadius: 9999,
+      fontSize: 10, fontWeight: 700, backgroundColor: c.bg, color: c.text,
+      textTransform: 'uppercase', letterSpacing: 0.5,
+    }}>
+      {c.label}
+    </span>
+  )
+}
+
+function UserActivityHistory({ userId, email }: { userId: string; email: string | null }) {
+  const [items, setItems] = useState<UserHistoryItem[]>([])
+  const [total, setTotal] = useState(0)
+  const [capped, setCapped] = useState(false)
+  const [days, setDays] = useState(90)
+  const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Reload from scratch whenever the time range changes.
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+    getUserHistory(userId, days, 0, HISTORY_PAGE_SIZE)
+      .then(res => {
+        if (cancelled) return
+        setItems(res.items)
+        setTotal(res.total)
+        setCapped(res.capped)
+      })
+      .catch(e => { if (!cancelled) setError(e?.message || 'Failed to load history') })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [userId, days])
+
+  const loadMore = useCallback(() => {
+    setLoadingMore(true)
+    getUserHistory(userId, days, items.length, HISTORY_PAGE_SIZE)
+      .then(res => {
+        setItems(prev => [...prev, ...res.items])
+        setTotal(res.total)
+        setCapped(res.capped)
+      })
+      .catch(e => setError(e?.message || 'Failed to load history'))
+      .finally(() => setLoadingMore(false))
+  }, [userId, days, items.length])
+
+  const startTime = useMemo(
+    () => new Date(Date.now() - days * 86400000).toISOString(),
+    [days],
+  )
+
+  return (
+    <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
+      <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ fontSize: 15, fontWeight: 600 }}>Activity History</div>
+        <div style={{ flex: 1 }} />
+        <TimeRangeSelector value={days} onChange={v => setDays(typeof v === 'number' ? v : 90)} />
+        <a
+          href={auditApi.exportAuditLog({ actor_user_id: userId, start_time: startTime })}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '6px 12px', borderRadius: 'var(--ui-radius, 12px)',
+            border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer',
+            fontSize: 13, fontWeight: 600, color: '#374151', textDecoration: 'none',
+          }}
+          title="Download this user's immutable audit trail as CSV"
+        >
+          <Download size={14} /> Export audit trail
+        </a>
+      </div>
+
+      {capped && (
+        <div style={{ padding: '10px 20px', background: '#fffbeb', borderBottom: '1px solid #fde68a', fontSize: 13, color: '#92400e', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <AlertCircle size={14} /> Showing the most recent events only — narrow the time range to see older history.
+        </div>
+      )}
+
+      {loading ? (
+        <div style={{ padding: 32, textAlign: 'center', color: '#6b7280', fontSize: 14 }}>Loading activity history...</div>
+      ) : error ? (
+        <div style={{ padding: 32, textAlign: 'center', color: '#dc2626', fontSize: 14 }}>Error: {error}</div>
+      ) : items.length === 0 ? (
+        <div style={{ padding: 32, textAlign: 'center', color: '#6b7280', fontSize: 14 }}>No recorded activity in this period.</div>
+      ) : (
+        <>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>When</th>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Source</th>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Action</th>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Resource</th>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>Status</th>
+                <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>IP</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((it, i) => (
+                <tr key={`${it.source}-${it.resource_id ?? ''}-${it.timestamp ?? ''}-${i}`} style={{ borderBottom: '1px solid #f3f4f6' }}>
+                  <td style={{ padding: '10px 16px', fontSize: 13, color: '#6b7280', whiteSpace: 'nowrap' }}>{formatDateTime(it.timestamp)}</td>
+                  <td style={{ padding: '10px 16px' }}><SourceBadge source={it.source} /></td>
+                  <td style={{ padding: '10px 16px', fontSize: 13, fontFamily: 'ui-monospace, monospace' }}>{it.action}</td>
+                  <td style={{ padding: '10px 16px', fontSize: 13 }}>
+                    {it.title || (it.resource_type ? <span style={{ color: '#9ca3af' }}>{it.resource_type}</span> : '-')}
+                  </td>
+                  <td style={{ padding: '10px 16px' }}>{it.status ? <StatusBadge status={it.status} /> : <span style={{ color: '#d1d5db' }}>—</span>}</td>
+                  <td style={{ padding: '10px 16px', fontSize: 12, color: '#6b7280', fontFamily: 'ui-monospace, monospace' }}>{it.ip_address || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div style={{ padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 12, borderTop: '1px solid #f3f4f6' }}>
+            <span style={{ fontSize: 12, color: '#9ca3af' }}>Showing {items.length} of {total}{email ? ` · ${email}` : ''}</span>
+            <div style={{ flex: 1 }} />
+            {items.length < total && (
+              <button
+                onClick={loadMore}
+                disabled={loadingMore}
+                style={{
+                  padding: '6px 14px', borderRadius: 'var(--ui-radius, 12px)',
+                  border: '1px solid #e5e7eb', background: '#fff',
+                  cursor: loadingMore ? 'wait' : 'pointer', fontSize: 13, fontWeight: 600, color: '#374151',
+                }}
+              >
+                {loadingMore ? 'Loading...' : 'Load more'}
+              </button>
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -731,7 +905,7 @@ function UsersTab() {
   const load = useCallback(() => {
     setLoading(true)
     const arg = typeof days === 'number' ? days : undefined
-    getUserLeaderboard(arg).then(setUsers).finally(() => setLoading(false))
+    getUserLeaderboard(arg).then(setUsers).catch(() => setUsers([])).finally(() => setLoading(false))
   }, [days])
 
   useEffect(() => { load() }, [load])
@@ -808,9 +982,9 @@ function UsersTab() {
                 <th style={{ padding: '10px 16px', textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase' }}>#</th>
                 <SortableHeader label="User" sortKey="name" currentSort={sort} onSort={handleSort} />
                 <SortableHeader label="Token Usage" sortKey="tokens_total" currentSort={sort} onSort={handleSort} />
-                <SortableHeader label="Workflows" sortKey="workflows_run" currentSort={sort} onSort={handleSort} />
-                <SortableHeader label="Chats" sortKey="conversations" currentSort={sort} onSort={handleSort} />
-                <SortableHeader label="Last Active" sortKey="last_active" currentSort={sort} onSort={handleSort} />
+                <SortableHeader label="Workflows" sortKey="workflows_run" currentSort={sort} onSort={handleSort} align="right" />
+                <SortableHeader label="Chats" sortKey="conversations" currentSort={sort} onSort={handleSort} align="right" />
+                <SortableHeader label="Last Active" sortKey="last_active" currentSort={sort} onSort={handleSort} align="right" />
               </tr>
             </thead>
             <tbody>
@@ -1058,6 +1232,7 @@ function TeamDrillDown({ teamId, onBack }: { teamId: string; onBack: () => void 
 }
 
 function TeamsTab() {
+  const confirm = useConfirm()
   const [subTab, setSubTab] = useState<'manage' | 'stats' | 'isolated'>('manage')
 
   // ── Manage sub-tab state ──────────────────────────────────────────────────
@@ -1096,7 +1271,7 @@ function TeamsTab() {
       setAllTeams(t)
       const def = t.find(x => x.is_default)
       if (def) setDefaultTeamUuid(def.uuid)
-    }).finally(() => setLoadingAll(false))
+    }).catch(() => setAllTeams([])).finally(() => setLoadingAll(false))
   }, [])
 
   const refreshIsolated = useCallback(() => {
@@ -1104,7 +1279,7 @@ function TeamsTab() {
     getIsolatedUsers().then(users => {
       setIsolated(users)
       setIsolatedLoaded(true)
-    }).finally(() => setLoadingIsolated(false))
+    }).catch(() => setIsolatedLoaded(true)).finally(() => setLoadingIsolated(false))
   }, [])
 
   useEffect(() => {
@@ -1118,7 +1293,7 @@ function TeamsTab() {
   const refreshStats = useCallback(() => {
     setLoadingStats(true)
     const arg = typeof statsDays === 'number' ? statsDays : undefined
-    getTeamLeaderboard(arg).then(setStatsTeams).finally(() => setLoadingStats(false))
+    getTeamLeaderboard(arg).then(setStatsTeams).catch(() => setStatsTeams([])).finally(() => setLoadingStats(false))
   }, [statsDays])
 
   useEffect(() => {
@@ -1183,7 +1358,17 @@ function TeamsTab() {
   }
 
   const handleRemoveUser = async (teamUuid: string, userId: string, userName: string) => {
-    if (!window.confirm(`Remove ${userName} from this team?`)) return
+    const ok = await confirm({
+      title: 'Remove user from team?',
+      message: (
+        <>
+          Are you sure you want to remove <strong>{userName}</strong> from this team? They will lose access to the team's content.
+        </>
+      ),
+      confirmLabel: 'Remove',
+      destructive: true,
+    })
+    if (!ok) return
     await adminRemoveUserFromTeam(teamUuid, userId)
     const members = await getTeamMembers(teamUuid)
     setTeamMembers(prev => ({ ...prev, [teamUuid]: members }))
@@ -1443,10 +1628,10 @@ function TeamsTab() {
                   <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
                     <SortableHeader label="Team" sortKey="name" currentSort={sort} onSort={handleSort} />
                     <SortableHeader label="Token Usage" sortKey="tokens_total" currentSort={sort} onSort={handleSort} />
-                    <SortableHeader label="Workflows" sortKey="workflows_completed" currentSort={sort} onSort={handleSort} />
-                    <SortableHeader label="Active Users" sortKey="active_users" currentSort={sort} onSort={handleSort} />
-                    <SortableHeader label="Members" sortKey="member_count" currentSort={sort} onSort={handleSort} />
-                    <SortableHeader label="Avg Latency" sortKey="avg_latency_ms" currentSort={sort} onSort={handleSort} />
+                    <SortableHeader label="Workflows" sortKey="workflows_completed" currentSort={sort} onSort={handleSort} align="right" />
+                    <SortableHeader label="Active Users" sortKey="active_users" currentSort={sort} onSort={handleSort} align="right" />
+                    <SortableHeader label="Members" sortKey="member_count" currentSort={sort} onSort={handleSort} align="right" />
+                    <SortableHeader label="Avg Latency" sortKey="avg_latency_ms" currentSort={sort} onSort={handleSort} align="right" />
                   </tr>
                 </thead>
                 <tbody>
@@ -1543,7 +1728,7 @@ function WorkflowsTab() {
 
   const load = useCallback(() => {
     setLoading(true)
-    getWorkflowEvents(page, status || undefined, search || undefined).then(setData).finally(() => setLoading(false))
+    getWorkflowEvents(page, status || undefined, search || undefined).then(setData).catch(() => setData(null)).finally(() => setLoading(false))
   }, [page, status, search])
 
   useEffect(() => { load() }, [load])
@@ -1890,12 +2075,21 @@ function QualityTab() {
                     <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{alert.item_name}</div>
                     <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
                       {alert.message}
-                      {alert.alert_type === 'regression' && alert.previous_score != null && alert.current_score != null && (
+                      {(alert.alert_type === 'regression' || alert.alert_type === 'baseline_drift') && alert.previous_score != null && alert.current_score != null && (
                         <span style={{
                           marginLeft: 8, fontFamily: 'ui-monospace, monospace', fontWeight: 600,
                           color: '#dc2626',
                         }}>
                           {alert.previous_score} &rarr; {alert.current_score}
+                        </span>
+                      )}
+                      {alert.alert_type === 'baseline_drift' && (
+                        <span style={{
+                          marginLeft: 8, padding: '1px 6px', borderRadius: 4,
+                          backgroundColor: '#fef3c7', color: '#78350f',
+                          fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
+                        }}>
+                          Drift
                         </span>
                       )}
                     </div>
@@ -2274,10 +2468,178 @@ function QualityTab() {
 }
 
 // ──────────────────────────────────────────
+// Model connectivity diagnostics
+// ──────────────────────────────────────────
+
+// Renders the step-by-step result of a model "Test" — on success, why the
+// hook-up is healthy (protocol, endpoint, latency, tokens, the actual reply);
+// on failure, a classified error with a plain-English cause and suggested fix.
+function ModelTestDiagnostics({ result }: { result: ModelTestResult }) {
+  const [showRaw, setShowRaw] = useState(false)
+  const accent = result.ok ? '#16a34a' : '#dc2626'
+  return (
+    <div style={{
+      padding: '12px 16px', fontSize: 13,
+      background: result.ok ? '#f0fdf4' : '#fef2f2',
+      border: '1px solid', borderTop: 'none',
+      borderColor: result.ok ? '#bbf7d0' : '#fecaca',
+      borderRadius: '0 0 var(--ui-radius, 12px) var(--ui-radius, 12px)',
+    }}>
+      <div style={{ fontWeight: 600, color: result.ok ? '#166534' : '#991b1b', marginBottom: 10 }}>
+        {result.summary}
+      </div>
+
+      {/* Step-by-step checks */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+        {result.checks.map((c, idx) => (
+          <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+            {c.ok
+              ? <CheckCircle2 size={15} style={{ color: '#16a34a', flexShrink: 0, marginTop: 1 }} />
+              : <XCircle size={15} style={{ color: '#dc2626', flexShrink: 0, marginTop: 1 }} />}
+            <span style={{ color: '#374151' }}>
+              <span style={{ fontWeight: 600 }}>{c.label}:</span> {c.detail}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Success facts */}
+      {result.ok && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+          {result.protocol && <DiagFact label="Protocol" value={result.protocol} />}
+          {result.endpoint && <DiagFact label="Endpoint" value={result.endpoint} mono />}
+          {typeof result.latency_ms === 'number' && <DiagFact label="Latency" value={`${result.latency_ms} ms`} />}
+          {result.tokens?.total != null && <DiagFact label="Tokens" value={String(result.tokens.total)} />}
+        </div>
+      )}
+      {result.ok && result.response_preview && (
+        <div style={{ marginTop: 10, padding: '8px 10px', background: '#fff', border: '1px solid #d1fae5', borderRadius: 8, fontFamily: 'ui-monospace, monospace', fontSize: 12, color: '#374151' }}>
+          <span style={{ color: '#9ca3af' }}>reply:</span> {result.response_preview}
+        </div>
+      )}
+
+      {/* Failure guidance */}
+      {!result.ok && result.error && (
+        <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+            <AlertCircle size={15} style={{ color: accent, flexShrink: 0, marginTop: 1 }} />
+            <div>
+              <div style={{ fontWeight: 600, color: '#991b1b' }}>{result.error.title}</div>
+              <div style={{ color: '#374151', marginTop: 2 }}>{result.error.why}</div>
+            </div>
+          </div>
+          <div style={{ padding: '8px 10px', background: '#fff', border: '1px solid #fecaca', borderRadius: 8, color: '#374151' }}>
+            <span style={{ fontWeight: 600, color: '#b91c1c' }}>Try this: </span>{result.error.fix}
+          </div>
+          {result.error.raw && (
+            <div>
+              <button
+                onClick={() => setShowRaw(v => !v)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: 12, padding: 0, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+              >
+                {showRaw ? <ChevronUp size={12} /> : <ChevronDown size={12} />} {showRaw ? 'Hide' : 'Show'} raw provider error
+              </button>
+              {showRaw && (
+                <pre style={{ marginTop: 6, padding: '8px 10px', background: '#1f2937', color: '#f9fafb', borderRadius: 8, fontSize: 11, overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                  {result.error.raw}
+                </pre>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DiagFact({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '2px 8px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 9999, fontSize: 12 }}>
+      <span style={{ color: '#9ca3af', fontWeight: 600 }}>{label}</span>
+      <span style={{ color: '#374151', fontFamily: mono ? 'ui-monospace, monospace' : undefined }}>{value}</span>
+    </span>
+  )
+}
+
+// ──────────────────────────────────────────
+// Setup readiness checklist
+// ──────────────────────────────────────────
+
+// A graded "is this install set up" surface. A dismissible banner auto-shows
+// while a blocker (no working LLM) is unresolved; the full checklist always
+// lives at the top of the config page. `onJump` scrolls to the relevant
+// section so each item is one click from being fixed.
+function SetupChecklist({ report, onJump, onDismiss }: { report: ReadinessReport; onJump: (target: string) => void; onDismiss?: () => void }) {
+  const sevColor: Record<string, string> = { blocker: '#dc2626', recommended: '#d97706', optional: '#6b7280' }
+  const statusPill = (item: ReadinessItem) => {
+    if (item.status === 'configured') return { label: 'Done', bg: '#dcfce7', fg: '#166534' }
+    if (item.status === 'incomplete') return { label: 'Needs attention', bg: '#fef9c3', fg: '#854d0e' }
+    return item.severity === 'blocker'
+      ? { label: 'Required', bg: '#fee2e2', fg: '#991b1b' }
+      : { label: 'Recommended', bg: '#ffedd5', fg: '#9a3412' }
+  }
+  return (
+    <div style={{ marginBottom: 20, border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
+      <div style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 8 }}>
+        {report.ready
+          ? <ShieldCheck size={18} style={{ color: '#16a34a' }} />
+          : <AlertCircle size={18} style={{ color: '#d97706' }} />}
+        <span style={{ fontSize: 14, fontWeight: 700, color: '#111' }}>
+          {report.ready ? 'System ready' : 'Finish setting up your workspace'}
+        </span>
+        {!report.ready && report.blockers_remaining > 0 && (
+          <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 9999, background: '#fee2e2', color: '#991b1b' }}>
+            {report.blockers_remaining} blocker{report.blockers_remaining > 1 ? 's' : ''} left
+          </span>
+        )}
+        <div style={{ flex: 1 }} />
+        {onDismiss && (
+          <button onClick={onDismiss} title="Dismiss" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 2 }}>
+            <X size={16} />
+          </button>
+        )}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        {report.items.map(item => {
+          const pill = statusPill(item)
+          const done = item.status === 'configured'
+          return (
+            <div key={item.key} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 16px', borderTop: '1px solid #f8fafc' }}>
+              <div style={{ marginTop: 1 }}>
+                {done
+                  ? <CheckCircle2 size={18} style={{ color: '#16a34a' }} />
+                  : <div style={{ width: 18, height: 18, borderRadius: 9999, border: `2px solid ${sevColor[item.severity]}` }} />}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#111' }}>{item.title}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 9999, background: pill.bg, color: pill.fg }}>{pill.label}</span>
+                </div>
+                <div style={{ fontSize: 12, color: '#4b5563', marginTop: 2 }}>{item.summary}</div>
+                {!done && <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Unlocks: {item.unlocks}</div>}
+              </div>
+              {!done && (
+                <button
+                  onClick={() => onJump(item.action_target)}
+                  style={{ flexShrink: 0, padding: '5px 12px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db', background: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#111' }}
+                >
+                  {item.action_label}
+                </button>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────
 // Config Tab
 // ──────────────────────────────────────────
 
 function ConfigTab() {
+  const confirm = useConfirm()
   const [cfg, setCfg] = useState<SystemConfigData | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -2285,8 +2647,14 @@ function ConfigTab() {
   const [error, setError] = useState<string | null>(null)
 
   // Theme state
+  const branding = useBranding()
   const [themeColor, setThemeColor] = useState('#eab308')
   const [themeRadius, setThemeRadius] = useState(12)
+  const [themeOrgName, setThemeOrgName] = useState('')
+  const [themeLogo, setThemeLogo] = useState('')
+  const [themeLogoError, setThemeLogoError] = useState<string | null>(null)
+  const [themeIcon, setThemeIcon] = useState('')
+  const [themeIconError, setThemeIconError] = useState<string | null>(null)
   const [themeSaving, setThemeSaving] = useState(false)
   const [themeSaved, setThemeSaved] = useState(false)
 
@@ -2321,7 +2689,27 @@ function ConfigTab() {
   const [ocrTesting, setOcrTesting] = useState(false)
   const [ocrTestResult, setOcrTestResult] = useState<{ ok: boolean; message: string } | null>(null)
   const [modelTesting, setModelTesting] = useState<number | null>(null)
-  const [modelTestResults, setModelTestResults] = useState<Record<number, { ok: boolean; message: string }>>({})
+  const [modelTestResults, setModelTestResults] = useState<Record<number, ModelTestResult>>({})
+  const [expandedModelTest, setExpandedModelTest] = useState<number | null>(null)
+
+  // System readiness / setup checklist
+  const [readiness, setReadiness] = useState<ReadinessReport | null>(null)
+  const [setupDismissed, setSetupDismissed] = useState(false)
+  const refreshReadiness = useCallback(async () => {
+    try {
+      setReadiness(await getReadiness())
+    } catch {
+      // Readiness is advisory — never block the config page on it.
+    }
+  }, [])
+
+  // Prompt playground
+  const [playgroundModel, setPlaygroundModel] = useState('')
+  const [playgroundSystem, setPlaygroundSystem] = useState('')
+  const [playgroundUser, setPlaygroundUser] = useState('')
+  const [playgroundSending, setPlaygroundSending] = useState(false)
+  const [playgroundResult, setPlaygroundResult] = useState<TestPromptResult | null>(null)
+  const [playgroundError, setPlaygroundError] = useState<string | null>(null)
 
   // Auth
   const [authMethods, setAuthMethods] = useState<string[]>(['password'])
@@ -2331,26 +2719,42 @@ function ConfigTab() {
   const [showModelForm, setShowModelForm] = useState(false)
   const [editingModelIndex, setEditingModelIndex] = useState<number | null>(null)
   const [savingModel, setSavingModel] = useState(false)
-  const [newModel, setNewModel] = useState({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '', speed: '', tier: '', privacy: '', supports_structured: true, multimodal: false, supports_pdf: false })
+  const [newModel, setNewModel] = useState({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '', speed: '', tier: '', privacy: '', supports_structured: true, multimodal: false, supports_pdf: false, context_window: 128000 })
+  const [probingContext, setProbingContext] = useState(false)
+  const [probeResult, setProbeResult] = useState<{ ok: boolean; message: string } | null>(null)
 
   // Support contacts
   const [supportContacts, setSupportContacts] = useState<{ user_id: string; email: string; name: string }[]>([])
   const [showAddContact, setShowAddContact] = useState(false)
   const [newContact, setNewContact] = useState({ user_id: '', email: '', name: '' })
 
-  // M365 integration
-  const [m365Enabled, setM365Enabled] = useState(false)
-  const [m365ClientId, setM365ClientId] = useState('')
-  const [m365ClientSecret, setM365ClientSecret] = useState('')
-  const [m365TenantId, setM365TenantId] = useState('')
-  const [m365Saving, setM365Saving] = useState(false)
-  const [m365Saved, setM365Saved] = useState(false)
+  // Compliance activation
+  const [complianceEnabled, setComplianceEnabled] = useState(false)
+  const [complianceCheckOnUpload, setComplianceCheckOnUpload] = useState(true)
+  const [complianceRules, setComplianceRules] = useState('')
+  const [complianceChunkSize, setComplianceChunkSize] = useState(8000)
+  const [complianceChunkOverlap, setComplianceChunkOverlap] = useState(200)
+  const [complianceSaving, setComplianceSaving] = useState(false)
+  const [complianceSaved, setComplianceSaved] = useState(false)
+
+  // Retention policy
+  type RetentionPolicyForm = { retention_days: number; soft_delete_grace_days: number; warning_days_before?: number }
+  const [retentionEnabled, setRetentionEnabled] = useState(false)
+  const [retentionPolicies, setRetentionPolicies] = useState<Record<string, RetentionPolicyForm>>({})
+  const [activityRetentionDays, setActivityRetentionDays] = useState(180)
+  const [chatRetentionDays, setChatRetentionDays] = useState(365)
+  const [workflowResultRetentionDays, setWorkflowResultRetentionDays] = useState(365)
+  const [staleActivityMinutes, setStaleActivityMinutes] = useState(30)
+  const [retentionSaving, setRetentionSaving] = useState(false)
+  const [retentionSaved, setRetentionSaved] = useState(false)
 
   // Add/edit provider form
   const [showAddProvider, setShowAddProvider] = useState(false)
   const [newProvider, setNewProvider] = useState({ provider: 'oauth', display_name: '', client_id: '', client_secret: '', redirect_uri: '', tenant_id: '' })
   const [editingProviderIndex, setEditingProviderIndex] = useState<number | null>(null)
   const [editingProvider, setEditingProvider] = useState({ provider: 'oauth', display_name: '', client_id: '', client_secret: '', redirect_uri: '', tenant_id: '' })
+
+  useEffect(() => { void refreshReadiness() }, [refreshReadiness])
 
   useEffect(() => {
     setLoading(true)
@@ -2394,17 +2798,29 @@ function ConfigTab() {
       setExcellentThreshold((tiers.excellent?.min_score as number) ?? 90)
       setGoodThreshold((tiers.good?.min_score as number) ?? 70)
       setFairThreshold((tiers.fair?.min_score as number) ?? 50)
-      // M365 config
-      const m365 = c.m365_config || {}
-      setM365Enabled(!!m365.enabled)
-      setM365ClientId(m365.client_id || '')
-      setM365ClientSecret(m365.client_secret || '')
-      setM365TenantId(m365.tenant_id || '')
-    }).finally(() => setLoading(false))
+      // Compliance config
+      const comp = c.compliance_config || ({} as Partial<typeof c.compliance_config>)
+      setComplianceEnabled(!!comp.enabled)
+      setComplianceCheckOnUpload(comp.check_on_upload !== false)
+      setComplianceRules(comp.rules || '')
+      setComplianceChunkSize(comp.chunk_size || 8000)
+      setComplianceChunkOverlap(comp.chunk_overlap ?? 200)
+      // Retention config
+      const rc = (c.retention_config || {}) as Record<string, unknown>
+      setRetentionEnabled(!!rc.enabled)
+      setRetentionPolicies((rc.policies as Record<string, RetentionPolicyForm>) || {})
+      setActivityRetentionDays((rc.activity_retention_days as number) ?? 180)
+      setChatRetentionDays((rc.chat_retention_days as number) ?? 365)
+      setWorkflowResultRetentionDays((rc.workflow_result_retention_days as number) ?? 365)
+      setStaleActivityMinutes((rc.activity_stale_threshold_minutes as number) ?? 30)
+    }).catch(() => {}).finally(() => setLoading(false))
 
     getThemeConfig().then(t => {
       setThemeColor(t.highlight_color)
       setThemeRadius(parseInt(t.ui_radius) || 12)
+      setThemeOrgName(t.org_name || '')
+      setThemeLogo(t.logo_data_url || '')
+      setThemeIcon(t.icon_data_url || '')
     }).catch(() => {})
   }, [])
 
@@ -2443,6 +2859,7 @@ function ConfigTab() {
       })
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
+      void refreshReadiness()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed')
     } finally {
@@ -2454,12 +2871,81 @@ function ConfigTab() {
     setThemeSaving(true)
     setThemeSaved(false)
     try {
-      const updated = await updateThemeConfig({ highlight_color: themeColor, ui_radius: `${themeRadius}px` })
+      const updated = await updateThemeConfig({
+        highlight_color: themeColor,
+        ui_radius: `${themeRadius}px`,
+        org_name: themeOrgName.trim(),
+        logo_data_url: themeLogo,
+        icon_data_url: themeIcon,
+      })
       applyThemeToDOM(updated)
+      await branding.refresh()
       setThemeSaved(true)
       setTimeout(() => setThemeSaved(false), 3000)
     } finally {
       setThemeSaving(false)
+    }
+  }
+
+  const handleLogoFile = async (file: File | null) => {
+    setThemeLogoError(null)
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setThemeLogoError('Please choose an image file (PNG, SVG, JPG).')
+      return
+    }
+    try {
+      const dataUrl = await readFileAsDataUrl(file)
+      if (dataUrl.length > MAX_LOGO_BYTES) {
+        setThemeLogoError(`Image too large — keep encoded size under ${Math.round(MAX_LOGO_BYTES / 1024)} KB.`)
+        return
+      }
+      setThemeLogo(dataUrl)
+    } catch {
+      setThemeLogoError('Could not read the selected file.')
+    }
+  }
+
+  const handleIconFile = async (file: File | null) => {
+    setThemeIconError(null)
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setThemeIconError('Please choose an image file (PNG, SVG, JPG).')
+      return
+    }
+    try {
+      const dataUrl = await readFileAsDataUrl(file)
+      if (dataUrl.length > MAX_LOGO_BYTES) {
+        setThemeIconError(`Image too large — keep encoded size under ${Math.round(MAX_LOGO_BYTES / 1024)} KB.`)
+        return
+      }
+      setThemeIcon(dataUrl)
+    } catch {
+      setThemeIconError('Could not read the selected file.')
+    }
+  }
+
+  const handleProbeContextWindow = async () => {
+    setProbingContext(true)
+    setProbeResult(null)
+    try {
+      const result = await probeModel({
+        name: newModel.name,
+        endpoint: newModel.endpoint,
+        api_protocol: newModel.api_protocol,
+        api_key: newModel.api_key,
+        existing_model_index: editingModelIndex,
+      })
+      if (result.context_window && result.context_window > 0) {
+        setNewModel(prev => ({ ...prev, context_window: result.context_window as number }))
+        setProbeResult({ ok: true, message: `Detected ${result.context_window.toLocaleString()} tokens (${result.source}).` })
+      } else {
+        setProbeResult({ ok: false, message: result.detail || `No context length reported (${result.source}).` })
+      }
+    } catch (e) {
+      setProbeResult({ ok: false, message: e instanceof Error ? e.message : 'Probe failed' })
+    } finally {
+      setProbingContext(false)
     }
   }
 
@@ -2489,9 +2975,11 @@ function ConfigTab() {
           ...(resDefault !== undefined ? { default_model: resDefault } : {}),
         })
       }
-      setNewModel({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '', speed: '', tier: '', privacy: '', supports_structured: true, multimodal: false, supports_pdf: false })
+      setNewModel({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '', speed: '', tier: '', privacy: '', supports_structured: true, multimodal: false, supports_pdf: false, context_window: 128000 })
+      setProbeResult(null)
       setShowModelForm(false)
       setEditingModelIndex(null)
+      void refreshReadiness()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save model')
     } finally {
@@ -2516,12 +3004,26 @@ function ConfigTab() {
       supports_structured: m.supports_structured !== false,
       multimodal: !!m.multimodal,
       supports_pdf: !!m.supports_pdf,
+      context_window: typeof m.context_window === 'number' && m.context_window > 0 ? m.context_window : 128000,
     })
+    setProbeResult(null)
     setEditingModelIndex(index)
     setShowModelForm(true)
   }
 
   const handleDeleteModel = async (index: number) => {
+    const model = cfg?.available_models?.[index]
+    const ok = await confirm({
+      title: 'Delete model?',
+      message: (
+        <>
+          Are you sure you want to delete the model <strong>{model?.name || 'this model'}</strong>? Workflows and chats configured to use it will fail until reconfigured.
+        </>
+      ),
+      confirmLabel: 'Delete',
+      destructive: true,
+    })
+    if (!ok) return
     try {
       const res = await deleteModel(index)
       if (cfg) {
@@ -2533,6 +3035,9 @@ function ConfigTab() {
           ...(res.default_model !== undefined ? { default_model: res.default_model } : {}),
         })
       }
+      // Dropping a model can clear the only configured LLM — re-grade setup.
+      setModelTestResults(prev => { const next = { ...prev }; delete next[index]; return next })
+      void refreshReadiness()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to delete model')
     }
@@ -2544,6 +3049,7 @@ function ConfigTab() {
       const next = cfg?.default_model === name ? '' : name
       const res = await setDefaultModel(next)
       if (cfg) setCfg({ ...cfg, default_model: res.default_model })
+      void refreshReadiness()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to set default model')
     }
@@ -2567,11 +3073,45 @@ function ConfigTab() {
     setModelTestResults(prev => { const next = { ...prev }; delete next[index]; return next })
     try {
       const res = await testModel(index)
-      setModelTestResults(prev => ({ ...prev, [index]: { ok: true, message: res.message } }))
+      setModelTestResults(prev => ({ ...prev, [index]: res }))
+      // Auto-expand so the admin sees the breakdown — especially on failure.
+      setExpandedModelTest(index)
+      // A successful test means readiness may have changed.
+      if (res.ok) void refreshReadiness()
     } catch (e) {
-      setModelTestResults(prev => ({ ...prev, [index]: { ok: false, message: e instanceof Error ? e.message : 'Test failed' } }))
+      // Transport-level failure (network/permission) — synthesize a result.
+      const message = e instanceof Error ? e.message : 'Test failed'
+      setModelTestResults(prev => ({
+        ...prev,
+        [index]: {
+          ok: false,
+          checks: [{ label: 'Request', ok: false, detail: message }],
+          summary: message,
+          error: { category: 'transport', title: 'Could not run the test', why: message, fix: 'Check that you are still signed in as an admin and the backend is reachable.', raw: message },
+        },
+      }))
+      setExpandedModelTest(index)
     } finally {
       setModelTesting(null)
+    }
+  }
+
+  const handleSendPlaygroundPrompt = async () => {
+    if (!playgroundUser.trim()) return
+    setPlaygroundSending(true)
+    setPlaygroundError(null)
+    setPlaygroundResult(null)
+    try {
+      const res = await testPrompt({
+        model_name: playgroundModel || cfg?.default_model || '',
+        system_prompt: playgroundSystem,
+        user_prompt: playgroundUser,
+      })
+      setPlaygroundResult(res)
+    } catch (e) {
+      setPlaygroundError(e instanceof Error ? e.message : 'Request failed')
+    } finally {
+      setPlaygroundSending(false)
     }
   }
 
@@ -2579,6 +3119,7 @@ function ConfigTab() {
     setAuthSaving(true)
     try {
       await updateAuthMethods(authMethods)
+      void refreshReadiness()
     } finally {
       setAuthSaving(false)
     }
@@ -2599,6 +3140,19 @@ function ConfigTab() {
   }
 
   const handleDeleteProvider = async (index: number) => {
+    const provider = cfg?.oauth_providers?.[index] as Record<string, unknown> | undefined
+    const name = (provider?.display_name as string) || (provider?.provider as string) || 'this provider'
+    const ok = await confirm({
+      title: 'Delete OAuth provider?',
+      message: (
+        <>
+          Are you sure you want to delete <strong>{name}</strong>? Users authenticating through this provider will no longer be able to sign in via it.
+        </>
+      ),
+      confirmLabel: 'Delete',
+      destructive: true,
+    })
+    if (!ok) return
     try {
       await deleteOAuthProvider(index)
       const c = await getSystemConfig()
@@ -2668,7 +3222,7 @@ function ConfigTab() {
         position: 'sticky', top: 0, zIndex: 20,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         background: '#fff', borderBottom: '1px solid #e5e7eb',
-        padding: '12px 0', margin: '0 0 -4px',
+        padding: '12px 20px', margin: '0 0 -4px',
         boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
       }}>
         <span style={{ fontSize: 14, fontWeight: 600, color: '#374151', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -2696,14 +3250,28 @@ function ConfigTab() {
         </div>
       )}
 
+      {/* Setup readiness — auto-shows while a blocker is unresolved; once the
+          system is ready it can be dismissed for the session. */}
+      {readiness && !(readiness.ready && setupDismissed) && (
+        <SetupChecklist
+          report={readiness}
+          onJump={(target) => {
+            const id = `cfg-${target}`
+            document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }}
+          onDismiss={readiness.ready ? () => setSetupDismissed(true) : undefined}
+        />
+      )}
+
       {/* Available Models */}
-      <div style={sectionStyle}>
+      <div id="cfg-models" style={sectionStyle}>
         <div style={sectionHeaderStyle}>
           <Cpu size={18} color="#6b7280" /> Available Models
           <div style={{ flex: 1 }} />
           <button
             onClick={() => {
-              setNewModel({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '', speed: '', tier: '', privacy: '', supports_structured: true, multimodal: false, supports_pdf: false })
+              setNewModel({ name: '', tag: '', external: false, thinking: false, endpoint: '', api_protocol: '', api_key: '', speed: '', tier: '', privacy: '', supports_structured: true, multimodal: false, supports_pdf: false, context_window: 128000 })
+              setProbeResult(null)
               setEditingModelIndex(null)
               setShowModelForm(!showModelForm)
             }}
@@ -2719,11 +3287,18 @@ function ConfigTab() {
         <div style={sectionBodyStyle}>
           {cfg?.available_models && cfg.available_models.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {cfg.available_models.map((m, i) => (
-                <div key={i} style={{
+              {cfg.available_models.map((m, i) => {
+                const test = modelTestResults[i]
+                const expanded = expandedModelTest === i
+                return (
+                <div key={i} style={{ display: 'flex', flexDirection: 'column' }}>
+                <div style={{
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  padding: '10px 16px', background: '#f9fafb', borderRadius: 'var(--ui-radius, 12px)',
-                  border: '1px solid #e5e7eb',
+                  padding: '10px 16px',
+                  background: test ? (test.ok ? '#f0fdf4' : '#fef2f2') : '#f9fafb',
+                  borderRadius: expanded ? 'var(--ui-radius, 12px) var(--ui-radius, 12px) 0 0' : 'var(--ui-radius, 12px)',
+                  border: '1px solid',
+                  borderColor: test ? (test.ok ? '#bbf7d0' : '#fecaca') : '#e5e7eb',
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                     {/* Identity & capability badges */}
@@ -2761,10 +3336,24 @@ function ConfigTab() {
                     <ModelCharacterBars model={m as ModelInfo} />
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    {modelTestResults[i] && (
-                      <span style={{ fontSize: 12, color: modelTestResults[i].ok ? '#059669' : '#dc2626', marginRight: 4, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={modelTestResults[i].message}>
-                        {modelTestResults[i].ok ? <CheckCircle2 size={14} style={{ verticalAlign: -2 }} /> : <XCircle size={14} style={{ verticalAlign: -2 }} />}
-                      </span>
+                    {test && (
+                      <button
+                        onClick={() => setExpandedModelTest(expanded ? null : i)}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 4, marginRight: 4,
+                          padding: '3px 8px', borderRadius: 9999, cursor: 'pointer', border: '1px solid',
+                          borderColor: test.ok ? '#86efac' : '#fca5a5',
+                          background: test.ok ? '#dcfce7' : '#fee2e2',
+                          color: test.ok ? '#166534' : '#991b1b', fontSize: 12, fontWeight: 600,
+                        }}
+                        title={expanded ? 'Hide details' : 'Show details'}
+                      >
+                        {test.ok ? <CheckCircle2 size={13} /> : <XCircle size={13} />}
+                        <span style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {test.ok ? 'Connected' : (test.error?.title || 'Failed')}
+                        </span>
+                        {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                      </button>
                     )}
                     <button
                       onClick={() => handleSetDefaultModel(m.name)}
@@ -2801,7 +3390,10 @@ function ConfigTab() {
                     </button>
                   </div>
                 </div>
-              ))}
+                {expanded && test && <ModelTestDiagnostics result={test} />}
+                </div>
+                )
+              })}
             </div>
           ) : (
             <div style={{ fontSize: 13, color: '#9ca3af' }}>No models configured.</div>
@@ -2836,7 +3428,7 @@ function ConfigTab() {
                 </div>
                 <div style={{ gridColumn: '1 / -1' }}>
                   <label style={labelStyle}>API Key (optional)</label>
-                  <input type="password" value={newModel.api_key} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, api_key: v })) }} placeholder="sk-..." style={inputStyle} />
+                  <input type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore name="vandalizer-model-api-key" value={newModel.api_key} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, api_key: v })) }} placeholder="sk-..." style={inputStyle} />
                 </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 12 }}>
@@ -2866,6 +3458,51 @@ function ConfigTab() {
                     <option value="external">External</option>
                   </select>
                 </div>
+              </div>
+              <div style={{ marginTop: 12 }}>
+                <label style={labelStyle}>Context Window (tokens)</label>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
+                  <input
+                    type="number"
+                    min={1}
+                    value={newModel.context_window}
+                    onChange={e => {
+                      const v = parseInt(e.target.value, 10)
+                      setNewModel(prev => ({ ...prev, context_window: Number.isFinite(v) && v > 0 ? v : 0 }))
+                      setProbeResult(null)
+                    }}
+                    placeholder="e.g. 65536"
+                    style={{ ...inputStyle, flex: 1 }}
+                  />
+                  <button
+                    onClick={handleProbeContextWindow}
+                    disabled={probingContext || !newModel.name.trim()}
+                    title="Ask the endpoint what context window it actually serves. Catches the case where the model card says 131k but the deployment was launched with a smaller --max-model-len."
+                    style={{
+                      padding: '0 14px', borderRadius: 'var(--ui-radius, 12px)',
+                      border: '1px solid #d1d5db', background: '#fff', fontSize: 13,
+                      cursor: probingContext || !newModel.name.trim() ? 'not-allowed' : 'pointer',
+                      opacity: probingContext || !newModel.name.trim() ? 0.6 : 1,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {probingContext ? 'Probing…' : 'Probe endpoint'}
+                  </button>
+                </div>
+                <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+                  The serving cap (e.g. vLLM&rsquo;s <code>--max-model-len</code>), not the model card&rsquo;s theoretical max. Compaction and the oversize-doc check use this to decide what fits.
+                </div>
+                {probeResult && (
+                  <div style={{
+                    marginTop: 6, padding: '6px 10px', borderRadius: 'var(--ui-radius, 12px)',
+                    background: probeResult.ok ? '#ecfdf5' : '#fef3c7',
+                    border: `1px solid ${probeResult.ok ? '#a7f3d0' : '#fcd34d'}`,
+                    color: probeResult.ok ? '#065f46' : '#92400e',
+                    fontSize: 12,
+                  }}>
+                    {probeResult.message}
+                  </div>
+                )}
               </div>
               <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
                 <label style={{ display: 'flex', alignItems: 'center', fontSize: 14, cursor: 'pointer' }}>
@@ -2923,8 +3560,134 @@ function ConfigTab() {
         </div>
       </div>
 
-      {/* Authentication */}
+      {/* Prompt Playground */}
       <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}>
+          <Play size={18} color="#6b7280" /> Prompt Playground
+          <span style={{ fontSize: 12, fontWeight: 400, color: '#6b7280' }}>
+            — send a prompt to a configured model and see the raw round-trip
+          </span>
+        </div>
+        <div style={sectionBodyStyle}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 220px', gap: 16, alignItems: 'start' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={labelStyle}>System Prompt (optional)</label>
+                <textarea
+                  value={playgroundSystem}
+                  onChange={e => setPlaygroundSystem(e.target.value)}
+                  placeholder="e.g. You are a helpful assistant. Reply concisely."
+                  rows={3}
+                  style={{ ...inputStyle, fontFamily: 'ui-monospace, monospace', fontSize: 13, resize: 'vertical' }}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>User Prompt</label>
+                <textarea
+                  value={playgroundUser}
+                  onChange={e => setPlaygroundUser(e.target.value)}
+                  placeholder="Ask anything. The text below will be sent verbatim to the selected model."
+                  rows={5}
+                  style={{ ...inputStyle, fontFamily: 'ui-monospace, monospace', fontSize: 13, resize: 'vertical' }}
+                />
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label style={labelStyle}>Model</label>
+                <select
+                  value={playgroundModel}
+                  onChange={e => setPlaygroundModel(e.target.value)}
+                  style={inputStyle}
+                >
+                  <option value="">
+                    {cfg?.default_model ? `Default (${cfg.default_model})` : 'Default'}
+                  </option>
+                  {cfg?.available_models?.map((m, i) => (
+                    <option key={i} value={m.name}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
+              <button
+                onClick={handleSendPlaygroundPrompt}
+                disabled={playgroundSending || !playgroundUser.trim()}
+                style={{
+                  padding: '10px 16px', borderRadius: 'var(--ui-radius, 12px)', border: 'none',
+                  backgroundColor: '#111827', color: '#fff', fontSize: 13, fontWeight: 600,
+                  cursor: playgroundSending || !playgroundUser.trim() ? 'not-allowed' : 'pointer',
+                  opacity: playgroundSending || !playgroundUser.trim() ? 0.6 : 1,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                }}
+              >
+                <Play size={14} /> {playgroundSending ? 'Sending...' : 'Send'}
+              </button>
+              {playgroundResult && (
+                <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.6 }}>
+                  <div>Model: <span style={{ color: '#111', fontFamily: 'ui-monospace, monospace' }}>{playgroundResult.request.model}</span></div>
+                  <div>Latency: {playgroundResult.latency_ms} ms</div>
+                  {playgroundResult.tokens && (
+                    <div>
+                      Tokens: {playgroundResult.tokens.request ?? '?'} in / {playgroundResult.tokens.response ?? '?'} out
+                      {playgroundResult.tokens.total != null && ` / ${playgroundResult.tokens.total} total`}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {playgroundError && (
+            <div style={{ marginTop: 16, padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--ui-radius, 12px)', color: '#991b1b', fontSize: 13 }}>
+              {playgroundError}
+            </div>
+          )}
+
+          {playgroundResult && (
+            <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  Request sent
+                </div>
+                <pre style={{
+                  margin: 0, padding: 12, background: '#f9fafb', border: '1px solid #e5e7eb',
+                  borderRadius: 'var(--ui-radius, 12px)', fontSize: 12, lineHeight: 1.5,
+                  fontFamily: 'ui-monospace, monospace', color: '#111',
+                  whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 400, overflow: 'auto',
+                }}>
+{`[system]
+${playgroundResult.request.system_prompt || '(none)'}
+
+[user]
+${playgroundResult.request.user_prompt}`}
+                </pre>
+              </div>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {playgroundResult.ok ? (
+                    <><CheckCircle2 size={13} color="#059669" /> Response</>
+                  ) : (
+                    <><XCircle size={13} color="#dc2626" /> Error</>
+                  )}
+                </div>
+                <pre style={{
+                  margin: 0, padding: 12,
+                  background: playgroundResult.ok ? '#f9fafb' : '#fef2f2',
+                  border: `1px solid ${playgroundResult.ok ? '#e5e7eb' : '#fecaca'}`,
+                  borderRadius: 'var(--ui-radius, 12px)', fontSize: 12, lineHeight: 1.5,
+                  fontFamily: 'ui-monospace, monospace',
+                  color: playgroundResult.ok ? '#111' : '#991b1b',
+                  whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 400, overflow: 'auto',
+                }}>
+                  {playgroundResult.ok ? (playgroundResult.response_text || '(empty response)') : (playgroundResult.error || 'Unknown error')}
+                </pre>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Authentication */}
+      <div id="cfg-auth" style={sectionStyle}>
         <div style={sectionHeaderStyle}>
           <Lock size={18} color="#6b7280" /> Authentication
         </div>
@@ -3034,7 +3797,7 @@ function ConfigTab() {
                           </div>
                           <div>
                             <label style={labelStyle}>Client Secret</label>
-                            <input type="password" value={editingProvider.client_secret} onChange={e => setEditingProvider({ ...editingProvider, client_secret: e.target.value })} style={inputStyle} placeholder="Leave as *** to keep existing" />
+                            <input type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore name="vandalizer-oauth-client-secret-edit" value={editingProvider.client_secret} onChange={e => setEditingProvider({ ...editingProvider, client_secret: e.target.value })} style={inputStyle} placeholder="Leave as *** to keep existing" />
                           </div>
                           <div style={{ gridColumn: '1 / -1' }}>
                             <label style={labelStyle}>Redirect URI</label>
@@ -3102,7 +3865,7 @@ function ConfigTab() {
                   </div>
                   <div>
                     <label style={labelStyle}>Client Secret</label>
-                    <input type="password" value={newProvider.client_secret} onChange={e => setNewProvider({ ...newProvider, client_secret: e.target.value })} style={inputStyle} />
+                    <input type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore name="vandalizer-oauth-client-secret-new" value={newProvider.client_secret} onChange={e => setNewProvider({ ...newProvider, client_secret: e.target.value })} style={inputStyle} />
                   </div>
                   <div style={{ gridColumn: '1 / -1' }}>
                     <label style={labelStyle}>Redirect URI (set automatically; register this in your identity provider)</label>
@@ -3142,7 +3905,7 @@ function ConfigTab() {
       </div>
 
       {/* Endpoints */}
-      <div style={sectionStyle}>
+      <div id="cfg-ocr" style={sectionStyle}>
         <div style={sectionHeaderStyle}>
           <Globe size={18} color="#6b7280" /> Endpoints
         </div>
@@ -3157,7 +3920,9 @@ function ConfigTab() {
           <div style={{ marginTop: 12 }}>
             <label style={labelStyle}>OCR API Key (optional)</label>
             <input
-              type="password" value={ocrApiKey} onChange={e => setOcrApiKey(e.target.value)}
+              type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore
+              name="vandalizer-ocr-api-key"
+              value={ocrApiKey} onChange={e => setOcrApiKey(e.target.value)}
               placeholder="Bearer token..." style={{ ...inputStyle, maxWidth: 500 }}
             />
           </div>
@@ -3187,7 +3952,7 @@ function ConfigTab() {
       {/* UI Theme */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          <Palette size={18} color="#6b7280" /> UI Theme
+          <Palette size={18} color="#6b7280" /> UI Theme &amp; Branding
         </div>
         <div style={sectionBodyStyle}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
@@ -3207,6 +3972,131 @@ function ConfigTab() {
               </div>
             </div>
           </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, marginTop: 20 }}>
+            <div>
+              <label style={labelStyle}>Organization Name</label>
+              <input
+                type="text"
+                value={themeOrgName}
+                onChange={e => setThemeOrgName(e.target.value)}
+                placeholder={DEFAULT_ORG_NAME}
+                style={inputStyle}
+              />
+              <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>
+                Shown in the header, login page, browser tab, and chat greeting. Leave blank to keep "Vandalizer".
+              </div>
+            </div>
+            <div>
+              <label style={labelStyle}>Logo</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                  width: 180, height: 56, borderRadius: 'var(--ui-radius, 12px)',
+                  border: '1px solid #e5e7eb', background: '#f9fafb',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+                }}>
+                  {themeLogo ? (
+                    <img src={themeLogo} alt="Logo preview" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                  ) : (
+                    <img src="/images/Vandalizer_Wordmark_RGB.png" alt="Default Vandalizer logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', opacity: 0.7 }} />
+                  )}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <label style={{
+                    padding: '6px 12px', borderRadius: 'var(--ui-radius, 12px)',
+                    border: '1px solid #d1d5db', background: '#fff',
+                    fontSize: 12, fontWeight: 500, cursor: 'pointer', textAlign: 'center',
+                  }}>
+                    {themeLogo ? 'Replace' : 'Upload'}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                      onChange={e => handleLogoFile(e.target.files?.[0] || null)}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+                  {themeLogo && (
+                    <button
+                      type="button"
+                      onClick={() => { setThemeLogo(''); setThemeLogoError(null) }}
+                      style={{
+                        padding: '6px 12px', borderRadius: 'var(--ui-radius, 12px)',
+                        border: '1px solid #fee2e2', background: '#fff',
+                        color: '#b91c1c', fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                      }}
+                    >
+                      Use default
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>
+                Wordmark-style image works best. PNG with transparency recommended. Max ~{Math.round(MAX_LOGO_BYTES / 1024)} KB encoded.
+              </div>
+              {themeLogoError && (
+                <div style={{ fontSize: 12, color: '#b91c1c', marginTop: 6 }}>{themeLogoError}</div>
+              )}
+            </div>
+            <div>
+              <label style={labelStyle}>Icon / Mascot</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                  width: 56, height: 56, borderRadius: 'var(--ui-radius, 12px)',
+                  border: '1px solid #e5e7eb', background: '#f9fafb',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+                }}>
+                  {themeIcon ? (
+                    <img src={themeIcon} alt="Icon preview" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                  ) : (
+                    <img src={DEFAULT_ICON_URL} alt="Default Joe Vandal icon" style={{ maxWidth: '70%', maxHeight: '90%', objectFit: 'contain', opacity: 0.7 }} />
+                  )}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <label style={{
+                    padding: '6px 12px', borderRadius: 'var(--ui-radius, 12px)',
+                    border: '1px solid #d1d5db', background: '#fff',
+                    fontSize: 12, fontWeight: 500, cursor: 'pointer', textAlign: 'center',
+                  }}>
+                    {themeIcon ? 'Replace' : 'Upload'}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                      onChange={e => handleIconFile(e.target.files?.[0] || null)}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+                  {themeIcon && (
+                    <button
+                      type="button"
+                      onClick={() => { setThemeIcon(''); setThemeIconError(null) }}
+                      style={{
+                        padding: '6px 12px', borderRadius: 'var(--ui-radius, 12px)',
+                        border: '1px solid #fee2e2', background: '#fff',
+                        color: '#b91c1c', fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                      }}
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>
+                Small square mark shown beside the logo (header & chat) and as the browser-tab favicon. A square, transparent PNG works best. The default Joe Vandal mark shows only on un-branded deployments — once you set an organization name or logo, leave this blank to hide it, or upload your own.
+              </div>
+              {themeIconError && (
+                <div style={{ fontSize: 12, color: '#b91c1c', marginTop: 6 }}>{themeIconError}</div>
+              )}
+            </div>
+          </div>
+
+          <div style={{
+            marginTop: 16, padding: 12, background: '#f9fafb',
+            borderRadius: 'var(--ui-radius, 12px)', border: '1px dashed #e5e7eb',
+            fontSize: 12, color: '#6b7280', lineHeight: 1.5,
+          }}>
+            Vandalizer is open source under the GPL v3 license and developed at the University of Idaho with support from the NSF GRANTED program (Award #2427549). Even with your custom branding applied, the footer will continue to credit the Vandalizer project and acknowledge NSF funding.
+          </div>
+
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16 }}>
             <div style={{ backgroundColor: themeColor, borderRadius: `${themeRadius}px`, padding: '8px 20px', color: 'var(--highlight-text-color, #000)', fontWeight: 600, fontSize: 13 }}>
               Sample Button
@@ -3521,66 +4411,288 @@ function ConfigTab() {
         </div>
       </div>
 
-      {/* M365 Integration */}
+      {/* Compliance Activation */}
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
-          <Globe size={18} color="#6b7280" /> Microsoft 365 Integration
+          <Lock size={18} color="#6b7280" /> Document Compliance Checks
         </div>
         <div style={{ padding: '0 20px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.5 }}>
+            When enabled, every uploaded document is scanned in chunks by an LLM
+            against the policy below. Documents containing sensitive or policy-violating
+            content are flagged in the document library.
+          </div>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-            <input type="checkbox" checked={m365Enabled} onChange={e => setM365Enabled(e.target.checked)} />
-            <span style={{ fontSize: 14, fontWeight: 500 }}>Enable M365 Integration</span>
+            <input type="checkbox" checked={complianceEnabled} onChange={e => setComplianceEnabled(e.target.checked)} />
+            <span style={{ fontSize: 14, fontWeight: 500 }}>Activate compliance checks</span>
           </label>
-          {m365Enabled && (
+          {complianceEnabled && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: '8px 0' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={complianceCheckOnUpload}
+                  onChange={e => setComplianceCheckOnUpload(e.target.checked)}
+                />
+                <span style={{ fontSize: 13 }}>Run checks automatically on every upload</span>
+              </label>
               <div>
-                <label style={labelStyle}>Azure Tenant ID</label>
-                <input value={m365TenantId} onChange={e => setM365TenantId(e.target.value)} placeholder="e.g. xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" style={inputStyle} />
+                <label style={labelStyle}>Compliance policy (sent to the validator LLM)</label>
+                <textarea
+                  value={complianceRules}
+                  onChange={e => setComplianceRules(e.target.value)}
+                  placeholder="Describe what content should be flagged…"
+                  rows={6}
+                  style={{ ...inputStyle, fontFamily: 'inherit', resize: 'vertical' }}
+                />
+                <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>
+                  Plain English. The validator decides whether each chunk passes or fails based on this rule set.
+                </div>
               </div>
-              <div>
-                <label style={labelStyle}>Application (Client) ID</label>
-                <input value={m365ClientId} onChange={e => setM365ClientId(e.target.value)} placeholder="Azure AD app registration client ID" style={inputStyle} />
-              </div>
-              <div>
-                <label style={labelStyle}>Client Secret</label>
-                <input type="password" value={m365ClientSecret} onChange={e => setM365ClientSecret(e.target.value)} placeholder={m365ClientSecret === '***' ? '(unchanged)' : 'Azure AD client secret'} style={inputStyle} />
-              </div>
-              <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
-                Requires an Azure AD app registration with Graph API permissions (Mail.Read, Files.Read).
-                Your IT department may need to grant admin consent.
+              <div style={{ display: 'flex', gap: 12 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>Chunk size (chars)</label>
+                  <input
+                    type="number"
+                    min={500}
+                    value={complianceChunkSize}
+                    onChange={e => setComplianceChunkSize(Number(e.target.value) || 8000)}
+                    style={inputStyle}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={labelStyle}>Chunk overlap (chars)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={complianceChunkOverlap}
+                    onChange={e => setComplianceChunkOverlap(Number(e.target.value) || 0)}
+                    style={inputStyle}
+                  />
+                </div>
               </div>
             </div>
           )}
           <div>
             <button
               onClick={async () => {
-                setM365Saving(true)
-                setM365Saved(false)
+                setComplianceSaving(true)
+                setComplianceSaved(false)
                 try {
-                  await updateM365Config({
-                    enabled: m365Enabled,
-                    client_id: m365ClientId,
-                    tenant_id: m365TenantId,
-                    ...(m365ClientSecret !== '***' ? { client_secret: m365ClientSecret } : {}),
+                  await updateCompliancePolicyConfig({
+                    enabled: complianceEnabled,
+                    check_on_upload: complianceCheckOnUpload,
+                    rules: complianceRules,
+                    chunk_size: complianceChunkSize,
+                    chunk_overlap: complianceChunkOverlap,
                   })
-                  setM365Saved(true)
-                  setTimeout(() => setM365Saved(false), 3000)
+                  setComplianceSaved(true)
+                  setTimeout(() => setComplianceSaved(false), 3000)
                 } catch {
-                  setError('Failed to save M365 configuration')
+                  setError('Failed to save compliance configuration')
                 } finally {
-                  setM365Saving(false)
+                  setComplianceSaving(false)
                 }
               }}
-              disabled={m365Saving}
+              disabled={complianceSaving}
               style={{
                 padding: '8px 20px', borderRadius: 'var(--ui-radius, 12px)', border: 'none',
                 background: '#111827', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                opacity: m365Saving ? 0.6 : 1,
+                opacity: complianceSaving ? 0.6 : 1,
               }}
             >
-              {m365Saving ? 'Saving...' : 'Save M365 Configuration'}
+              {complianceSaving ? 'Saving...' : 'Save Compliance Settings'}
             </button>
-            {m365Saved && <span style={{ marginLeft: 10, fontSize: 13, color: '#16a34a' }}>Saved!</span>}
+            {complianceSaved && <span style={{ marginLeft: 10, fontSize: 13, color: '#16a34a' }}>Saved!</span>}
+          </div>
+        </div>
+      </div>
+
+      {/* Retention Policy */}
+      <div style={sectionStyle}>
+        <div style={sectionHeaderStyle}>
+          <ShieldCheck size={18} color="#6b7280" /> Document Retention Policy
+        </div>
+        <div style={{ padding: '0 20px 16px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.5 }}>
+            When enforcement is on, documents are auto-scheduled for soft-deletion after their
+            classification-specific retention window. Soft-deleted documents become unrecoverable
+            after the grace period expires. Items on retention hold are never auto-deleted.
+          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={retentionEnabled}
+              onChange={e => setRetentionEnabled(e.target.checked)}
+              style={checkStyle}
+            />
+            <span style={{ fontSize: 14, fontWeight: 500 }}>Activate retention enforcement</span>
+          </label>
+          {retentionEnabled && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '8px 0' }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+                  Per-classification rules
+                </div>
+                <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f9fafb', color: '#6b7280', textAlign: 'left' }}>
+                      <th style={{ padding: '8px 12px', fontWeight: 500 }}>Tier</th>
+                      <th style={{ padding: '8px 12px', fontWeight: 500 }}>Retention (days)</th>
+                      <th style={{ padding: '8px 12px', fontWeight: 500 }}>Grace before purge (days)</th>
+                      <th style={{ padding: '8px 12px', fontWeight: 500 }}>Warn before (days)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      { name: 'unrestricted', label: 'Unrestricted', color: '#22c55e' },
+                      { name: 'internal', label: 'Internal', color: '#3b82f6' },
+                      { name: 'ferpa', label: 'FERPA', color: '#f59e0b' },
+                      { name: 'cui', label: 'CUI', color: '#f97316' },
+                      { name: 'itar', label: 'ITAR', color: '#ef4444' },
+                    ].map(level => {
+                      const p = retentionPolicies[level.name] || { retention_days: 0, soft_delete_grace_days: 0 }
+                      const update = (patch: Partial<RetentionPolicyForm>) => {
+                        setRetentionPolicies(prev => ({
+                          ...prev,
+                          [level.name]: { ...p, ...patch },
+                        }))
+                      }
+                      return (
+                        <tr key={level.name} style={{ borderTop: '1px solid #f3f4f6' }}>
+                          <td style={{ padding: '8px 12px' }}>
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 6,
+                              padding: '2px 10px', borderRadius: 9999,
+                              fontSize: 12, fontWeight: 600,
+                              backgroundColor: `${level.color}1a`, color: level.color,
+                              border: `1px solid ${level.color}66`,
+                            }}>
+                              <span style={{ width: 6, height: 6, borderRadius: 9999, backgroundColor: level.color }} />
+                              {level.label}
+                            </span>
+                          </td>
+                          <td style={{ padding: '8px 12px' }}>
+                            <input
+                              type="number"
+                              min={0}
+                              value={p.retention_days || 0}
+                              onChange={e => update({ retention_days: Number(e.target.value) || 0 })}
+                              style={{ ...inputStyle, padding: '6px 10px', width: 120 }}
+                            />
+                          </td>
+                          <td style={{ padding: '8px 12px' }}>
+                            <input
+                              type="number"
+                              min={0}
+                              value={p.soft_delete_grace_days || 0}
+                              onChange={e => update({ soft_delete_grace_days: Number(e.target.value) || 0 })}
+                              style={{ ...inputStyle, padding: '6px 10px', width: 120 }}
+                            />
+                          </td>
+                          <td style={{ padding: '8px 12px' }}>
+                            <input
+                              type="number"
+                              min={0}
+                              value={p.warning_days_before ?? ''}
+                              placeholder="—"
+                              onChange={e => {
+                                const v = e.target.value
+                                update({ warning_days_before: v === '' ? undefined : Number(v) || 0 })
+                              }}
+                              style={{ ...inputStyle, padding: '6px 10px', width: 120 }}
+                            />
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
+                  Other retention windows
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
+                  <div>
+                    <label style={labelStyle}>Activity logs (days)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={activityRetentionDays}
+                      onChange={e => setActivityRetentionDays(Number(e.target.value) || 0)}
+                      style={inputStyle}
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Chat conversations (days)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={chatRetentionDays}
+                      onChange={e => setChatRetentionDays(Number(e.target.value) || 0)}
+                      style={inputStyle}
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Workflow results (days)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={workflowResultRetentionDays}
+                      onChange={e => setWorkflowResultRetentionDays(Number(e.target.value) || 0)}
+                      style={inputStyle}
+                    />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Stale activity threshold (min)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={staleActivityMinutes}
+                      onChange={e => setStaleActivityMinutes(Number(e.target.value) || 0)}
+                      style={inputStyle}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          <div>
+            <button
+              onClick={async () => {
+                setRetentionSaving(true)
+                setRetentionSaved(false)
+                try {
+                  await updateSystemConfig({
+                    retention_config: {
+                      enabled: retentionEnabled,
+                      policies: retentionPolicies,
+                      activity_retention_days: activityRetentionDays,
+                      chat_retention_days: chatRetentionDays,
+                      workflow_result_retention_days: workflowResultRetentionDays,
+                      activity_stale_threshold_minutes: staleActivityMinutes,
+                    },
+                  })
+                  setRetentionSaved(true)
+                  setTimeout(() => setRetentionSaved(false), 3000)
+                } catch {
+                  setError('Failed to save retention configuration')
+                } finally {
+                  setRetentionSaving(false)
+                }
+              }}
+              disabled={retentionSaving}
+              style={{
+                padding: '8px 20px', borderRadius: 'var(--ui-radius, 12px)', border: 'none',
+                background: '#111827', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                opacity: retentionSaving ? 0.6 : 1,
+              }}
+            >
+              {retentionSaving ? 'Saving...' : 'Save Retention Settings'}
+            </button>
+            {retentionSaved && <span style={{ marginLeft: 10, fontSize: 13, color: '#16a34a' }}>Saved!</span>}
           </div>
         </div>
       </div>
@@ -3693,6 +4805,7 @@ function DemoResponseDetail({ responses }: { responses: Record<string, unknown> 
 }
 
 function DemoTab() {
+  const confirm = useConfirm()
   const [subTab, setSubTab] = useState<'applications' | 'surveys'>('applications')
   const [stats, setStats] = useState<DemoAdminStats | null>(null)
   const [apps, setApps] = useState<DemoApp[]>([])
@@ -3808,13 +4921,42 @@ function DemoTab() {
   }
 
   async function handleRestartTrial(uuid: string) {
-    if (!confirm('Restart this user\'s trial? This will give them a fresh 14-day trial.')) return
+    const ok = await confirm({
+      title: 'Restart trial?',
+      message: 'Restart this user\'s trial? They will get a fresh 14-day trial period starting now.',
+      confirmLabel: 'Restart trial',
+    })
+    if (!ok) return
     setActionLoading(`restart-${uuid}`)
     try {
       await restartDemoTrial(uuid)
       loadData()
     } catch {
       alert('Failed to restart trial')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  async function handlePromote(uuid: string, email: string) {
+    const ok = await confirm({
+      title: 'Promote to full user?',
+      message: (
+        <>
+          Promote <strong>{email}</strong> to a permanent full user? Their trial expiry
+          will be cleared and they'll keep their account, data, and team membership.
+          This cannot be reversed from this screen.
+        </>
+      ),
+      confirmLabel: 'Promote',
+    })
+    if (!ok) return
+    setActionLoading(`promote-${uuid}`)
+    try {
+      await promoteDemoUser(uuid)
+      loadData()
+    } catch {
+      alert('Failed to promote user')
     } finally {
       setActionLoading(null)
     }
@@ -3833,7 +4975,17 @@ function DemoTab() {
   }
 
   async function handleResendCredentials(uuid: string, email: string) {
-    if (!confirm(`Resend credentials to ${email}? This will reset their password.`)) return
+    const ok = await confirm({
+      title: 'Resend credentials?',
+      message: (
+        <>
+          Resend credentials to <strong>{email}</strong>? This will reset their password.
+        </>
+      ),
+      confirmLabel: 'Resend',
+      destructive: true,
+    })
+    if (!ok) return
     setActionLoading(`resend-${uuid}`)
     try {
       await adminResendCredentials(uuid)
@@ -4183,6 +5335,27 @@ function DemoTab() {
                             >
                               Restart Trial
                             </button>
+                          )}
+                          {(app.status === 'active' || app.status === 'expired' || app.status === 'completed') && app.user_is_demo && (
+                            <button
+                              onClick={() => handlePromote(app.uuid, app.email)}
+                              disabled={actionLoading === `promote-${app.uuid}`}
+                              title="Promote to permanent full user (clears trial expiry)"
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 4,
+                                padding: '4px 12px', borderRadius: 6, border: '1px solid #16a34a',
+                                background: '#f0fdf4', color: '#166534', fontSize: 12, fontWeight: 600,
+                                cursor: 'pointer', fontFamily: 'inherit',
+                                opacity: actionLoading === `promote-${app.uuid}` ? 0.5 : 1,
+                              }}
+                            >
+                              <Award size={12} /> Promote
+                            </button>
+                          )}
+                          {(app.status === 'active' || app.status === 'expired' || app.status === 'completed') && !app.user_is_demo && (
+                            <span style={{ fontSize: 12, color: '#166534', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+                              <Award size={12} /> Full user
+                            </span>
                           )}
                           <button
                             onClick={() => handleTestEmail(app.email)}
@@ -5616,6 +6789,7 @@ function ImportDialog({ onClose, onImported }: { onClose: () => void; onImported
 }
 
 function OrganizationsTab() {
+  const confirm = useConfirm()
   const [tree, setTree] = useState<Organization[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -5651,7 +6825,17 @@ function OrganizationsTab() {
     catch (e) { setError(e instanceof Error ? e.message : 'Failed to update') }
   }
   const handleDelete = async (org: Organization) => {
-    if (!confirm(`Delete "${org.name}"? Children will be re-parented to its parent.`)) return
+    const ok = await confirm({
+      title: 'Delete organization?',
+      message: (
+        <>
+          Are you sure you want to delete <strong>{org.name}</strong>? Any child organizations will be re-parented to its parent.
+        </>
+      ),
+      confirmLabel: 'Delete',
+      destructive: true,
+    })
+    if (!ok) return
     setError(null)
     if (selectedOrg?.uuid === org.uuid) setSelectedOrg(null)
     try { await orgApi.deleteOrganization(org.uuid); loadTree() }
@@ -6081,17 +7265,22 @@ export default function Admin() {
   const [trialEnabled, setTrialEnabled] = useState(false)
 
   useEffect(() => {
-    getAuthConfig().then(c => setTrialEnabled(!!c.trial_system_enabled))
+    getAuthConfig().then(c => setTrialEnabled(!!c.trial_system_enabled)).catch(() => {})
   }, [])
 
   const isGlobalAdmin = !!user?.is_admin
   const isStaff = !!user?.is_staff
-  const isExaminer = !!user?.is_examiner
   const isTeamAdmin = currentTeam?.role === 'owner' || currentTeam?.role === 'admin'
-  const hasAccess = isGlobalAdmin || isStaff || isExaminer || isTeamAdmin
+  // Examiners are intentionally excluded: every admin-panel endpoint gates on
+  // admin/staff/team-admin (see _require_admin_or_team_admin), so examiners would
+  // only hit 403s here. Their workspace is the Verification queue (/verification).
+  const hasAccess = isGlobalAdmin || isStaff || isTeamAdmin
 
-  // Staff see everything except config; examiners see analytics tabs only
-  const hiddenForNonAdmin = ['config', 'quality', 'demo', 'organizations', 'approvals', 'audit', 'certifications']
+  // Staff see everything except config; team admins see only team-scoped tabs whose
+  // endpoints accept a team scope. Tabs whose backends require admin/staff (email,
+  // plus everything in hiddenForNonAdmin) stay hidden so we never render a tab that
+  // can only 403.
+  const hiddenForNonAdmin = ['config', 'quality', 'compliance', 'demo', 'organizations', 'approvals', 'audit', 'certifications', 'apikeys', 'email', 'teams']
   let visibleTabs = isGlobalAdmin
     ? TABS
     : isStaff
@@ -6130,7 +7319,7 @@ export default function Admin() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '0 20px', marginBottom: 20 }}>
             <Shield size={20} color="#6b7280" />
             <h1 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>
-              {isGlobalAdmin ? 'Admin' : isStaff ? 'Admin' : isExaminer ? 'Analytics' : 'Team Admin'}
+              {isGlobalAdmin || isStaff ? 'Admin' : 'Team Admin'}
             </h1>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '0 8px' }}>
@@ -6170,11 +7359,12 @@ export default function Admin() {
           {activeTab === 'organizations' && (isGlobalAdmin || isStaff) && <OrganizationsTab />}
           {activeTab === 'workflows' && <WorkflowsTab />}
           {activeTab === 'quality' && <QualityTab />}
+          {activeTab === 'compliance' && (isGlobalAdmin || isStaff) && <ComplianceTab />}
           {activeTab === 'audit' && (isGlobalAdmin || isStaff) && <AuditTab />}
           {activeTab === 'demo' && (isGlobalAdmin || isStaff) && <DemoTab />}
           {activeTab === 'email' && (isGlobalAdmin || isStaff) && <EmailAnalyticsTab />}
           {activeTab === 'certifications' && (isGlobalAdmin || isStaff) && <CertificationsTab />}
-          {activeTab === 'apikeys' && isGlobalAdmin && <ApiKeysTab />}
+          {activeTab === 'apikeys' && (isGlobalAdmin || isStaff) && <ApiKeysTab />}
           {activeTab === 'config' && isGlobalAdmin && <ConfigTab />}
         </div>
       </div>

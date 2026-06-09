@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import datetime
 import json
+import logging
 from typing import TYPE_CHECKING, Optional
+
+from pydantic import BaseModel
 
 if TYPE_CHECKING:
     from app.models.extraction_test_case import ExtractionTestCase
 
 from beanie import PydanticObjectId
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile
+from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile
 from fastapi.responses import StreamingResponse
 
 from app.dependencies import get_api_key_user, get_current_user
@@ -29,6 +33,7 @@ from app.schemas.extractions import (
     SearchSetItemRequest,
     SearchSetItemResponse,
     SearchSetResponse,
+    SuggestFieldsRequest,
     TestCaseResponse,
     UpdateSearchSetRequest,
     UpdateSearchSetItemRequest,
@@ -36,6 +41,8 @@ from app.schemas.extractions import (
 )
 from app.services import extraction_validation_service as val_svc
 from app.services import search_set_service as svc
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -77,12 +84,14 @@ async def _ss_response(ss) -> SearchSetResponse:
     """Build a SearchSetResponse with quality data attached."""
     count = await ss.item_count()
     quality = await _attach_quality(ss)
+    portability = await val_svc.portability_summary(ss.uuid)
     return SearchSetResponse(
         id=str(ss.id), title=ss.title, uuid=ss.uuid,
         status=ss.status, set_type=ss.set_type, user_id=ss.user_id,
         team_id=ss.team_id, is_global=ss.is_global, verified=ss.verified, item_count=count,
         extraction_config=ss.extraction_config,
         fillable_pdf_url=ss.fillable_pdf_url,
+        validation_portability=portability,
         **quality,
     )
 
@@ -209,6 +218,134 @@ async def export_search_set(uuid: str, user: User = Depends(get_current_user)):
     )
 
 
+@router.get("/search-sets/{uuid}/download-validation")
+async def download_validation_zip(uuid: str, user: User = Depends(get_current_user)):
+    """Download a zip with the full validation setup: setup metadata, answer key,
+    snapshotted source text for every test case, and original source documents
+    where available and accessible.
+    """
+    import datetime
+    import io
+    import zipfile
+    from app.config import Settings
+    from app.services import file_service
+
+    ss = await _get_search_set_or_404(uuid, user)
+    items = await svc.list_items(uuid)
+    if ss.item_order:
+        order_map = {oid: idx for idx, oid in enumerate(ss.item_order)}
+        items = sorted(items, key=lambda i: order_map.get(str(i.id), 9999))
+
+    test_cases = await val_svc.list_test_cases(uuid)
+
+    settings = Settings()
+
+    def _safe(name: str | None, fallback: str) -> str:
+        cleaned = "".join(c if c.isalnum() or c in " _-." else "_" for c in (name or "")).strip()
+        return cleaned or fallback
+
+    safe_title = _safe(ss.title, "extraction")
+
+    buf = io.BytesIO()
+    case_entries: list[dict] = []
+    answer_key: dict[str, dict] = {}
+
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for tc in test_cases:
+            short = tc.uuid[:8]
+            base = f"{_safe(tc.label, 'case')}__{short}"
+
+            source_text_path: str | None = None
+            if tc.source_text:
+                source_text_path = f"sources/{base}.txt"
+                zf.writestr(source_text_path, tc.source_text)
+
+            document_path: str | None = None
+            document_filename: str | None = None
+            if tc.document_uuid:
+                dl = await file_service.download_document(tc.document_uuid, settings, user=user)
+                if dl:
+                    document_filename = dl.title
+                    document_path = f"documents/{base}__{_safe(dl.title, 'document')}"
+                    zf.writestr(document_path, dl.data)
+
+            case_entries.append({
+                "uuid": tc.uuid,
+                "label": tc.label,
+                "source_type": tc.source_type,
+                "document_uuid": tc.document_uuid,
+                "document_filename": document_filename,
+                "document_path": document_path,
+                "source_text_path": source_text_path,
+                "expected_values": tc.expected_values,
+                "created_at": tc.created_at.isoformat() if tc.created_at else None,
+            })
+            answer_key[tc.uuid] = {
+                "label": tc.label,
+                "expected_values": tc.expected_values,
+            }
+
+        setup = {
+            "format": "vandalizer.validation-setup.v1",
+            "exported_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "exported_by_user_id": user.user_id,
+            "search_set": {
+                "uuid": ss.uuid,
+                "title": ss.title,
+                "set_type": ss.set_type,
+                "extraction_config": ss.extraction_config or {},
+                "items": [
+                    {
+                        "id": str(item.id),
+                        "searchphrase": item.searchphrase,
+                        "title": item.title,
+                        "is_optional": item.is_optional,
+                        "enum_values": item.enum_values or [],
+                    }
+                    for item in items
+                ],
+            },
+            "test_cases": case_entries,
+        }
+        answer_key_payload = {
+            "search_set_uuid": ss.uuid,
+            "search_set_title": ss.title,
+            "test_cases": answer_key,
+        }
+
+        zf.writestr(
+            "validation-setup.json",
+            json.dumps(setup, indent=2, default=str),
+        )
+        zf.writestr(
+            "expected-values.json",
+            json.dumps(answer_key_payload, indent=2, default=str),
+        )
+        zf.writestr(
+            "README.txt",
+            (
+                "Vandalizer validation setup export\n"
+                "==================================\n\n"
+                f"Extraction: {ss.title}\n"
+                f"Test cases: {len(test_cases)}\n\n"
+                "validation-setup.json — full setup metadata, extraction field schema,\n"
+                "  and per-test-case expected values + paths to source content.\n"
+                "expected-values.json — flat answer key keyed by test case uuid.\n"
+                "sources/ — snapshotted text content for every test case (the text\n"
+                "  validation runs against).\n"
+                "documents/ — original source files for test cases that reference a\n"
+                "  document, when the file was available and you have access.\n"
+            ),
+        )
+
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{safe_title}_validation.zip"'},
+    )
+
+
 @router.post("/search-sets/import", response_model=SearchSetResponse)
 async def import_search_set(
     file: UploadFile = File(...),
@@ -315,7 +452,13 @@ async def upload_pdf_template(
         "Return a JSON object with key 'mappings' mapping each field name to a human-readable "
         "extraction prompt."
     )
-    result = await agent.run(prompt, output_type=FieldMapping)
+    from app.services.metering import metered_async
+    async with metered_async(
+        "extraction_template",
+        user_id=user.user_id,
+        team_id=str(user.current_team) if user.current_team else None,
+    ):
+        result = await agent.run(prompt, output_type=FieldMapping)
     mappings: dict[str, str] = result.output.mappings
 
     # Replace all existing items with new ones from the mapping
@@ -546,6 +689,26 @@ async def build_from_document(request: Request, uuid: str, req: BuildFromDocumen
     return {"entities": entities}
 
 
+@router.post("/suggest-fields")
+@limiter.limit("10/minute")
+async def suggest_fields(request: Request, req: SuggestFieldsRequest, user: User = Depends(get_current_user)):
+    """AI-suggest extraction field names from documents without persisting to a SearchSet.
+
+    Used by the workflow editor's manual-fields path so users can get AI suggestions
+    without first creating a saved extraction set.
+    """
+    document_uuids = await _authorize_documents(req.document_uuids, user)
+    try:
+        entities, _ = await svc.suggest_fields_from_documents(
+            document_uuids=document_uuids,
+            user_id=user.user_id,
+            model=req.model,
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    return {"entities": entities}
+
+
 @router.post("/run-sync")
 @limiter.limit("30/minute")
 async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, user: User = Depends(get_current_user)) -> dict:
@@ -565,14 +728,21 @@ async def run_extraction_sync(request: Request, req: RunExtractionSyncRequest, u
     assert activity.id is not None
 
     try:
-        results = await svc.run_extraction_sync(
-            search_set_uuid=req.search_set_uuid,
-            document_uuids=document_uuids,
+        from app.services.metering import metered_async
+        async with metered_async(
+            "extraction",
             user_id=user.user_id,
-            model=req.model,
-            extraction_config_override=req.extraction_config_override,
-            combined_context=req.combined_context,
-        )
+            team_id=str(user.current_team) if user.current_team else None,
+            activity_id=str(activity.id),
+        ):
+            results = await svc.run_extraction_sync(
+                search_set_uuid=req.search_set_uuid,
+                document_uuids=document_uuids,
+                user_id=user.user_id,
+                model=req.model,
+                extraction_config_override=req.extraction_config_override,
+                combined_context=req.combined_context,
+            )
         await activity_service.activity_finish(activity.id, ActivityStatus.COMPLETED)
         # Merge all result entities into a single normalized map so the
         # activity rail can restore results when the user reopens the run.
@@ -615,13 +785,16 @@ async def run_extraction_integrated(
     document_uuids: Optional[str] = Form(None),
     text: Optional[str] = Form(None),
     text_title: Optional[str] = Form(None),
+    ephemeral: bool = Form(True),
     files: list[UploadFile] = File(default=[]),
     user: User = Depends(get_api_key_user),
 ) -> dict:
     """Run extraction via external API.
 
     Accepts any combination of file uploads, existing document UUIDs, and a
-    raw ``text`` payload. At least one must be provided.
+    raw ``text`` payload. At least one must be provided. When ``ephemeral``
+    is true (default), documents created by this request are deleted after
+    the extraction completes; existing ``document_uuids`` are never touched.
     """
     import uuid as _uuid
     from pathlib import Path
@@ -631,6 +804,8 @@ async def run_extraction_integrated(
 
     settings = Settings()
     all_doc_uuids: list[str] = []
+    # Docs created by THIS request — only these are ever cleaned up.
+    created_doc_uuids: list[str] = []
 
     # Parse existing document UUIDs
     if document_uuids:
@@ -654,6 +829,7 @@ async def run_extraction_integrated(
         )
         await doc.insert()
         all_doc_uuids.append(uid)
+        created_doc_uuids.append(uid)
 
     # Handle file uploads
     for upload in files:
@@ -704,6 +880,7 @@ async def run_extraction_integrated(
         doc.task_id = task_id
         await doc.save()
         all_doc_uuids.append(uid)
+        created_doc_uuids.append(uid)
 
     if not all_doc_uuids:
         raise HTTPException(
@@ -763,6 +940,37 @@ async def run_extraction_integrated(
     except Exception as e:
         await activity_service.activity_finish(activity.id, ActivityStatus.FAILED, error=str(e))
         raise
+    finally:
+        if ephemeral and created_doc_uuids:
+            await _cleanup_ephemeral_docs(created_doc_uuids, user, settings)
+
+
+async def _cleanup_ephemeral_docs(uuids: list[str], user: User, settings) -> None:
+    """Best-effort delete of API-created docs (Mongo + file + ChromaDB).
+
+    Failures are logged and swallowed so cleanup never surfaces as an error
+    after the extraction itself has already succeeded.
+    """
+    from app.services import file_service
+
+    dm = None
+    try:
+        from app.services.document_manager import DocumentManager
+
+        dm = DocumentManager(persist_directory=settings.chromadb_persist_dir)
+    except Exception:
+        logger.warning("Could not initialize DocumentManager for ephemeral cleanup", exc_info=True)
+
+    for uid in uuids:
+        if dm is not None:
+            try:
+                dm.delete_document(user.user_id, uid)
+            except Exception:
+                logger.warning("ChromaDB cleanup failed for ephemeral doc %s", uid, exc_info=True)
+        try:
+            await file_service.delete_document(uid, settings, user=user)
+        except Exception:
+            logger.warning("Mongo/file cleanup failed for ephemeral doc %s", uid, exc_info=True)
 
 
 @router.get("/status/{activity_id}")
@@ -794,7 +1002,10 @@ async def get_extraction_status(
 # Extraction test cases & validation
 # ---------------------------------------------------------------------------
 
-def _tc_response(tc: "ExtractionTestCase") -> TestCaseResponse:
+def _tc_response(
+    tc: "ExtractionTestCase",
+    document_exists: Optional[bool] = None,
+) -> TestCaseResponse:
     return TestCaseResponse(
         id=str(tc.id),
         uuid=tc.uuid,
@@ -803,10 +1014,32 @@ def _tc_response(tc: "ExtractionTestCase") -> TestCaseResponse:
         source_type=tc.source_type,
         source_text=tc.source_text,
         document_uuid=tc.document_uuid,
+        document_exists=document_exists,
         expected_values=tc.expected_values,
         user_id=tc.user_id,
         created_at=tc.created_at.isoformat(),
     )
+
+
+async def _check_documents_exist(uuids: list[str]) -> dict[str, bool]:
+    """Return {uuid: exists} for the supplied document UUIDs.
+
+    A document counts as 'existing' if it's present and not soft-deleted —
+    a soft-deleted doc is on its way out and the UI should treat it the
+    same as gone.
+    """
+    from app.models.document import SmartDocument
+
+    if not uuids:
+        return {}
+    unique = list({u for u in uuids if u})
+    if not unique:
+        return {}
+    found = await SmartDocument.find(
+        {"uuid": {"$in": unique}, "soft_deleted": {"$ne": True}}
+    ).to_list()
+    present = {d.uuid for d in found}
+    return {u: (u in present) for u in unique}
 
 
 @router.post("/test-cases", response_model=TestCaseResponse)
@@ -823,14 +1056,19 @@ async def create_test_case(req: CreateTestCaseRequest, user: User = Depends(get_
         document_uuid=req.document_uuid,
         expected_values=req.expected_values,
     )
-    return _tc_response(tc)
+    exists_map = await _check_documents_exist([tc.document_uuid] if tc.document_uuid else [])
+    return _tc_response(tc, document_exists=exists_map.get(tc.document_uuid) if tc.document_uuid else None)
 
 
 @router.get("/test-cases", response_model=list[TestCaseResponse])
 async def list_test_cases(search_set_uuid: str, user: User = Depends(get_current_user)) -> list[TestCaseResponse]:
     await _get_search_set_or_404(search_set_uuid, user, manage=True)
     tcs = await val_svc.list_test_cases(search_set_uuid)
-    return [_tc_response(tc) for tc in tcs]
+    exists_map = await _check_documents_exist([tc.document_uuid for tc in tcs if tc.document_uuid])
+    return [
+        _tc_response(tc, document_exists=exists_map.get(tc.document_uuid) if tc.document_uuid else None)
+        for tc in tcs
+    ]
 
 
 @router.patch("/test-cases/{uuid}", response_model=TestCaseResponse)
@@ -851,7 +1089,8 @@ async def update_test_case(uuid: str, req: UpdateTestCaseRequest, user: User = D
     )
     if not tc:
         raise HTTPException(status_code=404, detail="Test case not found")
-    return _tc_response(tc)
+    exists_map = await _check_documents_exist([tc.document_uuid] if tc.document_uuid else [])
+    return _tc_response(tc, document_exists=exists_map.get(tc.document_uuid) if tc.document_uuid else None)
 
 
 @router.delete("/test-cases/{uuid}")
@@ -894,9 +1133,100 @@ async def create_test_cases_from_extraction(request: Request, user: User = Depen
             user_id=user.user_id,
             model=model,
         )
-        return {"test_cases": [_tc_response(tc) for tc in test_cases], "count": len(test_cases)}
+        exists_map = await _check_documents_exist([tc.document_uuid for tc in test_cases if tc.document_uuid])
+        return {
+            "test_cases": [
+                _tc_response(tc, document_exists=exists_map.get(tc.document_uuid) if tc.document_uuid else None)
+                for tc in test_cases
+            ],
+            "count": len(test_cases),
+        }
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# Test-case auto-generator (Phase 1B)
+# Two-step flow: generate proposals → user reviews + approves → persisted.
+# Distinct from "from-extraction" above: that flow saves immediately and bakes
+# in the current config's bias. This flow lets the user vet each proposal first.
+# ---------------------------------------------------------------------------
+
+
+class GenerateTestCasesRequest(BaseModel):
+    document_uuids: list[str]
+    coverage: str = "standard"  # "quick" | "standard" | "exhaustive"
+
+
+@router.post("/search-sets/{uuid}/generate-test-cases")
+@limiter.limit("5/minute")
+async def generate_test_case_proposals(
+    request: Request,
+    uuid: str,
+    req: GenerateTestCasesRequest,
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Generate proposed test cases from documents. Proposals are NOT saved
+    until the caller passes them to /test-cases/approve-bulk.
+
+    Body: ``{document_uuids, coverage}``
+    Returns: ``{proposals: [...], errors: [...]}``
+    """
+    await _get_search_set_or_404(uuid, user, manage=True)
+    if not req.document_uuids:
+        raise HTTPException(status_code=400, detail="At least one document_uuid is required")
+    await _authorize_documents(req.document_uuids, user)
+    coverage = req.coverage if req.coverage in ("quick", "standard", "exhaustive") else "standard"
+
+    from app.services.extraction_test_case_generator import generate_proposals
+    try:
+        out = await generate_proposals(
+            search_set_uuid=uuid,
+            user_id=user.user_id,
+            document_uuids=req.document_uuids,
+            coverage=coverage,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return out
+
+
+class ApproveProposalsRequest(BaseModel):
+    proposals: list[dict]
+
+
+@router.post("/search-sets/{uuid}/test-cases/approve-bulk")
+async def approve_test_case_proposals(
+    uuid: str,
+    req: ApproveProposalsRequest,
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Persist approved proposals as ExtractionTestCase records.
+
+    Caller provides the list returned from generate-test-cases (optionally
+    filtered or edited). Each proposal becomes one test case.
+    """
+    await _get_search_set_or_404(uuid, user, manage=True)
+    from app.services.extraction_test_case_generator import persist_approved_proposals
+
+    saved = await persist_approved_proposals(
+        search_set_uuid=uuid,
+        user_id=user.user_id,
+        proposals=req.proposals,
+    )
+    return {
+        "count": len(saved),
+        "test_cases": [
+            {
+                "uuid": tc.uuid,
+                "label": tc.label,
+                "source_type": tc.source_type,
+                "document_uuid": tc.document_uuid,
+                "expected_values": tc.expected_values,
+            }
+            for tc in saved
+        ],
+    }
 
 
 @router.get("/search-sets/{uuid}/history")
@@ -1125,6 +1455,581 @@ async def clear_tuning_result(uuid: str, user: User = Depends(get_current_user))
     return {"ok": True}
 
 
+# ---------------------------------------------------------------------------
+# Extraction optimization — orchestrates baselines + sweep + best-config apply.
+# Mirrors the KB Autovalidate route surface so the shared frontend can reuse
+# its polling + progress + comparison-card UI.
+# ---------------------------------------------------------------------------
+
+
+def _serialize_extraction_optimization_run(run) -> dict:
+    return {
+        "uuid": run.uuid,
+        "search_set_uuid": run.search_set_uuid,
+        "status": run.status,
+        "phase": run.phase,
+        "progress_message": run.progress_message,
+        "current_trial_index": run.current_trial_index,
+        "total_trials_planned": run.total_trials_planned,
+        "best_score_so_far": run.best_score_so_far,
+        "best_config_so_far": run.best_config_so_far,
+        "token_budget": run.token_budget,
+        "tokens_used": run.tokens_used,
+        "estimated_cost_usd": run.estimated_cost_usd,
+        "actual_cost_usd": run.actual_cost_usd,
+        "baseline_no_tool_score": run.baseline_no_tool_score,
+        "baseline_default_score": run.baseline_default_score,
+        "optimized_score": run.optimized_score,
+        "judge_variance": run.judge_variance,
+        "judge_score_se": getattr(run, "judge_score_se", None),
+        "tied_with_baseline": getattr(run, "tied_with_baseline", False),
+        "winner_selection_reason": getattr(run, "winner_selection_reason", None),
+        "excluded_models": getattr(run, "excluded_models", []) or [],
+        "judge_model": run.judge_model,
+        "best_config": run.best_config,
+        "trials": run.trials,
+        "field_breakdown": run.field_breakdown,
+        "winner_cross_field_summary": getattr(run, "winner_cross_field_summary", None),
+        "winner_cross_field_rule_breakdown": getattr(run, "winner_cross_field_rule_breakdown", []) or [],
+        "post_apply_validation": getattr(run, "post_apply_validation", None),
+        "suggestions": run.suggestions,
+        "previous_override": run.previous_override,
+        "apply_preview": getattr(run, "apply_preview", None),
+        "options": run.options,
+        "error_message": run.error_message,
+        "started_at": run.started_at.isoformat() if run.started_at else None,
+        "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+        "cancel_requested": run.cancel_requested,
+        "cancel_requested_at": run.cancel_requested_at.isoformat() if getattr(run, "cancel_requested_at", None) else None,
+    }
+
+
+class StartExtractionOptimizationRequest(BaseModel):
+    token_budget: int = 0  # 0 = use max_candidates directly (Phase 1A default)
+    max_candidates: int = 8
+    apply_on_finish: bool = False
+    # Phase 1B: when true, the optimizer uses an LLM judge for semantic-equality
+    # scoring instead of strict string matching. Costs more tokens; produces
+    # less false-failure noise on date/name/format variation.
+    include_judge: bool = False
+    # Wizard checkbox selection: when provided, the run uses exactly these test
+    # cases. None/empty means "use every test case for the set" (legacy behavior).
+    test_case_uuids: list[str] | None = None
+
+
+@router.post("/search-sets/{uuid}/baseline-probe")
+async def extraction_baseline_probe(
+    uuid: str, request: Request, user: User = Depends(get_current_user),
+):
+    """Cheap no-settings baseline probe for the tuning wizard.
+
+    Runs extraction with empty config_override against a sample of test cases
+    that have expected values, judged by the user's resolved model. Lets the
+    wizard show the floor *before* the user commits a budget — mirrors KB's
+    ``/baseline-probe`` so both wizards build budget trust the same way.
+
+    Body:
+      - sample_size: int, default 5. Capped at [1, 50].
+      - case_uuids: list[str], optional. When provided, runs the probe on
+        exactly these test cases.
+
+    Returns:
+      {
+        "no_settings_score": float in [0,1] or null if nothing judgeable,
+        "num_cases_judged": int,
+        "sample_case_ids": list[str],
+        "tokens_used": int,
+        "duration_ms": int,
+      }
+    """
+    import random
+    import time
+
+    from app.models.extraction_test_case import ExtractionTestCase
+    from app.models.system_config import SystemConfig
+    from app.services.config_service import get_user_model_name
+    from app.services.extraction_optimizer import _score_to_unit
+    from app.services.extraction_tuning_service import _run_single_config
+    from app.services.search_set_service import (
+        get_extraction_field_metadata,
+        get_extraction_keys,
+    )
+
+    ss = await _get_search_set_or_404(uuid, user, manage=True)
+
+    body: dict = {}
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    requested_uuids: list[str] = list(body.get("case_uuids") or [])
+    try:
+        sample_size = int(body.get("sample_size", 5))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=422, detail="sample_size must be an integer")
+    if sample_size < 1 or sample_size > 50:
+        raise HTTPException(status_code=422, detail="sample_size must be between 1 and 50")
+
+    all_cases = await ExtractionTestCase.find(
+        {"search_set_uuid": ss.uuid},
+    ).to_list()
+    judgeable = [
+        tc for tc in all_cases
+        if getattr(tc, "expected_values", None)
+        and any(v for v in tc.expected_values.values())
+    ]
+    if not judgeable:
+        return {
+            "no_settings_score": None,
+            "num_cases_judged": 0,
+            "sample_case_ids": [],
+            "tokens_used": 0,
+            "duration_ms": 0,
+        }
+
+    if requested_uuids:
+        wanted = set(requested_uuids)
+        sample = [tc for tc in judgeable if tc.uuid in wanted]
+    elif len(judgeable) <= sample_size:
+        sample = list(judgeable)
+    else:
+        sample = random.sample(judgeable, sample_size)
+
+    if not sample:
+        return {
+            "no_settings_score": None,
+            "num_cases_judged": 0,
+            "sample_case_ids": [],
+            "tokens_used": 0,
+            "duration_ms": 0,
+        }
+
+    baseline_model = await get_user_model_name(user.user_id)
+    if not baseline_model:
+        raise HTTPException(status_code=400, detail="No LLM model configured for this user")
+
+    keys = await get_extraction_keys(ss.uuid)
+    if not keys:
+        raise HTTPException(status_code=400, detail="No extraction fields defined")
+
+    sys_config = await SystemConfig.get_config()
+    sys_config_doc = sys_config.model_dump() if sys_config else {}
+    field_metadata = await get_extraction_field_metadata(ss.uuid)
+
+    started = time.monotonic()
+    result = await _run_single_config(
+        candidate={
+            "label": "baseline-probe",
+            "model": baseline_model,
+            "config_override": {},
+        },
+        keys=keys,
+        test_cases=sample,
+        sys_config_doc=sys_config_doc,
+        field_metadata=field_metadata,
+        num_runs=1,
+        judge_model=baseline_model,
+        cross_field_rules=[],
+    )
+    duration_ms = int((time.monotonic() - started) * 1000)
+
+    return {
+        "no_settings_score": _score_to_unit(result.get("score")),
+        "num_cases_judged": len(sample),
+        "sample_case_ids": [tc.uuid for tc in sample],
+        "tokens_used": int(result.get("judge_tokens", 0) or 0),
+        "duration_ms": duration_ms,
+    }
+
+
+@router.post("/search-sets/{uuid}/optimize")
+@limiter.limit("5/minute")
+async def start_extraction_optimization(
+    request: Request,
+    uuid: str,
+    req: StartExtractionOptimizationRequest,
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Kick off an extraction optimization run.
+
+    Returns ``{run_uuid, status: "queued"}``. The UI polls
+    ``GET /search-sets/{uuid}/optimize/{run_uuid}`` for progress.
+    """
+    import uuid as _uuid
+
+    from app.models.extraction_optimization_run import ExtractionOptimizationRun
+    from app.services.extraction_optimizer import reap_stale_runs
+
+    ss = await _get_search_set_or_404(uuid, user, manage=True)
+
+    # Recover any orphaned run first so a dead worker's "running" doc can't
+    # permanently block new runs via the 409 below.
+    await reap_stale_runs(ss.uuid)
+
+    # Reject if a non-terminal run already exists.
+    active = await ExtractionOptimizationRun.find_one(
+        ExtractionOptimizationRun.search_set_uuid == ss.uuid,
+        {"status": {"$in": ["queued", "running"]}},
+    )
+    if active:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Optimization already in progress (run {active.uuid})",
+        )
+
+    # Drop blanks/dupes; None means "use every test case" downstream.
+    selected_case_uuids = list(dict.fromkeys(u for u in (req.test_case_uuids or []) if u)) or None
+
+    # Generate the Celery task id up front so it's persisted before dispatch —
+    # no race where the task finishes before we record the id. It's the handle
+    # the cancel endpoint + stale-run watchdog use to hard-revoke a wedged run.
+    celery_task_id = _uuid.uuid4().hex
+
+    run = ExtractionOptimizationRun(
+        search_set_uuid=ss.uuid,
+        user_id=user.user_id,
+        status="queued",
+        token_budget=max(0, int(req.token_budget)),
+        celery_task_id=celery_task_id,
+        options={
+            "apply_on_finish": req.apply_on_finish,
+            "max_candidates": req.max_candidates,
+            "include_judge": req.include_judge,
+            "test_case_uuids": selected_case_uuids,
+        },
+    )
+    await run.insert()
+
+    from app.tasks.extraction_tasks import optimize_extraction_task
+    optimize_extraction_task.apply_async(
+        args=[
+            ss.uuid, user.user_id, run.uuid,
+            max(0, int(req.token_budget)),
+            bool(req.apply_on_finish),
+            max(1, int(req.max_candidates)),
+            bool(req.include_judge),
+            selected_case_uuids,
+        ],
+        task_id=celery_task_id,
+    )
+    return {"run_uuid": run.uuid, "status": "queued"}
+
+
+@router.get("/search-sets/{uuid}/optimize/active")
+async def get_active_extraction_optimization(
+    uuid: str,
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Return the active (queued/running) optimization run, or null."""
+    from app.models.extraction_optimization_run import ExtractionOptimizationRun
+    from app.services.extraction_optimizer import reap_one
+
+    ss = await _get_search_set_or_404(uuid, user)
+    run = await ExtractionOptimizationRun.find_one(
+        ExtractionOptimizationRun.search_set_uuid == ss.uuid,
+        {"status": {"$in": ["queued", "running"]}},
+    )
+    # Self-heal an orphaned run on read; if reaped it's no longer active.
+    run = await reap_one(run)
+    if run is not None and run.status not in ("queued", "running"):
+        run = None
+    return {"run": _serialize_extraction_optimization_run(run) if run else None}
+
+
+def _summarise_extraction_optimization_run(run) -> dict:
+    """Compact projection of a run for history list views — drops trials and
+    field_breakdown that bloat the response and aren't needed for a list.
+    Mirrors the shape KB's _summarise_optimization_run uses so the shared
+    frontend list pattern works."""
+    return {
+        "uuid": run.uuid,
+        "search_set_uuid": run.search_set_uuid,
+        "status": run.status,
+        "started_at": run.started_at.isoformat() if run.started_at else None,
+        "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+        "token_budget": run.token_budget,
+        "tokens_used": run.tokens_used,
+        "baseline_no_tool_score": run.baseline_no_tool_score,
+        "baseline_default_score": run.baseline_default_score,
+        "optimized_score": run.optimized_score,
+        "judge_model": run.judge_model,
+        "num_trials": len(run.trials or []),
+        "best_config": run.best_config,
+        "options": run.options,
+        "error_message": run.error_message,
+    }
+
+
+@router.get("/search-sets/{uuid}/optimize")
+async def list_extraction_optimization_history(
+    uuid: str,
+    limit: int = Query(20, ge=1, le=100),
+    skip: int = Query(0, ge=0),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """List past optimization runs for this SearchSet, newest first.
+
+    Returns compact summaries (without per-trial detail) so a long history
+    doesn't blow up response size. Use ``GET .../optimize/{run_uuid}`` to fetch
+    the full payload for a specific run.
+    """
+    from app.models.extraction_optimization_run import ExtractionOptimizationRun
+
+    ss = await _get_search_set_or_404(uuid, user)
+    runs = await (
+        ExtractionOptimizationRun.find(ExtractionOptimizationRun.search_set_uuid == ss.uuid)
+        .sort("-started_at")
+        .skip(skip)
+        .limit(limit)
+        .to_list()
+    )
+    return {
+        "items": [_summarise_extraction_optimization_run(r) for r in runs],
+        "skip": skip,
+        "limit": limit,
+        "count": len(runs),
+    }
+
+
+@router.get("/search-sets/{uuid}/optimize/{run_uuid}")
+async def get_extraction_optimization(
+    uuid: str,
+    run_uuid: str,
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Full state of an optimization run (for polling)."""
+    from app.models.extraction_optimization_run import ExtractionOptimizationRun
+    from app.services.extraction_optimizer import reap_one
+
+    ss = await _get_search_set_or_404(uuid, user)
+    run = await ExtractionOptimizationRun.find_one(
+        ExtractionOptimizationRun.uuid == run_uuid,
+        ExtractionOptimizationRun.search_set_uuid == ss.uuid,
+    )
+    if not run:
+        raise HTTPException(status_code=404, detail="Optimization run not found")
+    # Self-heal a forever-"Cancelling…"/"Running…" run the next time it's polled.
+    run = await reap_one(run)
+    return _serialize_extraction_optimization_run(run)
+
+
+@router.post("/search-sets/{uuid}/optimize/{run_uuid}/cancel")
+async def cancel_extraction_optimization(
+    uuid: str,
+    run_uuid: str,
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Request cancellation.
+
+    The worker re-reads this flag every few seconds and finalizes promptly. We
+    also hard-revoke the Celery task as a fallback for a worker too wedged to
+    reach its next poll; if even that fails, the stale-run watchdog finalizes
+    the run on the next read.
+    """
+    from app.models.extraction_optimization_run import ExtractionOptimizationRun
+    from app.services.extraction_optimizer import _revoke_task
+
+    ss = await _get_search_set_or_404(uuid, user, manage=True)
+    run = await ExtractionOptimizationRun.find_one(
+        ExtractionOptimizationRun.uuid == run_uuid,
+        ExtractionOptimizationRun.search_set_uuid == ss.uuid,
+    )
+    if not run:
+        raise HTTPException(status_code=404, detail="Optimization run not found")
+    if run.status not in ("queued", "running"):
+        return {"ok": True, "status": run.status, "note": "not running"}
+    run.cancel_requested = True
+    run.cancel_requested_at = datetime.datetime.now(tz=datetime.timezone.utc)
+    await run.save()
+    _revoke_task(run)
+    return {"ok": True, "status": "cancel_requested"}
+
+
+class ApplyExtractionOptimizationRequest(BaseModel):
+    # Minimum cross-field pass-rate (0..1) the winning config must hit on the
+    # rules evaluated during the run. When omitted, the check is skipped.
+    # When set and the winner's pass_rate falls below this, returns 409 with
+    # the violating rules unless ``force=True``.
+    min_cf_pass_rate: Optional[float] = None
+    # Override the cross-field gate. Use when the user has reviewed the
+    # violations and still wants the config applied.
+    force: bool = False
+
+
+@router.post("/search-sets/{uuid}/optimize/{run_uuid}/apply")
+async def apply_extraction_optimization(
+    uuid: str,
+    run_uuid: str,
+    # Body is optional — the existing UI calls this endpoint with no body. Use
+    # ``Body(None)`` so FastAPI treats a missing body as None rather than 422.
+    req: Optional[ApplyExtractionOptimizationRequest] = Body(default=None),
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Apply a completed run's best_config to the SearchSet override.
+
+    When ``min_cf_pass_rate`` is supplied and the winning config's cross-field
+    pass rate falls below it, returns 409 with a structured payload listing the
+    failing rules. The caller can resubmit with ``force=True`` to apply anyway.
+    """
+    from app.models.extraction_optimization_run import ExtractionOptimizationRun
+
+    ss = await _get_search_set_or_404(uuid, user, manage=True)
+    run = await ExtractionOptimizationRun.find_one(
+        ExtractionOptimizationRun.uuid == run_uuid,
+        ExtractionOptimizationRun.search_set_uuid == ss.uuid,
+    )
+    if not run:
+        raise HTTPException(status_code=404, detail="Optimization run not found")
+    if run.status != "completed":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot apply — run status is '{run.status}', expected 'completed'",
+        )
+    if not run.best_config:
+        raise HTTPException(status_code=400, detail="Run has no best_config to apply")
+
+    # Normalize missing body to a defaults instance — UI callers don't send one.
+    body = req or ApplyExtractionOptimizationRequest()
+
+    # Cross-field apply-gate. Only meaningful when the run actually evaluated
+    # rules (winner_cross_field_summary populated and has a decisive pass_rate).
+    if (
+        body.min_cf_pass_rate is not None
+        and not body.force
+        and run.winner_cross_field_summary
+    ):
+        cf_pass_rate = run.winner_cross_field_summary.get("pass_rate")
+        if cf_pass_rate is not None and cf_pass_rate < float(body.min_cf_pass_rate):
+            failing = [
+                {
+                    "rule_id": r.get("rule_id"),
+                    "type": r.get("type"),
+                    "label": r.get("label"),
+                    "pass": r.get("pass"),
+                    "fail": r.get("fail"),
+                    "pass_rate": r.get("pass_rate"),
+                }
+                for r in (run.winner_cross_field_rule_breakdown or [])
+                if (r.get("fail") or 0) > 0
+            ]
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "cross_field_below_threshold",
+                    "message": (
+                        f"Winning config's cross-field pass rate is "
+                        f"{cf_pass_rate:.0%}, below the requested minimum of "
+                        f"{float(req.min_cf_pass_rate):.0%}. Re-submit with "
+                        "force=true to apply anyway."
+                    ),
+                    "pass_rate": cf_pass_rate,
+                    "min_required": float(req.min_cf_pass_rate),
+                    "failing_rules": failing,
+                },
+            )
+
+    # Persist previous override on the run so revert can restore it.
+    run.previous_override = ss.extraction_config_override
+    ss.extraction_config_override = dict(run.best_config)
+    ss.extraction_config_override_set_at = datetime.datetime.now(tz=datetime.timezone.utc)
+    await ss.save()
+    await run.save()
+
+    # Close the loop: re-validate the test set with the applied config so the
+    # completed-state panel can show "optimizer score → real post-apply score."
+    # Synchronous so the UI's refetch sees post_apply_validation populated.
+    from app.services.extraction_optimizer import run_post_apply_validation
+    await run_post_apply_validation(
+        run_doc=run,
+        search_set_uuid=ss.uuid,
+        user_id=user.user_id,
+        source="explicit_apply",
+    )
+
+    # Phase 4: record this apply on the unified quality timeline. Prefer the
+    # authoritative post-apply score (0..1 unit, just stamped onto the run by
+    # run_post_apply_validation) so the timeline marker agrees with the certified
+    # quality tile; fall back to the optimizer's in-run headline only if the
+    # post-apply validation didn't run.
+    try:
+        from app.services import quality_service as _qs
+        _post = run.post_apply_validation or {}
+        _post_unit = _post.get("score")
+        score_pct = (
+            float(_post_unit * 100.0) if _post_unit is not None
+            else float((run.optimized_score or 0.0) * 100.0)
+        )
+        await _qs.record_optimizer_apply(
+            item_kind="search_set",
+            item_id=ss.uuid,
+            item_name=getattr(ss, "title", "") or "",
+            run_type="extraction",
+            score=score_pct,
+            user_id=user.user_id,
+            source_run_uuid=run.uuid,
+            applied_config=ss.extraction_config_override,
+            judge_model=run.judge_model,
+            judge_variance=run.judge_variance,
+        )
+    except Exception:
+        logger.warning("Failed to record optimizer-apply ValidationRun for SearchSet %s", ss.uuid)
+
+    return {"ok": True, "applied_config": ss.extraction_config_override}
+
+
+# ---------------------------------------------------------------------------
+# Optimizer apply-back: write the chosen config to extraction_config_override.
+# Revert clears it. The optimization-run document records what was overridden
+# so future revert/apply cycles still see the original authored config.
+# ---------------------------------------------------------------------------
+
+
+class ApplyExtractionConfigRequest(BaseModel):
+    config: dict  # the optimizer-chosen config to apply
+
+
+@router.post("/search-sets/{uuid}/apply-config")
+async def apply_extraction_config(
+    uuid: str,
+    req: ApplyExtractionConfigRequest,
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Apply an optimizer-chosen extraction config to this SearchSet.
+
+    Sets ``extraction_config_override`` (takes precedence over the user's
+    authored ``extraction_config`` at run time). The previous override (if
+    any) is included in the response so callers can persist it for revert.
+    """
+    if not isinstance(req.config, dict) or not req.config:
+        raise HTTPException(status_code=400, detail="config must be a non-empty dict")
+    ss = await _get_search_set_or_404(uuid, user, manage=True)
+    previous = ss.extraction_config_override
+    ss.extraction_config_override = req.config
+    ss.extraction_config_override_set_at = datetime.datetime.now(tz=datetime.timezone.utc)
+    await ss.save()
+    return {
+        "ok": True,
+        "applied_at": ss.extraction_config_override_set_at.isoformat(),
+        "previous_override": previous,
+    }
+
+
+@router.post("/search-sets/{uuid}/revert-config")
+async def revert_extraction_config(
+    uuid: str,
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Clear the optimizer override. The user's authored extraction_config is
+    used again at run time.
+    """
+    ss = await _get_search_set_or_404(uuid, user, manage=True)
+    ss.extraction_config_override = None
+    ss.extraction_config_override_set_at = None
+    await ss.save()
+    return {"ok": True}
+
+
 @router.post("/validate")
 @limiter.limit("10/minute")
 async def run_validation(request: Request, req: RunValidationRequest, user: User = Depends(get_current_user)) -> dict:
@@ -1170,18 +2075,49 @@ async def run_validation_v2(request: Request, req: RunValidationV2Request, user:
 async def get_cross_field_rules(uuid: str, user: User = Depends(get_current_user)) -> dict:
     """Get cross-field validation rules for a search set."""
     ss = await _get_search_set_or_404(uuid, user)
-    return {"rules": ss.cross_field_rules}
+    rules = ss.normalized_cross_field_rules()
+    # Stamp normalized ids/counters back to disk on read — one-time migration
+    # for legacy rules. After this, every persisted rule carries an id.
+    if rules != ss.cross_field_rules:
+        ss.cross_field_rules = rules
+        await ss.save()
+    return {"rules": rules}
 
 
 @router.put("/search-sets/{uuid}/cross-field-rules")
 async def update_cross_field_rules(uuid: str, request: Request, user: User = Depends(get_current_user)) -> dict:
-    """Update cross-field validation rules for a search set."""
+    """Update cross-field validation rules for a search set.
+
+    Preserves counters on rules that the client sends back with an existing
+    id — UI edits the params but shouldn't reset eval/pass/fail history.
+    """
+    from app.services.cross_field_rules import (
+        normalize_rules,
+        validate_rule_shape,
+    )
+
     body = await request.json()
-    rules = body.get("rules", [])
+    incoming = body.get("rules", [])
 
     ss = await _get_search_set_or_404(uuid, user, manage=True)
 
-    ss.cross_field_rules = rules
+    for r in incoming:
+        ok, err = validate_rule_shape(r)
+        if not ok:
+            raise HTTPException(status_code=400, detail=err)
+
+    existing_by_id = {r.get("id"): r for r in ss.cross_field_rules if r.get("id")}
+    merged: list[dict] = []
+    for incoming_rule in incoming:
+        rid = incoming_rule.get("id")
+        if rid and rid in existing_by_id:
+            base = dict(existing_by_id[rid])
+            base.update(incoming_rule)
+            merged.append(base)
+        else:
+            merged.append(incoming_rule)
+
+    ss.cross_field_rules = normalize_rules(merged)
     await ss.save()
     return {"rules": ss.cross_field_rules}
 
@@ -1197,13 +2133,57 @@ async def validate_cross_field(uuid: str, request: Request, user: User = Depends
     if not ss.cross_field_rules:
         return {"results": [], "message": "No cross-field rules defined"}
 
-    from app.services.cross_field_validation import CrossFieldValidator
+    from app.services.cross_field_validation import CrossFieldValidator, summarize_results
     validator = CrossFieldValidator()
-    results = validator.validate(data, ss.cross_field_rules)
-
-    passed = sum(1 for r in results if r["passed"])
-    total = len(results)
+    rules = ss.normalized_cross_field_rules()
+    results = validator.validate(data, rules)
+    summary = summarize_results(results)
     return {
         "results": results,
-        "summary": {"passed": passed, "failed": total - passed, "total": total},
+        "summary": summary,
     }
+
+
+@router.post("/search-sets/{uuid}/cross-field-rules/{rule_id}/mark-false-positive")
+async def mark_rule_false_positive(
+    uuid: str,
+    rule_id: str,
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Mark a rule's most recent verdict as a false positive.
+
+    Bumps the rule's fp_count. If fp_count/eval_count crosses the threshold,
+    the rule is auto-disabled so it stops dragging down the optimizer score
+    until the user fixes or re-enables it.
+    """
+    from app.services.cross_field_rules import apply_false_positive, normalize_rules
+
+    ss = await _get_search_set_or_404(uuid, user, manage=True)
+    rules = ss.normalized_cross_field_rules()
+    changed, rule = apply_false_positive(rules, rule_id)
+    if not changed:
+        raise HTTPException(status_code=404, detail="Rule not found")
+    ss.cross_field_rules = normalize_rules(rules)
+    await ss.save()
+    return {"rule": rule}
+
+
+@router.post("/search-sets/{uuid}/cross-field-rules/suggest")
+async def suggest_cross_field_rules(uuid: str, user: User = Depends(get_current_user)) -> dict:
+    """Propose cross-field rules from the search set's field metadata."""
+    from app.services.cross_field_rules import suggest_rules
+    from app.services.search_set_service import (
+        get_extraction_field_metadata,
+        infer_numeric_fields,
+    )
+
+    ss = await _get_search_set_or_404(uuid, user)
+    field_metadata = await get_extraction_field_metadata(ss.uuid)
+    # Stamp a data-driven numeric/text verdict (from past validation runs) onto
+    # each field so the suggester won't sum a text field into a numeric total.
+    numeric_by_field = await infer_numeric_fields(ss.uuid)
+    for fm in field_metadata:
+        if fm.get("key") in numeric_by_field:
+            fm["is_numeric"] = numeric_by_field[fm["key"]]
+    suggestions = suggest_rules(field_metadata, ss.normalized_cross_field_rules())
+    return {"suggestions": suggestions}

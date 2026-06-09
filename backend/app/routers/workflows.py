@@ -5,12 +5,13 @@ import base64
 import csv
 import io
 import json
+import logging
 import re
 import zipfile
 
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel
 
 from app.dependencies import get_api_key_user, get_current_user
@@ -41,7 +42,29 @@ from app.rate_limit import limiter
 from app.services import workflow_service as svc
 from app.services.user_lookup import resolve_author, resolve_authors
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter()
+
+
+async def _check_validation_input_documents_exist(uuids: list[str]) -> dict[str, bool]:
+    """Return {uuid: exists} for the supplied document UUIDs.
+
+    A soft-deleted doc is treated as gone — the UI should warn the user
+    before they try to run the workflow with it.
+    """
+    from app.models.document import SmartDocument
+
+    if not uuids:
+        return {}
+    unique = list({u for u in uuids if u})
+    if not unique:
+        return {}
+    found = await SmartDocument.find(
+        {"uuid": {"$in": unique}, "soft_deleted": {"$ne": True}}
+    ).to_list()
+    present = {d.uuid for d in found}
+    return {u: (u in present) for u in unique}
 
 
 async def _workflow_response_from_dict(wf: dict) -> WorkflowResponse:
@@ -111,31 +134,6 @@ def _parse_structured_string(text: str):
     return None
 
 
-def _strip_markdown(text: str) -> str:
-    """Remove common markdown formatting for plain-text output."""
-    text = re.sub(r"^#{1,6}\s+", "", text, flags=re.MULTILINE)
-    text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
-    text = re.sub(r"\*(.+?)\*", r"\1", text)
-    text = re.sub(r"`(.+?)`", r"\1", text)
-    return text
-
-
-_PDF_UNICODE_REPLACEMENTS = str.maketrans({
-    "‘": "'", "’": "'", "‚": "'", "‛": "'",
-    "“": '"', "”": '"', "„": '"', "‟": '"',
-    "–": "-", "—": "-", "−": "-", "‐": "-", "‑": "-",
-    "…": "...", " ": " ", "​": "", "‌": "", "‍": "",
-    "•": "*", "·": "*", "™": "(TM)", "®": "(R)", "©": "(C)",
-})
-
-
-def _pdf_safe(value) -> str:
-    """Coerce a value to a latin-1-safe string for fpdf core fonts."""
-    text = value if isinstance(value, str) else ("" if value is None else str(value))
-    text = text.translate(_PDF_UNICODE_REPLACEMENTS)
-    return text.encode("latin-1", errors="replace").decode("latin-1")
-
-
 _INLINE_BOLD = re.compile(r"\*\*(.+?)\*\*")
 _INLINE_ITALIC = re.compile(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)")
 _INLINE_CODE = re.compile(r"`(.+?)`")
@@ -173,14 +171,140 @@ def _add_runs_with_formatting(paragraph, text: str) -> None:
         pos = next_match.end()
 
 
+# Separator row of a GitHub-flavored markdown table (e.g. ``|---|:--:|-|``).
+# One-or-more dashes per column matches the GFM spec (and remark-gfm, which the
+# UI renders with), so a model emitting ``|--|--|`` still yields a real table.
+# Kept identical to pdf_service so DOCX and PDF detect the same tables.
+_MD_TABLE_SEP_RE = re.compile(r"^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$")
+# Horizontal rule: 3+ repeats of the same -, * or _ (e.g. ``---``). Mirrors
+# pdf_service so a standalone rule renders as a line, not literal text.
+_MD_HR_RE = re.compile(r"^\s{0,3}([-*_])(\s*\1){2,}\s*$")
+
+
+def _split_md_table_row(line: str) -> list[str]:
+    """Split a markdown table row into trimmed cell strings."""
+    line = line.strip()
+    if line.startswith("|"):
+        line = line[1:]
+    if line.endswith("|"):
+        line = line[:-1]
+    # Honor backslash-escaped pipes by stashing them behind a placeholder.
+    line = line.replace(r"\|", "\x00")
+    return [c.strip().replace("\x00", "|") for c in line.split("|")]
+
+
+# Downloaded-table theme — matches the gold PDF header in pdf_service so Word and
+# PDF downloads share the Vandalizer brand look (UI highlight color #eab308).
+_DOCX_TABLE_HEADER_FILL = "EAB308"   # brand gold header fill
+_DOCX_TABLE_STRIPE_FILL = "FDF9EB"   # faint gold tint for zebra striping
+_DOCX_TABLE_BORDER = "E5E7EB"        # light-gray grid
+_DOCX_HEADING_HEX = "191919"         # charcoal headings (override Word's blue)
+
+
+def _shade_docx_cell(cell, fill_hex: str) -> None:
+    """Set a table cell's background fill (python-docx has no high-level API)."""
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+
+    shd = OxmlElement("w:shd")
+    shd.set(qn("w:val"), "clear")
+    shd.set(qn("w:color"), "auto")
+    shd.set(qn("w:fill"), fill_hex)
+    cell._tc.get_or_add_tcPr().append(shd)
+
+
+def _set_docx_table_borders(table, color_hex: str) -> None:
+    """Apply a thin single-line grid border (color_hex) to every table edge."""
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+
+    borders = OxmlElement("w:tblBorders")
+    for edge in ("top", "left", "bottom", "right", "insideH", "insideV"):
+        el = OxmlElement(f"w:{edge}")
+        el.set(qn("w:val"), "single")
+        el.set(qn("w:sz"), "4")       # 4 eighths-of-a-point = 0.5pt
+        el.set(qn("w:space"), "0")
+        el.set(qn("w:color"), color_hex)
+        borders.append(el)
+    table._tbl.tblPr.append(borders)
+
+
+def _add_docx_hr(doc) -> None:
+    """Render a markdown horizontal rule as an empty paragraph with a thin,
+    light-gray bottom border (Word has no native ``<hr>``)."""
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+
+    p = doc.add_paragraph()
+    p_pr = p._p.get_or_add_pPr()
+    borders = OxmlElement("w:pBdr")
+    bottom = OxmlElement("w:bottom")
+    bottom.set(qn("w:val"), "single")
+    bottom.set(qn("w:sz"), "6")
+    bottom.set(qn("w:space"), "1")
+    bottom.set(qn("w:color"), _DOCX_TABLE_BORDER)
+    borders.append(bottom)
+    p_pr.append(borders)
+
+
+def _apply_docx_table_theme(table) -> None:
+    """Apply the Vandalizer gold table theme to a Word table.
+
+    Gold (#eab308) header row with bold black text, faint gold zebra striping on
+    body rows, and a light-gray grid. Replaces the built-in (blue) ``Light Grid
+    Accent 1`` style so DOCX downloads match the gold-headed PDF tables.
+    """
+    table.style = "Table Grid"
+    _set_docx_table_borders(table, _DOCX_TABLE_BORDER)
+    rows = table.rows
+    if not rows:
+        return
+    for cell in rows[0].cells:
+        _shade_docx_cell(cell, _DOCX_TABLE_HEADER_FILL)
+        for para in cell.paragraphs:
+            for run in para.runs:
+                run.bold = True
+    for idx, row in enumerate(rows[1:], start=1):
+        if idx % 2 == 0:  # zebra-stripe every other body row
+            for cell in row.cells:
+                _shade_docx_cell(cell, _DOCX_TABLE_STRIPE_FILL)
+
+
+def _add_markdown_table_to_docx(doc, headers: list[str], rows: list[list[str]]) -> None:
+    """Render parsed markdown-table cells as a real Word table.
+
+    Uses the shared gold table theme (see ``_apply_docx_table_theme``), with
+    inline **bold**/*italic*/`code` honored inside every cell.
+    """
+    col_count = max(len(headers), max((len(r) for r in rows), default=0)) or 1
+    headers = headers + [""] * (col_count - len(headers))
+
+    table = doc.add_table(rows=1, cols=col_count)
+
+    hdr_cells = table.rows[0].cells
+    for i, h in enumerate(headers):
+        _add_runs_with_formatting(hdr_cells[i].paragraphs[0], h)
+
+    for row in rows:
+        row = row + [""] * (col_count - len(row))
+        cells = table.add_row().cells
+        for i in range(col_count):
+            _add_runs_with_formatting(cells[i].paragraphs[0], row[i])
+
+    _apply_docx_table_theme(table)
+
+
 def _markdown_to_docx(text: str):
     """Render a markdown-ish string into a python-docx Document.
 
-    Handles ATX headings, unordered/ordered lists, blank-line paragraphs, and
-    inline bold/italic/code. Unknown syntax falls back to a plain paragraph.
+    Handles ATX headings, unordered/ordered lists, GitHub-flavored tables,
+    blank-line paragraphs, and inline bold/italic/code. Unknown syntax falls
+    back to a plain paragraph.
     """
     from docx import Document
-    from docx.shared import Inches, Pt
+    from docx.shared import Inches, Pt, RGBColor
+
+    heading_color = RGBColor.from_string(_DOCX_HEADING_HEX)
 
     doc = Document()
     for section in doc.sections:
@@ -194,32 +318,62 @@ def _markdown_to_docx(text: str):
     style.font.size = Pt(11)
 
     lines = (text or "").splitlines()
-    for raw in lines:
-        line = raw.rstrip()
+    n = len(lines)
+    i = 0
+    while i < n:
+        line = lines[i].rstrip()
         if not line.strip():
             doc.add_paragraph()
+            i += 1
+            continue
+
+        # Markdown table — a header row followed by a dash-separator row. Consume
+        # the header, separator, and all contiguous body rows into a real table.
+        if "|" in line and i + 1 < n and _MD_TABLE_SEP_RE.match(lines[i + 1].rstrip()):
+            headers = _split_md_table_row(line)
+            i += 2  # skip header + separator
+            rows: list[list[str]] = []
+            while i < n:
+                body = lines[i].rstrip()
+                if not body.strip() or "|" not in body:
+                    break
+                rows.append(_split_md_table_row(body))
+                i += 1
+            _add_markdown_table_to_docx(doc, headers, rows)
+            continue
+
+        # Horizontal rule (``---`` / ``***`` / ``___``) → a thin border, not text.
+        if _MD_HR_RE.match(line):
+            _add_docx_hr(doc)
+            i += 1
             continue
 
         heading = re.match(r"^(#{1,6})\s+(.+)$", line)
         if heading:
             level = min(len(heading.group(1)), 4)
-            doc.add_heading(heading.group(2).strip(), level=level)
+            h = doc.add_heading(heading.group(2).strip(), level=level)
+            for run in h.runs:
+                run.font.color.rgb = heading_color  # charcoal, not Word's blue
+            i += 1
             continue
 
         bullet = re.match(r"^\s*[-*+]\s+(.+)$", line)
         if bullet:
             p = doc.add_paragraph(style="List Bullet")
             _add_runs_with_formatting(p, bullet.group(1).strip())
+            i += 1
             continue
 
         numbered = re.match(r"^\s*\d+\.\s+(.+)$", line)
         if numbered:
             p = doc.add_paragraph(style="List Number")
             _add_runs_with_formatting(p, numbered.group(1).strip())
+            i += 1
             continue
 
         p = doc.add_paragraph()
         _add_runs_with_formatting(p, line)
+        i += 1
 
     return doc
 
@@ -248,17 +402,15 @@ def _data_to_docx_bytes(data) -> bytes:
         doc.styles["Normal"].font.size = Pt(11)
         headers = list(dict.fromkeys(k for row in data for k in row.keys()))
         table = doc.add_table(rows=1, cols=len(headers))
-        table.style = "Light Grid Accent 1"
         hdr_cells = table.rows[0].cells
         for i, h in enumerate(headers):
             hdr_cells[i].text = str(h)
-            for run in hdr_cells[i].paragraphs[0].runs:
-                run.bold = True
         for row in data:
             cells = table.add_row().cells
             for i, h in enumerate(headers):
                 val = row.get(h, "")
                 cells[i].text = json.dumps(val, default=str) if isinstance(val, (dict, list)) else str(val if val is not None else "")
+        _apply_docx_table_theme(table)
     elif isinstance(data, dict):
         doc = Document()
         for section in doc.sections:
@@ -267,17 +419,14 @@ def _data_to_docx_bytes(data) -> bytes:
         doc.styles["Normal"].font.name = "Arial"
         doc.styles["Normal"].font.size = Pt(11)
         table = doc.add_table(rows=1, cols=2)
-        table.style = "Light Grid Accent 1"
         hdr = table.rows[0].cells
         hdr[0].text = "Field"
         hdr[1].text = "Value"
-        for cell in hdr:
-            for run in cell.paragraphs[0].runs:
-                run.bold = True
         for k, v in data.items():
             cells = table.add_row().cells
             cells[0].text = str(k)
             cells[1].text = json.dumps(v, default=str) if isinstance(v, (dict, list)) else str(v)
+        _apply_docx_table_theme(table)
     elif isinstance(data, list):
         doc = _markdown_to_docx("\n".join(f"- {item}" for item in data))
     else:
@@ -315,7 +464,8 @@ async def create_workflow(req: CreateWorkflowRequest, user: User = Depends(get_c
     created_by = await resolve_author(wf.created_by_user_id or wf.user_id)
     return WorkflowResponse(
         id=str(wf.id), name=wf.name, description=wf.description,
-        user_id=wf.user_id, num_executions=wf.num_executions,
+        user_id=wf.user_id, team_id=wf.team_id, num_executions=wf.num_executions,
+        can_manage=True,  # creator can always manage
         created_by=created_by,
     )
 
@@ -332,10 +482,13 @@ async def list_workflows(
     author_map = await resolve_authors(
         (wf.created_by_user_id or wf.user_id) for wf in workflows
     )
+    # One team-access lookup powers can_manage for every workflow in the page.
+    team_access = await access_control.get_team_access_context(user)
     return [
         WorkflowResponse(
             id=str(wf.id), name=wf.name, description=wf.description,
-            user_id=wf.user_id, num_executions=wf.num_executions,
+            user_id=wf.user_id, team_id=wf.team_id, num_executions=wf.num_executions,
+            can_manage=access_control.can_manage_workflow(wf, user, team_access),
             created_by=author_map.get(wf.created_by_user_id or wf.user_id),
         )
         for wf in workflows
@@ -451,6 +604,24 @@ async def download_results(
     if not status:
         raise HTTPException(status_code=404, detail="Workflow result not found")
 
+    # Build a base filename unique per session. Browsers cap auto-suffixing of
+    # duplicate downloads at ~5; past that, the same Content-Disposition name
+    # causes older files to be overwritten. Embedding the session id in the
+    # name guarantees uniqueness across manual runs.
+    workflow_name = status.get("workflow_name")
+    document_title = status.get("document_title")
+    name_parts: list[str] = []
+    if workflow_name:
+        name_parts.append(workflow_name)
+    else:
+        name_parts.append("results")
+    if document_title:
+        doc_stem = document_title.rsplit(".", 1)[0] if "." in document_title else document_title
+        name_parts.append(doc_stem)
+    name_parts.append(session_id[:8])
+    raw_base = "-".join(name_parts)
+    base_filename = "".join(c if c.isalnum() or c in " _-." else "_" for c in raw_base).strip() or f"results-{session_id[:8]}"
+
     final_output = status.get("final_output", {})
     steps_output = status.get("steps_output", {}) or {}
     output_step_names = [n for n in (status.get("output_step_names") or []) if n in steps_output]
@@ -474,7 +645,7 @@ async def download_results(
         return StreamingResponse(
             zip_buf,
             media_type="application/zip",
-            headers={"Content-Disposition": 'attachment; filename="deliverables.zip"'},
+            headers={"Content-Disposition": f'attachment; filename="{base_filename}.zip"'},
         )
 
     if len(output_step_names) == 1:
@@ -531,7 +702,7 @@ async def download_results(
         return StreamingResponse(
             io.BytesIO(buf.getvalue().encode()),
             media_type="text/csv",
-            headers={"Content-Disposition": 'attachment; filename="results.csv"'},
+            headers={"Content-Disposition": f'attachment; filename="{base_filename}.csv"'},
         )
 
     if format == "text":
@@ -549,91 +720,17 @@ async def download_results(
         return StreamingResponse(
             io.BytesIO(text.encode()),
             media_type="text/plain",
-            headers={"Content-Disposition": 'attachment; filename="results.txt"'},
+            headers={"Content-Disposition": f'attachment; filename="{base_filename}.txt"'},
         )
 
     if format == "pdf":
-        from fpdf import FPDF
-        from fpdf.fonts import FontFace
+        from app.services.pdf_service import render_workflow_pdf
 
-        data = output_data
-        if isinstance(data, str):
-            try:
-                data = json.loads(data)
-            except (json.JSONDecodeError, ValueError):
-                pass
-
-        pdf = FPDF()
-        pdf.set_auto_page_break(auto=True, margin=20)
-        pdf.add_page()
-        pdf.set_font("Helvetica", "B", 14)
-        pdf.cell(0, 10, _pdf_safe("Workflow Results"), new_x="LMARGIN", new_y="NEXT")
-        pdf.ln(4)
-
-        heading_style = FontFace(color=255, fill_color=(55, 65, 81), emphasis="BOLD")
-
-        if isinstance(data, list) and data and isinstance(data[0], dict):
-            headers = list(dict.fromkeys(k for row in data for k in row.keys()))
-            usable = pdf.w - pdf.l_margin - pdf.r_margin
-            # Smart column widths: allocate proportionally to max content length
-            max_lens = []
-            for h in headers:
-                col_max = len(str(h))
-                for row in data:
-                    col_max = max(col_max, len(str(row.get(h, ""))))
-                max_lens.append(min(col_max, 80))
-            total = sum(max_lens) or 1
-            col_widths = tuple(max(usable * (ml / total), 20) for ml in max_lens)
-
-            pdf.set_font("Helvetica", "", 9)
-            with pdf.table(
-                col_widths=col_widths,
-                headings_style=heading_style,
-                text_align="LEFT",
-            ) as table:
-                header_row = table.row()
-                for h in headers:
-                    header_row.cell(_pdf_safe(h))
-                for i, item in enumerate(data):
-                    row = table.row()
-                    for h in headers:
-                        val = item.get(h, "")
-                        cell_text = str(val) if val is not None else ""
-                        if isinstance(val, (dict, list)):
-                            cell_text = json.dumps(val, default=str)
-                        row.cell(_pdf_safe(cell_text))
-
-        elif isinstance(data, dict):
-            usable = pdf.w - pdf.l_margin - pdf.r_margin
-            pdf.set_font("Helvetica", "", 10)
-            with pdf.table(
-                col_widths=(usable * 0.3, usable * 0.7),
-                headings_style=heading_style,
-                text_align="LEFT",
-            ) as table:
-                header_row = table.row()
-                header_row.cell(_pdf_safe("Field"))
-                header_row.cell(_pdf_safe("Value"))
-                for k, v in data.items():
-                    row = table.row()
-                    row.cell(_pdf_safe(k))
-                    val_text = str(v) if not isinstance(v, (dict, list)) else json.dumps(v, default=str)
-                    row.cell(_pdf_safe(val_text))
-
-        elif isinstance(data, str):
-            text = _strip_markdown(data)
-            pdf.set_font("Helvetica", "", 10)
-            pdf.multi_cell(0, 5, _pdf_safe(text))
-        else:
-            pdf.set_font("Helvetica", "", 10)
-            pdf.multi_cell(0, 5, _pdf_safe(str(data) if data else ""))
-
-        pdf_buf = io.BytesIO(pdf.output())
-
+        pdf_bytes = render_workflow_pdf(output_data, title="Workflow Results")
         return StreamingResponse(
-            pdf_buf,
+            io.BytesIO(pdf_bytes),
             media_type="application/pdf",
-            headers={"Content-Disposition": 'attachment; filename="results.pdf"'},
+            headers={"Content-Disposition": f'attachment; filename="{base_filename}.pdf"'},
         )
 
     if format == "docx":
@@ -641,7 +738,7 @@ async def download_results(
         return StreamingResponse(
             io.BytesIO(docx_bytes),
             media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            headers={"Content-Disposition": 'attachment; filename="results.docx"'},
+            headers={"Content-Disposition": f'attachment; filename="{base_filename}.docx"'},
         )
 
     # Default: JSON
@@ -649,8 +746,70 @@ async def download_results(
     return StreamingResponse(
         io.BytesIO(json_bytes),
         media_type="application/json",
-        headers={"Content-Disposition": 'attachment; filename="results.json"'},
+        headers={"Content-Disposition": f'attachment; filename="{base_filename}.json"'},
     )
+
+
+class SaveOutputToFolderRequest(BaseModel):
+    folder_uuid: str
+    format: str = "pdf"  # pdf | markdown | csv | json | text
+    file_name: str | None = None
+
+
+@router.post("/sessions/{session_id}/save-to-folder")
+async def save_session_output_to_folder(
+    session_id: str,
+    req: SaveOutputToFolderRequest,
+    user: User = Depends(get_current_user),
+):
+    """Save a workflow run's output as a SmartDocument in the chosen SmartFolder.
+
+    Writes the rendered output to disk (PDF/Markdown/CSV/JSON/text) and inserts
+    a SmartDocument record so the file shows up in the user's file structure.
+    """
+    from app.models.workflow import WorkflowResult
+    from app.services.access_control import get_authorized_folder
+    from app.services.output_handlers import save_results_to_folder
+
+    valid_formats = {"pdf", "markdown", "csv", "json", "text"}
+    if req.format not in valid_formats:
+        raise HTTPException(status_code=400, detail=f"Invalid format. Use one of: {sorted(valid_formats)}")
+
+    result = await WorkflowResult.find_one(WorkflowResult.session_id == session_id)
+    if not result or not result.workflow:
+        raise HTTPException(status_code=404, detail="Workflow result not found")
+    wf = await get_authorized_workflow(str(result.workflow), user)
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow result not found")
+
+    folder = await get_authorized_folder(req.folder_uuid, user, manage=True)
+    if not folder:
+        raise HTTPException(status_code=404, detail="Folder not found")
+
+    storage_cfg: dict = {
+        "destination_folder": req.folder_uuid,
+        "format": req.format,
+        "on_rerun": "new",
+        "actor_user_id": user.user_id,
+    }
+    if req.file_name:
+        safe = "".join(c if c.isalnum() or c in " _-." else "_" for c in req.file_name).strip()
+        if safe:
+            storage_cfg["file_naming"] = safe.rsplit(".", 1)[0] if "." in safe else safe
+
+    result_doc = result.model_dump(by_alias=True)
+    result_doc["_id"] = result.id
+    result_doc["workflow"] = result.workflow
+
+    try:
+        file_path = await asyncio.to_thread(save_results_to_folder, result_doc, storage_cfg)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception:
+        logger.exception("Failed to save workflow output to folder")
+        raise HTTPException(status_code=500, detail="Failed to save output")
+
+    return {"ok": True, "folder_uuid": req.folder_uuid, "file_path": file_path}
 
 
 @router.get("/{workflow_id}/export")
@@ -732,11 +891,34 @@ async def import_into_workflow(
 
 
 @router.get("/{workflow_id}", response_model=WorkflowResponse)
-async def get_workflow(workflow_id: str, user: User = Depends(get_current_user)):
-    wf = await svc.get_workflow(workflow_id, user=user)
+async def get_workflow(
+    workflow_id: str,
+    share_token: str | None = Query(default=None),
+    user: User = Depends(get_current_user),
+):
+    wf = await svc.get_workflow(workflow_id, user=user, share_token=share_token)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
     return await _workflow_response_from_dict(wf)
+
+
+@router.post("/{workflow_id}/share-token")
+async def mint_workflow_share_token(workflow_id: str, user: User = Depends(get_current_user)):
+    """Mint (or return existing) view-only share token for a workflow.
+
+    Manager-level access required: owners and team owner/admin can issue
+    share links. Anyone holding the token can view and duplicate the
+    workflow but cannot edit the original.
+    """
+    import secrets
+
+    wf = await get_authorized_workflow(workflow_id, user, manage=True)
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    if not wf.share_token:
+        wf.share_token = secrets.token_urlsafe(32)
+        await wf.save()
+    return {"share_token": wf.share_token}
 
 
 @router.patch("/{workflow_id}", response_model=WorkflowResponse)
@@ -753,9 +935,10 @@ async def update_workflow(workflow_id: str, req: UpdateWorkflowRequest, user: Us
     created_by = await resolve_author(wf.created_by_user_id or wf.user_id)
     return WorkflowResponse(
         id=str(wf.id), name=wf.name, description=wf.description,
-        user_id=wf.user_id, num_executions=wf.num_executions,
+        user_id=wf.user_id, team_id=wf.team_id, num_executions=wf.num_executions,
         input_config=wf.input_config,
         output_config=wf.output_config,
+        can_manage=True,  # update already enforced manage authorization
         created_by=created_by,
     )
 
@@ -769,12 +952,51 @@ async def delete_workflow(workflow_id: str, user: User = Depends(get_current_use
 
 
 @router.post("/{workflow_id}/duplicate", response_model=WorkflowResponse)
-async def duplicate_workflow(workflow_id: str, user: User = Depends(get_current_user)):
+async def duplicate_workflow(
+    workflow_id: str,
+    share_token: str | None = Query(default=None),
+    user: User = Depends(get_current_user),
+):
     team_id = str(user.current_team) if user.current_team else None
-    wf = await svc.duplicate_workflow(workflow_id, user=user, user_id=user.user_id, team_id=team_id)
+    wf = await svc.duplicate_workflow(
+        workflow_id,
+        user=user,
+        user_id=user.user_id,
+        team_id=team_id,
+        share_token=share_token,
+    )
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
     return await _workflow_response_from_dict(wf)
+
+
+@router.delete("/{workflow_id}/team", response_model=WorkflowResponse)
+async def remove_workflow_from_team(workflow_id: str, user: User = Depends(get_current_user)):
+    """Remove a workflow from its team library without deleting it.
+
+    The workflow stays owned by its creator (``user_id``) and disappears from
+    every other team member's view. Allowed for the creator or a team
+    owner/admin (same set as ``can_manage_workflow``).
+    """
+    try:
+        wf = await svc.remove_workflow_from_team(workflow_id, user=user)
+    except svc.WorkflowNotInTeam:
+        raise HTTPException(status_code=400, detail="Workflow is not in a team")
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    created_by = await resolve_author(wf.created_by_user_id or wf.user_id)
+    return WorkflowResponse(
+        id=str(wf.id),
+        name=wf.name,
+        description=wf.description,
+        user_id=wf.user_id,
+        team_id=wf.team_id,
+        num_executions=wf.num_executions,
+        input_config=wf.input_config,
+        output_config=wf.output_config,
+        can_manage=True,  # caller just managed it; trivially true
+        created_by=created_by,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -920,6 +1142,15 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
         raise HTTPException(status_code=404, detail=str(e))
 
 
+@router.post("/sessions/{session_id}/cancel")
+async def cancel_workflow_run(session_id: str, user: User = Depends(get_current_user)):
+    """Stop an in-flight workflow run (single-run sessions)."""
+    result = await svc.cancel_workflow(session_id, user)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Workflow run not found")
+    return result
+
+
 @router.post("/steps/test")
 @limiter.limit("20/minute")
 async def test_step(request: Request, req: TestStepRequest, user: User = Depends(get_current_user)):
@@ -994,6 +1225,24 @@ async def get_workflow_quality_history(
         raise HTTPException(status_code=404, detail="Workflow not found")
     from app.services.quality_service import get_quality_history
     return {"runs": await get_quality_history("workflow", workflow_id, limit)}
+
+
+@router.get("/{workflow_id}/quality")
+async def get_workflow_quality(
+    workflow_id: str, user: User = Depends(get_current_user),
+):
+    """Phase 3 unified quality endpoint — mirrors ``/api/knowledge/{uuid}/quality``.
+
+    Returns ``{history, contract}`` so the shared QualityTimeline component
+    (Phase 4) can render workflow scores on the same axes as KB scores.
+    """
+    wf = await get_authorized_workflow(workflow_id, user)
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    from app.services import quality_service
+    history = await quality_service.get_quality_history("workflow", workflow_id)
+    contract = await quality_service.get_quality_contract_status("workflow", workflow_id)
+    return {"history": history, "contract": contract}
 
 
 @router.get("/{workflow_id}/quality-sparkline")
@@ -1130,8 +1379,8 @@ async def get_workflow_quality_status(
 @router.get("/{workflow_id}/validation-plan", response_model=ValidationPlanResponse)
 async def get_validation_plan(workflow_id: str, user: User = Depends(get_current_user)):
     try:
-        checks = await svc.get_validation_plan(workflow_id, user=user)
-        return ValidationPlanResponse(checks=checks)
+        plan_info = await svc.get_validation_plan(workflow_id, user=user)
+        return ValidationPlanResponse(**plan_info)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -1157,10 +1406,38 @@ async def generate_validation_plan(request: Request, workflow_id: str, user: Use
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@router.get("/{workflow_id}/validation-report")
+async def download_validation_report(
+    workflow_id: str,
+    format: str = Query("md"),
+    user: User = Depends(get_current_user),
+):
+    """Download the latest validation run as a report file (Markdown or JSON)."""
+    fmt = (format or "md").lower()
+    if fmt not in ("md", "json"):
+        raise HTTPException(status_code=400, detail="format must be 'md' or 'json'")
+    try:
+        filename, content, media_type = await svc.build_validation_report(
+            workflow_id, fmt, user=user,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return Response(
+        content=content,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/{workflow_id}/validation-inputs", response_model=ValidationInputsResponse)
 async def get_validation_inputs(workflow_id: str, user: User = Depends(get_current_user)):
     try:
         inputs = await svc.get_validation_inputs(workflow_id, user=user)
+        doc_uuids = [inp.get("document_uuid") for inp in inputs if inp.get("document_uuid")]
+        exists_map = await _check_validation_input_documents_exist(doc_uuids)
+        for inp in inputs:
+            if inp.get("document_uuid"):
+                inp["document_exists"] = exists_map.get(inp["document_uuid"], False)
         return ValidationInputsResponse(inputs=inputs)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -1231,6 +1508,76 @@ async def delete_expected_output(
     if not ok:
         raise HTTPException(status_code=404, detail="Expected output not found")
     return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Test-case generator — proposes expected_output entries without manual saves.
+# Removes the "No test inputs available" gate that blocks the optimizer for
+# any workflow whose user hasn't yet manually marked a run as expected.
+# ---------------------------------------------------------------------------
+
+
+class TestCaseProposeRequest(BaseModel):
+    limit: int = 5
+
+
+class TestCaseAcceptRequest(BaseModel):
+    session_ids: list[str]
+    label_overrides: dict[str, str] | None = None
+
+
+@router.post("/{workflow_id}/test-cases/propose")
+@limiter.limit("10/minute")
+async def propose_test_cases(
+    request: Request,
+    workflow_id: str,
+    body: TestCaseProposeRequest | None = None,
+    user: User = Depends(get_current_user),
+):
+    """Scan recent runs and return scored candidate test cases for review."""
+    from app.services import workflow_test_case_generator as tcg
+
+    limit = max(1, min(20, (body.limit if body else 5)))
+    try:
+        return await tcg.propose_from_history(workflow_id, user, limit=limit)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/{workflow_id}/test-cases/synthesize")
+@limiter.limit("5/minute")
+async def synthesize_test_case(
+    request: Request,
+    workflow_id: str,
+    user: User = Depends(get_current_user),
+):
+    """Synthesize a candidate input document for a workflow with no history."""
+    from app.services import workflow_test_case_generator as tcg
+
+    try:
+        return await tcg.synthesize_seed_input(workflow_id, user)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{workflow_id}/test-cases/accept")
+async def accept_test_cases(
+    workflow_id: str,
+    body: TestCaseAcceptRequest,
+    user: User = Depends(get_current_user),
+):
+    """Persist accepted proposals as expected_output entries."""
+    from app.services import workflow_test_case_generator as tcg
+
+    if not body.session_ids:
+        raise HTTPException(status_code=400, detail="session_ids is required")
+    try:
+        return await tcg.accept_proposals(
+            workflow_id, user, body.session_ids,
+            label_overrides=body.label_overrides,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 # ---------------------------------------------------------------------------
@@ -1317,3 +1664,354 @@ async def run_workflow_integrated(
         from app.models.activity import ActivityStatus
         await activity_service.activity_finish(activity.id, ActivityStatus.FAILED, error=str(e))
         raise HTTPException(status_code=404, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# Workflow Autovalidate (optimizer)
+#
+# Mirrors KB / extraction autovalidate routes: queue, poll, cancel, apply,
+# revert. The same shared frontend components consume these responses, so
+# the field names mirror the KB optimization run serializer where possible.
+# ---------------------------------------------------------------------------
+
+
+def _serialize_workflow_optimization_run(run) -> dict:
+    return {
+        "uuid": run.uuid,
+        "workflow_id": run.workflow_id,
+        "status": run.status,
+        "phase": run.phase,
+        "progress_message": run.progress_message,
+        "current_trial_index": run.current_trial_index,
+        "total_trials_planned": run.total_trials_planned,
+        "best_score_so_far": run.best_score_so_far,
+        "best_config_so_far": run.best_config_so_far,
+        "token_budget": run.token_budget,
+        "tokens_used": run.tokens_used,
+        "baseline_no_workflow_score": run.baseline_no_workflow_score,
+        "baseline_default_score": run.baseline_default_score,
+        "optimized_score": run.optimized_score,
+        "judge_variance": run.judge_variance,
+        "judge_score_se": run.judge_score_se,
+        "judge_model": run.judge_model,
+        "winner_selection_reason": run.winner_selection_reason,
+        "tied_with_baseline": run.tied_with_baseline,
+        "best_config": run.best_config,
+        "best_per_step_config": run.best_per_step_config,
+        "step_breakdown": run.step_breakdown,
+        "removed_steps": run.removed_steps,
+        "trials": run.trials,
+        "suggestions": run.suggestions,
+        "previous_override": run.previous_override,
+        "apply_preview": getattr(run, "apply_preview", None),
+        "options": run.options,
+        "error_message": run.error_message,
+        "started_at": run.started_at.isoformat() if run.started_at else None,
+        "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+        "cancel_requested": run.cancel_requested,
+    }
+
+
+def _summarise_workflow_optimization_run(run) -> dict:
+    return {
+        "uuid": run.uuid,
+        "workflow_id": run.workflow_id,
+        "status": run.status,
+        "started_at": run.started_at.isoformat() if run.started_at else None,
+        "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+        "token_budget": run.token_budget,
+        "tokens_used": run.tokens_used,
+        "baseline_no_workflow_score": run.baseline_no_workflow_score,
+        "baseline_default_score": run.baseline_default_score,
+        "optimized_score": run.optimized_score,
+        "judge_model": run.judge_model,
+        "num_trials": len(run.trials or []),
+        "best_config": run.best_config,
+        "options": run.options,
+        "error_message": run.error_message,
+    }
+
+
+@router.post("/{workflow_id}/optimize")
+async def start_workflow_optimization(
+    workflow_id: str, request: Request, user: User = Depends(get_current_user),
+):
+    """Kick off a Workflow Autovalidate optimization run.
+
+    Body (all optional):
+      - token_budget: int — 0 (default) uses ``max_candidates`` as the cap.
+      - max_candidates: int (default 10)
+      - apply_on_finish: bool (default false)
+      - include_judge: bool (default true — workflow scoring is judge-based)
+    """
+    wf = await get_authorized_workflow(workflow_id, user, manage=True)
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    body: dict = {}
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    try:
+        token_budget = int(body.get("token_budget", 0))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="token_budget must be an integer")
+    if token_budget < 0:
+        raise HTTPException(status_code=400, detail="token_budget must be >= 0")
+
+    try:
+        max_candidates = int(body.get("max_candidates", 10))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="max_candidates must be an integer")
+    if max_candidates < 1 or max_candidates > 50:
+        raise HTTPException(status_code=400, detail="max_candidates must be in [1, 50]")
+
+    apply_on_finish = bool(body.get("apply_on_finish", False))
+    include_judge = bool(body.get("include_judge", True))
+
+    from app.models.workflow_optimization_run import WorkflowOptimizationRun
+    active = await WorkflowOptimizationRun.find_one(
+        WorkflowOptimizationRun.workflow_id == workflow_id,
+        {"status": {"$in": ["queued", "running"]}},
+    )
+    if active:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Optimization already in progress for this workflow (run {active.uuid})",
+        )
+
+    run = WorkflowOptimizationRun(
+        workflow_id=workflow_id,
+        user_id=user.user_id,
+        status="queued",
+        token_budget=token_budget,
+        options={
+            "apply_on_finish": apply_on_finish,
+            "include_judge": include_judge,
+            "max_candidates": max_candidates,
+        },
+    )
+    await run.insert()
+
+    from app.tasks.workflow_optimization_tasks import optimize_workflow_task
+    optimize_workflow_task.delay(
+        workflow_id, user.user_id, run.uuid,
+        token_budget, apply_on_finish, max_candidates, include_judge,
+    )
+    return {"run_uuid": run.uuid, "status": "queued"}
+
+
+@router.get("/{workflow_id}/optimize/active")
+async def get_active_workflow_optimization(
+    workflow_id: str, user: User = Depends(get_current_user),
+):
+    wf = await get_authorized_workflow(workflow_id, user)
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    from app.models.workflow_optimization_run import WorkflowOptimizationRun
+    run = await WorkflowOptimizationRun.find_one(
+        WorkflowOptimizationRun.workflow_id == workflow_id,
+        {"status": {"$in": ["queued", "running"]}},
+    )
+    return {"run": _serialize_workflow_optimization_run(run) if run else None}
+
+
+@router.get("/{workflow_id}/optimize")
+async def list_workflow_optimization_history(
+    workflow_id: str,
+    limit: int = Query(20, ge=1, le=100),
+    skip: int = Query(0, ge=0),
+    user: User = Depends(get_current_user),
+):
+    """List past optimization runs for this workflow, newest first."""
+    wf = await get_authorized_workflow(workflow_id, user)
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    from app.models.workflow_optimization_run import WorkflowOptimizationRun
+    runs = await (
+        WorkflowOptimizationRun.find(WorkflowOptimizationRun.workflow_id == workflow_id)
+        .sort("-started_at")
+        .skip(skip)
+        .limit(limit)
+        .to_list()
+    )
+    return {
+        "items": [_summarise_workflow_optimization_run(r) for r in runs],
+        "skip": skip,
+        "limit": limit,
+        "count": len(runs),
+    }
+
+
+@router.get("/{workflow_id}/optimize/{run_uuid}")
+async def get_workflow_optimization(
+    workflow_id: str, run_uuid: str, user: User = Depends(get_current_user),
+):
+    """Full state of one optimization run (UI polls this while status=running)."""
+    wf = await get_authorized_workflow(workflow_id, user)
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    from app.models.workflow_optimization_run import WorkflowOptimizationRun
+    run = await WorkflowOptimizationRun.find_one(
+        WorkflowOptimizationRun.uuid == run_uuid,
+        WorkflowOptimizationRun.workflow_id == workflow_id,
+    )
+    if not run:
+        raise HTTPException(status_code=404, detail="Optimization run not found")
+    return _serialize_workflow_optimization_run(run)
+
+
+@router.post("/{workflow_id}/optimize/{run_uuid}/cancel")
+async def cancel_workflow_optimization(
+    workflow_id: str, run_uuid: str, user: User = Depends(get_current_user),
+):
+    """Request cancellation. The worker checks this flag between trials."""
+    wf = await get_authorized_workflow(workflow_id, user, manage=True)
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    from app.models.workflow_optimization_run import WorkflowOptimizationRun
+    run = await WorkflowOptimizationRun.find_one(
+        WorkflowOptimizationRun.uuid == run_uuid,
+        WorkflowOptimizationRun.workflow_id == workflow_id,
+    )
+    if not run:
+        raise HTTPException(status_code=404, detail="Optimization run not found")
+    if run.status not in ("queued", "running"):
+        return {"ok": True, "status": run.status, "note": "not running"}
+    run.cancel_requested = True
+    await run.save()
+    return {"ok": True, "status": "cancel_requested"}
+
+
+class ApplyWorkflowOptimizationRequest(BaseModel):
+    """Phase 3: optional per-step subset apply.
+
+    When ``step_ids`` is provided, only the listed steps' overrides are
+    promoted to the live config — useful when a user wants to ship the
+    one or two clearly-winning step changes without bundling in less
+    confident ones. ``None`` (the default) preserves the legacy
+    apply-whole-config behavior.
+    """
+    step_ids: list[str] | None = None
+
+
+@router.post("/{workflow_id}/optimize/{run_uuid}/apply")
+async def apply_workflow_optimization(
+    workflow_id: str,
+    run_uuid: str,
+    req: ApplyWorkflowOptimizationRequest | None = None,
+    user: User = Depends(get_current_user),
+):
+    """Apply a completed run's best config to ``Workflow.config_override``.
+
+    Optional body: ``{"step_ids": ["step-uuid-1", "step-uuid-2"]}`` to
+    promote only those step overrides (Phase 3 per-step apply). Omitting
+    the body — or sending ``{}`` — applies all winning step overrides,
+    matching the legacy behavior.
+    """
+    import datetime as _dt
+
+    wf = await get_authorized_workflow(workflow_id, user, manage=True)
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    from app.models.workflow_optimization_run import WorkflowOptimizationRun
+    run = await WorkflowOptimizationRun.find_one(
+        WorkflowOptimizationRun.uuid == run_uuid,
+        WorkflowOptimizationRun.workflow_id == workflow_id,
+    )
+    if not run:
+        raise HTTPException(status_code=404, detail="Optimization run not found")
+    if run.status != "completed":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot apply — run status is '{run.status}', expected 'completed'",
+        )
+    if not run.best_config:
+        raise HTTPException(status_code=400, detail="Run has no best_config to apply")
+
+    # Snapshot the previous override so revert is exact.
+    run.previous_override = wf.config_override
+    await run.save()
+
+    winning_overrides: dict = (run.best_config or {}).get("step_overrides") or {}
+    requested_step_ids = req.step_ids if req else None
+    if requested_step_ids is not None:
+        # Validate: every requested step_id must exist in the winning config.
+        unknown = [s for s in requested_step_ids if s not in winning_overrides]
+        if unknown:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown step_ids in winning config: {unknown}",
+            )
+        # Subset apply: start from the currently-live step_overrides (so the
+        # user's prior choices on other steps survive) and overlay only the
+        # selected ones from this run's winner.
+        live_overrides: dict = ((wf.config_override or {}).get("step_overrides") or {})
+        merged = dict(live_overrides)
+        for sid in requested_step_ids:
+            merged[sid] = winning_overrides[sid]
+        applied_overrides = merged
+    else:
+        applied_overrides = dict(winning_overrides)
+
+    wf.config_override = {
+        "step_overrides": applied_overrides,
+        "from_run_uuid": run.uuid,
+        "partial": requested_step_ids is not None,
+    }
+    wf.config_override_set_at = _dt.datetime.now(tz=_dt.timezone.utc)
+    await wf.save()
+
+    # Phase 4: record this apply on the unified quality timeline so workflow
+    # applies show up alongside validation runs in the shared QualityTimeline.
+    try:
+        from app.services import quality_service as _qs
+        score_pct = float((run.optimized_score or 0.0) * 100.0)
+        wf_name = getattr(wf, "name", "") or getattr(wf, "title", "") or ""
+        await _qs.record_optimizer_apply(
+            item_kind="workflow",
+            item_id=str(wf.id),
+            item_name=wf_name,
+            run_type="workflow",
+            score=score_pct,
+            user_id=user.user_id,
+            source_run_uuid=run.uuid,
+            applied_config=wf.config_override,
+            judge_model=run.judge_model,
+            judge_variance=run.judge_variance,
+        )
+    except Exception:
+        logger.warning("Failed to record optimizer-apply ValidationRun for workflow %s", wf.id)
+
+    return {
+        "ok": True,
+        "applied_config": wf.config_override,
+        "applied_step_ids": list(applied_overrides.keys()),
+        "partial": requested_step_ids is not None,
+    }
+
+
+@router.post("/{workflow_id}/optimize/{run_uuid}/revert")
+async def revert_workflow_optimization(
+    workflow_id: str, run_uuid: str, user: User = Depends(get_current_user),
+):
+    """Restore the config_override that was in effect before this run applied."""
+    import datetime as _dt
+
+    wf = await get_authorized_workflow(workflow_id, user, manage=True)
+    if not wf:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    from app.models.workflow_optimization_run import WorkflowOptimizationRun
+    run = await WorkflowOptimizationRun.find_one(
+        WorkflowOptimizationRun.uuid == run_uuid,
+        WorkflowOptimizationRun.workflow_id == workflow_id,
+    )
+    if not run:
+        raise HTTPException(status_code=404, detail="Optimization run not found")
+
+    wf.config_override = run.previous_override
+    wf.config_override_set_at = _dt.datetime.now(tz=_dt.timezone.utc) if run.previous_override else None
+    await wf.save()
+    return {"ok": True, "reverted_to": wf.config_override}

@@ -18,6 +18,7 @@ export function Register() {
           extraction: undefined,
           automation: undefined,
           kb: undefined,
+          workflow_share_token: undefined,
         }}
       />
     )

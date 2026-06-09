@@ -23,13 +23,22 @@ export interface ThemeConfig {
   highlight_text_color: string
   highlight_complement: string
   ui_radius: string
+  org_name: string
+  logo_data_url: string
+  icon_data_url: string
 }
 
 export function getThemeConfig() {
   return apiFetch<ThemeConfig>('/api/config/theme')
 }
 
-export function updateThemeConfig(data: { highlight_color?: string; ui_radius?: string }) {
+export function updateThemeConfig(data: {
+  highlight_color?: string
+  ui_radius?: string
+  org_name?: string
+  logo_data_url?: string
+  icon_data_url?: string
+}) {
   return apiFetch<ThemeConfig>('/api/config/theme', {
     method: 'PUT',
     body: JSON.stringify(data),

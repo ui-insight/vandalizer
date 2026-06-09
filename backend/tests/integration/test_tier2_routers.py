@@ -376,3 +376,51 @@ class TestDemoService:
 
         result = await demo_service.get_waitlist_status("nonexistent-uuid")
         assert result is None
+
+    async def test_admin_promote_user_clears_demo_flags(self, mongo_client):
+        import datetime
+        from app.models.demo import DemoApplication
+        from app.models.user import User
+        from app.services import demo_service
+
+        suffix = uuid.uuid4().hex[:6]
+        user = User(
+            user_id=f"u-promote-{suffix}",
+            email=f"promote-{suffix}@example.com",
+            is_demo_user=True,
+            demo_status="active",
+            demo_expires_at=datetime.datetime.now(datetime.timezone.utc)
+                + datetime.timedelta(days=7),
+        )
+        await user.insert()
+
+        app = DemoApplication(
+            uuid=f"app-promote-{suffix}",
+            name="Promote Me",
+            email=user.email,
+            organization="Test U",
+            status="active",
+            user_id=user.user_id,
+            created_at=datetime.datetime.now(datetime.timezone.utc),
+        )
+        await app.insert()
+
+        ok = await demo_service.admin_promote_user(app.uuid)
+        assert ok is True
+
+        reloaded_user = await User.find_one(User.user_id == user.user_id)
+        assert reloaded_user is not None
+        assert reloaded_user.is_demo_user is False
+        assert reloaded_user.demo_status is None
+        assert reloaded_user.demo_expires_at is None
+
+        reloaded_app = await DemoApplication.find_one(DemoApplication.uuid == app.uuid)
+        assert reloaded_app is not None
+        assert reloaded_app.status == "completed"
+        assert reloaded_app.admin_released is True
+
+    async def test_admin_promote_user_missing_returns_false(self, mongo_client):
+        from app.services import demo_service
+
+        ok = await demo_service.admin_promote_user("nonexistent-uuid")
+        assert ok is False

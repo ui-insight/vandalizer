@@ -6,7 +6,7 @@ Read-only-ish surface designed for service consumers — dashboards, agentic cod
 
 ## Issuing a key
 
-Only **superadmins** (`is_admin=True`, not `is_staff`) can issue management keys.
+**Admins and staff** (`is_admin=True` or `is_staff=True`) can issue management keys. Every issuance writes to the admin audit log.
 
 ### From the Admin UI
 

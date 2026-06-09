@@ -21,18 +21,28 @@ export function useKnowledgeBases() {
   })
 
   const removeMutation = useMutation({
-    mutationFn: (uuid: string) => api.deleteKnowledgeBase(uuid),
+    mutationFn: (args: { uuid: string; mode?: 'unshare_and_delete' }) =>
+      api.deleteKnowledgeBase(args.uuid, args.mode),
+    onSuccess: () => qc.invalidateQueries({ queryKey }),
+  })
+
+  const transferMutation = useMutation({
+    mutationFn: (uuid: string) => api.transferKnowledgeBaseToTeam(uuid),
     onSuccess: () => qc.invalidateQueries({ queryKey }),
   })
 
   const create = async (title: string, description?: string) =>
     createMutation.mutateAsync({ title, description })
 
-  const remove = async (uuid: string) => {
-    await removeMutation.mutateAsync(uuid)
+  const remove = async (uuid: string, mode?: 'unshare_and_delete') => {
+    await removeMutation.mutateAsync({ uuid, mode })
   }
 
-  return { knowledgeBases, loading, refresh, create, remove }
+  const transferToTeam = async (uuid: string) => {
+    await transferMutation.mutateAsync(uuid)
+  }
+
+  return { knowledgeBases, loading, refresh, create, remove, transferToTeam }
 }
 
 /** Scoped hook — uses the v2 list endpoint with scope, search, and pagination. */
@@ -59,7 +69,13 @@ export function useScopedKnowledgeBases(params?: {
   })
 
   const removeMutation = useMutation({
-    mutationFn: (uuid: string) => api.deleteKnowledgeBase(uuid),
+    mutationFn: (args: { uuid: string; mode?: 'unshare_and_delete' }) =>
+      api.deleteKnowledgeBase(args.uuid, args.mode),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['knowledgeBases'] }),
+  })
+
+  const transferMutation = useMutation({
+    mutationFn: (uuid: string) => api.transferKnowledgeBaseToTeam(uuid),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['knowledgeBases'] }),
   })
 
@@ -77,8 +93,12 @@ export function useScopedKnowledgeBases(params?: {
   const create = async (title: string, description?: string) =>
     createMutation.mutateAsync({ title, description })
 
-  const remove = async (uuid: string) => {
-    await removeMutation.mutateAsync(uuid)
+  const remove = async (uuid: string, mode?: 'unshare_and_delete') => {
+    await removeMutation.mutateAsync({ uuid, mode })
+  }
+
+  const transferToTeam = async (uuid: string) => {
+    await transferMutation.mutateAsync(uuid)
   }
 
   const adopt = async (uuid: string, note?: string) =>
@@ -95,6 +115,7 @@ export function useScopedKnowledgeBases(params?: {
     refresh,
     create,
     remove,
+    transferToTeam,
     adopt,
     removeRef,
   }

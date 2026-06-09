@@ -12,7 +12,12 @@ from app.models.extraction_test_case import ExtractionTestCase
 from app.models.system_config import SystemConfig
 from app.services.config_service import get_user_model_name
 from app.services.extraction_engine import ExtractionEngine
-from app.services.search_set_service import get_extraction_field_metadata, get_extraction_keys, get_search_set
+from app.services.search_set_service import (
+    effective_extraction_config,
+    get_extraction_field_metadata,
+    get_extraction_keys,
+    get_search_set,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -28,6 +33,14 @@ async def create_test_case(
     document_uuid: Optional[str] = None,
     expected_values: Optional[dict[str, str]] = None,
 ) -> ExtractionTestCase:
+    # Snapshot doc text at creation so the test case is reproducible even if
+    # the source document is later edited or deleted. document_uuid is kept
+    # only as a back-reference for UI previews.
+    if not source_text and source_type == "document" and document_uuid:
+        doc = await SmartDocument.find_one(SmartDocument.uuid == document_uuid)
+        if doc and doc.raw_text:
+            source_text = doc.raw_text
+
     tc = ExtractionTestCase(
         search_set_uuid=search_set_uuid,
         label=label,
@@ -55,9 +68,22 @@ async def update_test_case(uuid: str, **fields) -> Optional[ExtractionTestCase]:
     tc = await get_test_case(uuid)
     if not tc:
         return None
+    prev_document_uuid = tc.document_uuid
+    explicit_source_text = "source_text" in fields and fields["source_text"] is not None
     for key, val in fields.items():
         if val is not None:
             setattr(tc, key, val)
+    # If the caller pointed the test case at a new document and didn't
+    # supply source_text explicitly, refresh the snapshot from the new doc.
+    if (
+        not explicit_source_text
+        and tc.source_type == "document"
+        and tc.document_uuid
+        and tc.document_uuid != prev_document_uuid
+    ):
+        doc = await SmartDocument.find_one(SmartDocument.uuid == tc.document_uuid)
+        if doc and doc.raw_text:
+            tc.source_text = doc.raw_text
     await tc.save()
     return tc
 
@@ -68,6 +94,33 @@ async def delete_test_case(uuid: str) -> bool:
         return False
     await tc.delete()
     return True
+
+
+async def portability_summary(search_set_uuid: str) -> dict:
+    """Summarize how portable a SearchSet's test cases are across owners.
+
+    A case is "portable" if it can run for a user who doesn't own the
+    referenced document — true when ``source_text`` was snapshotted at
+    creation. Document-bound cases without a snapshot need the original
+    document to be accessible.
+    """
+    cases = await list_test_cases(search_set_uuid)
+    text_count = 0
+    document_count = 0
+    missing_snapshot_count = 0
+    for tc in cases:
+        if tc.source_type == "document":
+            document_count += 1
+            if not tc.source_text:
+                missing_snapshot_count += 1
+        else:
+            text_count += 1
+    return {
+        "test_case_count": len(cases),
+        "text_count": text_count,
+        "document_count": document_count,
+        "missing_snapshot_count": missing_snapshot_count,
+    }
 
 
 async def create_test_cases_from_extraction(
@@ -90,7 +143,7 @@ async def create_test_cases_from_extraction(
         model = await get_user_model_name(user_id)
 
     ss = await get_search_set(search_set_uuid)
-    extraction_config_override = (ss.extraction_config if ss and ss.extraction_config else None)
+    extraction_config_override = effective_extraction_config(ss) or None
 
     sys_config = await SystemConfig.get_config()
     sys_config_doc = sys_config.model_dump() if sys_config else {}
@@ -126,6 +179,7 @@ async def create_test_cases_from_extraction(
             label=doc.title or doc_uuid,
             source_type="document",
             user_id=user_id,
+            source_text=doc.raw_text,
             document_uuid=doc_uuid,
             expected_values=expected_values,
         )
@@ -173,7 +227,7 @@ async def run_validation(
 
     # Load per-searchset config
     ss = await get_search_set(search_set_uuid)
-    extraction_config_override = (ss.extraction_config if ss and ss.extraction_config else None)
+    extraction_config_override = effective_extraction_config(ss) or None
 
     # Pre-fetch system config
     sys_config = await SystemConfig.get_config()
@@ -259,25 +313,42 @@ async def run_validation(
             for err_type, count in f.get("error_types", {}).items():
                 error_type_summary[err_type] = error_type_summary.get(err_type, 0) + count
 
-    # Run cross-field validation on most-common values from each test case
+    # Run cross-field validation on most-common values from each test case.
+    # Uses the structured validator: tri-state status, persists rule counters,
+    # auto-demotes false-positive-heavy rules.
     cross_field_score = None
+    cross_field_summary = None
+    cross_field_results: list[dict] = []
     if ss and ss.cross_field_rules:
-        from app.services.cross_field_validation import CrossFieldValidator
+        from app.services.cross_field_validation import (
+            CrossFieldValidator,
+            summarize_results,
+        )
+        from app.services.cross_field_rules import apply_evaluation_counters
+
+        rules = ss.normalized_cross_field_rules()
         cf_validator = CrossFieldValidator()
-        cf_pass_total = 0
-        cf_rule_total = 0
         for tcr in tc_results:
-            # Build data dict from most_common_value per field
             cf_data = {}
             for fr in tcr.get("fields", []):
                 if fr.get("most_common_value") is not None:
                     cf_data[fr["field_name"]] = fr["most_common_value"]
             if cf_data:
-                cf_results = cf_validator.validate(cf_data, ss.cross_field_rules)
-                cf_pass_total += sum(1 for r in cf_results if r["passed"])
-                cf_rule_total += len(cf_results)
-        if cf_rule_total > 0:
-            cross_field_score = cf_pass_total / cf_rule_total
+                tc_cf_results = cf_validator.validate(cf_data, rules)
+                # Stamp the source test case onto each result so the UI can
+                # show "rule X failed on test case Y" — needed for the FP
+                # mark-as-false-alarm flow.
+                for r in tc_cf_results:
+                    r["test_case_uuid"] = tcr.get("uuid")
+                    r["test_case_label"] = tcr.get("label")
+                cross_field_results.extend(tc_cf_results)
+
+        cross_field_summary = summarize_results(cross_field_results)
+        cross_field_score = cross_field_summary["pass_rate"]
+
+        if apply_evaluation_counters(rules, cross_field_results):
+            ss.cross_field_rules = rules
+            await ss.save()
 
     result_dict = {
         "search_set_uuid": search_set_uuid,
@@ -293,11 +364,14 @@ async def run_validation(
         "challenging_fields": challenging_fields,
         "error_type_summary": error_type_summary,
         "cross_field_score": cross_field_score,
+        "cross_field_summary": cross_field_summary,
+        "cross_field_results": cross_field_results,
     }
 
     # Persist validation run for quality tracking
-    from app.services.quality_service import persist_validation_run
-    await persist_validation_run(
+    from app.services.quality_service import compute_quality_tier, persist_validation_run
+
+    vr = await persist_validation_run(
         item_kind="search_set",
         item_id=search_set_uuid,
         item_name=ss.title if ss else "",
@@ -306,6 +380,16 @@ async def run_validation(
         user_id=user_id,
         model=model,
         extraction_config=extraction_config_override or {},
+    )
+
+    # Surface the *certified* score (raw score after the low-sample-size
+    # discount) alongside the raw aggregates so the completion card shows the
+    # same number as the persisted quality tile — instead of a raw accuracy
+    # that silently drops to a penalized score later.
+    result_dict["score"] = vr.score
+    result_dict["score_breakdown"] = vr.score_breakdown
+    result_dict["quality_tier"] = compute_quality_tier(
+        vr.score, sys_config.get_quality_config()
     )
 
     return result_dict
@@ -322,12 +406,17 @@ async def _validate_test_case(
     meta_map: dict[str, dict] | None = None,
 ) -> dict:
     """Run extraction N times against a test case and compute metrics."""
-    # Resolve source text
+    # Validation runs off the stored snapshot — document_uuid is only a
+    # back-reference for UI previews. For legacy rows created before the
+    # snapshot-on-write change, lazily backfill from the document if it
+    # still exists so this is the last run that touches SmartDocument.
     source_text = tc.source_text
-    if tc.source_type == "document" and tc.document_uuid:
+    if not source_text and tc.source_type == "document" and tc.document_uuid:
         doc = await SmartDocument.find_one(SmartDocument.uuid == tc.document_uuid)
         if doc and doc.raw_text:
             source_text = doc.raw_text
+            tc.source_text = source_text
+            await tc.save()
 
     if not source_text:
         return {
@@ -491,6 +580,8 @@ _NOT_FOUND_VARIANTS = frozenset({
     "", "n/a", "na", "n.a.", "not found", "not available",
     "not applicable", "none", "null", "nil", "unknown", "-", "--", "---",
     "nan", "no data", "no value", "not provided", "not specified",
+    "not present", "not stated", "not mentioned", "not given",
+    "no information", "no entry", "missing", "empty", "blank",
 })
 
 
@@ -876,9 +967,7 @@ async def run_validation_v2(
         model = await get_user_model_name(user_id)
 
     ss = await get_search_set(search_set_uuid)
-    extraction_config_override = (
-        ss.extraction_config if ss and ss.extraction_config else None
-    )
+    extraction_config_override = effective_extraction_config(ss) or None
 
     sys_config = await SystemConfig.get_config()
     sys_config_doc = sys_config.model_dump() if sys_config else {}
@@ -887,14 +976,16 @@ async def run_validation_v2(
     field_metadata = await get_extraction_field_metadata(search_set_uuid)
     meta_map = {m["key"]: m for m in field_metadata}
 
-    # Resolve document texts
+    # Validation runs off the stored snapshot — document_uuid is only a
+    # back-reference for UI previews. Legacy rows without a snapshot fall
+    # back to live-loading the document if it still exists.
     resolved_sources: list[dict] = []
     for i, src in enumerate(sources):
         source_text = src.get("source_text")
         source_type = src.get("source_type", "text")
         label = src.get("label") or f"Source {i + 1}"
 
-        if source_type == "document" and src.get("document_uuid"):
+        if not source_text and source_type == "document" and src.get("document_uuid"):
             doc = await SmartDocument.find_one(
                 SmartDocument.uuid == src["document_uuid"]
             )
@@ -972,25 +1063,38 @@ async def run_validation_v2(
             for err_type, count in f.get("error_types", {}).items():
                 error_type_summary[err_type] = error_type_summary.get(err_type, 0) + count
 
-    # Run cross-field validation on most-common values from each source
+    # Run cross-field validation on most-common values from each source.
+    # Same structured path as the test-case validator above — see that branch
+    # for rationale on tri-state status and counter persistence.
     cross_field_score = None
+    cross_field_summary = None
+    cross_field_results: list[dict] = []
     if ss and ss.cross_field_rules:
-        from app.services.cross_field_validation import CrossFieldValidator
+        from app.services.cross_field_validation import (
+            CrossFieldValidator,
+            summarize_results,
+        )
+        from app.services.cross_field_rules import apply_evaluation_counters
+
+        rules = ss.normalized_cross_field_rules()
         cf_validator = CrossFieldValidator()
-        cf_pass_total = 0
-        cf_rule_total = 0
         for sr in source_results:
-            # Build data dict from most_common_value per field
             cf_data = {}
             for fr in sr.get("fields", []):
                 if fr.get("most_common_value") is not None:
                     cf_data[fr["field_name"]] = fr["most_common_value"]
             if cf_data:
-                cf_results = cf_validator.validate(cf_data, ss.cross_field_rules)
-                cf_pass_total += sum(1 for r in cf_results if r["passed"])
-                cf_rule_total += len(cf_results)
-        if cf_rule_total > 0:
-            cross_field_score = cf_pass_total / cf_rule_total
+                sr_cf_results = cf_validator.validate(cf_data, rules)
+                for r in sr_cf_results:
+                    r["source_label"] = sr.get("source_label")
+                cross_field_results.extend(sr_cf_results)
+
+        cross_field_summary = summarize_results(cross_field_results)
+        cross_field_score = cross_field_summary["pass_rate"]
+
+        if apply_evaluation_counters(rules, cross_field_results):
+            ss.cross_field_rules = rules
+            await ss.save()
 
     result_dict = {
         "search_set_uuid": search_set_uuid,
@@ -1008,11 +1112,14 @@ async def run_validation_v2(
         "challenging_fields": challenging_fields,
         "error_type_summary": error_type_summary,
         "cross_field_score": cross_field_score,
+        "cross_field_summary": cross_field_summary,
+        "cross_field_results": cross_field_results,
     }
 
     # Persist validation run for quality tracking
-    from app.services.quality_service import persist_validation_run
-    await persist_validation_run(
+    from app.services.quality_service import compute_quality_tier, persist_validation_run
+
+    vr = await persist_validation_run(
         item_kind="search_set",
         item_id=search_set_uuid,
         item_name=ss.title if ss else "",
@@ -1021,6 +1128,16 @@ async def run_validation_v2(
         user_id=user_id,
         model=model,
         extraction_config=extraction_config_override or {},
+    )
+
+    # Surface the *certified* score (raw score after the low-sample-size
+    # discount) alongside the raw aggregates so the completion card shows the
+    # same number as the persisted quality tile — instead of a raw accuracy
+    # that silently drops to a penalized score later.
+    result_dict["score"] = vr.score
+    result_dict["score_breakdown"] = vr.score_breakdown
+    result_dict["quality_tier"] = compute_quality_tier(
+        vr.score, sys_config.get_quality_config()
     )
 
     return result_dict

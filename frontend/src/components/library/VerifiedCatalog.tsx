@@ -2,11 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Search, ShieldCheck, X, Pencil, ShieldOff, Tag, FolderPlus, Download, Upload } from 'lucide-react'
 import { QualityContractBadge } from './QualityContractBadge'
 import { CatalogImportDialog } from './CatalogImportDialog'
+import { AuthorChip } from '../shared/AuthorChip'
 import { listVerifiedItems, updateItemMetadata, unverifyItem, listCollections, addToCollection, exportCatalogUrl, previewCatalogImport } from '../../api/library'
 import type { CatalogPreviewItem } from '../../api/library'
 import type { VerifiedCatalogItem, VerifiedCollection } from '../../types/library'
 import { listOrganizationsFlat } from '../../api/organizations'
 import type { Organization } from '../../api/organizations'
+import { useConfirm } from '../shared/useConfirm'
 
 type KindFilter = '' | 'workflow' | 'search_set' | 'knowledge_base'
 type QualityFilter = '' | 'excellent' | 'good' | 'fair'
@@ -250,6 +252,7 @@ function CollectionPicker({
 }
 
 export function VerifiedCatalog() {
+  const confirm = useConfirm()
   const [items, setItems] = useState<VerifiedCatalogItem[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -299,7 +302,17 @@ export function VerifiedCatalog() {
   }, [refresh])
 
   const handleUnverify = async (item: VerifiedCatalogItem) => {
-    if (!confirm(`Remove verified status from "${item.display_name || item.name}"?`)) return
+    const ok = await confirm({
+      title: 'Remove verified status?',
+      message: (
+        <>
+          Remove verified status from <strong>{item.display_name || item.name}</strong>? It will no longer appear in the verified catalog.
+        </>
+      ),
+      confirmLabel: 'Remove',
+      destructive: true,
+    })
+    if (!ok) return
     await unverifyItem(item.kind, item.item_id)
     refresh()
   }
@@ -414,6 +427,9 @@ export function VerifiedCatalog() {
                       <span className="text-xs text-gray-500">
                         {new Date(item.created_at).toLocaleDateString()}
                       </span>
+                    )}
+                    {(item.submitted_by || item.created_by) && (
+                      <AuthorChip author={item.submitted_by || item.created_by} label="by" />
                     )}
                   </div>
                   {item.description && (

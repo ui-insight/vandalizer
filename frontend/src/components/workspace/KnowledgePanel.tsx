@@ -1,22 +1,27 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload, HelpCircle } from 'lucide-react'
+import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload, Sparkles, HelpCircle, Pencil } from 'lucide-react'
 import { useKnowledgeBases, useScopedKnowledgeBases } from '../../hooks/useKnowledgeBases'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useAuth } from '../../hooks/useAuth'
 import * as api from '../../api/knowledge'
 import { listOrganizationsFlat } from '../../api/organizations'
-import { getItemMetadata } from '../../api/library'
+import { MAX_NAME_LENGTH, normalizeName } from '../../utils/nameValidation'
 import type { Organization } from '../../api/organizations'
-import type { KnowledgeBaseDetail, KnowledgeBaseSource, KBScope, KnowledgeBase } from '../../types/knowledge'
-import type { VerifiedCatalogItem } from '../../types/library'
-import { ItemDetailModal } from '../library/ExploreTab'
+import type { KnowledgeBase, KnowledgeBaseDetail, KnowledgeBaseSource, KBScope } from '../../types/knowledge'
 import { AddUrlsModal } from '../knowledge/AddUrlsModal'
 import { DocumentPickerModal } from '../knowledge/DocumentPickerModal'
 import { KBSearchBar } from '../knowledge/KBSearchBar'
-import { KBListView } from '../knowledge/KBListView'
+import { KBGridView } from '../knowledge/KBGridView'
+import { KBValidationPanel } from '../knowledge/KBValidationPanel'
+import { KBSourceInspectorModal } from '../knowledge/KBSourceInspectorModal'
+import { KBExploreTab } from '../knowledge/KBExploreTab'
+import { CreateKBModal } from '../knowledge/CreateKBModal'
+import { KBTrustBanner } from '../knowledge/KBTrustBanner'
 import { KnowledgeExplainer } from './KnowledgeExplainer'
 import { ShareWithTeamDialog } from '../library/ShareWithTeamDialog'
 import { useToast } from '../../contexts/ToastContext'
+import { useConfirm } from '../shared/useConfirm'
+import { SharedKBDeleteDialog, type SharedKBDeleteChoice } from '../shared/SharedKBDeleteDialog'
 
 type TabKey = 'mine' | 'team' | 'explore'
 const TABS: { key: TabKey; label: string }[] = [
@@ -43,7 +48,9 @@ export function KnowledgePanel() {
   const { activateKB } = useWorkspace()
   const { user } = useAuth()
   const { toast } = useToast()
-  const { create, remove, refresh } = useKnowledgeBases()
+  const { create, remove, transferToTeam, refresh } = useKnowledgeBases()
+  const [sharedDeleteTarget, setSharedDeleteTarget] = useState<KnowledgeBase | null>(null)
+  const confirm = useConfirm()
   const [activeTab, setActiveTab] = useState<TabKey>('mine')
   const [search, setSearch] = useState('')
   const [creating, setCreating] = useState(false)
@@ -73,60 +80,47 @@ export function KnowledgePanel() {
   const [addingUrls, setAddingUrls] = useState(false)
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
-  const [exploreDetail, setExploreDetail] = useState<VerifiedCatalogItem | null>(null)
-
-  const handleExploreKBClick = useCallback(async (kb: KnowledgeBase) => {
-    // Build a base item immediately so the modal opens without waiting
-    const base: VerifiedCatalogItem = {
-      id: kb.uuid,
-      item_id: kb.uuid,
-      kind: 'knowledge_base',
-      name: kb.title,
-      tags: [],
-      verified: true,
-      created_at: kb.created_at,
-      display_name: null,
-      description: kb.description || null,
-      markdown: null,
-      organization_ids: kb.organization_ids || [],
-      quality_score: null,
-      quality_tier: null,
-      quality_grade: null,
-      last_validated_at: null,
-      validation_run_count: 0,
-      total_sources: kb.total_sources,
-      total_chunks: kb.total_chunks,
-      kb_status: kb.status,
-      source_uuid: kb.uuid,
+  const [editingDescription, setEditingDescription] = useState(false)
+  const [descriptionDraft, setDescriptionDraft] = useState('')
+  const [savingDescription, setSavingDescription] = useState(false)
+  const [inspectingSource, setInspectingSource] = useState<KnowledgeBaseSource | null>(null)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const titleInputRef = useRef<HTMLInputElement | null>(null)
+  const cancelTitleEdit = useRef(false)
+  // Single commit path for the inline KB title editor: every exit from edit
+  // mode (Enter, the check button, or tabbing/clicking away) routes through the
+  // input's onBlur to here, so the edit is saved instead of silently discarded.
+  // Escape sets cancelTitleEdit to bail out without saving.
+  const commitTitle = async () => {
+    setEditingTitle(false)
+    if (cancelTitleEdit.current) {
+      cancelTitleEdit.current = false
+      return
     }
-    setExploreDetail(base)
-    // Enrich with catalog metadata in the background
-    try {
-      const meta = await getItemMetadata('knowledge_base', kb.uuid)
-      setExploreDetail(prev => prev?.id === kb.uuid ? {
-        ...prev,
-        display_name: meta.display_name,
-        description: meta.description ?? prev.description,
-        markdown: meta.markdown,
-        quality_score: meta.quality_score ?? null,
-        quality_tier: meta.quality_tier ?? null,
-        quality_grade: meta.quality_grade ?? null,
-        last_validated_at: meta.last_validated_at ?? null,
-        validation_run_count: meta.validation_run_count ?? 0,
-      } : prev)
-    } catch {
-      // Keep the base item if metadata fetch fails
+    const t = normalizeName(titleDraft)
+    if (selectedKB && t && t !== selectedKB.title) {
+      try {
+        await api.updateKnowledgeBase(selectedKB.uuid, { title: t })
+        setSelectedKB(prev => prev ? { ...prev, title: t } : prev)
+        toast('Title updated', 'success')
+        refresh()
+      } catch (err) {
+        console.error('Failed to rename KB:', err)
+        toast(err instanceof Error ? err.message : 'Failed to rename', 'error')
+      }
     }
-  }, [])
+  }
 
-  const handleCreate = async () => {
+  const handleCreate = async (title: string, description: string) => {
     setCreating(true)
     setError(null)
     try {
-      const kb = await create('New Knowledge Base')
+      const kb = await create(title, description || undefined)
+      setShowCreateModal(false)
       loadDetail(kb.uuid)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create')
+      throw err
     } finally {
       setCreating(false)
     }
@@ -140,10 +134,11 @@ export function KnowledgePanel() {
       setSelectedKB(detail)
     } catch (err) {
       console.error('Failed to load KB:', err)
+      toast(err instanceof Error ? err.message : 'Failed to open knowledge base', 'error')
     } finally {
       setDetailLoading(false)
     }
-  }, [])
+  }, [toast])
 
   // Poll status when building
   useEffect(() => {
@@ -161,11 +156,49 @@ export function KnowledgePanel() {
   }, [selectedKB?.uuid, selectedKB?.status, refresh])
 
   const handleDelete = async (uuid: string) => {
+    const kb = scopedMine.knowledgeBases.find((k: KnowledgeBase) => k.uuid === uuid)
+    if (kb?.shared_with_team) {
+      setSharedDeleteTarget(kb)
+      return
+    }
+    const ok = await confirm({
+      title: 'Delete knowledge base?',
+      message: (
+        <>
+          Are you sure you want to delete <strong>{kb?.title || 'this knowledge base'}</strong>? Indexed content will be removed and chats referencing it may lose context. This cannot be undone.
+        </>
+      ),
+      confirmLabel: 'Delete',
+      destructive: true,
+    })
+    if (!ok) return
     try {
       await remove(uuid)
       if (selectedKB?.uuid === uuid) setSelectedKB(null)
+      toast('Knowledge base deleted', 'success')
     } catch (err) {
       console.error('Failed to delete KB:', err)
+      toast(err instanceof Error ? err.message : 'Failed to delete knowledge base', 'error')
+    }
+  }
+
+  const handleSharedDeleteChoice = async (choice: SharedKBDeleteChoice) => {
+    const kb = sharedDeleteTarget
+    if (!kb) return
+    try {
+      if (choice === 'transfer') {
+        await transferToTeam(kb.uuid)
+        if (selectedKB?.uuid === kb.uuid) setSelectedKB(null)
+        toast('Moved to Team Library', 'success')
+      } else {
+        await remove(kb.uuid, 'unshare_and_delete')
+        if (selectedKB?.uuid === kb.uuid) setSelectedKB(null)
+        toast('Knowledge base deleted', 'success')
+      }
+      setSharedDeleteTarget(null)
+    } catch (err) {
+      console.error('Failed to delete/transfer KB:', err)
+      toast(err instanceof Error ? err.message : 'Operation failed', 'error')
     }
   }
 
@@ -174,11 +207,14 @@ export function KnowledgePanel() {
     setAddingDocs(true)
     setShowDocPicker(false)
     try {
-      await api.addDocumentsToKB(selectedKB.uuid, docUuids)
+      const result = await api.addDocumentsToKB(selectedKB.uuid, docUuids)
+      const n = result?.added ?? docUuids.length
+      toast(`Added ${n} document${n === 1 ? '' : 's'}`, 'success')
       loadDetail(selectedKB.uuid)
       refresh()
     } catch (err) {
       console.error('Failed to add documents:', err)
+      toast(err instanceof Error ? err.message : 'Failed to add documents', 'error')
     } finally {
       setAddingDocs(false)
     }
@@ -190,11 +226,16 @@ export function KnowledgePanel() {
     // Optimistically set status to building so the poller starts
     setSelectedKB(prev => prev ? { ...prev, status: 'building' } : prev)
     api.addUrlsToKB(selectedKB.uuid, urls, crawlEnabled, maxCrawlPages, allowedDomains)
-      .then(() => {
+      .then((result) => {
+        const n = result?.added ?? urls.length
+        toast(`Added ${n} URL${n === 1 ? '' : 's'} — crawling in background`, 'success')
         loadDetail(selectedKB.uuid)
         refresh()
       })
-      .catch(err => console.error('Failed to add URLs:', err))
+      .catch(err => {
+        console.error('Failed to add URLs:', err)
+        toast(err instanceof Error ? err.message : 'Failed to add URLs', 'error')
+      })
       .finally(() => setAddingUrls(false))
   }
 
@@ -202,10 +243,69 @@ export function KnowledgePanel() {
     if (!selectedKB) return
     try {
       await api.removeKBSource(selectedKB.uuid, sourceUuid)
+      toast('Source removed', 'success')
       loadDetail(selectedKB.uuid)
       refresh()
     } catch (err) {
       console.error('Failed to remove source:', err)
+      toast(err instanceof Error ? err.message : 'Failed to remove source', 'error')
+    }
+  }
+
+  const [renamingSourceUuid, setRenamingSourceUuid] = useState<string | null>(null)
+  const [renameDraft, setRenameDraft] = useState('')
+  const [savingRename, setSavingRename] = useState(false)
+
+  const beginRenameSource = (source: KnowledgeBaseSource) => {
+    const current =
+      source.custom_name
+      || (source.source_type === 'url' ? (source.url_title || source.url || '') : (source.document_title || ''))
+    setRenamingSourceUuid(source.uuid)
+    setRenameDraft(current || '')
+  }
+
+  const cancelRenameSource = () => {
+    setRenamingSourceUuid(null)
+    setRenameDraft('')
+    setSavingRename(false)
+  }
+
+  const handleRenameSource = async () => {
+    if (!selectedKB || !renamingSourceUuid) return
+    const sourceUuid = renamingSourceUuid
+    const current = selectedKB.sources.find(s => s.uuid === sourceUuid)
+    const previous = current?.custom_name || ''
+    const next = renameDraft.trim()
+    if (next === previous) {
+      cancelRenameSource()
+      return
+    }
+    setSavingRename(true)
+    // Optimistic update so the row reflects the new name immediately
+    setSelectedKB(prev => prev ? {
+      ...prev,
+      sources: prev.sources.map(s => s.uuid === sourceUuid ? { ...s, custom_name: next || null } : s),
+    } : prev)
+    try {
+      const updated = await api.renameKBSource(selectedKB.uuid, sourceUuid, next)
+      setSelectedKB(prev => prev ? {
+        ...prev,
+        sources: prev.sources.map(s => s.uuid === sourceUuid ? {
+          ...s,
+          custom_name: updated.custom_name ?? null,
+        } : s),
+      } : prev)
+      toast(next ? 'Source renamed' : 'Custom name cleared', 'success')
+    } catch (err) {
+      console.error('Failed to rename source:', err)
+      toast(err instanceof Error ? err.message : 'Failed to rename source', 'error')
+      // Revert on failure
+      setSelectedKB(prev => prev ? {
+        ...prev,
+        sources: prev.sources.map(s => s.uuid === sourceUuid ? { ...s, custom_name: previous || null } : s),
+      } : prev)
+    } finally {
+      cancelRenameSource()
     }
   }
 
@@ -214,36 +314,38 @@ export function KnowledgePanel() {
     activateKB(selectedKB.uuid, selectedKB.title)
   }
 
-  const [shareKBDialogOpen, setShareKBDialogOpen] = useState(false)
+  const [shareDialogKB, setShareDialogKB] = useState<KnowledgeBase | null>(null)
 
-  const handleToggleShare = async () => {
-    if (!selectedKB) return
-    // Sharing for the first time → prompt for a note. Unsharing is silent.
-    if (!selectedKB.shared_with_team) {
-      setShareKBDialogOpen(true)
+  const handleToggleShare = async (kb: KnowledgeBase) => {
+    // Sharing for the first time → prompt for a note.
+    if (!kb.shared_with_team) {
+      setShareDialogKB(kb)
       return
     }
     try {
-      await api.shareKnowledgeBase(selectedKB.uuid)
-      loadDetail(selectedKB.uuid)
+      const result = await api.shareKnowledgeBase(kb.uuid)
+      toast(result.shared_with_team ? 'Shared with team' : 'Unshared from team', 'success')
+      if (selectedKB?.uuid === kb.uuid) loadDetail(kb.uuid)
       refresh()
     } catch (err) {
       console.error('Failed to toggle sharing:', err)
+      toast(err instanceof Error ? err.message : 'Failed to update team sharing', 'error')
     }
   }
 
   const confirmShareKB = async (comment: string) => {
-    if (!selectedKB) return
+    if (!shareDialogKB) return
+    const kbUuid = shareDialogKB.uuid
     try {
-      await api.shareKnowledgeBase(selectedKB.uuid, comment || undefined)
+      await api.shareKnowledgeBase(kbUuid, comment || undefined)
       toast('Shared with team', 'success')
-      loadDetail(selectedKB.uuid)
+      if (selectedKB?.uuid === kbUuid) loadDetail(kbUuid)
       refresh()
     } catch (err) {
       console.error('Failed to share KB:', err)
       toast('Failed to share knowledge base', 'error')
     } finally {
-      setShareKBDialogOpen(false)
+      setShareDialogKB(null)
     }
   }
 
@@ -258,11 +360,13 @@ export function KnowledgePanel() {
     setSavingOrgs(true)
     try {
       await api.setKBOrganizations(selectedKB.uuid, selectedOrgIds)
+      toast('Org visibility updated', 'success')
       loadDetail(selectedKB.uuid)
       refresh()
       setShowOrgsModal(false)
     } catch (err) {
       console.error('Failed to update org visibility:', err)
+      toast(err instanceof Error ? err.message : 'Failed to update org visibility', 'error')
     } finally {
       setSavingOrgs(false)
     }
@@ -313,29 +417,38 @@ export function KnowledgePanel() {
   }
 
   // Verification modal state
-  const [showVerifyModal, setShowVerifyModal] = useState(false)
+  const [verifyKB, setVerifyKB] = useState<KnowledgeBase | null>(null)
   const [verifySummary, setVerifySummary] = useState('')
   const [verifyDescription, setVerifyDescription] = useState('')
   const [verifyCategory, setVerifyCategory] = useState('')
   const [submittingVerify, setSubmittingVerify] = useState(false)
   const [verificationSubmitted, setVerificationSubmitted] = useState(false)
 
+  const openVerifyModal = (kb: KnowledgeBase) => {
+    setVerifySummary('')
+    setVerifyDescription('')
+    setVerifyCategory('')
+    setVerifyKB(kb)
+  }
+
   const handleSubmitVerification = async () => {
-    if (!selectedKB) return
+    if (!verifyKB) return
+    const kbUuid = verifyKB.uuid
     setSubmittingVerify(true)
     try {
-      await api.submitKBForVerification(selectedKB.uuid, {
+      await api.submitKBForVerification(kbUuid, {
         summary: verifySummary || undefined,
         description: verifyDescription || undefined,
         category: verifyCategory || undefined,
       })
-      setShowVerifyModal(false)
+      setVerifyKB(null)
       setVerifySummary('')
       setVerifyDescription('')
       setVerifyCategory('')
       setVerificationSubmitted(true)
       toast('Submitted for verification', 'success')
-      loadDetail(selectedKB.uuid)
+      if (selectedKB?.uuid === kbUuid) loadDetail(kbUuid)
+      refresh()
     } catch (err) {
       console.error('Failed to submit for verification:', err)
       toast(err instanceof Error ? err.message : 'Failed to submit for verification', 'error')
@@ -343,6 +456,94 @@ export function KnowledgePanel() {
       setSubmittingVerify(false)
     }
   }
+
+  const shareDialogJSX = shareDialogKB ? (
+    <ShareWithTeamDialog
+      itemName={shareDialogKB.title}
+      onCancel={() => setShareDialogKB(null)}
+      onConfirm={confirmShareKB}
+    />
+  ) : null
+
+  const verifyModalJSX = verifyKB ? (
+    <div style={{
+      position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+    }}>
+      <div style={{
+        backgroundColor: '#1e1e1e', borderRadius: 12, padding: 24, width: 400,
+        border: '1px solid #3a3a3a', maxHeight: '80vh', overflowY: 'auto',
+      }}>
+        <div style={{ fontSize: 16, fontWeight: 600, color: '#fff', marginBottom: 4 }}>
+          Submit for Verification
+        </div>
+        <div style={{ fontSize: 12, color: '#888', marginBottom: 16 }}>
+          {verifyKB.title}
+        </div>
+        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#aaa', marginBottom: 4 }}>Summary</label>
+        <input
+          value={verifySummary}
+          onChange={e => setVerifySummary(e.target.value)}
+          placeholder="Brief summary of this knowledge base"
+          style={{
+            width: '100%', padding: '8px 10px', fontSize: 13, fontFamily: 'inherit',
+            backgroundColor: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: 6,
+            color: '#e5e5e5', outline: 'none', marginBottom: 12, boxSizing: 'border-box',
+          }}
+        />
+        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#aaa', marginBottom: 4 }}>Description</label>
+        <textarea
+          value={verifyDescription}
+          onChange={e => setVerifyDescription(e.target.value)}
+          placeholder="Detailed description, intended use, etc."
+          rows={3}
+          style={{
+            width: '100%', padding: '8px 10px', fontSize: 13, fontFamily: 'inherit',
+            backgroundColor: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: 6,
+            color: '#e5e5e5', outline: 'none', marginBottom: 12, resize: 'vertical',
+            boxSizing: 'border-box',
+          }}
+        />
+        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#aaa', marginBottom: 4 }}>Category</label>
+        <input
+          value={verifyCategory}
+          onChange={e => setVerifyCategory(e.target.value)}
+          placeholder="e.g. Legal, Medical, Research"
+          style={{
+            width: '100%', padding: '8px 10px', fontSize: 13, fontFamily: 'inherit',
+            backgroundColor: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: 6,
+            color: '#e5e5e5', outline: 'none', marginBottom: 16, boxSizing: 'border-box',
+          }}
+        />
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button
+            onClick={() => setVerifyKB(null)}
+            style={{
+              padding: '6px 14px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+              color: '#aaa', backgroundColor: 'transparent', border: '1px solid #3a3a3a',
+              borderRadius: 6, cursor: 'pointer',
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmitVerification}
+            disabled={submittingVerify}
+            style={{
+              padding: '6px 14px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+              color: 'var(--highlight-text-color, #000)',
+              backgroundColor: 'var(--highlight-color, #eab308)',
+              border: 'none', borderRadius: 6,
+              cursor: submittingVerify ? 'default' : 'pointer',
+              opacity: submittingVerify ? 0.6 : 1,
+            }}
+          >
+            {submittingVerify ? 'Submitting...' : 'Submit'}
+          </button>
+        </div>
+      </div>
+    </div>
+  ) : null
 
   // Detail view
   if (selectedKB) {
@@ -372,25 +573,20 @@ export function KnowledgePanel() {
             <ArrowLeft size={18} style={{ color: '#888' }} />
           </button>
           {editingTitle ? (
-            <form
+            <div
               style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}
-              onSubmit={async (e) => {
-                e.preventDefault()
-                const t = titleDraft.trim()
-                if (t && t !== selectedKB.title) {
-                  await api.updateKnowledgeBase(selectedKB.uuid, { title: t })
-                  setSelectedKB(prev => prev ? { ...prev, title: t } : prev)
-                  refresh()
-                }
-                setEditingTitle(false)
-              }}
             >
               <input
+                ref={titleInputRef}
                 autoFocus
                 value={titleDraft}
+                maxLength={MAX_NAME_LENGTH}
                 onChange={e => setTitleDraft(e.target.value)}
-                onBlur={() => setEditingTitle(false)}
-                onKeyDown={e => { if (e.key === 'Escape') setEditingTitle(false) }}
+                onBlur={commitTitle}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() }
+                  else if (e.key === 'Escape') { cancelTitleEdit.current = true; e.currentTarget.blur() }
+                }}
                 style={{
                   flex: 1, fontSize: 16, fontWeight: 600, fontFamily: 'inherit',
                   color: '#fff', backgroundColor: '#2a2a2a',
@@ -399,25 +595,41 @@ export function KnowledgePanel() {
                 }}
               />
               <button
-                type="submit"
+                type="button"
+                // Keep focus on the input through mousedown, then blur on click so
+                // the commit runs exactly once via onBlur (no double-save).
                 onMouseDown={e => e.preventDefault()}
+                onClick={() => titleInputRef.current?.blur()}
                 style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, display: 'flex' }}
               >
                 <Check size={16} style={{ color: '#15803d' }} />
               </button>
-            </form>
+            </div>
           ) : (
-            <span
-              onClick={() => { setTitleDraft(selectedKB.title); setEditingTitle(true) }}
-              title="Click to rename"
-              style={{
-                fontSize: 16, fontWeight: 600, color: '#fff', flex: 1,
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                cursor: 'text', borderRadius: 4, padding: '2px 0',
-              }}
-            >
-              {selectedKB.title}
-            </span>
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span
+                onClick={() => { setTitleDraft(selectedKB.title); setEditingTitle(true) }}
+                title="Click to rename"
+                style={{
+                  fontSize: 16, fontWeight: 600, color: '#fff',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  cursor: 'text', borderRadius: 4, padding: '2px 0',
+                  minWidth: 0,
+                }}
+              >
+                {selectedKB.title}
+              </span>
+              <button
+                onClick={() => { setTitleDraft(selectedKB.title); setEditingTitle(true) }}
+                title="Edit title"
+                style={{
+                  background: 'transparent', border: 'none', cursor: 'pointer',
+                  padding: 2, display: 'flex', color: '#888', flexShrink: 0,
+                }}
+              >
+                <Pencil size={13} />
+              </button>
+            </div>
           )}
           {selectedKB.shared_with_team && (
             <span style={{
@@ -437,6 +649,24 @@ export function KnowledgePanel() {
               Verified
             </span>
           )}
+          {selectedKB.has_optimized_config && (
+            <span
+              title={
+                selectedKB.optimized_config_set_at
+                  ? `Optimized settings applied ${new Date(selectedKB.optimized_config_set_at).toLocaleString()}`
+                  : 'Optimized settings applied'
+              }
+              style={{
+                fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 8,
+                color: '#a78bfa', backgroundColor: 'rgba(124, 58, 237, 0.12)',
+                border: '1px solid rgba(124, 58, 237, 0.3)',
+                display: 'flex', alignItems: 'center', gap: 3,
+              }}
+            >
+              <Sparkles size={10} />
+              Optimized
+            </span>
+          )}
           <span
             style={{
               fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10,
@@ -454,11 +684,115 @@ export function KnowledgePanel() {
         ) : (
           <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px' }}>
             {/* Description */}
-            {selectedKB.description && (
-              <div style={{ fontSize: 13, color: '#aaa', marginBottom: 12, lineHeight: 1.5 }}>
-                {selectedKB.description}
-              </div>
-            )}
+            <div style={{ marginBottom: 12 }}>
+              {editingDescription ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <textarea
+                    autoFocus
+                    value={descriptionDraft}
+                    onChange={e => setDescriptionDraft(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Escape') {
+                        e.preventDefault()
+                        setEditingDescription(false)
+                      } else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                        e.preventDefault()
+                        ;(e.currentTarget.form as HTMLFormElement | null)?.requestSubmit()
+                      }
+                    }}
+                    placeholder="Describe what this knowledge base contains, who it's for, and how to use it."
+                    rows={4}
+                    maxLength={5000}
+                    disabled={savingDescription}
+                    style={{
+                      width: '100%', fontSize: 13, fontFamily: 'inherit', lineHeight: 1.5,
+                      color: '#e5e5e5', backgroundColor: '#1a1a1a',
+                      border: '1px solid #555', borderRadius: 6,
+                      padding: '8px 10px', outline: 'none',
+                      resize: 'vertical', minHeight: 80,
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                    <button
+                      onClick={() => setEditingDescription(false)}
+                      disabled={savingDescription}
+                      style={{
+                        padding: '4px 10px', fontSize: 12, fontFamily: 'inherit',
+                        color: '#ccc', background: 'transparent',
+                        border: '1px solid #3a3a3a', borderRadius: 5, cursor: 'pointer',
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={async () => {
+                        const next = descriptionDraft.trim()
+                        const current = selectedKB.description || ''
+                        if (next === current) { setEditingDescription(false); return }
+                        setSavingDescription(true)
+                        try {
+                          await api.updateKnowledgeBase(selectedKB.uuid, { description: next })
+                          setSelectedKB(prev => prev ? { ...prev, description: next } : prev)
+                          refresh()
+                          setEditingDescription(false)
+                        } catch (err) {
+                          console.error('Failed to update description:', err)
+                          toast('Failed to update description', 'error')
+                        } finally {
+                          setSavingDescription(false)
+                        }
+                      }}
+                      disabled={savingDescription}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                        padding: '4px 10px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                        color: 'var(--highlight-text-color, #000)',
+                        background: 'var(--highlight-color, #eab308)',
+                        border: 'none', borderRadius: 5,
+                        cursor: savingDescription ? 'default' : 'pointer',
+                        opacity: savingDescription ? 0.7 : 1,
+                      }}
+                    >
+                      {savingDescription ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : <Check size={11} />}
+                      Save
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                  <div style={{
+                    flex: 1, fontSize: 13, lineHeight: 1.5,
+                    color: selectedKB.description ? '#aaa' : '#666',
+                    fontStyle: selectedKB.description ? 'normal' : 'italic',
+                    whiteSpace: 'pre-wrap',
+                  }}>
+                    {selectedKB.description || 'No description yet — add one to help others understand what this KB is for.'}
+                  </div>
+                  <button
+                    onClick={() => {
+                      setDescriptionDraft(selectedKB.description || '')
+                      setEditingDescription(true)
+                    }}
+                    title="Edit description"
+                    style={{
+                      background: 'transparent', border: 'none', cursor: 'pointer',
+                      padding: 2, display: 'flex', color: '#888', flexShrink: 0,
+                      marginTop: 2,
+                    }}
+                  >
+                    <Pencil size={13} />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* AI Trust banner — headline answer to "is this KB worth using?" */}
+            <KBTrustBanner
+              score={selectedKB.last_validation_score}
+              baseline={selectedKB.last_validation_baseline_score}
+              lift={selectedKB.last_validation_lift}
+              validatedAt={selectedKB.last_validated_at}
+            />
 
             {/* Stats */}
             <div style={{ display: 'flex', gap: 12, marginBottom: 16, fontSize: 12, color: '#999' }}>
@@ -536,7 +870,7 @@ export function KnowledgePanel() {
                 Chat with this KB
               </button>
               <button
-                onClick={handleToggleShare}
+                onClick={() => handleToggleShare(selectedKB)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6,
                   padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
@@ -577,7 +911,7 @@ export function KnowledgePanel() {
                   </span>
                 ) : (
                   <button
-                    onClick={() => setShowVerifyModal(true)}
+                    onClick={() => openVerifyModal(selectedKB)}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 6,
                       padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
@@ -631,6 +965,17 @@ export function KnowledgePanel() {
               </div>
             )}
 
+            {/* Tags editor */}
+            <KBTagsEditor
+              tags={selectedKB.tags || []}
+              canManage={!!user && (selectedKB.user_id === user.user_id || isExaminerOrAdmin)}
+              onSave={async (next) => {
+                await api.updateKnowledgeBase(selectedKB.uuid, { tags: next })
+                setSelectedKB(prev => prev ? { ...prev, tags: next } : prev)
+                refresh()
+              }}
+            />
+
             {/* Sources list */}
             <div style={{ fontSize: 13, fontWeight: 600, color: '#ccc', marginBottom: 8 }}>Sources</div>
             {selectedKB.sources.length === 0 ? (
@@ -638,17 +983,48 @@ export function KnowledgePanel() {
                 No sources added yet. Add documents or URLs above.
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{
+                display: 'flex', flexDirection: 'column', gap: 6,
+                maxHeight: 320, overflowY: 'auto',
+                paddingRight: 4,
+              }}>
                 {selectedKB.sources.map((source: KnowledgeBaseSource) => {
                   const st = SOURCE_STATUS[source.status] || SOURCE_STATUS.pending
                   const StatusIcon = st.icon
+                  const autoLabel = source.source_type === 'url'
+                    ? (source.url_title || source.url || source.uuid)
+                    : (source.document_title || source.document_uuid || source.uuid)
+                  const displayLabel = source.custom_name || autoLabel
+                  // Verifiable provenance: an explicit source_reference, else the
+                  // origin URL for url sources. Linkify http(s)/www, else show text.
+                  const effectiveSource = source.source_reference || (source.source_type === 'url' ? (source.url || '') : '')
+                  const sourceHref = effectiveSource
+                    ? (/^https?:\/\//i.test(effectiveSource)
+                        ? effectiveSource
+                        : (/^www\./i.test(effectiveSource) ? `https://${effectiveSource}` : null))
+                    : null
+                  const isRenaming = renamingSourceUuid === source.uuid
+                  const canInspect = source.status !== 'pending' && !isRenaming
                   return (
                     <div
                       key={source.uuid}
+                      onClick={() => { if (canInspect) setInspectingSource(source) }}
+                      title={canInspect ? 'Click to inspect this source' : undefined}
                       style={{
                         display: 'flex', alignItems: 'center', gap: 8,
                         padding: '8px 10px', backgroundColor: '#2a2a2a',
                         border: '1px solid #3a3a3a', borderRadius: 6,
+                        cursor: canInspect ? 'pointer' : 'default',
+                        transition: 'background-color 0.12s, border-color 0.12s',
+                      }}
+                      onMouseEnter={e => {
+                        if (!canInspect) return
+                        e.currentTarget.style.backgroundColor = '#323232'
+                        e.currentTarget.style.borderColor = '#4a4a4a'
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.backgroundColor = '#2a2a2a'
+                        e.currentTarget.style.borderColor = '#3a3a3a'
                       }}
                     >
                       {source.source_type === 'document' ? (
@@ -657,34 +1033,125 @@ export function KnowledgePanel() {
                         <Globe size={14} style={{ color: '#888', flexShrink: 0 }} />
                       )}
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 12, color: '#e5e5e5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {source.source_type === 'url' ? (source.url_title || source.url) : source.document_uuid}
-                        </div>
-                        {source.error_message && (
+                        {isRenaming ? (
+                          <input
+                            autoFocus
+                            value={renameDraft}
+                            onChange={e => setRenameDraft(e.target.value)}
+                            onClick={e => e.stopPropagation()}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') { e.preventDefault(); handleRenameSource() }
+                              else if (e.key === 'Escape') { e.preventDefault(); cancelRenameSource() }
+                            }}
+                            placeholder={autoLabel || 'Custom name'}
+                            maxLength={300}
+                            disabled={savingRename}
+                            style={{
+                              width: '100%', fontSize: 12, color: '#e5e5e5',
+                              backgroundColor: '#1f1f1f', border: '1px solid #4a4a4a',
+                              borderRadius: 4, padding: '4px 6px', fontFamily: 'inherit',
+                              outline: 'none',
+                            }}
+                          />
+                        ) : (
+                          <div
+                            style={{ fontSize: 12, color: '#e5e5e5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                            title={source.custom_name
+                              ? `${displayLabel} — original: ${autoLabel || (source.source_type === 'url' ? source.url : source.document_uuid) || ''}`
+                              : (source.source_type === 'url' ? (source.url || '') : (source.document_uuid || ''))}
+                          >
+                            {displayLabel}
+                            {source.custom_name && autoLabel && autoLabel !== source.custom_name && (
+                              <span style={{ color: '#888', marginLeft: 6, fontStyle: 'italic' }}>
+                                · {autoLabel}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {!isRenaming && effectiveSource && (
+                          <div
+                            style={{ fontSize: 11, color: '#9a9a9a', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                            title={`Source: ${effectiveSource}`}
+                          >
+                            Source:{' '}
+                            {sourceHref ? (
+                              <a
+                                href={sourceHref}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={e => e.stopPropagation()}
+                                style={{ color: '#7aa2f7', textDecoration: 'none' }}
+                              >
+                                {effectiveSource}
+                              </a>
+                            ) : (
+                              <span style={{ color: '#bcbcbc' }}>{effectiveSource}</span>
+                            )}
+                          </div>
+                        )}
+                        {!isRenaming && source.error_message && (
                           <div style={{ fontSize: 11, color: '#ef4444', marginTop: 2 }}>{source.error_message}</div>
                         )}
-                        {source.status === 'ready' && (
+                        {!isRenaming && source.status === 'ready' && (
                           <div style={{ fontSize: 11, color: '#888', marginTop: 2 }}>{source.chunk_count} chunks</div>
                         )}
                       </div>
-                      <StatusIcon
-                        size={14}
-                        style={{
-                          color: st.color, flexShrink: 0,
-                          ...(source.status === 'processing' || source.status === 'pending' ? { animation: 'spin 1s linear infinite' } : {}),
-                        }}
-                      />
-                      <button
-                        onClick={() => handleRemoveSource(source.uuid)}
-                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }}
-                      >
-                        <X size={12} style={{ color: '#666' }} />
-                      </button>
+                      {isRenaming ? (
+                        <>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleRenameSource() }}
+                            disabled={savingRename}
+                            title="Save name"
+                            style={{ background: 'transparent', border: 'none', cursor: savingRename ? 'default' : 'pointer', padding: 2, display: 'flex' }}
+                          >
+                            <Check size={14} style={{ color: '#22c55e' }} />
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); cancelRenameSource() }}
+                            disabled={savingRename}
+                            title="Cancel"
+                            style={{ background: 'transparent', border: 'none', cursor: savingRename ? 'default' : 'pointer', padding: 2, display: 'flex' }}
+                          >
+                            <X size={14} style={{ color: '#888' }} />
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <StatusIcon
+                            size={14}
+                            style={{
+                              color: st.color, flexShrink: 0,
+                              ...(source.status === 'processing' || source.status === 'pending' ? { animation: 'spin 1s linear infinite' } : {}),
+                            }}
+                          />
+                          <button
+                            onClick={(e) => { e.stopPropagation(); beginRenameSource(source) }}
+                            title={source.custom_name ? 'Rename (or clear to revert to original)' : 'Rename source'}
+                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }}
+                          >
+                            <Pencil size={12} style={{ color: '#888' }} />
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleRemoveSource(source.uuid) }}
+                            title="Remove source"
+                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }}
+                          >
+                            <X size={12} style={{ color: '#666' }} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   )
                 })}
               </div>
             )}
+
+            {/* Validation panel — gates on ready KB and management permission */}
+            <KBValidationPanel
+              kbUuid={selectedKB.uuid}
+              kbReady={selectedKB.status === 'ready'}
+              canManage={!!user && (selectedKB.user_id === user.user_id || isExaminerOrAdmin)}
+            />
 
             {/* "What are knowledge bases?" pill */}
             <div style={{ display: 'flex', justifyContent: 'center', marginTop: 24, marginBottom: 4 }}>
@@ -719,6 +1186,15 @@ export function KnowledgePanel() {
 
         {showExplainer && <KnowledgeExplainer onClose={() => setShowExplainer(false)} />}
 
+        {inspectingSource && selectedKB && (
+          <KBSourceInspectorModal
+            kbUuid={selectedKB.uuid}
+            source={inspectingSource}
+            onClose={() => setInspectingSource(null)}
+            onUpdated={() => { if (selectedKB) loadDetail(selectedKB.uuid) }}
+          />
+        )}
+
         {showUrlModal && (
           <AddUrlsModal
             onSubmit={(urls, crawlEnabled, maxCrawlPages, allowedDomains) => { handleAddUrls(urls, crawlEnabled, maxCrawlPages, allowedDomains); setShowUrlModal(false) }}
@@ -733,82 +1209,6 @@ export function KnowledgePanel() {
               .filter(s => s.source_type === 'document' && s.document_uuid)
               .map(s => s.document_uuid!)}
           />
-        )}
-        {showVerifyModal && (
-          <div style={{
-            position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-          }}>
-            <div style={{
-              backgroundColor: '#1e1e1e', borderRadius: 12, padding: 24, width: 400,
-              border: '1px solid #3a3a3a', maxHeight: '80vh', overflowY: 'auto',
-            }}>
-              <div style={{ fontSize: 16, fontWeight: 600, color: '#fff', marginBottom: 16 }}>
-                Submit for Verification
-              </div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#aaa', marginBottom: 4 }}>Summary</label>
-              <input
-                value={verifySummary}
-                onChange={e => setVerifySummary(e.target.value)}
-                placeholder="Brief summary of this knowledge base"
-                style={{
-                  width: '100%', padding: '8px 10px', fontSize: 13, fontFamily: 'inherit',
-                  backgroundColor: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: 6,
-                  color: '#e5e5e5', outline: 'none', marginBottom: 12, boxSizing: 'border-box',
-                }}
-              />
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#aaa', marginBottom: 4 }}>Description</label>
-              <textarea
-                value={verifyDescription}
-                onChange={e => setVerifyDescription(e.target.value)}
-                placeholder="Detailed description, intended use, etc."
-                rows={3}
-                style={{
-                  width: '100%', padding: '8px 10px', fontSize: 13, fontFamily: 'inherit',
-                  backgroundColor: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: 6,
-                  color: '#e5e5e5', outline: 'none', marginBottom: 12, resize: 'vertical',
-                  boxSizing: 'border-box',
-                }}
-              />
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#aaa', marginBottom: 4 }}>Category</label>
-              <input
-                value={verifyCategory}
-                onChange={e => setVerifyCategory(e.target.value)}
-                placeholder="e.g. Legal, Medical, Research"
-                style={{
-                  width: '100%', padding: '8px 10px', fontSize: 13, fontFamily: 'inherit',
-                  backgroundColor: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: 6,
-                  color: '#e5e5e5', outline: 'none', marginBottom: 16, boxSizing: 'border-box',
-                }}
-              />
-              <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                <button
-                  onClick={() => setShowVerifyModal(false)}
-                  style={{
-                    padding: '6px 14px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
-                    color: '#aaa', backgroundColor: 'transparent', border: '1px solid #3a3a3a',
-                    borderRadius: 6, cursor: 'pointer',
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSubmitVerification}
-                  disabled={submittingVerify}
-                  style={{
-                    padding: '6px 14px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
-                    color: 'var(--highlight-text-color, #000)',
-                    backgroundColor: 'var(--highlight-color, #eab308)',
-                    border: 'none', borderRadius: 6,
-                    cursor: submittingVerify ? 'default' : 'pointer',
-                    opacity: submittingVerify ? 0.6 : 1,
-                  }}
-                >
-                  {submittingVerify ? 'Submitting...' : 'Submit'}
-                </button>
-              </div>
-            </div>
-          </div>
         )}
         {showOrgsModal && (
           <div style={{
@@ -895,19 +1295,20 @@ export function KnowledgePanel() {
         )}
       </div>
 
-      {shareKBDialogOpen && (
-        <ShareWithTeamDialog
-          itemName={selectedKB.title}
-          onCancel={() => setShareKBDialogOpen(false)}
-          onConfirm={confirmShareKB}
-        />
-      )}
+      {shareDialogJSX}
+      {verifyModalJSX}
+      <SharedKBDeleteDialog
+        open={!!sharedDeleteTarget}
+        kbTitle={sharedDeleteTarget?.title ?? ''}
+        onCancel={() => setSharedDeleteTarget(null)}
+        onChoose={handleSharedDeleteChoice}
+      />
       </>
     )
   }
 
-  // Determine the scope for the KBListView based on active tab
-  const listScope: KBScope = activeTab === 'explore' ? 'verified' : activeTab
+  // Mine/team only — Explore renders its own KBExploreTab.
+  const listScope: KBScope = activeTab === 'team' ? 'team' : 'mine'
 
   // List view
   return (
@@ -965,7 +1366,7 @@ export function KnowledgePanel() {
               {importing ? 'Importing...' : 'Import'}
             </button>
             <button
-              onClick={handleCreate}
+              onClick={() => setShowCreateModal(true)}
               disabled={creating}
               style={{
                 display: 'flex',
@@ -983,7 +1384,7 @@ export function KnowledgePanel() {
                 opacity: creating ? 0.6 : 1,
               }}
             >
-              {creating ? <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} /> : <Plus style={{ width: 14, height: 14 }} />}
+              <Plus style={{ width: 14, height: 14 }} />
               New
             </button>
           </div>
@@ -1020,12 +1421,10 @@ export function KnowledgePanel() {
         ))}
       </div>
 
-      {/* Search */}
-      <KBSearchBar
-        value={search}
-        onChange={setSearch}
-        placeholder={activeTab === 'explore' ? 'Search verified knowledge bases...' : 'Search...'}
-      />
+      {/* Search (hidden on Explore — KBExploreTab has its own) */}
+      {activeTab !== 'explore' && (
+        <KBSearchBar value={search} onChange={setSearch} placeholder="Search..." />
+      )}
 
       {/* Error */}
       {error && (
@@ -1038,60 +1437,181 @@ export function KnowledgePanel() {
         </div>
       )}
 
-      {/* List */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px', position: 'relative' }}>
-        <KBListView
-          scope={listScope}
-          search={search}
-          allOrgs={allOrgs}
-          onSelect={loadDetail}
-          onChat={(uuid, title) => activateKB(uuid, title)}
-          onEdit={activeTab !== 'explore' ? loadDetail : undefined}
-          onDelete={activeTab === 'mine' ? handleDelete : undefined}
-          onAdopt={activeTab === 'explore' || activeTab === 'team'
-            ? async (uuid) => { await scopedMine.adopt(uuid); refresh() }
-            : undefined}
-          onRemoveRef={activeTab === 'mine'
-            ? async (refUuid) => { await scopedMine.removeRef(refUuid); refresh() }
-            : undefined}
-          onClone={activeTab === 'explore'
-            ? async (uuid) => { await api.cloneKnowledgeBase(uuid); refresh() }
-            : undefined}
-          onExplore={activeTab === 'explore' ? handleExploreKBClick : undefined}
-          emptyComponent={activeTab === 'mine' && !search ? <KnowledgeExplainer /> : undefined}
-          emptyMessage={
-            activeTab === 'team'
-              ? 'No knowledge bases shared with your team yet.'
-              : activeTab === 'explore'
-                ? 'No verified knowledge bases available yet.'
+      {activeTab === 'explore' ? (
+        <KBExploreTab onAdopted={refresh} />
+      ) : (
+        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px', position: 'relative' }}>
+          <KBGridView
+            scope={listScope}
+            search={search}
+            allOrgs={allOrgs}
+            onSelect={loadDetail}
+            onChat={(uuid, title) => activateKB(uuid, title)}
+            onEdit={loadDetail}
+            onDelete={activeTab === 'mine' ? handleDelete : undefined}
+            onAdopt={activeTab === 'team'
+              ? async (uuid) => {
+                  try {
+                    await scopedMine.adopt(uuid)
+                    toast('Added to My KBs', 'success')
+                    refresh()
+                  } catch (err) {
+                    console.error('Failed to adopt KB:', err)
+                    toast(err instanceof Error ? err.message : 'Failed to add to My KBs', 'error')
+                  }
+                }
+              : undefined}
+            onRemoveRef={activeTab === 'mine'
+              ? async (refUuid) => {
+                  const kb = scopedMine.knowledgeBases.find((k: KnowledgeBase) => k.reference_uuid === refUuid)
+                  const ok = await confirm({
+                    title: 'Remove from My KBs?',
+                    message: (
+                      <>
+                        Remove <strong>{kb?.title || 'this knowledge base'}</strong> from My KBs? This only removes your bookmark — the original knowledge base is unaffected, and you can add it again from Explore.
+                      </>
+                    ),
+                    confirmLabel: 'Remove',
+                  })
+                  if (!ok) return
+                  try {
+                    await scopedMine.removeRef(refUuid)
+                    toast('Removed from My KBs', 'success')
+                    refresh()
+                  } catch (err) {
+                    console.error('Failed to remove KB reference:', err)
+                    toast(err instanceof Error ? err.message : 'Failed to remove', 'error')
+                  }
+                }
+              : undefined}
+            emptyComponent={activeTab === 'mine' && !search ? <KnowledgeExplainer /> : undefined}
+            emptyMessage={
+              activeTab === 'team'
+                ? 'No knowledge bases shared with your team yet.'
                 : 'No knowledge bases found.'
-          }
-        />
-      </div>
+            }
+          />
+        </div>
+      )}
     </div>
 
-    {exploreDetail && (
-      <ItemDetailModal
-        item={exploreDetail}
-        onClose={() => setExploreDetail(null)}
-        onAddToLibrary={() => {}}
-        onAdoptKB={async (kbUuid) => {
-          try {
-            await scopedMine.adopt(kbUuid)
-            refresh()
-            setExploreDetail(null)
-          } catch {
-            // already adopted — still close the modal
-            setExploreDetail(null)
-          }
-        }}
-        onTryIt={(item) => {
-          if (!item.source_uuid) return
-          setExploreDetail(null)
-          activateKB(item.source_uuid, item.display_name || item.name)
-        }}
+    {showCreateModal && (
+      <CreateKBModal
+        onClose={() => setShowCreateModal(false)}
+        onCreate={handleCreate}
       />
     )}
+    {shareDialogJSX}
+    {verifyModalJSX}
+    <SharedKBDeleteDialog
+      open={!!sharedDeleteTarget}
+      kbTitle={sharedDeleteTarget?.title ?? ''}
+      onCancel={() => setSharedDeleteTarget(null)}
+      onChoose={handleSharedDeleteChoice}
+    />
     </>
+  )
+}
+
+// Inline tag editor — free-form labels (e.g. "v1.2", "draft", "2026-Q1").
+// Owners and examiners/admins can add/remove; everyone else sees read-only chips.
+function KBTagsEditor({
+  tags, canManage, onSave,
+}: {
+  tags: string[]
+  canManage: boolean
+  onSave: (next: string[]) => Promise<void>
+}) {
+  const [draft, setDraft] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const normalize = (t: string) => t.trim().slice(0, 50)
+
+  const addTag = async () => {
+    const t = normalize(draft)
+    if (!t) return
+    if (tags.some(existing => existing.toLowerCase() === t.toLowerCase())) {
+      setDraft('')
+      return
+    }
+    if (tags.length >= 20) return
+    setSaving(true)
+    try {
+      await onSave([...tags, t])
+      setDraft('')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const removeTag = async (t: string) => {
+    setSaving(true)
+    try {
+      await onSave(tags.filter(x => x !== t))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!canManage && tags.length === 0) return null
+
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ fontSize: 13, fontWeight: 600, color: '#ccc', marginBottom: 8 }}>Tags</div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+        {tags.map(t => (
+          <span
+            key={t}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              fontSize: 11, fontWeight: 600, padding: '2px 4px 2px 8px', borderRadius: 8,
+              color: '#cbd5e1', backgroundColor: '#2f2f2f',
+              border: '1px solid #3a3a3a',
+            }}
+          >
+            {t}
+            {canManage && (
+              <button
+                onClick={() => removeTag(t)}
+                disabled={saving}
+                title="Remove tag"
+                style={{
+                  background: 'transparent', border: 'none',
+                  cursor: saving ? 'default' : 'pointer',
+                  padding: 0, display: 'flex', color: '#888',
+                }}
+              >
+                <X size={11} />
+              </button>
+            )}
+          </span>
+        ))}
+        {canManage && tags.length < 20 && (
+          <input
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                addTag()
+              } else if (e.key === 'Backspace' && !draft && tags.length > 0) {
+                e.preventDefault()
+                removeTag(tags[tags.length - 1])
+              }
+            }}
+            onBlur={() => { if (draft.trim()) addTag() }}
+            disabled={saving}
+            placeholder={tags.length === 0 ? 'e.g. v1.2, draft' : 'Add tag…'}
+            maxLength={50}
+            style={{
+              minWidth: 100, fontSize: 12, fontFamily: 'inherit',
+              color: '#e5e5e5', backgroundColor: '#1a1a1a',
+              border: '1px solid #333', borderRadius: 6,
+              padding: '3px 8px', outline: 'none',
+            }}
+          />
+        )}
+      </div>
+    </div>
   )
 }

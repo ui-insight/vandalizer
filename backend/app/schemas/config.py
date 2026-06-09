@@ -17,6 +17,10 @@ class ModelInfo(BaseModel):
     multimodal: bool = False
     supports_pdf: bool = False
     context_window: int = 128000
+    # USD per 1M tokens, optional. Used by KB Autovalidate to render dollar
+    # estimates next to token budgets when admins have populated these fields.
+    cost_per_1m_input: Optional[float] = None
+    cost_per_1m_output: Optional[float] = None
 
 
 class UserConfigResponse(BaseModel):
@@ -37,11 +41,17 @@ class ThemeConfigResponse(BaseModel):
     highlight_text_color: str = "#000000"
     highlight_complement: str = "#154cf7"
     ui_radius: str = "12px"
+    org_name: str = ""
+    logo_data_url: str = ""
+    icon_data_url: str = ""
 
 
 class UpdateThemeConfigRequest(BaseModel):
     highlight_color: Optional[str] = None
     ui_radius: Optional[str] = None
+    org_name: Optional[str] = None
+    logo_data_url: Optional[str] = None
+    icon_data_url: Optional[str] = None
 
 
 class RecentActivityItem(BaseModel):

@@ -118,10 +118,8 @@ def triage_work_item_sync(
             models = system_config_doc.get("available_models", [])
             model_name = models[0]["name"] if models else ""
         if not model_name:
-            from pymongo import MongoClient
-            from app.config import Settings
-            _settings = Settings()
-            db = MongoClient(_settings.mongo_host)[_settings.mongo_db]
+            from app.tasks import get_sync_db
+            db = get_sync_db()
             sys_cfg = db.system_config.find_one() or {}
             models = sys_cfg.get("available_models", [])
             model_name = models[0]["name"] if models else "gpt-4o-mini"
@@ -147,5 +145,11 @@ Attachments ({work_item_doc.get('attachment_count', 0)} files): {', '.join(attac
 {attachment_text_preview}
 """.strip()
 
-    result = agent.run_sync(context)
+    from app.services.metering import metered
+    with metered(
+        "m365_triage",
+        user_id=work_item_doc.get("user_id"),
+        team_id=work_item_doc.get("team_id"),
+    ):
+        result = agent.run_sync(context)
     return result.output

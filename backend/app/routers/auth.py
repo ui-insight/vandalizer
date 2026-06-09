@@ -60,14 +60,8 @@ async def _user_response(user: User) -> UserResponse:
             current_team_uuid = team.uuid
 
     # Resolve support agent status from system config
-    is_support_agent = False
-    if user.is_admin:
-        is_support_agent = True
-    else:
-        from app.models.system_config import SystemConfig
-        config = await SystemConfig.get_config()
-        contacts = config.support_contacts or []
-        is_support_agent = any(c.get("user_id") == user.user_id for c in contacts)
+    from app.services import support_service
+    is_support_agent = await support_service.is_support_user(user)
 
     return UserResponse(
         id=str(user.id),
@@ -84,6 +78,27 @@ async def _user_response(user: User) -> UserResponse:
     )
 
 
+_LOGIN_ERROR_MESSAGES = {
+    auth_service.AUTH_REASON_UNKNOWN_USER: (
+        "We couldn't find an account for that email. Double-check the "
+        "spelling, or create a new account if you don't have one yet."
+    ),
+    auth_service.AUTH_REASON_SSO_ONLY: (
+        "This account signs in with single sign-on. Use the SSO button on "
+        "the sign-in page, or click \"Forgot password\" to set a password."
+    ),
+    auth_service.AUTH_REASON_WRONG_PASSWORD: (
+        "That password is incorrect. Try again, or click \"Forgot "
+        "password\" to reset it."
+    ),
+    auth_service.AUTH_REASON_TRIAL_EXPIRED: (
+        "Your free trial has ended, so this account is locked. Look for "
+        "the trial-feedback email we sent you, or get in touch with your "
+        "Vandalizer contact if you'd like to extend access."
+    ),
+}
+
+
 @router.post("/login")
 @limiter.limit("5/minute")
 async def login(
@@ -92,11 +107,16 @@ async def login(
     response: Response,
     settings: Settings = Depends(get_settings),
 ):
-    user = await auth_service.authenticate(body.user_id, body.password)
+    user, reason = await auth_service.authenticate_with_reason(
+        body.user_id, body.password
+    )
     if not user:
+        message = _LOGIN_ERROR_MESSAGES.get(
+            reason or "", "We couldn't sign you in. Please try again."
+        )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials",
+            detail=message,
         )
     _set_tokens(response, user, settings)
     await audit_service.log_event(
@@ -142,6 +162,14 @@ async def register(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Registration failed. Please check your details and try again.",
         )
+
+    if settings.enable_trial_system:
+        from app.services.demo_service import TRIAL_DAYS
+
+        now = datetime.datetime.now(datetime.timezone.utc)
+        user.is_demo_user = True
+        user.demo_expires_at = now + datetime.timedelta(days=TRIAL_DAYS)
+        user.demo_status = "active"
 
     # Capture role cohort + enroll new users in the agentic-chat drip.
     _ALLOWED_ROLES = {"research_admin", "pi", "sponsored_programs", "compliance", "it", "other"}

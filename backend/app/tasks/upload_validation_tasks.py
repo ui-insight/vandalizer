@@ -17,24 +17,42 @@ logger = logging.getLogger(__name__)
 
 
 def _get_db():
-    """Get sync pymongo database handle."""
-    from pymongo import MongoClient
+    """Get sync pymongo database handle (shared per-process client)."""
+    from app.tasks import get_sync_db
 
-    from app.config import Settings
-    settings = Settings()
-    client = MongoClient(settings.mongo_host)
-    return client[settings.mongo_db]
+    return get_sync_db()
+
+
+_DEFAULT_COMPLIANCE_RULES = (
+    "Check that the document does not contain any sensitive PII data "
+    "that should not be processed by an external LLM. Flag SSNs, credit "
+    "card numbers, medical records, or classified information."
+)
+
+
+def _get_compliance_settings() -> dict:
+    """Fetch compliance settings from SystemConfig.compliance_config.
+
+    Falls back to the legacy `upload_compliance` string field for older
+    configs that haven't been migrated. Returns a dict with at least
+    `enabled`, `rules`, `chunk_size`, and `chunk_overlap`.
+    """
+    db = _get_db()
+    sys_cfg = db.system_config.find_one() or {}
+    compliance = sys_cfg.get("compliance_config") or {}
+    legacy_rules = sys_cfg.get("upload_compliance")
+    return {
+        "enabled": bool(compliance.get("enabled", False)),
+        "check_on_upload": bool(compliance.get("check_on_upload", True)),
+        "rules": compliance.get("rules") or legacy_rules or _DEFAULT_COMPLIANCE_RULES,
+        "chunk_size": int(compliance.get("chunk_size") or 8000),
+        "chunk_overlap": int(compliance.get("chunk_overlap") or 200),
+    }
 
 
 def _get_compliance_rules() -> str:
-    """Fetch compliance rules from SystemConfig."""
-    db = _get_db()
-    sys_cfg = db.system_config.find_one() or {}
-    return sys_cfg.get("upload_compliance", (
-        "Check that the document does not contain any sensitive PII data "
-        "that should not be processed by an external LLM. Flag SSNs, credit "
-        "card numbers, medical records, or classified information."
-    ))
+    """Return the compliance rule prompt (used by chunk validation)."""
+    return _get_compliance_settings()["rules"]
 
 
 def _get_secure_agent():
@@ -83,7 +101,9 @@ def validate_chunk(
             f"Compliance Requirements:\n{compliance}\n"
             f"Document Text Chunk:\n{chunk_text}"
         )
-        result = agent.run_sync(prompt)
+        from app.services.metering import metered
+        with metered("upload_validation"):
+            result = agent.run_sync(prompt)
         output = result.output
 
         # Parse structured output or treat as text
@@ -139,14 +159,16 @@ def summarize_results(
     # Summarize via LLM
     try:
         agent = _get_secure_agent()
-        summary_result = agent.run_sync(
-            f"Analyze this validation feedback and return a structured response.\n"
-            f'Validation results: {"PASSED" if all_valid else "FAILED"}\n\n'
-            f"Validation feedback:\n{combined}\n\n"
-            f"Return:\n"
-            f"- valid: {str(all_valid).lower()}\n"
-            f'- feedback: {"Confirm all sections passed validation" if all_valid else "Concise summary of failures and required fixes"}'
-        )
+        from app.services.metering import metered
+        with metered("upload_validation"):
+            summary_result = agent.run_sync(
+                f"Analyze this validation feedback and return a structured response.\n"
+                f'Validation results: {"PASSED" if all_valid else "FAILED"}\n\n'
+                f"Validation feedback:\n{combined}\n\n"
+                f"Return:\n"
+                f"- valid: {str(all_valid).lower()}\n"
+                f'- feedback: {"Confirm all sections passed validation" if all_valid else "Concise summary of failures and required fixes"}'
+            )
         output = summary_result.output
 
         if hasattr(output, "model_dump"):
@@ -203,6 +225,23 @@ def perform_document_validation(
 
     db = _get_db()
 
+    settings = _get_compliance_settings()
+    if not settings["enabled"] or not (settings["rules"] or "").strip():
+        # Compliance checks are off — mark the document as valid and skip.
+        skip_fields = {
+            "valid": True,
+            "validation_feedback": "Compliance checks disabled.",
+            "validating": False,
+        }
+        if not background:
+            skip_fields["task_status"] = "complete"
+        db.smart_document.update_one(
+            {"uuid": document_uuid},
+            {"$set": skip_fields},
+        )
+        logger.info("Compliance disabled — skipping validation for %s", document_uuid)
+        return ""
+
     update_fields = {"validating": True}
     if not background:
         update_fields["task_status"] = "security"
@@ -222,11 +261,13 @@ def perform_document_validation(
         ext = os.path.splitext(document_path)[1].lstrip(".")
         text = extract_text_from_file(document_path, ext)
 
-    compliance = _get_compliance_rules()
+    compliance = settings["rules"]
+    effective_chunk_size = chunk_size or settings["chunk_size"]
+    effective_chunk_overlap = chunk_overlap if chunk_overlap is not None else settings["chunk_overlap"]
 
     # Split into chunks
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=chunk_size, chunk_overlap=chunk_overlap,
+        chunk_size=effective_chunk_size, chunk_overlap=effective_chunk_overlap,
     )
     chunks = text_splitter.split_text(text)
     total = len(chunks)

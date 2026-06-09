@@ -63,6 +63,31 @@ class TestExtractionNode:
         assert args[0][1] == ["Title"]
 
     @patch("app.services.workflow_engine.data_extraction_model")
+    def test_extraction_forwards_field_metadata(self, mock_extract):
+        """Optional designations + enum validation resolved from a saved set
+        must reach the engine when an extraction runs inside a workflow."""
+        mock_extract.return_value = {"raw": [], "formatted": ""}
+        field_metadata = [
+            {"key": "Status", "is_optional": False, "enum_values": ["Open", "Closed"]},
+            {"key": "Notes", "is_optional": True, "enum_values": []},
+        ]
+        node = ExtractionNode({
+            "model": "gpt-4o",
+            "keys": ["Status", "Notes"],
+            "field_metadata": field_metadata,
+        })
+        node.process({"output": ["uuid1"], "step_name": "Document"})
+        assert mock_extract.call_args.kwargs.get("field_metadata") == field_metadata
+
+    @patch("app.services.workflow_engine.data_extraction_model")
+    def test_extraction_omits_field_metadata_when_absent(self, mock_extract):
+        """Manual-field extractions (no saved set) pass no field_metadata."""
+        mock_extract.return_value = {"raw": [], "formatted": ""}
+        node = ExtractionNode({"model": "gpt-4o", "keys": ["X"]})
+        node.process({"output": ["uuid1"], "step_name": "Document"})
+        assert "field_metadata" not in mock_extract.call_args.kwargs
+
+    @patch("app.services.workflow_engine.data_extraction_model")
     def test_extraction_from_selected_document(self, mock_extract):
         mock_extract.return_value = {"raw": [{"Name": "Bob"}], "formatted": ""}
         node = ExtractionNode({
@@ -347,21 +372,18 @@ class TestFormatNode:
 # ---------------------------------------------------------------------------
 
 class TestWebsiteNode:
-    @patch("app.services.workflow_engine._extract_text_from_html")
-    @patch("app.services.workflow_engine.httpx.Client")
-    @patch("app.utils.url_validation.validate_outbound_url")
-    def test_successful_fetch(self, mock_validate, mock_client_cls, mock_extract):
-        mock_validate.return_value = "https://example.com"
-        mock_response = MagicMock()
-        mock_response.text = "<p>Page content</p>"
-        mock_response.raise_for_status = MagicMock()
-        mock_client = MagicMock()
-        mock_client.__enter__ = MagicMock(return_value=mock_client)
-        mock_client.__exit__ = MagicMock(return_value=False)
-        mock_client.get.return_value = mock_response
-        mock_client_cls.return_value = mock_client
-        mock_extract.return_value = "Page content"
+    @patch("app.services.web_fetcher.fetch_url_sync")
+    def test_successful_fetch(self, mock_fetch):
+        from app.services.web_fetcher import WebFetchResult
 
+        mock_fetch.return_value = WebFetchResult(
+            url="https://example.com",
+            title="Example",
+            text="Page content",
+            raw_html="<p>Page content</p>",
+            used_browser=False,
+            status_code=200,
+        )
         node = WebsiteNode({"url": "https://example.com"})
         result = node.process({"output": "prev"})
         assert result["output"] == "Page content"
@@ -372,28 +394,20 @@ class TestWebsiteNode:
         result = node.process({"output": "prev"})
         assert result["output"] == ""
 
-    @patch("app.utils.url_validation.validate_outbound_url", side_effect=ValueError("blocked"))
-    def test_blocked_url(self, mock_validate):
+    @patch("app.services.web_fetcher.fetch_url_sync", side_effect=ValueError("blocked"))
+    def test_blocked_url(self, mock_fetch):
         node = WebsiteNode({"url": "http://metadata.google.internal"})
         result = node.process({"output": "prev"})
         assert "Blocked URL" in result["output"]
 
-    @patch("app.utils.url_validation.validate_outbound_url")
-    @patch("app.services.workflow_engine.httpx.Client")
-    def test_http_error(self, mock_client_cls, mock_validate):
+    @patch("app.services.web_fetcher.fetch_url_sync")
+    def test_http_error(self, mock_fetch):
         import httpx
-        mock_validate.return_value = "https://example.com"
         mock_response = MagicMock()
         mock_response.status_code = 404
-        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+        mock_fetch.side_effect = httpx.HTTPStatusError(
             "Not Found", request=MagicMock(), response=mock_response
         )
-        mock_client = MagicMock()
-        mock_client.__enter__ = MagicMock(return_value=mock_client)
-        mock_client.__exit__ = MagicMock(return_value=False)
-        mock_client.get.return_value = mock_response
-        mock_client_cls.return_value = mock_client
-
         node = WebsiteNode({"url": "https://example.com/404"})
         result = node.process({"output": "prev"})
         assert "HTTP error" in result["output"]
@@ -689,6 +703,239 @@ class TestAPICallNode:
         call_kwargs = mock_client.request.call_args[1]
         assert call_kwargs["content"] == "plain text body"
 
+    @staticmethod
+    def _ok_client(mock_client_cls, json_return=None):
+        """Wire a MagicMock httpx.Client that returns a 200 JSON response."""
+        mock_response = MagicMock()
+        mock_response.json.return_value = json_return if json_return is not None else {"ok": True}
+        mock_response.raise_for_status = MagicMock()
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client.request.return_value = mock_response
+        mock_client_cls.return_value = mock_client
+        return mock_client
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_body_template_wraps_upstream_output(self, mock_client_cls, _mock_validate):
+        mock_client = self._ok_client(mock_client_cls)
+        node = APICallNode({
+            "url": "https://api.example.com/create",
+            "method": "POST",
+            "body": '{"records": {{ inputs.output }}}',
+        })
+        node.process({"output": [{"id": 1}, {"id": 2}]})
+        assert mock_client.request.call_args[1]["json"] == {"records": [{"id": 1}, {"id": 2}]}
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_body_template_unknown_variable_errors(self, mock_client_cls, _mock_validate):
+        node = APICallNode({
+            "url": "https://api.example.com/create",
+            "method": "POST",
+            "body": '{"x": {{ inputs.output.missing }}}',
+        })
+        result = node.process({"output": {"present": 1}})
+        assert "could not be resolved" in result["output"]
+        mock_client_cls.assert_not_called()
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_empty_body_passthrough_dict(self, mock_client_cls, _mock_validate):
+        mock_client = self._ok_client(mock_client_cls)
+        node = APICallNode({"url": "https://api.example.com/store", "method": "POST"})
+        node.process({"output": {"id": 1, "value": "x"}})
+        assert mock_client.request.call_args[1]["json"] == {"id": 1, "value": "x"}
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_empty_body_passthrough_string_as_content(self, mock_client_cls, _mock_validate):
+        mock_client = self._ok_client(mock_client_cls)
+        node = APICallNode({"url": "https://api.example.com/store", "method": "PUT"})
+        node.process({"output": "raw text result"})
+        call_kwargs = mock_client.request.call_args[1]
+        assert call_kwargs["content"] == "raw text result"
+        assert call_kwargs["json"] is None
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_get_with_empty_body_has_no_passthrough(self, mock_client_cls, _mock_validate):
+        mock_client = self._ok_client(mock_client_cls)
+        node = APICallNode({"url": "https://api.example.com", "method": "GET"})
+        node.process({"output": {"id": 1}})
+        call_kwargs = mock_client.request.call_args[1]
+        assert call_kwargs["json"] is None
+        assert call_kwargs["content"] is None
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_configured_scalar_body_is_not_dropped(self, mock_client_cls, _mock_validate):
+        # Regression: a populated body that parses to a JSON scalar (not an
+        # object/array) used to fall through to a zero-byte POST, which the
+        # remote rejected with a confusing 400. It must go out as raw JSON text.
+        mock_client = self._ok_client(mock_client_cls)
+        node = APICallNode({
+            "url": "https://api.example.com/submit",
+            "method": "POST",
+            "body": "123",
+        })
+        node.process({"output": "prev"})
+        call_kwargs = mock_client.request.call_args[1]
+        assert call_kwargs["content"] == "123"
+        assert call_kwargs["json"] is None
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_configured_null_body_is_not_dropped(self, mock_client_cls, _mock_validate):
+        mock_client = self._ok_client(mock_client_cls)
+        node = APICallNode({
+            "url": "https://api.example.com/submit",
+            "method": "POST",
+            "body": "null",
+        })
+        node.process({"output": "prev"})
+        call_kwargs = mock_client.request.call_args[1]
+        assert call_kwargs["content"] == "null"
+        assert call_kwargs["json"] is None
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_json_object_body_defaults_content_type(self, mock_client_cls, _mock_validate):
+        mock_client = self._ok_client(mock_client_cls)
+        node = APICallNode({
+            "url": "https://api.example.com/submit",
+            "method": "POST",
+            "body": '{"a": 1}',
+        })
+        node.process({"output": "prev"})
+        assert mock_client.request.call_args[1]["headers"]["Content-Type"] == "application/json"
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_scalar_body_sent_as_content_defaults_content_type(self, mock_client_cls, _mock_validate):
+        # The string/content send path doesn't get httpx's automatic JSON
+        # content-type — we must add it ourselves so Flask's request.json works.
+        mock_client = self._ok_client(mock_client_cls)
+        node = APICallNode({
+            "url": "https://api.example.com/submit",
+            "method": "POST",
+            "body": "123",
+        })
+        node.process({"output": "prev"})
+        call_kwargs = mock_client.request.call_args[1]
+        assert call_kwargs["content"] == "123"
+        assert call_kwargs["headers"]["Content-Type"] == "application/json"
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_passthrough_dict_defaults_content_type(self, mock_client_cls, _mock_validate):
+        mock_client = self._ok_client(mock_client_cls)
+        node = APICallNode({"url": "https://api.example.com/submit", "method": "POST"})
+        node.process({"output": {"id": 1}})
+        assert mock_client.request.call_args[1]["headers"]["Content-Type"] == "application/json"
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_explicit_content_type_not_overridden(self, mock_client_cls, _mock_validate):
+        # User picked a different content type (and a different casing) — respect it.
+        mock_client = self._ok_client(mock_client_cls)
+        node = APICallNode({
+            "url": "https://api.example.com/submit",
+            "method": "POST",
+            "headers": '{"content-type": "application/vnd.api+json"}',
+            "body": '{"a": 1}',
+        })
+        node.process({"output": "prev"})
+        sent = mock_client.request.call_args[1]["headers"]
+        assert sent["content-type"] == "application/vnd.api+json"
+        assert "Content-Type" not in sent
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_non_json_text_body_gets_no_content_type(self, mock_client_cls, _mock_validate):
+        mock_client = self._ok_client(mock_client_cls)
+        node = APICallNode({
+            "url": "https://api.example.com/submit",
+            "method": "POST",
+            "body": "plain text body",
+        })
+        node.process({"output": "prev"})
+        assert "Content-Type" not in mock_client.request.call_args[1]["headers"]
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_success_includes_request_preview(self, mock_client_cls, _mock_validate):
+        self._ok_client(mock_client_cls, json_return={"ok": True})
+        node = APICallNode({
+            "url": "https://api.example.com/submit",
+            "method": "POST",
+            "body": '{"a": 1}',
+        })
+        result = node.process({"output": "prev"})
+        req = result["request"]
+        assert req["method"] == "POST"
+        assert req["url"] == "https://api.example.com/submit"
+        assert req["body"] == '{"a": 1}'
+        assert req["body_bytes"] == len('{"a": 1}'.encode())
+        assert req["headers"]["Content-Type"] == "application/json"
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_request_preview_redacts_secrets(self, mock_client_cls, _mock_validate):
+        self._ok_client(mock_client_cls)
+        node = APICallNode({
+            "url": "https://api.example.com/submit",
+            "method": "POST",
+            "headers": '{"Authorization": "Bearer s3cr3t", "X-Api-Key": "abc", "X-Trace": "ok"}',
+            "body": '{"a": 1}',
+        })
+        result = node.process({"output": "prev"})
+        headers = result["request"]["headers"]
+        assert headers["Authorization"] == "<redacted>"
+        assert headers["X-Api-Key"] == "<redacted>"
+        assert headers["X-Trace"] == "ok"  # non-secret header passes through
+        # And the secret must not leak anywhere in the serialized result.
+        assert "s3cr3t" not in json.dumps(result)
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_http_error_embeds_request_in_output(self, mock_client_cls, _mock_validate):
+        import httpx
+        mock_response = MagicMock()
+        mock_response.status_code = 415
+        mock_response.text = "Unsupported Media Type"
+        mock_response.raise_for_status.side_effect = httpx.HTTPStatusError(
+            "415", request=MagicMock(), response=mock_response
+        )
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client.request.return_value = mock_response
+        mock_client_cls.return_value = mock_client
+
+        node = APICallNode({
+            "url": "https://marina.example.com/submit/foo",
+            "method": "POST",
+            "body": '{"records": [1, 2]}',
+        })
+        result = node.process({"output": "prev"})
+        assert "HTTP error: 415" in result["output"]
+        assert "--- Request sent ---" in result["output"]
+        assert "POST https://marina.example.com/submit/foo" in result["output"]
+        assert "request" in result and result["request"]["method"] == "POST"
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_url_template_interpolates_upstream_id(self, mock_client_cls, _mock_validate):
+        mock_client = self._ok_client(mock_client_cls)
+        node = APICallNode({
+            "url": "https://api.example.com/records/{{ inputs.output.id }}",
+            "method": "GET",
+        })
+        node.process({"output": {"id": "abc123"}})
+        assert mock_client.request.call_args[0] == ("GET", "https://api.example.com/records/abc123")
+
     @patch("app.utils.url_validation.validate_outbound_url")
     @patch("app.services.workflow_engine.httpx.Client")
     def test_get_ignores_body(self, mock_client_cls, mock_validate):
@@ -733,6 +980,35 @@ class TestAPICallNode:
         result = node.process({"output": "prev"})
         call_kwargs = mock_client.request.call_args[1]
         assert call_kwargs["headers"]["Authorization"] == "Bearer token"
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_malformed_headers_returns_error(self, mock_client_cls, _mock_validate):
+        # Smart quotes — looks like JSON to a human but fails json.loads.
+        # Previously the parse error was silently swallowed, which sent the
+        # request with no auth headers and produced a confusing 403 from the
+        # target server (commonly Vandalizer's own CSRF middleware when the
+        # missing header was x-api-key).
+        node = APICallNode({
+            "url": "https://api.example.com",
+            "method": "POST",
+            "headers": '{“x-api-key”: “secret”}',
+        })
+        result = node.process({"output": "prev"})
+        assert "Invalid Headers JSON" in result["output"]
+        mock_client_cls.assert_not_called()
+
+    @patch("app.utils.url_validation.validate_outbound_url", return_value="ok")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_non_object_headers_returns_error(self, mock_client_cls, _mock_validate):
+        node = APICallNode({
+            "url": "https://api.example.com",
+            "method": "POST",
+            "headers": '"just-a-string"',
+        })
+        result = node.process({"output": "prev"})
+        assert "Invalid Headers JSON" in result["output"]
+        mock_client_cls.assert_not_called()
 
     @patch("app.utils.url_validation.validate_outbound_url")
     @patch("app.services.workflow_engine.httpx.Client")
@@ -1077,6 +1353,45 @@ class TestKnowledgeBaseQueryNode:
         node = KnowledgeBaseQueryNode({"kb_uuid": "kb-123", "query": "obscure"})
         result = node.process({"output": "prev"})
         assert result["output"] == ""
+
+    @patch("app.services.document_manager.DocumentManager")
+    def test_emits_retrieved_sources_with_page_and_score(self, mock_dm_cls):
+        """The KB node returns a structured citation list for the workflow
+        result to persist, in addition to the joined prompt text."""
+        mock_dm = MagicMock()
+        mock_dm.query_kb.return_value = [
+            {
+                "content": "Section II.D — cost share",
+                "metadata": {"source_id": "src-1", "source_name": "PAPPG.pdf", "page": 234},
+                "chunk_id": "src-1_chunk_47",
+                "score": 0.12,
+            },
+            {
+                "content": "Q1 budget row",
+                "metadata": {"source_id": "src-2", "source_name": "Budget.xlsx", "sheet": "Year 1"},
+                "chunk_id": "src-2_chunk_3",
+                "score": 0.19,
+            },
+        ]
+        mock_dm_cls.return_value = mock_dm
+
+        node = KnowledgeBaseQueryNode({"kb_uuid": "kb-1", "query": "cost share"})
+        result = node.process({"output": "prev"})
+
+        # Prompt-side: cited label appears in the joined output text.
+        assert "p. 234" in result["output"]
+        assert "Year 1" in result["output"]
+
+        # Citation-side: each result becomes a retrieved_sources entry.
+        sources = result["retrieved_sources"]
+        assert len(sources) == 2
+        assert sources[0]["document_title"] == "PAPPG.pdf"
+        assert sources[0]["page"] == 234
+        assert sources[0]["sheet"] is None
+        assert sources[0]["chunk_id"] == "src-1_chunk_47"
+        assert sources[0]["score"] == 0.12
+        assert sources[1]["sheet"] == "Year 1"
+        assert sources[1]["page"] is None
 
 
 # ---------------------------------------------------------------------------

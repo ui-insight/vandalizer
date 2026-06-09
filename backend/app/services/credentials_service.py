@@ -33,6 +33,10 @@ _ENCRYPTED_FIELDS: dict[str, tuple[str, ...]] = {
     "oauth_client_credentials": ("private_key", "client_secret"),
 }
 
+# Sentinel returned to clients in place of an encrypted field's value, so the
+# real secret never leaves the server. A client must never echo it back.
+MASKED_SECRET = "<set>"
+
 # Redis cache key prefix and skew window for bearer expiry.
 _TOKEN_CACHE_PREFIX = "credentials:bearer:"
 _BEARER_REFRESH_SKEW_SECONDS = 30
@@ -98,7 +102,7 @@ def metadata_view(credential_doc: dict) -> dict:
     encrypted_fields = set(_ENCRYPTED_FIELDS.get(credential_doc.get("type", ""), ()))
     for k, v in payload.items():
         if k in encrypted_fields:
-            safe_payload[k] = "<set>" if v else ""
+            safe_payload[k] = MASKED_SECRET if v else ""
         else:
             safe_payload[k] = v
     return {
@@ -114,13 +118,46 @@ def metadata_view(credential_doc: dict) -> dict:
     }
 
 
+def merge_update_payload(credential_type: str, existing_encrypted: dict, provided: dict) -> dict:
+    """Overlay caller-supplied fields onto the existing (decrypted) payload.
+
+    Lets a caller rotate a single secret (or tweak one non-secret field) without
+    resubmitting the rest — important because secrets are never returned to the
+    client, so it can't echo them back. A provided value that is ``None``, the
+    masked sentinel, or an empty string for a secret field means "keep the
+    stored value". Returns plaintext ready for :func:`validate_payload` /
+    :func:`encrypt_payload`.
+    """
+    merged = decrypt_payload(credential_type, existing_encrypted)
+    secret_fields = set(_ENCRYPTED_FIELDS.get(credential_type, ()))
+    for key, value in provided.items():
+        if value is None or value == MASKED_SECRET:
+            continue
+        if key in secret_fields and value == "":
+            continue
+        merged[key] = value
+    return merged
+
+
 # ---------------------------------------------------------------------------
 # OAuth client_credentials JWT-assertion flow
 # ---------------------------------------------------------------------------
 
+# Process-wide sync Redis client, created once and reused. A new redis.Redis()
+# per call opens a fresh connection pool whose sockets are never reclaimed
+# (callers here don't close it), leaking file descriptors until the process hits
+# [Errno 24] Too many open files — get_bearer_token() runs on every credentialed
+# workflow API call. redis.Redis is thread-safe and pools internally, so a
+# singleton is both correct and what avoids the leak.
+_redis_singleton: "redis.Redis | None" = None
+
+
 def _redis_client() -> redis.Redis:
-    redis_host = os.environ.get("redis_host", "localhost")
-    return redis.Redis(host=redis_host, port=6379, db=0, decode_responses=True)
+    global _redis_singleton
+    if _redis_singleton is None:
+        redis_host = os.environ.get("redis_host", "localhost")
+        _redis_singleton = redis.Redis(host=redis_host, port=6379, db=0, decode_responses=True)
+    return _redis_singleton
 
 
 def _build_client_assertion(payload: dict) -> str:

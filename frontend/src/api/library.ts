@@ -1,8 +1,8 @@
-import { apiFetch, csrfHeaders } from './client'
+import { apiFetch, rawFetch } from './client'
 import type {
   Library, LibraryItem, LibraryFolder, LibraryItemKind,
   VerificationRequest, VerifiedCatalogItem, VerifiedItemMetadata,
-  VerifiedCollection, ExaminerUser,
+  VerifiedCollection, ExaminerUser, CatalogCoverageItem, ExaminerBaselineAdditions,
 } from '../types/library'
 
 // Library CRUD
@@ -118,10 +118,8 @@ export interface CatalogPreviewItem {
 export async function previewCatalogImport(file: File): Promise<CatalogPreviewItem[]> {
   const form = new FormData()
   form.append('file', file)
-  const res = await fetch('/api/verification/catalog/preview-import', {
+  const res = await rawFetch('/api/verification/catalog/preview-import', {
     method: 'POST',
-    credentials: 'include',
-    headers: csrfHeaders(),
     body: form,
   })
   if (!res.ok) {
@@ -139,10 +137,8 @@ export async function importCatalogItems(
   const form = new FormData()
   form.append('file', file)
   form.append('selected_indices', JSON.stringify(selectedIndices))
-  const res = await fetch('/api/verification/catalog/import', {
+  const res = await rawFetch('/api/verification/catalog/import', {
     method: 'POST',
-    credentials: 'include',
-    headers: csrfHeaders(),
     body: form,
   })
   if (!res.ok) {
@@ -169,11 +165,60 @@ export function submitForVerification(data: {
   expected_outputs?: string[]
   dependencies?: string[]
   intended_use_tags?: string[]
+  skip_validation?: boolean
 }) {
   return apiFetch<VerificationRequest>('/api/verification/submit', {
     method: 'POST',
     body: JSON.stringify(data),
   })
+}
+
+// Phase C: examiner authoring during review
+
+export function claimVerificationRequest(uuid: string) {
+  return apiFetch<{ ok: boolean; claimed_at: string }>(`/api/verification/${uuid}/claim`, {
+    method: 'POST',
+  })
+}
+
+export function releaseVerificationRequest(uuid: string) {
+  return apiFetch<{ ok: boolean }>(`/api/verification/${uuid}/release`, {
+    method: 'POST',
+  })
+}
+
+export function setExaminerAdditions(uuid: string, additions: ExaminerBaselineAdditions) {
+  return apiFetch<{ ok: boolean }>(`/api/verification/${uuid}/examiner-additions`, {
+    method: 'PUT',
+    body: JSON.stringify({ additions }),
+  })
+}
+
+// Phase D: catalog coverage
+
+export function listCatalogCoverage(params?: { kind?: string; coverage?: string; limit?: number }) {
+  const sp = new URLSearchParams()
+  if (params?.kind) sp.set('kind', params.kind)
+  if (params?.coverage) sp.set('coverage', params.coverage)
+  if (params?.limit) sp.set('limit', String(params.limit))
+  const qs = sp.toString()
+  return apiFetch<{ items: CatalogCoverageItem[]; total: number }>(
+    `/api/verification/catalog/coverage${qs ? `?${qs}` : ''}`,
+  )
+}
+
+export function pinRetroactiveBaseline(
+  itemKind: string,
+  itemId: string,
+  data: { baseline: Record<string, unknown>; source_run_uuid?: string; score?: number },
+) {
+  return apiFetch<{ ok: boolean; pinned_at: string; live_passes_baseline: boolean | null; live_score: number | null; pinned_score: number | null }>(
+    `/api/verification/catalog/${itemKind}/${itemId}/pin-baseline`,
+    {
+      method: 'POST',
+      body: JSON.stringify(data),
+    },
+  )
 }
 
 export function listVerificationQueue(status?: string, limit = 50) {
@@ -244,8 +289,8 @@ export function updateItemMetadata(itemKind: string, itemId: string, data: { dis
 }
 
 export function unverifyItem(itemKind: string, itemId: string) {
-  return apiFetch<{ ok: boolean }>(`/api/verification/verified/${itemKind}/${itemId}/unverify`, {
-    method: 'POST',
+  return apiFetch<{ ok: boolean }>(`/api/verification/verified/${itemKind}/${itemId}`, {
+    method: 'DELETE',
   })
 }
 

@@ -16,6 +16,15 @@ vi.mock('../../hooks/useAuth', () => ({
   }),
 }))
 
+vi.mock('../../lib/shareLink', () => ({
+  useShareLink: () => vi.fn(),
+  buildShareUrl: vi.fn(),
+}))
+
+vi.mock('../../contexts/ToastContext', () => ({
+  useToast: () => ({ toast: vi.fn() }),
+}))
+
 function makeItem(overrides: Partial<LibraryItem> = {}): LibraryItem {
   return {
     id: 'item-1',

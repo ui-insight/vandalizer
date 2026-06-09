@@ -53,6 +53,8 @@ async def get_models(user: User = Depends(get_current_user)):
             privacy=m.get("privacy", ""),
             supports_structured=m.get("supports_structured", True),
             context_window=m.get("context_window", 128000),
+            cost_per_1m_input=m.get("cost_per_1m_input"),
+            cost_per_1m_output=m.get("cost_per_1m_output"),
         )
         for m in models
         if isinstance(m, dict)
@@ -75,6 +77,8 @@ async def get_user_config(user: User = Depends(get_current_user)):
             privacy=m.get("privacy", ""),
             supports_structured=m.get("supports_structured", True),
             context_window=m.get("context_window", 128000),
+            cost_per_1m_input=m.get("cost_per_1m_input"),
+            cost_per_1m_output=m.get("cost_per_1m_output"),
         )
         for m in models
         if isinstance(m, dict)
@@ -124,6 +128,8 @@ async def update_user_config(req: UpdateUserConfigRequest, user: User = Depends(
             privacy=m.get("privacy", ""),
             supports_structured=m.get("supports_structured", True),
             context_window=m.get("context_window", 128000),
+            cost_per_1m_input=m.get("cost_per_1m_input"),
+            cost_per_1m_output=m.get("cost_per_1m_output"),
         )
         for m in models
         if isinstance(m, dict)
@@ -144,6 +150,26 @@ async def update_user_config(req: UpdateUserConfigRequest, user: User = Depends(
 # ---------------------------------------------------------------------------
 
 
+_MAX_LOGO_DATA_URL_BYTES = 500_000  # ~375KB after base64 — plenty for a wordmark
+
+
+def _validate_image_data_url(value: str, field: str) -> str:
+    value = (value or "").strip()
+    if not value:
+        return ""
+    if not value.startswith("data:image/"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"{field} must be a data:image/* URL",
+        )
+    if len(value) > _MAX_LOGO_DATA_URL_BYTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"image too large (max {_MAX_LOGO_DATA_URL_BYTES // 1024} KB encoded)",
+        )
+    return value
+
+
 @router.get("/theme", response_model=ThemeConfigResponse)
 async def get_theme():
     """Public endpoint  - returns brand theme so the landing page can render it."""
@@ -151,6 +177,9 @@ async def get_theme():
     return ThemeConfigResponse(
         highlight_color=config.highlight_color,
         ui_radius=config.ui_radius,
+        org_name=config.org_name,
+        logo_data_url=config.logo_data_url,
+        icon_data_url=config.icon_data_url,
     )
 
 
@@ -163,12 +192,21 @@ async def update_theme(req: UpdateThemeConfigRequest, user: User = Depends(get_c
         config.highlight_color = req.highlight_color
     if req.ui_radius is not None:
         config.ui_radius = req.ui_radius
+    if req.org_name is not None:
+        config.org_name = req.org_name.strip()
+    if req.logo_data_url is not None:
+        config.logo_data_url = _validate_image_data_url(req.logo_data_url, "logo_data_url")
+    if req.icon_data_url is not None:
+        config.icon_data_url = _validate_image_data_url(req.icon_data_url, "icon_data_url")
     config.updated_at = datetime.datetime.now(datetime.timezone.utc)
     config.updated_by = user.user_id
     await config.save()
     return ThemeConfigResponse(
         highlight_color=config.highlight_color,
         ui_radius=config.ui_radius,
+        org_name=config.org_name,
+        logo_data_url=config.logo_data_url,
+        icon_data_url=config.icon_data_url,
     )
 
 
@@ -182,7 +220,8 @@ async def get_features(user: User = Depends(get_current_user)):
     """Return feature flags for the current deployment."""
     config = await SystemConfig.get_config()
     return {
-        "m365_enabled": config.is_m365_enabled(),
+        "m365_enabled": False,
+        "compliance_enabled": config.is_compliance_enabled(),
     }
 
 

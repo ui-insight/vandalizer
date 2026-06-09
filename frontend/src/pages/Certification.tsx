@@ -1002,6 +1002,10 @@ export default function Certification() {
     try {
       const result = await validate(moduleId)
       setValidationResult(result)
+    } catch {
+      // A bare try/finally re-throws on failure (e.g. a 5xx while the backend is
+      // restarting), escaping as a global "Request failed" unhandled rejection.
+      toast('Could not validate the module right now. Please try again.', 'error')
     } finally {
       setValidating(false)
     }
@@ -1029,6 +1033,10 @@ export default function Certification() {
       await provision(moduleId)
       // Invalidate document queries so workspace shows the new files without a hard refresh
       queryClient.invalidateQueries({ queryKey: ['documents'] })
+    } catch {
+      // Bare try/finally re-throws; catch so a failed provision doesn't escape
+      // as a global "Request failed" unhandled rejection.
+      toast('Could not set up the exercise right now. Please try again.', 'error')
     } finally {
       setProvisioning(false)
     }
@@ -1038,6 +1046,10 @@ export default function Certification() {
     setSubmittingAssessment(true)
     try {
       await submitAssessment(moduleId, answers)
+    } catch {
+      // Bare try/finally re-throws; catch so a failed submit doesn't escape as a
+      // global "Request failed" unhandled rejection.
+      toast('Could not submit your answers right now. Please try again.', 'error')
     } finally {
       setSubmittingAssessment(false)
     }
@@ -1092,7 +1104,7 @@ export default function Certification() {
     }
   }, [completionResult, isModuleLocked, toast])
 
-  if (loading) {
+  if (loading && !progress) {
     return (
       <PageLayout>
         <div className="p-6 max-w-5xl mx-auto">

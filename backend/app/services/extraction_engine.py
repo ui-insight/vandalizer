@@ -34,6 +34,56 @@ ExtractionContent = Union[str, list[BinaryContent]]
 MAX_PDF_PAGES_FOR_IMAGES = 50
 
 
+# Prompt variants the optimizer can sweep over. Each variant returns the
+# extraction-task system prompt (the source-label clause is appended by the
+# caller). "default" preserves the historical prompt verbatim — do not change
+# its wording without re-tuning the candidate-config sweep.
+def _prompt_default(source_label: str) -> str:
+    return (
+        f"You are a precise entity extraction assistant. Extract the requested information from the {source_label}. "
+        f"Extract the exact text as it appears in the document. Do not infer types, do not convert numbers, "
+        "do not change formatting. Keep everything as strings. "
+        "If a field is not found, leave it as null. "
+        "Return a JSON object with an 'entities' key containing a list of extracted objects."
+    )
+
+
+def _prompt_strict(source_label: str) -> str:
+    return (
+        f"You extract verbatim values from the {source_label}. Rules:\n"
+        "1. Copy the EXACT characters as they appear — including punctuation, capitalisation, and whitespace.\n"
+        "2. Never paraphrase, summarise, or normalise (no date format conversion, no number rounding).\n"
+        "3. If a field is not literally present, use null. Do NOT infer or guess.\n"
+        "4. Keep all values as strings.\n"
+        "Return a JSON object with an 'entities' key containing a list of extracted objects."
+    )
+
+
+def _prompt_instructive(source_label: str) -> str:
+    return (
+        f"Your task: extract structured information from the {source_label}.\n\n"
+        "Approach each field carefully:\n"
+        "- Read the document to find where this field is discussed.\n"
+        "- Copy the value as-written. Don't rephrase.\n"
+        "- If the field is genuinely absent (not just hard to find), use null.\n"
+        "- When a field has enum_values listed, only pick from those exact options.\n\n"
+        "Output: JSON object with key 'entities' holding a list of extracted objects. All values are strings; "
+        "absent values are null."
+    )
+
+
+PROMPT_VARIANTS: dict[str, "callable"] = {
+    "default": _prompt_default,
+    "strict": _prompt_strict,
+    "instructive": _prompt_instructive,
+}
+
+
+def _resolve_prompt(variant: str | None, source_label: str) -> str:
+    fn = PROMPT_VARIANTS.get(variant or "default", _prompt_default)
+    return fn(source_label)
+
+
 class ExtractionEngine:
     """Synchronous extraction engine. Thread-safe for use in Celery workers."""
 
@@ -279,20 +329,22 @@ class ExtractionEngine:
             try:
                 import fitz  # pymupdf
 
-                doc = fitz.open(file_path)
-                total_pages = len(doc)
-                render_pages = min(total_pages, MAX_PDF_PAGES_FOR_IMAGES)
-                if total_pages > MAX_PDF_PAGES_FOR_IMAGES:
-                    logger.warning(
-                        "PDF %s has %d pages, capping at %d for image rendering",
-                        file_path, total_pages, MAX_PDF_PAGES_FOR_IMAGES,
-                    )
-                pages: list[BinaryContent] = []
-                for page in doc[:render_pages]:
-                    # 144 DPI (2x zoom) balances quality and memory
-                    pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
-                    pages.append(BinaryContent(data=pix.tobytes("png"), media_type="image/png"))
-                doc.close()
+                # Context-managed so the document's file handle is released on
+                # every path, including if get_pixmap/tobytes raises mid-render
+                # (a bare close() after the loop leaks the fd on exceptions).
+                with fitz.open(file_path) as doc:
+                    total_pages = len(doc)
+                    render_pages = min(total_pages, MAX_PDF_PAGES_FOR_IMAGES)
+                    if total_pages > MAX_PDF_PAGES_FOR_IMAGES:
+                        logger.warning(
+                            "PDF %s has %d pages, capping at %d for image rendering",
+                            file_path, total_pages, MAX_PDF_PAGES_FOR_IMAGES,
+                        )
+                    pages: list[BinaryContent] = []
+                    for page in doc[:render_pages]:
+                        # 144 DPI (2x zoom) balances quality and memory
+                        pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+                        pages.append(BinaryContent(data=pix.tobytes("png"), media_type="image/png"))
                 logger.info("Rendered %d/%d page(s) from %s", render_pages, total_pages, file_path)
                 return pages
             except Exception as e:
@@ -329,30 +381,37 @@ class ExtractionEngine:
 
     def _dispatch_extraction(self, content: ExtractionContent, keys: list[str], model_name: str, config: dict, meta_map: dict[str, dict] | None = None) -> list:
         mode = config.get("mode", "two_pass")
+        prompt_variant = config.get("prompt_variant", "default")
 
         if mode == "one_pass":
             one_pass = config.get("one_pass", {})
             thinking = one_pass.get("thinking", True)
             structured = one_pass.get("structured", True)
             pass_model = one_pass.get("model", "") or model_name
-            return self._execute_single_pass(content, keys, pass_model, thinking, structured, meta_map)
+            return self._execute_single_pass(content, keys, pass_model, thinking, structured, meta_map, prompt_variant)
 
         # two_pass (default)
         two_pass = config.get("two_pass", {})
         pass_1_cfg = two_pass.get("pass_1", {})
         pass_2_cfg = two_pass.get("pass_2", {})
-        return self._execute_two_pass(content, keys, model_name, pass_1_cfg, pass_2_cfg, meta_map)
+        return self._execute_two_pass(content, keys, model_name, pass_1_cfg, pass_2_cfg, meta_map, prompt_variant)
 
-    def _execute_single_pass(self, content: ExtractionContent, keys: list[str], model_name: str, thinking: bool, structured: bool, meta_map: dict[str, dict] | None = None) -> list:
+    def _execute_single_pass(
+        self, content: ExtractionContent, keys: list[str], model_name: str,
+        thinking: bool, structured: bool,
+        meta_map: dict[str, dict] | None = None,
+        prompt_variant: str = "default",
+    ) -> list:
         if structured:
-            return self._extract_structured(content, keys, model_name, thinking_override=thinking, meta_map=meta_map)
+            return self._extract_structured(content, keys, model_name, thinking_override=thinking, meta_map=meta_map, prompt_variant=prompt_variant)
         else:
-            return self._extract_fallback_json(content, keys, model_name, thinking_override=thinking, meta_map=meta_map)
+            return self._extract_fallback_json(content, keys, model_name, thinking_override=thinking, meta_map=meta_map, prompt_variant=prompt_variant)
 
     def _execute_two_pass(
         self, content: ExtractionContent, keys: list[str], model_name: str,
         pass_1_cfg: dict, pass_2_cfg: dict,
         meta_map: dict[str, dict] | None = None,
+        prompt_variant: str = "default",
     ) -> list:
         p1_model = pass_1_cfg.get("model", "") or model_name
         p1_thinking = pass_1_cfg.get("thinking", True)
@@ -364,9 +423,9 @@ class ExtractionEngine:
 
         # Pass 1
         if p1_structured:
-            draft = self._extract_structured(content, keys, p1_model, thinking_override=p1_thinking, meta_map=meta_map)
+            draft = self._extract_structured(content, keys, p1_model, thinking_override=p1_thinking, meta_map=meta_map, prompt_variant=prompt_variant)
         else:
-            draft = self._extract_fallback_json(content, keys, p1_model, thinking_override=p1_thinking, meta_map=meta_map)
+            draft = self._extract_fallback_json(content, keys, p1_model, thinking_override=p1_thinking, meta_map=meta_map, prompt_variant=prompt_variant)
 
         draft_hint = self._build_draft_hint(draft)
 
@@ -385,9 +444,10 @@ class ExtractionEngine:
                 draft_hint=draft_hint,
                 allow_fallback=False,
                 meta_map=meta_map,
+                prompt_variant=prompt_variant,
             )
         else:
-            final = self._extract_fallback_json(p2_content, keys, p2_model, thinking_override=p2_thinking, meta_map=meta_map)
+            final = self._extract_fallback_json(p2_content, keys, p2_model, thinking_override=p2_thinking, meta_map=meta_map, prompt_variant=prompt_variant)
 
         return final or draft or []
 
@@ -615,6 +675,7 @@ class ExtractionEngine:
         draft_hint: dict | None = None,
         allow_fallback: bool = True,
         meta_map: dict[str, dict] | None = None,
+        prompt_variant: str = "default",
     ) -> list:
         # Build dynamic Pydantic model
         field_definitions = {}
@@ -678,13 +739,7 @@ class ExtractionEngine:
         structured_retries = 3
 
         source_label = self._describe_content(content)
-        system_prompt = (
-            f"You are a precise entity extraction assistant. Extract the requested information from the {source_label}. "
-            f"Extract the exact text as it appears in the document. Do not infer types, do not convert numbers, "
-            "do not change formatting. Keep everything as strings. "
-            "If a field is not found, leave it as null. "
-            "Return a JSON object with an 'entities' key containing a list of extracted objects."
-        )
+        system_prompt = _resolve_prompt(prompt_variant, source_label)
         system_prompt += self._get_domain_supplement()
 
         try:
@@ -730,7 +785,7 @@ class ExtractionEngine:
             if ("output validation" in error_msg or "retries" in error_msg.lower()
                     or "validation error" in error_msg.lower()):
                 if allow_fallback:
-                    return self._extract_fallback_json(content, keys, model_name, thinking_override=thinking_override, meta_map=meta_map)
+                    return self._extract_fallback_json(content, keys, model_name, thinking_override=thinking_override, meta_map=meta_map, prompt_variant=prompt_variant)
                 return []
             return []
 
@@ -752,16 +807,19 @@ class ExtractionEngine:
         model_name: str,
         thinking_override: Optional[bool] = None,
         meta_map: dict[str, dict] | None = None,
+        prompt_variant: str = "default",
     ) -> list:
         try:
             source_label = self._describe_content(content)
             fields_str = self._build_fields_prompt(keys, meta_map)
             prompt = self._build_user_prompt(content, fields_str, fallback_mode=True)
 
-            system_prompt = (
-                f"You are a precise entity extraction assistant. Extract the requested information from the {source_label}. "
-                "Return ONLY valid JSON, no markdown formatting, no code blocks, no explanations. "
-                "If a field is not found, use null."
+            # Use the variant prompt + append a fallback-specific clause about
+            # JSON-only output (no markdown / code fences) since the fallback
+            # path parses raw text instead of structured output.
+            system_prompt = _resolve_prompt(prompt_variant, source_label)
+            system_prompt += (
+                " Return ONLY valid JSON, no markdown formatting, no code blocks, no explanations."
             )
             system_prompt += self._get_domain_supplement()
 

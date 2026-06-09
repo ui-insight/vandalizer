@@ -18,6 +18,28 @@ export function initSentry() {
     // so frontend errors link to the backend request that caused them.
     tracePropagationTargets: [/^\/api\//],
     tracesSampleRate: import.meta.env.PROD ? 0.1 : 1.0,
+    ignoreErrors: [
+      // Internal Sentry rejection when the transport is torn down on page
+      // unload — picked back up by Sentry's own unhandledrejection handler.
+      'Transport destroyed',
+      // Expected 401 from protected endpoints when the session has lapsed.
+      // Surfaced as an ApiError; the auth/protected-route layer already
+      // redirects to /landing, so an uncaught rejection here is just noise.
+      'Not authenticated',
+      // Transient backend unavailability: apiFetch throws ApiError('Request
+      // failed') for any non-OK response with a non-JSON body (a 5xx / nginx
+      // gateway page during a backend restart or FD-exhaustion blip), and
+      // 'Request timed out' on a client-side timeout. These are infra events,
+      // not frontend bugs — the backend's own Sentry covers the outage, and
+      // any on-mount hook / fire-and-forget caller that misses a .catch()
+      // would otherwise spam this as a useless single-frame unhandled
+      // rejection. UI-facing callers still catch these to show a toast.
+      'Request failed',
+      'Request timed out',
+      // pdf.js throws this when an in-flight page render is cancelled
+      // (component unmount, doc close, zoom change). Normal behavior.
+      'Rendering cancelled',
+    ],
   })
 }
 

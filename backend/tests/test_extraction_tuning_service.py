@@ -114,3 +114,23 @@ class TestBuildCandidateConfigs:
             assert c["model"] == "m"
             assert isinstance(c["config_override"], dict)
             assert c["config_override"].get("mode") in ("one_pass", "two_pass")
+
+    def test_prompt_variants_emitted_for_first_model_only(self):
+        """strict + instructive variants appear, only for first model — keeps
+        candidate count manageable."""
+        cands = _build_candidate_configs(
+            [_model("alpha"), _model("beta")],
+            num_fields=4,
+        )
+        labels = [c["label"] for c in cands]
+        assert "alpha - two-pass (strict prompt)" in labels
+        assert "alpha - two-pass (instructive prompt)" in labels
+        # NOT emitted for the second model — that would blow up the sweep
+        assert "beta - two-pass (strict prompt)" not in labels
+        assert "beta - two-pass (instructive prompt)" not in labels
+
+    def test_prompt_variant_threaded_into_config_override(self):
+        cands = _build_candidate_configs([_model("m")], num_fields=4)
+        strict = next(c for c in cands if "strict prompt" in c["label"])
+        assert strict["config_override"]["prompt_variant"] == "strict"
+        assert strict["config_override"]["mode"] == "two_pass"

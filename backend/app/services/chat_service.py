@@ -40,6 +40,7 @@ from app.services.llm_service import (
     DOCUMENT_CHAT_SYSTEM_PROMPT,
     FIRST_SESSION_SYSTEM_PROMPT,
     HELP_CHAT_SYSTEM_PROMPT,
+    KB_CHAT_SYSTEM_PROMPT,
     VANDALIZER_CONTEXT,
 )
 
@@ -510,11 +511,15 @@ async def chat_stream(
     url_attachments = await conversation.get_url_attachments()
     for att in url_attachments:
         if att.content:
+            # Content is already clean extracted text (web_fetcher runs
+            # trafilatura).  Cap at 80K chars (~20K tokens) — enough for a
+            # multi-page policy or article; the budget planner trims further
+            # when prompt space is tight.
             attachment_segments.append(DocumentSegment(
                 label=f"web:{att.title or att.url}",
                 text=(
                     f"\n\n## Web Content: {att.title}\nSource: {att.url}\n\n"
-                    f"{att.content[:10000]}\n"
+                    f"{att.content[:80000]}\n"
                 ),
             ))
 
@@ -548,18 +553,33 @@ async def chat_stream(
     # independently by the budget planner.
     doc_segments: list[DocumentSegment] = []
     skipped_no_text: list[str] = []
+    errored_docs: list[str] = []
     for doc in documents:
         if doc.raw_text:
             doc_segments.append(DocumentSegment(
                 label=f"doc:{doc.title or doc.uuid}",
                 text=f"\n\n## Document: {doc.title}\n{doc.raw_text}",
             ))
+        elif doc.task_status == "error":
+            errored_docs.append(doc.title or doc.uuid)
         else:
             skipped_no_text.append(doc.title or doc.uuid)
 
     # Warn the caller about any selected document that the model won't see
-    # because text extraction hasn't finished (or produced no text).
+    # because text extraction hasn't finished, errored out, or the doc is gone.
     missing_uuids = [u for u in document_uuids if u not in {d.uuid for d in documents}]
+    if errored_docs:
+        joined = ", ".join(errored_docs[:5]) + ("…" if len(errored_docs) > 5 else "")
+        yield json.dumps({
+            "kind": "context_notice",
+            "content": (
+                f"{len(errored_docs)} selected document(s) failed text extraction "
+                f"and can't be used here: {joined}. Open the document and use "
+                "\"Retry extraction\" to try again."
+            ),
+            "action": "documents_extraction_failed",
+            "tokens_dropped": 0,
+        }) + "\n"
     if skipped_no_text or missing_uuids:
         names = list(skipped_no_text) + missing_uuids
         joined = ", ".join(names[:5]) + ("…" if len(names) > 5 else "")
@@ -586,16 +606,40 @@ async def chat_stream(
         )
 
     # KB context: query ChromaDB for relevant chunks and add as a segment.
+    kb_sources: list[dict] = []
     if kb_uuid:
         try:
             from app.services.document_manager import get_document_manager
             dm = get_document_manager()
             kb_results = await asyncio.to_thread(dm.query_kb, kb_uuid, message, 8)
             if kb_results:
-                kb_text = "\n\n## Knowledge Base Context:\n"
+                kb_text = (
+                    "\n\n## Retrieved Knowledge Base Snippets\n"
+                    "_The following are partial excerpts from a larger corpus, ranked "
+                    "by similarity to the user's question. They may be incomplete, "
+                    "off-topic, or miss the best answer. Cite by filename only when a "
+                    "snippet actually supports your claim._\n"
+                )
                 for r in kb_results:
-                    src = r.get("metadata", {}).get("source_name", "Unknown")
-                    kb_text += f"\n**Source: {src}**\n{r['content']}\n"
+                    meta = r.get("metadata") or {}
+                    src = meta.get("source_name", "Unknown")
+                    page = meta.get("page")
+                    sheet = meta.get("sheet")
+                    label = src
+                    if isinstance(page, int):
+                        label = f"{src} (p. {page})"
+                    elif isinstance(sheet, str) and sheet:
+                        label = f"{src} ({sheet})"
+                    kb_text += f"\n**Source: {label}**\n{r['content']}\n"
+                    kb_sources.append({
+                        "document_id": meta.get("source_id"),
+                        "document_title": src,
+                        "page": page if isinstance(page, int) else None,
+                        "sheet": sheet if isinstance(sheet, str) else None,
+                        "chunk_id": r.get("chunk_id"),
+                        "score": r.get("score"),
+                        "content_preview": (r.get("content") or "")[:240],
+                    })
                 doc_segments.insert(0, DocumentSegment(label="kb", text=kb_text))
             else:
                 logger.warning("KB query returned no results for kb_uuid=%s", kb_uuid)
@@ -615,9 +659,16 @@ async def chat_stream(
     # Select system prompt based on whether we have document context.
     # Note: run_demo is handled via scripted demo and returns early above, so
     # it never reaches this block.
+    # KB chat needs a stricter prompt: snippets are partial excerpts, so the model
+    # must cite by filename, distinguish grounded answers from general knowledge,
+    # and admit when the retrieved set doesn't actually contain the answer.
     have_context = bool(doc_segments or attachment_segments)
-    if have_context:
-        system_prompt: Optional[str] = DOCUMENT_CHAT_SYSTEM_PROMPT
+    if kb_sources:
+        system_prompt: Optional[str] = KB_CHAT_SYSTEM_PROMPT
+        if inventory:
+            system_prompt = system_prompt + "\n\n" + inventory
+    elif have_context:
+        system_prompt = DOCUMENT_CHAT_SYSTEM_PROMPT
         if inventory:
             system_prompt = system_prompt + "\n\n" + inventory
     elif is_first_session:
@@ -680,21 +731,60 @@ async def chat_stream(
             "tokens_dropped": action.tokens_dropped,
         }) + "\n"
 
+    # Emit KB sources before the LLM streams its answer so the UI can render
+    # citation chips alongside (or just before) the response.
+    if kb_sources:
+        yield json.dumps({
+            "kind": "sources",
+            "content": "",
+            "sources": kb_sources,
+        }) + "\n"
+
     if compacted.fatal:
         logger.warning(
             "Chat context over budget for model=%s: plan=%s actions=%s",
             model_name, compacted.plan.to_dict(),
             [a.to_dict() for a in compacted.actions],
         )
-        yield json.dumps({
-            "kind": "error",
-            "content": (
-                "This request is too large for the selected model "
-                f"(~{compacted.plan.total_input_tokens} tokens vs "
-                f"{compacted.plan.input_budget} token input budget). "
-                "Remove some documents or switch to a larger model."
-            ),
-        }) + "\n"
+        # Identify which attached documents are individually too large for the
+        # model — those are the ones the user should convert to a Knowledge
+        # Base. If none qualify, the prompt is just generically too big and we
+        # fall back to the plain error.
+        from app.services.context_budget import find_oversize_documents
+        oversize = find_oversize_documents(
+            documents=[
+                {"uuid": d.uuid, "title": d.title, "token_count": d.token_count}
+                for d in documents
+            ],
+            model_name=model_name,
+            model_config=model_config,
+        )
+        if oversize:
+            titles = ", ".join(o.title for o in oversize[:3])
+            if len(oversize) > 3:
+                titles += f", and {len(oversize) - 3} more"
+            content = (
+                f"{titles} is too large to read inline with the selected model. "
+                "Convert it to a Knowledge Base and chat will search it instead."
+            )
+            yield json.dumps({
+                "kind": "error",
+                "code": "context_over_budget_convertible",
+                "content": content,
+                "suggested_action": "convert_to_kb",
+                "oversize_documents": [o.to_dict() for o in oversize],
+            }) + "\n"
+        else:
+            yield json.dumps({
+                "kind": "error",
+                "code": "context_over_budget",
+                "content": (
+                    "This request is too large for the selected model "
+                    f"(~{compacted.plan.total_input_tokens} tokens vs "
+                    f"{compacted.plan.input_budget} token input budget). "
+                    "Remove some documents or switch to a larger model."
+                ),
+            }) + "\n"
         await _save_failed_assistant_turn(
             conversation,
             "_(no response — request exceeded the model's context budget)_",
@@ -767,6 +857,17 @@ async def chat_stream(
     streamed_tool_results: list[dict] = []
     streamed_segments: list[dict] = []
 
+    # Meter every token this chat consumes (see app/services/metering.py). Manual
+    # enter/exit avoids re-indenting the large streaming body; __aexit__ in the
+    # finally flushes whatever was accrued, even on cancellation mid-stream.
+    from app.services.metering import metered_async
+    _meter = metered_async(
+        "chat",
+        user_id=user_id,
+        team_id=getattr(conversation, "team_id", None),
+        activity_id=activity_id,
+    )
+    await _meter.__aenter__()
     try:
         think_parser = _ThinkTagParser()
 
@@ -967,6 +1068,8 @@ async def chat_stream(
             )
         except Exception as save_err:
             logger.error("Failed to persist interrupted chat: %s", save_err)
+    finally:
+        await _meter.__aexit__(None, None, None)
 
 
 

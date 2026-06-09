@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, type DragEvent } from 'react'
-import { Loader2, BookOpen, X, ArrowDown, ChevronRight, Shield, CheckCircle2, Upload, Zap } from 'lucide-react'
+import { Loader2, BookOpen, X, ArrowDown, ChevronRight, Shield, CheckCircle2, Upload, Zap, Link2, Sparkles } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
@@ -13,11 +13,15 @@ import { useChat } from '../../hooks/useChat'
 import { useOnboarding } from '../../hooks/useOnboarding'
 import { useWorkspace, type PendingChatMessage } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
+import { useBranding } from '../../contexts/BrandingContext'
+import { useShareLink } from '../../lib/shareLink'
 import { addLink, removeDocument, removeLink, truncateContext, compactContext, clearContext } from '../../api/chat'
 import { uploadFile } from '../../api/files'
+import { convertDocumentsToKB } from '../../api/knowledge'
 import { getUserConfig, updateUserConfig, markFirstSessionComplete } from '../../api/config'
 import type { FileAttachment, UrlAttachment } from '../../types/chat'
 import type { ModelInfo } from '../../types/workflow'
+import { stageCopy } from '../../utils/processingStatus'
 
 const LOADING_WORDS = [
   'Thinking', 'Vandalizing', 'Pondering', 'Analyzing',
@@ -112,6 +116,8 @@ interface ChatPanelProps {
 }
 
 export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessageConsumed }: ChatPanelProps) {
+  const branding = useBranding()
+  const brandIcon = branding.iconUrl
   const {
     messages,
     setMessages,
@@ -125,6 +131,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     activeToolCalls,
     toolResults,
     segments,
+    errorDetails,
+    clearError,
     contextTokens,
     contextMode,
     contextCutoffIndex,
@@ -138,8 +146,10 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     setActivity,
   } = useChat()
 
-  const { bumpActivitySignal, processingDoc, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, activeKBUuid, activeKBTitle, deactivateKB } = useWorkspace()
+  const { bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, activeKBUuid, activeKBTitle, activateKB, deactivateKB, setCurrentConversationUuid } = useWorkspace()
+  const [convertingToKB, setConvertingToKB] = useState(false)
   const { toast } = useToast()
+  const shareLink = useShareLink()
   const { pills: onboardingPills, isFirstSession, loading: onboardingLoading, status: onboardingStatus } = useOnboarding()
   // Lock the first-session flag once it's set so remounts/refetches can't
   // flip it mid-conversation (markFirstSessionComplete fires early).
@@ -211,7 +221,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       setMessages([{
         role: 'assistant',
         content:
-          "Hi! I'm your Vandalizer assistant.\n\n" +
+          `Hi! I'm your ${branding.orgName} assistant.\n\n` +
           "I specialize in document intelligence for research administration — " +
           "extraction with **measured accuracy**, not guesses.\n\n" +
           "Want a quick demo? Say **\"show me\"** and I'll run one live against a sample grant proposal.\n\n" +
@@ -249,6 +259,34 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     setContextTokens(0)
   }
 
+  const handleConvertToKB = async () => {
+    const docs = errorDetails?.oversizeDocuments ?? []
+    if (!docs.length) return
+    setConvertingToKB(true)
+    try {
+      const kb = await convertDocumentsToKB(docs.map(d => d.uuid))
+      // Detach the now-oversized docs from the message so retrying with the KB
+      // doesn't immediately re-trigger the same error.
+      const oversizeUuids = new Set(docs.map(d => d.uuid))
+      setSelectedDocUuids(selectedDocUuids.filter(u => !oversizeUuids.has(u)))
+      const remainingNames: Record<string, string> = {}
+      for (const [uuid, name] of Object.entries(selectedDocNames)) {
+        if (!oversizeUuids.has(uuid)) remainingNames[uuid] = name
+      }
+      setSelectedDocNames(remainingNames)
+      activateKB(kb.uuid, kb.title)
+      clearError()
+      toast('Converted to Knowledge Base — ask your question again.', 'success')
+    } catch (e) {
+      toast(
+        e instanceof Error ? e.message : 'Could not convert the documents to a Knowledge Base.',
+        'error',
+      )
+    } finally {
+      setConvertingToKB(false)
+    }
+  }
+
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current
     if (!el) return
@@ -278,6 +316,13 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       setShowScrollDown(false)
     }
   }, [conversationUuid])
+
+  // Mirror the active conversation into workspace context so ActivityRail
+  // can clear the chat when the user deletes the currently-open activity.
+  useEffect(() => {
+    setCurrentConversationUuid(conversationUuid)
+    return () => setCurrentConversationUuid(null)
+  }, [conversationUuid, setCurrentConversationUuid])
 
   const prevMsgCount = useRef(messages.length)
   useEffect(() => {
@@ -331,6 +376,14 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
 
   const hasDocContext = fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0 || selectedFolderUuids.length > 0
 
+  // For the banner / pills: prefer the doc the user is actively viewing, but
+  // fall back to any selected-but-still-processing doc so the chat doesn't
+  // claim "ready for analysis" while OCR/indexing is still in flight.
+  const bannerProcessingDoc = processingDoc ?? (selectedDocsProcessing.length > 0
+    ? { title: selectedDocsProcessing[0].title, status: selectedDocsProcessing[0].status }
+    : null)
+  const processingCount = processingDoc ? 1 : selectedDocsProcessing.length
+
   const handleSend = (message: string, includeOnboardingContext?: boolean) => {
     // Use the locked ref so remounts / refetches can't flip this mid-conversation.
     const firstSession = effectiveFirstSession && !hasDocContext && !activeKBUuid
@@ -350,7 +403,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const handleRunDemo = () => {
     demoTriggered.current = true
     send(
-      "Show me what Vandalizer can do",
+      `Show me what ${branding.orgName} can do`,
       selectedDocUuids,
       selectedModel || undefined,
       undefined, // knowledgeBaseUuid
@@ -646,12 +699,14 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
               />
               <div className="relative z-[1]">
                 <div className="flex items-center gap-4">
-                  <div style={{ animation: 'float 3s ease-in-out infinite' }} className="shrink-0">
-                    <img src="/images/joevandal.png" alt="Joe Vandal" style={{ width: 22, height: 35 }} className="opacity-90" />
-                  </div>
+                  {brandIcon && (
+                    <div style={{ animation: 'float 3s ease-in-out infinite' }} className="shrink-0">
+                      <img src={brandIcon} alt={branding.orgName} style={{ width: 22, height: 35, objectFit: 'contain' }} className="opacity-90" />
+                    </div>
+                  )}
                   <div>
                     <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3 }}>
-                      Welcome to Vandalizer
+                      Welcome to {branding.orgName}
                     </div>
                     <div style={{ fontSize: 13, opacity: 0.8, marginTop: 2, fontWeight: 400 }}>
                       AI-powered document intelligence — watch it in action below
@@ -686,22 +741,22 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
               />
               <div className="relative z-[1] flex items-center gap-4">
                 <div style={{ animation: 'float 3s ease-in-out infinite' }} className="shrink-0">
-                  {processingDoc ? (
+                  {bannerProcessingDoc ? (
                     <Loader2 className="h-7 w-7 opacity-90 animate-spin" />
                   ) : activeKBUuid ? (
                     <BookOpen className="h-7 w-7 opacity-90" />
+                  ) : brandIcon ? (
+                    <img src={brandIcon} alt={branding.orgName} style={{ width: 22, height: 35, objectFit: 'contain' }} className="opacity-90" />
                   ) : (
-                    <img src="/images/joevandal.png" alt="Joe Vandal" style={{ width: 22, height: 35 }} className="opacity-90" />
+                    <Sparkles className="h-7 w-7 opacity-90" />
                   )}
                 </div>
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3 }}>
-                    {processingDoc
-                      ? processingDoc.status === 'layout' ? 'Converting & Preparing Your Document...'
-                        : processingDoc.status === 'ocr' ? 'Extracting Text From Your Document...'
-                        : processingDoc.status === 'security' ? 'Scanning Your Document...'
-                        : processingDoc.status === 'readying' ? 'Almost Ready...'
-                        : 'Processing Your Document...'
+                    {bannerProcessingDoc
+                      ? processingCount > 1
+                        ? `Preparing ${processingCount} documents…`
+                        : stageCopy(bannerProcessingDoc.status).title
                       : activeKBUuid
                         ? `Knowledge Base: ${activeKBTitle}`
                         : hasDocContext
@@ -711,12 +766,10 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                             : 'What would you like to work on?'}
                   </div>
                   <div style={{ fontSize: 13, opacity: 0.8, marginTop: 2, fontWeight: 400 }}>
-                    {processingDoc
-                      ? processingDoc.status === 'layout' ? "We're converting your document so it can be read and analyzed accurately."
-                        : processingDoc.status === 'ocr' ? 'Running OCR to extract text content from your document.'
-                        : processingDoc.status === 'security' ? "Checking for any sensitive information in your document."
-                        : processingDoc.status === 'readying' ? 'Indexing your document for search and analysis.'
-                        : 'Please wait while we prepare your document.'
+                    {bannerProcessingDoc
+                      ? processingCount > 1
+                        ? "We'll be ready as soon as each document finishes processing."
+                        : stageCopy(bannerProcessingDoc.status).message
                       : activeKBUuid
                         ? 'Ask questions grounded in your indexed documents and sources.'
                         : hasDocContext
@@ -727,17 +780,13 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                   </div>
                 </div>
               </div>
-              {processingDoc && (
+              {bannerProcessingDoc && (
                 <div className="relative z-[1]" style={{ marginTop: 16, height: 4, borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.2)', overflow: 'hidden' }}>
                   <div
                     className="animate-pulse"
                     style={{
                       height: '100%', borderRadius: 2, backgroundColor: 'rgba(255,255,255,0.7)',
-                      width: processingDoc.status === 'layout' ? '20%'
-                        : processingDoc.status === 'ocr' ? '45%'
-                        : processingDoc.status === 'security' ? '65%'
-                        : processingDoc.status === 'readying' ? '85%'
-                        : '10%',
+                      width: `${Math.round(stageCopy(bannerProcessingDoc.status).progress * 100)}%`,
                       transition: 'width 0.5s ease',
                     }}
                   />
@@ -813,7 +862,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
               ] : onboardingPills).map(suggestion => (
                 <button
                   key={suggestion}
-                  disabled={!!processingDoc}
+                  disabled={!!bannerProcessingDoc}
                   onClick={() => {
                     // Server-generated action pills don't need onboarding context injection —
                     // the workspace inventory in the system prompt provides the context.
@@ -830,12 +879,12 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                     borderRadius: 20,
                     backgroundColor: '#fff',
                     color: '#374151',
-                    cursor: processingDoc ? 'default' : 'pointer',
+                    cursor: bannerProcessingDoc ? 'default' : 'pointer',
                     transition: 'all 0.15s',
-                    opacity: processingDoc ? 0.5 : 1,
+                    opacity: bannerProcessingDoc ? 0.5 : 1,
                   }}
                   onMouseEnter={e => {
-                    if (processingDoc) return
+                    if (bannerProcessingDoc) return
                     e.currentTarget.style.borderColor = 'var(--highlight-color, #eab308)'
                     e.currentTarget.style.backgroundColor = 'color-mix(in srgb, var(--highlight-color, #eab308) 8%, white)'
                   }}
@@ -861,8 +910,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           </div>
         )}
 
-        {/* Chat messages — centered under banner for first-session */}
-        <div style={effectiveFirstSession ? { maxWidth: 640, margin: '0 auto' } : undefined}>
+        {/* Chat messages — centered column for readability */}
+        <div style={{ maxWidth: 640, margin: '0 auto' }}>
           {messages.map((msg, i) => {
             const isExcluded = contextMode !== 'full' && contextCutoffIndex > 0 && i < contextCutoffIndex
             const showBoundary = contextMode !== 'full' && contextCutoffIndex > 0 && i === contextCutoffIndex
@@ -931,7 +980,33 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         )}
 
         {error && (
-          <div className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>
+          <div className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 border border-red-200">
+            <div>{error}</div>
+            {errorDetails?.suggestedAction === 'convert_to_kb' && (errorDetails.oversizeDocuments?.length ?? 0) > 0 && (
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  onClick={handleConvertToKB}
+                  disabled={convertingToKB}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {convertingToKB ? (
+                    <>
+                      <Loader2 size={12} className="animate-spin" />
+                      Converting…
+                    </>
+                  ) : (
+                    <>
+                      <BookOpen size={12} />
+                      Convert to Knowledge Base
+                    </>
+                  )}
+                </button>
+                <span className="text-xs text-red-600/80">
+                  Builds a searchable index so chat can read the document a chunk at a time.
+                </span>
+              </div>
+            )}
+          </div>
         )}
 
         {contextNotices.length > 0 && (
@@ -1004,6 +1079,21 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         >
           <BookOpen size={14} />
           <span style={{ flex: 1 }}>Knowledge Base: {activeKBTitle}</span>
+          <button
+            onClick={() => shareLink('kb', activeKBUuid, activeKBTitle || undefined)}
+            title="Copy share link"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 2,
+              display: 'flex',
+              color: 'inherit',
+              opacity: 0.7,
+            }}
+          >
+            <Link2 size={14} />
+          </button>
           <button
             onClick={deactivateKB}
             style={{

@@ -443,7 +443,6 @@ class TestAcceptInvite:
                 await accept_invite("tok123", _make_user())
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="Beanie field descriptors not available on MagicMock")
     async def test_creates_membership_and_sets_current_team(self):
         team = _make_team()
         invite = _make_invite(role="member")
@@ -453,6 +452,7 @@ class TestAcceptInvite:
             patch("app.services.team_service.TeamInvite") as MockInvite,
             patch("app.services.team_service.Team") as MockTeam,
             patch("app.services.team_service.TeamMembership") as MockTM,
+            patch("app.services.team_service._notify_invite_accepted", new=AsyncMock()),
         ):
             MockInvite.find_one = AsyncMock(return_value=invite)
             MockTeam.get = AsyncMock(return_value=team)
@@ -474,7 +474,6 @@ class TestAcceptInvite:
         user.save.assert_awaited_once()
 
     @pytest.mark.asyncio
-    @pytest.mark.skip(reason="Beanie field descriptors not available on MagicMock")
     async def test_updates_existing_membership_role(self):
         team = _make_team()
         invite = _make_invite(role="admin")
@@ -485,6 +484,7 @@ class TestAcceptInvite:
             patch("app.services.team_service.TeamInvite") as MockInvite,
             patch("app.services.team_service.Team") as MockTeam,
             patch("app.services.team_service.TeamMembership") as MockTM,
+            patch("app.services.team_service._notify_invite_accepted", new=AsyncMock()),
         ):
             MockInvite.find_one = AsyncMock(return_value=invite)
             MockTeam.get = AsyncMock(return_value=team)
@@ -497,6 +497,33 @@ class TestAcceptInvite:
         assert result is team
         assert existing_m.role == "admin"
         existing_m.save.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_does_not_demote_existing_higher_role(self):
+        """An owner/admin accepting a lower-role invite keeps their role."""
+        team = _make_team()
+        invite = _make_invite(role="member")
+        user = _make_user(user_id="alice")
+        existing_m = _make_membership(user_id="alice", role="owner")
+
+        with (
+            patch("app.services.team_service.TeamInvite") as MockInvite,
+            patch("app.services.team_service.Team") as MockTeam,
+            patch("app.services.team_service.TeamMembership") as MockTM,
+            patch("app.services.team_service._notify_invite_accepted", new=AsyncMock()),
+        ):
+            MockInvite.find_one = AsyncMock(return_value=invite)
+            MockTeam.get = AsyncMock(return_value=team)
+            MockTM.find_one = AsyncMock(return_value=existing_m)
+
+            from app.services.team_service import accept_invite
+
+            result = await accept_invite("tok123", user)
+
+        assert result is team
+        # Role unchanged — invite must not demote owner to member.
+        assert existing_m.role == "owner"
+        existing_m.save.assert_not_awaited()
 
 
 # ---------------------------------------------------------------------------

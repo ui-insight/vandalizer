@@ -16,13 +16,10 @@ logger = logging.getLogger(__name__)
 
 
 def _get_db():
-    """Get sync pymongo database handle."""
-    from pymongo import MongoClient
+    """Get sync pymongo database handle (shared per-process client)."""
+    from app.tasks import get_sync_db
 
-    from app.config import Settings
-    settings = Settings()
-    client = MongoClient(settings.mongo_host)
-    return client[settings.mongo_db]
+    return get_sync_db()
 
 
 def _recalculate_kb(db, kb_uuid: str) -> None:
@@ -168,22 +165,13 @@ def kb_ingest_url(self, source_uuid: str) -> None:
             _recalculate_kb(db, kb_uuid)
             return
 
-        # Fetch URL content
-        from bs4 import BeautifulSoup
-        from app.utils.url_validation import validate_outbound_url
+        # Fetch URL content via the shared web_fetcher (trafilatura + Playwright
+        # fallback for JS-rendered pages).
+        from app.services.web_fetcher import fetch_url_sync
 
-        validate_outbound_url(url)  # raises ValueError for internal/private URLs
-        resp = httpx.get(url, timeout=30.0, follow_redirects=True)
-        resp.raise_for_status()
-
-        soup = BeautifulSoup(resp.text, "html.parser")
-
-        # Remove non-content elements
-        for tag in soup(["script", "style", "nav", "footer", "header", "form"]):
-            tag.decompose()
-
-        raw_text = soup.get_text(separator="\n", strip=True)
-        url_title = soup.title.string if soup.title else ""
+        result = fetch_url_sync(url)  # raises ValueError for blocked URLs
+        raw_text = result.text
+        url_title = result.title
 
         if not raw_text.strip():
             db.knowledge_base_sources.update_one(
@@ -237,6 +225,12 @@ def kb_ingest_url(self, source_uuid: str) -> None:
                 {"$set": {"status": "error", "error_message": str(e)[:2000]}},
             )
             raise
+    except (ValueError, httpx.RequestError) as e:
+        logger.warning("URL source %s unreachable: %s", source_uuid, e)
+        db.knowledge_base_sources.update_one(
+            {"uuid": source_uuid},
+            {"$set": {"status": "error", "error_message": str(e)[:2000]}},
+        )
     except Exception as e:
         logger.error("Error ingesting URL source %s: %s", source_uuid, e)
         db.knowledge_base_sources.update_one(

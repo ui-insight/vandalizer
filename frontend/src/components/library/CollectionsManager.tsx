@@ -5,9 +5,12 @@ import {
   addToCollection, removeFromCollection, listVerifiedItems,
 } from '../../api/library'
 import type { VerifiedCollection, VerifiedCatalogItem } from '../../types/library'
+import { AuthorChip } from '../shared/AuthorChip'
 import { useOptionalWorkspace } from '../../contexts/WorkspaceContext'
+import { useConfirm } from '../shared/useConfirm'
 
 export function CollectionsManager() {
+  const confirm = useConfirm()
   const [collections, setCollections] = useState<VerifiedCollection[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -71,7 +74,18 @@ export function CollectionsManager() {
 
   const handleDelete = async (id: string) => {
     const col = collections.find(c => c.id === id)
-    if (!col || !confirm(`Delete collection "${col.title}"?`)) return
+    if (!col) return
+    const ok = await confirm({
+      title: 'Delete collection?',
+      message: (
+        <>
+          Are you sure you want to delete the collection <strong>{col.title}</strong>? Items in the collection won't be deleted, but the grouping will be lost.
+        </>
+      ),
+      confirmLabel: 'Delete',
+      destructive: true,
+    })
+    if (!ok) return
     await deleteCollection(id)
     if (selectedId === id) setSelectedId(null)
     refresh()
@@ -321,6 +335,9 @@ export function CollectionsManager() {
                                   }`}>
                                     {item.quality_tier}
                                   </span>
+                                )}
+                                {item?.submitted_by && (
+                                  <AuthorChip author={item.submitted_by} label="by" />
                                 )}
                               </div>
                               <div className="flex items-center gap-1 shrink-0">

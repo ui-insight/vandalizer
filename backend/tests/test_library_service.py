@@ -273,6 +273,34 @@ class TestAddItem:
             assert result is None
 
     @pytest.mark.asyncio
+    async def test_uses_contribute_authorization_not_manage(self):
+        # Regression guard: members must be able to add items to team libraries,
+        # so add_item should request contribute-level access (not manage).
+        lib = _make_library()
+        user = _make_user()
+        mock_wf = MagicMock()
+        mock_wf.name = "WF"
+        mock_wf.description = "d"
+        item_id = str(PydanticObjectId())
+        with (
+            patch("app.services.library_service.access_control") as mock_ac,
+            patch("app.services.library_service.LibraryItem") as MockItem,
+            patch("app.services.library_service.Workflow") as MockWF,
+        ):
+            mock_ac.get_authorized_library = AsyncMock(return_value=lib)
+            mock_ac.get_authorized_workflow = AsyncMock(return_value=mock_wf)
+            MockItem.return_value = _make_library_item()
+            MockWF.get = AsyncMock(return_value=mock_wf)
+
+            from app.services.library_service import add_item
+
+            await add_item(str(lib.id), user, item_id, "workflow")
+            mock_ac.get_authorized_library.assert_awaited_once()
+            _, kwargs = mock_ac.get_authorized_library.call_args
+            assert kwargs.get("contribute") is True
+            assert kwargs.get("manage") is not True
+
+    @pytest.mark.asyncio
     async def test_propagates_verified_flag_for_workflow(self):
         # Saving a verified workflow into a personal/team library should mark
         # the LibraryItem verified so the row shows the verified badge and
@@ -629,21 +657,83 @@ class TestShareToTeamErrors:
             assert exc.value.status == 403
 
     @pytest.mark.asyncio
-    async def test_raises_clone_failed_when_underlying_object_missing(self):
+    async def test_raises_original_missing_when_source_object_gone(self):
+        from app.services.library_service import (
+            CloneSourceMissingError,
+            ShareError,
+            share_to_team,
+        )
+
+        item = _make_library_item()
+        team_oid = PydanticObjectId()
+        with patch("app.services.library_service.access_control") as ac, \
+             patch("app.services.library_service._resolve_team_oid", AsyncMock(return_value=team_oid)), \
+             patch(
+                 "app.services.library_service._clone_underlying_object",
+                 AsyncMock(side_effect=CloneSourceMissingError("Workflow gone")),
+             ):
+            ac.get_authorized_library_item = AsyncMock(return_value=item)
+            ac.get_team_access_context = AsyncMock(return_value=MagicMock())
+            ac.can_view_team = MagicMock(return_value=True)
+            with pytest.raises(ShareError) as exc:
+                await share_to_team("item-1", _make_user(), str(team_oid))
+            assert exc.value.code == "original_missing"
+            assert exc.value.status == 404
+
+    @pytest.mark.asyncio
+    async def test_raises_clone_failed_when_clone_raises_unexpected(self, caplog):
+        """Unexpected errors during clone must be caught, logged with a traceback,
+        and surfaced as clone_failed (500) — not a bare 500 with no detail."""
         from app.services.library_service import ShareError, share_to_team
 
         item = _make_library_item()
         team_oid = PydanticObjectId()
         with patch("app.services.library_service.access_control") as ac, \
              patch("app.services.library_service._resolve_team_oid", AsyncMock(return_value=team_oid)), \
-             patch("app.services.library_service._clone_underlying_object", AsyncMock(return_value=None)):
+             patch(
+                 "app.services.library_service._clone_underlying_object",
+                 AsyncMock(side_effect=RuntimeError("db blew up")),
+             ):
             ac.get_authorized_library_item = AsyncMock(return_value=item)
             ac.get_team_access_context = AsyncMock(return_value=MagicMock())
             ac.can_view_team = MagicMock(return_value=True)
-            with pytest.raises(ShareError) as exc:
-                await share_to_team("item-1", _make_user(), str(team_oid))
+            with caplog.at_level("ERROR"):
+                with pytest.raises(ShareError) as exc:
+                    await share_to_team("item-1", _make_user(), str(team_oid))
             assert exc.value.code == "clone_failed"
             assert exc.value.status == 500
+            assert any("Unexpected error cloning" in r.message for r in caplog.records)
+
+    @pytest.mark.asyncio
+    async def test_raises_clone_failed_when_add_item_raises(self, caplog):
+        from app.services.library_service import ShareError, share_to_team
+
+        item = _make_library_item()
+        team_oid = PydanticObjectId()
+        team_lib = MagicMock(id="team-lib-id")
+        with patch("app.services.library_service.access_control") as ac, \
+             patch("app.services.library_service._resolve_team_oid", AsyncMock(return_value=team_oid)), \
+             patch(
+                 "app.services.library_service._clone_underlying_object",
+                 AsyncMock(return_value=PydanticObjectId()),
+             ), \
+             patch(
+                 "app.services.library_service.get_or_create_team_library",
+                 AsyncMock(return_value=team_lib),
+             ), \
+             patch(
+                 "app.services.library_service.add_item",
+                 AsyncMock(side_effect=RuntimeError("indexing failed")),
+             ):
+            ac.get_authorized_library_item = AsyncMock(return_value=item)
+            ac.get_team_access_context = AsyncMock(return_value=MagicMock())
+            ac.can_view_team = MagicMock(return_value=True)
+            with caplog.at_level("ERROR"):
+                with pytest.raises(ShareError) as exc:
+                    await share_to_team("item-1", _make_user(), str(team_oid))
+            assert exc.value.code == "clone_failed"
+            assert exc.value.status == 500
+            assert any("adding cloned object" in r.message for r in caplog.records)
 
 
 # ---------------------------------------------------------------------------
@@ -669,3 +759,133 @@ class TestHelpers:
         assert result["name"] == "Grants"
         assert result["uuid"] == "f1"
         assert result["item_count"] == 5
+
+
+# ---------------------------------------------------------------------------
+# _clone_underlying_object — validation data preservation
+# ---------------------------------------------------------------------------
+
+
+class TestClonePreservesValidation:
+    @pytest.mark.asyncio
+    async def test_workflow_clone_copies_validation_plan_and_inputs(self):
+        # _clone_underlying_object historically dropped validation_plan /
+        # validation_inputs, leaving cloned workflows with no validation
+        # context. The clone must carry these fields so the new owner can
+        # re-run validation without rebuilding the plan.
+        from app.models.library import LibraryItemKind
+
+        original = MagicMock()
+        original.name = "Source WF"
+        original.description = "desc"
+        original.input_config = {"a": 1}
+        original.output_config = {"b": 2}
+        original.resource_config = {"c": 3}
+        original.validation_plan = [{"check": "field_present", "field": "title"}]
+        original.validation_inputs = [{"document_uuid": "doc-1"}]
+        original.steps = []
+
+        item = _make_library_item(kind_value="workflow")
+        item.kind = LibraryItemKind.WORKFLOW
+
+        captured: dict = {}
+
+        def workflow_factory(**kwargs):
+            captured.update(kwargs)
+            wf = MagicMock()
+            wf.id = PydanticObjectId()
+            wf.insert = AsyncMock()
+            wf.save = AsyncMock()
+            return wf
+
+        with (
+            patch("app.services.library_service.Workflow") as MockWF,
+            patch("app.services.library_service.WorkflowStep"),
+            patch("app.services.library_service.WorkflowStepTask"),
+        ):
+            MockWF.get = AsyncMock(return_value=original)
+            MockWF.side_effect = workflow_factory
+
+            from app.services.library_service import _clone_underlying_object
+
+            new_id = await _clone_underlying_object(item, "new-user")
+            assert new_id is not None
+            assert captured["validation_plan"] == [{"check": "field_present", "field": "title"}]
+            assert captured["validation_inputs"] == [{"document_uuid": "doc-1"}]
+
+    @pytest.mark.asyncio
+    async def test_search_set_clone_copies_plan_fields_and_test_cases(self):
+        # SearchSet clones must preserve cross_field_rules, tuning_result,
+        # domain, item_order, AND clone every ExtractionTestCase so the new
+        # owner inherits the validation plan. source_text snapshots travel
+        # so document-bound cases stay runnable without doc access.
+        original = MagicMock()
+        original.id = PydanticObjectId()
+        original.title = "NSF Extraction"
+        original.uuid = "src-uuid"
+        original.status = "active"
+        original.set_type = "extraction"
+        original.extraction_config = {"k": "v"}
+        original.cross_field_rules = [{"rule": "x"}]
+        original.tuning_result = {"best": "config"}
+        original.domain = "nsf"
+        original.item_order = ["a", "b"]
+        original.get_items = AsyncMock(return_value=[])
+
+        from app.models.library import LibraryItemKind
+
+        item = _make_library_item(kind_value="search_set")
+        item.kind = LibraryItemKind.SEARCH_SET
+
+        captured_ss: dict = {}
+        captured_tcs: list[dict] = []
+
+        def ss_factory(**kwargs):
+            captured_ss.update(kwargs)
+            ss = MagicMock()
+            ss.id = PydanticObjectId()
+            ss.insert = AsyncMock()
+            return ss
+
+        def tc_factory(**kwargs):
+            captured_tcs.append(kwargs)
+            tc = MagicMock()
+            tc.insert = AsyncMock()
+            return tc
+
+        original_tc = MagicMock()
+        original_tc.label = "Case A"
+        original_tc.source_type = "document"
+        original_tc.source_text = "snapshot text"
+        original_tc.document_uuid = "doc-xyz"
+        original_tc.expected_values = {"field1": "answer1"}
+
+        mock_etc_query = MagicMock()
+        mock_etc_query.to_list = AsyncMock(return_value=[original_tc])
+
+        with (
+            patch("app.services.library_service.SearchSet") as MockSS,
+            patch("app.services.library_service.SearchSetItem"),
+            patch("app.models.extraction_test_case.ExtractionTestCase") as MockETC,
+        ):
+            MockSS.get = AsyncMock(return_value=original)
+            MockSS.side_effect = ss_factory
+            MockETC.find = MagicMock(return_value=mock_etc_query)
+            MockETC.side_effect = tc_factory
+
+            from app.services.library_service import _clone_underlying_object
+
+            new_id = await _clone_underlying_object(item, "new-user", team_id="team-1")
+            assert new_id is not None
+            assert captured_ss["cross_field_rules"] == [{"rule": "x"}]
+            assert captured_ss["tuning_result"] == {"best": "config"}
+            assert captured_ss["domain"] == "nsf"
+            assert captured_ss["item_order"] == ["a", "b"]
+            assert captured_ss["team_id"] == "team-1"
+            assert len(captured_tcs) == 1
+            assert captured_tcs[0]["label"] == "Case A"
+            assert captured_tcs[0]["source_text"] == "snapshot text"
+            assert captured_tcs[0]["document_uuid"] == "doc-xyz"
+            assert captured_tcs[0]["expected_values"] == {"field1": "answer1"}
+            assert captured_tcs[0]["user_id"] == "new-user"
+            assert captured_tcs[0]["search_set_uuid"] == captured_ss["uuid"]

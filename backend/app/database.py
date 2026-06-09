@@ -26,8 +26,11 @@ from app.models.office import IntakeConfig, WorkItem
 from app.models.automation import Automation
 from app.models.knowledge import KnowledgeBase, KnowledgeBaseReference, KnowledgeBaseSource
 from app.models.kb_test_query import KBTestQuery
+from app.models.kb_optimization_run import KBOptimizationRun
 from app.models.kb_suggestion import KBSuggestion
 from app.models.extraction_test_case import ExtractionTestCase
+from app.models.extraction_optimization_run import ExtractionOptimizationRun
+from app.models.workflow_optimization_run import WorkflowOptimizationRun
 from app.models.validation_run import ValidationRun
 from app.models.quality_alert import QualityAlert
 from app.models.verification_session import VerificationSession
@@ -38,12 +41,13 @@ from app.models.organization import Organization
 from app.models.audit_log import AuditLog, AdminAuditLog
 from app.models.approval import ApprovalRequest
 from app.models.notification import Notification
-from app.models.support import SupportTicket
+from app.models.support import SupportTicket, SupportCounter
 from app.models.feedback_prompt import FeedbackPrompt, FeedbackPromptResponse
 from app.models.user_memory import UserMemory
 from app.models.email_log import EmailLog
 from app.models.api_key import ApiKey
 from app.models.credential import Credential
+from app.models.llm_usage import LlmUsageRecord
 
 ALL_MODELS = [
     User,
@@ -83,8 +87,11 @@ ALL_MODELS = [
     KnowledgeBaseReference,
     KnowledgeBaseSource,
     KBTestQuery,
+    KBOptimizationRun,
     KBSuggestion,
     ExtractionTestCase,
+    ExtractionOptimizationRun,
+    WorkflowOptimizationRun,
     ValidationRun,
     QualityAlert,
     VerificationSession,
@@ -101,17 +108,34 @@ ALL_MODELS = [
     ApprovalRequest,
     Notification,
     SupportTicket,
+    SupportCounter,
     FeedbackPrompt,
     FeedbackPromptResponse,
     UserMemory,
     EmailLog,
     ApiKey,
     Credential,
+    LlmUsageRecord,
 ]
 
 
+# Process-wide Motor client, created once in init_db() and reused everywhere
+# (e.g. the health check). Never construct a new AsyncIOMotorClient per request:
+# each one opens sockets + a topology-monitor thread that are not promptly
+# reclaimed, exhausting file descriptors in a long-running process.
+_client: AsyncIOMotorClient | None = None
+
+
+def get_client() -> AsyncIOMotorClient:
+    """Return the shared Motor client. Raises if init_db() hasn't run yet."""
+    if _client is None:
+        raise RuntimeError("Database not initialized; init_db() must run first")
+    return _client
+
+
 async def init_db(settings: Settings) -> None:
-    client = AsyncIOMotorClient(
+    global _client
+    _client = AsyncIOMotorClient(
         settings.mongo_host,
         maxPoolSize=100,
         minPoolSize=10,
@@ -121,6 +145,6 @@ async def init_db(settings: Settings) -> None:
         socketTimeoutMS=30000,
     )
     await init_beanie(
-        database=client[settings.mongo_db],
+        database=_client[settings.mongo_db],
         document_models=ALL_MODELS,
     )

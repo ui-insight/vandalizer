@@ -196,6 +196,72 @@ class TestComputeConfigHash:
 # ---------------------------------------------------------------------------
 
 
+class TestSampleSizePenalty:
+    """The low-sample-size confidence discount: only ever reduces a score,
+    never inflates; KB validation is judged on test-query count, not runs."""
+
+    async def _persist(self, run_type, result_data):
+        with (
+            patch("app.services.quality_service.ValidationRun") as MockVR,
+            patch("app.services.quality_service.update_quality_metadata", new_callable=AsyncMock),
+        ):
+            MockVR.return_value = _make_validation_run(run_type=run_type)
+            from app.services.quality_service import persist_validation_run
+
+            await persist_validation_run(
+                "search_set" if run_type != "kb_validation" else "knowledge_base",
+                "item-1", "Item", run_type, result_data, "user1",
+            )
+            return MockVR.call_args.kwargs
+
+    @pytest.mark.asyncio
+    async def test_high_score_one_test_case_is_discounted(self):
+        # accuracy 0.97, consistency 1.0 -> raw 98.2; 1 test case, 3 runs.
+        kwargs = await self._persist("extraction", {
+            "aggregate_accuracy": 0.97, "aggregate_consistency": 1.0,
+            "test_cases": [{"label": "tc1"}], "num_runs": 3,
+        })
+        bd = kwargs["score_breakdown"]
+        assert bd["raw_score"] == pytest.approx(98.2, abs=0.1)
+        assert kwargs["score"] == pytest.approx(66.1, abs=0.5)  # ~98 -> ~66
+        assert bd["sample_size_penalty"] > 0
+        assert bd["test_cases_needed"] == 2
+
+    @pytest.mark.asyncio
+    async def test_failing_score_is_never_inflated(self):
+        # raw 10 on a tiny sample must stay 10 — not blended up toward 50.
+        kwargs = await self._persist("extraction", {
+            "aggregate_accuracy": 0.1, "aggregate_consistency": 0.1,
+            "test_cases": [{"label": "tc1"}], "num_runs": 3,
+        })
+        assert kwargs["score"] == pytest.approx(10.0, abs=0.1)
+        assert kwargs["score_breakdown"]["sample_size_penalty"] == 0
+
+    @pytest.mark.asyncio
+    async def test_kb_validation_not_penalized_for_single_run(self):
+        # KB is single-run by design; 3 test queries must reach full confidence.
+        kwargs = await self._persist("kb_validation", {
+            "raw_score": 88.0, "num_test_queries": 3, "num_sources": 5,
+            "sources": [], "num_runs": 1,
+        })
+        assert kwargs["score"] == pytest.approx(88.0, abs=0.1)
+        assert kwargs["score_breakdown"]["sample_size_penalty"] == 0
+        assert kwargs["score_breakdown"]["runs_needed"] == 0
+
+    @pytest.mark.asyncio
+    async def test_kb_validation_one_query_discounted_on_queries_only(self):
+        kwargs = await self._persist("kb_validation", {
+            "raw_score": 88.0, "num_test_queries": 1, "num_sources": 5,
+            "sources": [], "num_runs": 1,
+        })
+        bd = kwargs["score_breakdown"]
+        # ssf = 1/3 (queries only, NOT 1/9 from also penalizing the single run)
+        assert bd["sample_size_factor"] == pytest.approx(0.333, abs=0.01)
+        assert kwargs["score"] == pytest.approx(62.7, abs=0.5)
+        assert bd["runs_needed"] == 0
+        assert bd["test_cases_needed"] == 2
+
+
 class TestPersistValidationRun:
     @pytest.mark.asyncio
     async def test_extraction_run_computes_score(self):

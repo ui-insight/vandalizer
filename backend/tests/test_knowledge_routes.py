@@ -249,6 +249,7 @@ def _mock_kb(**overrides):
     kb.description = overrides.get("description", "A test knowledge base")
     kb.status = overrides.get("status", "ready")
     kb.shared_with_team = overrides.get("shared_with_team", False)
+    kb.team_owned = overrides.get("team_owned", False)
     kb.verified = overrides.get("verified", False)
     kb.organization_ids = overrides.get("organization_ids", [])
     kb.total_sources = overrides.get("total_sources", 2)
@@ -272,6 +273,8 @@ def _mock_source(**overrides):
     s.document_uuid = overrides.get("document_uuid", "doc-1")
     s.url = overrides.get("url", None)
     s.url_title = overrides.get("url_title", None)
+    s.custom_name = overrides.get("custom_name", None)
+    s.source_reference = overrides.get("source_reference", None)
     s.status = overrides.get("status", "ready")
     s.error_message = overrides.get("error_message", None)
     s.chunk_count = overrides.get("chunk_count", 50)
@@ -322,11 +325,15 @@ class TestKnowledgeListEndpoints:
             patch("app.dependencies.User") as MockUser,
             patch("app.routers.knowledge.svc") as mock_svc,
             patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.routers.knowledge.ValidationRun") as MockRun,
+            patch("app.routers.knowledge.KBOptimizationRun") as MockOpt,
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
             mock_svc.list_knowledge_bases = AsyncMock(return_value=([kb], 1))
             mock_svc.list_references = AsyncMock(return_value=[])
+            MockRun.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
+            MockOpt.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
 
             resp = await client.get(
                 "/api/knowledge/list/v2?scope=mine",
@@ -396,8 +403,10 @@ class TestKnowledgeCRUD:
                 headers=headers,
             )
 
-        assert resp.status_code == 400
-        assert resp.json()["detail"] == "Title is required"
+        # A whitespace-only title is rejected by the EntityName validator on
+        # CreateKBRequest (422), before the handler runs.
+        assert resp.status_code == 422
+        assert "empty" in str(resp.json()["detail"]).lower()
 
     @pytest.mark.asyncio
     async def test_get_detail_success(self, client):
@@ -411,11 +420,22 @@ class TestKnowledgeCRUD:
             patch("app.dependencies.User") as MockUser,
             patch("app.routers.knowledge.svc") as mock_svc,
             patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.routers.knowledge.ValidationRun") as MockRun,
+            patch("app.routers.knowledge.KBOptimizationRun") as MockOpt,
+            # SmartDocument.find requires Beanie initialization which the
+            # ASGI test client skips; stub the title lookup helper directly.
+            patch(
+                "app.routers.knowledge._resolve_document_titles",
+                new_callable=AsyncMock,
+                return_value={"doc-1": "Some Document.pdf"},
+            ),
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
             mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
             mock_svc.get_kb_sources = AsyncMock(return_value=[src])
+            MockRun.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
+            MockOpt.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
 
             resp = await client.get("/api/knowledge/kb-uuid-1", cookies=cookies, headers=headers)
 
@@ -423,6 +443,7 @@ class TestKnowledgeCRUD:
         data = resp.json()
         assert data["uuid"] == "kb-uuid-1"
         assert len(data["sources"]) == 1
+        assert data["sources"][0]["document_title"] == "Some Document.pdf"
 
     @pytest.mark.asyncio
     async def test_get_detail_not_found(self, client):
@@ -715,6 +736,65 @@ class TestKnowledgeDocSources:
         assert resp.status_code == 404
 
     @pytest.mark.asyncio
+    async def test_update_source_sets_custom_name(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+        renamed = _mock_source(custom_name="Friendly Label")
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.routers.knowledge._resolve_document_titles", new_callable=AsyncMock) as mock_titles,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+            mock_svc.update_source_name = AsyncMock(return_value=renamed)
+            mock_titles.return_value = {"doc-1": "Original.pdf"}
+
+            resp = await client.patch(
+                "/api/knowledge/kb-uuid-1/source/src-uuid-1",
+                json={"custom_name": "Friendly Label"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["custom_name"] == "Friendly Label"
+        assert body["document_title"] == "Original.pdf"
+        mock_svc.update_source_name.assert_awaited_once_with(kb, "src-uuid-1", "Friendly Label")
+
+    @pytest.mark.asyncio
+    async def test_update_source_not_found(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+            mock_svc.update_source_name = AsyncMock(return_value=None)
+
+            resp = await client.patch(
+                "/api/knowledge/kb-uuid-1/source/ghost",
+                json={"custom_name": "x"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 404
+
+    @pytest.mark.asyncio
     async def test_get_status_success(self, client):
         user = _make_user()
         cookies, headers = _auth()
@@ -813,3 +893,661 @@ class TestKnowledgeReference:
             )
 
         assert resp.status_code == 404
+
+    @staticmethod
+    def _fake_ref(team_id=None):
+        ref = MagicMock()
+        ref.uuid = "ref-1"
+        ref.source_kb_uuid = "kb-1"
+        ref.user_id = "user1"
+        ref.team_id = team_id
+        ref.note = None
+        ref.pinned = False
+        ref.created_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        return ref
+
+    @pytest.mark.asyncio
+    async def test_adopt_personal_passes_no_team(self, client):
+        """Omitting team_id bookmarks the KB privately (team_id=None)."""
+        user = _make_user()
+        user.current_team = "team-abc"  # has a team, but didn't pick it
+        cookies, headers = _auth()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.routers.knowledge.organization_service.get_user_org_ancestry",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch("app.routers.knowledge.svc.adopt_knowledge_base", new_callable=AsyncMock) as mock_adopt,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_adopt.return_value = self._fake_ref(team_id=None)
+
+            resp = await client.post(
+                "/api/knowledge/kb-1/adopt",
+                json={},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert mock_adopt.await_args.kwargs["team_id"] is None
+
+    @pytest.mark.asyncio
+    async def test_adopt_to_current_team(self, client):
+        """Passing the caller's current team shares the bookmark with that team."""
+        user = _make_user()
+        user.current_team = "team-abc"
+        cookies, headers = _auth()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.routers.knowledge.organization_service.get_user_org_ancestry",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch("app.routers.knowledge.svc.adopt_knowledge_base", new_callable=AsyncMock) as mock_adopt,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_adopt.return_value = self._fake_ref(team_id="team-abc")
+
+            resp = await client.post(
+                "/api/knowledge/kb-1/adopt",
+                json={"team_id": "team-abc"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["team_id"] == "team-abc"
+        assert mock_adopt.await_args.kwargs["team_id"] == "team-abc"
+
+    @pytest.mark.asyncio
+    async def test_adopt_to_foreign_team_rejected(self, client):
+        """A team_id that isn't the caller's current team is refused before adopting."""
+        user = _make_user()
+        user.current_team = "team-abc"
+        cookies, headers = _auth()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.routers.knowledge.organization_service.get_user_org_ancestry",
+                new_callable=AsyncMock,
+                return_value=[],
+            ),
+            patch("app.routers.knowledge.svc.adopt_knowledge_base", new_callable=AsyncMock) as mock_adopt,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+
+            resp = await client.post(
+                "/api/knowledge/kb-1/adopt",
+                json={"team_id": "team-other"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 403
+        mock_adopt.assert_not_awaited()
+
+
+class TestConvertDocumentsToKB:
+    @pytest.mark.asyncio
+    async def test_convert_creates_kb_and_attaches_docs(self, client):
+        # Supply an explicit title so the route skips the SmartDocument lookup
+        # (which would require initializing Beanie's class-level field
+        # descriptors). The default-title fallback is covered in unit tests.
+        user = _make_user()
+        cookies, headers = _auth()
+
+        fake_kb = MagicMock()
+        fake_kb.uuid = "kb-new"
+        fake_kb.title = "PAPPG"
+        fake_kb.description = ""
+        fake_kb.status = "building"
+        fake_kb.shared_with_team = False
+        fake_kb.verified = False
+        fake_kb.organization_ids = []
+        fake_kb.total_sources = 0
+        fake_kb.sources_ready = 0
+        fake_kb.sources_failed = 0
+        fake_kb.total_chunks = 0
+        fake_kb.created_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        fake_kb.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        fake_kb.user_id = "user1"
+        fake_kb.save = AsyncMock()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.create_knowledge_base = AsyncMock(return_value=fake_kb)
+            mock_svc.add_documents = AsyncMock(return_value=1)
+
+            resp = await client.post(
+                "/api/knowledge/convert_documents",
+                cookies=cookies,
+                headers=headers,
+                json={"document_uuids": ["doc-1"], "title": "PAPPG"},
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["uuid"] == "kb-new"
+        assert body["title"] == "PAPPG"
+        # KB was set to "building" before add_documents fires, so retrieval UIs
+        # can show progress.
+        assert fake_kb.status == "building"
+        mock_svc.create_knowledge_base.assert_awaited_once()
+        mock_svc.add_documents.assert_awaited_once()
+        # Both doc UUIDs flow through to the existing attach pipeline.
+        attach_args = mock_svc.add_documents.await_args.args
+        assert attach_args[1] == ["doc-1"]
+
+    @pytest.mark.asyncio
+    async def test_convert_rejects_empty_uuid_list(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+
+            resp = await client.post(
+                "/api/knowledge/convert_documents",
+                cookies=cookies,
+                headers=headers,
+                json={"document_uuids": []},
+            )
+
+        assert resp.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_convert_uses_supplied_title_when_provided(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+
+        fake_kb = MagicMock()
+        fake_kb.uuid = "kb-new"
+        fake_kb.title = "Reference materials"
+        fake_kb.description = ""
+        fake_kb.status = "building"
+        fake_kb.shared_with_team = False
+        fake_kb.verified = False
+        fake_kb.organization_ids = []
+        fake_kb.total_sources = 0
+        fake_kb.sources_ready = 0
+        fake_kb.sources_failed = 0
+        fake_kb.total_chunks = 0
+        fake_kb.created_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        fake_kb.updated_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        fake_kb.user_id = "user1"
+        fake_kb.save = AsyncMock()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.create_knowledge_base = AsyncMock(return_value=fake_kb)
+            mock_svc.add_documents = AsyncMock(return_value=2)
+
+            resp = await client.post(
+                "/api/knowledge/convert_documents",
+                cookies=cookies,
+                headers=headers,
+                json={"document_uuids": ["d1", "d2"], "title": "Reference materials"},
+            )
+
+        assert resp.status_code == 200
+        # Title should be the supplied one, NOT the first doc's title.
+        call_kwargs = mock_svc.create_knowledge_base.await_args.kwargs
+        assert call_kwargs["title"] == "Reference materials"
+
+
+class TestKnowledgeSharedDeleteFlow:
+    """Cover the two-mode delete + transfer-to-team flow for shared KBs."""
+
+    @pytest.mark.asyncio
+    async def test_delete_shared_kb_without_mode_returns_409(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            from app.services.knowledge_service import SharedKBDeleteRequiresMode
+            mock_svc.SharedKBDeleteRequiresMode = SharedKBDeleteRequiresMode
+            mock_svc.delete_knowledge_base = AsyncMock(side_effect=SharedKBDeleteRequiresMode())
+
+            resp = await client.delete(
+                "/api/knowledge/kb-uuid-1",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 409
+        body = resp.json()["detail"]
+        assert body["code"] == "shared_kb_delete_requires_mode"
+        # Caller was invoked without force_shared.
+        call_kwargs = mock_svc.delete_knowledge_base.await_args.kwargs
+        assert call_kwargs["force_shared"] is False
+
+    @pytest.mark.asyncio
+    async def test_delete_with_unshare_and_delete_mode_force_deletes(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            from app.services.knowledge_service import SharedKBDeleteRequiresMode
+            mock_svc.SharedKBDeleteRequiresMode = SharedKBDeleteRequiresMode
+            mock_svc.delete_knowledge_base = AsyncMock(return_value=True)
+
+            resp = await client.delete(
+                "/api/knowledge/kb-uuid-1?mode=unshare_and_delete",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        call_kwargs = mock_svc.delete_knowledge_base.await_args.kwargs
+        assert call_kwargs["force_shared"] is True
+
+    @pytest.mark.asyncio
+    async def test_delete_rejects_unknown_mode(self, client):
+        # The route's Query regex only allows "unshare_and_delete".
+        user = _make_user()
+        cookies, headers = _auth()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            resp = await client.delete(
+                "/api/knowledge/kb-uuid-1?mode=transfer",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_transfer_to_team_success(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb(shared_with_team=True, team_owned=True, team_id="team-1")
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.transfer_kb_to_team = AsyncMock(return_value=kb)
+
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/transfer-to-team",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.json() == {"ok": True, "team_owned": True}
+
+    @pytest.mark.asyncio
+    async def test_transfer_to_team_not_found_returns_404(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.transfer_kb_to_team = AsyncMock(return_value=None)
+
+            resp = await client.post(
+                "/api/knowledge/missing/transfer-to-team",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 404
+
+
+class TestKBListQueryBuilder:
+    """Verify the mongo query shape for the scope filters that drive My KBs vs Team."""
+
+    def test_mine_scope_excludes_team_owned(self):
+        from app.services.knowledge_service import build_kb_list_query
+
+        q = build_kb_list_query("user1", "team-1", "mine", None)
+        assert q == {"user_id": "user1", "team_owned": {"$ne": True}}
+
+    def test_team_scope_filters_by_shared_and_team_id(self):
+        from app.services.knowledge_service import build_kb_list_query
+
+        q = build_kb_list_query("user1", "team-1", "team", None)
+        assert q == {"shared_with_team": True, "team_id": "team-1"}
+
+    def test_team_scope_without_team_id_returns_none(self):
+        from app.services.knowledge_service import build_kb_list_query
+
+        assert build_kb_list_query("user1", None, "team", None) is None
+
+    def test_default_scope_excludes_team_owned_from_mine_branch(self):
+        from app.services.knowledge_service import build_kb_list_query
+
+        q = build_kb_list_query("user1", "team-1", None, None)
+        or_clauses = q["$or"]
+        mine_clause = next(
+            (c for c in or_clauses if c.get("user_id") == "user1"),
+            None,
+        )
+        assert mine_clause is not None
+        assert mine_clause["team_owned"] == {"$ne": True}
+        # Team-share branch should still be present.
+        assert any(
+            c.get("shared_with_team") is True and c.get("team_id") == "team-1"
+            for c in or_clauses
+        )
+
+    def test_search_wraps_with_and_clause(self):
+        from app.services.knowledge_service import build_kb_list_query
+
+        q = build_kb_list_query("user1", None, "mine", "needle")
+        assert "$and" in q
+        base, search = q["$and"]
+        assert base == {"user_id": "user1", "team_owned": {"$ne": True}}
+        assert search["$or"][0]["title"]["$regex"] == "needle"
+
+
+class TestBaselineProbe:
+    """Cover the cheap no-KB probe used by the tuning wizard."""
+
+    @pytest.mark.asyncio
+    async def test_returns_404_when_kb_missing(self, client):
+        user = _make_user("viewer")
+        cookies, headers = _auth("viewer")
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "viewer", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.routers.knowledge.organization_service.get_user_org_ancestry",
+                new_callable=AsyncMock,
+            ) as mock_org_ancestry,
+            patch("app.routers.knowledge.svc.get_knowledge_base", new_callable=AsyncMock) as mock_get_kb,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org_ancestry.return_value = []
+            mock_get_kb.return_value = None
+            resp = await client.post(
+                "/api/knowledge/kb-1/baseline-probe", json={}, cookies=cookies, headers=headers,
+            )
+        assert resp.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_rejects_invalid_sample_size(self, client):
+        user = _make_user("manager")
+        cookies, headers = _auth("manager")
+        kb = MagicMock(uuid="kb-1")
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "manager", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.routers.knowledge.organization_service.get_user_org_ancestry",
+                new_callable=AsyncMock,
+            ) as mock_org_ancestry,
+            patch("app.routers.knowledge.svc.get_knowledge_base", new_callable=AsyncMock) as mock_get_kb,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org_ancestry.return_value = []
+            mock_get_kb.return_value = kb
+            resp = await client.post(
+                "/api/knowledge/kb-1/baseline-probe",
+                json={"sample_size": 999},
+                cookies=cookies,
+                headers=headers,
+            )
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_returns_score_for_judgeable_queries(self, client):
+        user = _make_user("manager")
+        cookies, headers = _auth("manager")
+        kb = MagicMock(uuid="kb-1")
+
+        # Two test queries: one judgeable, one without expected_answer.
+        judgeable = MagicMock(uuid="q1", query="What is X?", expected_answer="X is foo.")
+        unjudgeable = MagicMock(uuid="q2", query="What about Y?", expected_answer=None)
+
+        # Beanie's chained `find().to_list()` — mock the find result to return
+        # an awaitable list when ``to_list`` is called.
+        find_result = MagicMock()
+        find_result.to_list = AsyncMock(return_value=[judgeable, unjudgeable])
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "manager", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.routers.knowledge.organization_service.get_user_org_ancestry",
+                new_callable=AsyncMock,
+            ) as mock_org_ancestry,
+            patch("app.routers.knowledge.svc.get_knowledge_base", new_callable=AsyncMock) as mock_get_kb,
+            patch("app.models.kb_test_query.KBTestQuery.find", return_value=find_result),
+            patch(
+                "app.services.workflow_validator._resolve_model_name",
+                return_value="gpt-4o-mini",
+            ),
+            patch(
+                "app.services.kb_validation_service.judge_baselines_only",
+                new_callable=AsyncMock,
+            ) as mock_judge,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org_ancestry.return_value = []
+            mock_get_kb.return_value = kb
+            mock_judge.return_value = {
+                "avg_baseline_score": 0.72,
+                "num_baselines_judged": 1,
+                "tokens_used": 1500,
+                "details": [],
+            }
+
+            resp = await client.post(
+                "/api/knowledge/kb-1/baseline-probe",
+                json={"sample_size": 5},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["no_kb_score"] == 0.72
+        assert body["num_queries_judged"] == 1
+        assert body["sample_query_ids"] == ["q1"]
+        assert body["tokens_used"] == 1500
+        assert "duration_ms" in body
+
+    @pytest.mark.asyncio
+    async def test_returns_null_score_when_no_judgeable_queries(self, client):
+        user = _make_user("manager")
+        cookies, headers = _auth("manager")
+        kb = MagicMock(uuid="kb-1")
+        find_result = MagicMock()
+        find_result.to_list = AsyncMock(return_value=[])  # no queries at all
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "manager", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.routers.knowledge.organization_service.get_user_org_ancestry",
+                new_callable=AsyncMock,
+            ) as mock_org_ancestry,
+            patch("app.routers.knowledge.svc.get_knowledge_base", new_callable=AsyncMock) as mock_get_kb,
+            patch("app.models.kb_test_query.KBTestQuery.find", return_value=find_result),
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org_ancestry.return_value = []
+            mock_get_kb.return_value = kb
+            resp = await client.post(
+                "/api/knowledge/kb-1/baseline-probe", json={}, cookies=cookies, headers=headers,
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["no_kb_score"] is None
+        assert body["num_queries_judged"] == 0
+        assert body["sample_query_ids"] == []
+
+
+def _make_source(uuid="s1", source_type="document"):
+    s = MagicMock()
+    s.uuid = uuid
+    s.source_type = source_type
+    s.document_uuid = "doc1" if source_type == "document" else None
+    s.url = None if source_type == "document" else "https://www.uidaho.edu/apm/45"
+    s.url_title = None
+    s.custom_name = "My label"
+    s.source_reference = "APM Ch.45"
+    s.status = "ready"
+    s.error_message = None
+    s.chunk_count = 3
+    s.created_at = datetime.datetime(2026, 6, 9, tzinfo=datetime.timezone.utc)
+    return s
+
+
+class TestUpdateSourceFields:
+    @pytest.mark.asyncio
+    async def test_source_reference_only_does_not_clear_custom_name(self, client):
+        """A PATCH carrying only source_reference must route to
+        set_source_reference and NOT call update_source_name (which would
+        otherwise clear the custom_name)."""
+        user = _make_user("manager")
+        cookies, headers = _auth("manager")
+        kb = MagicMock()
+        kb.uuid = "kb-1"
+        updated = _make_source()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "manager", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.routers.knowledge.organization_service.get_user_org_ancestry",
+                new_callable=AsyncMock,
+            ) as mock_org_ancestry,
+            patch("app.routers.knowledge.svc.get_knowledge_base", new_callable=AsyncMock) as mock_get_kb,
+            patch("app.routers.knowledge.svc.set_source_reference", new_callable=AsyncMock) as mock_set_ref,
+            patch("app.routers.knowledge.svc.update_source_name", new_callable=AsyncMock) as mock_rename,
+            patch("app.routers.knowledge._resolve_document_titles", new_callable=AsyncMock) as mock_titles,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org_ancestry.return_value = []
+            mock_get_kb.return_value = kb
+            mock_set_ref.return_value = updated
+            mock_titles.return_value = {}
+
+            resp = await client.patch(
+                "/api/knowledge/kb-1/source/s1",
+                json={"source_reference": "APM Ch.45"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        mock_set_ref.assert_awaited_once()
+        mock_rename.assert_not_awaited()  # custom_name left untouched
+        assert resp.json()["source_reference"] == "APM Ch.45"
+
+
+class TestAdminKBInventory:
+    @pytest.mark.asyncio
+    async def test_non_admin_forbidden(self, client):
+        user = _make_user("plebe")
+        user.is_admin = False
+        user.is_staff = False  # MagicMock attrs are truthy by default — pin it
+        cookies, headers = _auth("plebe")
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "plebe", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.services.knowledge_service.admin_list_all_knowledge_bases",
+                new_callable=AsyncMock,
+            ) as mock_list,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            resp = await client.get("/api/admin/knowledge-bases", cookies=cookies, headers=headers)
+
+        assert resp.status_code == 403
+        mock_list.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_admin_lists_kbs(self, client):
+        user = _make_user("boss")
+        user.is_admin = True
+        cookies, headers = _auth("boss")
+        kb = MagicMock()
+        kb.uuid = "kb-1"
+        kb.title = "APM Chapter 45"
+        kb.status = "ready"
+        kb.verified = True
+        kb.tags = ["v2026-06"]
+        kb.total_sources = 2
+        kb.total_chunks = 40
+        kb.user_id = "boss"
+        kb.team_id = None
+        kb.created_at = datetime.datetime(2026, 6, 1, tzinfo=datetime.timezone.utc)
+        kb.updated_at = datetime.datetime(2026, 6, 9, tzinfo=datetime.timezone.utc)
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "boss", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.services.knowledge_service.admin_list_all_knowledge_bases",
+                new_callable=AsyncMock,
+            ) as mock_list,
+            patch("app.routers.admin.User.find") as mock_user_find,
+            patch("app.routers.admin.Team.find") as mock_team_find,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_list.return_value = [kb]
+            mock_user_find.return_value.to_list = AsyncMock(return_value=[])
+            mock_team_find.return_value.to_list = AsyncMock(return_value=[])
+
+            resp = await client.get("/api/admin/knowledge-bases", cookies=cookies, headers=headers)
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["total"] == 1
+        assert body["knowledge_bases"][0]["title"] == "APM Chapter 45"
+        assert body["knowledge_bases"][0]["tags"] == ["v2026-06"]

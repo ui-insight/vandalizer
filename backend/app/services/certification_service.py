@@ -9,7 +9,7 @@ from pathlib import Path
 
 from app.models.certification import CertificationProgress
 from app.models.workflow import Workflow, WorkflowStep, WorkflowStepTask, WorkflowResult
-from app.models.search_set import SearchSetItem
+from app.models.search_set import SearchSet, SearchSetItem
 from app.models.folder import SmartFolder
 from app.models.document import SmartDocument
 
@@ -473,6 +473,47 @@ async def _user_ran_search_set_on_n_docs(user_id: str, min_docs: int) -> int:
     return best
 
 
+async def _collect_searchset_fields(user_id: str) -> list[str]:
+    """Field names from the user's own standalone Extractions (SearchSets).
+
+    The extraction challenge is built in the Extraction editor, which saves a
+    SearchSet — not necessarily a workflow. Counting those items directly means
+    a user is credited for the extraction they actually built, even if they
+    haven't wired it into a workflow yet (or the workflow task didn't carry every
+    field across). Each item counts once, by its display title (falling back to
+    the searchphrase). Deduped case-insensitively.
+    """
+    seen: set[str] = set()
+    names: list[str] = []
+    sets = await SearchSet.find(
+        {"$or": [{"user_id": user_id}, {"created_by_user_id": user_id}]}
+    ).to_list()
+    for ss in sets:
+        items = await SearchSetItem.find(SearchSetItem.searchset == ss.uuid).to_list()
+        for it in items:
+            name = (it.title or it.searchphrase or "").strip()
+            if not name:
+                continue
+            key = name.lower()
+            if key not in seen:
+                seen.add(key)
+                names.append(name)
+    return names
+
+
+def _union_fields(*field_lists: list[str]) -> list[str]:
+    """Case-insensitive union of several field-name lists, preserving order."""
+    seen: set[str] = set()
+    combined: list[str] = []
+    for fields in field_lists:
+        for name in fields:
+            key = name.lower()
+            if key not in seen:
+                seen.add(key)
+                combined.append(name)
+    return combined
+
+
 # ---------------------------------------------------------------------------
 # Self-assessment storage
 # ---------------------------------------------------------------------------
@@ -548,9 +589,11 @@ async def _validate_foundations(user_id: str) -> dict:
     expected_fields = exercise.get("expected_fields", []) if exercise else []
 
     workflows = await Workflow.find(Workflow.user_id == user_id).to_list()
-    has_extraction_artifact = False
-    extraction_field_count = 0
-    matched_fields: list[str] = []
+    workflow_fields, _largest = await _collect_extraction_fields(workflows)
+    standalone_fields = await _collect_searchset_fields(user_id)
+    combined_fields = _union_fields(workflow_fields, standalone_fields)
+
+    has_extraction_workflow = False
     has_execution = False
 
     for wf in workflows:
@@ -561,30 +604,22 @@ async def _validate_foundations(user_id: str) -> dict:
             for task_id in step.tasks:
                 task = await WorkflowStepTask.get(task_id)
                 if task and task.name == "Extraction":
-                    has_extraction_artifact = True
-                    field_names = await _resolve_extraction_field_names(task.data or {})
-                    if len(field_names) > extraction_field_count:
-                        extraction_field_count = len(field_names)
-                        matched_fields = [
-                            ef for ef in expected_fields
-                            if _fuzzy_field_match(ef, field_names)
-                        ]
+                    has_extraction_workflow = True
 
         if wf.num_executions and wf.num_executions >= 1:
             has_execution = True
 
-    # Chat-driven path: also inspect user SearchSets and SEARCH_SET_RUN events
-    ss_max_fields, ss_field_names, ss_uuids = await _get_user_search_set_fields(user_id)
-    if ss_max_fields > 0:
-        has_extraction_artifact = True
-    if ss_max_fields > extraction_field_count:
-        extraction_field_count = ss_max_fields
-        matched_fields = [
-            ef for ef in expected_fields if _fuzzy_field_match(ef, ss_field_names)
-        ]
-    if not has_execution and await _user_ran_search_set(user_id, ss_uuids):
-        has_execution = True
+    # Chat-driven path: a standalone SearchSet counts as the extraction
+    # artifact, and a completed SEARCH_SET_RUN event counts as the execution.
+    has_extraction_artifact = has_extraction_workflow or bool(standalone_fields)
+    if not has_execution:
+        _, _, ss_uuids = await _get_user_search_set_fields(user_id)
+        has_execution = await _user_ran_search_set(user_id, ss_uuids)
 
+    matched_fields = [
+        ef for ef in expected_fields
+        if _fuzzy_field_match(ef, combined_fields)
+    ]
     missing_fields = [f for f in expected_fields if f not in matched_fields]
 
     checks.append({
@@ -608,7 +643,7 @@ async def _validate_foundations(user_id: str) -> dict:
     stars = 1 if passed else 0
     if passed and len(matched_fields) >= 5:
         stars = 2
-    if passed and extraction_field_count >= 8:
+    if passed and len(combined_fields) >= 8:
         stars = 3
 
     return {"passed": passed, "stars": stars, "checks": checks}
@@ -620,25 +655,25 @@ async def _validate_extraction_engine(user_id: str) -> dict:
     expected_fields = exercise.get("expected_fields", []) if exercise else []
 
     workflows = await Workflow.find(Workflow.user_id == user_id).to_list()
-    wf_max_fields, wf_field_names = await _get_extraction_fields(workflows)
-    ss_max_fields, ss_field_names, _ = await _get_user_search_set_fields(user_id)
-
-    # Take whichever path has more fields — chat and classical are equivalent here.
-    if ss_max_fields >= wf_max_fields:
-        max_fields, all_field_names = ss_max_fields, ss_field_names
-    else:
-        max_fields, all_field_names = wf_max_fields, wf_field_names
+    workflow_fields, _largest = await _collect_extraction_fields(workflows)
+    standalone_fields = await _collect_searchset_fields(user_id)
+    # Credit fields the user defined in a standalone Extraction OR in a workflow
+    # Extraction task — the challenge is "fields across your extraction tasks",
+    # and most users build the Extraction directly in the editor (including via
+    # chat, which saves a SearchSet).
+    combined_fields = _union_fields(workflow_fields, standalone_fields)
+    total_fields = len(combined_fields)
 
     matched_fields = [
         ef for ef in expected_fields
-        if _fuzzy_field_match(ef, all_field_names)
+        if _fuzzy_field_match(ef, combined_fields)
     ]
     missing_fields = [f for f in expected_fields if f not in matched_fields]
 
     checks.append({
         "name": "15+ extraction fields",
-        "passed": max_fields >= 15,
-        "detail": f"Largest extraction has {max_fields} fields (need 15+)"
+        "passed": total_fields >= 15,
+        "detail": f"You have {total_fields} unique fields across your extraction tasks (need 15+)"
               + (f" — matched {len(matched_fields)}/{len(expected_fields)} expected" if expected_fields else ""),
     })
     if missing_fields:
@@ -648,11 +683,11 @@ async def _validate_extraction_engine(user_id: str) -> dict:
             "detail": f"Consider adding: {', '.join(missing_fields[:5])}",
         })
 
-    passed = max_fields >= 15
+    passed = total_fields >= 15
     stars = 1 if passed else 0
-    if passed and max_fields >= 20:
+    if passed and total_fields >= 20:
         stars = 2
-    if passed and max_fields >= 25:
+    if passed and total_fields >= 25:
         stars = 3
 
     return {"passed": passed, "stars": stars, "checks": checks}

@@ -3,6 +3,7 @@ import { Send, Square, Plus, FileUp, Globe, Download, ChevronDown, Cpu } from 'l
 import { getModels } from '../../api/config'
 import type { ModelInfo } from '../../types/workflow'
 import { ModelEffortPicker } from '../ModelEffortPicker'
+import { useBranding } from '../../contexts/BrandingContext'
 
 interface Props {
   onSend: (message: string) => void
@@ -25,6 +26,7 @@ export function ChatInput({
   selectedModel, onModelChange, onExport, hasMessages, hasDocuments,
   contextMeter,
 }: Props) {
+  const branding = useBranding()
   const [message, setMessage] = useState('')
   const [showAddMenu, setShowAddMenu] = useState(false)
   const [showLinkInput, setShowLinkInput] = useState(false)
@@ -148,7 +150,7 @@ export function ChatInput({
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={hasDocuments ? "Ask anything about this document..." : "Ask Vandalizer anything..."}
+            placeholder={hasDocuments ? "Ask anything about this document..." : `Ask ${branding.orgName} anything...`}
             aria-label="Message input"
             rows={1}
             className="block w-full resize-none border-0 bg-transparent text-base font-medium caret-highlight placeholder:text-[#8a8f98] placeholder:font-medium focus:outline-none focus-visible:outline-none overflow-y-auto"

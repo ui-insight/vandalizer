@@ -45,19 +45,31 @@ def convert_to_markdown(doc_path: str, keep_data_uris: bool = True) -> str:
 
 
 def extract_text_from_pdf(pdf_path: str) -> str:
-    """Extract text from a PDF using PyMuPDF.
+    """Extract text from a PDF using PyMuPDF. See _pymupdf_extract_with_pages for the page-aware variant."""
+    text, _ = _pymupdf_extract_with_pages(pdf_path)
+    return text
 
-    PyMuPDF preserves reading order in multi-column layouts and exposes
-    form field values that PyPDF2 misses (NIH biosketches, NSF Current
-    & Pending forms, etc. are common research-admin uploads).
+
+def _pymupdf_extract_with_pages(pdf_path: str) -> tuple[str, list[dict]]:
+    """Extract PDF text via PyMuPDF, returning text plus per-page char offsets.
+
+    Markers are ``[{"char_offset": int, "kind": "page", "value": page_number}]``
+    one per page of the source PDF. Used by ``extract_text_with_markers`` so
+    chunks can be tagged with their source page for citations.
+
+    PyMuPDF preserves reading order in multi-column layouts and exposes form
+    field values that PyPDF2 misses (NIH biosketches, NSF Current & Pending
+    forms, etc. are common research-admin uploads).
     """
     import pymupdf
 
-    chunks: list[str] = []
-    with pymupdf.open(pdf_path) as doc:
-        for page in doc:
-            chunks.append(page.get_text("text"))
+    parts: list[str] = []
+    markers: list[dict] = []
+    cursor = 0
 
+    with pymupdf.open(pdf_path) as doc:
+        for i, page in enumerate(doc, start=1):
+            page_text = page.get_text("text")
             field_lines: list[str] = []
             for widget in page.widgets() or []:
                 value = (widget.field_value or "").strip()
@@ -66,9 +78,20 @@ def extract_text_from_pdf(pdf_path: str) -> str:
                 label = (widget.field_label or widget.field_name or "").strip()
                 field_lines.append(f"- {label}: {value}" if label else f"- {value}")
             if field_lines:
-                chunks.append("[Form fields]\n" + "\n".join(field_lines))
+                page_text = (page_text or "") + "\n[Form fields]\n" + "\n".join(field_lines)
 
-    return "\n".join(c for c in chunks if c)
+            if not page_text:
+                continue
+
+            # Page marker points at the start of this page's text.
+            markers.append({"char_offset": cursor, "kind": "page", "value": i})
+            if parts:
+                # The "\n" join we add below contributes one character.
+                cursor += 1
+            parts.append(page_text)
+            cursor += len(page_text)
+
+    return "\n".join(parts), markers
 
 
 def ocr_extract_text_from_pdf(pdf_path: str, retries: int = 3) -> str:
@@ -77,12 +100,9 @@ def ocr_extract_text_from_pdf(pdf_path: str, retries: int = 3) -> str:
     Falls back gracefully if the OCR service is unavailable.
     """
     # OCR endpoint is stored in the database via admin config (SystemConfig)
-    from pymongo import MongoClient
-    from app.config import Settings
+    from app.tasks import get_sync_db
     from app.utils.encryption import decrypt_value
-    settings = Settings()
-    client = MongoClient(settings.mongo_host)
-    db = client[settings.mongo_db]
+    db = get_sync_db()
     cfg = db.system_config.find_one({})
     ocr_endpoint = (cfg or {}).get("ocr_endpoint", "")
     raw_api_key = (cfg or {}).get("ocr_api_key", "")
@@ -110,6 +130,8 @@ def ocr_extract_text_from_pdf(pdf_path: str, retries: int = 3) -> str:
     if ocr_api_key:
         headers["Authorization"] = f"Bearer {ocr_api_key}"
 
+    import time as _time
+
     import httpx
     for attempt in range(retries):
         try:
@@ -128,13 +150,15 @@ def ocr_extract_text_from_pdf(pdf_path: str, retries: int = 3) -> str:
                 )
         except Exception as e:
             logger.warning("OCR attempt %d raised: %s", attempt + 1, e)
+        if attempt < retries - 1:
+            _time.sleep(2 ** attempt)
 
     logger.error("OCR failed after %d attempts for %s", retries, pdf_path)
     return ""
 
 
-def _format_xlsx_cell(value: object) -> str:
-    """Render an openpyxl cell value as a pipe-table-safe string."""
+def _stringify_cell_value(value: object) -> str:
+    """Render an openpyxl cell value as a plain display string."""
     if value is None:
         return ""
     if isinstance(value, bool):
@@ -151,7 +175,14 @@ def _format_xlsx_cell(value: object) -> str:
         rounded = round(value, 4)
         text = f"{rounded:.4f}".rstrip("0").rstrip(".")
         return text or "0"
-    text = str(value)
+    return str(value)
+
+
+def _format_xlsx_cell(value: object) -> str:
+    """Render an openpyxl cell value as a pipe-table-safe string."""
+    text = _stringify_cell_value(value)
+    if not text:
+        return ""
     return text.replace("\\", "\\\\").replace("|", r"\|").replace("\n", " ").strip()
 
 
@@ -337,6 +368,75 @@ def extract_text_from_xlsx(xlsx_path: str) -> str:
     return "\n\n".join(out).strip()
 
 
+def extract_sheet_json_from_xlsx(xlsx_path: str) -> dict:
+    """Render an .xlsx workbook as JSON sheets for the document viewer.
+
+    Mirrors extract_text_from_xlsx's evaluation strategy so the viewer
+    and OCR agree on formula results: prefer Excel-cached values, then
+    fall back to the `formulas` library, then to the formula text.
+    """
+    import openpyxl
+
+    wb_values = openpyxl.load_workbook(xlsx_path, data_only=True)
+    wb_formulas = openpyxl.load_workbook(xlsx_path, data_only=False)
+
+    needs_eval = False
+    for sheet_name in wb_values.sheetnames:
+        ws_v = wb_values[sheet_name]
+        ws_f = wb_formulas[sheet_name]
+        for r in range(1, (ws_v.max_row or 0) + 1):
+            for c in range(1, (ws_v.max_column or 0) + 1):
+                if ws_v.cell(row=r, column=c).value is None:
+                    fv = ws_f.cell(row=r, column=c).value
+                    if isinstance(fv, str) and fv.startswith("="):
+                        needs_eval = True
+                        break
+            if needs_eval:
+                break
+        if needs_eval:
+            break
+
+    computed = _evaluate_xlsx_formulas(xlsx_path) if needs_eval else {}
+
+    sheets: list[dict] = []
+    for sheet_name in wb_values.sheetnames:
+        ws_v = wb_values[sheet_name]
+        ws_f = wb_formulas[sheet_name]
+
+        max_row = ws_v.max_row or 0
+        max_col = ws_v.max_column or 0
+        if max_row == 0 or max_col == 0:
+            sheets.append({"name": sheet_name, "headers": [], "rows": [], "hidden": ws_v.sheet_state != "visible"})
+            continue
+
+        sheet_key = sheet_name.upper()
+        grid: list[list[str]] = []
+        for r in range(1, max_row + 1):
+            row: list[str] = []
+            for c in range(1, max_col + 1):
+                cell_v = ws_v.cell(row=r, column=c)
+                cached = cell_v.value
+                formula = ws_f.cell(row=r, column=c).value
+                if cached is None and isinstance(formula, str) and formula.startswith("="):
+                    coord = cell_v.coordinate.upper()
+                    evaluated = computed.get((sheet_key, coord))
+                    row.append(_stringify_cell_value(evaluated if evaluated is not None else formula))
+                else:
+                    row.append(_stringify_cell_value(cached))
+            grid.append(row)
+
+        headers = grid[0] if grid else []
+        rows = grid[1:] if len(grid) > 1 else []
+        sheets.append({
+            "name": sheet_name,
+            "headers": headers,
+            "rows": rows,
+            "hidden": ws_v.sheet_state != "visible",
+        })
+
+    return {"sheets": sheets}
+
+
 _DOCX_W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 
 
@@ -422,6 +522,84 @@ def remove_images_from_markdown(markdown_text: str) -> str:
     text = re.sub(r"\n\s*\n\s*\n", "\n\n", text)
     text = re.sub(r"^\s+$", "", text, flags=re.MULTILINE)
     return text.strip()
+
+
+def _xlsx_sheet_markers(text: str) -> list[dict]:
+    """Recover per-sheet char offsets from extract_text_from_xlsx output.
+
+    The xlsx extractor uses unique ``## {sheet_name}`` headers as section
+    boundaries. Parsing them back out is cheaper than refactoring the whole
+    builder to thread markers through every branch.
+    """
+    markers: list[dict] = []
+    for m in re.finditer(r"(?m)^## (.+?)$", text):
+        markers.append({"char_offset": m.start(), "kind": "sheet", "value": m.group(1).strip()})
+    return markers
+
+
+def _interpolate_page_markers(text: str, num_pages: int) -> list[dict]:
+    """Approximate page boundaries by spreading them evenly across the text.
+
+    Used when we know the page count (from PyMuPDF) but the text body came
+    from a service that didn't preserve page structure (the OCR endpoint).
+    Treats the text as uniformly dense — a rough heuristic, but good enough
+    for "this answer is from somewhere around page 234" citations.
+    """
+    if num_pages <= 0 or not text:
+        return []
+    length = len(text)
+    step = max(1, length // num_pages)
+    return [
+        {"char_offset": min(length - 1, i * step), "kind": "page", "value": i + 1}
+        for i in range(num_pages)
+    ]
+
+
+def _pdf_page_count(pdf_path: str) -> int:
+    """Cheap page-count read via PyMuPDF. Returns 0 if it can't open the file."""
+    try:
+        import pymupdf
+        with pymupdf.open(pdf_path) as doc:
+            return doc.page_count
+    except Exception as e:
+        logger.warning("Could not read PDF page count for %s: %s", pdf_path, e)
+        return 0
+
+
+def extract_text_with_markers(file_path: str, file_extension: str) -> tuple[str, list[dict]]:
+    """Like extract_text_from_file, but also returns per-location char offsets.
+
+    Markers are a list of ``{"char_offset": int, "kind": "page"|"sheet",
+    "value": int|str}`` entries. Used by the chunker to attach page / sheet
+    metadata to ChromaDB chunks so retrieval results can cite their source.
+
+    Locations that can't preserve structure (DOCX text, plaintext, code
+    files) return an empty marker list — chunks from those documents simply
+    omit page metadata in citations.
+    """
+    ext = file_extension.lower().lstrip(".")
+
+    if ext == "pdf":
+        # Prefer OCR text for accuracy. When OCR is used we lose true page
+        # boundaries, so fall back to interpolating against PyMuPDF's page
+        # count — approximate, but enough for "around page N" citations.
+        try:
+            ocr_text = ocr_extract_text_from_pdf(file_path)
+        except Exception as e:
+            logger.warning("OCR raised, falling back to PyMuPDF: %s", e)
+            ocr_text = ""
+        if ocr_text and len(ocr_text.strip()) >= MIN_PDF_TEXT_LENGTH:
+            num_pages = _pdf_page_count(file_path)
+            return ocr_text, _interpolate_page_markers(ocr_text, num_pages)
+        # OCR unavailable / too little text — PyMuPDF gives us exact boundaries.
+        return _pymupdf_extract_with_pages(file_path)
+
+    if ext == "xlsx":
+        text = extract_text_from_xlsx(file_path)
+        return text, _xlsx_sheet_markers(text)
+
+    # Other formats (docx, txt, html, code) — extract as text, no markers.
+    return extract_text_from_file(file_path, ext), []
 
 
 def extract_text_from_file(file_path: str, file_extension: str) -> str:

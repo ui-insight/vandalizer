@@ -279,7 +279,8 @@ def llm_chat_model(model: str, prompt: str, data=None, progress_callback=None,
 
 def data_extraction_model(model: str, keys: list[str], doc_texts: list[str] | None = None,
                           full_text: str | None = None, system_config_doc: dict | None = None,
-                          usage_acc: UsageAccumulator | None = None):
+                          usage_acc: UsageAccumulator | None = None,
+                          field_metadata: list[dict] | None = None):
     """Run extraction and return {raw, formatted}. Sync context."""
     engine = ExtractionEngine(system_config_doc=system_config_doc)
     output = engine.extract(
@@ -287,6 +288,7 @@ def data_extraction_model(model: str, keys: list[str], doc_texts: list[str] | No
         model=model,
         full_text=full_text,
         doc_texts=doc_texts,
+        field_metadata=field_metadata,
     )
     if usage_acc:
         usage_acc.add(engine.tokens_in, engine.tokens_out)
@@ -381,12 +383,19 @@ class MultiTaskNode(Node):
         return task._apply_post_process(result)
 
     def process(self, inputs):
+        import contextvars
         from copy import deepcopy
 
         for task in self.tasks:
             task.inputs = deepcopy(inputs)
+        # Run each node within a copy of the current context so contextvars set
+        # by the caller (notably the LLM metering scope) propagate into the
+        # worker threads — ThreadPoolExecutor does not copy contextvars itself.
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            task_futures = [executor.submit(self.process_task, task) for task in self.tasks]
+            task_futures = [
+                executor.submit(contextvars.copy_context().run, self.process_task, task)
+                for task in self.tasks
+            ]
             results = [future.result() for future in as_completed(task_futures)]
 
         collected = []
@@ -458,6 +467,13 @@ class ExtractionNode(Node):
             kwargs["doc_texts"] = texts
         elif texts:
             kwargs["full_text"] = texts[0]
+
+        # Carry per-field validation / optional designations resolved from the
+        # saved set (see workflow_tasks resolution) so enum and optional rules
+        # are honored at extraction time.
+        field_metadata = self.data.get("field_metadata")
+        if field_metadata:
+            kwargs["field_metadata"] = field_metadata
 
         extraction_response = data_extraction_model(self.model, keys, **kwargs)
 
@@ -533,19 +549,14 @@ class WebsiteNode(Node):
         if not url:
             return {"output": "", "input": inputs.get("output"), "step_name": self.name}
 
-        from app.utils.url_validation import validate_outbound_url
-
-        try:
-            validate_outbound_url(url)
-        except ValueError as e:
-            return {"output": f"Blocked URL: {e}", "input": inputs.get("output"), "step_name": self.name}
+        from app.services.web_fetcher import fetch_url_sync
 
         self.report_progress(f"Fetching {url}")
         try:
-            with httpx.Client(timeout=30, follow_redirects=True) as client:
-                resp = client.get(url)
-                resp.raise_for_status()
-            text = _extract_text_from_html(resp.text)
+            result = fetch_url_sync(url)
+            text = result.text
+        except ValueError as e:
+            text = f"Blocked URL: {e}"
         except httpx.HTTPStatusError as e:
             text = f"HTTP error fetching {url}: {e.response.status_code}"
         except httpx.RequestError as e:
@@ -739,12 +750,78 @@ class ResearchNode(Node):
 
 def _open_sync_db():
     """Open a pymongo handle for in-node credential lookups (sync context)."""
-    from pymongo import MongoClient
+    from app.tasks import get_sync_db
 
-    from app.config import Settings
-    settings = Settings()
-    client = MongoClient(settings.mongo_host)
-    return client[settings.mongo_db]
+    return get_sync_db()
+
+
+# Header names whose values are secrets and must never appear in a debug
+# preview, a log line, or the step output. Matched as case-insensitive
+# substrings so e.g. "X-Api-Key" and "Proxy-Authorization" are both caught.
+_SENSITIVE_HEADER_HINTS = (
+    "authorization",
+    "cookie",
+    "token",
+    "secret",
+    "api-key",
+    "apikey",
+    "password",
+    "auth",
+)
+
+_REQUEST_BODY_PREVIEW_LIMIT = 4000
+
+
+def _redact_headers(headers: dict) -> dict:
+    """Copy *headers*, masking the values of any secret-bearing header."""
+    redacted: dict[str, str] = {}
+    for k, v in headers.items():
+        if any(hint in str(k).lower() for hint in _SENSITIVE_HEADER_HINTS):
+            redacted[str(k)] = "<redacted>"
+        else:
+            redacted[str(k)] = str(v)
+    return redacted
+
+
+def _build_request_preview(method: str, url: str, headers: dict, body) -> dict:
+    """A safe, structured snapshot of the request the API node is about to send.
+
+    Used for debugging — surfaced in the step output and logged — so authors can
+    see exactly what went on the wire (the recurring pain behind API-node
+    tickets). Secret header values are redacted; the body is the literal text
+    that will be transmitted, truncated if very large.
+    """
+    if isinstance(body, (dict, list)):
+        body_text = json.dumps(body)
+    elif isinstance(body, str):
+        body_text = body
+    else:
+        body_text = ""
+    byte_len = len(body_text.encode("utf-8"))
+    if len(body_text) > _REQUEST_BODY_PREVIEW_LIMIT:
+        body_text = body_text[:_REQUEST_BODY_PREVIEW_LIMIT] + "…(truncated)"
+    return {
+        "method": method,
+        "url": url,
+        "headers": _redact_headers(headers),
+        "body": body_text,
+        "body_bytes": byte_len,
+    }
+
+
+def _format_request_preview(preview: dict) -> str:
+    """Render a request preview as a readable block for inclusion in output."""
+    lines = [f"{preview.get('method', '')} {preview.get('url', '')}".strip()]
+    headers = preview.get("headers") or {}
+    if headers:
+        lines.append("Headers:")
+        lines.extend(f"  {k}: {v}" for k, v in headers.items())
+    else:
+        lines.append("Headers: (none)")
+    body = preview.get("body") or ""
+    lines.append(f"Body ({preview.get('body_bytes', 0)} bytes):")
+    lines.append(body if body else "(empty)")
+    return "\n".join(lines)
 
 
 class APICallNode(Node):
@@ -753,12 +830,25 @@ class APICallNode(Node):
         self.data = data
 
     def process(self, inputs):
-        url = self.data.get("url", "")
+        from app.utils import templating
+
         method = self.data.get("method", "GET").upper()
-        headers_raw = self.data.get("headers", "")
-        body_raw = self.data.get("body", "")
         auth_strategy = (self.data.get("auth_strategy") or "none").lower()
         credential_id = self.data.get("credential_id") or ""
+
+        # Resolve {{ inputs.output }}-style placeholders against the previous
+        # step's output so authors can reference upstream data instead of
+        # pasting it in literally. URL and headers use raw-string substitution
+        # (they sit inside already-quoted positions); the body is rendered
+        # below with JSON-encoding semantics.
+        try:
+            url = templating.render(self.data.get("url", ""), inputs, json_encode=False)
+            headers_raw = templating.render(
+                self.data.get("headers", ""), inputs, json_encode=False
+            )
+        except templating.TemplateError as e:
+            return {"output": str(e), "input": inputs.get("output"), "step_name": self.name}
+        body_raw = self.data.get("body", "")
         if not url:
             return {"output": "", "input": inputs.get("output"), "step_name": self.name}
 
@@ -773,9 +863,26 @@ class APICallNode(Node):
         headers: dict[str, str] = {}
         if headers_raw:
             try:
-                headers = json.loads(headers_raw)
-            except json.JSONDecodeError:
-                pass
+                parsed = json.loads(headers_raw)
+            except json.JSONDecodeError as e:
+                return {
+                    "output": (
+                        f"Invalid Headers JSON: {e}. "
+                        "Check for smart quotes or other invisible characters."
+                    ),
+                    "input": inputs.get("output"),
+                    "step_name": self.name,
+                }
+            if not isinstance(parsed, dict):
+                return {
+                    "output": (
+                        "Invalid Headers JSON: expected an object like "
+                        '{"x-api-key": "..."}'
+                    ),
+                    "input": inputs.get("output"),
+                    "step_name": self.name,
+                }
+            headers = {str(k): str(v) for k, v in parsed.items()}
 
         # Apply credential-based auth (overrides any conflicting header).
         if auth_strategy != "none":
@@ -822,27 +929,103 @@ class APICallNode(Node):
                 }
 
         body = None
-        if body_raw and method in ("POST", "PUT", "PATCH"):
-            try:
-                body = json.loads(body_raw)
-            except json.JSONDecodeError:
-                body = body_raw
+        body_is_json = False
+        if method in ("POST", "PUT", "PATCH"):
+            if body_raw and body_raw.strip():
+                # Render {{ inputs.output }} placeholders with JSON-encoding so
+                # an envelope like {"records": {{ inputs.output }}} stays valid
+                # JSON whatever the upstream output's type is.
+                try:
+                    rendered_body = templating.render(body_raw, inputs, json_encode=True)
+                except templating.TemplateError as e:
+                    return {
+                        "output": str(e),
+                        "input": inputs.get("output"),
+                        "step_name": self.name,
+                    }
+                try:
+                    parsed = json.loads(rendered_body)
+                except json.JSONDecodeError:
+                    # Not JSON — send the literal text as-is.
+                    body = rendered_body
+                else:
+                    # Objects/arrays go out via httpx's json= (which also sets
+                    # Content-Type). Any other JSON type — a scalar or null —
+                    # is still a body the author configured, so send its raw
+                    # JSON text rather than silently transmitting zero bytes.
+                    body = parsed if isinstance(parsed, (dict, list)) else rendered_body
+                    body_is_json = True
+            else:
+                # Implicit passthrough: an empty body on a write request sends
+                # the previous step's output as-is. This is what lets a
+                # [generate] -> [POST] workflow store its result without the
+                # author wiring up a template at all.
+                upstream = inputs.get("output")
+                if isinstance(upstream, (dict, list)):
+                    body = upstream
+                    body_is_json = True
+                elif isinstance(upstream, str):
+                    # Raw text — its type is unknown, so don't claim it's JSON.
+                    body = upstream
+                elif upstream is not None:
+                    # Scalars (number/bool) — send a JSON literal as the body.
+                    body = json.dumps(upstream)
+                    body_is_json = True
+
+        # When we're sending a JSON body, tag it as such so servers that route
+        # on Content-Type (e.g. Flask's request.json, which 415s without it)
+        # parse it. httpx only sets this automatically on the json= path, not
+        # for JSON we send as a string (scalars/null) — and the author may not
+        # have added the header themselves. Never override an explicit choice.
+        if body_is_json and not any(k.lower() == "content-type" for k in headers):
+            headers["Content-Type"] = "application/json"
+
+        # Snapshot exactly what we're about to send (secrets redacted). This is
+        # attached to the step result so authors can inspect the request when
+        # debugging — and embedded into the error output when it fails, since
+        # that's when they most need to see it.
+        request_preview = _build_request_preview(method, url, headers, body)
+        logger.info(
+            "APINode sending %s %s (%d body bytes)",
+            method, url, request_preview["body_bytes"],
+        )
 
         try:
             with httpx.Client(timeout=30, follow_redirects=True) as client:
                 resp = client.request(method, url, headers=headers, json=body if isinstance(body, (dict, list)) else None, content=body if isinstance(body, str) else None)
                 resp.raise_for_status()
         except httpx.HTTPStatusError as e:
-            return {"output": f"HTTP error: {e.response.status_code} {e.response.text[:500]}", "input": inputs.get("output"), "step_name": self.name}
+            return {
+                "output": (
+                    f"HTTP error: {e.response.status_code} {e.response.text[:500]}\n\n"
+                    f"--- Request sent ---\n{_format_request_preview(request_preview)}"
+                ),
+                "input": inputs.get("output"),
+                "step_name": self.name,
+                "request": request_preview,
+            }
         except httpx.RequestError as e:
-            return {"output": f"Request error: {e}", "input": inputs.get("output"), "step_name": self.name}
+            return {
+                "output": (
+                    f"Request error: {e}\n\n"
+                    f"--- Request sent ---\n{_format_request_preview(request_preview)}"
+                ),
+                "input": inputs.get("output"),
+                "step_name": self.name,
+                "request": request_preview,
+            }
 
         try:
             output = resp.json()
         except Exception:
             output = resp.text
 
-        return {"output": output, "input": inputs.get("output"), "step_name": self.name}
+        return {
+            "output": output,
+            "input": inputs.get("output"),
+            "step_name": self.name,
+            "request": request_preview,
+        }
 
 
 class DocumentRendererNode(Node):
@@ -1086,17 +1269,46 @@ class KnowledgeBaseQueryNode(Node):
 
         # Format as plain text context block so downstream LLM steps can use it naturally
         parts = []
+        sources: list[dict] = []
         for i, r in enumerate(results, 1):
-            source = r["metadata"].get("source_name", "Unknown source")
-            parts.append(f"[{i}] {source}\n{r['content']}")
+            meta = r.get("metadata") or {}
+            source_name = meta.get("source_name", "Unknown source")
+            page = meta.get("page")
+            sheet = meta.get("sheet")
+            label = source_name
+            if isinstance(page, int):
+                label = f"{source_name} · p. {page}"
+            elif isinstance(sheet, str) and sheet:
+                label = f"{source_name} · {sheet}"
+            parts.append(f"[{i}] {label}\n{r['content']}")
+            sources.append({
+                "document_id": meta.get("source_id"),
+                "document_title": source_name,
+                "page": page if isinstance(page, int) else None,
+                "sheet": sheet if isinstance(sheet, str) else None,
+                "chunk_id": r.get("chunk_id"),
+                "score": r.get("score"),
+                "content_preview": (r.get("content") or "")[:240],
+            })
 
         output = "\n\n---\n\n".join(parts)
-        return {"output": output, "input": inputs.get("output"), "step_name": self.name}
+        return {
+            "output": output,
+            "input": inputs.get("output"),
+            "step_name": self.name,
+            "retrieved_sources": sources,
+        }
 
 
 # ---------------------------------------------------------------------------
 # Workflow Engine
 # ---------------------------------------------------------------------------
+
+class WorkflowCancelled(Exception):
+    """Raised inside execute() when a user-requested cancel is detected between
+    steps. Callers should treat this as a clean terminal stop (status
+    ``canceled``), not an error, and must not retry the task."""
+
 
 class WorkflowEngine:
     def __init__(self) -> None:
@@ -1114,13 +1326,18 @@ class WorkflowEngine:
     def get_topological_order(self) -> list[Node]:
         return list(reversed(tuple(self.graph.static_order())))
 
-    def execute(self, workflow_result_updater=None, start_index=0, initial_output=None):
+    def execute(self, workflow_result_updater=None, start_index=0, initial_output=None,
+                should_cancel=None):
         """Execute workflow. Returns (final_output, step_data_list).
 
         Args:
             workflow_result_updater: Optional callable(update_dict) for progress.
             start_index: Index to start execution from (for resumption after approval).
             initial_output: Output to feed into the first node when resuming.
+            should_cancel: Optional callable() -> bool, polled before each step.
+                When it returns True the run is aborted with WorkflowCancelled.
+                This is the cooperative backstop for the between-steps case; an
+                in-flight step is interrupted out-of-band via Celery revocation.
         """
         data = []
         nodes = self.get_topological_order()
@@ -1130,6 +1347,11 @@ class WorkflowEngine:
             # Skip already-executed nodes when resuming
             if idx < start_index:
                 continue
+
+            # Cooperative cancellation: bail before starting the next step if the
+            # user requested a stop while we were between steps.
+            if should_cancel is not None and should_cancel():
+                raise WorkflowCancelled()
 
             if workflow_result_updater:
                 workflow_result_updater({
@@ -1152,6 +1374,14 @@ class WorkflowEngine:
                         )
                 output = node.process(latest_output or {})
 
+            # Retry-on-empty / fallback-model. Optimizer-set hook: if the
+            # node's first task has ``_fallback_model`` and the output looks
+            # empty or error-shaped, re-run once with the fallback. Catches
+            # transient model failures (rate limits, partial outages) that
+            # would otherwise silently degrade the trial.
+            if _should_retry_with_fallback(node, output):
+                output = _retry_node_with_fallback(node, latest_output or {})
+
             latest_output = output
 
             # Check for approval pause signal
@@ -1165,11 +1395,15 @@ class WorkflowEngine:
                     "num_steps_completed": idx,
                 })
 
-            data.append({
+            entry = {
                 "name": node.name,
                 "output": latest_output.get("output"),
                 "input": latest_output.get("input"),
-            })
+            }
+            sources = latest_output.get("retrieved_sources")
+            if isinstance(sources, list) and sources:
+                entry["retrieved_sources"] = sources
+            data.append(entry)
 
         if latest_output is None:
             return None, data
@@ -1213,12 +1447,167 @@ class WorkflowEngine:
 # Factory
 # ---------------------------------------------------------------------------
 
+# Task names whose ``data.prompt`` (or analogous free-text field) the
+# prompt-variant wrapper applies to. Extraction-style tasks have structured
+# instructions and are excluded.
+_PROMPT_VARIANT_TASKS = {"Prompt", "Formatter", "ResearchNode", "FormFiller"}
+
+
+_RETRY_ERROR_PATTERN = re.compile(
+    r"^\s*(error|exception|failed|timeout|rate.?limit)\b", re.IGNORECASE,
+)
+
+
+def _output_looks_empty_or_error(output: dict | None) -> bool:
+    """True when an output dict represents a no-result or an error stub.
+
+    Used by the engine's retry-on-empty hook. Conservative — only fires on
+    obviously dead outputs so we don't pay a retry on every borderline run.
+    """
+    if not output:
+        return True
+    val = output.get("output")
+    if val is None:
+        return True
+    if isinstance(val, str):
+        stripped = val.strip()
+        if not stripped:
+            return True
+        if len(stripped) <= 500 and _RETRY_ERROR_PATTERN.match(stripped):
+            return True
+        return False
+    if isinstance(val, (list, dict)):
+        return not val
+    return False
+
+
+def _should_retry_with_fallback(node, output: dict | None) -> bool:
+    """Decide whether to retry this node with its fallback model.
+
+    Returns True only when:
+    - The node has at least one task with both ``_retry_on_empty`` and
+      ``_fallback_model`` set (single-task LLM steps — the common case),
+    - AND the produced output is empty or error-shaped per
+      :func:`_output_looks_empty_or_error`,
+    - AND the fallback model differs from the current model (otherwise the
+      retry would just repeat the same call).
+    """
+    tasks = getattr(node, "tasks", None)
+    if not tasks:
+        return False
+    # Only single-task nodes — multi-task retry would need per-task isolation
+    # which gets noisy fast.
+    if len(tasks) != 1:
+        return False
+    task = tasks[0]
+    data = getattr(task, "data", None) or getattr(task, "node_data", None) or {}
+    if not isinstance(data, dict):
+        return False
+    if not data.get("_retry_on_empty"):
+        return False
+    fallback = data.get("_fallback_model")
+    if not fallback:
+        return False
+    current = data.get("model")
+    if current and current == fallback:
+        return False
+    return _output_looks_empty_or_error(output)
+
+
+def _retry_node_with_fallback(node, prev_output: dict) -> dict:
+    """Mutate the node's task to use its fallback model and re-run process().
+
+    The mutation is intentionally permanent on the task instance — re-running
+    this trial / step with the same node again would hit the same broken
+    primary model, so the fallback should stick. The previous (failed) output
+    is logged so debugging signal isn't lost.
+    """
+    task = node.tasks[0]
+    data = getattr(task, "data", None) or {}
+    fallback = data.get("_fallback_model")
+    if not fallback:
+        return None  # type: ignore[return-value]
+    original_model = data.get("model")
+    data["model"] = fallback
+    logger.info(
+        "Workflow engine: retrying node '%s' with fallback model %r (was %r)",
+        getattr(node, "name", "?"), fallback, original_model,
+    )
+    return node.process(prev_output)
+
+
+def _apply_step_override(
+    task_name: str,
+    task_data: dict,
+    step_override: dict | None,
+) -> dict:
+    """Mutate ``task_data`` in place with the optimizer's per-step override.
+
+    Returns the same dict for call-site readability. ``model`` swaps apply to
+    every LLM task; ``prompt_variant`` wraps the free-text instruction field
+    used by the matching task type.
+    """
+    if not step_override:
+        return task_data
+
+    model_override = step_override.get("model")
+    if model_override:
+        task_data["model"] = model_override
+
+    # Retry / fallback hooks — consumed by the engine's execute loop, not by
+    # the task itself. ``_retry_on_empty`` + ``_fallback_model`` together mean
+    # "if this step's output is empty or error-shaped, re-run it once with
+    # the fallback model." Prefixed with _ so they don't collide with any
+    # task-meaningful config key.
+    if step_override.get("retry_on_empty"):
+        task_data["_retry_on_empty"] = True
+    fallback = step_override.get("fallback_model")
+    if fallback:
+        task_data["_fallback_model"] = str(fallback)
+
+    variant = step_override.get("prompt_variant")
+    rewrite = step_override.get("prompt_rewrite")
+    if (variant or rewrite) and task_name in _PROMPT_VARIANT_TASKS:
+        from app.services.workflow_prompt_variants import apply_prompt_variant
+
+        # Field name depends on task type — keep this map aligned with the
+        # concrete Node classes' .process() reads.
+        prompt_fields_by_task = {
+            "Prompt": "prompt",
+            "Formatter": "format_template",
+            "ResearchNode": "question",
+            "FormFiller": "template",
+        }
+        field = prompt_fields_by_task.get(task_name)
+        if field:
+            original = task_data.get(field) or ""
+            if rewrite:
+                # Full rewrite — pre-generated by the optimizer once per step
+                # and threaded through as a literal replacement. Bypasses the
+                # variant wrapper entirely.
+                task_data[field] = rewrite
+            elif original:
+                task_data[field] = apply_prompt_variant(original, variant)
+            # Formatter falls back to ``prompt`` when ``format_template`` is
+            # empty (see FormatNode); wrap that too so the variant takes
+            # effect regardless of which field is populated.
+            if task_name == "Formatter" and not (task_data.get("format_template") or "").strip():
+                fallback = task_data.get("prompt") or ""
+                if rewrite:
+                    task_data["prompt"] = rewrite
+                elif fallback:
+                    task_data["prompt"] = apply_prompt_variant(fallback, variant)
+
+    return task_data
+
+
 def build_workflow_engine(
     steps_data: list[dict],
     model: str,
     user_id: str | None = None,
     system_config_doc: dict | None = None,
     allow_code_execution: bool = False,
+    config_override: dict | None = None,
 ) -> WorkflowEngine:
     """Build a WorkflowEngine from step data dicts.
 
@@ -1229,13 +1618,27 @@ def build_workflow_engine(
         user_id: User ID for extraction nodes.
         system_config_doc: Pre-fetched SystemConfig as dict.
         allow_code_execution: If False, CodeNode tasks are rejected. Only admins should set True.
+        config_override: Optional optimizer-applied override of shape
+            ``{"step_overrides": {step_name: {"model": str, "prompt_variant": str | None}}}``.
+            When supplied, per-step model + prompt-variant overrides are merged
+            into each task's ``data`` before node construction.
     """
     engine = WorkflowEngine()
     nodes = []
 
+    # Resolve overrides to a flat {step_name: override_dict} map. The optimizer
+    # writes ``step_overrides`` as a dict keyed by sanitized OR human-readable
+    # step name; we keep both so callers can refer to whichever they have.
+    step_overrides: dict[str, dict] = {}
+    if isinstance(config_override, dict):
+        raw = config_override.get("step_overrides") or {}
+        if isinstance(raw, dict):
+            step_overrides = {str(k): v for k, v in raw.items() if isinstance(v, dict)}
+
     for idx, step in enumerate(steps_data):
         step_name = step.get("name", "")
         step_data = step.get("data", {})
+        step_override = step_overrides.get(step_name) or step_overrides.get(sanitize_step_name(step_name))
 
         if step_name == "Document":
             node = DocumentNode(step_data)
@@ -1247,6 +1650,8 @@ def build_workflow_engine(
                 task_data = task.get("data", {})
                 task_data["user_id"] = user_id
                 task_data["model"] = task_data.get("model") or model
+                # Optimizer-applied per-step override (model swap + prompt variant).
+                _apply_step_override(task_name, task_data, step_override)
 
                 if task_name == "Extraction":
                     n = ExtractionNode(data=task_data)

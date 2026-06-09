@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { Navigate, useNavigate, useSearch } from '@tanstack/react-router'
 import {
-  ArrowLeft, MessageSquare, Send, Plus, Paperclip, X, Loader2, Link2, Tag,
+  ArrowLeft, Check, MessageSquare, Send, Plus, Paperclip, Pencil, X, Loader2, Link2, Tag,
+  Eye, UserPlus, Search, Flag, Lock, Layers,
 } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
 import { useAuth } from '../hooks/useAuth'
@@ -13,6 +14,8 @@ import type {
 
 type View = 'list' | 'new' | 'chat'
 type StatusFilter = 'all' | 'open' | 'in_progress' | 'closed'
+type PriorityFilter = 'all' | 'low' | 'normal' | 'high'
+type ClassificationFilter = 'all' | 'bug' | 'enhancement' | 'feature_request'
 
 const MAX_BYTES = 10 * 1024 * 1024
 
@@ -35,13 +38,23 @@ const PRIORITY_COLORS: Record<string, string> = {
   normal: '#3b82f6',
   high: '#ef4444',
 }
+const CLASSIFICATION_COLORS: Record<string, string> = {
+  bug: '#ef4444',
+  enhancement: '#8b5cf6',
+  feature_request: '#0ea5e9',
+}
+const CLASSIFICATION_LABELS: Record<string, string> = {
+  bug: 'Bug',
+  enhancement: 'Enhancement',
+  feature_request: 'Feature Request',
+}
 
 type Stats = { total: number; open: number; in_progress: number; closed: number }
 
 export default function SupportCenter() {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const search = useSearch({ from: '/support' }) as { ticket?: string }
+  const urlSearch = useSearch({ from: '/support' }) as { ticket?: string }
   const { toast } = useToast()
 
   const [view, setView] = useState<View>('list')
@@ -49,19 +62,36 @@ export default function SupportCenter() {
   const [stats, setStats] = useState<Stats | null>(null)
   // Default to "open" — agents care about the active queue, not the archive.
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('open')
+  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all')
+  const [classificationFilter, setClassificationFilter] = useState<ClassificationFilter>('all')
   const [tagFilter, setTagFilter] = useState<string>('')
+  // `searchInput` is the live text in the box; `search` is the debounced value
+  // we actually query with, so typing doesn't fire a request on every keystroke.
+  const [searchInput, setSearchInput] = useState<string>('')
+  const [search, setSearch] = useState<string>('')
   const [allTags, setAllTags] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTicketUuid, setActiveTicketUuid] = useState<string | null>(null)
+
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(searchInput.trim()), 250)
+    return () => clearTimeout(t)
+  }, [searchInput])
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
       const statusParam = statusFilter === 'all' ? undefined : statusFilter
+      const priorityParam = priorityFilter === 'all' ? undefined : priorityFilter
+      const classificationParam = classificationFilter === 'all' ? undefined : classificationFilter
       const tagParam = tagFilter || undefined
+      const searchParam = search || undefined
       const [s, t, tagList] = await Promise.all([
         supportApi.getTicketStats(),
-        supportApi.listTickets(statusParam, 200, 0, undefined, tagParam),
+        supportApi.listTickets(
+          statusParam, 200, 0, undefined, tagParam, undefined,
+          searchParam, priorityParam, classificationParam,
+        ),
         supportApi.listAllTags(),
       ])
       setStats(s)
@@ -72,24 +102,24 @@ export default function SupportCenter() {
     } finally {
       setLoading(false)
     }
-  }, [toast, statusFilter, tagFilter])
+  }, [toast, statusFilter, priorityFilter, classificationFilter, tagFilter, search])
 
   useEffect(() => { load() }, [load])
 
   // Keep the URL in sync with the open ticket so agents can copy the address
   // bar (or the explicit Copy link button) and share it with each other.
   useEffect(() => {
-    if (search.ticket && search.ticket !== activeTicketUuid) {
-      setActiveTicketUuid(search.ticket)
+    if (urlSearch.ticket && urlSearch.ticket !== activeTicketUuid) {
+      setActiveTicketUuid(urlSearch.ticket)
       setView('chat')
-    } else if (!search.ticket && view === 'chat') {
+    } else if (!urlSearch.ticket && view === 'chat') {
       setActiveTicketUuid(null)
       setView('list')
     }
-  }, [search.ticket, activeTicketUuid, view])
+  }, [urlSearch.ticket, activeTicketUuid, view])
 
   if (!user?.is_support_agent) {
-    return <Navigate to="/" search={{ mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined }} />
+    return <Navigate to="/" search={{ mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined, workflow_share_token: undefined }} />
   }
 
   const openTicket = (uuid: string) => {
@@ -114,9 +144,16 @@ export default function SupportCenter() {
           loading={loading}
           statusFilter={statusFilter}
           onStatusFilterChange={setStatusFilter}
+          priorityFilter={priorityFilter}
+          onPriorityFilterChange={setPriorityFilter}
+          classificationFilter={classificationFilter}
+          onClassificationFilterChange={setClassificationFilter}
           tagFilter={tagFilter}
           onTagFilterChange={setTagFilter}
           allTags={allTags}
+          searchInput={searchInput}
+          onSearchInputChange={setSearchInput}
+          activeSearch={search}
           currentUserId={user.user_id}
           onNew={() => setView('new')}
           onSelect={openTicket}
@@ -148,7 +185,10 @@ export default function SupportCenter() {
 
 function ListView({
   tickets, stats, loading, statusFilter, onStatusFilterChange,
+  priorityFilter, onPriorityFilterChange,
+  classificationFilter, onClassificationFilterChange,
   tagFilter, onTagFilterChange, allTags,
+  searchInput, onSearchInputChange, activeSearch,
   currentUserId, onNew, onSelect,
 }: {
   tickets: SupportTicketSummary[]
@@ -156,13 +196,30 @@ function ListView({
   loading: boolean
   statusFilter: StatusFilter
   onStatusFilterChange: (s: StatusFilter) => void
+  priorityFilter: PriorityFilter
+  onPriorityFilterChange: (p: PriorityFilter) => void
+  classificationFilter: ClassificationFilter
+  onClassificationFilterChange: (c: ClassificationFilter) => void
   tagFilter: string
   onTagFilterChange: (t: string) => void
   allTags: string[]
+  searchInput: string
+  onSearchInputChange: (s: string) => void
+  activeSearch: string
   currentUserId: string
   onNew: () => void
   onSelect: (uuid: string) => void
 }) {
+  const hasFilters =
+    statusFilter !== 'open' || priorityFilter !== 'all' ||
+    classificationFilter !== 'all' || tagFilter !== '' || activeSearch !== ''
+  const clearAll = () => {
+    onStatusFilterChange('open')
+    onPriorityFilterChange('all')
+    onClassificationFilterChange('all')
+    onTagFilterChange('')
+    onSearchInputChange('')
+  }
   const statCardStyle = (color: string): React.CSSProperties => ({
     flex: 1, padding: '16px 20px', background: '#fff', borderRadius: 'var(--ui-radius, 12px)',
     border: '1px solid #e5e7eb', borderLeft: `4px solid ${color}`,
@@ -217,8 +274,53 @@ function ListView({
 
       {/* Ticket list */}
       <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
-        <div style={{ padding: '14px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <div style={{ fontSize: 15, fontWeight: 600 }}>Tickets</div>
+        <div style={{ padding: '14px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ fontSize: 15, fontWeight: 600 }}>Tickets</div>
+            {/* Search — matches ticket number, subject, requester, message body. */}
+            <div style={{ position: 'relative', flex: '1 1 260px', maxWidth: 380 }}>
+              <Search
+                size={14}
+                color="#9ca3af"
+                style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
+              />
+              <input
+                value={searchInput}
+                onChange={(e) => onSearchInputChange(e.target.value)}
+                placeholder="Search by #, name, email, or keyword…"
+                style={{
+                  width: '100%', padding: '6px 30px 6px 30px', fontSize: 13,
+                  border: '1px solid #e5e7eb', borderRadius: 9999,
+                  outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
+                }}
+              />
+              {searchInput && (
+                <button
+                  onClick={() => onSearchInputChange('')}
+                  title="Clear search"
+                  style={{
+                    position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
+                    background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af',
+                    padding: 2, display: 'inline-flex', alignItems: 'center',
+                  }}
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+            {hasFilters && (
+              <button
+                onClick={clearAll}
+                style={{
+                  fontSize: 12, padding: '4px 10px', borderRadius: 9999,
+                  border: '1px solid #e5e7eb', background: '#fff', color: '#6b7280',
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <div style={{ display: 'flex', gap: 4 }}>
               {(['all', 'open', 'in_progress', 'closed'] as StatusFilter[]).map(s => (
@@ -236,6 +338,42 @@ function ListView({
                   {s === 'in_progress' ? 'In Progress' : s.charAt(0).toUpperCase() + s.slice(1)}
                 </button>
               ))}
+            </div>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <Flag size={12} color="#6b7280" />
+              <select
+                value={priorityFilter}
+                onChange={(e) => onPriorityFilterChange(e.target.value as PriorityFilter)}
+                style={{
+                  padding: '4px 8px', fontSize: 12, border: '1px solid #e5e7eb',
+                  borderRadius: 9999, background: '#fff',
+                  color: priorityFilter !== 'all' ? '#111827' : '#6b7280',
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}
+              >
+                <option value="all">All priorities</option>
+                <option value="high">High</option>
+                <option value="normal">Normal</option>
+                <option value="low">Low</option>
+              </select>
+            </div>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <Layers size={12} color="#6b7280" />
+              <select
+                value={classificationFilter}
+                onChange={(e) => onClassificationFilterChange(e.target.value as ClassificationFilter)}
+                style={{
+                  padding: '4px 8px', fontSize: 12, border: '1px solid #e5e7eb',
+                  borderRadius: 9999, background: '#fff',
+                  color: classificationFilter !== 'all' ? '#111827' : '#6b7280',
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}
+              >
+                <option value="all">All types</option>
+                <option value="bug">Bug</option>
+                <option value="enhancement">Enhancement</option>
+                <option value="feature_request">Feature Request</option>
+              </select>
             </div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
               <Tag size={12} color="#6b7280" />
@@ -265,7 +403,23 @@ function ListView({
         ) : tickets.length === 0 ? (
           <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>
             <MessageSquare size={28} color="#d1d5db" style={{ display: 'block', margin: '0 auto 8px' }} />
-            <div style={{ fontSize: 14 }}>No tickets {statusFilter !== 'all' ? `with status "${statusFilter.replace('_', ' ')}"` : 'yet'}.</div>
+            <div style={{ fontSize: 14 }}>
+              {activeSearch
+                ? `No tickets match "${activeSearch}".`
+                : `No tickets ${statusFilter !== 'all' ? `with status "${statusFilter.replace('_', ' ')}"` : 'yet'}.`}
+            </div>
+            {hasFilters && (
+              <button
+                onClick={clearAll}
+                style={{
+                  marginTop: 10, fontSize: 12, padding: '4px 12px', borderRadius: 9999,
+                  border: '1px solid #e5e7eb', background: '#fff', color: '#374151',
+                  cursor: 'pointer', fontFamily: 'inherit',
+                }}
+              >
+                Clear filters
+              </button>
+            )}
           </div>
         ) : (
           <div>
@@ -293,6 +447,16 @@ function ListView({
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       {needsAttention && <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3b82f6', flexShrink: 0 }} />}
+                      {t.ticket_number != null && (
+                        <span
+                          style={{
+                            fontSize: 12, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                            color: '#6b7280', flexShrink: 0,
+                          }}
+                        >
+                          #{t.ticket_number}
+                        </span>
+                      )}
                       <span style={{ fontSize: 14, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {t.subject}
                       </span>
@@ -308,6 +472,15 @@ function ListView({
                       }}>
                         {t.priority}
                       </span>
+                      {t.classification && (
+                        <span style={{
+                          fontSize: 11, padding: '1px 6px', borderRadius: 9999,
+                          background: `${CLASSIFICATION_COLORS[t.classification]}20`,
+                          color: CLASSIFICATION_COLORS[t.classification], fontWeight: 600,
+                        }}>
+                          {CLASSIFICATION_LABELS[t.classification]}
+                        </span>
+                      )}
                       {(t.tags ?? []).map((tag) => (
                         <span
                           key={tag}
@@ -322,6 +495,18 @@ function ListView({
                     </div>
                     <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {t.user_name || t.user_id} &middot; {t.message_count} message{t.message_count !== 1 ? 's' : ''}
+                      {t.last_message_is_internal_note && (
+                        <span
+                          style={{
+                            marginLeft: 6, padding: '0 5px', borderRadius: 4,
+                            background: '#fde68a', color: '#78350f',
+                            fontSize: 10, fontWeight: 700, letterSpacing: 0.3,
+                          }}
+                          title="Last activity was an internal note"
+                        >
+                          INTERNAL
+                        </span>
+                      )}
                       {t.last_message_preview ? ` — ${t.last_message_preview}` : ''}
                     </div>
                   </div>
@@ -352,6 +537,7 @@ function NewTicketView({
   const [subject, setSubject] = useState('')
   const [message, setMessage] = useState('')
   const [priority, setPriority] = useState('normal')
+  const [classification, setClassification] = useState('bug')
   const [files, setFiles] = useState<File[]>([])
   const [submitting, setSubmitting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -371,7 +557,7 @@ function NewTicketView({
     if (!subject.trim() || !message.trim()) return
     setSubmitting(true)
     try {
-      const ticket = await supportApi.createTicket(subject.trim(), message.trim(), priority, files)
+      const ticket = await supportApi.createTicket(subject.trim(), message.trim(), priority, classification, files)
       toast('Ticket created', 'success')
       onCreated(ticket)
     } catch (err) {
@@ -428,6 +614,18 @@ function NewTicketView({
               <option value="low">Low</option>
               <option value="normal">Normal</option>
               <option value="high">High</option>
+            </select>
+          </div>
+          <div>
+            <label style={labelStyle}>Type</label>
+            <select
+              value={classification}
+              onChange={(e) => setClassification(e.target.value)}
+              style={inputStyle}
+            >
+              <option value="bug">Bug</option>
+              <option value="enhancement">Enhancement</option>
+              <option value="feature_request">Feature Request</option>
             </select>
           </div>
           <div>
@@ -530,14 +728,28 @@ function ChatView({
   ticketUuid: string
   onBack: () => void
 }) {
+  const { user } = useAuth()
   const { toast } = useToast()
   const [ticket, setTicket] = useState<SupportTicket | null>(null)
   const [loading, setLoading] = useState(true)
   const [reply, setReply] = useState('')
+  const [isInternalNote, setIsInternalNote] = useState(false)
   const [sending, setSending] = useState(false)
   const [previewAttachment, setPreviewAttachment] = useState<SupportAttachment | null>(null)
+  const [editingMessageUuid, setEditingMessageUuid] = useState<string | null>(null)
+  const [editDraft, setEditDraft] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const replyRef = useRef<HTMLTextAreaElement>(null)
+
+  // Auto-grow the reply textarea to fit its content (up to a max height).
+  useEffect(() => {
+    const el = replyRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, 200)}px`
+  }, [reply])
 
   const loadTicket = useCallback(async () => {
     try {
@@ -565,9 +777,12 @@ function ChatView({
     if (!reply.trim() || sending) return
     setSending(true)
     try {
-      const updated = await supportApi.addMessage(ticketUuid, reply.trim())
+      const updated = await supportApi.addMessage(ticketUuid, reply.trim(), {
+        isInternalNote: isInternalNote,
+      })
       setTicket(updated)
       setReply('')
+      setIsInternalNote(false)
     } catch {
       toast('Failed to send message', 'error')
     } finally {
@@ -584,20 +799,62 @@ function ChatView({
     }
   }
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    if (fileInputRef.current) fileInputRef.current.value = ''
-    if (file.size > MAX_BYTES) {
-      toast(`File must be under 10MB`, 'error')
-      return
-    }
+  const startEdit = (msg: { uuid: string; content: string }) => {
+    setEditingMessageUuid(msg.uuid)
+    setEditDraft(msg.content)
+  }
+
+  const cancelEdit = () => {
+    setEditingMessageUuid(null)
+    setEditDraft('')
+  }
+
+  const saveEdit = async () => {
+    if (!editingMessageUuid) return
+    const trimmed = editDraft.trim()
+    if (!trimmed) return
+    setSavingEdit(true)
     try {
-      const updated = await supportApi.addAttachment(ticketUuid, file)
+      const updated = await supportApi.editMessage(ticketUuid, editingMessageUuid, trimmed)
       setTicket(updated)
-      toast('File attached', 'success')
+      cancelEdit()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Could not save edit', 'error')
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = Array.from(e.target.files ?? [])
+    if (fileInputRef.current) fileInputRef.current.value = ''
+    if (picked.length === 0) return
+    const accepted: File[] = []
+    for (const f of picked) {
+      if (f.size > MAX_BYTES) { toast(`${f.name} is over 10MB`, 'error'); continue }
+      accepted.push(f)
+    }
+    if (accepted.length === 0) return
+    try {
+      const updated = await supportApi.addAttachment(ticketUuid, accepted)
+      setTicket(updated)
+      toast(
+        accepted.length === 1 ? 'File attached' : `${accepted.length} files attached`,
+        'success',
+      )
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Upload failed', 'error')
+    }
+  }
+
+  const handleDeleteAttachment = async (attachmentUuid: string, filename: string) => {
+    if (!window.confirm(`Remove "${filename}" from this ticket?`)) return
+    try {
+      const updated = await supportApi.deleteAttachment(ticketUuid, attachmentUuid)
+      setTicket(updated)
+      toast('Attachment removed', 'success')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to remove attachment', 'error')
     }
   }
 
@@ -639,7 +896,19 @@ function ChatView({
         {/* Header with requester + status controls */}
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>{ticket.subject}</h3>
+            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {ticket.ticket_number != null && (
+                <span
+                  style={{
+                    fontSize: 13, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                    color: '#6b7280', marginRight: 8,
+                  }}
+                >
+                  #{ticket.ticket_number}
+                </span>
+              )}
+              {ticket.subject}
+            </h3>
             <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>
               {ticket.user_name || ticket.user_id}
               {ticket.user_email ? ` (${ticket.user_email})` : ''}
@@ -675,6 +944,16 @@ function ChatView({
             }}>
               {ticket.priority}
             </span>
+            {ticket.classification && (
+              <span style={{
+                fontSize: 11, padding: '2px 8px', borderRadius: 9999,
+                background: `${CLASSIFICATION_COLORS[ticket.classification]}20`,
+                color: CLASSIFICATION_COLORS[ticket.classification],
+                fontWeight: 600, textTransform: 'uppercase',
+              }}>
+                {CLASSIFICATION_LABELS[ticket.classification]}
+              </span>
+            )}
             <span style={{
               fontSize: 11, padding: '2px 8px', borderRadius: 9999,
               background: `${STATUS_COLORS[ticket.status]}20`,
@@ -720,32 +999,160 @@ function ChatView({
           }}
         />
 
+        {/* Watchers — tagged users who follow the ticket. Visible to all parties. */}
+        <WatcherBar ticket={ticket} onChange={setTicket} />
+
         {/* Messages — agent on right (blue, "Support" label), customer on left */}
         <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 12, maxHeight: 520, overflowY: 'auto' }}>
           {ticket.messages.map((m) => {
             const isSupport = m.is_support_reply
+            const isInternal = m.is_internal_note
+            const isMine = m.user_id === user?.user_id
+            const isEditing = editingMessageUuid === m.uuid
             const msgAttachments = ticket.attachments.filter((a) => a.message_uuid === m.uuid)
+            // Internal notes get a distinct yellow card and span full width so
+            // agents can't miss them when scanning the conversation.
+            const bubbleAlign = isInternal ? 'stretch' : (isSupport ? 'flex-end' : 'flex-start')
+            const bubbleBg = isInternal ? '#fef9c3' : (isSupport ? '#2563eb' : '#f3f4f6')
+            const bubbleColor = isInternal ? '#713f12' : (isSupport ? '#fff' : '#111827')
+            const bubbleBorder = isInternal ? '1px dashed #ca8a04' : 'none'
+            const bubbleBorderLeft = isInternal ? '5px solid #ca8a04' : undefined
+            const bubbleMaxWidth = isInternal ? '100%' : '85%'
+            const labelColor = isInternal
+              ? '#92400e'
+              : (isSupport ? 'rgba(255,255,255,0.85)' : '#6b7280')
             return (
-              <div key={m.uuid} style={{ display: 'flex', flexDirection: 'column', alignItems: isSupport ? 'flex-end' : 'flex-start' }}>
+              <div key={m.uuid} style={{ display: 'flex', flexDirection: 'column', alignItems: bubbleAlign }}>
                 <div style={{
-                  maxWidth: '85%', padding: '10px 14px', borderRadius: 'var(--ui-radius, 12px)',
-                  background: isSupport ? '#2563eb' : '#f3f4f6',
-                  color: isSupport ? '#fff' : '#111827',
+                  maxWidth: bubbleMaxWidth, padding: '10px 14px', borderRadius: 'var(--ui-radius, 12px)',
+                  background: bubbleBg, color: bubbleColor, border: bubbleBorder,
+                  borderLeft: bubbleBorderLeft ?? bubbleBorder,
+                  width: isInternal ? '100%' : undefined,
                 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4, color: isSupport ? 'rgba(255,255,255,0.85)' : '#6b7280' }}>
-                    {m.user_name || m.user_id}
-                    {isSupport && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 500, opacity: 0.85 }}>Support</span>}
+                  {isInternal && (
+                    <div
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        gap: 8, marginBottom: 6, paddingBottom: 6,
+                        borderBottom: '1px dashed #ca8a04',
+                      }}
+                    >
+                      <span
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                          padding: '2px 8px', fontSize: 10, fontWeight: 700,
+                          textTransform: 'uppercase', letterSpacing: 0.4,
+                          background: '#fde68a', color: '#78350f', borderRadius: 4,
+                        }}
+                      >
+                        <Lock size={11} /> Internal note · Agents only
+                      </span>
+                      <span style={{ fontSize: 10, fontStyle: 'italic', color: '#92400e' }}>
+                        Not visible to the requester
+                      </span>
+                    </div>
+                  )}
+                  <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4, color: labelColor, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span>{m.user_name || m.user_id}</span>
+                    {isSupport && !isInternal && <span style={{ fontSize: 10, fontWeight: 500, opacity: 0.85 }}>Support</span>}
                   </div>
-                  <div style={{ fontSize: 14, whiteSpace: 'pre-wrap' }}>{m.content}</div>
-                  <div style={{ fontSize: 10, marginTop: 4, color: isSupport ? 'rgba(255,255,255,0.75)' : '#9ca3af' }}>
+                  {isEditing ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <textarea
+                        autoFocus
+                        value={editDraft}
+                        onChange={(e) => setEditDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                            e.preventDefault()
+                            saveEdit()
+                          }
+                          if (e.key === 'Escape') {
+                            e.preventDefault()
+                            cancelEdit()
+                          }
+                        }}
+                        rows={Math.min(10, Math.max(2, editDraft.split('\n').length))}
+                        style={{
+                          fontSize: 14, padding: '6px 8px', borderRadius: 6,
+                          border: '1px solid rgba(0,0,0,0.1)', resize: 'vertical',
+                          background: isInternal ? '#fff' : (isSupport ? 'rgba(255,255,255,0.95)' : '#fff'),
+                          color: '#111827', fontFamily: 'inherit', minWidth: 280,
+                        }}
+                      />
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
+                        <button
+                          onClick={cancelEdit}
+                          disabled={savingEdit}
+                          style={{
+                            padding: '2px 8px', fontSize: 11, fontWeight: 600,
+                            borderRadius: 6, border: 'none', cursor: 'pointer',
+                            background: 'transparent',
+                            color: isInternal ? '#92400e' : (isSupport ? 'rgba(255,255,255,0.85)' : '#6b7280'),
+                            opacity: savingEdit ? 0.5 : 1,
+                          }}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={saveEdit}
+                          disabled={savingEdit || !editDraft.trim()}
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 3,
+                            padding: '2px 10px', fontSize: 11, fontWeight: 600,
+                            borderRadius: 6, border: 'none', cursor: 'pointer',
+                            background: isInternal ? '#ca8a04' : (isSupport ? 'rgba(255,255,255,0.25)' : '#2563eb'),
+                            color: '#fff',
+                            opacity: (savingEdit || !editDraft.trim()) ? 0.5 : 1,
+                          }}
+                        >
+                          {savingEdit ? (
+                            <Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} />
+                          ) : (
+                            <Check size={10} />
+                          )}
+                          Save
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 14, whiteSpace: 'pre-wrap' }}>{m.content}</div>
+                  )}
+                  <div style={{ fontSize: 10, marginTop: 4, color: isInternal ? '#a16207' : (isSupport ? 'rgba(255,255,255,0.75)' : '#9ca3af') }}>
                     {timeAgo(m.created_at)}
+                    {m.edited_at && <span style={{ marginLeft: 4, fontStyle: 'italic' }}>(edited)</span>}
                   </div>
                 </div>
+                {isMine && !isEditing && (
+                  <button
+                    onClick={() => startEdit(m)}
+                    title="Edit message"
+                    style={{
+                      marginTop: 2, display: 'inline-flex', alignItems: 'center', gap: 3,
+                      padding: '2px 6px', fontSize: 11, color: '#9ca3af',
+                      background: 'transparent', border: 'none', cursor: 'pointer',
+                      borderRadius: 4, fontFamily: 'inherit',
+                    }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#374151' }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#9ca3af' }}
+                  >
+                    <Pencil size={10} /> Edit
+                  </button>
+                )}
                 {msgAttachments.length > 0 && (
                   <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6, alignItems: isSupport ? 'flex-end' : 'flex-start' }}>
-                    {msgAttachments.map((a) => (
-                      <AttachmentChip key={a.uuid} attachment={a} ticketUuid={ticketUuid} onPreview={setPreviewAttachment} />
-                    ))}
+                    {msgAttachments.map((a) => {
+                      const canDelete = !!user && (user.is_support_agent || a.uploaded_by === user.user_id)
+                      return (
+                        <AttachmentChip
+                          key={a.uuid}
+                          attachment={a}
+                          ticketUuid={ticketUuid}
+                          onPreview={setPreviewAttachment}
+                          onDelete={canDelete ? () => handleDeleteAttachment(a.uuid, a.filename) : undefined}
+                        />
+                      )
+                    })}
                   </div>
                 )}
               </div>
@@ -753,9 +1160,18 @@ function ChatView({
           })}
           {ticket.attachments.filter((a) => !a.message_uuid).length > 0 && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, paddingTop: 8, borderTop: '1px solid #f3f4f6' }}>
-              {ticket.attachments.filter((a) => !a.message_uuid).map((a) => (
-                <AttachmentChip key={a.uuid} attachment={a} ticketUuid={ticketUuid} onPreview={setPreviewAttachment} />
-              ))}
+              {ticket.attachments.filter((a) => !a.message_uuid).map((a) => {
+                const canDelete = !!user && (user.is_support_agent || a.uploaded_by === user.user_id)
+                return (
+                  <AttachmentChip
+                    key={a.uuid}
+                    attachment={a}
+                    ticketUuid={ticketUuid}
+                    onPreview={setPreviewAttachment}
+                    onDelete={canDelete ? () => handleDeleteAttachment(a.uuid, a.filename) : undefined}
+                  />
+                )
+              })}
             </div>
           )}
           <div ref={messagesEndRef} />
@@ -763,38 +1179,77 @@ function ChatView({
 
         {/* Reply input */}
         {ticket.status !== 'closed' ? (
-          <div style={{ padding: '12px 20px', borderTop: '1px solid #e5e7eb', display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              title="Attach file"
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4 }}
-            >
-              <Paperclip size={16} />
-            </button>
-            <input ref={fileInputRef} type="file" onChange={handleFileUpload} style={{ display: 'none' }} />
-            <input
-              value={reply}
-              onChange={(e) => setReply(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
-              placeholder="Reply as support..."
-              style={{
-                flex: 1, padding: '8px 12px', fontSize: 14,
-                border: '1px solid #d1d5db', borderRadius: 'var(--ui-radius, 12px)', outline: 'none',
-              }}
-            />
-            <button
-              onClick={handleSend}
-              disabled={sending || !reply.trim()}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-                padding: '8px 14px', borderRadius: 'var(--ui-radius, 12px)', border: 'none',
-                background: '#2563eb', color: '#fff', fontSize: 13, fontWeight: 600,
-                cursor: reply.trim() && !sending ? 'pointer' : 'not-allowed',
-                opacity: sending ? 0.6 : 1,
-              }}
-            >
-              <Send size={14} /> {sending ? 'Sending...' : 'Reply'}
-            </button>
+          <div style={{
+            padding: '12px 20px', borderTop: '1px solid #e5e7eb',
+            display: 'flex', flexDirection: 'column', gap: 8,
+            background: isInternalNote ? '#fef9c3' : undefined,
+            transition: 'background 120ms ease',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <button
+                type="button"
+                onClick={() => setIsInternalNote((v) => !v)}
+                title={isInternalNote
+                  ? 'This will only be visible to other support agents'
+                  : 'Switch to an internal note — visible only to support agents'}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  padding: '4px 10px', borderRadius: 999, cursor: 'pointer',
+                  border: isInternalNote ? '1px solid #ca8a04' : '1px solid #d1d5db',
+                  background: isInternalNote ? '#fde68a' : '#fff',
+                  color: isInternalNote ? '#78350f' : '#6b7280',
+                  fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                }}
+              >
+                <Lock size={12} />
+                {isInternalNote ? 'Internal note (agents only)' : 'Internal note'}
+              </button>
+              {isInternalNote && (
+                <span style={{ fontSize: 11, color: '#92400e', fontStyle: 'italic' }}>
+                  The requester will not see this message.
+                </span>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                title="Attach file"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4 }}
+              >
+                <Paperclip size={16} />
+              </button>
+              <input ref={fileInputRef} type="file" multiple onChange={handleFileUpload} style={{ display: 'none' }} />
+              <textarea
+                ref={replyRef}
+                value={reply}
+                onChange={(e) => setReply(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
+                placeholder={isInternalNote ? 'Leave a note for other agents...' : 'Reply as support...'}
+                rows={1}
+                style={{
+                  flex: 1, padding: '8px 12px', fontSize: 14,
+                  border: isInternalNote ? '1px solid #ca8a04' : '1px solid #d1d5db',
+                  borderRadius: 'var(--ui-radius, 12px)', outline: 'none',
+                  background: '#fff',
+                  resize: 'none', fontFamily: 'inherit', lineHeight: 1.4,
+                  maxHeight: 200, overflowY: 'auto',
+                }}
+              />
+              <button
+                onClick={handleSend}
+                disabled={sending || !reply.trim()}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  padding: '8px 14px', borderRadius: 'var(--ui-radius, 12px)', border: 'none',
+                  background: isInternalNote ? '#ca8a04' : '#2563eb', color: '#fff', fontSize: 13, fontWeight: 600,
+                  cursor: reply.trim() && !sending ? 'pointer' : 'not-allowed',
+                  opacity: sending ? 0.6 : 1,
+                }}
+              >
+                {isInternalNote ? <Lock size={14} /> : <Send size={14} />}
+                {sending ? 'Sending...' : (isInternalNote ? 'Add Note' : 'Reply')}
+              </button>
+            </div>
           </div>
         ) : (
           <div style={{ padding: '12px 20px', borderTop: '1px solid #e5e7eb', fontSize: 13, color: '#6b7280', textAlign: 'center' }}>
@@ -838,49 +1293,188 @@ function ChatView({
 }
 
 function AttachmentChip({
-  attachment: a, ticketUuid, onPreview,
+  attachment: a, ticketUuid, onPreview, onDelete,
 }: {
   attachment: SupportAttachment
   ticketUuid: string
   onPreview: (a: SupportAttachment) => void
+  onDelete?: () => void
 }) {
   const [imgBroken, setImgBroken] = useState(false)
   const isImage = a.file_type?.startsWith('image/') && !imgBroken
   const downloadUrl = `/api/support/tickets/${ticketUuid}/attachments/${a.uuid}`
 
+  // Floating remove button shared by both image and file chips.
+  const removeButton = onDelete && (
+    <button
+      onClick={(e) => { e.stopPropagation(); e.preventDefault(); onDelete() }}
+      title="Remove attachment"
+      style={{
+        position: 'absolute', top: -6, right: -6,
+        width: 20, height: 20, padding: 0, borderRadius: '50%',
+        border: '1px solid #e5e7eb', background: '#fff', color: '#6b7280',
+        cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+      }}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#dc2626' }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = '#6b7280' }}
+    >
+      <X size={11} />
+    </button>
+  )
+
   if (isImage) {
     return (
-      <button
-        onClick={() => onPreview(a)}
-        title={a.filename}
-        style={{
-          padding: 0, border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)',
-          overflow: 'hidden', cursor: 'pointer', background: 'none',
-        }}
-      >
-        <img
-          src={downloadUrl}
-          alt={a.filename}
-          onError={() => setImgBroken(true)}
-          style={{ display: 'block', maxWidth: 220, maxHeight: 160, objectFit: 'cover' }}
-        />
-      </button>
+      <div style={{ position: 'relative', display: 'inline-block' }}>
+        <button
+          onClick={() => onPreview(a)}
+          title={a.filename}
+          style={{
+            padding: 0, border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)',
+            overflow: 'hidden', cursor: 'pointer', background: 'none',
+          }}
+        >
+          <img
+            src={downloadUrl}
+            alt={a.filename}
+            onError={() => setImgBroken(true)}
+            style={{ display: 'block', maxWidth: 220, maxHeight: 160, objectFit: 'cover' }}
+          />
+        </button>
+        {removeButton}
+      </div>
     )
   }
 
   return (
-    <a
-      href={downloadUrl}
-      download={a.filename}
-      style={{
-        display: 'inline-flex', alignItems: 'center', gap: 6,
-        padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)',
-        background: '#fff', color: '#2563eb', fontSize: 12, textDecoration: 'none',
-      }}
-    >
-      <Paperclip size={12} />
-      {a.filename}
-    </a>
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      <a
+        href={downloadUrl}
+        download={a.filename}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)',
+          background: '#fff', color: '#2563eb', fontSize: 12, textDecoration: 'none',
+        }}
+      >
+        <Paperclip size={12} />
+        {a.filename}
+      </a>
+      {removeButton}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Watcher bar — agent view of tagged users; can add/remove anyone
+// ---------------------------------------------------------------------------
+
+function WatcherBar({
+  ticket, onChange,
+}: {
+  ticket: SupportTicket
+  onChange: (next: SupportTicket) => void
+}) {
+  const { toast } = useToast()
+  const [adding, setAdding] = useState(false)
+  const [email, setEmail] = useState('')
+  const [busy, setBusy] = useState(false)
+  const watchers = ticket.watchers ?? []
+
+  const submit = async () => {
+    const trimmed = email.trim()
+    if (!trimmed || busy) return
+    setBusy(true)
+    try {
+      const updated = await supportApi.addWatcher(ticket.uuid, trimmed)
+      onChange(updated)
+      setEmail('')
+      setAdding(false)
+      toast('Watcher added', 'success')
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Could not add watcher', 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const remove = async (userId: string) => {
+    try {
+      const updated = await supportApi.removeWatcher(ticket.uuid, userId)
+      onChange(updated)
+    } catch {
+      toast('Could not remove watcher', 'error')
+    }
+  }
+
+  return (
+    <div style={{
+      padding: '8px 20px', borderBottom: '1px solid #e5e7eb', background: '#fafafa',
+      display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
+    }}>
+      <Eye size={12} color="#6b7280" />
+      <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, marginRight: 4 }}>
+        Watchers
+      </span>
+      {watchers.length === 0 && !adding && (
+        <span style={{ fontSize: 12, color: '#9ca3af' }}>None</span>
+      )}
+      {watchers.map((w) => (
+        <span
+          key={w.user_id}
+          title={w.email || w.user_id}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            fontSize: 12, padding: '2px 4px 2px 8px', borderRadius: 9999,
+            background: '#eef2ff', color: '#4338ca', fontWeight: 500,
+          }}
+        >
+          {w.name}
+          <button
+            onClick={() => remove(w.user_id)}
+            title={`Remove ${w.name}`}
+            style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: 16, height: 16, padding: 0, border: 'none', background: 'none',
+              color: '#4338ca', cursor: 'pointer', borderRadius: 9999,
+            }}
+          >
+            <X size={10} />
+          </button>
+        </span>
+      ))}
+      {adding ? (
+        <input
+          autoFocus
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          onBlur={() => { if (!busy) { setEmail(''); setAdding(false) } }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { e.preventDefault(); submit() }
+            if (e.key === 'Escape') { setEmail(''); setAdding(false) }
+          }}
+          placeholder="user email…"
+          type="email"
+          disabled={busy}
+          style={{
+            fontSize: 12, padding: '2px 8px', border: '1px solid #d1d5db',
+            borderRadius: 9999, outline: 'none', minWidth: 160, fontFamily: 'inherit',
+          }}
+        />
+      ) : (
+        <button
+          onClick={() => setAdding(true)}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 3,
+            fontSize: 12, padding: '2px 8px', borderRadius: 9999,
+            border: '1px dashed #d1d5db', background: 'transparent', color: '#6b7280',
+            cursor: 'pointer', fontFamily: 'inherit',
+          }}
+        >
+          <UserPlus size={10} /> Tag user
+        </button>
+      )}
+    </div>
   )
 }
 

@@ -14,6 +14,7 @@ import pytest
 from app.services.export_import_service import (
     SCHEMA_VERSION,
     _envelope,
+    _reconstruct_task_references,
     _resolve_task_references,
     validate_export_data,
 )
@@ -207,3 +208,36 @@ class TestResolveTaskReferences:
         assert ref["uuid"] == "doc-1"
         assert ref["_portable"] is False
         assert "re-selected" in ref["_note"]
+
+
+class TestReconstructTaskReferences:
+    """On import, task payloads are reconstructed/canonicalized."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("task_name", ["Formatter", "Format"])
+    async def test_formatter_prompt_is_renamed_to_format_template(self, task_name):
+        # Older exports store the template under "prompt"; import should
+        # canonicalize it to "format_template" so the editor reads it.
+        result = await _reconstruct_task_references(
+            {"prompt": "**Summary**\n{{content}}"}, task_name, "user-1", "team-1",
+        )
+        assert result["format_template"] == "**Summary**\n{{content}}"
+        assert "prompt" not in result
+
+    @pytest.mark.asyncio
+    async def test_formatter_keeps_existing_format_template(self):
+        # If both keys are present, the canonical one wins and prompt is left alone.
+        result = await _reconstruct_task_references(
+            {"format_template": "canonical", "prompt": "legacy"},
+            "Formatter", "user-1", "team-1",
+        )
+        assert result["format_template"] == "canonical"
+
+    @pytest.mark.asyncio
+    async def test_prompt_task_prompt_is_left_untouched(self):
+        # Non-formatter tasks legitimately use "prompt"; don't rewrite them.
+        result = await _reconstruct_task_references(
+            {"prompt": "Extract the dates"}, "Prompt", "user-1", "team-1",
+        )
+        assert result["prompt"] == "Extract the dates"
+        assert "format_template" not in result

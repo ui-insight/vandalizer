@@ -5,6 +5,7 @@ import { getAutomation, updateAutomation, deleteAutomation } from '../../api/aut
 import { apiFetch } from '../../api/client'
 import { useWorkflows } from '../../hooks/useWorkflows'
 import { useSearchSets } from '../../hooks/useExtractions'
+import { useConfirm } from '../shared/useConfirm'
 import { ItemPickerModal } from './ItemPickerModal'
 import { AutomationsExplainer } from './AutomationsExplainer'
 import type { Automation, TriggerType, ActionType } from '../../types/automation'
@@ -24,6 +25,7 @@ export function AutomationEditorPanel() {
   const { openAutomationId, closeAutomation } = useWorkspace()
   const { workflows } = useWorkflows()
   const { searchSets } = useSearchSets()
+  const confirm = useConfirm()
   const [automation, setAutomation] = useState<Automation | null>(null)
   const [loading, setLoading] = useState(true)
   const [showActionPicker, setShowActionPicker] = useState(false)
@@ -83,6 +85,17 @@ export function AutomationEditorPanel() {
 
   const handleDelete = async () => {
     if (!openAutomationId || !canManage) return
+    const ok = await confirm({
+      title: 'Delete automation?',
+      message: (
+        <>
+          Are you sure you want to delete <strong>{automation?.name || 'this automation'}</strong>? The automation will stop running and this cannot be undone.
+        </>
+      ),
+      confirmLabel: 'Delete',
+      destructive: true,
+    })
+    if (!ok) return
     await deleteAutomation(openAutomationId)
     closeAutomation()
   }

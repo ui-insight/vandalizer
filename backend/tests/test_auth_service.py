@@ -169,6 +169,106 @@ class TestAuthenticate:
 
 
 # ---------------------------------------------------------------------------
+# authenticate_with_reason — reason codes drive the login error message
+# ---------------------------------------------------------------------------
+
+
+class TestAuthenticateWithReason:
+    @pytest.mark.asyncio
+    async def test_unknown_user_returns_unknown_user_reason(self):
+        with patch("app.services.auth_service.User") as MockUser:
+            MockUser.find_one = AsyncMock(return_value=None)
+
+            from app.services.auth_service import (
+                AUTH_REASON_UNKNOWN_USER,
+                authenticate_with_reason,
+            )
+
+            user, reason = await authenticate_with_reason("nobody", "pw")
+
+        assert user is None
+        assert reason == AUTH_REASON_UNKNOWN_USER
+
+    @pytest.mark.asyncio
+    async def test_no_password_hash_returns_sso_only_reason(self):
+        existing = _make_user(password_hash=None)
+
+        with patch("app.services.auth_service.User") as MockUser:
+            MockUser.find_one = AsyncMock(return_value=existing)
+
+            from app.services.auth_service import (
+                AUTH_REASON_SSO_ONLY,
+                authenticate_with_reason,
+            )
+
+            user, reason = await authenticate_with_reason("alice", "pw")
+
+        assert user is None
+        assert reason == AUTH_REASON_SSO_ONLY
+
+    @pytest.mark.asyncio
+    async def test_wrong_password_returns_wrong_password_reason(self):
+        existing = _make_user()
+        existing.demo_status = None
+
+        with (
+            patch("app.services.auth_service.User") as MockUser,
+            patch("app.services.auth_service.verify_password", return_value=False),
+        ):
+            MockUser.find_one = AsyncMock(return_value=existing)
+
+            from app.services.auth_service import (
+                AUTH_REASON_WRONG_PASSWORD,
+                authenticate_with_reason,
+            )
+
+            user, reason = await authenticate_with_reason("alice", "nope")
+
+        assert user is None
+        assert reason == AUTH_REASON_WRONG_PASSWORD
+
+    @pytest.mark.asyncio
+    async def test_locked_trial_with_wrong_password_returns_trial_expired(self):
+        existing = _make_user(is_demo_user=True)
+        existing.demo_status = "locked"
+
+        with (
+            patch("app.services.auth_service.User") as MockUser,
+            patch("app.services.auth_service.verify_password", return_value=False),
+        ):
+            MockUser.find_one = AsyncMock(return_value=existing)
+
+            from app.services.auth_service import (
+                AUTH_REASON_TRIAL_EXPIRED,
+                authenticate_with_reason,
+            )
+
+            user, reason = await authenticate_with_reason("alice", "nope")
+
+        assert user is None
+        assert reason == AUTH_REASON_TRIAL_EXPIRED
+
+    @pytest.mark.asyncio
+    async def test_successful_login_returns_no_reason(self):
+        existing = _make_user()
+
+        with (
+            patch("app.services.auth_service.User") as MockUser,
+            patch("app.services.auth_service.verify_password", return_value=True),
+            patch("app.services.auth_service._auto_join_default_team", new_callable=AsyncMock),
+            patch("app.services.team_service.ensure_current_team", new_callable=AsyncMock),
+        ):
+            MockUser.find_one = AsyncMock(return_value=existing)
+
+            from app.services.auth_service import authenticate_with_reason
+
+            user, reason = await authenticate_with_reason("alice", "pw")
+
+        assert user is existing
+        assert reason is None
+
+
+# ---------------------------------------------------------------------------
 # register
 # ---------------------------------------------------------------------------
 

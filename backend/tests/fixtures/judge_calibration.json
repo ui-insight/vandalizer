@@ -1,0 +1,1666 @@
+{
+  "_meta": {
+    "purpose": "Human-labeled (expected, actual) triples to calibrate the extraction judge. Each entry carries a gold verdict (PASS/PARTIAL/FAIL) and an acceptable score band so judges with slightly different anchors can still pass.",
+    "labelling_rules": [
+      "PASS (score band [0.7, 1.0]): same fact, any reasonable formatting variation.",
+      "PARTIAL (score band [0.4, 0.7]): right fact buried in extra text that adds no information, OR a multi-valued field with missing/extra elements.",
+      "FAIL (score band [0.0, 0.4]): wrong fact, hallucinated value, contradicts expected, or contains the right answer alongside a contradicting wrong answer."
+    ],
+    "version": 1
+  },
+  "cases": [
+    {
+      "id": "date_iso_vs_long",
+      "field_name": "Invoice Date",
+      "expected": "2026-01-05",
+      "actual": "January 5, 2026",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.9,
+        1.0
+      ],
+      "field_type": "date",
+      "notes": "Same date, different format. Deterministic comparator should resolve."
+    },
+    {
+      "id": "date_short_vs_long",
+      "field_name": "Invoice Date",
+      "expected": "Jan 5, 2026",
+      "actual": "1/5/2026",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.9,
+        1.0
+      ],
+      "field_type": "date"
+    },
+    {
+      "id": "date_off_by_one_day",
+      "field_name": "Invoice Date",
+      "expected": "2026-01-05",
+      "actual": "2026-01-06",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.3
+      ],
+      "field_type": "date",
+      "notes": "One day apart is still wrong."
+    },
+    {
+      "id": "date_year_wrong",
+      "field_name": "Effective Date",
+      "expected": "2026-06-01",
+      "actual": "2025-06-01",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.3
+      ],
+      "field_type": "date"
+    },
+    {
+      "id": "currency_with_symbol_vs_plain",
+      "field_name": "Total",
+      "expected": "$1,000",
+      "actual": "1000",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.9,
+        1.0
+      ],
+      "field_type": "currency"
+    },
+    {
+      "id": "currency_decimals",
+      "field_name": "Total",
+      "expected": "1000",
+      "actual": "1,000.00",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.9,
+        1.0
+      ],
+      "field_type": "currency"
+    },
+    {
+      "id": "currency_wrong_value",
+      "field_name": "Total",
+      "expected": "$1,000",
+      "actual": "$100",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.3
+      ],
+      "field_type": "currency"
+    },
+    {
+      "id": "currency_off_by_decimal_place",
+      "field_name": "Amount",
+      "expected": "1500.00",
+      "actual": "150.00",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.3
+      ],
+      "field_type": "number"
+    },
+    {
+      "id": "name_lastname_first",
+      "field_name": "Author",
+      "expected": "John Smith",
+      "actual": "Smith, John",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.85,
+        1.0
+      ],
+      "field_type": "name"
+    },
+    {
+      "id": "name_middle_initial",
+      "field_name": "Author",
+      "expected": "John Smith",
+      "actual": "John A. Smith",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.85,
+        1.0
+      ],
+      "field_type": "name",
+      "notes": "Middle initial is additional but consistent information."
+    },
+    {
+      "id": "name_wrong_person",
+      "field_name": "Author",
+      "expected": "John Smith",
+      "actual": "Jane Smith",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.3
+      ],
+      "field_type": "name"
+    },
+    {
+      "id": "country_iso_vs_full",
+      "field_name": "Country",
+      "expected": "United States",
+      "actual": "USA",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.85,
+        1.0
+      ],
+      "field_type": "free_text"
+    },
+    {
+      "id": "country_us_vs_uk",
+      "field_name": "Country",
+      "expected": "United States",
+      "actual": "United Kingdom",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.3
+      ],
+      "field_type": "free_text"
+    },
+    {
+      "id": "absence_both_empty",
+      "field_name": "Middle Name",
+      "expected": "",
+      "actual": "",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.9,
+        1.0
+      ],
+      "field_type": "absence"
+    },
+    {
+      "id": "absence_na_vs_not_present",
+      "field_name": "Middle Name",
+      "expected": "N/A",
+      "actual": "not present",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.85,
+        1.0
+      ],
+      "field_type": "absence"
+    },
+    {
+      "id": "absence_expected_value_actual_empty",
+      "field_name": "Middle Name",
+      "expected": "Alan",
+      "actual": "",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.2
+      ],
+      "field_type": "absence"
+    },
+    {
+      "id": "absence_expected_empty_actual_value",
+      "field_name": "Middle Name",
+      "expected": "",
+      "actual": "Alan",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.3
+      ],
+      "field_type": "absence",
+      "notes": "Hallucinated value when expected absence."
+    },
+    {
+      "id": "enum_exact_match",
+      "field_name": "Status",
+      "expected": "Active",
+      "actual": "Active",
+      "field_metadata": {
+        "enum_values": [
+          "Active",
+          "Inactive",
+          "Pending"
+        ]
+      },
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.9,
+        1.0
+      ],
+      "field_type": "enum"
+    },
+    {
+      "id": "enum_case_variation",
+      "field_name": "Status",
+      "expected": "Active",
+      "actual": "active",
+      "field_metadata": {
+        "enum_values": [
+          "Active",
+          "Inactive",
+          "Pending"
+        ]
+      },
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.85,
+        1.0
+      ],
+      "field_type": "enum",
+      "notes": "Case-insensitive enum match should still PASS."
+    },
+    {
+      "id": "enum_off_value",
+      "field_name": "Status",
+      "expected": "Active",
+      "actual": "Pending",
+      "field_metadata": {
+        "enum_values": [
+          "Active",
+          "Inactive",
+          "Pending"
+        ]
+      },
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.3
+      ],
+      "field_type": "enum"
+    },
+    {
+      "id": "enum_not_in_set",
+      "field_name": "Status",
+      "expected": "Active",
+      "actual": "Running",
+      "field_metadata": {
+        "enum_values": [
+          "Active",
+          "Inactive",
+          "Pending"
+        ]
+      },
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.3
+      ],
+      "field_type": "enum"
+    },
+    {
+      "id": "partial_right_answer_with_label",
+      "field_name": "Total",
+      "expected": "1500",
+      "actual": "The total amount is 1500 dollars",
+      "field_metadata": null,
+      "gold_verdict": "PARTIAL",
+      "gold_score_band": [
+        0.4,
+        0.7
+      ],
+      "field_type": "length_trap",
+      "notes": "Right fact buried in extra text. Score 0.5."
+    },
+    {
+      "id": "partial_right_answer_with_unit",
+      "field_name": "Weight",
+      "expected": "5",
+      "actual": "5 kg",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.6,
+        1.0
+      ],
+      "field_type": "length_trap",
+      "notes": "Unit annotation is the same fact. PASS leaning generous, but some judges may PARTIAL it."
+    },
+    {
+      "id": "length_trap_right_plus_wrong",
+      "field_name": "CEO",
+      "expected": "Alice Lee",
+      "actual": "The CEO is Alice Lee, formerly Bob Chen",
+      "field_metadata": null,
+      "gold_verdict": "PARTIAL",
+      "gold_score_band": [
+        0.3,
+        0.7
+      ],
+      "field_type": "length_trap",
+      "notes": "Right answer is present but the response includes a contradicting historical reference. Some judges may PASS this."
+    },
+    {
+      "id": "length_trap_verbose_wrong",
+      "field_name": "Founded Year",
+      "expected": "1998",
+      "actual": "The company was founded in the late 1990s, with the official incorporation date generally cited as 1999.",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.4
+      ],
+      "field_type": "length_trap",
+      "notes": "Verbose answer with the WRONG year. Length-biased judges may credit verbosity — should still FAIL."
+    },
+    {
+      "id": "free_text_paraphrase",
+      "field_name": "Summary",
+      "expected": "Quarterly revenue grew 12%",
+      "actual": "Revenue increased by twelve percent this quarter",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.7,
+        1.0
+      ],
+      "field_type": "free_text"
+    },
+    {
+      "id": "free_text_paraphrase_wrong_number",
+      "field_name": "Summary",
+      "expected": "Quarterly revenue grew 12%",
+      "actual": "Revenue increased by twenty percent this quarter",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.4
+      ],
+      "field_type": "free_text"
+    },
+    {
+      "id": "multi_valued_complete_reorder",
+      "field_name": "Authors",
+      "expected": "Smith, Jones, Lee",
+      "actual": "Lee, Smith, Jones",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.85,
+        1.0
+      ],
+      "field_type": "free_text",
+      "notes": "Multi-valued; order should not matter."
+    },
+    {
+      "id": "multi_valued_missing_one",
+      "field_name": "Authors",
+      "expected": "Smith, Jones, Lee",
+      "actual": "Smith, Jones",
+      "field_metadata": null,
+      "gold_verdict": "PARTIAL",
+      "gold_score_band": [
+        0.4,
+        0.7
+      ],
+      "field_type": "free_text",
+      "notes": "Missing one element from a multi-valued field."
+    },
+    {
+      "id": "multi_valued_extra_one",
+      "field_name": "Authors",
+      "expected": "Smith, Jones",
+      "actual": "Smith, Jones, Williams",
+      "field_metadata": null,
+      "gold_verdict": "PARTIAL",
+      "gold_score_band": [
+        0.4,
+        0.7
+      ],
+      "field_type": "free_text",
+      "notes": "Extra element not in expected."
+    },
+    {
+      "id": "percent_with_sign",
+      "field_name": "Growth Rate",
+      "expected": "12%",
+      "actual": "12 percent",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.85,
+        1.0
+      ],
+      "field_type": "free_text",
+      "notes": "Word-form percent needs semantic understanding — deferred to LLM."
+    },
+    {
+      "id": "negative_parens",
+      "field_name": "Net Income",
+      "expected": "-500",
+      "actual": "(500)",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.85,
+        1.0
+      ],
+      "field_type": "number",
+      "notes": "Accounting parenthetical-negative notation."
+    },
+    {
+      "id": "id_exact",
+      "field_name": "Invoice ID",
+      "expected": "INV-2026-001",
+      "actual": "INV-2026-001",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.95,
+        1.0
+      ],
+      "field_type": "free_text",
+      "notes": "Exact-string match handled by _values_match."
+    },
+    {
+      "id": "id_case_variation",
+      "field_name": "Invoice ID",
+      "expected": "INV-2026-001",
+      "actual": "inv-2026-001",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.7,
+        1.0
+      ],
+      "field_type": "free_text",
+      "notes": "Case-insensitive string match handled by _values_match normalization."
+    },
+    {
+      "id": "id_wrong_digits",
+      "field_name": "Invoice ID",
+      "expected": "INV-2026-001",
+      "actual": "INV-2026-002",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.3
+      ],
+      "field_type": "free_text",
+      "notes": "IDs with embedded structure need LLM to recognize the schema; defer."
+    },
+    {
+      "id": "phone_format",
+      "field_name": "Phone",
+      "expected": "555-123-4567",
+      "actual": "(555) 123-4567",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.85,
+        1.0
+      ],
+      "field_type": "free_text"
+    },
+    {
+      "id": "email_exact",
+      "field_name": "Email",
+      "expected": "alice@example.com",
+      "actual": "alice@example.com",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.95,
+        1.0
+      ],
+      "field_type": "free_text"
+    },
+    {
+      "id": "email_wrong",
+      "field_name": "Email",
+      "expected": "alice@example.com",
+      "actual": "bob@example.com",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.3
+      ],
+      "field_type": "free_text"
+    },
+    {
+      "id": "boolean_yes_true",
+      "field_name": "Has Insurance",
+      "expected": "yes",
+      "actual": "true",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.75,
+        1.0
+      ],
+      "field_type": "free_text"
+    },
+    {
+      "id": "boolean_no_vs_yes",
+      "field_name": "Has Insurance",
+      "expected": "yes",
+      "actual": "no",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.3
+      ],
+      "field_type": "free_text"
+    },
+    {
+      "id": "hallucination",
+      "field_name": "CEO",
+      "expected": "Alice Lee",
+      "actual": "Some person named John who isn't mentioned in the document",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.3
+      ],
+      "field_type": "free_text"
+    },
+    {
+      "id": "empty_actual_for_required",
+      "field_name": "Total",
+      "expected": "1500",
+      "actual": "",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.2
+      ],
+      "field_type": "absence"
+    },
+    {
+      "id": "stripped_whitespace",
+      "field_name": "Name",
+      "expected": "Alice Lee",
+      "actual": "  Alice Lee  ",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.95,
+        1.0
+      ],
+      "field_type": "free_text"
+    },
+    {
+      "id": "trailing_punctuation",
+      "field_name": "Title",
+      "expected": "Chief Operating Officer",
+      "actual": "Chief Operating Officer.",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.9,
+        1.0
+      ],
+      "field_type": "free_text"
+    },
+    {
+      "id": "date_quarter_form",
+      "field_name": "Fiscal Period",
+      "expected": "Q2 2026",
+      "actual": "Second quarter of 2026",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.8,
+        1.0
+      ],
+      "field_type": "free_text"
+    },
+    {
+      "id": "synonym_role",
+      "field_name": "Role",
+      "expected": "Software Engineer",
+      "actual": "Software Developer",
+      "field_metadata": null,
+      "gold_verdict": "PARTIAL",
+      "gold_score_band": [
+        0.4,
+        0.85
+      ],
+      "field_type": "free_text",
+      "notes": "Near-synonym for many companies but not all. Some judges will PASS, others PARTIAL — wide band acceptable."
+    },
+    {
+      "id": "abbreviation_state",
+      "field_name": "State",
+      "expected": "California",
+      "actual": "CA",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.85,
+        1.0
+      ],
+      "field_type": "free_text"
+    },
+    {
+      "id": "currency_different_currency",
+      "field_name": "Price",
+      "expected": "$1000",
+      "actual": "€1000",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.5
+      ],
+      "field_type": "currency",
+      "notes": "Same number, wrong currency — the fact is different. Some judges may PARTIAL."
+    },
+    {
+      "id": "rounded_number",
+      "field_name": "Population",
+      "expected": "1000000",
+      "actual": "1 million",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.8,
+        1.0
+      ],
+      "field_type": "free_text",
+      "notes": "Word-form number needs semantic understanding."
+    },
+    {
+      "id": "rounded_number_wrong_magnitude",
+      "field_name": "Population",
+      "expected": "1000000",
+      "actual": "1 billion",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.3
+      ],
+      "field_type": "free_text",
+      "notes": "Word-form number, wrong magnitude — needs semantic understanding."
+    },
+    {
+      "id": "title_acronym",
+      "field_name": "Organization",
+      "expected": "National Aeronautics and Space Administration",
+      "actual": "NASA",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.85,
+        1.0
+      ],
+      "field_type": "free_text"
+    },
+    {
+      "id": "title_partial_match",
+      "field_name": "Organization",
+      "expected": "National Aeronautics and Space Administration",
+      "actual": "National Space Agency",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.5
+      ],
+      "field_type": "free_text",
+      "notes": "Wrong organization, similar-sounding name."
+    },
+    {
+      "id": "fraction_decimal",
+      "field_name": "Ratio",
+      "expected": "0.5",
+      "actual": "1/2",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.75,
+        1.0
+      ],
+      "field_type": "free_text",
+      "notes": "Fraction-to-decimal conversion needs semantic understanding."
+    },
+    {
+      "id": "date_with_timezone",
+      "field_name": "Submitted At",
+      "expected": "2026-04-15T14:30:00Z",
+      "actual": "April 15, 2026 14:30 UTC",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.85,
+        1.0
+      ],
+      "field_type": "free_text",
+      "notes": "[was date; LLM-only — deterministic router cannot resolve unit/format/locale ambiguity]"
+    },
+    {
+      "id": "date_tz_shifted_same_instant",
+      "field_name": "Submitted At",
+      "expected": "2026-04-15T14:30:00Z",
+      "actual": "2026-04-15T09:30:00-05:00",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.8,
+        1.0
+      ],
+      "field_type": "free_text",
+      "notes": "Same instant, expressed in CDT. [was date; LLM-only — deterministic router cannot resolve unit/format/locale ambiguity]"
+    },
+    {
+      "id": "date_tz_dropped_ambiguous",
+      "field_name": "Submitted At",
+      "expected": "2026-04-15T14:30:00Z",
+      "actual": "April 15, 2026 09:30",
+      "field_metadata": null,
+      "gold_verdict": "PARTIAL",
+      "gold_score_band": [
+        0.4,
+        0.65
+      ],
+      "field_type": "free_text",
+      "notes": "Time present but tz dropped — could be the same instant or not. [was date; LLM-only — deterministic router cannot resolve unit/format/locale ambiguity]"
+    },
+    {
+      "id": "date_quarter_label",
+      "field_name": "Effective Period",
+      "expected": "Q3 2026",
+      "actual": "third quarter of 2026",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.85,
+        1.0
+      ],
+      "field_type": "free_text",
+      "notes": "[was date; LLM-only — deterministic router cannot resolve unit/format/locale ambiguity]"
+    },
+    {
+      "id": "date_fiscal_vs_calendar",
+      "field_name": "Effective Period",
+      "expected": "FY2026",
+      "actual": "fiscal year 2026",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.85,
+        1.0
+      ],
+      "field_type": "free_text",
+      "notes": "[was date; LLM-only — deterministic router cannot resolve unit/format/locale ambiguity]"
+    },
+    {
+      "id": "date_iso_week",
+      "field_name": "Submission Week",
+      "expected": "2026-W15",
+      "actual": "week 15 of 2026",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.8,
+        1.0
+      ],
+      "field_type": "free_text",
+      "notes": "[was date; LLM-only — deterministic router cannot resolve unit/format/locale ambiguity]"
+    },
+    {
+      "id": "date_dmy_us_ambiguous",
+      "field_name": "Invoice Date",
+      "expected": "2026-04-05",
+      "actual": "5/4/2026",
+      "field_metadata": null,
+      "gold_verdict": "PARTIAL",
+      "gold_score_band": [
+        0.4,
+        0.7
+      ],
+      "field_type": "free_text",
+      "notes": "Could be parsed as either April 5 or May 4 depending on locale. [was date; LLM-only — deterministic router cannot resolve unit/format/locale ambiguity]"
+    },
+    {
+      "id": "date_month_off_by_one",
+      "field_name": "Invoice Date",
+      "expected": "2026-04-05",
+      "actual": "2026-05-05",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.3
+      ],
+      "field_type": "date"
+    },
+    {
+      "id": "date_only_year",
+      "field_name": "Invoice Date",
+      "expected": "2026-04-05",
+      "actual": "2026",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.4
+      ],
+      "field_type": "free_text",
+      "notes": "Year alone is not the date; downstream consumer cannot resolve it. [was date; LLM-only — deterministic router cannot resolve unit/format/locale ambiguity]"
+    },
+    {
+      "id": "date_iso_with_offset_zero",
+      "field_name": "Created At",
+      "expected": "2026-04-15T14:30:00+00:00",
+      "actual": "2026-04-15T14:30:00Z",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.9,
+        1.0
+      ],
+      "field_type": "free_text",
+      "notes": "[was date; LLM-only — deterministic router cannot resolve unit/format/locale ambiguity]"
+    },
+    {
+      "id": "date_typo_year",
+      "field_name": "Invoice Date",
+      "expected": "2026-04-05",
+      "actual": "2062-04-05",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.2
+      ],
+      "field_type": "date",
+      "notes": "Digit swap in year."
+    },
+    {
+      "id": "number_thousands_separator",
+      "field_name": "Headcount",
+      "expected": "12345",
+      "actual": "12,345",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.9,
+        1.0
+      ],
+      "field_type": "number"
+    },
+    {
+      "id": "number_european_separator",
+      "field_name": "Headcount",
+      "expected": "12345",
+      "actual": "12.345",
+      "field_metadata": null,
+      "gold_verdict": "PARTIAL",
+      "gold_score_band": [
+        0.4,
+        0.7
+      ],
+      "field_type": "free_text",
+      "notes": "European thousands separator looks like a decimal in US locale; ambiguous. [was number; LLM-only — deterministic router cannot resolve unit/format/locale ambiguity]"
+    },
+    {
+      "id": "number_scientific_notation",
+      "field_name": "Cells Counted",
+      "expected": "1500000",
+      "actual": "1.5e6",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.85,
+        1.0
+      ],
+      "field_type": "number"
+    },
+    {
+      "id": "number_with_unit_kelvin",
+      "field_name": "Reaction Temp",
+      "expected": "300",
+      "actual": "300 K",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.8,
+        1.0
+      ],
+      "field_type": "free_text",
+      "notes": "[was number; LLM-only — deterministic router cannot resolve unit/format/locale ambiguity]"
+    },
+    {
+      "id": "number_unit_conversion_wrong",
+      "field_name": "Reaction Temp",
+      "expected": "300 K",
+      "actual": "300 C",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.3
+      ],
+      "field_type": "free_text",
+      "notes": "Wrong unit, wrong value. [was number; LLM-only — deterministic router cannot resolve unit/format/locale ambiguity]"
+    },
+    {
+      "id": "number_unit_equivalent",
+      "field_name": "Distance",
+      "expected": "1000 m",
+      "actual": "1 km",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.8,
+        1.0
+      ],
+      "field_type": "free_text",
+      "notes": "[was number; LLM-only — deterministic router cannot resolve unit/format/locale ambiguity]"
+    },
+    {
+      "id": "number_percentage_vs_decimal",
+      "field_name": "Coverage",
+      "expected": "85%",
+      "actual": "0.85",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.85,
+        1.0
+      ],
+      "field_type": "free_text",
+      "notes": "[was number; LLM-only — deterministic router cannot resolve unit/format/locale ambiguity]"
+    },
+    {
+      "id": "number_percentage_off_by_decimal",
+      "field_name": "Coverage",
+      "expected": "85%",
+      "actual": "0.085",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.3
+      ],
+      "field_type": "number",
+      "notes": "Wrong magnitude."
+    },
+    {
+      "id": "number_negative_sign",
+      "field_name": "Net Change",
+      "expected": "-5",
+      "actual": "5",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.3
+      ],
+      "field_type": "number"
+    },
+    {
+      "id": "number_rounded",
+      "field_name": "Pi Approximation",
+      "expected": "3.14159",
+      "actual": "3.14",
+      "field_metadata": null,
+      "gold_verdict": "PARTIAL",
+      "gold_score_band": [
+        0.4,
+        0.7
+      ],
+      "field_type": "free_text",
+      "notes": "Lower precision; whether acceptable depends on downstream tolerance. [was number; LLM-only — deterministic router cannot resolve unit/format/locale ambiguity]"
+    },
+    {
+      "id": "name_initials_to_full",
+      "field_name": "Author",
+      "expected": "Jane M. Smith",
+      "actual": "J. M. Smith",
+      "field_metadata": null,
+      "gold_verdict": "PARTIAL",
+      "gold_score_band": [
+        0.4,
+        0.7
+      ],
+      "field_type": "name",
+      "notes": "First name dropped to initial — partial information."
+    },
+    {
+      "id": "name_full_to_initials",
+      "field_name": "Author",
+      "expected": "J. M. Smith",
+      "actual": "Jane M. Smith",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.8,
+        1.0
+      ],
+      "field_type": "name",
+      "notes": "Expansion of initials with a plausible match — additional info, not wrong."
+    },
+    {
+      "id": "name_diacritic_preserved",
+      "field_name": "Author",
+      "expected": "José Álvarez",
+      "actual": "José Álvarez",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.95,
+        1.0
+      ],
+      "field_type": "name"
+    },
+    {
+      "id": "name_diacritic_stripped",
+      "field_name": "Author",
+      "expected": "José Álvarez",
+      "actual": "Jose Alvarez",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.8,
+        1.0
+      ],
+      "field_type": "name",
+      "notes": "ASCII fallback — same person."
+    },
+    {
+      "id": "name_with_suffix",
+      "field_name": "Author",
+      "expected": "Robert Downey Jr.",
+      "actual": "Robert Downey",
+      "field_metadata": null,
+      "gold_verdict": "PARTIAL",
+      "gold_score_band": [
+        0.4,
+        0.7
+      ],
+      "field_type": "name",
+      "notes": "Suffix dropped — ambiguous in some contexts (could refer to Sr.)."
+    },
+    {
+      "id": "name_hyphenated",
+      "field_name": "Author",
+      "expected": "Mary-Jane Watson",
+      "actual": "Mary Jane Watson",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.8,
+        1.0
+      ],
+      "field_type": "name"
+    },
+    {
+      "id": "name_last_first_with_middle",
+      "field_name": "Author",
+      "expected": "Smith, Jane M.",
+      "actual": "Jane Marie Smith",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.75,
+        1.0
+      ],
+      "field_type": "name",
+      "notes": "Last,First reorder plus middle initial expanded to full name."
+    },
+    {
+      "id": "name_with_honorific",
+      "field_name": "PI",
+      "expected": "Dr. Jane Smith",
+      "actual": "Jane Smith, Ph.D.",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.85,
+        1.0
+      ],
+      "field_type": "name"
+    },
+    {
+      "id": "name_wrong_person_same_surname",
+      "field_name": "Author",
+      "expected": "Jane Smith",
+      "actual": "John Smith",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.3
+      ],
+      "field_type": "name"
+    },
+    {
+      "id": "length_trap_wrong_buried_in_prose",
+      "field_name": "Indirect Cost Rate",
+      "expected": "48.5%",
+      "actual": "After reviewing the policy documents, the negotiation agreement, and the most recent budget forms in detail, I conclude that the indirect cost rate is best described as approximately 52%, though some legacy references list other values.",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.3
+      ],
+      "field_type": "length_trap",
+      "notes": "Verbose confident wrong answer — must not PASS."
+    },
+    {
+      "id": "length_trap_correct_buried",
+      "field_name": "Indirect Cost Rate",
+      "expected": "48.5%",
+      "actual": "Per the negotiation agreement effective FY24-FY27, applicable to all federal awards through the University, the indirect cost rate is 48.5%, which has been confirmed by the Office of Sponsored Programs.",
+      "field_metadata": null,
+      "gold_verdict": "PARTIAL",
+      "gold_score_band": [
+        0.4,
+        0.7
+      ],
+      "field_type": "length_trap",
+      "notes": "Correct fact wrapped in padding — partial."
+    },
+    {
+      "id": "length_trap_contradictory_long",
+      "field_name": "Budget",
+      "expected": "$1.2M",
+      "actual": "The budget is $1.2M, although page 3 mentions $1.5M, so a strict reading would say it is either $1.2M or $1.5M depending on which section you privilege.",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.4
+      ],
+      "field_type": "length_trap",
+      "notes": "Right answer alongside a contradicting wrong answer — FAIL."
+    },
+    {
+      "id": "length_trap_confident_padding_for_wrong",
+      "field_name": "Funder",
+      "expected": "NIH",
+      "actual": "After exhaustive review of every page of the document, every appendix, and the cover letter, I can state with high confidence that the funder is the National Science Foundation.",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.2
+      ],
+      "field_type": "length_trap"
+    },
+    {
+      "id": "free_text_synonym_org",
+      "field_name": "Department",
+      "expected": "Office of Sponsored Programs",
+      "actual": "OSP",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.8,
+        1.0
+      ],
+      "field_type": "free_text"
+    },
+    {
+      "id": "free_text_synonym_wrong_expansion",
+      "field_name": "Department",
+      "expected": "Office of Sponsored Programs",
+      "actual": "Office of Sponsored Research",
+      "field_metadata": null,
+      "gold_verdict": "PARTIAL",
+      "gold_score_band": [
+        0.3,
+        0.6
+      ],
+      "field_type": "free_text",
+      "notes": "Plausible-sounding but distinct org name."
+    },
+    {
+      "id": "currency_thousands_with_decimal",
+      "field_name": "Total",
+      "expected": "$1,234,567.89",
+      "actual": "1234567.89",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.9,
+        1.0
+      ],
+      "field_type": "currency"
+    },
+    {
+      "id": "currency_rounded_to_dollar",
+      "field_name": "Total",
+      "expected": "$1,234,567.89",
+      "actual": "$1,234,568",
+      "field_metadata": null,
+      "gold_verdict": "PARTIAL",
+      "gold_score_band": [
+        0.4,
+        0.7
+      ],
+      "field_type": "free_text",
+      "notes": "Rounded — loses cents; acceptable for some downstream uses, not others. [was currency; LLM-only — deterministic router cannot resolve unit/format/locale ambiguity]"
+    },
+    {
+      "id": "currency_in_millions_shorthand",
+      "field_name": "Total",
+      "expected": "$1,200,000",
+      "actual": "$1.2M",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.85,
+        1.0
+      ],
+      "field_type": "free_text",
+      "notes": "[was currency; LLM-only — deterministic router cannot resolve unit/format/locale ambiguity]"
+    },
+    {
+      "id": "currency_wrong_magnitude",
+      "field_name": "Total",
+      "expected": "$1,200,000",
+      "actual": "$1,200",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.2
+      ],
+      "field_type": "currency"
+    },
+    {
+      "id": "enum_case_insensitive",
+      "field_name": "Status",
+      "expected": "Active",
+      "actual": "ACTIVE",
+      "field_metadata": {
+        "enum_values": [
+          "Active",
+          "Inactive",
+          "Pending"
+        ]
+      },
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.95,
+        1.0
+      ],
+      "field_type": "enum"
+    },
+    {
+      "id": "enum_off_enum",
+      "field_name": "Status",
+      "expected": "Active",
+      "actual": "Live",
+      "field_metadata": {
+        "enum_values": [
+          "Active",
+          "Inactive",
+          "Pending"
+        ]
+      },
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.3
+      ],
+      "field_type": "enum",
+      "notes": "Synonymous in plain English but not in the enum domain."
+    },
+    {
+      "id": "absence_judge_silent_should_have_answer",
+      "field_name": "PI",
+      "expected": "Dr. Smith",
+      "actual": "",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.2
+      ],
+      "field_type": "absence"
+    },
+    {
+      "id": "absence_nullish_strings_equiv",
+      "field_name": "IRB Protocol",
+      "expected": "-",
+      "actual": "N/A",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.85,
+        1.0
+      ],
+      "field_type": "absence",
+      "notes": "Both indicate 'not applicable' — should be equal."
+    },
+    {
+      "id": "free_text_multi_valued_extras",
+      "field_name": "Co-investigators",
+      "expected": "Lee, Garcia",
+      "actual": "Lee, Garcia, Vasquez",
+      "field_metadata": null,
+      "gold_verdict": "PARTIAL",
+      "gold_score_band": [
+        0.4,
+        0.7
+      ],
+      "field_type": "free_text",
+      "notes": "Extra element not in expected."
+    },
+    {
+      "id": "free_text_multi_valued_missing",
+      "field_name": "Co-investigators",
+      "expected": "Lee, Garcia, Patel",
+      "actual": "Lee, Garcia",
+      "field_metadata": null,
+      "gold_verdict": "PARTIAL",
+      "gold_score_band": [
+        0.4,
+        0.7
+      ],
+      "field_type": "free_text"
+    },
+    {
+      "id": "free_text_multi_valued_reordered",
+      "field_name": "Co-investigators",
+      "expected": "Lee, Garcia, Patel",
+      "actual": "Patel, Lee, Garcia",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.9,
+        1.0
+      ],
+      "field_type": "free_text",
+      "notes": "Same set, different order — equal."
+    },
+    {
+      "id": "free_text_whitespace_only_diff",
+      "field_name": "Title",
+      "expected": "Hyperbolic Embeddings",
+      "actual": "  Hyperbolic Embeddings  ",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.95,
+        1.0
+      ],
+      "field_type": "free_text"
+    },
+    {
+      "id": "free_text_quoted_vs_unquoted",
+      "field_name": "Title",
+      "expected": "Hyperbolic Embeddings",
+      "actual": "\"Hyperbolic Embeddings\"",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.9,
+        1.0
+      ],
+      "field_type": "free_text"
+    },
+    {
+      "id": "free_text_punctuation_terminal",
+      "field_name": "Title",
+      "expected": "Hyperbolic Embeddings",
+      "actual": "Hyperbolic Embeddings.",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.95,
+        1.0
+      ],
+      "field_type": "free_text"
+    },
+    {
+      "id": "free_text_unicode_quote_difference",
+      "field_name": "Title",
+      "expected": "Hyperbolic 'Embeddings'",
+      "actual": "Hyperbolic ‘Embeddings’",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.85,
+        1.0
+      ],
+      "field_type": "free_text",
+      "notes": "Curly vs straight quotes."
+    },
+    {
+      "id": "free_text_partial_overlap_wrong",
+      "field_name": "Title",
+      "expected": "Hyperbolic Embeddings for Sparse Citation Graphs",
+      "actual": "Hyperbolic Embeddings",
+      "field_metadata": null,
+      "gold_verdict": "PARTIAL",
+      "gold_score_band": [
+        0.4,
+        0.7
+      ],
+      "field_type": "free_text",
+      "notes": "Substring match but loses specificity."
+    },
+    {
+      "id": "free_text_paraphrase_inverted",
+      "field_name": "Approach",
+      "expected": "embeddings for sparse graphs",
+      "actual": "for sparse graphs, embeddings",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.85,
+        1.0
+      ],
+      "field_type": "free_text"
+    },
+    {
+      "id": "free_text_negation_swap",
+      "field_name": "Status",
+      "expected": "approved",
+      "actual": "not approved",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.2
+      ],
+      "field_type": "free_text"
+    },
+    {
+      "id": "free_text_double_negation",
+      "field_name": "Status",
+      "expected": "approved",
+      "actual": "not unapproved",
+      "field_metadata": null,
+      "gold_verdict": "PARTIAL",
+      "gold_score_band": [
+        0.4,
+        0.7
+      ],
+      "field_type": "free_text",
+      "notes": "Equivalent in logic but uncommon phrasing."
+    },
+    {
+      "id": "free_text_url_canonicalization",
+      "field_name": "Repository",
+      "expected": "https://github.com/user/repo",
+      "actual": "github.com/user/repo",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.85,
+        1.0
+      ],
+      "field_type": "free_text"
+    },
+    {
+      "id": "free_text_url_wrong_org",
+      "field_name": "Repository",
+      "expected": "https://github.com/user/repo",
+      "actual": "https://github.com/other/repo",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.3
+      ],
+      "field_type": "free_text"
+    },
+    {
+      "id": "free_text_email_canonicalization",
+      "field_name": "Contact",
+      "expected": "Jane.Smith@Example.Edu",
+      "actual": "jane.smith@example.edu",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.95,
+        1.0
+      ],
+      "field_type": "free_text"
+    },
+    {
+      "id": "free_text_email_typo",
+      "field_name": "Contact",
+      "expected": "jane.smith@example.edu",
+      "actual": "jane.smtih@example.edu",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.3
+      ],
+      "field_type": "free_text",
+      "notes": "One letter swap — invalid email address."
+    },
+    {
+      "id": "currency_no_symbol_vs_eur_symbol",
+      "field_name": "Total",
+      "expected": "1000",
+      "actual": "€1000",
+      "field_metadata": null,
+      "gold_verdict": "PARTIAL",
+      "gold_score_band": [
+        0.4,
+        0.7
+      ],
+      "field_type": "free_text",
+      "notes": "Number matches but unspecified currency on expected side leaves it ambiguous. [was currency; LLM-only — deterministic router cannot resolve unit/format/locale ambiguity]"
+    },
+    {
+      "id": "currency_negative_balance",
+      "field_name": "Balance",
+      "expected": "-$500",
+      "actual": "$500 (overdrawn)",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.7,
+        1.0
+      ],
+      "field_type": "free_text",
+      "notes": "[was currency; LLM-only — deterministic router cannot resolve unit/format/locale ambiguity]"
+    },
+    {
+      "id": "currency_negative_dropped_sign",
+      "field_name": "Balance",
+      "expected": "-$500",
+      "actual": "$500",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.3
+      ],
+      "field_type": "free_text",
+      "notes": "[was currency; LLM-only — deterministic router cannot resolve unit/format/locale ambiguity]"
+    },
+    {
+      "id": "absence_one_present_one_unknown",
+      "field_name": "IRB Protocol",
+      "expected": "2024-1158",
+      "actual": "unknown",
+      "field_metadata": null,
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.3
+      ],
+      "field_type": "absence"
+    },
+    {
+      "id": "enum_typo",
+      "field_name": "Status",
+      "expected": "Active",
+      "actual": "Activ",
+      "field_metadata": {
+        "enum_values": [
+          "Active",
+          "Inactive",
+          "Pending"
+        ]
+      },
+      "gold_verdict": "FAIL",
+      "gold_score_band": [
+        0.0,
+        0.3
+      ],
+      "field_type": "enum",
+      "notes": "Off-enum due to truncation."
+    },
+    {
+      "id": "free_text_acronym_with_definition",
+      "field_name": "Funder",
+      "expected": "NIH",
+      "actual": "National Institutes of Health (NIH)",
+      "field_metadata": null,
+      "gold_verdict": "PASS",
+      "gold_score_band": [
+        0.9,
+        1.0
+      ],
+      "field_type": "free_text"
+    },
+    {
+      "id": "length_trap_pass_phrased_as_uncertain",
+      "field_name": "Funder",
+      "expected": "NIH",
+      "actual": "It may be the case that the funder is NIH, though I cannot confirm this with absolute certainty.",
+      "field_metadata": null,
+      "gold_verdict": "PARTIAL",
+      "gold_score_band": [
+        0.4,
+        0.7
+      ],
+      "field_type": "length_trap",
+      "notes": "Hedged correct — partial credit."
+    }
+  ]
+}

@@ -1,8 +1,8 @@
 # Deploying Vandalizer (FastAPI + React)
 
-## Quick Start
+## Recommended: the interactive setup wizard
 
-The fastest way to get Vandalizer running locally is the interactive setup wizard. It walks you through environment configuration, secret generation, service startup, admin account creation, and database seeding:
+`./setup.sh` is the supported install path for **both** local evaluation and production deployments on a real server. It handles environment configuration, secret generation (`JWT_SECRET_KEY`, `CONFIG_ENCRYPTION_KEY`), Docker builds, service startup, admin account creation, and verified-catalog seeding in one session. When you run it on a server, choose the **production** profile when prompted and give it your public URL and web port — everything else is filled in for you.
 
 ```bash
 git clone https://github.com/ui-insight/vandalizer.git
@@ -10,9 +10,13 @@ cd vandalizer
 ./setup.sh
 ```
 
-### Manual Docker Compose Setup
+After the first run, the same script is the entry point for ongoing operations: `./setup.sh --repair`, `--upgrade`, `--redeploy`. See the [README](README.md#interactive-setup-recommended) for the full menu of maintenance commands.
 
-If you prefer to run each step yourself:
+The frontend is available at the URL you configured (defaults to `http://localhost`) and the API at `http://localhost:8001` when setup completes.
+
+### Escape hatch: manual Docker Compose
+
+This path exists for operators who need to script each step themselves (CI builds, golden images, configuration-management tools). The interactive wizard above is the supported path for everyone else.
 
 ```bash
 # 1. Clone the repository
@@ -89,6 +93,8 @@ docker compose up -d redis mongo chromadb
 
 This section covers what you need to know when deploying Vandalizer for real users in a university environment.
 
+**Install path:** use `./setup.sh` from the project root and select the **production** profile when prompted. It will ask for your public URL (e.g. `https://vandalizer.example.edu`) and web port, then generate `JWT_SECRET_KEY` and `CONFIG_ENCRYPTION_KEY`, build images, bring up Mongo / Redis / ChromaDB / API / Celery / frontend, create your admin account, and seed the verified catalog. The remaining subsections here cover production-specific decisions (sizing, optional self-hosted LLM/OCR, TLS termination, scaling) that sit *around* setup.sh — they don't replace it.
+
 ### Resource Requirements
 
 Vandalizer is designed to be lightweight. The application itself (all Docker services plus the OS) consumes roughly **8 GB of RAM** in production. A machine with **16 GB of RAM** comfortably handles a departmental deployment; smaller teams can run on as little as **10 GB**.
@@ -141,9 +147,22 @@ For OCR, self-hosted options include [Marker](https://github.com/VikParuchuri/ma
 
 The MongoDB database is named `vandalizer` by default. The name is configurable via the `MONGO_DB` environment variable and has no effect on functionality.
 
-### Production Configuration
+### Branding your deployment
 
-Create `backend/.env` with the following variables:
+Vandalizer white-labels to your institution. Sign in as an admin and open **System Config → UI Theme & Branding** (`/admin`) to set:
+
+- **Organization name** — replaces "Vandalizer" in the header, sign-in page, browser tab, and chat greeting.
+- **Logo** — a wordmark image (PNG with transparency works best) shown in the header, sign-in page, and the public landing page.
+- **Icon / mascot** — a small square mark shown beside the logo and used as the browser-tab favicon. Leave it blank on a branded deployment to hide the default Joe Vandal mark, or upload your own.
+- **Brand color** — the highlight color used throughout the UI, and in the styling of outgoing email.
+
+All of these are stored in the `SystemConfig` document in MongoDB and applied at runtime — **no rebuild or redeploy is needed**; changes take effect as soon as you save. Logos and icons are stored inline (as data URLs), so there is no separate asset bucket to provision or back up beyond the MongoDB volume you already back up.
+
+Because the project is open source under GPL v3, the footer keeps a small "Powered by Vandalizer" credit and the NSF GRANTED acknowledgement whenever custom branding is in effect, so creator and funder lineage stay visible.
+
+### Production Configuration (reference)
+
+`./setup.sh` writes the production `backend/.env` for you. This subsection is a **reference** for what those variables mean — useful when you need to edit `.env` later, externalize a database, or rebuild the file by hand on the manual path.
 
 ```env
 MONGO_HOST=mongodb://mongo:27017/
@@ -177,6 +196,7 @@ Each model entry includes:
 - **API key** — the key for that provider
 - **Endpoint URL** — the API base URL
 - **Protocol** — `openai`, `anthropic`, `openrouter`, `ollama`, or `vllm` (or leave blank for auto-detect)
+- **Context Window** — the model's real serving token limit. Use the **Probe endpoint** button to read it from the configured endpoint (`max_model_len` for vLLM, `context_length` for OpenRouter, `model_info` for Ollama). Anthropic and plain-OpenAI endpoints do not expose this — set it by hand. The chat and workflow context-budget planner trims against this value, so a value larger than what the endpoint was actually started with (e.g. vLLM `--max-model-len`) causes mid-workflow `400` errors.
 
 The `anthropic` protocol uses Anthropic's native Messages API for first-class
 support of Claude models (tool use, streaming, native thinking). The

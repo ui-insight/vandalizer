@@ -71,14 +71,133 @@ def _notify_approval_reviewers_sync(
                 logger.exception("Failed to send approval email to %s", user_id)
 
 
-def _get_db():
-    """Get sync pymongo database handle."""
-    from pymongo import MongoClient
+def _bson_safe(value):
+    """Coerce arbitrary step output into a MongoDB-storable shape.
 
-    from app.config import Settings
-    settings = Settings()
-    client = MongoClient(settings.mongo_host)
-    return client[settings.mongo_db]
+    `data_for_review` is whatever the previous step emitted, which can include
+    bytes, sets, tuples, or custom objects that pymongo cannot encode. A failed
+    insert used to escape uncaught and leave the run frozen in "running" with no
+    approval record, so anything we can't confidently store is stringified
+    rather than allowed to raise.
+    """
+    import datetime as _dt
+
+    from bson import ObjectId
+
+    if value is None or isinstance(value, (str, bool, int, float, _dt.datetime, ObjectId)):
+        return value
+    if isinstance(value, dict):
+        return {str(k): _bson_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_bson_safe(v) for v in value]
+    if isinstance(value, bytes):
+        return value.decode("utf-8", "replace")
+    return str(value)
+
+
+def _pause_for_approval(db, final_output, engine, workflow_id, workflow_result_id):
+    """Persist the approval request and flip the run to ``pending_approval``.
+
+    Extracted from :func:`execute_workflow_task` so the whole sequence runs
+    under a single guard in the caller: any failure here must surface as an
+    error status instead of silently freezing the run.
+    """
+    import uuid as uuid_mod
+    from datetime import datetime, timedelta, timezone
+
+    from bson import ObjectId
+
+    from app.services.approval_service import (
+        detect_artifact_kind,
+        resolve_assignees_sync,
+    )
+
+    # Find the step index (count of executed steps)
+    nodes = engine.get_topological_order()
+    step_index = 0
+    for idx, node in enumerate(nodes):
+        if node.name == "Approval":
+            step_index = idx
+            break
+
+    approval_uuid = str(uuid_mod.uuid4())
+    workflow_doc = db.workflow.find_one({"_id": ObjectId(workflow_id)})
+    workflow_name = workflow_doc.get("name", "Workflow") if workflow_doc else "Workflow"
+    result_doc = db.workflow_result.find_one({"_id": ObjectId(workflow_result_id)}) or {}
+    source_doc_uuids = (result_doc.get("input_context") or {}).get("doc_uuids", [])
+
+    assignee_role = final_output.get("_assignee_role", "specific_users")
+    explicit_users = final_output.get("_assigned_to_user_ids", []) or []
+    resolved_assignees = resolve_assignees_sync(
+        db, assignee_role, workflow_doc or {}, explicit_users,
+    )
+
+    sla_days = final_output.get("_sla_days")
+    expires_at = None
+    if isinstance(sla_days, (int, float)) and sla_days > 0:
+        expires_at = datetime.now(timezone.utc) + timedelta(days=float(sla_days))
+
+    artifact_data = final_output.get("_data_for_review")
+    artifact_kind = detect_artifact_kind(artifact_data)
+    safe_artifact = _bson_safe(artifact_data)
+
+    db.approval_request.insert_one({
+        "uuid": approval_uuid,
+        "workflow_result_id": ObjectId(workflow_result_id),
+        "workflow_id": ObjectId(workflow_id),
+        "step_index": step_index,
+        "step_name": "Approval",
+        "workflow_name": workflow_name,
+        "requester_user_id": (workflow_doc or {}).get("user_id"),
+        "team_id": (workflow_doc or {}).get("team_id"),
+        "source_doc_uuids": source_doc_uuids,
+        "artifact_kind": artifact_kind,
+        "data_for_review": safe_artifact if isinstance(safe_artifact, dict) else {"value": safe_artifact},
+        "edited_artifact": None,
+        "review_instructions": final_output.get("_review_instructions", ""),
+        "assignee_role": assignee_role,
+        "assigned_to_user_ids": resolved_assignees,
+        "expires_at": expires_at,
+        "timeout_action": final_output.get("_timeout_action", "none"),
+        "escalation_user_ids": final_output.get("_escalation_user_ids", []),
+        "status": "pending",
+        "reviewer_user_id": None,
+        "reviewer_comments": "",
+        "decision_at": None,
+        "expired_at": None,
+        "escalated_at": None,
+        "created_at": datetime.now(timezone.utc),
+    })
+
+    db.workflow_result.update_one(
+        {"_id": ObjectId(workflow_result_id)},
+        {"$set": {
+            "status": "pending_approval",
+            "paused_at_step_index": step_index,
+            "approval_request_id": approval_uuid,
+            "current_step_name": "Approval",
+            "current_step_detail": "Waiting for human review",
+        }},
+    )
+
+    review_instructions = final_output.get("_review_instructions", "")
+    _notify_approval_reviewers_sync(
+        db, resolved_assignees, workflow_name, "Approval",
+        review_instructions, approval_uuid,
+    )
+
+    return {
+        "status": "pending_approval",
+        "approval_uuid": approval_uuid,
+        "result_id": workflow_result_id,
+    }
+
+
+def _get_db():
+    """Get sync pymongo database handle (shared per-process client)."""
+    from app.tasks import get_sync_db
+
+    return get_sync_db()
 
 
 @celery_app.task(
@@ -102,7 +221,11 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
     """
     from bson import ObjectId
 
-    from app.services.workflow_engine import build_workflow_engine, sanitize_step_name
+    from app.services.workflow_engine import (
+        WorkflowCancelled,
+        build_workflow_engine,
+        sanitize_step_name,
+    )
 
     db = _get_db()
 
@@ -144,16 +267,36 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
                             "searchtype": "extraction",
                         }))
                         task_data["keys"] = [item["searchphrase"] for item in items]
+                        # Preserve per-field validation (enum_values) and optional
+                        # designations (is_optional) so workflow extraction honors the
+                        # same constraints as a standalone run. Without this, the saved
+                        # set's optional/enum metadata is silently dropped at execution.
+                        task_data["field_metadata"] = [
+                            {
+                                "key": item["searchphrase"],
+                                "is_optional": item.get("is_optional", False),
+                                "enum_values": item.get("enum_values", []),
+                            }
+                            for item in items
+                        ]
+                        # UI is mutually exclusive between saved-set and manual fields,
+                        # but older workflows may have both persisted. Drop stale manual
+                        # fields so the saved set is unambiguously the source of truth.
+                        task_data.pop("extractions", None)
 
                 # Pre-load doc texts for extraction and prompt nodes
                 doc_uuids = list(trigger_step_data.get("doc_uuids", []))
 
-                # Merge fixed documents from workflow input_config
-                fixed_doc_config = (workflow_doc.get("input_config") or {}).get("fixed_documents", [])
-                for fd in fixed_doc_config:
-                    fd_uuid = fd.get("uuid") if isinstance(fd, dict) else str(fd)
-                    if fd_uuid and fd_uuid not in doc_uuids:
-                        doc_uuids.append(fd_uuid)
+                # Merge fixed documents from workflow input_config — except in
+                # "no input" mode, where the workflow runs with no documents at
+                # all (leftover fixed docs from a prior mode must not leak in).
+                input_cfg = workflow_doc.get("input_config") or {}
+                if input_cfg.get("trigger_type") != "no_input":
+                    fixed_doc_config = input_cfg.get("fixed_documents", [])
+                    for fd in fixed_doc_config:
+                        fd_uuid = fd.get("uuid") if isinstance(fd, dict) else str(fd)
+                        if fd_uuid and fd_uuid not in doc_uuids:
+                            doc_uuids.append(fd_uuid)
 
                 if doc_uuids:
                     doc_texts = []
@@ -228,7 +371,94 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
         user_id=user_id,
         system_config_doc=sys_config,
         allow_code_execution=is_admin,
+        config_override=workflow_doc.get("config_override"),
     )
+
+    # Pre-flight oversize check: refuse the run cleanly when an attached
+    # document's token_count would blow the model's input budget on its own.
+    # The user sees a guided "Convert to Knowledge Base" affordance instead
+    # of a mid-step 400 from the LLM gateway.
+    try:
+        from app.services.context_budget import find_oversize_documents
+
+        attached_uuids: set[str] = set()
+        for step in steps_data:
+            for task in step.get("tasks", []):
+                td = task.get("data", {}) or {}
+                sel = td.get("selected_document_uuid")
+                if sel:
+                    attached_uuids.add(sel)
+            for u in (step.get("data", {}) or {}).get("doc_uuids", []) or []:
+                if u:
+                    attached_uuids.add(u)
+
+        candidate_docs: list[dict] = []
+        for uuid in attached_uuids:
+            d = db.smart_document.find_one(
+                {"uuid": uuid},
+                {"uuid": 1, "title": 1, "token_count": 1},
+            )
+            if d:
+                candidate_docs.append({
+                    "uuid": d.get("uuid"),
+                    "title": d.get("title") or d.get("uuid"),
+                    "token_count": d.get("token_count") or 0,
+                })
+
+        # Resolve the actual model config so context_window override is honored.
+        model_cfg = None
+        for m in (sys_config.get("available_models") or []):
+            if m.get("name") == model:
+                model_cfg = m
+                break
+
+        oversize = find_oversize_documents(
+            documents=candidate_docs,
+            model_name=model,
+            model_config=model_cfg,
+        )
+        if oversize:
+            titles = ", ".join(o.title for o in oversize[:3])
+            if len(oversize) > 3:
+                titles += f", and {len(oversize) - 3} more"
+            error_msg = (
+                f"{titles} is too large to read inline with the selected model. "
+                "Convert it to a Knowledge Base and use a Knowledge Base Query step instead."
+            )
+            error_payload = {
+                "code": "context_over_budget_convertible",
+                "suggested_action": "convert_to_kb",
+                "oversize_documents": [o.to_dict() for o in oversize],
+            }
+            db.workflow_result.update_one(
+                {"_id": ObjectId(workflow_result_id)},
+                {"$set": {
+                    "status": "error",
+                    "error": error_msg,
+                    "error_payload": error_payload,
+                }},
+            )
+            if activity_id:
+                from datetime import datetime, timezone
+                try:
+                    db.activity_event.update_one(
+                        {"_id": ObjectId(activity_id)},
+                        {"$set": {
+                            "status": "failed",
+                            "error": error_msg[:2000],
+                            "finished_at": datetime.now(timezone.utc),
+                        }},
+                    )
+                except Exception:
+                    pass
+            logger.warning(
+                "Workflow %s aborted pre-flight: oversize docs %s for model=%s",
+                workflow_id, [o.uuid for o in oversize], model,
+            )
+            return
+    except Exception:
+        # The pre-flight is best-effort; don't let it block a valid run.
+        logger.exception("Pre-flight oversize check failed for workflow %s", workflow_id)
 
     # Mark activity as running
     if activity_id:
@@ -240,8 +470,53 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
         except Exception as e:
             logger.warning("Could not update activity to running: %s", e)
 
+    # Polled by the engine between steps. The cancel endpoint flips the result
+    # status to "canceled"; this lets a run that is between steps stop cleanly
+    # (a mid-step stop is handled out-of-band by Celery task revocation).
+    def should_cancel() -> bool:
+        try:
+            doc = db.workflow_result.find_one(
+                {"_id": ObjectId(workflow_result_id)}, {"status": 1},
+            )
+            return bool(doc and doc.get("status") == "canceled")
+        except Exception:
+            return False
+
     try:
-        final_output, data = engine.execute(workflow_result_updater=update_progress)
+        from app.services.metering import metered
+        with metered(
+            "workflow",
+            user_id=user_id,
+            team_id=workflow_doc.get("team_id"),
+            activity_id=activity_id,
+        ):
+            final_output, data = engine.execute(
+                workflow_result_updater=update_progress,
+                should_cancel=should_cancel,
+            )
+    except WorkflowCancelled:
+        logger.info(
+            "Workflow %s canceled by user (result %s)", workflow_id, workflow_result_id,
+        )
+        db.workflow_result.update_one(
+            {"_id": ObjectId(workflow_result_id)},
+            {"$set": {"status": "canceled", "error": "Canceled by user"}},
+        )
+        if activity_id:
+            try:
+                from datetime import datetime, timezone
+                db.activity_event.update_one(
+                    {"_id": ObjectId(activity_id)},
+                    {"$set": {
+                        "status": "canceled",
+                        "error": "Canceled by user",
+                        "finished_at": datetime.now(timezone.utc),
+                    }},
+                )
+            except Exception:
+                pass
+        # Clean terminal stop — do not re-raise (no retry).
+        return {"status": "canceled", "result_id": workflow_result_id}
     except Exception as e:
         logger.error("Workflow execution failed for %s: %s", workflow_id, e)
         db.workflow_result.update_one(
@@ -259,94 +534,44 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
                 pass
         raise
 
-    # Check if workflow paused for approval
+    # Check if workflow paused for approval. The handling below must run under a
+    # guard: it used to sit outside any try/except, so a single failure (a
+    # non-BSON-serializable review artifact, a notifier error, etc.) escaped
+    # uncaught and left the run frozen in "running" with no approval record and
+    # no notification. Surface any failure as an error status instead.
     if isinstance(final_output, dict) and final_output.get("_approval_pause"):
-        import uuid as uuid_mod
-        from datetime import datetime, timedelta, timezone
+        try:
+            return _pause_for_approval(
+                db, final_output, engine, workflow_id, workflow_result_id,
+            )
+        except Exception as e:
+            logger.exception(
+                "Approval gate handling failed for workflow %s (result %s)",
+                workflow_id, workflow_result_id,
+            )
+            db.workflow_result.update_one(
+                {"_id": ObjectId(workflow_result_id)},
+                {"$set": {"status": "error", "error": f"Approval gate failed: {e}"}},
+            )
+            if activity_id:
+                try:
+                    from datetime import datetime, timezone
+                    db.activity_event.update_one(
+                        {"_id": ObjectId(activity_id)},
+                        {"$set": {"status": "failed", "error": str(e)[:2000], "finished_at": datetime.now(timezone.utc)}},
+                    )
+                except Exception:
+                    pass
+            raise
 
-        from app.services.approval_service import (
-            detect_artifact_kind,
-            resolve_assignees_sync,
-        )
-
-        # Find the step index (count of executed steps)
-        nodes = engine.get_topological_order()
-        step_index = 0
-        for idx, node in enumerate(nodes):
-            if node.name == "Approval":
-                step_index = idx
-                break
-
-        approval_uuid = str(uuid_mod.uuid4())
-        workflow_doc = db.workflow.find_one({"_id": ObjectId(workflow_id)})
-        workflow_name = workflow_doc.get("name", "Workflow") if workflow_doc else "Workflow"
-        result_doc = db.workflow_result.find_one({"_id": ObjectId(workflow_result_id)}) or {}
-        source_doc_uuids = (result_doc.get("input_context") or {}).get("doc_uuids", [])
-
-        assignee_role = final_output.get("_assignee_role", "specific_users")
-        explicit_users = final_output.get("_assigned_to_user_ids", []) or []
-        resolved_assignees = resolve_assignees_sync(
-            db, assignee_role, workflow_doc or {}, explicit_users,
-        )
-
-        sla_days = final_output.get("_sla_days")
-        expires_at = None
-        if isinstance(sla_days, (int, float)) and sla_days > 0:
-            expires_at = datetime.now(timezone.utc) + timedelta(days=float(sla_days))
-
-        artifact_data = final_output.get("_data_for_review")
-        artifact_kind = detect_artifact_kind(artifact_data)
-
-        db.approval_request.insert_one({
-            "uuid": approval_uuid,
-            "workflow_result_id": ObjectId(workflow_result_id),
-            "workflow_id": ObjectId(workflow_id),
-            "step_index": step_index,
-            "step_name": "Approval",
-            "workflow_name": workflow_name,
-            "requester_user_id": (workflow_doc or {}).get("user_id"),
-            "team_id": (workflow_doc or {}).get("team_id"),
-            "source_doc_uuids": source_doc_uuids,
-            "artifact_kind": artifact_kind,
-            "data_for_review": artifact_data if isinstance(artifact_data, dict) else {"value": artifact_data},
-            "edited_artifact": None,
-            "review_instructions": final_output.get("_review_instructions", ""),
-            "assignee_role": assignee_role,
-            "assigned_to_user_ids": resolved_assignees,
-            "expires_at": expires_at,
-            "timeout_action": final_output.get("_timeout_action", "none"),
-            "escalation_user_ids": final_output.get("_escalation_user_ids", []),
-            "status": "pending",
-            "reviewer_user_id": None,
-            "reviewer_comments": "",
-            "decision_at": None,
-            "expired_at": None,
-            "escalated_at": None,
-            "created_at": datetime.now(timezone.utc),
-        })
-
-        db.workflow_result.update_one(
-            {"_id": ObjectId(workflow_result_id)},
-            {"$set": {
-                "status": "pending_approval",
-                "paused_at_step_index": step_index,
-                "approval_request_id": approval_uuid,
-                "current_step_name": "Approval",
-                "current_step_detail": "Waiting for human review",
-            }},
-        )
-
-        review_instructions = final_output.get("_review_instructions", "")
-        _notify_approval_reviewers_sync(
-            db, resolved_assignees, workflow_name, "Approval",
-            review_instructions, approval_uuid,
-        )
-
-        return {
-            "status": "pending_approval",
-            "approval_uuid": approval_uuid,
-            "result_id": workflow_result_id,
-        }
+    # Aggregate citations from every step that produced retrieved_sources so
+    # the frontend can render them next to the workflow output without
+    # walking the steps_output dict itself.
+    retrieved_sources: list[dict] = []
+    for step in data or []:
+        sources = step.get("retrieved_sources") if isinstance(step, dict) else None
+        if isinstance(sources, list):
+            retrieved_sources.extend(sources)
 
     # Save final result
     db.workflow_result.update_one(
@@ -354,6 +579,7 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
         {"$set": {
             "status": "completed",
             "final_output": {"output": final_output, "data": data},
+            "retrieved_sources": retrieved_sources,
         }},
     )
 
@@ -458,6 +684,7 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
         ExtractionNode,
         FormatNode,
         FormFillerNode,
+        KnowledgeBaseQueryNode,
         MultiTaskNode,
         PackageBuilderNode,
         PromptNode,
@@ -520,6 +747,8 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
         process_node = PackageBuilderNode(data=task_data)
     elif task_name == "BrowserAutomation":
         process_node = BrowserAutomationNode(data=task_data)
+    elif task_name == "KnowledgeBaseQuery":
+        process_node = KnowledgeBaseQueryNode(data=task_data)
     else:
         raise ValueError(f"Unknown task type: {task_name}")
 
@@ -592,6 +821,7 @@ def resume_workflow_after_approval(self, approval_uuid):
                             "searchtype": "extraction",
                         }))
                         task_data["keys"] = [item["searchphrase"] for item in items]
+                        task_data.pop("extractions", None)
                 if doc_uuids:
                     doc_texts = []
                     for uuid in doc_uuids:
@@ -663,11 +893,21 @@ def resume_workflow_after_approval(self, approval_uuid):
     )
 
     try:
-        final_output, data = engine.execute(
-            workflow_result_updater=update_progress,
-            start_index=step_index + 1,
-            initial_output=initial_output,
+        from app.services.metering import metered
+        _act = db.activity_event.find_one(
+            {"workflow_result": ObjectId(workflow_result_id)}, {"_id": 1}
         )
+        with metered(
+            "workflow",
+            user_id=user_id,
+            team_id=workflow_doc.get("team_id"),
+            activity_id=str(_act["_id"]) if _act else None,
+        ):
+            final_output, data = engine.execute(
+                workflow_result_updater=update_progress,
+                start_index=step_index + 1,
+                initial_output=initial_output,
+            )
     except Exception as e:
         logger.error("Workflow resume failed for %s: %s", workflow_id, e)
         db.workflow_result.update_one(

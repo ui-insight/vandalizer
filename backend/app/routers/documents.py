@@ -127,6 +127,51 @@ async def poll_status(
     return result
 
 
+@router.post("/{doc_uuid}/retry-extraction")
+async def retry_extraction(
+    doc_uuid: str,
+    user: User = Depends(get_current_user),
+):
+    """Re-run text extraction (and downstream ingestion) for a document.
+
+    Useful when the original extraction silently produced no text — for example
+    because the OCR endpoint was temporarily down. Clears any prior error state
+    and re-dispatches the same Celery chain that ran at upload time.
+    """
+    doc = await access_control.get_authorized_document(
+        doc_uuid, user, manage=True, allow_admin=True
+    )
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    from app.tasks.upload_tasks import dispatch_upload_tasks
+
+    doc.task_status = "extracting"
+    doc.processing = True
+    doc.error_message = None
+    doc.raw_text = ""
+    doc.token_count = 0
+    doc.text_markers = []
+    await doc.save()
+
+    task_id = dispatch_upload_tasks(
+        document_uuid=doc.uuid,
+        extension=doc.extension or "",
+        document_path=doc.path,
+        user_id=user.user_id,
+    )
+
+    await audit_service.log_event(
+        action="document.retry_extraction",
+        actor_user_id=user.user_id,
+        resource_type="document",
+        resource_id=doc_uuid,
+        resource_name=doc.title,
+    )
+
+    return {"uuid": doc_uuid, "task_id": task_id, "status": "extracting"}
+
+
 # ---------------------------------------------------------------------------
 # Classification
 # ---------------------------------------------------------------------------

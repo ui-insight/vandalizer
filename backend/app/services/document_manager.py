@@ -84,11 +84,21 @@ def get_chroma_client(persist_directory: str | None = None) -> chromadb.ClientAP
 
 def _split_text(text: str, chunk_size: int, chunk_overlap: int) -> list[str]:
     """Split text into overlapping chunks without external dependencies."""
+    return [c for c, _ in _split_text_with_offsets(text, chunk_size, chunk_overlap)]
+
+
+def _split_text_with_offsets(
+    text: str, chunk_size: int, chunk_overlap: int,
+) -> list[tuple[str, int]]:
+    """Same as _split_text but also returns each chunk's start offset in the
+    normalized source text. The offset lets callers map a chunk back to its
+    location (page number, sheet name, etc.) when source markers are known.
+    """
     normalized = text.strip()
     if not normalized:
         return []
 
-    chunks: list[str] = []
+    chunks: list[tuple[str, int]] = []
     start = 0
     step = max(1, chunk_size - chunk_overlap)
     text_length = len(normalized)
@@ -102,9 +112,13 @@ def _split_text(text: str, chunk_size: int, chunk_overlap: int) -> list[str]:
             if preferred_break > start:
                 end = preferred_break
 
-        chunk = normalized[start:end].strip()
+        # Track where the *stripped* chunk actually starts in the source so
+        # marker lookup matches a meaningful position.
+        chunk_raw = normalized[start:end]
+        chunk = chunk_raw.strip()
         if chunk:
-            chunks.append(chunk)
+            leading = len(chunk_raw) - len(chunk_raw.lstrip())
+            chunks.append((chunk, start + leading))
 
         if end >= text_length:
             break
@@ -117,15 +131,20 @@ def _split_text(text: str, chunk_size: int, chunk_overlap: int) -> list[str]:
     return chunks
 
 
-_instance: "DocumentManager | None" = None
+def _location_for_offset(offset: int, markers: list[dict]) -> dict:
+    """Return the most recent marker at or before *offset*.
 
-
-def get_document_manager() -> "DocumentManager":
-    """Return a process-wide singleton DocumentManager."""
-    global _instance
-    if _instance is None:
-        _instance = DocumentManager()
-    return _instance
+    Used by add_document to tag each chunk with the page (or sheet) it came
+    from. Returns an empty dict when no markers apply.
+    """
+    if not markers:
+        return {}
+    location: dict = {}
+    for m in markers:
+        if m.get("char_offset", 0) > offset:
+            break
+        location = m
+    return location
 
 
 class DocumentManager:
@@ -162,35 +181,58 @@ class DocumentManager:
         document_name: str,
         document_id: str,
         raw_text: Optional[str] = None,
-    ) -> None:
+        text_markers: Optional[list[dict]] = None,
+    ) -> int:
+        """Chunk and embed *raw_text* into the user's collection.
+
+        ``text_markers`` is the optional output of
+        ``document_readers.extract_text_with_markers`` — when present, each
+        chunk's metadata is tagged with the page or sheet it came from so
+        retrieval results can render citations like "PAPPG p. 234".
+
+        Returns the number of chunks written. ``0`` means the document had no
+        extractable text — callers should treat that as "not retrieval-ready"
+        rather than an error.
+        """
         text = raw_text or ""
         if not text:
-            return
+            return 0
 
-        text_splits = _split_text(text, self.chunk_size, self.chunk_overlap)
+        text_splits = _split_text_with_offsets(text, self.chunk_size, self.chunk_overlap)
         if not text_splits:
-            return
+            return 0
 
         collection = self.get_user_collection(user_id)
+        markers = sorted(
+            (m for m in (text_markers or []) if isinstance(m, dict)),
+            key=lambda m: m.get("char_offset", 0),
+        )
 
         ids = []
         documents = []
         metadatas = []
-        for i, chunk in enumerate(text_splits):
+        for i, (chunk, offset) in enumerate(text_splits):
             ids.append(f"{document_id}_chunk_{i}")
             documents.append(chunk)
-            metadatas.append(
-                {
-                    "document_id": document_id,
-                    "document_name": document_name,
-                    "chunk_index": i,
-                    "total_chunks": len(text_splits),
-                    "timestamp": datetime.now().isoformat(),
-                    "user_id": user_id,
-                }
-            )
+            meta: dict = {
+                "document_id": document_id,
+                "document_name": document_name,
+                "chunk_index": i,
+                "total_chunks": len(text_splits),
+                "timestamp": datetime.now().isoformat(),
+                "user_id": user_id,
+            }
+            location = _location_for_offset(offset, markers)
+            kind = location.get("kind")
+            value = location.get("value")
+            if kind == "page" and isinstance(value, int):
+                meta["page"] = value
+            elif kind == "sheet" and isinstance(value, str):
+                meta["sheet"] = value
+            metadatas.append(meta)
 
         collection.add(ids=ids, documents=documents, metadatas=metadatas)
+        return len(text_splits)
 
     def query_documents(
         self,
@@ -218,11 +260,18 @@ class DocumentManager:
 
         output = []
         if results and results.get("documents"):
+            ids_list = (results.get("ids") or [[]])[0]
+            dists_list = (results.get("distances") or [[]])[0]
             for i, doc in enumerate(results["documents"][0]):
                 metadata = (
                     results["metadatas"][0][i] if results.get("metadatas") else {}
                 )
-                output.append({"content": doc, "metadata": metadata})
+                output.append({
+                    "content": doc,
+                    "metadata": metadata,
+                    "chunk_id": ids_list[i] if i < len(ids_list) else None,
+                    "score": dists_list[i] if i < len(dists_list) else None,
+                })
 
         return output
 
@@ -257,27 +306,45 @@ class DocumentManager:
         source_id: str,
         source_name: str,
         raw_text: str,
+        text_markers: Optional[list[dict]] = None,
     ) -> int:
-        """Chunk text, embed, and add to a KB collection. Returns chunk count."""
-        text_splits = _split_text(raw_text, self.chunk_size, self.chunk_overlap)
+        """Chunk text, embed, and add to a KB collection. Returns chunk count.
+
+        ``text_markers`` lets KB ingestion preserve page/sheet citations the
+        same way per-user ingestion does. Sources without markers (web URLs,
+        plaintext) just omit the page metadata.
+        """
+        text_splits = _split_text_with_offsets(raw_text, self.chunk_size, self.chunk_overlap)
         if not text_splits:
             return 0
 
         collection = self.get_kb_collection(kb_uuid)
+        markers = sorted(
+            (m for m in (text_markers or []) if isinstance(m, dict)),
+            key=lambda m: m.get("char_offset", 0),
+        )
 
         ids = []
         documents = []
         metadatas = []
-        for i, chunk in enumerate(text_splits):
+        for i, (chunk, offset) in enumerate(text_splits):
             ids.append(f"{source_id}_chunk_{i}")
             documents.append(chunk)
-            metadatas.append({
+            meta: dict = {
                 "source_id": source_id,
                 "source_name": source_name,
                 "chunk_index": i,
                 "total_chunks": len(text_splits),
                 "timestamp": datetime.now().isoformat(),
-            })
+            }
+            location = _location_for_offset(offset, markers)
+            kind = location.get("kind")
+            value = location.get("value")
+            if kind == "page" and isinstance(value, int):
+                meta["page"] = value
+            elif kind == "sheet" and isinstance(value, str):
+                meta["sheet"] = value
+            metadatas.append(meta)
 
         collection.add(ids=ids, documents=documents, metadatas=metadatas)
         return len(text_splits)
@@ -298,9 +365,16 @@ class DocumentManager:
 
         output = []
         if results and results.get("documents"):
+            ids_list = (results.get("ids") or [[]])[0]
+            dists_list = (results.get("distances") or [[]])[0]
             for i, doc in enumerate(results["documents"][0]):
                 metadata = results["metadatas"][0][i] if results.get("metadatas") else {}
-                output.append({"content": doc, "metadata": metadata})
+                output.append({
+                    "content": doc,
+                    "metadata": metadata,
+                    "chunk_id": ids_list[i] if i < len(ids_list) else None,
+                    "score": dists_list[i] if i < len(dists_list) else None,
+                })
         return output
 
     def delete_kb_collection(self, kb_uuid: str) -> None:
@@ -322,3 +396,28 @@ class DocumentManager:
             collection.delete(where={"source_id": source_id})
         except Exception as e:
             logger.error(f"Error deleting KB source {source_id}: {e}")
+
+    def rename_kb_source(self, kb_uuid: str, source_id: str, new_name: str) -> None:
+        """Rewrite source_name on every chunk for this source.
+
+        Keeps retrieval citations in sync with the user-facing label.
+        """
+        try:
+            collection = self.get_kb_collection(kb_uuid)
+            existing = collection.get(where={"source_id": source_id})
+        except Exception as e:
+            logger.error(f"Error reading KB source {source_id} for rename: {e}")
+            return
+        ids = existing.get("ids") or []
+        metadatas = existing.get("metadatas") or []
+        if not ids:
+            return
+        updated: list[dict] = []
+        for meta in metadatas:
+            m = dict(meta or {})
+            m["source_name"] = new_name
+            updated.append(m)
+        try:
+            collection.update(ids=ids, metadatas=updated)
+        except Exception as e:
+            logger.error(f"Error updating KB source {source_id} metadata: {e}")

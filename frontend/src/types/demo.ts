@@ -58,6 +58,7 @@ export interface DemoApplication {
   questionnaire_responses: Record<string, unknown>
   credentials_sent_at: string | null
   last_login_at: string | null
+  user_is_demo: boolean
 }
 
 export interface DemoAdminStats {

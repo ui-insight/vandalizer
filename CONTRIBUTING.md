@@ -16,6 +16,8 @@ This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.
 
 ## Development Setup
 
+> **Just want a working install, not a dev loop?** Run `./setup.sh` from the project root. It brings up the full Dockerized stack, creates an admin account, and seeds the verified catalog. The steps below are for active backend/frontend development where you want hot-reload, native debugging, and direct access to the FastAPI / Vite dev servers — Docker handles only the infrastructure (Redis / MongoDB / ChromaDB) in this mode. See [DEPLOY.md](DEPLOY.md) for production deployment.
+
 ### 1. Infrastructure
 
 Start Redis, MongoDB, and ChromaDB:

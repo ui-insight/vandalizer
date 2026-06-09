@@ -96,4 +96,5 @@ class ActivityEvent(Document):
             "tokens_output": self.tokens_output,
             "message_count": self.message_count,
             "result_snapshot": self.result_snapshot or {},
+            "meta_summary": self.meta_summary or {},
         }

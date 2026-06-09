@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, type ComponentType } from 'react'
 import { Link } from '@tanstack/react-router'
 import { Footer } from '../components/layout/Footer'
+import { PresentSidebar } from './present/components/PresentSidebar'
 import {
   BookOpen,
   Server,
@@ -289,6 +290,23 @@ function Administration() {
         MongoDB document provides runtime-editable settings for LLM models, authentication methods,
         extraction configuration, and UI theming. Admins can modify these through the admin panel
         without restarting the server.
+      </p>
+
+      <h3 className="text-xl font-bold text-white mt-8">Customization &amp; Branding</h3>
+      <p className="text-gray-300 leading-relaxed">
+        Vandalizer white-labels to your institution. Under{' '}
+        <strong className="text-white">System Config &rarr; UI Theme &amp; Branding</strong>, an admin
+        can set the <strong className="text-white">organization name</strong> (shown in the header,
+        sign-in page, browser tab, and chat greeting), upload a{' '}
+        <strong className="text-white">logo</strong> and a square{' '}
+        <strong className="text-white">icon</strong> (the icon also becomes the browser-tab favicon),
+        and choose a <strong className="text-white">brand color</strong> that threads through the UI
+        and the styling of outgoing email. These values are stored in{' '}
+        <code className="bg-white/10 text-[#f1b300] px-1.5 py-0.5 rounded text-xs">SystemConfig</code>{' '}
+        and served by a public theme endpoint, so they apply at runtime with no rebuild or redeploy.
+        On a branded deployment the default Joe Vandal mark is hidden unless you upload your own icon,
+        and the footer keeps a small &ldquo;Powered by Vandalizer&rdquo; credit and the NSF GRANTED
+        acknowledgement, as required by the GPL v3 license.
       </p>
 
       <h3 className="text-xl font-bold text-white mt-8">User & Team Management</h3>
@@ -624,7 +642,7 @@ export default function Docs() {
       <nav className="fixed top-0 inset-x-0 z-50 bg-[#0a0a0a]/80 backdrop-blur-md border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
           <div className="flex items-center gap-6">
-            <Link to="/landing" search={{ error: undefined, invite_token: undefined, admin: undefined }} className="text-xl font-bold text-white hover:text-[#f1b300] transition-colors">
+            <Link to="/landing" search={{ error: undefined, invite_token: undefined, admin: undefined, next: undefined }} className="text-xl font-bold text-white hover:text-[#f1b300] transition-colors">
               Vandalizer
             </Link>
             <span className="text-sm text-[#f1b300] font-medium">Docs</span>
@@ -657,6 +675,9 @@ export default function Docs() {
             className="absolute top-16 right-0 w-72 bg-[#0a0a0a] border-l border-white/10 h-full overflow-y-auto p-6"
             onClick={(e) => e.stopPropagation()}
           >
+            <div className="mb-4">
+              <PresentSidebar onNavigate={() => setMobileMenuOpen(false)} />
+            </div>
             <nav className="space-y-1">
               {sections.map((s) => {
                 const Icon = s.icon
@@ -684,8 +705,11 @@ export default function Docs() {
       <div className="pt-16 flex max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Sticky sidebar TOC — desktop only */}
         <aside className="hidden lg:block w-64 shrink-0 pr-8">
-          <nav className="sticky top-24 space-y-1">
-            {sections.map((s) => {
+          <div className="sticky top-24 space-y-4">
+            <PresentSidebar />
+            <hr className="border-white/10" />
+            <nav className="space-y-1">
+              {sections.map((s) => {
               const Icon = s.icon
               return (
                 <a
@@ -701,8 +725,9 @@ export default function Docs() {
                   {s.label}
                 </a>
               )
-            })}
-          </nav>
+              })}
+            </nav>
+          </div>
         </aside>
 
         {/* Content */}

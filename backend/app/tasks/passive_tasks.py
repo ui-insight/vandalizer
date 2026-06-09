@@ -65,10 +65,24 @@ def process_pending_triggers(self) -> dict:
                 )
                 continue
 
-            # Check folder watch enabled (for folder_watch triggers)
+            # Check folder watch enabled (for folder_watch triggers).
+            # New automation-driven flow gates on automation.enabled; legacy
+            # workflow-driven flow gates on workflow.input_config.folder_watch.enabled.
             if event.get("trigger_type") == "folder_watch":
                 fw_cfg = (workflow.get("input_config") or {}).get("folder_watch", {})
-                if not fw_cfg.get("enabled"):
+                automation_id = (event.get("trigger_context") or {}).get("automation_id")
+
+                if automation_id:
+                    auto_doc = None
+                    try:
+                        auto_doc = db.automation.find_one({"_id": ObjectId(automation_id)})
+                    except Exception:
+                        auto_doc = None
+                    fw_enabled = bool(auto_doc and auto_doc.get("enabled"))
+                else:
+                    fw_enabled = bool(fw_cfg.get("enabled"))
+
+                if not fw_enabled:
                     db.workflow_trigger_event.update_one(
                         {"_id": event["_id"]},
                         {"$set": {"status": "skipped", "error": "Folder watch disabled"}},
@@ -344,12 +358,15 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
         docs = list(db.smart_document.find({"_id": {"$in": doc_ids}}))
         doc_uuids = [d.get("uuid", "") for d in docs]
 
-        # Merge fixed documents from input_config
-        fixed_doc_config = (workflow.get("input_config") or {}).get("fixed_documents", [])
-        for fd in fixed_doc_config:
-            fd_uuid = fd.get("uuid") if isinstance(fd, dict) else str(fd)
-            if fd_uuid and fd_uuid not in doc_uuids:
-                doc_uuids.append(fd_uuid)
+        # Merge fixed documents from input_config — except in "no input" mode,
+        # where the workflow runs with no documents at all.
+        input_cfg = workflow.get("input_config") or {}
+        if input_cfg.get("trigger_type") != "no_input":
+            fixed_doc_config = input_cfg.get("fixed_documents", [])
+            for fd in fixed_doc_config:
+                fd_uuid = fd.get("uuid") if isinstance(fd, dict) else str(fd)
+                if fd_uuid and fd_uuid not in doc_uuids:
+                    doc_uuids.append(fd_uuid)
 
         # Build trigger step data
         trigger_step_data = {"doc_uuids": doc_uuids, "user_id": workflow.get("user_id")}
@@ -410,7 +427,9 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
             allow_code_execution=wf_is_admin,
         )
 
-        final_output, data = engine.execute()
+        from app.services.metering import metered
+        with metered("workflow_passive", user_id=wf_user_id, team_id=workflow.get("team_id")):
+            final_output, data = engine.execute()
 
         # Update result
         completed_at = datetime.now(timezone.utc)
@@ -571,22 +590,33 @@ def process_outputs(self, workflow_result_id: str) -> dict:
     if not workflow:
         return {"error": "Workflow not found"}
 
-    output_config = workflow.get("output_config") or {}
-
-    # Override with automation output_config if an enabled automation targets this workflow
-    automation = db.automation.find_one({
-        "action_type": "workflow",
-        "action_id": str(workflow["_id"]),
-        "enabled": True,
-    })
-    if automation and automation.get("output_config"):
-        output_config = automation["output_config"]
-
     # Find associated trigger event and work item
     work_item = None
     trigger_event = db.workflow_trigger_event.find_one({"workflow_result": result_doc["_id"]})
     if trigger_event:
         work_item = db.work_items.find_one({"trigger_event": trigger_event["_id"]})
+
+    # Resolve output_config. Prefer the specific automation that produced this
+    # run (carried on trigger_context.automation_id) — using a workflow-wide
+    # find_one would arbitrarily pick among multiple automations that share
+    # the same workflow (e.g. folder_watch + api).
+    output_config = workflow.get("output_config") or {}
+
+    automation = None
+    automation_id = (trigger_event.get("trigger_context") or {}).get("automation_id") if trigger_event else None
+    if automation_id:
+        try:
+            automation = db.automation.find_one({"_id": ObjectId(automation_id)})
+        except Exception:
+            automation = None
+    if not automation:
+        automation = db.automation.find_one({
+            "action_type": "workflow",
+            "action_id": str(workflow["_id"]),
+            "enabled": True,
+        })
+    if automation and automation.get("output_config"):
+        output_config = automation["output_config"]
 
     outputs = {"storage": None, "onedrive": None, "notifications": [], "webhooks": [], "chains": []}
 
@@ -826,8 +856,9 @@ def process_extraction_outputs(
 
         sys_config = db.system_config.find_one() or {}
 
+        from app.services.search_set_service import effective_extraction_config
         ss_doc = db.search_set.find_one({"uuid": search_set_uuid})
-        extraction_config = (ss_doc or {}).get("extraction_config") or {}
+        extraction_config = effective_extraction_config(ss_doc)
         domain = (ss_doc or {}).get("domain")
 
         ss_items = list(db.search_set_item.find({
@@ -880,12 +911,14 @@ def process_extraction_outputs(
                 continue
             try:
                 engine = ExtractionEngine(system_config_doc=sys_config, domain=domain)
-                doc_results = engine.extract(
-                    extract_keys=keys,
-                    full_text=doc["raw_text"],
-                    extraction_config_override=extraction_config,
-                    field_metadata=field_metadata,
-                )
+                from app.services.metering import metered
+                with metered("extraction_passive", user_id=user_id):
+                    doc_results = engine.extract(
+                        extract_keys=keys,
+                        full_text=doc["raw_text"],
+                        extraction_config_override=extraction_config,
+                        field_metadata=field_metadata,
+                    )
                 for entity in doc_results:
                     entity["document_id"] = doc_uuid
                     results.append(entity)

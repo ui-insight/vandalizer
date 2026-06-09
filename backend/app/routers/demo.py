@@ -160,6 +160,18 @@ async def admin_release(demo_uuid: str, user: User = Depends(get_current_user)):
     return {"ok": True}
 
 
+@router.post("/admin/promote/{demo_uuid}")
+async def admin_promote(demo_uuid: str, user: User = Depends(get_current_user)):
+    """Promote a demo/trial user to a permanent full user (clears demo flags)."""
+    _require_admin(user)
+    success = await demo_service.admin_promote_user(demo_uuid)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Application not found"
+        )
+    return {"ok": True}
+
+
 @router.post("/admin/restart-trial/{demo_uuid}")
 async def admin_restart_trial(demo_uuid: str, user: User = Depends(get_current_user)):
     """Restart the trial for an expired demo user (reset to 14 days)."""

@@ -59,7 +59,27 @@ class Workflow(Document):
     version: int = 1
     parent_version_id: Optional[str] = None
     validation_plan: list[dict] = []
+    # SHA256 of the workflow definition (steps/tasks/output_config) at the time
+    # the plan was last generated or saved. Mismatch with the current
+    # definition means the plan may reference steps or fields that no longer
+    # exist — surfaced as a stale-plan warning in the Validate tab.
+    validation_plan_definition_hash: Optional[str] = None
+    validation_plan_updated_at: Optional[datetime.datetime] = None
     validation_inputs: list[dict] = []
+    # Random opaque token that grants view-only access to anyone holding it.
+    # Minted lazily the first time the owner copies a share link.
+    share_token: Optional[str] = None
+    # Optimizer-applied per-step overrides. The workflow engine consults this
+    # at build time to swap per-step ``model`` and prompt variant without
+    # rewriting the underlying WorkflowStep/WorkflowStepTask documents — so
+    # a one-click revert restores the authored config.
+    # Shape:
+    #   {
+    #     "step_overrides": {step_name: {"model": str, "prompt_variant": str | None}},
+    #     "from_run_uuid": str,
+    #   }
+    config_override: Optional[dict] = None
+    config_override_set_at: Optional[datetime.datetime] = None
 
     class Settings:
         name = "workflow"
@@ -82,7 +102,17 @@ class WorkflowResult(Document):
     output_step_names: list[str] = []
     start_time: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
     status: str = "running"
+    error: Optional[str] = None
+    # Machine-readable error payload set by the runner when the failure has a
+    # suggested user action (e.g. oversize-context with a convert-to-KB hint).
+    # Schema: {"code": "context_over_budget", "suggested_action": "convert_to_kb",
+    #          "oversize_documents": [{"uuid": ..., "title": ..., "token_count": ...}]}
+    error_payload: Optional[dict] = None
     session_id: str
+    # Celery task id of the execution job, captured at enqueue time so a user
+    # can cancel an in-flight run (revoke + terminate). None for runs created
+    # before this field existed or for runs that never enqueued a task.
+    celery_task_id: Optional[str] = None
     current_step_name: Optional[str] = None
     current_step_detail: Optional[str] = None
     current_step_preview: Optional[str] = None
@@ -95,6 +125,10 @@ class WorkflowResult(Document):
     # Batch run fields
     batch_id: Optional[str] = None
     document_title: Optional[str] = None
+    # Citations aggregated from every KnowledgeBaseQuery step that ran. Each
+    # entry: {document_id, document_title, page, sheet, chunk_id, score,
+    # content_preview}. The frontend renders these as citation chips.
+    retrieved_sources: list[dict] = []
 
     class Settings:
         name = "workflow_result"

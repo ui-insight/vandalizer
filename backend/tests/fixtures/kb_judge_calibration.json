@@ -1,0 +1,612 @@
+{
+  "_meta": {
+    "purpose": "Human-labeled (query, expected_answer, actual_answer, retrieved_context) cases to calibrate the KB judge. Stratified across query categories: factoid, summarization, multi_hop, partial_coverage, hallucination_trap, absence. retrieved_context is the chunk text the judge sees when in with-KB mode; leave empty for baseline-style cases.",
+    "labelling_rules": [
+      "PASS (score band [0.7, 1.0]): all expected facts covered, no contradictions, no unsupported claims.",
+      "WARN (score band [0.4, 0.7]): partial coverage OR one hedged but unsupported claim.",
+      "FAIL (score band [0.0, 0.4]): wrong, contradictory, or contains a load-bearing fabrication.",
+      "hallucination_trap cases pair a grounded expected_answer with an actual_answer that adds a confident-but-unsupported claim; gold is FAIL even if the original fact is correct."
+    ],
+    "categories": [
+      "factoid",
+      "summarization",
+      "multi_hop",
+      "partial_coverage",
+      "hallucination_trap",
+      "absence"
+    ],
+    "version": 1
+  },
+  "cases": [
+    {
+      "id": "factoid_exact_match",
+      "category": "factoid",
+      "query": "What is the indirect cost rate at the University of Idaho?",
+      "expected_answer": "48.5%",
+      "actual_answer": "The indirect cost rate at the University of Idaho is 48.5%.",
+      "retrieved_context": "University of Idaho negotiated F&A rate: 48.5% (effective FY24-FY27).",
+      "gold_verdict": "PASS",
+      "gold_score_band": [0.85, 1.0]
+    },
+    {
+      "id": "factoid_paraphrase",
+      "category": "factoid",
+      "query": "What is the indirect cost rate?",
+      "expected_answer": "48.5%",
+      "actual_answer": "0.485, expressed as a fraction.",
+      "retrieved_context": "F&A rate: 48.5%.",
+      "gold_verdict": "PASS",
+      "gold_score_band": [0.8, 1.0]
+    },
+    {
+      "id": "factoid_wrong_number",
+      "category": "factoid",
+      "query": "What is the indirect cost rate?",
+      "expected_answer": "48.5%",
+      "actual_answer": "It is approximately 52%.",
+      "retrieved_context": "F&A rate: 48.5%.",
+      "gold_verdict": "FAIL",
+      "gold_score_band": [0.0, 0.3]
+    },
+    {
+      "id": "factoid_close_but_wrong",
+      "category": "factoid",
+      "query": "What year did the grant cycle start?",
+      "expected_answer": "2024",
+      "actual_answer": "2023",
+      "retrieved_context": "The current grant cycle began in FY24 (started October 2024).",
+      "gold_verdict": "FAIL",
+      "gold_score_band": [0.0, 0.3]
+    },
+    {
+      "id": "factoid_correct_with_extra_info",
+      "category": "factoid",
+      "query": "Who is the PI on the Smith proposal?",
+      "expected_answer": "Dr. Jane Smith",
+      "actual_answer": "Dr. Jane Smith is the PI; she is a Professor of Computational Biology.",
+      "retrieved_context": "Smith proposal — PI: Dr. Jane Smith, Department of Computational Biology.",
+      "gold_verdict": "PASS",
+      "gold_score_band": [0.85, 1.0]
+    },
+    {
+      "id": "factoid_unit_swap",
+      "category": "factoid",
+      "query": "What is the project budget?",
+      "expected_answer": "$1.2M",
+      "actual_answer": "1,200,000 dollars",
+      "retrieved_context": "Total proposed budget: $1.2M.",
+      "gold_verdict": "PASS",
+      "gold_score_band": [0.85, 1.0]
+    },
+    {
+      "id": "factoid_unit_wrong",
+      "category": "factoid",
+      "query": "What is the project budget?",
+      "expected_answer": "$1.2M",
+      "actual_answer": "$120,000",
+      "retrieved_context": "Total proposed budget: $1.2M.",
+      "gold_verdict": "FAIL",
+      "gold_score_band": [0.0, 0.3]
+    },
+    {
+      "id": "factoid_date_format",
+      "category": "factoid",
+      "query": "When does the project begin?",
+      "expected_answer": "September 1, 2026",
+      "actual_answer": "2026-09-01",
+      "retrieved_context": "Project start: 2026-09-01.",
+      "gold_verdict": "PASS",
+      "gold_score_band": [0.85, 1.0]
+    },
+    {
+      "id": "summarization_full_coverage",
+      "category": "summarization",
+      "query": "Summarize the risks identified in the proposal review.",
+      "expected_answer": "Budget exceeds program cap; timeline is aggressive; key personnel commitments are unconfirmed.",
+      "actual_answer": "Three risks were identified: the budget is above the program cap, the timeline is aggressive, and the commitments of key personnel have not been confirmed.",
+      "retrieved_context": "Review noted: budget over cap; aggressive timeline; unconfirmed key personnel.",
+      "gold_verdict": "PASS",
+      "gold_score_band": [0.85, 1.0]
+    },
+    {
+      "id": "summarization_partial_coverage",
+      "category": "summarization",
+      "query": "Summarize the risks identified in the proposal review.",
+      "expected_answer": "Budget exceeds program cap; timeline is aggressive; key personnel commitments are unconfirmed.",
+      "actual_answer": "The main risk is that the budget exceeds the program cap.",
+      "retrieved_context": "Review noted: budget over cap; aggressive timeline; unconfirmed key personnel.",
+      "gold_verdict": "WARN",
+      "gold_score_band": [0.4, 0.65]
+    },
+    {
+      "id": "summarization_misses_critical",
+      "category": "summarization",
+      "query": "Summarize the risks identified in the proposal review.",
+      "expected_answer": "Budget exceeds program cap; timeline is aggressive; key personnel commitments are unconfirmed.",
+      "actual_answer": "The proposal is well-structured and the team is qualified.",
+      "retrieved_context": "Review noted: budget over cap; aggressive timeline; unconfirmed key personnel.",
+      "gold_verdict": "FAIL",
+      "gold_score_band": [0.0, 0.3]
+    },
+    {
+      "id": "summarization_verbose_correct",
+      "category": "summarization",
+      "query": "Summarize the proposal's main innovation.",
+      "expected_answer": "Hyperbolic embeddings for sparse citation graphs.",
+      "actual_answer": "After thorough review, the central innovation of this proposal is the use of hyperbolic embeddings applied to sparse citation graphs, a technique the PI argues will outperform Euclidean methods.",
+      "retrieved_context": "Proposal centres on hyperbolic embeddings for sparse citation graphs.",
+      "gold_verdict": "PASS",
+      "gold_score_band": [0.8, 1.0]
+    },
+    {
+      "id": "summarization_padding_no_substance",
+      "category": "summarization",
+      "query": "Summarize the proposal's main innovation.",
+      "expected_answer": "Hyperbolic embeddings for sparse citation graphs.",
+      "actual_answer": "The proposal contains many innovations. Each innovation is significant. The team has thought carefully about each one. The PI is well-qualified to execute on them.",
+      "retrieved_context": "Proposal centres on hyperbolic embeddings for sparse citation graphs.",
+      "gold_verdict": "FAIL",
+      "gold_score_band": [0.0, 0.3]
+    },
+    {
+      "id": "summarization_correct_ordering_different",
+      "category": "summarization",
+      "query": "List the three deliverables of the project.",
+      "expected_answer": "Trained model, public benchmark, technical report.",
+      "actual_answer": "1. Technical report. 2. Public benchmark. 3. Trained model.",
+      "retrieved_context": "Deliverables: trained model, public benchmark, technical report.",
+      "gold_verdict": "PASS",
+      "gold_score_band": [0.85, 1.0]
+    },
+    {
+      "id": "multi_hop_both_facts",
+      "category": "multi_hop",
+      "query": "Which PI leads the lab funded by the largest NIH award in the document?",
+      "expected_answer": "Dr. Jane Smith",
+      "actual_answer": "The largest NIH award in the document is R01-CA-12345 ($2.4M), led by Dr. Jane Smith of the Computational Biology lab.",
+      "retrieved_context": "Award R01-CA-12345: $2.4M to Computational Biology lab. Lab PI: Dr. Jane Smith. Other awards: R21 ($350k, Bioinformatics, Dr. Patel).",
+      "gold_verdict": "PASS",
+      "gold_score_band": [0.85, 1.0]
+    },
+    {
+      "id": "multi_hop_missing_link",
+      "category": "multi_hop",
+      "query": "Which PI leads the lab funded by the largest NIH award in the document?",
+      "expected_answer": "Dr. Jane Smith",
+      "actual_answer": "Dr. Patel leads a lab that has NIH funding.",
+      "retrieved_context": "Award R01-CA-12345: $2.4M to Computational Biology lab. Lab PI: Dr. Jane Smith. Other awards: R21 ($350k, Bioinformatics, Dr. Patel).",
+      "gold_verdict": "FAIL",
+      "gold_score_band": [0.0, 0.3]
+    },
+    {
+      "id": "multi_hop_one_correct_one_wrong",
+      "category": "multi_hop",
+      "query": "What is the start date and budget of the Smith proposal?",
+      "expected_answer": "Start 2026-09-01, budget $1.2M",
+      "actual_answer": "Start 2026-09-01, budget $1.5M.",
+      "retrieved_context": "Smith proposal — start: 2026-09-01, total budget: $1.2M.",
+      "gold_verdict": "WARN",
+      "gold_score_band": [0.4, 0.65]
+    },
+    {
+      "id": "multi_hop_correct_chain",
+      "category": "multi_hop",
+      "query": "What department does the PI of the largest awarded grant belong to?",
+      "expected_answer": "Computational Biology",
+      "actual_answer": "The PI of the largest awarded grant (Dr. Smith) belongs to the Computational Biology department.",
+      "retrieved_context": "Award R01-CA-12345: $2.4M to Computational Biology lab. Lab PI: Dr. Jane Smith.",
+      "gold_verdict": "PASS",
+      "gold_score_band": [0.85, 1.0]
+    },
+    {
+      "id": "multi_hop_invented_intermediate",
+      "category": "multi_hop",
+      "query": "Which awards in the document went to early-career investigators?",
+      "expected_answer": "R21 to Dr. Patel.",
+      "actual_answer": "R21 to Dr. Patel and the K99 to Dr. Lopez.",
+      "retrieved_context": "Awards listed: R01-CA-12345 (Smith, senior), R21 (Patel, early-career), R03 (Garcia, mid-career).",
+      "gold_verdict": "FAIL",
+      "gold_score_band": [0.0, 0.3]
+    },
+    {
+      "id": "partial_coverage_two_of_three",
+      "category": "partial_coverage",
+      "query": "What are the three required sections of the report?",
+      "expected_answer": "Methods, Results, Discussion.",
+      "actual_answer": "The report requires a Methods section and a Results section.",
+      "retrieved_context": "Required sections: Methods, Results, Discussion.",
+      "gold_verdict": "WARN",
+      "gold_score_band": [0.45, 0.65]
+    },
+    {
+      "id": "partial_coverage_one_of_three",
+      "category": "partial_coverage",
+      "query": "What are the three required sections of the report?",
+      "expected_answer": "Methods, Results, Discussion.",
+      "actual_answer": "Methods.",
+      "retrieved_context": "Required sections: Methods, Results, Discussion.",
+      "gold_verdict": "FAIL",
+      "gold_score_band": [0.0, 0.35]
+    },
+    {
+      "id": "partial_coverage_extras_no_facts",
+      "category": "partial_coverage",
+      "query": "What are the three required sections of the report?",
+      "expected_answer": "Methods, Results, Discussion.",
+      "actual_answer": "The report must include the Methods, Results, and Discussion sections. Each section should be carefully written and reviewed by all collaborators before submission.",
+      "retrieved_context": "Required sections: Methods, Results, Discussion.",
+      "gold_verdict": "PASS",
+      "gold_score_band": [0.8, 1.0]
+    },
+    {
+      "id": "partial_coverage_with_extra_fact_invented",
+      "category": "partial_coverage",
+      "query": "What are the required sections?",
+      "expected_answer": "Methods, Results, Discussion.",
+      "actual_answer": "Methods, Results, Discussion, and Acknowledgements.",
+      "retrieved_context": "Required sections: Methods, Results, Discussion.",
+      "gold_verdict": "WARN",
+      "gold_score_band": [0.4, 0.65]
+    },
+    {
+      "id": "hallucination_trap_added_dollar_amount",
+      "category": "hallucination_trap",
+      "query": "Describe the funding source for the project.",
+      "expected_answer": "The project is funded by NSF.",
+      "actual_answer": "The project is funded by NSF under a $2.8M cooperative agreement signed in early 2026.",
+      "retrieved_context": "Funding source: NSF.",
+      "gold_verdict": "FAIL",
+      "gold_score_band": [0.0, 0.35]
+    },
+    {
+      "id": "hallucination_trap_added_collaborator",
+      "category": "hallucination_trap",
+      "query": "Who collaborates on the project?",
+      "expected_answer": "Dr. Lee and Dr. Garcia.",
+      "actual_answer": "Dr. Lee, Dr. Garcia, and Dr. Elena Vasquez of MIT.",
+      "retrieved_context": "Collaborators: Dr. Lee, Dr. Garcia.",
+      "gold_verdict": "FAIL",
+      "gold_score_band": [0.0, 0.35]
+    },
+    {
+      "id": "hallucination_trap_confident_irb",
+      "category": "hallucination_trap",
+      "query": "Has the study been approved by an IRB?",
+      "expected_answer": "The document does not specify.",
+      "actual_answer": "Yes, the study was approved under IRB protocol #2024-1158.",
+      "retrieved_context": "(The document does not mention IRB approval.)",
+      "gold_verdict": "FAIL",
+      "gold_score_band": [0.0, 0.3]
+    },
+    {
+      "id": "hallucination_trap_hedged_borderline",
+      "category": "hallucination_trap",
+      "query": "What is the project's primary application area?",
+      "expected_answer": "Clinical research.",
+      "actual_answer": "Clinical research — and likely translational research as well, though the document is not explicit.",
+      "retrieved_context": "Application area: clinical research.",
+      "gold_verdict": "WARN",
+      "gold_score_band": [0.45, 0.65]
+    },
+    {
+      "id": "hallucination_trap_added_publication",
+      "category": "hallucination_trap",
+      "query": "What does the document say about prior publications by the team?",
+      "expected_answer": "The team has prior work on citation graphs.",
+      "actual_answer": "The team has prior work on citation graphs, including Smith et al. (2025) in Nature Machine Intelligence.",
+      "retrieved_context": "Team has prior work on citation graphs.",
+      "gold_verdict": "FAIL",
+      "gold_score_band": [0.0, 0.3]
+    },
+    {
+      "id": "absence_both_absent",
+      "category": "absence",
+      "query": "What is the project's GitHub repository URL?",
+      "expected_answer": "Not specified.",
+      "actual_answer": "The document does not specify a GitHub repository URL.",
+      "retrieved_context": "(No repository URL appears in the document.)",
+      "gold_verdict": "PASS",
+      "gold_score_band": [0.85, 1.0]
+    },
+    {
+      "id": "absence_judge_fabricates",
+      "category": "absence",
+      "query": "What is the project's GitHub repository URL?",
+      "expected_answer": "Not specified.",
+      "actual_answer": "https://github.com/exampleuser/project-repo.",
+      "retrieved_context": "(No repository URL appears in the document.)",
+      "gold_verdict": "FAIL",
+      "gold_score_band": [0.0, 0.3]
+    },
+    {
+      "id": "absence_correct_decline",
+      "category": "absence",
+      "query": "What is the indirect cost rate?",
+      "expected_answer": "Not specified in this document.",
+      "actual_answer": "The indirect cost rate is not specified in this document.",
+      "retrieved_context": "(F&A rate is not stated.)",
+      "gold_verdict": "PASS",
+      "gold_score_band": [0.85, 1.0]
+    },
+    {
+      "id": "absence_silent_when_should_answer",
+      "category": "absence",
+      "query": "Who is the PI?",
+      "expected_answer": "Dr. Smith.",
+      "actual_answer": "The document does not specify a PI.",
+      "retrieved_context": "PI: Dr. Smith.",
+      "gold_verdict": "FAIL",
+      "gold_score_band": [0.0, 0.3]
+    },
+    {
+      "id": "factoid_acronym_expansion",
+      "category": "factoid",
+      "query": "Which agency funds the project?",
+      "expected_answer": "NIH",
+      "actual_answer": "National Institutes of Health.",
+      "retrieved_context": "Funder: NIH.",
+      "gold_verdict": "PASS",
+      "gold_score_band": [0.85, 1.0]
+    },
+    {
+      "id": "factoid_acronym_wrong_expansion",
+      "category": "factoid",
+      "query": "Which agency funds the project?",
+      "expected_answer": "NIH",
+      "actual_answer": "National Science Foundation.",
+      "retrieved_context": "Funder: NIH.",
+      "gold_verdict": "FAIL",
+      "gold_score_band": [0.0, 0.2]
+    },
+    {
+      "id": "summarization_correct_brief",
+      "category": "summarization",
+      "query": "What does the proposal aim to do?",
+      "expected_answer": "Build a public benchmark for sparse citation graph methods.",
+      "actual_answer": "It will create a public benchmark for sparse citation graph methods.",
+      "retrieved_context": "Aim: build a public benchmark for sparse citation graph methods.",
+      "gold_verdict": "PASS",
+      "gold_score_band": [0.85, 1.0]
+    },
+    {
+      "id": "summarization_correct_with_grounded_extra",
+      "category": "summarization",
+      "query": "What does the proposal aim to do?",
+      "expected_answer": "Build a public benchmark for sparse citation graph methods.",
+      "actual_answer": "It will build a public benchmark for sparse citation graph methods, evaluated against three baselines mentioned in the abstract.",
+      "retrieved_context": "Aim: build a public benchmark for sparse citation graph methods. Baselines: GraphSAGE, GCN, GAT (per abstract).",
+      "gold_verdict": "PASS",
+      "gold_score_band": [0.8, 1.0]
+    },
+    {
+      "id": "multi_hop_correct_two_step",
+      "category": "multi_hop",
+      "query": "What is the start year of the PI's most recent grant?",
+      "expected_answer": "2025",
+      "actual_answer": "The PI's most recent grant (R01-XYZ) started in 2025.",
+      "retrieved_context": "Grants list: R01-ABC (2020-2024), R21-DEF (2023-2026), R01-XYZ (2025-2030, most recent).",
+      "gold_verdict": "PASS",
+      "gold_score_band": [0.85, 1.0]
+    },
+    {
+      "id": "multi_hop_wrong_step",
+      "category": "multi_hop",
+      "query": "What is the start year of the PI's most recent grant?",
+      "expected_answer": "2025",
+      "actual_answer": "The PI's most recent grant started in 2023.",
+      "retrieved_context": "Grants list: R01-ABC (2020-2024), R21-DEF (2023-2026), R01-XYZ (2025-2030, most recent).",
+      "gold_verdict": "FAIL",
+      "gold_score_band": [0.0, 0.3]
+    },
+    {
+      "id": "partial_coverage_no_overlap",
+      "category": "partial_coverage",
+      "query": "What are the required sections of the report?",
+      "expected_answer": "Methods, Results, Discussion.",
+      "actual_answer": "References and Acknowledgements.",
+      "retrieved_context": "Required sections: Methods, Results, Discussion.",
+      "gold_verdict": "FAIL",
+      "gold_score_band": [0.0, 0.2]
+    },
+    {
+      "id": "factoid_synonym",
+      "category": "factoid",
+      "query": "What is the project status?",
+      "expected_answer": "Active",
+      "actual_answer": "Ongoing.",
+      "retrieved_context": "Project status: Active.",
+      "gold_verdict": "PASS",
+      "gold_score_band": [0.8, 1.0]
+    },
+    {
+      "id": "factoid_antonym",
+      "category": "factoid",
+      "query": "What is the project status?",
+      "expected_answer": "Active",
+      "actual_answer": "Inactive.",
+      "retrieved_context": "Project status: Active.",
+      "gold_verdict": "FAIL",
+      "gold_score_band": [0.0, 0.2]
+    },
+    {
+      "id": "absence_actual_says_unknown",
+      "category": "absence",
+      "query": "What is the IRB protocol number?",
+      "expected_answer": "Not specified.",
+      "actual_answer": "Unknown.",
+      "retrieved_context": "(No IRB protocol number appears.)",
+      "gold_verdict": "PASS",
+      "gold_score_band": [0.8, 1.0]
+    },
+    {
+      "id": "summarization_one_wrong_fact",
+      "category": "summarization",
+      "query": "Summarize the project timeline.",
+      "expected_answer": "Three-year project from September 2026 to August 2029.",
+      "actual_answer": "Two-year project from September 2026 to August 2028.",
+      "retrieved_context": "Timeline: 2026-09-01 to 2029-08-31 (three years).",
+      "gold_verdict": "FAIL",
+      "gold_score_band": [0.0, 0.35]
+    },
+    {
+      "id": "hallucination_trap_extra_dollar_grounded_rate",
+      "category": "hallucination_trap",
+      "query": "What is the F&A rate?",
+      "expected_answer": "48.5%",
+      "actual_answer": "48.5%, approved by DHHS in March 2024 under negotiation agreement #UIDAHO-2024-FA-001.",
+      "retrieved_context": "F&A rate: 48.5%.",
+      "gold_verdict": "FAIL",
+      "gold_score_band": [0.0, 0.4]
+    },
+    {
+      "id": "factoid_yes_no_correct",
+      "category": "factoid",
+      "query": "Does the project require IRB approval?",
+      "expected_answer": "Yes.",
+      "actual_answer": "Yes, IRB approval is required.",
+      "retrieved_context": "IRB approval required: yes.",
+      "gold_verdict": "PASS",
+      "gold_score_band": [0.85, 1.0]
+    },
+    {
+      "id": "factoid_yes_no_wrong",
+      "category": "factoid",
+      "query": "Does the project require IRB approval?",
+      "expected_answer": "Yes.",
+      "actual_answer": "No, the document indicates IRB approval is not needed.",
+      "retrieved_context": "IRB approval required: yes.",
+      "gold_verdict": "FAIL",
+      "gold_score_band": [0.0, 0.2]
+    },
+    {
+      "id": "multi_hop_full_correct_complex",
+      "category": "multi_hop",
+      "query": "How many years remain on the largest active grant for the lab housing the PI of the proposal under review?",
+      "expected_answer": "Four years.",
+      "actual_answer": "The PI of the proposal under review (Dr. Smith) is housed in the Computational Biology lab. The largest active grant in that lab is R01-XYZ, which ends in 2030. Four years remain (as of 2026).",
+      "retrieved_context": "Proposal PI: Dr. Smith (Computational Biology). Lab grants: R01-XYZ (2025-2030, $2.4M), R21-DEF (2023-2026, $350k).",
+      "gold_verdict": "PASS",
+      "gold_score_band": [0.8, 1.0]
+    },
+    {
+      "id": "summarization_misordered_facts_correct",
+      "category": "summarization",
+      "query": "Summarize the proposal's budget.",
+      "expected_answer": "Total $1.2M: $800k personnel, $300k equipment, $100k travel.",
+      "actual_answer": "Personnel $800k, equipment $300k, travel $100k. Total $1.2M.",
+      "retrieved_context": "Budget: total $1.2M (personnel $800k, equipment $300k, travel $100k).",
+      "gold_verdict": "PASS",
+      "gold_score_band": [0.85, 1.0]
+    },
+    {
+      "id": "partial_coverage_with_correct_extra",
+      "category": "partial_coverage",
+      "query": "List the deliverables.",
+      "expected_answer": "Trained model, public benchmark.",
+      "actual_answer": "Trained model, public benchmark, and a technical report.",
+      "retrieved_context": "Deliverables: trained model, public benchmark, technical report.",
+      "gold_verdict": "PASS",
+      "gold_score_band": [0.75, 1.0]
+    },
+    {
+      "id": "absence_judge_should_acknowledge_unknown",
+      "category": "absence",
+      "query": "What journal published the team's most cited paper?",
+      "expected_answer": "Not specified in the document.",
+      "actual_answer": "Nature Machine Intelligence.",
+      "retrieved_context": "(The team's most cited paper is referenced but the journal is not named.)",
+      "gold_verdict": "FAIL",
+      "gold_score_band": [0.0, 0.3]
+    },
+    {
+      "id": "hallucination_trap_misattributed_quote",
+      "category": "hallucination_trap",
+      "query": "What does the PI say about the project's scalability?",
+      "expected_answer": "The PI claims it will scale to graphs of 10M nodes.",
+      "actual_answer": "The PI states it will scale to graphs of 10M nodes and notes that prior work by Smith et al. (2024) achieved similar results.",
+      "retrieved_context": "PI claim: project will scale to 10M-node graphs.",
+      "gold_verdict": "FAIL",
+      "gold_score_band": [0.0, 0.35]
+    },
+    {
+      "id": "factoid_capitalization_only",
+      "category": "factoid",
+      "query": "What is the department name?",
+      "expected_answer": "Computational Biology",
+      "actual_answer": "computational biology",
+      "retrieved_context": "Department: Computational Biology.",
+      "gold_verdict": "PASS",
+      "gold_score_band": [0.85, 1.0]
+    },
+    {
+      "id": "factoid_empty_actual",
+      "category": "factoid",
+      "query": "Who is the PI?",
+      "expected_answer": "Dr. Smith.",
+      "actual_answer": "",
+      "retrieved_context": "PI: Dr. Smith.",
+      "gold_verdict": "FAIL",
+      "gold_score_band": [0.0, 0.2]
+    },
+    {
+      "id": "summarization_partial_with_minor_error",
+      "category": "summarization",
+      "query": "Summarize the project deliverables.",
+      "expected_answer": "Trained model, public benchmark, technical report.",
+      "actual_answer": "Trained model and technical document.",
+      "retrieved_context": "Deliverables: trained model, public benchmark, technical report.",
+      "gold_verdict": "WARN",
+      "gold_score_band": [0.4, 0.65]
+    },
+    {
+      "id": "multi_hop_missing_aggregation",
+      "category": "multi_hop",
+      "query": "What is the total funding across all active grants in the lab?",
+      "expected_answer": "$2.75M",
+      "actual_answer": "$2.4M, from the single R01.",
+      "retrieved_context": "Lab grants (active): R01-XYZ $2.4M; R21-DEF $350k.",
+      "gold_verdict": "FAIL",
+      "gold_score_band": [0.0, 0.35]
+    },
+    {
+      "id": "absence_both_say_n_a",
+      "category": "absence",
+      "query": "What is the IRB protocol number?",
+      "expected_answer": "N/A",
+      "actual_answer": "N/A.",
+      "retrieved_context": "(IRB not applicable.)",
+      "gold_verdict": "PASS",
+      "gold_score_band": [0.85, 1.0]
+    },
+    {
+      "id": "factoid_extra_label_around_value",
+      "category": "factoid",
+      "query": "What is the project title?",
+      "expected_answer": "Hyperbolic Embeddings for Sparse Citation Graphs",
+      "actual_answer": "Project title: 'Hyperbolic Embeddings for Sparse Citation Graphs'.",
+      "retrieved_context": "Title: Hyperbolic Embeddings for Sparse Citation Graphs.",
+      "gold_verdict": "PASS",
+      "gold_score_band": [0.85, 1.0]
+    },
+    {
+      "id": "hallucination_trap_added_date",
+      "category": "hallucination_trap",
+      "query": "When was the lab established?",
+      "expected_answer": "2018",
+      "actual_answer": "The lab was established in 2018 by Dr. Smith after returning from a postdoc at Stanford.",
+      "retrieved_context": "Lab established: 2018.",
+      "gold_verdict": "FAIL",
+      "gold_score_band": [0.0, 0.4]
+    },
+    {
+      "id": "partial_coverage_minor_omission_pass",
+      "category": "partial_coverage",
+      "query": "Name the three baseline methods used for comparison.",
+      "expected_answer": "GraphSAGE, GCN, GAT.",
+      "actual_answer": "GraphSAGE, GCN, and GAT — standard graph neural network baselines.",
+      "retrieved_context": "Baselines for comparison: GraphSAGE, GCN, GAT.",
+      "gold_verdict": "PASS",
+      "gold_score_band": [0.85, 1.0]
+    }
+  ]
+}

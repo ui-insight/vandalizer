@@ -32,6 +32,10 @@ async def test_health_endpoint(client):
     assert "status" in body
     assert body["status"] in ("ok", "degraded")
     assert "checks" in body
+    # fd-usage gauge — surfaces a climbing open-fd count before it crashes the
+    # process as a misleading Mongo AutoReconnect.
+    assert "resources" in body
+    assert set(body["resources"]) == {"open_fds", "fd_limit", "fd_pct"}
 
 
 @pytest.mark.asyncio

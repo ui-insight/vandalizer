@@ -1,10 +1,15 @@
 """LLM service  - provider classes and agent creation, ported from agents.py."""
 
+import asyncio
+import weakref
 from dataclasses import dataclass
 from typing import Optional
 
+import httpx
+from contextlib import asynccontextmanager
 from pydantic_ai.agent import Agent
 from pydantic_ai.models.openai import OpenAIModel
+from pydantic_ai.models.wrapper import WrapperModel
 from pydantic_ai.profiles import ModelProfile
 from pydantic_ai.profiles.openai import (
     OpenAIJsonSchemaTransformer,
@@ -36,6 +41,53 @@ def clear_agent_caches():
 
 
 # ---------------------------------------------------------------------------
+# Per-event-loop HTTP client
+# ---------------------------------------------------------------------------
+# One shared httpx.AsyncClient per event loop, reused across every LLM call on
+# that loop. Why per-loop instead of per-call or process-wide:
+#   * pydantic-ai's process-wide `cached_async_http_client` is shared across ALL
+#     loops. The workflow MultiTaskNode runs each task via run_sync() on its own
+#     ThreadPoolExecutor thread (each thread gets its own event loop), so reusing
+#     one client's connection pool across loops raises "bound to a different
+#     event loop", which the OpenAI SDK re-wraps as a zero-token "Connection
+#     error" (#455).
+#   * The first fix for #455 built a fresh client on EVERY call. But run_sync
+#     reuses one long-lived loop per worker thread, so those per-call clients —
+#     never closed — piled their connection pools + sockets onto that live loop
+#     until the process hit `[Errno 24] Too many open files` (prod incident
+#     2026-06-03, Sentry 7517108223; the AutoReconnect surfaced on the healthy
+#     Mongo singleton, the victim, not the cause).
+# Caching one client per loop gives both properties: never shared across loops
+# (event-loop safe) and bounded to the small number of live loops. The
+# WeakKeyDictionary drops a loop's entry once the loop is garbage-collected
+# (e.g. when a workflow's ThreadPoolExecutor thread exits), letting its client —
+# and the file descriptors it holds — be reclaimed.
+_loop_http_clients: "weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, httpx.AsyncClient]" = (
+    weakref.WeakKeyDictionary()
+)
+
+
+def _get_loop_http_client() -> httpx.AsyncClient:
+    """Return the httpx.AsyncClient bound to the current event loop, creating it
+    on first use. Reused across calls so we never leak a client per call."""
+    from app.config import Settings
+
+    read_timeout = max(30, Settings().workflow_llm_timeout_seconds)
+    # Mirror pydantic-ai's own run_sync() loop resolution so we key off the exact
+    # loop the request will run on.
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    client = _loop_http_clients.get(loop)
+    if client is None or client.is_closed:
+        client = httpx.AsyncClient(timeout=httpx.Timeout(read_timeout, connect=10.0))
+        _loop_http_clients[loop] = client
+    return client
+
+
+# ---------------------------------------------------------------------------
 # RAG deps dataclass
 # ---------------------------------------------------------------------------
 
@@ -53,9 +105,20 @@ class RagDeps:
 class InsightAIProvider(OpenRouterProvider):
     """Custom OpenRouter provider for UIdaho Insight AI server."""
 
-    def __init__(self, api_key: str, endpoint: Optional[str] = None):
+    def __init__(self, api_key: str, endpoint: Optional[str] = None,
+                 http_client: Optional[httpx.AsyncClient] = None):
         self._endpoint = endpoint
-        super().__init__(api_key=api_key)
+        # Passing a dedicated http_client makes pydantic-ai build a per-instance
+        # AsyncOpenAI rather than fall back to the process-wide
+        # cached_async_http_client. The shared cached client is unsafe under the
+        # workflow MultiTaskNode, whose ThreadPoolExecutor runs each task on its
+        # own event loop — reusing one client's connection pool across loops
+        # raises "bound to a different event loop", surfacing as a zero-token
+        # "Connection error".
+        if http_client is not None:
+            super().__init__(api_key=api_key, http_client=http_client)
+        else:
+            super().__init__(api_key=api_key)
 
     @property
     def name(self) -> str:
@@ -79,9 +142,13 @@ class InsightAIProvider(OpenRouterProvider):
 class OllamaProvider(OpenRouterProvider):
     """Provider for Ollama API-compatible servers."""
 
-    def __init__(self, api_key: str, endpoint: str):
+    def __init__(self, api_key: str, endpoint: str,
+                 http_client: Optional[httpx.AsyncClient] = None):
         self._endpoint = endpoint
-        super().__init__(api_key=api_key)
+        if http_client is not None:
+            super().__init__(api_key=api_key, http_client=http_client)
+        else:
+            super().__init__(api_key=api_key)
 
     @property
     def name(self) -> str:
@@ -105,9 +172,13 @@ class OllamaProvider(OpenRouterProvider):
 class VLLMProvider(OpenRouterProvider):
     """Provider for VLLM API-compatible servers."""
 
-    def __init__(self, api_key: str, endpoint: str):
+    def __init__(self, api_key: str, endpoint: str,
+                 http_client: Optional[httpx.AsyncClient] = None):
         self._endpoint = endpoint
-        super().__init__(api_key=api_key)
+        if http_client is not None:
+            super().__init__(api_key=api_key, http_client=http_client)
+        else:
+            super().__init__(api_key=api_key)
 
     @property
     def name(self) -> str:
@@ -247,12 +318,92 @@ def build_thinking_model_settings(
     return settings
 
 
+class MeteredModel(WrapperModel):
+    """Transparent wrapper that records token usage on every model call.
+
+    This is the single chokepoint for LLM metering: every agent in the app is
+    built from a model produced by get_agent_model(), so wrapping here meters
+    100% of calls — including agentic-chat tool sub-calls, RAG's nested prompt
+    agent, and retries. Usage is reported to the active metering scope (see
+    app/services/metering.py); attribution (user/team/feature) is supplied by
+    the call site via metered()/metered_async().
+
+    When the provider/gateway returns no usage (some OpenAI-compatible gateways
+    omit it), tokens are estimated locally and flagged, so a real call never
+    records zero.
+    """
+
+    async def request(self, messages, model_settings, model_request_parameters):
+        resp = await self.wrapped.request(messages, model_settings, model_request_parameters)
+        self._record(messages, getattr(resp, "usage", None), getattr(resp, "parts", None))
+        return resp
+
+    @asynccontextmanager
+    async def request_stream(
+        self, messages, model_settings, model_request_parameters, run_context=None
+    ):
+        async with self.wrapped.request_stream(
+            messages, model_settings, model_request_parameters, run_context
+        ) as stream:
+            try:
+                yield stream
+            finally:
+                # Usage is final only after the consumer drains the stream, which
+                # happens inside the caller's `async with` block — i.e. before
+                # this finally runs.
+                usage = None
+                parts = None
+                try:
+                    usage = stream.usage()
+                except Exception:
+                    pass
+                try:
+                    parts = stream.get().parts
+                except Exception:
+                    pass
+                self._record(messages, usage, parts)
+
+    def _record(self, messages, usage, parts):
+        from app.services.metering import (
+            estimate_messages_tokens,
+            estimate_parts_tokens,
+            record_usage,
+        )
+
+        in_tok = int(getattr(usage, "input_tokens", 0) or 0)
+        out_tok = int(getattr(usage, "output_tokens", 0) or 0)
+        estimated = False
+        if in_tok + out_tok == 0:
+            in_tok = estimate_messages_tokens(messages)
+            out_tok = estimate_parts_tokens(parts)
+            estimated = True
+        try:
+            record_usage(self.model_name, in_tok, out_tok, estimated=estimated)
+        except Exception:
+            # Metering must never break an LLM call.
+            pass
+
+
 def get_agent_model(
     agent_model: str,
     thinking_override: Optional[bool] = None,
     system_config_doc: dict | None = None,
 ):
-    """Get the appropriate model instance. Sync  - safe for Celery workers."""
+    """Get the appropriate model instance, wrapped for token metering.
+
+    Sync  - safe for Celery workers. The returned MeteredModel is a drop-in
+    Model that Agent(...) accepts unchanged.
+    """
+    model = _build_agent_model(agent_model, thinking_override, system_config_doc)
+    return MeteredModel(model)
+
+
+def _build_agent_model(
+    agent_model: str,
+    thinking_override: Optional[bool] = None,
+    system_config_doc: dict | None = None,
+):
+    """Build the raw (unmetered) provider-specific model instance."""
     model_config = _get_model_config_sync(agent_model, system_config_doc)
 
     # Resolve per-model API key from system config (decrypt if encrypted)
@@ -269,7 +420,13 @@ def get_agent_model(
         from pydantic_ai.models.anthropic import AnthropicModel
         from pydantic_ai.providers.anthropic import AnthropicProvider
         model_name = agent_model.split("/", 1)[1] if agent_model.startswith("anthropic/") else agent_model
-        provider_kwargs: dict = {"api_key": api_key}
+        # Pass the per-loop httpx client so this provider doesn't fall back to
+        # pydantic-ai's process-wide cached_async_http_client. The cached client
+        # is shared across loops and breaks under the workflow ThreadPoolExecutor
+        # ("bound to a different event loop" -> zero-token Connection error, #455);
+        # the per-loop client is event-loop safe and reused, not leaked — see
+        # _get_loop_http_client above.
+        provider_kwargs: dict = {"api_key": api_key, "http_client": _get_loop_http_client()}
         if endpoint:
             provider_kwargs["base_url"] = endpoint
         return AnthropicModel(model_name=model_name, provider=AnthropicProvider(**provider_kwargs))
@@ -285,28 +442,53 @@ def get_agent_model(
         model_name = agent_model.split("/", 1)[1] if agent_model.startswith("openrouter/") else agent_model
         if endpoint:
             from openai import AsyncOpenAI
-            client = AsyncOpenAI(api_key=api_key, base_url=endpoint, timeout=120.0)
+            # Reuse the per-loop httpx client so we don't leak an SDK client (and
+            # its connection pool) per call — see _get_loop_http_client above.
+            client = AsyncOpenAI(
+                api_key=api_key, base_url=endpoint, timeout=120.0,
+                http_client=_get_loop_http_client(),
+            )
             provider = OpenRouterProvider(openai_client=client, app_title="Vandalizer")
         else:
-            provider = OpenRouterProvider(api_key=api_key, app_title="Vandalizer")
+            # Pass the per-loop httpx client so we don't fall back to the
+            # cross-loop-unsafe process-wide cache — see _get_loop_http_client.
+            provider = OpenRouterProvider(
+                api_key=api_key, app_title="Vandalizer",
+                http_client=_get_loop_http_client(),
+            )
         return OpenAIModel(model_name=model_name, provider=provider)
 
     # Handle external models with OpenAI protocol (use OpenAI SDK directly)
     if model_config and model_config.get("external", False) and api_protocol == "openai":
         model_name = agent_model.split("/")[-1] if "/" in agent_model else agent_model
         from openai import AsyncOpenAI
-        client_kwargs: dict = {"api_key": api_key, "timeout": 120.0}
+        # Reuse the per-loop httpx client so we don't leak an SDK client (and its
+        # connection pool) per call — see _get_loop_http_client above.
+        client_kwargs: dict = {
+            "api_key": api_key,
+            "timeout": 120.0,
+            "http_client": _get_loop_http_client(),
+        }
         if endpoint:
             client_kwargs["base_url"] = endpoint
         client = AsyncOpenAI(**client_kwargs)
         return OpenAIModel(model_name=model_name, openai_client=client)
 
+    # Use the per-event-loop httpx client instead of pydantic-ai's process-wide
+    # cached_async_http_client. The cached client is shared across the workflow
+    # MultiTaskNode's ThreadPoolExecutor threads, each of which runs run_sync()
+    # on its own event loop; reusing one client's connection pool across loops
+    # raises "RuntimeError: bound to a different event loop", which the OpenAI
+    # SDK re-wraps as a zero-token "Connection error". The per-loop client binds
+    # only to the loop that uses it, and is reused (not rebuilt per call) so it
+    # doesn't leak file descriptors — see _get_loop_http_client above.
+    dedicated_client = _get_loop_http_client()
     if api_protocol == "ollama":
-        provider = OllamaProvider(api_key=api_key, endpoint=endpoint)
+        provider = OllamaProvider(api_key=api_key, endpoint=endpoint, http_client=dedicated_client)
     elif api_protocol == "vllm":
-        provider = VLLMProvider(api_key=api_key, endpoint=endpoint)
+        provider = VLLMProvider(api_key=api_key, endpoint=endpoint, http_client=dedicated_client)
     else:
-        provider = InsightAIProvider(api_key=api_key, endpoint=endpoint)
+        provider = InsightAIProvider(api_key=api_key, endpoint=endpoint, http_client=dedicated_client)
 
     return OpenAIModel(model_name=agent_model, provider=provider)
 
@@ -317,16 +499,13 @@ def create_chat_agent(
     thinking_override: Optional[bool] = None,
     system_config_doc: dict | None = None,
 ) -> Agent:
-    """Create or retrieve a cached chat agent."""
+    # Always build fresh: cached Agents carry an httpx pool bound to whichever
+    # event loop first used them, and Celery's sync wrapper creates a new loop
+    # per pydantic-ai run_sync() call — causing silent retries on every call.
     prompt_to_use = system_prompt or DEFAULT_CHAT_SYSTEM_PROMPT
-    cache_key = f"{agent_model}_{hash(prompt_to_use)}_{thinking_override}"
-
-    if cache_key not in _chat_agent_cache:
-        model = get_agent_model(agent_model, thinking_override=thinking_override, system_config_doc=system_config_doc)
-        model_settings = build_thinking_model_settings(agent_model, thinking_override, system_config_doc)
-        _chat_agent_cache[cache_key] = Agent(model, system_prompt=prompt_to_use, model_settings=model_settings)
-
-    return _chat_agent_cache[cache_key]
+    model = get_agent_model(agent_model, thinking_override=thinking_override, system_config_doc=system_config_doc)
+    model_settings = build_thinking_model_settings(agent_model, thinking_override, system_config_doc)
+    return Agent(model, system_prompt=prompt_to_use, model_settings=model_settings)
 
 
 def create_agentic_chat_agent(
@@ -644,6 +823,41 @@ DOCUMENT_CHAT_SYSTEM_PROMPT = (
     "After a tool call produces results, offer ONE concrete follow-up when it naturally "
     "follows (e.g., cross-reference against a KB, extract structured data, run on more "
     "docs). Keep it to a single sentence. Do not force suggestions after every tool call.\n"
+)
+
+KB_CHAT_SYSTEM_PROMPT = VANDALIZER_IDENTITY_PREAMBLE + (
+    "You are a knowledge-base research assistant. The user has connected a Knowledge "
+    "Base (a searchable corpus of their documents). For each question, the system "
+    "retrieves a small set of snippets that look relevant — but those snippets are not "
+    "the user's whole library, and the best answer may not be in the retrieved set at all.\n\n"
+    "## Retrieval reality — read carefully\n"
+    "- The snippets in the context are **partial excerpts**, not full documents.\n"
+    "- A snippet being included only means it was lexically or semantically similar to "
+    "the question. It does not mean it actually supports an answer.\n"
+    "- Snippets can be off-topic, contradictory, or stale. Read each one before relying on it.\n\n"
+    "## How to answer\n"
+    "- **Cite every factual claim inline** with the source filename that supports it, "
+    "e.g. `[Source: contract_v3.pdf]` or `[Source: budget.xlsx, Sheet1]`. The filename "
+    "must match a `Source:` line shown in the retrieved snippets — never invent, "
+    "paraphrase, or guess source names.\n"
+    "- **Synthesize across snippets** when the answer needs to combine multiple facts. "
+    "Cite each snippet you draw from.\n"
+    "- **If a retrieved snippet is clearly off-topic, ignore it** — do not force-fit "
+    "irrelevant context into the answer just because it was retrieved.\n"
+    "- **If you supplement with general knowledge** (definitions, background, common "
+    "practice) that is NOT in the snippets, mark that portion with the prefix "
+    "`_Beyond the retrieved sources:_` so the reader can see where grounded information "
+    "ends and general reasoning begins.\n"
+    "- **If the snippets don't contain a clear answer, say so explicitly.** Suggest the "
+    "user rephrase the question, broaden the KB, or open the original documents — do "
+    "not paper over the gap with a confident-sounding guess.\n"
+    "- **Never attribute a claim to a source that doesn't support it.** If you can't "
+    "point to a specific snippet for a fact, either drop the fact or mark it as general "
+    "knowledge using the prefix above.\n\n"
+    "## Format\n"
+    "- Be concise. Short Markdown bullets and headings — no walls of text.\n"
+    "- Do NOT restate the question.\n"
+    "- Keep answers under 150 words unless the user asks for detail.\n"
 )
 
 HELP_CHAT_SYSTEM_PROMPT = VANDALIZER_IDENTITY_PREAMBLE + (
@@ -1027,44 +1241,50 @@ def create_rag_agent(
     agent_model: str,
     system_config_doc: dict | None = None,
 ) -> Agent:
-    """Create or retrieve a cached RAG agent with retrieve tool."""
-    cache_key = f"rag_{agent_model}"
+    # Always build fresh (see create_chat_agent for rationale).
+    model = get_agent_model(agent_model, system_config_doc=system_config_doc)
+    model_settings = build_thinking_model_settings(agent_model, system_config_doc=system_config_doc)
+    agent = Agent(
+        model,
+        deps_type=RagDeps,
+        system_prompt=RAG_SYSTEM_PROMPT,
+        model_settings=model_settings,
+    )
 
-    if cache_key not in _rag_agent_cache:
-        model = get_agent_model(agent_model, system_config_doc=system_config_doc)
-        model_settings = build_thinking_model_settings(agent_model, system_config_doc=system_config_doc)
-        _rag_agent_cache[cache_key] = Agent(
-            model,
-            deps_type=RagDeps,
-            system_prompt=RAG_SYSTEM_PROMPT,
-            model_settings=model_settings,
+    @agent.tool
+    def retrieve(
+        context: RunContext[RagDeps],
+        question: str,
+        docs_ids: Optional[list[str]] = None,
+    ):
+        if docs_ids is None:
+            docs_ids = []
+
+        prompt_agent = create_prompt_agent(agent_model, system_config_doc=system_config_doc)
+        prompt_response = prompt_agent.run_sync(
+            f"Generate a prompt for the following user question: {question}",
+        )
+        prompt = prompt_response.output
+
+        results = context.deps.doc_manager.query_documents(
+            context.deps.user_id,
+            prompt,
+            docs_ids,
+            k=10,
         )
 
-        @_rag_agent_cache[cache_key].tool
-        def retrieve(
-            context: RunContext[RagDeps],
-            question: str,
-            docs_ids: Optional[list[str]] = None,
-        ):
-            """Retrieve relevant document chunks for a given question.
-
-            Args:
-                context: The call context
-                question: The question of the user
-                docs_ids: A list of document IDs to search in (optional).
-
-            Returns:
-                A list of document chunks that match the question
-            """
-            if docs_ids is None:
-                docs_ids = []
-
-            # Use prompt agent to optimize the query
-            prompt_agent = create_prompt_agent(agent_model, system_config_doc=system_config_doc)
-            prompt_response = prompt_agent.run_sync(
-                f"Generate a prompt for the following user question: {question}",
-            )
-            prompt = prompt_response.output
+        if len(results) == 0:
+            for doc in context.deps.documents:
+                if not context.deps.doc_manager.document_exists(
+                    context.deps.user_id, doc.uuid
+                ):
+                    context.deps.doc_manager.add_document(
+                        user_id=context.deps.user_id,
+                        doc_path="",
+                        document_name=doc.title,
+                        document_id=doc.uuid,
+                        raw_text=doc.raw_text or "",
+                    )
 
             results = context.deps.doc_manager.query_documents(
                 context.deps.user_id,
@@ -1073,46 +1293,20 @@ def create_rag_agent(
                 k=10,
             )
 
-            if len(results) == 0:
-                # Try to re-ingest missing documents
-                for doc in context.deps.documents:
-                    if not context.deps.doc_manager.document_exists(
-                        context.deps.user_id, doc.uuid
-                    ):
-                        context.deps.doc_manager.add_document(
-                            user_id=context.deps.user_id,
-                            doc_path="",
-                            document_name=doc.title,
-                            document_id=doc.uuid,
-                            raw_text=doc.raw_text or "",
-                        )
+        return results
 
-                results = context.deps.doc_manager.query_documents(
-                    context.deps.user_id,
-                    prompt,
-                    docs_ids,
-                    k=10,
-                )
-
-            return results
-
-    return _rag_agent_cache[cache_key]
+    return agent
 
 
 def create_prompt_agent(
     agent_model: str,
     system_config_doc: dict | None = None,
 ) -> Agent:
-    """Create or retrieve a cached prompt optimization agent."""
-    cache_key = f"prompt_{agent_model}"
-
-    if cache_key not in _prompt_agent_cache:
-        model = get_agent_model(agent_model, system_config_doc=system_config_doc)
-        model_settings = build_thinking_model_settings(agent_model, system_config_doc=system_config_doc)
-        _prompt_agent_cache[cache_key] = Agent(
-            model,
-            system_prompt=PROMPT_AGENT_SYSTEM_PROMPT,
-            model_settings=model_settings,
-        )
-
-    return _prompt_agent_cache[cache_key]
+    # Always build fresh (see create_chat_agent for rationale).
+    model = get_agent_model(agent_model, system_config_doc=system_config_doc)
+    model_settings = build_thinking_model_settings(agent_model, system_config_doc=system_config_doc)
+    return Agent(
+        model,
+        system_prompt=PROMPT_AGENT_SYSTEM_PROMPT,
+        model_settings=model_settings,
+    )

@@ -4,6 +4,7 @@ import { UserPlus, Trash2, Pencil, Check, X, Copy, AlertTriangle, ArrowRightLeft
 import { PageLayout } from '../components/layout/PageLayout'
 import { useTeams } from '../hooks/useTeams'
 import { useAuth } from '../hooks/useAuth'
+import { useConfirm } from '../components/shared/useConfirm'
 import type { TeamMember, TeamInvite, TeamJoinLink } from '../types/user'
 import {
   getTeamMembers,
@@ -48,6 +49,7 @@ export function TeamSettings() {
   const { user } = useAuth()
   const { teams, currentTeam, switchTeam, refreshTeams } = useTeams()
   const navigate = useNavigate()
+  const confirm = useConfirm()
   const [members, setMembers] = useState<TeamMember[]>([])
   const [invites, setInvites] = useState<TeamInvite[]>([])
   const [joinLinks, setJoinLinks] = useState<TeamJoinLink[]>([])
@@ -107,6 +109,18 @@ export function TeamSettings() {
 
   async function handleRemove(userId: string) {
     if (!currentTeam) return
+    const member = members.find(m => m.user_id === userId)
+    const ok = await confirm({
+      title: 'Remove member?',
+      message: (
+        <>
+          Are you sure you want to remove <strong>{member?.name || member?.email || 'this member'}</strong> from <strong>{currentTeam.name}</strong>? They will lose access to the team's content.
+        </>
+      ),
+      confirmLabel: 'Remove',
+      destructive: true,
+    })
+    if (!ok) return
     try {
       await removeMember(currentTeam.uuid, userId)
       refreshData()
@@ -136,9 +150,17 @@ export function TeamSettings() {
 
   async function handleTransferOwnership() {
     if (!currentTeam || !transferTarget) return
-    const confirmed = window.confirm(
-      'Are you sure? You will be demoted to admin.',
-    )
+    const target = members.find(m => m.user_id === transferTarget)
+    const confirmed = await confirm({
+      title: 'Transfer ownership?',
+      message: (
+        <>
+          Transfer ownership of <strong>{currentTeam.name}</strong> to <strong>{target?.name || target?.email || 'this member'}</strong>? You will be demoted to admin and lose owner permissions.
+        </>
+      ),
+      confirmLabel: 'Transfer',
+      destructive: true,
+    })
     if (!confirmed) return
     setError('')
     try {
@@ -153,15 +175,22 @@ export function TeamSettings() {
 
   async function handleLeaveTeam() {
     if (!currentTeam || !user) return
-    const confirmed = window.confirm(
-      `Are you sure you want to leave "${currentTeam.name}"?`,
-    )
+    const confirmed = await confirm({
+      title: 'Leave team?',
+      message: (
+        <>
+          Are you sure you want to leave <strong>{currentTeam.name}</strong>? You will lose access to the team's content.
+        </>
+      ),
+      confirmLabel: 'Leave team',
+      destructive: true,
+    })
     if (!confirmed) return
     setError('')
     try {
       await removeMember(currentTeam.uuid, user.user_id)
       await refreshTeams()
-      navigate({ to: '/', search: { mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined } })
+      navigate({ to: '/', search: { mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined, workflow_share_token: undefined } })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to leave team')
     }
@@ -169,15 +198,22 @@ export function TeamSettings() {
 
   async function handleDeleteTeam() {
     if (!currentTeam) return
-    const confirmed = window.confirm(
-      'Are you sure? This cannot be undone. All members will be removed.',
-    )
+    const confirmed = await confirm({
+      title: 'Delete team?',
+      message: (
+        <>
+          Are you sure you want to delete <strong>{currentTeam.name}</strong>? All members will be removed and all team content will be lost. This cannot be undone.
+        </>
+      ),
+      confirmLabel: 'Delete team',
+      destructive: true,
+    })
     if (!confirmed) return
     setError('')
     try {
       await deleteTeam(currentTeam.uuid)
       await refreshTeams()
-      navigate({ to: '/', search: { mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined } })
+      navigate({ to: '/', search: { mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined, workflow_share_token: undefined } })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete team')
     }
@@ -217,9 +253,12 @@ export function TeamSettings() {
   }
 
   async function handleRevokeJoinLink(token: string) {
-    const confirmed = window.confirm(
-      'Revoke this join link? Anyone with the link will no longer be able to use it.',
-    )
+    const confirmed = await confirm({
+      title: 'Revoke join link?',
+      message: 'Anyone with this link will no longer be able to use it to join the team.',
+      confirmLabel: 'Revoke',
+      destructive: true,
+    })
     if (!confirmed) return
     setError('')
     try {

@@ -52,22 +52,48 @@ async def _auto_join_default_team(user: User, *, set_current: bool = True) -> No
             await user.save()
 
 
-async def authenticate(user_id: str, password: str) -> User | None:
+# Reason codes returned by authenticate_with_reason on failure. These are
+# consumed by the login route to produce a helpful error message.
+AUTH_REASON_UNKNOWN_USER = "unknown_user"
+AUTH_REASON_SSO_ONLY = "sso_only"
+AUTH_REASON_WRONG_PASSWORD = "wrong_password"
+AUTH_REASON_TRIAL_EXPIRED = "trial_expired"
+
+
+async def authenticate_with_reason(
+    user_id: str, password: str
+) -> tuple[User | None, str | None]:
+    """Authenticate and report *why* it failed.
+
+    Returns (user, None) on success, or (None, reason) where reason is one of
+    the AUTH_REASON_* constants above.
+    """
     # Normalize to lowercase to match Flask's normalize_identity behavior
     normalized = user_id.strip().lower()
     user = await User.find_one(User.user_id == normalized)
     if not user:
         user = await User.find_one(User.email == normalized)
-    if not user or not user.password_hash:
-        return None
+    if not user:
+        return None, AUTH_REASON_UNKNOWN_USER
+    if not user.password_hash:
+        return None, AUTH_REASON_SSO_ONLY
     if not verify_password(password, user.password_hash):
-        return None
+        # If the account is a locked trial, surface that instead of "wrong
+        # password" — the user can't recover access by guessing harder.
+        if user.is_demo_user and user.demo_status == "locked":
+            return None, AUTH_REASON_TRIAL_EXPIRED
+        return None, AUTH_REASON_WRONG_PASSWORD
     # Silently backfill default-team membership for non-demo users
     if not user.is_demo_user:
         await _auto_join_default_team(user, set_current=False)
     from app.services.team_service import ensure_current_team
     await ensure_current_team(user)
     await _stamp_login(user)
+    return user, None
+
+
+async def authenticate(user_id: str, password: str) -> User | None:
+    user, _ = await authenticate_with_reason(user_id, password)
     return user
 
 

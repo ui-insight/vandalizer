@@ -79,13 +79,13 @@ services:
       - uploads:/app/static/uploads
     ulimits:
       nofile:
-        soft: 8192
-        hard: 8192
+        soft: 65536
+        hard: 65536
     restart: unless-stopped
     deploy:
       resources:
         limits:
-          memory: 4G
+          memory: 8G
           cpus: "4.0"
 
   celery:
@@ -111,20 +111,24 @@ services:
       - uploads:/app/static/uploads
     ulimits:
       nofile:
-        soft: 8192
-        hard: 8192
+        soft: 65536
+        hard: 65536
     entrypoint: ["sh", "run_celery.sh", "start"]
     restart: unless-stopped
     deploy:
       resources:
         limits:
-          memory: 8G
+          memory: 12G
           cpus: "4.0"
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
+        VITE_SENTRY_ENVIRONMENT: ${VITE_SENTRY_ENVIRONMENT:-}
+        VITE_SENTRY_RELEASE: ${VITE_SENTRY_RELEASE:-}
     ports:
       - "${WEB_PORT:-80}:80"
     depends_on:

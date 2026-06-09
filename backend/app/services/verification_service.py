@@ -1,12 +1,14 @@
 """Verification queue service  - submit, review, approve, reject."""
 
 import datetime
+import logging
 
 from beanie import PydanticObjectId
 
 from app.models.library import LibraryItem, LibraryItemKind
 from app.models.user import User
 from app.models.verification import (
+    ValidationOrigin,
     VerificationRequest,
     VerificationStatus,
     VerifiedCollection,
@@ -16,6 +18,77 @@ from app.models.knowledge import KnowledgeBase
 from app.models.system_config import SystemConfig
 from app.models.workflow import Workflow
 from app.models.search_set import SearchSet
+from app.schemas.user import AuthorRef
+from app.services.user_lookup import resolve_author, resolve_authors
+
+logger = logging.getLogger(__name__)
+
+
+# Claim lock duration — after this, lock is considered abandoned (Phase C)
+CLAIM_TTL_MINUTES = 30
+
+
+def _merge_baseline(
+    item_kind: str,
+    submitter_snapshot: dict | None,
+    examiner_additions: dict | None,
+) -> dict | None:
+    """Merge submitter validation snapshot with examiner-curated additions.
+
+    Examiner additions are additive only — they extend the test set, never replace.
+    Returns a combined snapshot dict suitable for storage as `official_baseline`.
+    """
+    if not submitter_snapshot and not examiner_additions:
+        return None
+    base = dict(submitter_snapshot or {})
+    if not examiner_additions:
+        return base
+
+    # Kind-specific merge of additions on top of submitter snapshot
+    if item_kind == "search_set":
+        existing = list(base.get("test_cases") or [])
+        added = list(examiner_additions.get("test_cases") or [])
+        if added:
+            base["test_cases"] = existing + added
+    elif item_kind == "knowledge_base":
+        existing_q = list(base.get("queries") or base.get("sources") or [])
+        added_q = list(examiner_additions.get("queries") or [])
+        if added_q:
+            # Standardize on "queries" as merged key (snapshot may have used either)
+            base["queries"] = existing_q + added_q
+    elif item_kind == "workflow":
+        existing_inputs = list(base.get("example_inputs") or [])
+        added_inputs = list(examiner_additions.get("regression_inputs") or [])
+        if added_inputs:
+            base["example_inputs"] = existing_inputs + added_inputs
+        existing_checks = list(base.get("checks") or [])
+        added_checks = list(examiner_additions.get("checks") or [])
+        if added_checks:
+            base["checks"] = existing_checks + added_checks
+
+    # Attach provenance — useful at drift-check time and for the UI
+    base["_examiner_curated"] = True
+    if examiner_additions.get("run_uuid"):
+        base["_examiner_run_uuid"] = examiner_additions["run_uuid"]
+    if examiner_additions.get("run_score") is not None:
+        base["_examiner_run_score"] = examiner_additions["run_score"]
+    return base
+
+
+def _coverage_status(meta: VerifiedItemMetadata | None) -> str:
+    """Classify a catalog entry's validation coverage for the Catalog tab (Phase D).
+
+    Returns one of: ``none``, ``snapshot_only``, ``pinned_baseline``, ``drift_checked``.
+    """
+    if not meta:
+        return "none"
+    if meta.last_drift_check_at and meta.official_baseline:
+        return "drift_checked"
+    if meta.official_baseline:
+        return "pinned_baseline"
+    if meta.last_validated_at or meta.validation_run_count:
+        return "snapshot_only"
+    return "none"
 
 
 async def submit_for_verification(
@@ -37,6 +110,7 @@ async def submit_for_verification(
     dependencies: list[str] | None = None,
     intended_use_tags: list[str] | None = None,
     test_files: list[dict] | None = None,
+    skip_validation: bool = False,
 ) -> dict:
     """Create a verification request for a library item."""
     # Look up by uuid string for knowledge_base and search_set; ObjectId for others
@@ -86,34 +160,49 @@ async def submit_for_verification(
     qc = sys_cfg.get_quality_config()
     gates = qc.get("verification_gates", {})
 
-    # Quality gate: require validation before submission
-    if gates.get("require_validation") and not latest:
-        raise ValueError("This item must be validated before submitting for verification. Run validation first.")
+    if skip_validation:
+        # Submitter opted to send an unvalidated submission (Phase B).
+        # System-level require_validation gate still wins — admins can disable opt-out by enforcing it.
+        if gates.get("require_validation"):
+            raise ValueError(
+                "Unvalidated submissions are disabled by your system administrator. "
+                "Validate this item before submitting."
+            )
+        latest = None  # ignore any stale validation; explicitly an unvalidated path
+    else:
+        # Quality gate: require validation before submission
+        if gates.get("require_validation") and not latest:
+            raise ValueError("This item must be validated before submitting for verification. Run validation first.")
 
-    # Enforce minimum sample size thresholds
-    if latest:
-        result_snap = latest.get("result_snapshot", {})
-        min_tc = gates.get("min_test_cases", 0)
-        min_runs = gates.get("min_runs", 0)
-        min_score_gate = gates.get("min_score", 0)
+        # Enforce minimum sample size thresholds
+        if latest:
+            result_snap = latest.get("result_snapshot", {})
+            min_tc = gates.get("min_test_cases", 0)
+            min_runs = gates.get("min_runs", 0)
+            min_score_gate = gates.get("min_score", 0)
 
-        num_tc = len(result_snap.get("test_cases", result_snap.get("sources", [])))
-        num_runs_val = result_snap.get("num_runs", 1)
-        val_score = latest.get("score", 0)
+            num_tc = len(result_snap.get("test_cases", result_snap.get("sources", [])))
+            num_runs_val = result_snap.get("num_runs", 1)
+            val_score = latest.get("score", 0)
 
-        issues = []
-        if min_tc > 0 and num_tc < min_tc:
-            issues.append(f"Validation used {num_tc} test case(s), minimum is {min_tc}")
-        if min_runs > 0 and num_runs_val < min_runs:
-            issues.append(f"Validation used {num_runs_val} run(s), minimum is {min_runs}")
-        if min_score_gate > 0 and val_score < min_score_gate:
-            issues.append(f"Quality score is {val_score:.0f}, minimum is {min_score_gate}")
-        if issues:
-            raise ValueError("Submission requirements not met: " + "; ".join(issues))
+            issues = []
+            if min_tc > 0 and num_tc < min_tc:
+                issues.append(f"Validation used {num_tc} test case(s), minimum is {min_tc}")
+            if min_runs > 0 and num_runs_val < min_runs:
+                issues.append(f"Validation used {num_runs_val} run(s), minimum is {min_runs}")
+            if min_score_gate > 0 and val_score < min_score_gate:
+                issues.append(f"Quality score is {val_score:.0f}, minimum is {min_score_gate}")
+            if issues:
+                raise ValueError("Submission requirements not met: " + "; ".join(issues))
 
     validation_snapshot = latest.get("result_snapshot") if latest else None
     validation_score = latest.get("score") if latest else None
     validation_tier = compute_quality_tier(validation_score, qc) if validation_score is not None else None
+    validation_origin = (
+        ValidationOrigin.PENDING_ADMIN_VALIDATION.value
+        if skip_validation
+        else ValidationOrigin.VALIDATED_BY_SUBMITTER.value
+    )
 
     req = VerificationRequest(
         item_kind=item_kind,
@@ -137,9 +226,11 @@ async def submit_for_verification(
         validation_snapshot=validation_snapshot,
         validation_score=validation_score,
         validation_tier=validation_tier,
+        validation_origin=validation_origin,
     )
     await req.insert()
-    return await _request_to_dict(req)
+    submitter_ref = await resolve_author(user_id)
+    return await _request_to_dict(req, submitter_ref=submitter_ref)
 
 
 async def list_queue(
@@ -147,6 +238,7 @@ async def list_queue(
     limit: int = 50,
 ) -> list[dict]:
     """List verification requests (for reviewers)."""
+
     query: dict = {}
     if status_filter:
         query["status"] = status_filter
@@ -157,9 +249,10 @@ async def list_queue(
         ]}
 
     requests = await VerificationRequest.find(query).sort("-submitted_at").limit(limit).to_list()
+    author_map = await resolve_authors(r.submitter_user_id for r in requests)
     results = []
     for req in requests:
-        d = await _request_to_dict(req)
+        d = await _request_to_dict(req, submitter_ref=author_map.get(req.submitter_user_id))
         # Attach item name
         d["item_name"] = await _get_item_name(req.item_kind, req.item_id)
         results.append(d)
@@ -168,10 +261,12 @@ async def list_queue(
 
 async def get_request(request_uuid: str) -> dict | None:
     """Get a single verification request by UUID."""
+
     req = await VerificationRequest.find_one(VerificationRequest.uuid == request_uuid)
     if not req:
         return None
-    d = await _request_to_dict(req)
+    submitter_ref = await resolve_author(req.submitter_user_id)
+    d = await _request_to_dict(req, submitter_ref=submitter_ref)
     d["item_name"] = await _get_item_name(req.item_kind, req.item_id)
     return d
 
@@ -225,20 +320,28 @@ async def update_status(
             for cid in collection_ids:
                 await add_to_collection(cid, str(req.item_id))
 
-    return await _request_to_dict(req)
+        # Pin official baseline (Phase A) — freeze the validation snapshot
+        # (combined with any examiner additions from Phase C) as the catalog-side
+        # baseline that drift monitoring will check against.
+        await _pin_official_baseline(req, reviewer_user_id)
+
+    submitter_ref = await resolve_author(req.submitter_user_id)
+    return await _request_to_dict(req, submitter_ref=submitter_ref)
 
 
 async def my_requests(user_id: str, limit: int = 50) -> list[dict]:
     """List a user's own verification requests."""
+
     requests = (
         await VerificationRequest.find(VerificationRequest.submitter_user_id == user_id)
         .sort("-submitted_at")
         .limit(limit)
         .to_list()
     )
+    submitter_ref = await resolve_author(user_id)
     results = []
     for req in requests:
-        d = await _request_to_dict(req)
+        d = await _request_to_dict(req, submitter_ref=submitter_ref)
         d["item_name"] = await _get_item_name(req.item_kind, req.item_id)
         results.append(d)
     return results
@@ -455,24 +558,28 @@ async def list_verified_items(
     kb_ids = [i.item_id for i in items if i.kind == LibraryItemKind.KNOWLEDGE_BASE]
 
     name_map: dict[str, str] = {}
-    wf_creator_map: dict[str, str] = {}
+    creator_map: dict[tuple[str, str], str] = {}
     if wf_ids:
         wfs = await Workflow.find({"_id": {"$in": wf_ids}}).to_list()
         for wf in wfs:
             name_map[str(wf.id)] = wf.name
             creator_id = wf.created_by_user_id or wf.user_id
             if creator_id:
-                wf_creator_map[str(wf.id)] = creator_id
+                creator_map[(LibraryItemKind.WORKFLOW.value, str(wf.id))] = creator_id
     ss_map: dict[str, SearchSet] = {}
     if ss_ids:
         ssets = await SearchSet.find({"_id": {"$in": ss_ids}}).to_list()
         for ss in ssets:
             name_map[str(ss.id)] = ss.title
             ss_map[str(ss.id)] = ss
+            if ss.user_id:
+                creator_map[(LibraryItemKind.SEARCH_SET.value, str(ss.id))] = ss.user_id
     if kb_ids:
         kbs = await KnowledgeBase.find({"_id": {"$in": kb_ids}}).to_list()
         for kb in kbs:
             name_map[str(kb.id)] = kb.title
+            if kb.user_id:
+                creator_map[(LibraryItemKind.KNOWLEDGE_BASE.value, str(kb.id))] = kb.user_id
 
     # --- Batch-fetch all metadata ---
     all_meta = await VerifiedItemMetadata.find_all().to_list()
@@ -480,9 +587,28 @@ async def list_verified_items(
     for m in all_meta:
         meta_map[(m.item_kind, m.item_id)] = m
 
-    # --- Batch-resolve workflow authors ---
-    from app.services.user_lookup import resolve_authors
-    author_map = await resolve_authors(wf_creator_map.values())
+    # --- Batch-resolve submitters from latest approved VerificationRequest per item ---
+    all_object_ids = [i.item_id for i in items]
+    submitter_user_map: dict[tuple[str, str], str] = {}
+    if all_object_ids:
+        approved_reqs = (
+            await VerificationRequest.find(
+                {
+                    "item_id": {"$in": all_object_ids},
+                    "status": VerificationStatus.APPROVED.value,
+                }
+            )
+            .sort("-reviewed_at")
+            .to_list()
+        )
+        for req in approved_reqs:
+            key = (req.item_kind, str(req.item_id))
+            # First occurrence is the latest (sorted desc)
+            submitter_user_map.setdefault(key, req.submitter_user_id)
+
+    # --- Batch-resolve creators + submitters in one shot ---
+    all_user_ids = list(creator_map.values()) + list(submitter_user_map.values())
+    author_map = await resolve_authors(all_user_ids)
 
     # --- Batch-fetch KB metrics ---
     kb_map: dict[str, KnowledgeBase] = {}
@@ -521,6 +647,11 @@ async def list_verified_items(
         if quality_tier and item_tier != quality_tier:
             continue
 
+        submitter_id = submitter_user_map.get((item.kind.value, item_id_str))
+        submitter_ref = author_map.get(submitter_id) if submitter_id else None
+        creator_id = creator_map.get((item.kind.value, item_id_str))
+        creator_ref = author_map.get(creator_id) if creator_id else None
+
         entry = {
             "id": str(item.id),
             "item_id": item_id_str,
@@ -538,6 +669,8 @@ async def list_verified_items(
             "quality_grade": meta.quality_grade if meta else None,
             "last_validated_at": meta.last_validated_at.isoformat() if meta and meta.last_validated_at else None,
             "validation_run_count": meta.validation_run_count if meta else 0,
+            "submitted_by": submitter_ref.model_dump() if submitter_ref else None,
+            "created_by": creator_ref.model_dump() if creator_ref else None,
         }
 
         # KB-specific metrics (from batch)
@@ -559,9 +692,6 @@ async def list_verified_items(
         # Workflow: use MongoDB _id as source_uuid (workspace routes by _id)
         if item.kind == LibraryItemKind.WORKFLOW:
             entry["source_uuid"] = item_id_str
-            creator_id = wf_creator_map.get(item_id_str)
-            ref = author_map.get(creator_id) if creator_id else None
-            entry["created_by"] = ref.model_dump() if ref else None
 
         results.append(entry)
 
@@ -603,6 +733,15 @@ async def get_item_metadata(item_kind: str, item_id: str) -> dict | None:
         "quality_grade": meta.quality_grade,
         "last_validated_at": meta.last_validated_at.isoformat() if meta.last_validated_at else None,
         "validation_run_count": meta.validation_run_count,
+        "official_baseline": meta.official_baseline,
+        "official_baseline_pinned_at": meta.official_baseline_pinned_at.isoformat() if meta.official_baseline_pinned_at else None,
+        "official_baseline_source_run_uuid": meta.official_baseline_source_run_uuid,
+        "official_baseline_score": meta.official_baseline_score,
+        "official_baseline_pinned_by_user_id": meta.official_baseline_pinned_by_user_id,
+        "official_baseline_history": meta.official_baseline_history,
+        "last_drift_check_at": meta.last_drift_check_at.isoformat() if meta.last_drift_check_at else None,
+        "last_drift_score": meta.last_drift_score,
+        "coverage": _coverage_status(meta),
     }
 
 
@@ -656,6 +795,308 @@ async def update_item_metadata(
         "organization_ids": meta.organization_ids,
         "updated_at": meta.updated_at.isoformat() if meta.updated_at else None,
         "updated_by_user_id": meta.updated_by_user_id,
+    }
+
+
+async def _pin_official_baseline(req: VerificationRequest, reviewer_user_id: str) -> None:
+    """Freeze the validation snapshot (and any examiner additions) as the catalog baseline.
+
+    Phase A: writes to VerifiedItemMetadata.official_baseline at approval time.
+    Combined with Phase C examiner additions if present on the request.
+    """
+    combined = _merge_baseline(req.item_kind, req.validation_snapshot, req.examiner_baseline_additions)
+    if not combined:
+        # No baseline to pin — examiner approved without any validation evidence.
+        return
+
+    item_id_str = str(req.item_id)
+    now = datetime.datetime.now(datetime.timezone.utc)
+
+    # Source run uuid: prefer examiner run, fall back to submitter snapshot
+    source_run_uuid = None
+    if req.examiner_baseline_additions and req.examiner_baseline_additions.get("run_uuid"):
+        source_run_uuid = req.examiner_baseline_additions.get("run_uuid")
+    elif req.validation_snapshot and isinstance(req.validation_snapshot, dict):
+        source_run_uuid = req.validation_snapshot.get("run_uuid") or req.validation_snapshot.get("_examiner_run_uuid")
+
+    score = req.validation_score
+    if combined.get("_examiner_run_score") is not None:
+        score = combined["_examiner_run_score"]
+
+    meta = await VerifiedItemMetadata.find_one(
+        VerifiedItemMetadata.item_kind == req.item_kind,
+        VerifiedItemMetadata.item_id == item_id_str,
+    )
+    history_entry = {
+        "pinned_at": now.isoformat(),
+        "pinned_by_user_id": reviewer_user_id,
+        "source_run_uuid": source_run_uuid,
+        "score": score,
+        "trigger": "approval",
+        "examiner_curated": bool(req.examiner_baseline_additions),
+        "request_uuid": req.uuid,
+    }
+
+    if meta:
+        # If there's an existing baseline, archive it before overwriting
+        if meta.official_baseline:
+            meta.official_baseline_history.append({
+                "archived_at": now.isoformat(),
+                "previous_pinned_at": meta.official_baseline_pinned_at.isoformat() if meta.official_baseline_pinned_at else None,
+                "previous_score": meta.official_baseline_score,
+                "previous_source_run_uuid": meta.official_baseline_source_run_uuid,
+            })
+        meta.official_baseline = combined
+        meta.official_baseline_pinned_at = now
+        meta.official_baseline_source_run_uuid = source_run_uuid
+        meta.official_baseline_score = score
+        meta.official_baseline_pinned_by_user_id = reviewer_user_id
+        meta.official_baseline_history.append(history_entry)
+        meta.updated_at = now
+        meta.updated_by_user_id = reviewer_user_id
+        await meta.save()
+    else:
+        meta = VerifiedItemMetadata(
+            item_kind=req.item_kind,
+            item_id=item_id_str,
+            official_baseline=combined,
+            official_baseline_pinned_at=now,
+            official_baseline_source_run_uuid=source_run_uuid,
+            official_baseline_score=score,
+            official_baseline_pinned_by_user_id=reviewer_user_id,
+            official_baseline_history=[history_entry],
+            updated_at=now,
+            updated_by_user_id=reviewer_user_id,
+        )
+        await meta.insert()
+
+
+# ---------------------------------------------------------------------------
+# Phase C: examiner authoring during review
+# ---------------------------------------------------------------------------
+
+
+async def claim_request(request_uuid: str, user_id: str) -> dict:
+    """Soft-lock a verification request to a reviewer so two examiners don't duplicate work."""
+    req = await VerificationRequest.find_one(VerificationRequest.uuid == request_uuid)
+    if not req:
+        raise ValueError("Request not found")
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    # Honor existing claim unless it's expired
+    if req.claimed_by_user_id and req.claimed_by_user_id != user_id and req.claimed_at:
+        age = (now - req.claimed_at).total_seconds() / 60
+        if age < CLAIM_TTL_MINUTES:
+            raise ValueError(f"Already claimed by another reviewer (held for {int(age)} minute(s))")
+
+    req.claimed_by_user_id = user_id
+    req.claimed_at = now
+    if req.status == VerificationStatus.SUBMITTED.value:
+        req.status = VerificationStatus.IN_REVIEW.value
+    await req.save()
+    return {"ok": True, "claimed_at": now.isoformat()}
+
+
+async def release_claim(request_uuid: str, user_id: str) -> dict:
+    """Release a claim lock — called on explicit unclaim or tab close."""
+    req = await VerificationRequest.find_one(VerificationRequest.uuid == request_uuid)
+    if not req:
+        raise ValueError("Request not found")
+    # Only the holder can release (or claim has expired)
+    if req.claimed_by_user_id and req.claimed_by_user_id != user_id and req.claimed_at:
+        age = (datetime.datetime.now(datetime.timezone.utc) - req.claimed_at).total_seconds() / 60
+        if age < CLAIM_TTL_MINUTES:
+            raise ValueError("Claim is held by another reviewer")
+    req.claimed_by_user_id = None
+    req.claimed_at = None
+    await req.save()
+    return {"ok": True}
+
+
+async def set_examiner_additions(
+    request_uuid: str,
+    user_id: str,
+    additions: dict,
+) -> dict:
+    """Persist examiner-curated baseline additions on a verification request.
+
+    Additions shape (by kind):
+        search_set: {"test_cases": [{document_uuid, expected: {field: value, ...}}, ...]}
+        knowledge_base: {"queries": [{query, expected_answer?, expected_chunks?}, ...]}
+        workflow: {"regression_inputs": [{input, expected_output?}, ...], "checks": [...]}
+
+    Optionally carries {"run_uuid": str, "run_score": float} from a Run Now action.
+    """
+    req = await VerificationRequest.find_one(VerificationRequest.uuid == request_uuid)
+    if not req:
+        raise ValueError("Request not found")
+    # Soft-respect the claim lock — non-holders get a warning but it's not a hard block
+    # (the lock exists to avoid simultaneous editing, not to gate access)
+    if req.claimed_by_user_id and req.claimed_by_user_id != user_id and req.claimed_at:
+        age = (datetime.datetime.now(datetime.timezone.utc) - req.claimed_at).total_seconds() / 60
+        if age < CLAIM_TTL_MINUTES:
+            raise ValueError("Another reviewer is currently editing this request")
+
+    req.examiner_baseline_additions = additions or None
+    await req.save()
+    return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Phase D: catalog coverage view + retroactive baseline
+# ---------------------------------------------------------------------------
+
+
+async def list_catalog_coverage(
+    kind_filter: str | None = None,
+    coverage_filter: str | None = None,
+    limit: int = 200,
+) -> dict:
+    """List all verified catalog items with their validation coverage status.
+
+    Used by the admin Catalog tab to triage which verified items lack pinned baselines.
+    Coverage values: ``none``, ``snapshot_only``, ``pinned_baseline``, ``drift_checked``.
+    """
+    items_query: dict = {"verified": True}
+    if kind_filter:
+        items_query["kind"] = kind_filter
+    items = await LibraryItem.find(items_query).sort("-created_at").to_list()
+
+    # Dedupe by (item_id, kind)
+    seen: set[tuple[str, str]] = set()
+    deduped: list[LibraryItem] = []
+    for it in items:
+        key = (str(it.item_id), it.kind.value)
+        if key not in seen:
+            seen.add(key)
+            deduped.append(it)
+    items = deduped
+
+    # Batch-fetch metadata + names
+    all_meta = await VerifiedItemMetadata.find_all().to_list()
+    meta_map: dict[tuple[str, str], VerifiedItemMetadata] = {
+        (m.item_kind, m.item_id): m for m in all_meta
+    }
+    wf_ids = [i.item_id for i in items if i.kind == LibraryItemKind.WORKFLOW]
+    ss_ids = [i.item_id for i in items if i.kind == LibraryItemKind.SEARCH_SET]
+    kb_ids = [i.item_id for i in items if i.kind == LibraryItemKind.KNOWLEDGE_BASE]
+    name_map: dict[str, str] = {}
+    if wf_ids:
+        for wf in await Workflow.find({"_id": {"$in": wf_ids}}).to_list():
+            name_map[str(wf.id)] = wf.name
+    if ss_ids:
+        for ss in await SearchSet.find({"_id": {"$in": ss_ids}}).to_list():
+            name_map[str(ss.id)] = ss.title
+    if kb_ids:
+        for kb in await KnowledgeBase.find({"_id": {"$in": kb_ids}}).to_list():
+            name_map[str(kb.id)] = kb.title
+
+    rows: list[dict] = []
+    coverage_order = {"none": 0, "snapshot_only": 1, "pinned_baseline": 2, "drift_checked": 3}
+    for it in items:
+        item_id_str = str(it.item_id)
+        meta = meta_map.get((it.kind.value, item_id_str))
+        coverage = _coverage_status(meta)
+        if coverage_filter and coverage != coverage_filter:
+            continue
+        rows.append({
+            "item_kind": it.kind.value,
+            "item_id": item_id_str,
+            "name": name_map.get(item_id_str, "Unknown"),
+            "coverage": coverage,
+            "coverage_order": coverage_order.get(coverage, 99),
+            "quality_score": meta.quality_score if meta else None,
+            "quality_tier": meta.quality_tier if meta else None,
+            "last_validated_at": meta.last_validated_at.isoformat() if meta and meta.last_validated_at else None,
+            "official_baseline_pinned_at": meta.official_baseline_pinned_at.isoformat() if meta and meta.official_baseline_pinned_at else None,
+            "official_baseline_score": meta.official_baseline_score if meta else None,
+            "official_baseline_test_case_count": (
+                len((meta.official_baseline or {}).get("test_cases", []))
+                + len((meta.official_baseline or {}).get("queries", []))
+                + len((meta.official_baseline or {}).get("example_inputs", []))
+            ) if meta and meta.official_baseline else 0,
+            "last_drift_check_at": meta.last_drift_check_at.isoformat() if meta and meta.last_drift_check_at else None,
+            "last_drift_score": meta.last_drift_score if meta else None,
+        })
+
+    rows.sort(key=lambda r: (r["coverage_order"], -(r["quality_score"] or 0)))
+    return {"items": rows[:limit], "total": len(rows)}
+
+
+async def pin_retroactive_baseline(
+    item_kind: str,
+    item_id: str,
+    baseline: dict,
+    user_id: str,
+    source_run_uuid: str | None = None,
+    score: float | None = None,
+) -> dict:
+    """Establish or update an official baseline for an already-verified catalog item.
+
+    Used by Phase D Catalog tab when admins backfill validation for legacy items.
+    Returns a dict including ``live_passes_baseline: bool | None`` so the UI can
+    soft-warn if the live config doesn't currently meet the new baseline.
+    """
+    item_id_str = str(item_id)
+    now = datetime.datetime.now(datetime.timezone.utc)
+
+    meta = await VerifiedItemMetadata.find_one(
+        VerifiedItemMetadata.item_kind == item_kind,
+        VerifiedItemMetadata.item_id == item_id_str,
+    )
+    history_entry = {
+        "pinned_at": now.isoformat(),
+        "pinned_by_user_id": user_id,
+        "source_run_uuid": source_run_uuid,
+        "score": score,
+        "trigger": "retroactive",
+    }
+
+    if meta:
+        if meta.official_baseline:
+            meta.official_baseline_history.append({
+                "archived_at": now.isoformat(),
+                "previous_pinned_at": meta.official_baseline_pinned_at.isoformat() if meta.official_baseline_pinned_at else None,
+                "previous_score": meta.official_baseline_score,
+                "previous_source_run_uuid": meta.official_baseline_source_run_uuid,
+            })
+        meta.official_baseline = baseline
+        meta.official_baseline_pinned_at = now
+        meta.official_baseline_source_run_uuid = source_run_uuid
+        meta.official_baseline_score = score
+        meta.official_baseline_pinned_by_user_id = user_id
+        meta.official_baseline_history.append(history_entry)
+        meta.updated_at = now
+        meta.updated_by_user_id = user_id
+        await meta.save()
+    else:
+        meta = VerifiedItemMetadata(
+            item_kind=item_kind,
+            item_id=item_id_str,
+            official_baseline=baseline,
+            official_baseline_pinned_at=now,
+            official_baseline_source_run_uuid=source_run_uuid,
+            official_baseline_score=score,
+            official_baseline_pinned_by_user_id=user_id,
+            official_baseline_history=[history_entry],
+            updated_at=now,
+            updated_by_user_id=user_id,
+        )
+        await meta.insert()
+
+    # Soft check: does the live config currently pass its own new baseline?
+    # Compare against the existing latest validation score as a cheap proxy.
+    # (Full re-run against the new baseline happens in drift monitoring or on user request.)
+    live_passes: bool | None = None
+    if score is not None and meta.quality_score is not None:
+        live_passes = meta.quality_score >= score - 5  # 5pt tolerance
+
+    return {
+        "ok": True,
+        "pinned_at": now.isoformat(),
+        "live_passes_baseline": live_passes,
+        "live_score": meta.quality_score,
+        "pinned_score": score,
     }
 
 
@@ -850,7 +1291,12 @@ async def search_users(query: str, limit: int = 20) -> list[dict]:
 
 
 async def _mark_kb_verified(item_id: PydanticObjectId) -> None:
-    """Set verified=True on a KnowledgeBase and add to the verified library."""
+    """Set verified=True on a KnowledgeBase and add to the verified library.
+
+    User-defined KB tags are copied onto the verified LibraryItem so they
+    surface in the Explore catalog; subsequent edits flow through
+    sync_verified_kb_tags() from knowledge_service.update_knowledge_base.
+    """
     from app.services.library_service import get_or_create_verified_library
 
     kb = await KnowledgeBase.get(item_id)
@@ -859,29 +1305,64 @@ async def _mark_kb_verified(item_id: PydanticObjectId) -> None:
     kb.verified = True
     await kb.save()
 
+    kb_tags = list(kb.tags or [])
+
     # Add a verified LibraryItem to the global verified library
     verified_lib = await get_or_create_verified_library()
-    verified_item_ids = set(verified_lib.items) if verified_lib.items else set()
+    verified_item_ids = list(verified_lib.items) if verified_lib.items else []
 
     existing_in_verified = await LibraryItem.find(
-        {"_id": {"$in": list(verified_item_ids)}},
-        {"item_id": item_id, "kind": "knowledge_base"},
+        {"_id": {"$in": verified_item_ids}},
+        LibraryItem.item_id == item_id,
+        LibraryItem.kind == LibraryItemKind.KNOWLEDGE_BASE,
     ).to_list() if verified_item_ids else []
 
-    if not existing_in_verified:
+    if existing_in_verified:
+        for existing in existing_in_verified:
+            if existing.tags != kb_tags:
+                existing.tags = kb_tags
+                await existing.save()
+    else:
         now = datetime.datetime.now(datetime.timezone.utc)
         new_item = LibraryItem(
             item_id=item_id,
             kind=LibraryItemKind.KNOWLEDGE_BASE,
             added_by_user_id="system",
             verified=True,
-            tags=[],
+            tags=kb_tags,
             created_at=now,
         )
         await new_item.insert()
         verified_lib.items.append(new_item.id)
         verified_lib.updated_at = now
         await verified_lib.save()
+
+
+async def sync_verified_kb_tags(kb: KnowledgeBase) -> None:
+    """Push the KB's current tags onto its verified LibraryItem(s), if any.
+
+    Called after a user edits tags on a verified KB so the Explore catalog
+    stays in sync. No-op for unverified KBs or KBs with no catalog entry.
+    """
+    if not kb.verified:
+        return
+    from app.services.library_service import get_or_create_verified_library
+
+    verified_lib = await get_or_create_verified_library()
+    if not verified_lib.items:
+        return
+
+    items = await LibraryItem.find(
+        {"_id": {"$in": list(verified_lib.items)}},
+        LibraryItem.item_id == kb.id,
+        LibraryItem.kind == LibraryItemKind.KNOWLEDGE_BASE,
+    ).to_list()
+
+    new_tags = list(kb.tags or [])
+    for item in items:
+        if item.tags != new_tags:
+            item.tags = new_tags
+            await item.save()
 
 
 async def _mark_item_verified(item_id: PydanticObjectId, item_kind: str) -> None:
@@ -904,14 +1385,22 @@ async def _mark_item_verified(item_id: PydanticObjectId, item_kind: str) -> None
     verified_lib = await get_or_create_verified_library()
     verified_item_ids = set(verified_lib.items) if verified_lib.items else set()
 
-    # Check if this item is already in the verified library
+    # Check if this item is already in the verified library. The submitter's own
+    # LibraryItem is often already attached to the verified library at submission
+    # time but with verified=False — flip it to True rather than silently leaving
+    # it unverified (or creating a duplicate).
     existing_in_verified = await LibraryItem.find(
         {"_id": {"$in": list(verified_item_ids)}},
         {"item_id": item_id, "kind": item_kind},
     ).to_list() if verified_item_ids else []
 
-    if not existing_in_verified:
-        now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.datetime.now(datetime.timezone.utc)
+    if existing_in_verified:
+        for li in existing_in_verified:
+            if not li.verified:
+                li.verified = True
+                await li.save()
+    else:
         new_item = LibraryItem(
             item_id=item_id,
             kind=LibraryItemKind(item_kind),
@@ -938,7 +1427,10 @@ async def _get_item_name(item_kind: str, item_id: PydanticObjectId) -> str:
         return ss.title if ss else "Unknown extraction"
 
 
-async def _request_to_dict(req: VerificationRequest) -> dict:
+async def _request_to_dict(
+    req: VerificationRequest,
+    submitter_ref: AuthorRef | None = None,
+) -> dict:
     # Resolve item_uuid for search_set and knowledge_base items
     item_uuid = None
     if req.item_kind == "search_set":
@@ -961,6 +1453,7 @@ async def _request_to_dict(req: VerificationRequest) -> dict:
         "submitter_name": req.submitter_name,
         "submitter_org": req.submitter_org,
         "submitter_role": req.submitter_role,
+        "submitter": submitter_ref.model_dump() if submitter_ref else None,
         "summary": req.summary,
         "description": req.description,
         "category": req.category,
@@ -980,6 +1473,10 @@ async def _request_to_dict(req: VerificationRequest) -> dict:
         "validation_snapshot": req.validation_snapshot,
         "validation_score": req.validation_score,
         "validation_tier": req.validation_tier,
+        "validation_origin": req.validation_origin,
+        "examiner_baseline_additions": req.examiner_baseline_additions,
+        "claimed_by_user_id": req.claimed_by_user_id,
+        "claimed_at": req.claimed_at.isoformat() if req.claimed_at else None,
         "return_guidance": req.return_guidance,
     }
 

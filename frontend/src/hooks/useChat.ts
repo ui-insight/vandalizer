@@ -1,11 +1,18 @@
 import { useState, useCallback, useRef } from 'react'
 import { streamChat, getHistory } from '../api/chat'
-import type { ChatMessage, ContextBudgetPlan, StreamChunk, StreamSegment, ToolCallInfo, ToolResultInfo } from '../types/chat'
+import type { ChatMessage, Citation, ContextBudgetPlan, OversizeDocument, StreamChunk, StreamSegment, ToolCallInfo, ToolResultInfo } from '../types/chat'
 
 export interface ContextNotice {
   action: string
   detail: string
   tokens_dropped: number
+}
+
+export interface ChatError {
+  message: string
+  code?: string
+  suggestedAction?: 'convert_to_kb'
+  oversizeDocuments?: OversizeDocument[]
 }
 
 const THINK_BLOCK_RE = /<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>\n?/g
@@ -23,6 +30,7 @@ export function useChat() {
   const [activeToolCalls, setActiveToolCalls] = useState<ToolCallInfo[]>([])
   const [toolResults, setToolResults] = useState<ToolResultInfo[]>([])
   const [segments, setSegments] = useState<StreamSegment[]>([])
+  const [errorDetails, setErrorDetails] = useState<ChatError | null>(null)
   const [contextTokens, setContextTokens] = useState(0)
   const [contextMode, setContextMode] = useState<'full' | 'truncated' | 'compacted'>('full')
   const [contextCutoffIndex, setContextCutoffIndex] = useState(0)
@@ -36,10 +44,12 @@ export function useChat() {
   const toolResultsRef = useRef<ToolResultInfo[]>([])
   const segmentsRef = useRef<StreamSegment[]>([])
   const abortRef = useRef<AbortController | null>(null)
+  const citationsRef = useRef<Citation[]>([])
 
   const send = useCallback(
     async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuid?: string, includeOnboardingContext?: boolean, folderUuids?: string[], isFirstSession?: boolean, runDemo?: boolean) => {
       setError(null)
+      setErrorDetails(null)
       setIsStreaming(true)
       setStreamingContent('')
       setThinkingContent('')
@@ -55,6 +65,7 @@ export function useChat() {
       toolCallsRef.current = []
       toolResultsRef.current = []
       segmentsRef.current = []
+      citationsRef.current = []
 
       // Add user message immediately
       setMessages((prev) => [...prev, { role: 'user', content: message }])
@@ -127,6 +138,10 @@ export function useChat() {
                   setContextTokens(chunk.plan.total_input_tokens)
                 }
               }
+            } else if (chunk.kind === 'sources') {
+              if (chunk.sources?.length) {
+                citationsRef.current = [...citationsRef.current, ...chunk.sources]
+              }
             } else if (chunk.kind === 'context_notice') {
               setContextNotices((prev) => [
                 ...prev,
@@ -138,6 +153,12 @@ export function useChat() {
               ])
             } else if (chunk.kind === 'error') {
               setError(chunk.content)
+              setErrorDetails({
+                message: chunk.content,
+                code: chunk.code,
+                suggestedAction: chunk.suggested_action,
+                oversizeDocuments: chunk.oversize_documents,
+              })
             }
           },
           model,
@@ -183,6 +204,9 @@ export function useChat() {
               return seg
             }).filter((seg) => seg.kind !== 'text' || seg.content.trim().length > 0)
           }
+          if (citationsRef.current.length) {
+            assistantMsg.citations = citationsRef.current
+          }
           setMessages((prev) => [...prev, assistantMsg])
         }
       } catch (e) {
@@ -213,6 +237,9 @@ export function useChat() {
                     : seg,
                 )
                 .filter((seg) => seg.kind !== 'text' || seg.content.trim().length > 0)
+            }
+            if (citationsRef.current.length) {
+              assistantMsg.citations = citationsRef.current
             }
             setMessages((prev) => [...prev, assistantMsg])
           }
@@ -261,11 +288,17 @@ export function useChat() {
     setActiveToolCalls([])
     setToolResults([])
     setSegments([])
+    setErrorDetails(null)
     setContextTokens(0)
     setContextMode('full')
     setContextCutoffIndex(0)
     setContextPlan(null)
     setContextNotices([])
+  }, [])
+
+  const clearError = useCallback(() => {
+    setError(null)
+    setErrorDetails(null)
   }, [])
 
   const setActivity = useCallback((newActivityId: string, newConversationUuid: string) => {
@@ -286,6 +319,8 @@ export function useChat() {
     activeToolCalls,
     toolResults,
     segments,
+    errorDetails,
+    clearError,
     contextTokens,
     contextMode,
     contextCutoffIndex,

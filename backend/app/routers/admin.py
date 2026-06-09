@@ -1,6 +1,7 @@
 """Admin API routes  - usage stats, leaderboards, system config management."""
 
 import datetime
+import logging
 import math
 import re
 from typing import Optional
@@ -14,12 +15,15 @@ from app.dependencies import get_current_user
 from app.models.activity import ActivityEvent
 from app.models.audit_log import AdminAuditLog
 from app.models.system_config import SystemConfig
+from app.services import audit_service
 from app.services.llm_service import clear_agent_caches, get_agent_model
 from app.services.version_service import get_update_status
 from app.utils.encryption import decrypt_value, encrypt_value
 from app.models.team import Team, TeamMembership
 from app.models.user import User
 from app.models.document import SmartDocument
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -219,6 +223,8 @@ class PaginatedWorkflowResponse(BaseModel):
 class ConfigUpdateRequest(BaseModel):
     extraction_config: Optional[dict] = None
     quality_config: Optional[dict] = None
+    compliance_config: Optional[dict] = None
+    retention_config: Optional[dict] = None
     ocr_endpoint: Optional[str] = None
     ocr_api_key: Optional[str] = None
     llm_endpoint: Optional[str] = None
@@ -265,6 +271,11 @@ class ModelAddRequest(BaseModel):
     multimodal: bool = False
     supports_pdf: bool = False
     context_window: int = 128000
+    # Cost rates in USD per 1M tokens. Populated for external paid providers
+    # so KB Autovalidate can show dollar cost estimates in its budget modal.
+    # None = not declared; UI falls back to tokens-only display.
+    cost_per_1m_input: Optional[float] = None
+    cost_per_1m_output: Optional[float] = None
 
 
 class OAuthProviderRequest(BaseModel):
@@ -1063,6 +1074,135 @@ async def user_detail(
 
 
 # ---------------------------------------------------------------------------
+# 3d. GET /users/{user_id}/history  - Full per-user activity timeline
+# ---------------------------------------------------------------------------
+
+# Max rows pulled from each store before merging. A single user's audit +
+# activity rows within any reasonable window stay well under this; if either
+# store hits the cap we flag `capped` so the UI can prompt a narrower range
+# rather than silently dropping older events.
+HISTORY_FETCH_CAP = 1000
+
+
+class UserHistoryItem(BaseModel):
+    timestamp: Optional[datetime.datetime] = None
+    source: str  # "audit" | "activity"
+    action: str  # audit: e.g. "user.login"; activity: e.g. "workflow_run"
+    title: Optional[str] = None
+    resource_type: Optional[str] = None
+    resource_id: Optional[str] = None
+    status: Optional[str] = None  # activity status; None for audit rows
+    ip_address: Optional[str] = None
+    detail: dict = {}
+
+
+class UserHistoryResponse(BaseModel):
+    items: list[UserHistoryItem]
+    total: int
+    capped: bool
+
+
+@router.get("/users/{user_id}/history", response_model=UserHistoryResponse)
+async def user_history(
+    user_id: str,
+    days: int = Query(default=90, ge=1, le=MAX_ANALYTICS_DAYS),
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=200),
+    user: User = Depends(get_current_user),
+):
+    """Full chronological activity history for a single user.
+
+    Merges the immutable audit trail (``AuditLog``, who-did-what) with feature
+    telemetry (``ActivityEvent``, conversations/searches/workflow runs) into one
+    reverse-chronological feed. Super-admin only, for leadership auditing.
+    """
+    await _require_superadmin(user)
+
+    target_user = await User.find_one(User.user_id == user_id)
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    cutoff = datetime.datetime.utcnow() - datetime.timedelta(days=days)
+
+    # Immutable audit trail (who-did-what), filtered to this actor.
+    audit_entries, _ = await audit_service.query_audit_log(
+        actor_user_id=user_id,
+        start_time=cutoff,
+        skip=0,
+        limit=HISTORY_FETCH_CAP,
+    )
+
+    # Feature telemetry for this user.
+    activity_events = (
+        await ActivityEvent.find(
+            {"user_id": user_id, "started_at": {"$gte": cutoff}}
+        )
+        .sort(-ActivityEvent.started_at)
+        .limit(HISTORY_FETCH_CAP)
+        .to_list()
+    )
+
+    capped = (
+        len(audit_entries) >= HISTORY_FETCH_CAP
+        or len(activity_events) >= HISTORY_FETCH_CAP
+    )
+    if capped:
+        logger.warning(
+            "user_history hit fetch cap for user_id=%s (audit=%d activity=%d, days=%d)",
+            user_id,
+            len(audit_entries),
+            len(activity_events),
+            days,
+        )
+
+    items: list[UserHistoryItem] = []
+    for e in audit_entries:
+        items.append(
+            UserHistoryItem(
+                timestamp=e.timestamp,
+                source="audit",
+                action=e.action,
+                title=e.resource_name,
+                resource_type=e.resource_type,
+                resource_id=e.resource_id,
+                status=None,
+                ip_address=e.ip_address,
+                detail=e.detail or {},
+            )
+        )
+    for ev in activity_events:
+        items.append(
+            UserHistoryItem(
+                timestamp=ev.started_at,
+                source="activity",
+                action=ev.type,
+                title=ev.title,
+                resource_type=ev.type,
+                resource_id=str(ev.id),
+                status=ev.status,
+                ip_address=None,
+                detail={
+                    "tokens_input": ev.tokens_input or 0,
+                    "tokens_output": ev.tokens_output or 0,
+                    "steps_completed": ev.steps_completed or 0,
+                    "steps_total": ev.steps_total or 0,
+                    "error": ev.error,
+                },
+            )
+        )
+
+    # Newest first; rows with no timestamp sort to the end.
+    items.sort(
+        key=lambda r: r.timestamp or datetime.datetime.min,
+        reverse=True,
+    )
+    total = len(items)
+    page = items[skip : skip + limit]
+
+    return UserHistoryResponse(items=page, total=total, capped=capped)
+
+
+# ---------------------------------------------------------------------------
 # 3c. PUT /users/{user_id}/roles  - Update platform roles
 # ---------------------------------------------------------------------------
 
@@ -1245,7 +1385,8 @@ async def get_config(
         "ui_radius": cfg.ui_radius,
         "default_team_id": cfg.default_team_id or "",
         "support_contacts": cfg.support_contacts,
-        "m365_config": _sanitize_m365_config(cfg.get_m365_config()),
+        "compliance_config": cfg.get_compliance_config(),
+        "retention_config": cfg.get_retention_config(),
     }
 
 
@@ -1266,6 +1407,10 @@ async def update_config(
         cfg.extraction_config = body.extraction_config
     if body.quality_config is not None:
         cfg.quality_config = body.quality_config
+    if body.compliance_config is not None:
+        cfg.compliance_config = body.compliance_config
+    if body.retention_config is not None:
+        cfg.retention_config = body.retention_config
     if body.ocr_endpoint is not None:
         cfg.ocr_endpoint = body.ocr_endpoint
     if body.ocr_api_key is not None and body.ocr_api_key != "***":
@@ -1314,6 +1459,8 @@ async def add_model(
             "multimodal": body.multimodal,
             "supports_pdf": body.supports_pdf,
             "context_window": body.context_window,
+            "cost_per_1m_input": body.cost_per_1m_input,
+            "cost_per_1m_output": body.cost_per_1m_output,
         }
     )
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
@@ -1326,7 +1473,44 @@ async def add_model(
 
 
 # ---------------------------------------------------------------------------
-# 7b. PUT /config/models/{index}  - Update an existing model
+# 7b. PUT /config/models/default  - Set (or clear) the system default model
+# ---------------------------------------------------------------------------
+# Defined before PUT /config/models/{index} so "default" isn't parsed as an int.
+
+class DefaultModelRequest(BaseModel):
+    name: str = ""
+
+
+@router.put("/config/models/default")
+async def set_default_model(
+    body: DefaultModelRequest,
+    user: User = Depends(get_current_user),
+):
+    await _require_superadmin(user)
+
+    cfg = await SystemConfig.get_config()
+    name = (body.name or "").strip()
+
+    if name:
+        match = next(
+            (m for m in cfg.available_models if isinstance(m, dict) and m.get("name") == name),
+            None,
+        )
+        if not match:
+            raise HTTPException(status_code=404, detail=f"Model '{name}' is not configured")
+
+    cfg.default_model = name
+    cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
+    cfg.updated_by = user.user_id
+    await cfg.save()
+    clear_agent_caches()
+    await _audit(user, "set_default_model", f"Default model: {name or '(cleared)'}")
+
+    return {"status": "ok", "default_model": cfg.default_model or ""}
+
+
+# ---------------------------------------------------------------------------
+# 7c. PUT /config/models/{index}  - Update an existing model
 # ---------------------------------------------------------------------------
 
 @router.put("/config/models/{index}")
@@ -1364,6 +1548,8 @@ async def update_model(
         "multimodal": body.multimodal,
         "supports_pdf": body.supports_pdf,
         "context_window": body.context_window,
+        "cost_per_1m_input": body.cost_per_1m_input,
+        "cost_per_1m_output": body.cost_per_1m_output,
     }
     # Keep default_model pointer stable when the default is renamed.
     if cfg.default_model and cfg.default_model == prev_name and body.name != prev_name:
@@ -1403,42 +1589,6 @@ async def delete_model(
     await _audit(user, "delete_model", f"Deleted model at index {index}: {removed.get('tag', '?')}")
 
     return {"status": "ok", "removed": removed, "models": cfg.available_models, "default_model": cfg.default_model or ""}
-
-
-# ---------------------------------------------------------------------------
-# 8b. PUT /config/models/default  - Set (or clear) the system default model
-# ---------------------------------------------------------------------------
-
-class DefaultModelRequest(BaseModel):
-    name: str = ""
-
-
-@router.put("/config/models/default")
-async def set_default_model(
-    body: DefaultModelRequest,
-    user: User = Depends(get_current_user),
-):
-    await _require_superadmin(user)
-
-    cfg = await SystemConfig.get_config()
-    name = (body.name or "").strip()
-
-    if name:
-        match = next(
-            (m for m in cfg.available_models if isinstance(m, dict) and m.get("name") == name),
-            None,
-        )
-        if not match:
-            raise HTTPException(status_code=404, detail=f"Model '{name}' is not configured")
-
-    cfg.default_model = name
-    cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
-    cfg.updated_by = user.user_id
-    await cfg.save()
-    clear_agent_caches()
-    await _audit(user, "set_default_model", f"Default model: {name or '(cleared)'}")
-
-    return {"status": "ok", "default_model": cfg.default_model or ""}
 
 
 # ---------------------------------------------------------------------------
@@ -1543,53 +1693,56 @@ async def update_auth_methods(
 
 
 # ---------------------------------------------------------------------------
-# 12b. GET/PUT /config/m365  - M365 integration config
+# 12b. GET/PUT /config/compliance  - Document compliance check config
 # ---------------------------------------------------------------------------
 
 
-def _sanitize_m365_config(cfg: dict) -> dict:
-    """Mask the client_secret for safe display."""
-    out = {**cfg}
-    secret = out.get("client_secret", "")
-    if secret and secret != "***":
-        out["client_secret"] = "***"
-    return out
-
-
-@router.get("/config/m365")
-async def get_m365_config(
+@router.get("/config/compliance")
+async def get_compliance_config(
     user: User = Depends(get_current_user),
 ):
     await _require_superadmin(user)
     cfg = await SystemConfig.get_config()
-    return _sanitize_m365_config(cfg.get_m365_config())
+    return cfg.get_compliance_config()
 
 
-@router.put("/config/m365")
-async def update_m365_config(
+@router.put("/config/compliance")
+async def update_compliance_config(
     body: dict,
     user: User = Depends(get_current_user),
 ):
     await _require_superadmin(user)
     cfg = await SystemConfig.get_config()
-    current = cfg.get_m365_config()
+    current = cfg.get_compliance_config()
 
     if "enabled" in body:
         current["enabled"] = bool(body["enabled"])
-    if "client_id" in body:
-        current["client_id"] = body["client_id"]
-    if "tenant_id" in body:
-        current["tenant_id"] = body["tenant_id"]
-    if "client_secret" in body and body["client_secret"] != "***":
-        current["client_secret"] = encrypt_value(body["client_secret"])
+    if "check_on_upload" in body:
+        current["check_on_upload"] = bool(body["check_on_upload"])
+    if "rules" in body:
+        current["rules"] = str(body["rules"] or "")
+    if "chunk_size" in body:
+        try:
+            current["chunk_size"] = max(500, int(body["chunk_size"]))
+        except (TypeError, ValueError):
+            pass
+    if "chunk_overlap" in body:
+        try:
+            current["chunk_overlap"] = max(0, int(body["chunk_overlap"]))
+        except (TypeError, ValueError):
+            pass
 
-    cfg.m365_config = current
+    cfg.compliance_config = current
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
     cfg.updated_by = user.user_id
     await cfg.save()
-    await _audit(user, "update_m365_config", "Updated M365 integration configuration")
+    await _audit(
+        user,
+        "update_compliance_config",
+        f"Updated compliance configuration (enabled={current.get('enabled')})",
+    )
 
-    return _sanitize_m365_config(cfg.get_m365_config())
+    return cfg.get_compliance_config()
 
 
 # ---------------------------------------------------------------------------
@@ -2025,29 +2178,151 @@ async def test_ocr(user: User = Depends(get_current_user)):
 
 @router.post("/config/test-model/{index}")
 async def test_model(index: int, user: User = Depends(get_current_user)):
-    """Test an LLM model by sending a minimal completion request."""
+    """Run a real round-trip against a model and return full diagnostics.
+
+    Returns HTTP 200 with ``ok`` true/false (in-band, like the Prompt
+    Playground) so the UI can render a step-by-step breakdown — on success why
+    the model is healthy, on failure a classified error with a suggested fix —
+    instead of a bare error toast. A genuinely missing model still 404s.
+    """
     await _require_superadmin(user)
 
     cfg = await SystemConfig.get_config()
     if index < 0 or index >= len(cfg.available_models):
         raise HTTPException(status_code=404, detail="Model not found")
 
-    model_cfg = cfg.available_models[index]
-    model_name = model_cfg.get("name", "")
+    from app.services.system_diagnostics import diagnose_model
 
+    return await diagnose_model(cfg, index)
+
+
+@router.get("/readiness")
+async def get_readiness(user: User = Depends(get_current_user)) -> dict:
+    """Report whether this install is set up: a graded setup checklist.
+
+    Drives the admin setup surface. ``ready`` is false while any blocker
+    (e.g. no language model) is unresolved.
+    """
+    await _require_admin(user)
+
+    from app.services.system_diagnostics import build_readiness
+
+    cfg = await SystemConfig.get_config()
+    return build_readiness(cfg)
+
+
+class TestPromptRequest(BaseModel):
+    model_name: str = ""
+    system_prompt: str = ""
+    user_prompt: str
+
+
+@router.post("/config/test-prompt")
+async def test_prompt(body: TestPromptRequest, user: User = Depends(get_current_user)):
+    """Send an ad-hoc prompt to a configured model and return the raw round-trip.
+
+    Powers the admin "Prompt Playground" — admins paste a system/user prompt,
+    pick a model, and see exactly what came back. Errors are returned in-band
+    (HTTP 200 with ok=false) so the UI can render the failure alongside the
+    request that produced it.
+    """
+    await _require_superadmin(user)
+
+    cfg = await SystemConfig.get_config()
+    requested = (body.model_name or "").strip()
+    model_name = requested or (cfg.default_model or "").strip()
+    if not model_name:
+        raise HTTPException(status_code=400, detail="No model specified and no default model configured")
+
+    if not body.user_prompt.strip():
+        raise HTTPException(status_code=400, detail="user_prompt cannot be empty")
+
+    model_entry = next((m for m in cfg.available_models if m.get("name") == model_name), None)
+    if not model_entry:
+        raise HTTPException(status_code=404, detail=f"Model '{model_name}' is not in available_models")
+
+    import time as _time
+    from pydantic_ai import Agent
+
+    started = _time.perf_counter()
+    request_echo = {
+        "model": model_name,
+        "system_prompt": body.system_prompt,
+        "user_prompt": body.user_prompt,
+    }
     try:
-        from pydantic_ai import Agent
-
         model = get_agent_model(model_name, system_config_doc=cfg.model_dump())
-        agent = Agent(model, system_prompt="Reply with exactly: ok")
-        result = await agent.run("Say ok")
+        system = body.system_prompt.strip()
+        agent = Agent(model, system_prompt=system) if system else Agent(model)
+        from app.services.metering import metered_async
+        async with metered_async("diagnostics"):
+            result = await agent.run(body.user_prompt)
+        elapsed_ms = int((_time.perf_counter() - started) * 1000)
+        usage = result.usage()
         return {
-            "status": "ok",
-            "model": model_name,
-            "message": f"Model responded: {result.output[:100]}",
+            "ok": True,
+            "request": request_echo,
+            "response_text": result.output or "",
+            "latency_ms": elapsed_ms,
+            "tokens": {
+                "request": getattr(usage, "request_tokens", None),
+                "response": getattr(usage, "response_tokens", None),
+                "total": getattr(usage, "total_tokens", None),
+            },
         }
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Model test failed: {e}")
+        elapsed_ms = int((_time.perf_counter() - started) * 1000)
+        return {
+            "ok": False,
+            "request": request_echo,
+            "response_text": "",
+            "latency_ms": elapsed_ms,
+            "error": str(e),
+        }
+
+
+class ModelProbeRequest(BaseModel):
+    name: str
+    endpoint: Optional[str] = ""
+    api_protocol: Optional[str] = ""
+    api_key: Optional[str] = ""
+    # When editing an existing model, the form sends api_key="***" to
+    # preserve the stored credential. Pass that model's index so we can
+    # decrypt and use it.
+    existing_model_index: Optional[int] = None
+
+
+@router.post("/config/probe-model")
+async def probe_model(
+    body: ModelProbeRequest,
+    user: User = Depends(get_current_user),
+):
+    """Ask the endpoint what context window it actually serves.
+
+    Used by the admin model form to pre-fill `context_window` from the
+    truth instead of the substring fallback table. Result is advisory —
+    the admin still chooses whether to accept it.
+    """
+    await _require_superadmin(user)
+
+    from app.services.model_probe import probe_context_window
+
+    api_key = (body.api_key or "").strip()
+    if (api_key == "***" or not api_key) and body.existing_model_index is not None:
+        cfg = await SystemConfig.get_config()
+        idx = body.existing_model_index
+        if 0 <= idx < len(cfg.available_models):
+            stored = cfg.available_models[idx].get("api_key", "")
+            if stored:
+                api_key = decrypt_value(stored) or ""
+
+    result = await probe_context_window(
+        endpoint=(body.endpoint or "").strip(),
+        api_protocol=(body.api_protocol or "").strip(),
+        api_key=api_key,
+        model_name=(body.name or "").strip(),
+    )
+    return result.to_dict()
 
 
 # ---------------------------------------------------------------------------
@@ -2460,7 +2735,7 @@ async def create_api_key(
     user: User = Depends(get_current_user),
 ):
     """Issue a new management API key. Returns the full token once."""
-    await _require_superadmin(user)
+    await _require_admin(user)
 
     from app.dependencies import MGMT_SCOPES
     from app.models.api_key import ApiKey
@@ -2507,7 +2782,7 @@ async def list_api_keys(
     include_revoked: bool = False,
     user: User = Depends(get_current_user),
 ):
-    await _require_superadmin(user)
+    await _require_admin(user)
 
     from app.models.api_key import ApiKey
 
@@ -2538,7 +2813,7 @@ async def revoke_api_key(
     key_id: str,
     user: User = Depends(get_current_user),
 ):
-    await _require_superadmin(user)
+    await _require_admin(user)
 
     from app.models.api_key import ApiKey
 
@@ -2563,3 +2838,113 @@ async def revoke_api_key(
         {"key_id": key_id, "name": key.name},
     )
     return {"id": key_id, "revoked": True}
+
+
+@router.get("/api-keys/docs")
+async def get_api_key_docs(user: User = Depends(get_current_user)):
+    """Return the management-API documentation as markdown."""
+    await _require_admin(user)
+
+    from pathlib import Path
+
+    docs_path = Path(__file__).resolve().parent.parent / "docs" / "mgmt-api.md"
+    if not docs_path.is_file():
+        raise HTTPException(status_code=404, detail="Documentation not found")
+    return {"markdown": docs_path.read_text(encoding="utf-8")}
+
+
+@router.get("/api-keys/skill")
+async def get_api_key_skill(user: User = Depends(get_current_user)):
+    """Download the Claude Code skill file for the Management API."""
+    from pathlib import Path
+
+    from fastapi.responses import FileResponse
+
+    await _require_admin(user)
+
+    skill_path = Path(__file__).resolve().parent.parent / "docs" / "vandalizer-api-skill.md"
+    if not skill_path.is_file():
+        raise HTTPException(status_code=404, detail="Skill file not found")
+    return FileResponse(
+        path=skill_path,
+        media_type="text/markdown; charset=utf-8",
+        filename="SKILL.md",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Knowledge base inventory (admin review — e.g. auditing names for versioning)
+# ---------------------------------------------------------------------------
+
+class AdminKBSummary(BaseModel):
+    uuid: str
+    title: str
+    status: str
+    verified: bool
+    tags: list[str]
+    total_sources: int
+    total_chunks: int
+    owner_id: str
+    owner_email: Optional[str] = None
+    team_id: Optional[str] = None
+    team_name: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class AdminKBListResponse(BaseModel):
+    total: int
+    knowledge_bases: list[AdminKBSummary]
+
+
+@router.get("/knowledge-bases", response_model=AdminKBListResponse)
+async def admin_list_knowledge_bases(
+    search: Optional[str] = Query(None, description="Case-insensitive title substring"),
+    limit: int = Query(1000, ge=1, le=5000),
+    user: User = Depends(get_current_user),
+):
+    """List every knowledge base across all users and teams (admin-only).
+
+    Read-only inventory for reviewing KB names/versions org-wide. Owner email
+    and team name are batch-resolved for display.
+    """
+    await _require_admin(user)
+
+    from app.services import knowledge_service
+
+    kbs = await knowledge_service.admin_list_all_knowledge_bases(search=search, limit=limit)
+
+    # Batch-resolve owner emails and team names so the table is readable
+    # without an N+1 per row.
+    owner_ids = {kb.user_id for kb in kbs if kb.user_id}
+    team_ids = {kb.team_id for kb in kbs if kb.team_id}
+    owner_email: dict[str, str] = {}
+    team_name: dict[str, str] = {}
+    if owner_ids:
+        for u in await User.find({"user_id": {"$in": list(owner_ids)}}).to_list():
+            if getattr(u, "email", None):
+                owner_email[u.user_id] = u.email
+    if team_ids:
+        for t in await Team.find({"uuid": {"$in": list(team_ids)}}).to_list():
+            if getattr(t, "name", None):
+                team_name[t.uuid] = t.name
+
+    summaries = [
+        AdminKBSummary(
+            uuid=kb.uuid,
+            title=kb.title,
+            status=kb.status,
+            verified=kb.verified,
+            tags=kb.tags,
+            total_sources=kb.total_sources,
+            total_chunks=kb.total_chunks,
+            owner_id=kb.user_id,
+            owner_email=owner_email.get(kb.user_id),
+            team_id=kb.team_id,
+            team_name=team_name.get(kb.team_id) if kb.team_id else None,
+            created_at=kb.created_at.isoformat() if kb.created_at else None,
+            updated_at=kb.updated_at.isoformat() if kb.updated_at else None,
+        )
+        for kb in kbs
+    ]
+    return AdminKBListResponse(total=len(summaries), knowledge_bases=summaries)

@@ -33,8 +33,23 @@ Run an extraction against a search set. Accepts files, existing document UUIDs, 
 | `document_uuids`  | one of   | Comma-separated UUIDs of documents already in Vandalizer. |
 | `text`            | one of   | Raw text to extract from. |
 | `text_title`      | no       | Optional title for the `text` payload (defaults to `"API text input"`). |
+| `ephemeral`       | no       | `true` (default) deletes API-supplied `files` and `text` after the run so they don't accumulate in your library. Existing `document_uuids` are never touched. Set to `false` to retain them in your root folder. |
 
 At least one of `files`, `document_uuids`, or `text` must be provided.
+
+### Document lifecycle
+
+By default, anything you submit as `files` or `text` is treated as an
+ephemeral payload: the document is created, extracted against, and then
+deleted (Mongo record + uploaded file + any embeddings) before the response
+returns. The UUIDs still appear in the `documents` diagnostic block so you
+can read per-document status, but the records are gone afterward.
+
+If you want API uploads to stick around — for example, you're seeding a
+library from a script and want the files visible in the UI — pass
+`ephemeral=false`. The documents will land in your root folder (the legacy
+behavior). Documents referenced via `document_uuids` are never deleted
+regardless of this flag.
 
 ### Response
 
@@ -90,6 +105,16 @@ curl -X POST "https://vandalizer.example.edu/api/extractions/run-integrated" \
   -H "x-api-key: YOUR_API_KEY" \
   -F "search_set_uuid=YOUR_SEARCH_SET_UUID" \
   -F "document_uuids=UUID1,UUID2"
+```
+
+#### curl — keep API uploads in your library
+
+```bash
+curl -X POST "https://vandalizer.example.edu/api/extractions/run-integrated" \
+  -H "x-api-key: YOUR_API_KEY" \
+  -F "search_set_uuid=YOUR_SEARCH_SET_UUID" \
+  -F "ephemeral=false" \
+  -F "files=@/absolute/path/to/document.pdf"
 ```
 
 #### Python — file upload

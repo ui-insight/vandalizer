@@ -11,6 +11,12 @@ export function useCertification() {
     try {
       const data = await api.getProgress()
       setProgress(data)
+    } catch {
+      // Progress fetch failed (e.g. a transient 5xx / gateway error while the
+      // backend is restarting). This hook runs app-wide on every page mount via
+      // CertificationPanelProvider, so an uncaught rejection here surfaced as a
+      // global "Request failed" unhandled rejection. Swallow it and keep any
+      // prior progress — the next refresh recovers.
     } finally {
       setLoading(false)
     }

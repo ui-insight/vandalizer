@@ -12,10 +12,27 @@ interface DocumentPickerModalProps {
 
 type UploadStatus = 'uploading' | 'done' | 'error'
 interface UploadItem {
+  id: string
   name: string
   status: UploadStatus
   uuid?: string
   error?: string
+}
+
+// Keep in sync with backend ALLOWED_EXTS in app/utils/file_validation.py
+const ALLOWED_EXTS = ['pdf', 'doc', 'docx', 'xlsx', 'xls', 'csv', 'txt', 'md']
+const ACCEPT_ATTR = ALLOWED_EXTS.map(e => `.${e}`).join(',')
+const ALLOWED_HINT = ALLOWED_EXTS.join(', ')
+
+function getExt(name: string): string {
+  const i = name.lastIndexOf('.')
+  return i >= 0 ? name.slice(i + 1).toLowerCase() : ''
+}
+
+function newId(): string {
+  return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`
 }
 
 function fileToBase64(file: File): Promise<string> {
@@ -95,47 +112,66 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
     return folders.find(f => f.uuid === uuid)?.path ?? ''
   }, [folders])
 
+  const patchUpload = (id: string, patch: Partial<UploadItem>) => {
+    setUploads(prev => prev.map(u => (u.id === id ? { ...u, ...patch } : u)))
+  }
+
+  const removeUpload = (id: string) => {
+    setUploads(prev => {
+      const target = prev.find(u => u.id === id)
+      if (target?.status === 'done' && target.uuid) {
+        setSelected(s => {
+          const next = new Set(s)
+          next.delete(target.uuid!)
+          return next
+        })
+      }
+      return prev.filter(u => u.id !== id)
+    })
+  }
+
   const handleFiles = async (files: File[]) => {
     if (files.length === 0) return
     const targetFolder = folderFilter && folderFilter !== '__root__' ? folderFilter : undefined
-    const initial: UploadItem[] = files.map(f => ({ name: f.name, status: 'uploading' }))
-    setUploads(prev => [...prev, ...initial])
-    const startIdx = uploads.length
+
+    type Prepared = { item: UploadItem; file?: File; ext?: string }
+    const prepared: Prepared[] = files.map(file => {
+      const ext = getExt(file.name)
+      if (!ALLOWED_EXTS.includes(ext)) {
+        return {
+          item: {
+            id: newId(),
+            name: file.name,
+            status: 'error',
+            error: ext ? `.${ext} not supported` : 'unsupported file type',
+          },
+        }
+      }
+      return { item: { id: newId(), name: file.name, status: 'uploading' }, file, ext }
+    })
+    setUploads(prev => [...prev, ...prepared.map(p => p.item)])
+
     const newUuids: string[] = []
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i]
-      const ext = file.name.split('.').pop() || ''
+    for (const p of prepared) {
+      if (!p.file || !p.ext) continue
       try {
-        const base64 = await fileToBase64(file)
+        const base64 = await fileToBase64(p.file)
         const result = await uploadFile({
           contentAsBase64String: base64,
-          fileName: file.name,
-          extension: ext,
+          fileName: p.file.name,
+          extension: p.ext,
           folder: targetFolder,
         })
         if (result.uuid) {
           newUuids.push(result.uuid)
-          setUploads(prev => {
-            const next = [...prev]
-            next[startIdx + i] = { ...next[startIdx + i], status: 'done', uuid: result.uuid }
-            return next
-          })
+          patchUpload(p.item.id, { status: 'done', uuid: result.uuid })
         } else {
-          setUploads(prev => {
-            const next = [...prev]
-            next[startIdx + i] = { ...next[startIdx + i], status: 'error', error: 'Upload failed' }
-            return next
-          })
+          patchUpload(p.item.id, { status: 'error', error: 'Upload failed' })
         }
       } catch (err) {
-        setUploads(prev => {
-          const next = [...prev]
-          next[startIdx + i] = {
-            ...next[startIdx + i],
-            status: 'error',
-            error: err instanceof Error ? err.message : 'Upload failed',
-          }
-          return next
+        patchUpload(p.item.id, {
+          status: 'error',
+          error: err instanceof Error ? err.message : 'Upload failed',
         })
       }
     }
@@ -145,7 +181,6 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
         newUuids.forEach(u => next.add(u))
         return next
       })
-      // Refresh list so uploaded docs are visible in results
       doSearch(query, folderFilter)
     }
   }
@@ -237,28 +272,34 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
         </div>
 
         {/* Upload row */}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            onChange={onFileInputChange}
-            style={{ display: 'none' }}
-          />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '8px 12px', fontSize: 13, fontWeight: 500, fontFamily: 'inherit',
-              color: '#000', backgroundColor: 'var(--highlight-color, #eab308)',
-              border: 'none', borderRadius: 6, cursor: 'pointer',
-            }}
-          >
-            <Upload size={14} />
-            Upload files
-          </button>
-          <span style={{ fontSize: 12, color: '#888' }}>
-            or drag &amp; drop anywhere in this dialog
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept={ACCEPT_ATTR}
+              onChange={onFileInputChange}
+              style={{ display: 'none' }}
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '8px 12px', fontSize: 13, fontWeight: 500, fontFamily: 'inherit',
+                color: '#000', backgroundColor: 'var(--highlight-color, #eab308)',
+                border: 'none', borderRadius: 6, cursor: 'pointer',
+              }}
+            >
+              <Upload size={14} />
+              Upload files
+            </button>
+            <span style={{ fontSize: 12, color: '#888' }}>
+              or drag &amp; drop anywhere in this dialog
+            </span>
+          </div>
+          <span style={{ fontSize: 11, color: '#777', fontStyle: 'italic' }}>
+            Supported: {ALLOWED_HINT}
           </span>
         </div>
 
@@ -308,8 +349,8 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
             padding: 8, backgroundColor: '#252525', borderRadius: 6,
             border: '1px solid #333',
           }}>
-            {uploads.map((u, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+            {uploads.map(u => (
+              <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
                 {u.status === 'uploading' && <Loader2 size={12} style={{ color: '#888', animation: 'spin 1s linear infinite' }} />}
                 {u.status === 'done' && <Check size={12} style={{ color: '#6a9955' }} />}
                 {u.status === 'error' && <X size={12} style={{ color: '#c75450' }} />}
@@ -318,6 +359,19 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
                 </span>
                 {u.status === 'error' && <span style={{ color: '#c75450', fontSize: 11 }}>{u.error}</span>}
                 {u.status === 'done' && <span style={{ color: '#6a9955', fontSize: 11 }}>uploaded &amp; selected</span>}
+                {u.status !== 'uploading' && (
+                  <button
+                    onClick={() => removeUpload(u.id)}
+                    aria-label={`Remove ${u.name}`}
+                    title="Remove"
+                    style={{
+                      background: 'transparent', border: 'none', cursor: 'pointer',
+                      padding: 2, display: 'flex', color: '#888',
+                    }}
+                  >
+                    <X size={12} />
+                  </button>
+                )}
               </div>
             ))}
           </div>

@@ -96,6 +96,41 @@ async def _log_send(
         logger.exception("Failed to persist EmailLog for %s", recipient)
 
 
+#: Brand defaults baked into the email templates below. When an admin customizes
+#: branding in System Config, these are swapped out at send time (see
+#: _apply_branding) so every template — current and future — is white-labeled
+#: without threading branding through 20+ template signatures.
+_EMAIL_DEFAULT_NAME = "Vandalizer"
+_EMAIL_DEFAULT_COLOR = "#f1b300"
+#: The theme's own default highlight; if highlight_color still equals this, the
+#: admin hasn't picked a brand color, so leave the email gold (#f1b300) alone.
+_THEME_DEFAULT_COLOR = "#eab308"
+
+
+async def _apply_branding(subject: str, html_body: str) -> tuple[str, str]:
+    """Swap the baked-in Vandalizer name/color for the deployment's branding.
+
+    Best-effort: any failure (DB unavailable in a worker, etc.) falls back to the
+    default Vandalizer branding rather than blocking the email. The name swap is
+    case-sensitive on the capitalized product name, so lowercase URLs/domains
+    (e.g. https://vandalizer.example.edu) are never rewritten.
+    """
+    try:
+        from app.models.system_config import SystemConfig
+
+        config = await SystemConfig.get_config()
+        org = (config.org_name or "").strip()
+        if org and org != _EMAIL_DEFAULT_NAME:
+            subject = subject.replace(_EMAIL_DEFAULT_NAME, org)
+            html_body = html_body.replace(_EMAIL_DEFAULT_NAME, org)
+        color = (config.highlight_color or "").strip()
+        if color and color.lower() != _THEME_DEFAULT_COLOR:
+            html_body = html_body.replace(_EMAIL_DEFAULT_COLOR, color)
+    except Exception:
+        logger.exception("Failed to apply email branding; sending with defaults")
+    return subject, html_body
+
+
 async def send_email(
     to: str,
     subject: str,
@@ -109,6 +144,8 @@ async def send_email(
     """
     if settings is None:
         settings = Settings()
+
+    subject, html_body = await _apply_branding(subject, html_body)
 
     provider = settings.email_provider if settings.email_provider == "resend" else "smtp"
     if provider == "resend":
@@ -356,14 +393,21 @@ def verification_status_email(
 
 def support_reply_email(
     user_name: str, ticket_subject: str, message: str, ticket_uuid: str, frontend_url: str,
+    ticket_number: int | None = None,
 ) -> tuple[str, str]:
     """Returns (subject, html_body) when support replies to a user's ticket."""
-    subject = f"Re: {ticket_subject}"
+    num_prefix = f"[#{ticket_number}] " if ticket_number else ""
+    subject = f"{num_prefix}Re: {ticket_subject}"
+    label = (
+        f'<span class="highlight">#{ticket_number}</span> &middot; <span class="highlight">{ticket_subject}</span>'
+        if ticket_number
+        else f'<span class="highlight">{ticket_subject}</span>'
+    )
     html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
     <div class="container"><div class="card">
       <div class="logo">Vandalizer Support</div>
       <h1>New reply on your ticket</h1>
-      <p>Hi {user_name}, there's a new reply on your support ticket <span class="highlight">{ticket_subject}</span>.</p>
+      <p>Hi {user_name}, there's a new reply on your support ticket {label}.</p>
       <div style="margin:16px 0;padding:12px 16px;background:rgba(255,255,255,0.05);border-left:3px solid #f1b300;border-radius:4px;">
         <p style="margin:0;font-size:14px;color:#d1d5db;">{message[:500]}</p>
       </div>
@@ -375,9 +419,11 @@ def support_reply_email(
 
 def support_status_email(
     user_name: str, ticket_subject: str, new_status: str, ticket_uuid: str, frontend_url: str,
+    ticket_number: int | None = None,
 ) -> tuple[str, str]:
     """Returns (subject, html_body) when a support ticket status changes."""
-    subject = f"Ticket {new_status}: {ticket_subject}"
+    num_prefix = f"[#{ticket_number}] " if ticket_number else ""
+    subject = f"{num_prefix}Ticket {new_status}: {ticket_subject}"
     html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
     <div class="container"><div class="card">
       <div class="logo">Vandalizer Support</div>
@@ -392,9 +438,11 @@ def support_status_email(
 def support_new_message_email(
     support_name: str, ticket_subject: str, ticket_user: str, message: str,
     ticket_uuid: str, frontend_url: str,
+    ticket_number: int | None = None,
 ) -> tuple[str, str]:
     """Returns (subject, html_body) when a user replies on a support ticket (for agents)."""
-    subject = f"New message on ticket: {ticket_subject}"
+    num_prefix = f"[#{ticket_number}] " if ticket_number else ""
+    subject = f"{num_prefix}New message on ticket: {ticket_subject}"
     html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
     <div class="container"><div class="card">
       <div class="logo">Vandalizer Support</div>
@@ -417,11 +465,13 @@ def support_tag_added_email(
     actor_name: str,
     ticket_uuid: str,
     frontend_url: str,
+    ticket_number: int | None = None,
 ) -> tuple[str, str]:
     """Returns (subject, html_body) when a support agent adds tag(s) to a ticket."""
     tag_list = ", ".join(added_tags)
     plural = "s" if len(added_tags) != 1 else ""
-    subject = f"Tag{plural} added to ticket: {ticket_subject}"
+    num_prefix = f"[#{ticket_number}] " if ticket_number else ""
+    subject = f"{num_prefix}Tag{plural} added to ticket: {ticket_subject}"
     tag_pills = "".join(
         f'<span style="display:inline-block;background:#f1b300;color:#000;'
         f'font-weight:600;font-size:13px;padding:3px 10px;border-radius:12px;'
@@ -434,6 +484,37 @@ def support_tag_added_email(
       <h1>Tag{plural} added to a ticket</h1>
       <p>Hi {support_name}, <span class="highlight">{actor_name}</span> added tag{plural} <strong style="color:#fff">{tag_list}</strong> to ticket <strong style="color:#fff">{ticket_subject}</strong> (from {ticket_user}).</p>
       <div style="margin:16px 0;">{tag_pills}</div>
+      <p style="margin-top:24px"><a class="btn" href="{frontend_url}/support?ticket={ticket_uuid}">View Ticket</a></p>
+      <div class="footer">Vandalizer Support System</div>
+    </div></div></body></html>"""
+    return subject, html
+
+
+def support_watcher_added_email(
+    watcher_name: str,
+    ticket_subject: str,
+    ticket_user: str,
+    actor_name: str,
+    first_message: str,
+    ticket_uuid: str,
+    frontend_url: str,
+    ticket_number: int | None = None,
+) -> tuple[str, str]:
+    """Returns (subject, html_body) when a user is tagged as a watcher on a ticket."""
+    num_prefix = f"[#{ticket_number}] " if ticket_number else ""
+    subject = f"{num_prefix}You were added to a support ticket: {ticket_subject}"
+    preview_block = ""
+    if first_message:
+        preview_block = f"""
+      <div style="margin:16px 0;padding:12px 16px;background:rgba(255,255,255,0.05);border-left:3px solid #f1b300;border-radius:4px;">
+        <p style="margin:0;font-size:14px;color:#d1d5db;">{first_message[:500]}</p>
+      </div>"""
+    html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
+    <div class="container"><div class="card">
+      <div class="logo">Vandalizer Support</div>
+      <h1>You're now following a support ticket</h1>
+      <p>Hi {watcher_name}, <span class="highlight">{actor_name}</span> added you to ticket <strong style="color:#fff">{ticket_subject}</strong> (opened by {ticket_user}). You'll receive updates as the ticket progresses and can reply directly.</p>
+      {preview_block}
       <p style="margin-top:24px"><a class="btn" href="{frontend_url}/support?ticket={ticket_uuid}">View Ticket</a></p>
       <div class="footer">Vandalizer Support System</div>
     </div></div></body></html>"""

@@ -90,6 +90,33 @@ async def get_search_set(search_set_uuid: str) -> SearchSet | None:
     return await SearchSet.find_one(SearchSet.uuid == search_set_uuid)
 
 
+def effective_extraction_config(ss: SearchSet | dict | None) -> dict:
+    """Resolve the extraction config that should actually be used at run time.
+
+    When the optimizer has applied a config (``extraction_config_override`` is
+    set), that wins. Otherwise the user's authored ``extraction_config`` is
+    returned. Both empty → returns an empty dict.
+
+    Accepts either a SearchSet Beanie document or a raw pymongo dict (Celery
+    tasks read with `db.search_set.find_one` and don't bother hydrating).
+
+    All ExtractionEngine callers should resolve through this helper so the
+    optimizer's apply-back is honored uniformly across extraction, verification,
+    workflow, and passive tasks.
+    """
+    if ss is None:
+        return {}
+    if isinstance(ss, dict):
+        override = ss.get("extraction_config_override")
+        base = ss.get("extraction_config")
+    else:
+        override = getattr(ss, "extraction_config_override", None)
+        base = ss.extraction_config
+    if isinstance(override, dict) and override:
+        return override
+    return base or {}
+
+
 async def get_search_set_item(item_id: str) -> SearchSetItem | None:
     try:
         return await SearchSetItem.get(PydanticObjectId(item_id))
@@ -261,6 +288,76 @@ async def get_extraction_field_metadata(search_set_uuid: str) -> list[dict]:
     ]
 
 
+# Values that mean "the model found nothing", not a real data point. Excluded
+# from the numeric/text vote so a numeric field that is often blank isn't
+# misread as text.
+_NUMERIC_SAMPLE_SENTINELS = {"", "n/a", "na", "none", "null", "-", "—",
+                             "not found", "not applicable", "unknown"}
+
+
+async def infer_numeric_fields(search_set_uuid: str, sample_runs: int = 5) -> dict[str, bool]:
+    """Classify each field as numeric or not from recently-validated values.
+
+    Walks the most recent validation runs for this search set and tallies, per
+    field, how many real extracted values parse as numbers (reusing the same
+    parser the cross-field validator uses). Returns ``{field_name: bool}`` only
+    for fields with a confident verdict — fields never validated, or whose
+    sample is too small or too mixed to call, are omitted so the caller falls
+    back to name/enum heuristics.
+
+    Used by the cross-field rule suggester to keep text fields out of numeric
+    sum_equals rules.
+    """
+    from app.models.validation_run import ValidationRun
+    from app.services.cross_field_validation import _try_parse_number
+
+    runs = (
+        await ValidationRun.find(
+            ValidationRun.item_kind == "search_set",
+            ValidationRun.item_id == search_set_uuid,
+            ValidationRun.run_type == "extraction",
+        )
+        .sort("-created_at")
+        .limit(sample_runs)
+        .to_list()
+    )
+
+    # field_name -> [numeric_count, total_count]
+    tallies: dict[str, list[int]] = {}
+    for run in runs:
+        snapshot = run.result_snapshot or {}
+        for tc in snapshot.get("test_cases", []):
+            for fr in tc.get("fields", []) or []:
+                name = fr.get("field_name")
+                if not name:
+                    continue
+                values = list(fr.get("extracted_values") or [])
+                mcv = fr.get("most_common_value")
+                if mcv is not None:
+                    values.append(mcv)
+                for v in values:
+                    if v is None:
+                        continue
+                    s = str(v).strip()
+                    if not s or s.lower() in _NUMERIC_SAMPLE_SENTINELS:
+                        continue
+                    tally = tallies.setdefault(name, [0, 0])
+                    tally[1] += 1
+                    if _try_parse_number(v) is not None:
+                        tally[0] += 1
+
+    verdicts: dict[str, bool] = {}
+    for name, (numeric, total) in tallies.items():
+        if total < 3:
+            continue  # too few samples to call confidently
+        frac = numeric / total
+        if frac >= 0.8:
+            verdicts[name] = True
+        elif frac <= 0.2:
+            verdicts[name] = False
+    return verdicts
+
+
 # ---------------------------------------------------------------------------
 # Build from document (AI-powered field generation)
 # ---------------------------------------------------------------------------
@@ -296,13 +393,16 @@ Passage:
 {doc_text}"""
 
 
-async def build_from_documents(
-    search_set_uuid: str,
+async def suggest_fields_from_documents(
     document_uuids: list[str],
     user_id: str,
     model: str | None = None,
 ) -> tuple[list[str], str | None]:
     """Use an LLM to analyze documents and suggest extraction field names.
+
+    Pure suggestion — does not persist to any SearchSet. Use this when you need
+    AI-suggested fields without a saved set (e.g., inside the workflow editor's
+    manual-fields path).
 
     Returns a tuple of (field_names, suggested_title). The suggested title is
     a short, content-aware name callers can use when the user didn't supply
@@ -311,7 +411,6 @@ async def build_from_documents(
     import json as _json
     from app.services.llm_service import create_chat_agent
 
-    # Load document texts
     doc_text = ""
     for doc_uuid in document_uuids:
         doc = await SmartDocument.find_one(SmartDocument.uuid == doc_uuid)
@@ -319,9 +418,8 @@ async def build_from_documents(
             doc_text += doc.raw_text + "\n"
 
     if not doc_text.strip():
-        return []
+        return [], None
 
-    # Resolve model
     if not model:
         model = await get_user_model_name(user_id)
 
@@ -336,14 +434,14 @@ async def build_from_documents(
 
     prompt = BUILD_FROM_DOC_USER_PROMPT.format(doc_text=doc_text[:100000])
     try:
-        result = await agent.run(prompt)
+        from app.services.metering import metered_async
+        async with metered_async("kb_field_suggest", user_id=user_id):
+            result = await agent.run(prompt)
     except Exception as e:
         raise RuntimeError(f"LLM call failed: {e}") from e
     response_text = result.output
 
-    # Parse JSON from response
     text = response_text.strip()
-    # Strip markdown code blocks if present
     if text.startswith("```"):
         text = text.split("\n", 1)[1] if "\n" in text else text[3:]
     if text.endswith("```"):
@@ -353,7 +451,6 @@ async def build_from_documents(
     try:
         parsed = _json.loads(text)
     except _json.JSONDecodeError:
-        # Try to find JSON object in the response
         start = text.find("{")
         end = text.rfind("}") + 1
         if start >= 0 and end > start:
@@ -371,15 +468,29 @@ async def build_from_documents(
     else:
         suggested_title = None
 
-    # Add items to the search set
-    added = []
+    cleaned: list[str] = []
     for entity_name in entities:
         if not isinstance(entity_name, str) or not entity_name.strip():
             continue
-        name = entity_name.strip()
+        cleaned.append(entity_name.strip())
+    return cleaned, suggested_title
+
+
+async def build_from_documents(
+    search_set_uuid: str,
+    document_uuids: list[str],
+    user_id: str,
+    model: str | None = None,
+) -> tuple[list[str], str | None]:
+    """Suggest extraction fields from documents and persist them into a SearchSet.
+
+    Returns (added_field_names, suggested_title).
+    """
+    entities, suggested_title = await suggest_fields_from_documents(document_uuids, user_id, model)
+    added = []
+    for name in entities:
         await add_item(search_set_uuid, name, searchtype="extraction", title=name, user_id=user_id)
         added.append(name)
-
     return added, suggested_title
 
 
@@ -474,11 +585,10 @@ async def run_extraction_sync(
     if not model:
         model = await get_user_model_name(user_id)
 
-    # Load per-searchset config override
+    # Load per-searchset config (optimizer override wins, else user's authored config)
     ss = await get_search_set(search_set_uuid)
     combined_override = {}
-    if ss and ss.extraction_config:
-        combined_override.update(ss.extraction_config)
+    combined_override.update(effective_extraction_config(ss))
     if extraction_config_override:
         combined_override.update(extraction_config_override)
 

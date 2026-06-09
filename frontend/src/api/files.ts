@@ -1,4 +1,4 @@
-import { apiFetch, csrfHeaders } from './client'
+import { apiFetch, rawFetch } from './client'
 
 export function uploadFile(data: {
   contentAsBase64String: string
@@ -30,8 +30,22 @@ export function moveFile(fileUUID: string, folderID: string) {
   })
 }
 
-export function downloadFileUrl(docid: string) {
-  return `/api/files/download?docid=${docid}`
+export function downloadFileUrl(docid: string, options?: { inline?: boolean }) {
+  const base = `/api/files/download?docid=${encodeURIComponent(docid)}`
+  return options?.inline ? `${base}&inline=1` : base
+}
+
+export interface SheetJsonResponse {
+  sheets: Array<{
+    name: string
+    headers: string[]
+    rows: string[][]
+    hidden: boolean
+  }>
+}
+
+export function fetchSheetJson(docUuid: string) {
+  return apiFetch<SheetJsonResponse>(`/api/files/${docUuid}/sheet-json`)
 }
 
 export function downloadFile(docid: string) {
@@ -44,10 +58,9 @@ export function downloadFile(docid: string) {
 }
 
 export async function downloadFilesAsZip(docIds: string[]) {
-  const res = await fetch('/api/files/download-bulk', {
+  const res = await rawFetch('/api/files/download-bulk', {
     method: 'POST',
-    credentials: 'include',
-    headers: csrfHeaders({ 'Content-Type': 'application/json' }),
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ doc_ids: docIds }),
   })
   if (!res.ok) throw new Error('Download failed')

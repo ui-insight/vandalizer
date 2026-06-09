@@ -74,6 +74,21 @@ class Settings(BaseSettings):
     # for air-gapped or privacy-strict deployments.
     disable_update_check: bool = False
 
+    # Web fetcher — controls Playwright fallback for JS-rendered pages.
+    # When True (default), pages whose static HTML yields too little text are
+    # re-fetched in a headless Chromium so client-rendered SPAs (Next.js,
+    # Nuxt, etc.) produce usable content for chat / workflow / KB ingestion.
+    web_fetcher_browser_enabled: bool = True
+    web_fetcher_min_chars: int = 500
+    web_fetcher_max_chars: int = 500_000
+    web_fetcher_timeout_seconds: int = 30
+
+    # Per-request read timeout (seconds) for the dedicated httpx client used by
+    # workflow LLM calls. Reasoning models (e.g. gpt-oss) can think for a while
+    # over a large document before emitting the first token, so this is set
+    # generously above httpx's 5s default.
+    workflow_llm_timeout_seconds: int = 120
+
     @model_validator(mode="after")
     def _resolve_paths(self) -> "Settings":
         # Resolve relative paths against the backend directory (parent of app/)

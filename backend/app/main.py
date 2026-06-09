@@ -7,14 +7,15 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.datastructures import MutableHeaders
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.config import Settings
 from app.database import init_db
 from app.exceptions import AppError
 from app.middleware.csrf import CSRFMiddleware
 from app.rate_limit import limiter
-from app.routers import activity, admin, audit, auth, automations, browser_automation, certification, chat, config, contact, credentials, demo, documents, extractions, feedback, feedback_prompt, files, folders, graph_webhooks, knowledge, library, mgmt, notifications, office, organizations, reviews, spaces, support, teams, verification, verification_sessions, workflows
+from app.routers import activity, admin, audit, auth, automations, browser_automation, certification, chat, config, contact, credentials, demo, documents, extractions, feedback, feedback_prompt, files, folders, graph_webhooks, knowledge, library, mgmt, notifications, office, optimizer_inbox, organizations, reviews, spaces, support, teams, verification, verification_sessions, workflows
 
 
 @lru_cache
@@ -135,25 +136,43 @@ if not _boot_settings.is_production:
 # ---------------------------------------------------------------------------
 # Security headers middleware
 # ---------------------------------------------------------------------------
-class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):  # type: ignore[no-untyped-def]
-        response = await call_next(request)
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-        response.headers["X-XSS-Protection"] = "1; mode=block"
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; "
-            "script-src 'self'; "
-            "style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' data: blob:; "
-            "connect-src 'self'; "
-            "frame-ancestors 'none'"
-        )
-        if get_settings().is_production:
-            response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
-        return response
+# Implemented as pure ASGI middleware (not BaseHTTPMiddleware) so that client
+# disconnects mid-response don't leak pending asyncio tasks from Starlette's
+# internal task group.
+class SecurityHeadersMiddleware:
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        is_production = get_settings().is_production
+
+        async def send_with_headers(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                headers["X-Content-Type-Options"] = "nosniff"
+                headers["X-Frame-Options"] = "DENY"
+                headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+                headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+                headers["X-XSS-Protection"] = "1; mode=block"
+                headers["Content-Security-Policy"] = (
+                    "default-src 'self'; "
+                    "script-src 'self'; "
+                    "style-src 'self' 'unsafe-inline'; "
+                    "img-src 'self' data: blob:; "
+                    "connect-src 'self'; "
+                    "frame-ancestors 'none'"
+                )
+                if is_production:
+                    headers["Strict-Transport-Security"] = (
+                        "max-age=63072000; includeSubDomains"
+                    )
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)
 
 
 app.add_middleware(SecurityHeadersMiddleware)
@@ -212,6 +231,7 @@ app.include_router(browser_automation.router, prefix="/api/browser-automation", 
 app.include_router(certification.router, prefix="/api/certification", tags=["certification"])
 app.include_router(organizations.router, prefix="/api/organizations", tags=["organizations"])
 app.include_router(audit.router, prefix="/api/audit", tags=["audit"])
+app.include_router(optimizer_inbox.router, prefix="/api/optimizer", tags=["optimizer"])
 app.include_router(reviews.router, prefix="/api/reviews", tags=["reviews"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
 app.include_router(spaces.router, prefix="/api/spaces", tags=["spaces"])
@@ -229,20 +249,50 @@ from prometheus_fastapi_instrumentator import Instrumentator  # noqa: E402
 Instrumentator().instrument(app).expose(app, endpoint="/api/metrics")
 
 
+def _fd_usage() -> dict[str, object]:
+    """Report this process's open file-descriptor count and soft limit.
+
+    A steadily climbing ``open_fds`` is the early signal of an fd leak — the
+    kind that has repeatedly surfaced only as a misleading Mongo
+    ``AutoReconnect`` once the table is already exhausted. Surfacing it here
+    lets monitoring alert on the rising line instead of the eventual crash.
+
+    ``open_fds`` is None on platforms without ``/proc`` (e.g. macOS dev); the
+    limit is still read via ``resource``. ``pct`` is the soft-limit usage so a
+    scrape/alert can threshold without re-deriving it.
+    """
+    import os
+    import resource
+
+    open_fds: int | None = None
+    try:
+        open_fds = len(os.listdir("/proc/self/fd"))
+    except OSError:
+        open_fds = None
+
+    limit: int | None = None
+    try:
+        soft, _hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+        limit = soft if soft != resource.RLIM_INFINITY else None
+    except (ValueError, OSError):
+        limit = None
+
+    pct = round(100 * open_fds / limit, 1) if open_fds is not None and limit else None
+    return {"open_fds": open_fds, "fd_limit": limit, "fd_pct": pct}
+
+
 @app.get("/api/health")
 async def health() -> JSONResponse:
     """Health check that verifies all critical dependencies."""
     checks: dict[str, str] = {}
     settings = get_settings()
 
-    # MongoDB
+    # MongoDB — reuse the app's pooled client; never open a new one per probe
+    # (that leaks file descriptors over the life of the process).
     try:
-        from motor.motor_asyncio import AsyncIOMotorClient
+        from app.database import get_client
 
-        client = AsyncIOMotorClient(
-            settings.mongo_host, serverSelectionTimeoutMS=2000
-        )
-        await client[settings.mongo_db].command("ping")
+        await get_client()[settings.mongo_db].command("ping")
         checks["mongodb"] = "ok"
     except Exception as e:
         checks["mongodb"] = f"error: {e}"
@@ -274,5 +324,9 @@ async def health() -> JSONResponse:
     status_code = 200 if all_ok else 503
     return JSONResponse(
         status_code=status_code,
-        content={"status": "ok" if all_ok else "degraded", "checks": checks},
+        content={
+            "status": "ok" if all_ok else "degraded",
+            "checks": checks,
+            "resources": _fd_usage(),
+        },
     )

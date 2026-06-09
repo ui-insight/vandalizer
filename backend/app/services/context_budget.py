@@ -501,3 +501,54 @@ def plan_and_compact_context(
         plan=plan,
         actions=actions,
     )
+
+
+# ---------------------------------------------------------------------------
+# Pre-flight oversize check (no LLM call required)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class OversizeDocument:
+    uuid: str
+    title: str
+    token_count: int
+
+    def to_dict(self) -> dict:
+        return {"uuid": self.uuid, "title": self.title, "token_count": self.token_count}
+
+
+def find_oversize_documents(
+    *,
+    documents: list[dict],
+    model_name: str,
+    model_config: Optional[dict] = None,
+    overhead_tokens: int = 1024,
+) -> list[OversizeDocument]:
+    """Return docs whose token_count alone would not fit the model's input budget.
+
+    A doc is "oversize" if its `token_count` exceeds the per-request budget
+    after reserving room for the response and a small overhead (system prompt,
+    user message, scaffolding). Returns docs sorted largest-first. The caller
+    uses this to recommend "Convert to Knowledge Base" rather than running
+    compaction and silently truncating.
+
+    ``documents`` is a list of dicts each with at least ``uuid``, ``title``,
+    ``token_count``. Accepting dicts (not the Beanie model) keeps this usable
+    from sync Celery code.
+    """
+    context_window = resolve_context_window(model_name, model_config)
+    reserve = _default_response_reserve(context_window)
+    budget = max(1, context_window - reserve - overhead_tokens)
+
+    oversize: list[OversizeDocument] = []
+    for d in documents:
+        tc = int(d.get("token_count") or 0)
+        if tc > budget:
+            oversize.append(OversizeDocument(
+                uuid=str(d.get("uuid") or ""),
+                title=str(d.get("title") or d.get("uuid") or "Untitled"),
+                token_count=tc,
+            ))
+    oversize.sort(key=lambda o: o.token_count, reverse=True)
+    return oversize

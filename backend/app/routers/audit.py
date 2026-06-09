@@ -81,12 +81,17 @@ async def query_audit_log(
 @router.get("/export")
 async def export_audit_log(
     action: Optional[str] = None,
+    actor_user_id: Optional[str] = None,
     resource_type: Optional[str] = None,
     start_time: Optional[str] = None,
     end_time: Optional[str] = None,
     user: User = Depends(get_current_user),
 ):
-    """Export audit log as CSV. Admin only."""
+    """Export audit log as CSV. Admin only.
+
+    Pass ``actor_user_id`` to scope the export to a single user's trail (used by
+    the per-user activity drill-down in the admin console).
+    """
     import csv
     import io
 
@@ -104,6 +109,7 @@ async def export_audit_log(
 
     entries, _ = await audit_service.query_audit_log(
         action=action,
+        actor_user_id=actor_user_id,
         resource_type=resource_type,
         start_time=parsed_start,
         end_time=parsed_end,

@@ -17,6 +17,8 @@ class KnowledgeBaseSource(Document):
     document_uuid: Optional[str] = None
     url: Optional[str] = None
     url_title: Optional[str] = None
+    custom_name: Optional[str] = None  # user-provided label; overrides auto-derived title
+    source_reference: Optional[str] = None  # user-verifiable provenance (origin URL / citation); shown as "Source: …"
     content: Optional[str] = None
     status: str = "pending"  # pending | processing | ready | error
     error_message: Optional[str] = None
@@ -76,14 +78,22 @@ class KnowledgeBase(Document):
     user_id: str
     team_id: Optional[str] = None
     shared_with_team: bool = False
+    team_owned: bool = False
     verified: bool = False
     organization_ids: list[str] = Field(default_factory=list)  # Org UUIDs for visibility scoping
+    tags: list[str] = Field(default_factory=list)  # User-defined free-form tags (e.g. version, status)
     status: str = "empty"  # empty | building | ready | error
     total_sources: int = 0
     sources_ready: int = 0
     sources_failed: int = 0
     total_chunks: int = 0
     collection_name: Optional[str] = None
+    # Optimized RAG settings discovered by KB Autovalidate. When present, the
+    # headless RAG path consults this dict to pick k / model / prompt variant
+    # / etc. Keys correspond to ``RAGConfig`` fields. None = use defaults.
+    rag_config_override: Optional[dict] = None
+    rag_config_override_set_at: Optional[datetime.datetime] = None
+    rag_config_override_run_uuid: Optional[str] = None  # which optimization run produced it
     created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
     updated_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
 

@@ -56,13 +56,14 @@ async def client():
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _mock_workflow(wf_id="wf-1", user_id="user1", name="Test Workflow"):
+def _mock_workflow(wf_id="wf-1", user_id="user1", name="Test Workflow", team_id=None):
     """Return a MagicMock that looks like a Workflow document."""
     wf = MagicMock()
     wf.id = wf_id
     wf.name = name
     wf.description = "A test workflow"
     wf.user_id = user_id
+    wf.team_id = team_id
     wf.space = "default"
     wf.num_executions = 0
     wf.input_config = {}
@@ -87,9 +88,12 @@ class TestWorkflowListScoping:
         with patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}), \
              patch("app.dependencies.User") as MockUser, \
              patch("app.routers.workflows.svc") as mock_svc, \
-             patch("app.routers.workflows.resolve_authors", new_callable=AsyncMock, return_value={}):
+             patch("app.routers.workflows.resolve_authors", new_callable=AsyncMock, return_value={}), \
+             patch("app.routers.workflows.access_control") as mock_ac:
             MockUser.find_one = AsyncMock(return_value=user)
             mock_svc.list_workflows = AsyncMock(return_value=[wf])
+            mock_ac.get_team_access_context = AsyncMock(return_value=MagicMock())
+            mock_ac.can_manage_workflow = MagicMock(return_value=True)
 
             resp = await client.get("/api/workflows", cookies=cookies, headers=headers)
 
@@ -441,3 +445,136 @@ class TestWorkflowDuplicateAuthz:
 
         assert resp.status_code == 404
         assert "not found" in resp.json()["detail"].lower()
+
+
+# ---------------------------------------------------------------------------
+# Workflow share-token: lets a recipient view+duplicate without team access.
+# ---------------------------------------------------------------------------
+
+
+class TestWorkflowShareToken:
+    @pytest.mark.asyncio
+    async def test_mint_requires_manage_access(self, client):
+        """POST /share-token returns 404 when caller lacks manage rights."""
+        user = _make_user("outsider")
+        cookies, headers = _auth("outsider")
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "outsider", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.workflows.get_authorized_workflow", new_callable=AsyncMock, return_value=None):
+            MockUser.find_one = AsyncMock(return_value=user)
+
+            resp = await client.post(
+                "/api/workflows/wf-1/share-token",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_mint_returns_persists_token(self, client):
+        """POST /share-token mints a token on first call and persists it."""
+        user = _make_user("user1")
+        cookies, headers = _auth("user1")
+
+        wf = _mock_workflow(wf_id="wf-1", user_id="user1")
+        wf.share_token = None
+        wf.save = AsyncMock()
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.workflows.get_authorized_workflow", new_callable=AsyncMock, return_value=wf):
+            MockUser.find_one = AsyncMock(return_value=user)
+
+            resp = await client.post(
+                "/api/workflows/wf-1/share-token",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        token = resp.json()["share_token"]
+        assert token and len(token) >= 20
+        assert wf.share_token == token
+        wf.save.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_mint_reuses_existing_token(self, client):
+        """Repeated mint calls return the same token without rewriting."""
+        user = _make_user("user1")
+        cookies, headers = _auth("user1")
+
+        wf = _mock_workflow(wf_id="wf-1", user_id="user1")
+        wf.share_token = "existing-token-xyz"
+        wf.save = AsyncMock()
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.workflows.get_authorized_workflow", new_callable=AsyncMock, return_value=wf):
+            MockUser.find_one = AsyncMock(return_value=user)
+
+            resp = await client.post(
+                "/api/workflows/wf-1/share-token",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["share_token"] == "existing-token-xyz"
+        wf.save.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_get_with_share_token_passes_through(self, client):
+        """Outside user supplying a share_token reaches the service layer."""
+        user = _make_user("outsider")
+        cookies, headers = _auth("outsider")
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "outsider", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.workflows.svc") as mock_svc, \
+             patch("app.routers.workflows.resolve_author", new_callable=AsyncMock, return_value=None):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.get_workflow = AsyncMock(return_value={
+                "id": "wf-1", "name": "Shared", "description": "",
+                "user_id": "owner", "team_id": None, "num_executions": 0,
+                "can_manage": False,
+            })
+
+            resp = await client.get(
+                "/api/workflows/wf-1?share_token=tok-abc",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["can_manage"] is False
+        mock_svc.get_workflow.assert_awaited_once()
+        kwargs = mock_svc.get_workflow.await_args.kwargs
+        assert kwargs.get("share_token") == "tok-abc"
+
+    @pytest.mark.asyncio
+    async def test_duplicate_with_share_token_passes_through(self, client):
+        """A share-token recipient can duplicate via the token."""
+        user = _make_user("outsider")
+        cookies, headers = _auth("outsider")
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "outsider", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.workflows.svc") as mock_svc, \
+             patch("app.routers.workflows.resolve_author", new_callable=AsyncMock, return_value=None):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.duplicate_workflow = AsyncMock(return_value={
+                "id": "wf-copy", "name": "Shared (Copy)", "description": "",
+                "user_id": "outsider", "team_id": None, "num_executions": 0,
+            })
+
+            resp = await client.post(
+                "/api/workflows/wf-1/duplicate?share_token=tok-abc",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        kwargs = mock_svc.duplicate_workflow.await_args.kwargs
+        assert kwargs.get("share_token") == "tok-abc"

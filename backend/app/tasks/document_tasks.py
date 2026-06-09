@@ -44,7 +44,6 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
         convert_to_markdown,
         extract_docx_extras,
         extract_text_from_file,
-        extract_text_from_xlsx,
         remove_images_from_markdown,
     )
 
@@ -69,9 +68,11 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
         )
 
         raw_text = ""
+        text_markers: list[dict] = []
 
         if extension == "xlsx":
-            raw_text = extract_text_from_xlsx(str(absolute_path))
+            from app.services.document_readers import extract_text_with_markers
+            raw_text, text_markers = extract_text_with_markers(str(absolute_path), extension)
 
         elif extension == "xls":
             raw_text = convert_to_markdown(str(absolute_path))
@@ -90,11 +91,46 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
                 if extras:
                     raw_text = (raw_text or "").rstrip() + "\n\n" + extras
 
+        elif extension == "pdf":
+            from app.services.document_readers import extract_text_with_markers
+            raw_text, text_markers = extract_text_with_markers(str(absolute_path), extension)
+
         else:
             raw_text = extract_text_from_file(str(absolute_path), extension)
 
-        # Count tokens (rough estimate: ~4 chars per token)
-        token_count = len(raw_text) // 4 if raw_text else 0
+        # Count tokens using the same tokenizer the budget planner uses so the
+        # pre-flight oversize check is accurate.
+        from app.services.context_budget import count_tokens
+        token_count = count_tokens(raw_text) if raw_text else 0
+
+        # An "extracted successfully but got zero text" outcome is almost always
+        # a silent OCR/extraction failure (image-only PDF, OCR endpoint down,
+        # encrypted file). Mark it as error so the UI can surface it and offer
+        # a retry, rather than presenting an empty document.
+        if not raw_text or not raw_text.strip():
+            logger.warning(
+                "Document %s produced empty extracted text (ext=%s) — marking as error",
+                document_uuid, extension,
+            )
+            db.smart_document.update_one(
+                {"uuid": document_uuid},
+                {
+                    "$set": {
+                        "raw_text": "",
+                        "processing": False,
+                        "token_count": 0,
+                        "text_markers": [],
+                        "task_status": "error",
+                        "error_message": (
+                            "We couldn't extract any text from this document. "
+                            "It may be image-only, encrypted, or our OCR service "
+                            "may be temporarily unavailable. Try retrying — if "
+                            "it keeps failing, re-upload or contact support."
+                        ),
+                    }
+                },
+            )
+            return ""
 
         db.smart_document.update_one(
             {"uuid": document_uuid},
@@ -103,6 +139,8 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
                     "raw_text": raw_text,
                     "processing": False,
                     "token_count": token_count,
+                    "text_markers": text_markers,
+                    "error_message": None,
                 }
             },
         )
@@ -110,10 +148,17 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
         return raw_text
 
     except Exception as e:
-        logger.error("Error extracting text from document %s: %s", document_uuid, e)
+        logger.exception("Error extracting text from document %s", document_uuid)
         db.smart_document.update_one(
             {"uuid": document_uuid},
-            {"$set": {"raw_text": "", "processing": False}},
+            {
+                "$set": {
+                    "raw_text": "",
+                    "processing": False,
+                    "task_status": "error",
+                    "error_message": f"Text extraction failed: {str(e)[:300]}",
+                }
+            },
         )
         return ""
 
@@ -127,15 +172,28 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
     default_retry_delay=5,
 )
 def update_document_fields(self, document_uuid: str) -> None:
-    """Mark document extraction as complete, then check folder watch automations."""
+    """Mark document extraction as complete, then check folder watch automations.
+
+    Skips the complete status if extraction already flagged the doc as errored —
+    we don't want to mask a silent OCR failure with a green checkmark.
+    """
     db = get_sync_db()
-    result = db.smart_document.update_one(
+    doc = db.smart_document.find_one({"uuid": document_uuid}, {"task_status": 1})
+    if not doc:
+        logger.warning("Document %s not found for update", document_uuid)
+        return
+
+    if doc.get("task_status") == "error":
+        db.smart_document.update_one(
+            {"uuid": document_uuid},
+            {"$set": {"task_id": None}},
+        )
+        return
+
+    db.smart_document.update_one(
         {"uuid": document_uuid},
         {"$set": {"task_id": None, "task_status": "complete"}},
     )
-    if result.matched_count == 0:
-        logger.warning("Document %s not found for update", document_uuid)
-        return
 
     # Check for folder watch automations targeting this document's folder
     try:
@@ -259,9 +317,10 @@ def _run_automation_extraction(db, automation: dict, search_set_uuid: str, doc: 
         models = sys_config.get("available_models", [])
         model = models[0]["name"] if models else "gpt-4o-mini"
 
-        # Load search set config
+        # Load search set config (honors optimizer override if set)
+        from app.services.search_set_service import effective_extraction_config
         ss_doc = db.search_set.find_one({"uuid": search_set_uuid})
-        extraction_config = (ss_doc or {}).get("extraction_config") or {}
+        extraction_config = effective_extraction_config(ss_doc)
 
         # Load field metadata
         field_metadata = {}
@@ -362,19 +421,33 @@ def _process_extraction_outputs(db, automation: dict, results: dict) -> None:
     default_retry_delay=5,
 )
 def cleanup_document(self, document_uuid: str) -> None:
-    """Error handler — mark document as errored with details."""
+    """Error handler — mark document as errored with details.
+
+    If the extraction task already wrote a specific error_message before raising,
+    keep it (it's more diagnostic than the generic fallback below).
+    """
     db = get_sync_db()
-    result = db.smart_document.update_one(
-        {"uuid": document_uuid},
-        {"$set": {
-            "task_id": None,
-            "task_status": "error",
-            "processing": False,
-            "error_message": "Document extraction failed. Please try re-uploading.",
-        }},
+    existing = db.smart_document.find_one(
+        {"uuid": document_uuid}, {"error_message": 1}
     )
-    if result.matched_count == 0:
+    if not existing:
         logger.warning("Document %s not found for cleanup", document_uuid)
+        return
+
+    update_fields = {
+        "task_id": None,
+        "task_status": "error",
+        "processing": False,
+    }
+    if not existing.get("error_message"):
+        update_fields["error_message"] = (
+            "Document extraction failed. Please retry or re-upload."
+        )
+
+    db.smart_document.update_one(
+        {"uuid": document_uuid},
+        {"$set": update_fields},
+    )
 
 
 @celery_app.task(
@@ -386,7 +459,11 @@ def cleanup_document(self, document_uuid: str) -> None:
     default_retry_delay=5,
 )
 def perform_semantic_ingestion(self, raw_text: str, document_uuid: str, user_id: str) -> str:
-    """Chunk text and embed into ChromaDB for RAG search."""
+    """Chunk text and embed into ChromaDB for RAG search.
+
+    Writes back ``chromadb_ready`` / ``chunk_count`` / ``ingest_error`` so the
+    frontend can show a meaningful retrieval state on the document.
+    """
 
     from app.services.document_manager import DocumentManager
 
@@ -401,21 +478,88 @@ def perform_semantic_ingestion(self, raw_text: str, document_uuid: str, user_id:
         {"$set": {"task_status": "readying"}},
     )
 
+    # If the caller passed empty raw_text, fall back to whatever the
+    # extraction task already wrote to the DB.
+    text = raw_text or doc.get("raw_text", "") or ""
+    markers = doc.get("text_markers") or []
+
     from app.config import Settings
 
     settings = Settings()
-    dm = DocumentManager(persist_directory=settings.chromadb_persist_dir)
-    dm.add_document(
-        user_id=user_id,
-        document_name=doc.get("title", ""),
-        document_id=document_uuid,
-        doc_path=doc.get("path", ""),
-        raw_text=raw_text,
-    )
+    try:
+        dm = DocumentManager(persist_directory=settings.chromadb_persist_dir)
+        chunk_count = dm.add_document(
+            user_id=user_id,
+            document_name=doc.get("title", ""),
+            document_id=document_uuid,
+            doc_path=doc.get("path", ""),
+            raw_text=text,
+            text_markers=markers,
+        )
+    except Exception as e:
+        logger.exception("Semantic ingestion failed for %s", document_uuid)
+        db.smart_document.update_one(
+            {"uuid": document_uuid},
+            {
+                "$set": {
+                    "task_status": "complete",
+                    "chromadb_ready": False,
+                    "chunk_count": 0,
+                    "ingest_error": str(e)[:500],
+                }
+            },
+        )
+        raise
 
     db.smart_document.update_one(
         {"uuid": document_uuid},
-        {"$set": {"task_status": "complete"}},
+        {
+            "$set": {
+                "task_status": "complete",
+                "chromadb_ready": chunk_count > 0,
+                "chunk_count": chunk_count,
+                "ingest_error": None,
+            }
+        },
     )
 
     return document_uuid
+
+
+# In-progress task_status values. A doc with one of these stages but
+# processing=False has finished extraction without the chain advancing it —
+# usually because a caller dispatched extraction without chaining update.
+_IN_PROGRESS_TASK_STATUSES = ["layout", "extracting", "ocr", "security", "readying"]
+
+
+@celery_app.task(bind=True, name="tasks.document.reap_stuck")
+def reap_stuck_documents(self) -> None:
+    """Self-heal documents whose task_status is stuck in an in-progress stage.
+
+    Failure mode this handles: extraction finished (processing=False, raw_text
+    populated) but task_status never advanced to "complete" because the caller
+    dispatched the extraction task without chaining update_document_fields.
+    The frontend then shows these docs as "Reading text…" indefinitely.
+
+    Acts as a backstop against pipeline-chaining bugs; the fix in the caller
+    is still preferred.
+    """
+    db = get_sync_db()
+
+    orphans = list(db.smart_document.find(
+        {
+            "processing": False,
+            "task_status": {"$in": _IN_PROGRESS_TASK_STATUSES},
+            "soft_deleted": {"$ne": True},
+            "raw_text": {"$ne": ""},
+        },
+        {"uuid": 1},
+    ))
+
+    if not orphans:
+        return
+
+    for doc in orphans:
+        update_document_fields.delay(doc["uuid"])
+
+    logger.info("Reaped %d stuck document(s) — dispatched update step", len(orphans))

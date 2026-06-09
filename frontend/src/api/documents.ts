@@ -13,6 +13,13 @@ export function pollStatus(docid: string) {
   return apiFetch<PollStatusResponse>(`/api/documents/poll_status?docid=${docid}`)
 }
 
+export function retryExtraction(docUuid: string) {
+  return apiFetch<{ uuid: string; task_id: string; status: string }>(
+    `/api/documents/${docUuid}/retry-extraction`,
+    { method: 'POST' }
+  )
+}
+
 export interface SearchResult {
   uuid: string
   title: string

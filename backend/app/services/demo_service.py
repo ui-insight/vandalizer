@@ -70,6 +70,7 @@ async def submit_application(
     if settings is None:
         settings = Settings()
 
+    email = email.strip().lower()
     existing = await DemoApplication.find_one(DemoApplication.email == email)
     if existing:
         raise ValueError("An application with this email already exists")
@@ -167,11 +168,13 @@ async def _activate_application(app: DemoApplication, settings: Settings) -> Non
     expires_at = now + datetime.timedelta(days=TRIAL_DAYS)
     password = _generate_demo_password()
 
-    # Create user
-    user_id = app.email
+    # Create user. Normalize the identity to lowercase to match register()'s
+    # convention — login lowercases the typed identity before a case-sensitive
+    # lookup, so a mixed-case stored email would never be found.
+    user_id = app.email.strip().lower()
     user = User(
         user_id=user_id,
-        email=app.email,
+        email=user_id,
         name=app.name,
         password_hash=hash_password(password),
         is_demo_user=True,
@@ -421,6 +424,35 @@ async def admin_release_user(demo_uuid: str) -> bool:
     return True
 
 
+async def admin_promote_user(demo_uuid: str) -> bool:
+    """Admin: convert a demo/trial user into a permanent full user.
+
+    Clears the demo flags on the underlying User so the auth dependency stops
+    gating them, and marks the DemoApplication as completed + released so it
+    drops out of the active trial lifecycle (no expiry warnings, no recapture).
+    """
+    app = await DemoApplication.find_one(DemoApplication.uuid == demo_uuid)
+    if not app:
+        return False
+
+    app.status = "completed"
+    app.admin_released = True
+    app.expired_at = None
+    app.recapture_step = 0
+    app.recapture_next_at = None
+    await app.save()
+
+    if app.user_id:
+        user = await User.find_one(User.user_id == app.user_id)
+        if user:
+            user.is_demo_user = False
+            user.demo_expires_at = None
+            user.demo_status = None
+            await user.save()
+
+    return True
+
+
 async def admin_restart_trial(demo_uuid: str) -> bool:
     """Admin: restart the trial for an expired demo user (reset to 14 days)."""
     app = await DemoApplication.find_one(DemoApplication.uuid == demo_uuid)
@@ -457,6 +489,7 @@ async def admin_add_demo_user(
     if settings is None:
         settings = Settings()
 
+    email = email.strip().lower()
     existing = await DemoApplication.find_one(DemoApplication.email == email)
     if existing:
         raise ValueError("An application with this email already exists")
@@ -543,11 +576,13 @@ async def admin_list_applications(status_filter: Optional[str] = None) -> list[d
     # per row on a list that may have hundreds of entries.
     user_ids = [a.user_id for a in apps if a.user_id]
     last_login_by_user: dict[str, datetime.datetime] = {}
+    is_demo_by_user: dict[str, bool] = {}
     if user_ids:
         users = await User.find({"user_id": {"$in": user_ids}}).to_list()
         last_login_by_user = {
             u.user_id: u.last_login_at for u in users if u.last_login_at
         }
+        is_demo_by_user = {u.user_id: u.is_demo_user for u in users}
 
     emails = [a.email for a in apps if a.email]
     creds_sent_by_email: dict[str, datetime.datetime] = {}
@@ -588,6 +623,9 @@ async def admin_list_applications(status_filter: Optional[str] = None) -> list[d
                 last_login_by_user[a.user_id].isoformat()
                 if a.user_id and a.user_id in last_login_by_user
                 else None
+            ),
+            "user_is_demo": (
+                is_demo_by_user.get(a.user_id, True) if a.user_id else True
             ),
         }
         for a in apps

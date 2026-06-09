@@ -7,6 +7,8 @@ interface Props {
   size?: 'sm' | 'md'
   /** Optional override label prefix (e.g. "Author"). Default is no prefix. */
   label?: string
+  /** 'default' for light backgrounds; 'on-dark' for colored/gradient headers. */
+  tone?: 'default' | 'on-dark'
   className?: string
 }
 
@@ -19,7 +21,7 @@ interface Props {
  * reach out for refinement help. Stops propagation so it works inside cards
  * that have their own click handler.
  */
-export function AuthorChip({ author, size = 'sm', label, className }: Props) {
+export function AuthorChip({ author, size = 'sm', label, tone = 'default', className }: Props) {
   if (!author) return null
 
   const display = author.name || author.email || author.user_id
@@ -43,8 +45,8 @@ export function AuthorChip({ author, size = 'sm', label, className }: Props) {
     alignItems: 'center',
     gap: 4,
     fontSize,
-    color: '#5f6368',
-    background: 'rgba(0,0,0,0.04)',
+    color: tone === 'on-dark' ? '#ffffff' : '#5f6368',
+    background: tone === 'on-dark' ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.04)',
     padding: '2px 8px',
     borderRadius: 999,
     lineHeight: 1.4,

@@ -3,6 +3,7 @@ import { Link, Navigate, useSearch } from '@tanstack/react-router'
 import { useAuth } from '../hooks/useAuth'
 import { getAuthConfig, type AuthConfig } from '../api/auth'
 import { Footer } from '../components/layout/Footer'
+import { useBranding } from '../contexts/BrandingContext'
 import {
   Check,
   ShieldCheck,
@@ -454,15 +455,38 @@ function AuthBlock({ config }: { config: AuthConfig | null }) {
 // Landing page
 // ---------------------------------------------------------------------------
 
+function safeNextPath(raw: string | undefined): string | null {
+  if (!raw) return null
+  // Must be a same-origin relative path. Reject protocol-relative (//host)
+  // and absolute URLs to prevent open-redirect.
+  if (!raw.startsWith('/') || raw.startsWith('//')) return null
+  return raw
+}
+
 export default function Landing() {
   const { user, loading, demoExpired, demoFeedbackToken } = useAuth()
+  const branding = useBranding()
   const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null)
   const search = useSearch({ strict: false }) as Record<string, string | undefined>
   const inviteToken = search?.invite_token
+  const nextPath = safeNextPath(search?.next)
 
   useEffect(() => {
-    getAuthConfig().then(setAuthConfig)
+    // A network-level fetch failure (Safari reports these as "Load failed")
+    // rejects the promise; without a .catch() it surfaces as an unhandled
+    // rejection in Sentry and leaves AuthBlock spinning forever. Fall back to
+    // the same default getAuthConfig() uses for non-OK responses so the
+    // password form still renders.
+    getAuthConfig()
+      .then(setAuthConfig)
+      .catch(() => setAuthConfig({ auth_methods: ['password'], oauth_providers: [] }))
   }, [])
+
+  useEffect(() => {
+    if (user && !demoExpired && !inviteToken && nextPath) {
+      window.location.replace(nextPath)
+    }
+  }, [user, demoExpired, inviteToken, nextPath])
 
   if (loading) return null
   if (user && demoExpired && demoFeedbackToken) {
@@ -472,6 +496,10 @@ export default function Landing() {
     // If user arrived here with an invite token, redirect to accept it
     if (inviteToken) {
       return <Navigate to="/invite" search={{ token: inviteToken }} />
+    }
+    if (nextPath) {
+      // Effect above is handling the redirect via location.replace — render nothing meanwhile.
+      return null
     }
     return (
       <Navigate
@@ -483,6 +511,7 @@ export default function Landing() {
           extraction: undefined,
           automation: undefined,
           kb: undefined,
+          workflow_share_token: undefined,
         }}
       />
     )
@@ -493,8 +522,14 @@ export default function Landing() {
       {/* Fixed top nav */}
       <nav className="fixed top-0 inset-x-0 z-50 bg-[#0a0a0a]/80 backdrop-blur-md border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
-          <img src="/images/Vandalizer_Wordmark_Color_RGB+W.png" alt="Vandalizer" className="h-10" />
+          <img src={branding.logoDarkUrl} alt={branding.orgName} className="h-10" style={{ maxWidth: 220, objectFit: 'contain' }} />
           <div className="flex items-center gap-4">
+            <Link
+              to="/docs/present"
+              className="text-sm text-gray-400 hover:text-highlight transition-colors"
+            >
+              Overview
+            </Link>
             <Link
               to="/docs"
               className="text-sm text-gray-400 hover:text-highlight transition-colors"
@@ -561,9 +596,10 @@ export default function Landing() {
 
           {/* Logo */}
           <img
-            src="/images/Vandalizer_Wordmark_Color_RGB+W.png"
-            alt="Vandalizer"
+            src={branding.logoDarkUrl}
+            alt={branding.orgName}
             className="w-full max-w-[500px] mb-5"
+            style={{ objectFit: 'contain' }}
           />
 
           {/* Tagline */}

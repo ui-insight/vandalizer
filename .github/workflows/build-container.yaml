@@ -55,7 +55,16 @@ jobs:
         with:
           context: ${{ matrix.context }}
           push: true
+          # The Sentry args are only consumed by the frontend Dockerfile;
+          # the backend image declares no matching ARG and ignores them.
+          # Empty secrets pass through as empty strings, which makes
+          # initSentry() a no-op rather than failing the build.
           build-args: |
             VERSION=sha-${{ steps.vars.outputs.sha_short }}
+            VITE_SENTRY_DSN=${{ secrets.VITE_SENTRY_DSN }}
+            VITE_SENTRY_ENVIRONMENT=${{ vars.VITE_SENTRY_ENVIRONMENT || 'staging' }}
+            SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }}
+            SENTRY_ORG=${{ vars.SENTRY_ORG }}
+            SENTRY_PROJECT=${{ vars.SENTRY_PROJECT }}
           tags: ghcr.io/${{ github.repository }}-${{ matrix.image_name }}:sha-${{ steps.vars.outputs.sha_short }},ghcr.io/${{ github.repository }}-${{ matrix.image_name }}:${{ steps.vars.outputs.ref_name }}
           file: ${{ matrix.dockerfile }}
