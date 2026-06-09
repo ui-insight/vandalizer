@@ -23,6 +23,7 @@ const SupportCenter = lazy(() => import('./pages/SupportCenter'))
 const Docs = lazy(() => import('./pages/Docs'))
 const Demo = lazy(() => import('./pages/Demo'))
 const DemoFeedback = lazy(() => import('./pages/DemoFeedback'))
+const DemoTrialEnd = lazy(() => import('./pages/DemoTrialEnd'))
 const InviteAccept = lazy(() => import('./pages/InviteAccept'))
 const JoinLinkAccept = lazy(() => import('./pages/JoinLinkAccept'))
 const Organizations = lazy(() => import('./pages/Organizations'))
@@ -295,6 +296,15 @@ const demoFeedbackRoute = createRoute({
   component: DemoFeedback,
 })
 
+const demoTrialEndRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/demo/trial-end',
+  validateSearch: (search: Record<string, unknown>) => ({
+    token: (search.token as string) || undefined,
+  }),
+  component: DemoTrialEnd,
+})
+
 const certificationRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/certification',
@@ -404,6 +414,7 @@ const routeTree = rootRoute.addChildren([
   certificationRoute,
   demoRoute,
   demoFeedbackRoute,
+  demoTrialEndRoute,
   demoStatusRoute,
   organizationsRoute,
   credentialsRoute,

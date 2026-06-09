@@ -13,6 +13,9 @@ from app.schemas.demo import (
     PostExperienceRequest,
     PostExperienceResponseSchema,
     DemoAdminStatsResponse,
+    TrialEndInfoResponse,
+    TrialExtensionRequest,
+    TrialExtensionResponse,
 )
 from app.services import demo_service
 
@@ -105,6 +108,43 @@ async def submit_feedback(token: str, body: PostExperienceRequest):
         )
     return PostExperienceResponseSchema(
         message="Thank you for your feedback!"
+    )
+
+
+@router.get("/trial-end/{token}", response_model=TrialEndInfoResponse)
+async def trial_end_info(token: str):
+    """Return the data the end-of-trial screen needs (engagement + renewal state)."""
+    info = await demo_service.get_trial_end_info(token)
+    if not info:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Invalid trial token"
+        )
+    return TrialEndInfoResponse(**info)
+
+
+@router.post("/trial-end/{token}/extend", response_model=TrialExtensionResponse)
+async def extend_trial(
+    token: str,
+    body: TrialExtensionRequest,
+    settings: Settings = Depends(get_settings),
+):
+    """Self-serve trial renewal from the end-of-trial screen (+14 days)."""
+    result = await demo_service.self_extend_trial(token, body.notes, settings)
+    if not result.get("ok"):
+        reason = result.get("reason")
+        if reason == "cap_reached":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="You've reached the self-serve renewal limit. "
+                "Get in touch and we'll keep your access going.",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Invalid trial token"
+        )
+    return TrialExtensionResponse(
+        ok=True,
+        message="Your trial has been extended. Welcome back!",
+        expires_at=result.get("expires_at"),
     )
 
 

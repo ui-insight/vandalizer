@@ -260,17 +260,43 @@ def expiry_warning_email(name: str, days_left: int, expires_at: str, frontend_ur
     return subject, html
 
 
-def trial_expired_email(name: str, feedback_url: str) -> tuple[str, str]:
-    """Returns (subject, html_body) for trial expired notification."""
-    subject = "Your Vandalizer Demo Has Ended"
+def trial_expired_email(name: str, trial_end_url: str) -> tuple[str, str]:
+    """Returns (subject, html_body) for the friendly end-of-trial notification.
+
+    Links to the end-of-trial screen, where the user can pick up where they left
+    off (self-serve renewal) or tell us what to build next.
+    """
+    subject = "Your Vandalizer trial — pick up where you left off"
     html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
     <div class="container"><div class="card">
       <div class="logo">Vandalizer</div>
-      <h1>Thank you for trying Vandalizer!</h1>
-      <p>Hi {name}, your 2-week demo trial has ended. We hope you found the platform valuable.</p>
-      <p>We'd love to hear about your experience. Please take a few minutes to fill out our feedback questionnaire:</p>
-      <p style="margin-top:24px"><a class="btn" href="{feedback_url}">Share Your Feedback</a></p>
-      <p>Your feedback helps us improve Vandalizer for future users and researchers.</p>
+      <h1>Your trial wrapped up — but you don't have to stop here</h1>
+      <p>Hi {name}, your two weeks with Vandalizer are up. Vandalizer is an
+         evolving beta built for research offices, and the feedback from trial
+         users like you is actively shaping where it goes next.</p>
+      <p>Want more time? You can pick up right where you left off, or tell us
+         what would make Vandalizer more useful for your office — either way,
+         we'll keep your access going.</p>
+      <p style="margin-top:24px"><a class="btn" href="{trial_end_url}">Keep going &amp; share your thoughts</a></p>
+      <p>Trial access continues as new releases come out. Thanks for helping
+         build it.</p>
+      <div class="footer">Vandalizer</div>
+    </div></div></body></html>"""
+    return subject, html
+
+
+def trial_extended_email(name: str, expires_at: str, frontend_url: str) -> tuple[str, str]:
+    """Returns (subject, html_body) confirming a self-serve trial renewal."""
+    subject = "Your Vandalizer trial is extended"
+    html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
+    <div class="container"><div class="card">
+      <div class="logo">Vandalizer</div>
+      <h1>You're back in — welcome!</h1>
+      <p>Hi {name}, your Vandalizer trial has been extended. You now have access
+         through <span class="highlight">{expires_at}</span>.</p>
+      <p>Thanks for helping shape the product. As new releases land, you'll see
+         them here first.</p>
+      <p style="margin-top:24px"><a class="btn" href="{frontend_url}/login">Back to Vandalizer</a></p>
       <div class="footer">Vandalizer</div>
     </div></div></body></html>"""
     return subject, html

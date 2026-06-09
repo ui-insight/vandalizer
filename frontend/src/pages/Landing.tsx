@@ -301,7 +301,7 @@ export default function Landing() {
 
   if (loading) return null
   if (user && demoExpired && demoFeedbackToken) {
-    return <Navigate to="/demo/feedback" search={{ token: demoFeedbackToken }} />
+    return <Navigate to="/demo/trial-end" search={{ token: demoFeedbackToken }} />
   }
   if (user && !demoExpired) {
     // If user arrived here with an invite token, redirect to accept it
