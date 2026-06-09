@@ -195,6 +195,7 @@ def _source_response(s, *, document_title: str | None = None) -> KBSourceRespons
         url=s.url,
         url_title=s.url_title or "",
         custom_name=s.custom_name,
+        source_reference=getattr(s, "source_reference", None),
         status=s.status,
         error_message=s.error_message or "",
         chunk_count=s.chunk_count,
@@ -615,10 +616,11 @@ async def update_source(
     req: UpdateSourceRequest,
     user: User = Depends(get_current_user),
 ):
-    """Rename a single source within a KB.
+    """Update a single source within a KB.
 
-    Send ``custom_name`` to set a user-facing label; send an empty string to
-    clear the override and revert to the auto-derived title.
+    Send ``custom_name`` to set a user-facing label, or ``source_reference`` to
+    set the verifiable provenance shown as "Source: …". Only fields explicitly
+    present in the request are applied; an empty string clears that field.
     """
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
     kb = await svc.get_knowledge_base(
@@ -630,8 +632,16 @@ async def update_source(
     )
     if not kb:
         raise HTTPException(status_code=404, detail="Knowledge base not found")
-    source = await svc.update_source_name(kb, source_uuid, req.custom_name)
-    if not source:
+
+    # Only touch fields the client actually sent — a PATCH that sets just
+    # source_reference must not clear an existing custom_name (and vice versa).
+    fields_set = req.model_fields_set
+    source = None
+    if "custom_name" in fields_set:
+        source = await svc.update_source_name(kb, source_uuid, req.custom_name)
+    if "source_reference" in fields_set:
+        source = await svc.set_source_reference(kb, source_uuid, req.source_reference)
+    if source is None:
         raise HTTPException(status_code=404, detail="Source not found")
     titles = await _resolve_document_titles([source])
     return _source_response(source, document_title=titles.get(source.document_uuid or ""))

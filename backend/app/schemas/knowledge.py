@@ -52,6 +52,7 @@ class KBSourceResponse(BaseModel):
     url: Optional[str] = None
     url_title: Optional[str] = None
     custom_name: Optional[str] = None  # user-provided label; UI prefers this over title/url
+    source_reference: Optional[str] = None  # user-verifiable provenance, shown as "Source: …"
     status: str
     error_message: Optional[str] = None
     chunk_count: int = 0
@@ -75,8 +76,10 @@ class KBSourceDetailResponse(KBSourceResponse):
 
 
 class UpdateSourceRequest(BaseModel):
-    """Patch a single KB source. Empty string clears the custom name."""
+    """Patch a single KB source. Only fields explicitly present are applied;
+    an empty string clears that field (reverts to the auto-derived value)."""
     custom_name: Optional[str] = None
+    source_reference: Optional[str] = None
 
 
 class KBResponse(BaseModel):

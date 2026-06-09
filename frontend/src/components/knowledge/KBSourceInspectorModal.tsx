@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { X, FileText, Globe, ExternalLink, Loader2, AlertCircle } from 'lucide-react'
-import { getKBSource } from '../../api/knowledge'
+import { X, FileText, Globe, ExternalLink, Loader2, AlertCircle, Check } from 'lucide-react'
+import { getKBSource, setKBSourceReference } from '../../api/knowledge'
 import type { KnowledgeBaseSource, KnowledgeBaseSourceDetail } from '../../types/knowledge'
 import { DocumentViewer } from '../files/DocumentViewer'
 
@@ -8,23 +8,49 @@ interface Props {
   kbUuid: string
   source: KnowledgeBaseSource  // initial summary from the list — used for instant header
   onClose: () => void
+  onUpdated?: () => void  // called after the source's provenance is edited, so the list refreshes
 }
 
-export function KBSourceInspectorModal({ kbUuid, source, onClose }: Props) {
+export function KBSourceInspectorModal({ kbUuid, source, onClose, onUpdated }: Props) {
   const [detail, setDetail] = useState<KnowledgeBaseSourceDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Editable provenance ("Source: …"). For url sources the origin URL is the
+  // default when nothing was entered yet; the user can override either type.
+  const [sourceDraft, setSourceDraft] = useState('')
+  const [savingSource, setSavingSource] = useState(false)
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(null)
     getKBSource(kbUuid, source.uuid)
-      .then(d => { if (!cancelled) setDetail(d) })
+      .then(d => {
+        if (cancelled) return
+        setDetail(d)
+        setSourceDraft(d.source_reference || (d.source_type === 'url' ? (d.url || '') : ''))
+      })
       .catch(err => { if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load source') })
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [kbUuid, source.uuid])
+
+  const savedSource = detail?.source_reference || (detail?.source_type === 'url' ? (detail?.url || '') : '')
+  const sourceDirty = sourceDraft.trim() !== (savedSource || '').trim()
+
+  const saveSource = async () => {
+    if (savingSource || !sourceDirty) return
+    setSavingSource(true)
+    try {
+      const updated = await setKBSourceReference(kbUuid, source.uuid, sourceDraft.trim())
+      setDetail(prev => (prev ? { ...prev, source_reference: updated.source_reference } : prev))
+      onUpdated?.()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save source')
+    } finally {
+      setSavingSource(false)
+    }
+  }
 
   const isDoc = source.source_type === 'document'
   const displayTitle =
@@ -98,6 +124,46 @@ export function KBSourceInspectorModal({ kbUuid, source, onClose }: Props) {
           >
             <X size={18} />
           </button>
+        </div>
+
+        {/* Verifiable provenance — editable, shown for both URL and document sources.
+            Lets a user confirm/record where the content came from (origin URL or citation). */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '8px 18px', borderBottom: '1px solid #2e2e2e', flexShrink: 0,
+        }}>
+          <span style={{ fontSize: 11, color: '#888', flexShrink: 0 }}>Source</span>
+          <input
+            value={sourceDraft}
+            onChange={e => setSourceDraft(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); saveSource() } }}
+            placeholder={isDoc ? 'e.g. APM Ch.45 — uidaho.edu/apm/45' : 'Origin URL'}
+            maxLength={2000}
+            disabled={savingSource}
+            style={{
+              flex: 1, fontSize: 12, color: '#e5e5e5',
+              backgroundColor: '#161616', border: '1px solid #2e2e2e',
+              borderRadius: 5, padding: '5px 8px', fontFamily: 'inherit', outline: 'none',
+            }}
+          />
+          {sourceDirty && (
+            <button
+              onClick={saveSource}
+              disabled={savingSource}
+              title="Save source"
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                fontSize: 12, color: '#fff', backgroundColor: '#2563eb',
+                border: 'none', borderRadius: 5, padding: '5px 10px',
+                cursor: savingSource ? 'default' : 'pointer', flexShrink: 0,
+              }}
+            >
+              {savingSource
+                ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
+                : <Check size={12} />}
+              Save
+            </button>
+          )}
         </div>
 
         {/* Body */}

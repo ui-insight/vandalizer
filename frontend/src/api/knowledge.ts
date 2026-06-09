@@ -126,6 +126,14 @@ export function renameKBSource(uuid: string, sourceUuid: string, customName: str
   })
 }
 
+/** Set or clear the verifiable provenance ("Source: …") for a KB source. Pass `""` to clear. */
+export function setKBSourceReference(uuid: string, sourceUuid: string, sourceReference: string) {
+  return apiFetch<KBSourceResponse>(`/api/knowledge/${uuid}/source/${sourceUuid}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ source_reference: sourceReference }),
+  })
+}
+
 export function shareKnowledgeBase(uuid: string, comment?: string) {
   return apiFetch<{ ok: boolean; shared_with_team: boolean }>(`/api/knowledge/${uuid}/share`, {
     method: 'POST',

@@ -2784,3 +2784,81 @@ async def get_api_key_skill(user: User = Depends(get_current_user)):
         media_type="text/markdown; charset=utf-8",
         filename="SKILL.md",
     )
+
+
+# ---------------------------------------------------------------------------
+# Knowledge base inventory (admin review — e.g. auditing names for versioning)
+# ---------------------------------------------------------------------------
+
+class AdminKBSummary(BaseModel):
+    uuid: str
+    title: str
+    status: str
+    verified: bool
+    tags: list[str]
+    total_sources: int
+    total_chunks: int
+    owner_id: str
+    owner_email: Optional[str] = None
+    team_id: Optional[str] = None
+    team_name: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class AdminKBListResponse(BaseModel):
+    total: int
+    knowledge_bases: list[AdminKBSummary]
+
+
+@router.get("/knowledge-bases", response_model=AdminKBListResponse)
+async def admin_list_knowledge_bases(
+    search: Optional[str] = Query(None, description="Case-insensitive title substring"),
+    limit: int = Query(1000, ge=1, le=5000),
+    user: User = Depends(get_current_user),
+):
+    """List every knowledge base across all users and teams (admin-only).
+
+    Read-only inventory for reviewing KB names/versions org-wide. Owner email
+    and team name are batch-resolved for display.
+    """
+    await _require_admin(user)
+
+    from app.services import knowledge_service
+
+    kbs = await knowledge_service.admin_list_all_knowledge_bases(search=search, limit=limit)
+
+    # Batch-resolve owner emails and team names so the table is readable
+    # without an N+1 per row.
+    owner_ids = {kb.user_id for kb in kbs if kb.user_id}
+    team_ids = {kb.team_id for kb in kbs if kb.team_id}
+    owner_email: dict[str, str] = {}
+    team_name: dict[str, str] = {}
+    if owner_ids:
+        for u in await User.find({"user_id": {"$in": list(owner_ids)}}).to_list():
+            if getattr(u, "email", None):
+                owner_email[u.user_id] = u.email
+    if team_ids:
+        for t in await Team.find({"uuid": {"$in": list(team_ids)}}).to_list():
+            if getattr(t, "name", None):
+                team_name[t.uuid] = t.name
+
+    summaries = [
+        AdminKBSummary(
+            uuid=kb.uuid,
+            title=kb.title,
+            status=kb.status,
+            verified=kb.verified,
+            tags=kb.tags,
+            total_sources=kb.total_sources,
+            total_chunks=kb.total_chunks,
+            owner_id=kb.user_id,
+            owner_email=owner_email.get(kb.user_id),
+            team_id=kb.team_id,
+            team_name=team_name.get(kb.team_id) if kb.team_id else None,
+            created_at=kb.created_at.isoformat() if kb.created_at else None,
+            updated_at=kb.updated_at.isoformat() if kb.updated_at else None,
+        )
+        for kb in kbs
+    ]
+    return AdminKBListResponse(total=len(summaries), knowledge_bases=summaries)

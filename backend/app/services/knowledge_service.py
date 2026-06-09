@@ -130,6 +130,27 @@ async def list_knowledge_bases_flat(
     return kbs
 
 
+async def admin_list_all_knowledge_bases(
+    search: str | None = None,
+    limit: int = 1000,
+) -> list[KnowledgeBase]:
+    """List EVERY knowledge base across all users/teams (admin-only).
+
+    Unscoped — bypasses the per-user/team/org visibility filtering of
+    ``list_knowledge_bases``. Intended for admin review (e.g. auditing names
+    for versioning). Newest first; optional case-insensitive title search.
+    """
+    query: dict = {}
+    if search and search.strip():
+        query["title"] = {"$regex": re.escape(search.strip()), "$options": "i"}
+    return await (
+        KnowledgeBase.find(query)
+        .sort("-created_at")
+        .limit(max(1, min(limit, 5000)))
+        .to_list()
+    )
+
+
 async def create_knowledge_base(
     title: str, user_id: str, team_id: str | None = None,
     description: str | None = None,
@@ -517,6 +538,30 @@ async def update_source_name(
         except Exception as e:
             logger.error(f"Error renaming KB source {source.uuid} in ChromaDB: {e}")
 
+    return source
+
+
+async def set_source_reference(
+    kb: KnowledgeBase,
+    source_uuid: str,
+    source_reference: str | None,
+) -> KnowledgeBaseSource | None:
+    """Set or clear the user-verifiable provenance ("Source: …") on a source.
+
+    Unlike ``custom_name`` this is metadata only — it is not used as a
+    retrieval citation label, so there's no ChromaDB rewrite. Pass an empty
+    string or None to clear it.
+    """
+    source = await KnowledgeBaseSource.find_one(
+        KnowledgeBaseSource.uuid == source_uuid,
+        KnowledgeBaseSource.knowledge_base_uuid == kb.uuid,
+    )
+    if not source:
+        return None
+
+    cleaned = (source_reference or "").strip()
+    source.source_reference = cleaned[:2000] if cleaned else None
+    await source.save()
     return source
 
 

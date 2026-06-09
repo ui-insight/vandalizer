@@ -995,6 +995,14 @@ export function KnowledgePanel() {
                     ? (source.url_title || source.url || source.uuid)
                     : (source.document_title || source.document_uuid || source.uuid)
                   const displayLabel = source.custom_name || autoLabel
+                  // Verifiable provenance: an explicit source_reference, else the
+                  // origin URL for url sources. Linkify http(s)/www, else show text.
+                  const effectiveSource = source.source_reference || (source.source_type === 'url' ? (source.url || '') : '')
+                  const sourceHref = effectiveSource
+                    ? (/^https?:\/\//i.test(effectiveSource)
+                        ? effectiveSource
+                        : (/^www\./i.test(effectiveSource) ? `https://${effectiveSource}` : null))
+                    : null
                   const isRenaming = renamingSourceUuid === source.uuid
                   const canInspect = source.status !== 'pending' && !isRenaming
                   return (
@@ -1057,6 +1065,27 @@ export function KnowledgePanel() {
                               <span style={{ color: '#888', marginLeft: 6, fontStyle: 'italic' }}>
                                 · {autoLabel}
                               </span>
+                            )}
+                          </div>
+                        )}
+                        {!isRenaming && effectiveSource && (
+                          <div
+                            style={{ fontSize: 11, color: '#9a9a9a', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                            title={`Source: ${effectiveSource}`}
+                          >
+                            Source:{' '}
+                            {sourceHref ? (
+                              <a
+                                href={sourceHref}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={e => e.stopPropagation()}
+                                style={{ color: '#7aa2f7', textDecoration: 'none' }}
+                              >
+                                {effectiveSource}
+                              </a>
+                            ) : (
+                              <span style={{ color: '#bcbcbc' }}>{effectiveSource}</span>
                             )}
                           </div>
                         )}
@@ -1162,6 +1191,7 @@ export function KnowledgePanel() {
             kbUuid={selectedKB.uuid}
             source={inspectingSource}
             onClose={() => setInspectingSource(null)}
+            onUpdated={() => { if (selectedKB) loadDetail(selectedKB.uuid) }}
           />
         )}
 

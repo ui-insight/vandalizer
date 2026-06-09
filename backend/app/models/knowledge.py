@@ -18,6 +18,7 @@ class KnowledgeBaseSource(Document):
     url: Optional[str] = None
     url_title: Optional[str] = None
     custom_name: Optional[str] = None  # user-provided label; overrides auto-derived title
+    source_reference: Optional[str] = None  # user-verifiable provenance (origin URL / citation); shown as "Source: …"
     content: Optional[str] = None
     status: str = "pending"  # pending | processing | ready | error
     error_message: Optional[str] = None
