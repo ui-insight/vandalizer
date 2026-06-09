@@ -20,7 +20,7 @@ import {
   updateWorkflow, updateStep, downloadResults, testStep, getTestStepStatus,
   reorderSteps, validateWorkflow, runWorkflow, streamWorkflowStatus, createTempDocuments,
   getWorkflowQualityHistory, getWorkflowImprovementSuggestions, getWorkflowQualityStatus,
-  getValidationPlan, updateValidationPlan, generateValidationPlan,
+  getValidationPlan, updateValidationPlan, generateValidationPlan, validationReportUrl,
   getValidationInputs, updateValidationInputs,
   proposeTestCases, synthesizeTestCase, acceptTestCases,
   getExpectedOutputs, deleteExpectedOutput,
@@ -5667,6 +5667,12 @@ function ValidateTab({
     }
   }
 
+  const handleDownloadReport = (format: 'md' | 'json') => {
+    if (!workflowId) return
+    // GET download; cookie auth carries through window.open (like exportWorkflowUrl).
+    window.open(validationReportUrl(workflowId, format), '_blank')
+  }
+
   const handleValidate = async () => {
     if (!workflowId || planChecks.length === 0) return
     setValidating(true)
@@ -6584,6 +6590,32 @@ function ValidateTab({
                   ± {gradeInfo.variancePts.toFixed(1)} pts
                 </div>
               )}
+              <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                <button
+                  onClick={() => handleDownloadReport('md')}
+                  title="Download the full validation report (Markdown)"
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                    borderRadius: 6, border: '1px solid #d1d5db', backgroundColor: '#fff',
+                    color: '#374151', cursor: 'pointer',
+                  }}
+                >
+                  <Download style={{ width: 13, height: 13 }} /> Report
+                </button>
+                <button
+                  onClick={() => handleDownloadReport('json')}
+                  title="Download the validation report data (JSON)"
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                    padding: '6px 10px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                    borderRadius: 6, border: '1px solid #d1d5db', backgroundColor: '#fff',
+                    color: '#6b7280', cursor: 'pointer',
+                  }}
+                >
+                  JSON
+                </button>
+              </div>
             </div>
 
             {/* Deterministic diagnostics — surface structural problems the

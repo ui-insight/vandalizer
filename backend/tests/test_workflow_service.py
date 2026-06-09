@@ -814,3 +814,124 @@ class TestParseJsonArray:
         from app.services.workflow_service import _parse_json_array
         result = _parse_json_array("[]")
         assert result == []
+
+
+class TestResolveRunSourceText:
+    """_resolve_run_source_text must turn a run's doc UUIDs into the real
+    SmartDocument.raw_text (the judge's missing ground truth), not leave the
+    judge looking at UUID 'hash strings'."""
+
+    @patch("app.services.workflow_service.SmartDocument")
+    async def test_resolves_doc_uuids_to_raw_text(self, mock_doc_cls):
+        from app.services.workflow_service import _resolve_run_source_text
+        doc1 = MagicMock(raw_text="BLM award total $96,673.48")
+        doc2 = MagicMock(raw_text="second doc text")
+        mock_doc_cls.find_one = AsyncMock(side_effect=[doc1, doc2])
+        result = MagicMock()
+        result.input_context = {"doc_uuids": ["u1", "u2"]}
+        result.retrieved_sources = []
+        out = await _resolve_run_source_text(result)
+        assert "BLM award total $96,673.48" in out
+        assert "second doc text" in out
+
+    @patch("app.services.workflow_service.SmartDocument")
+    async def test_skips_docs_without_raw_text(self, mock_doc_cls):
+        from app.services.workflow_service import _resolve_run_source_text
+        empty = MagicMock(raw_text="")
+        good = MagicMock(raw_text="real text")
+        mock_doc_cls.find_one = AsyncMock(side_effect=[empty, good])
+        result = MagicMock()
+        result.input_context = {"doc_uuids": ["u1", "u2"]}
+        result.retrieved_sources = []
+        out = await _resolve_run_source_text(result)
+        assert out == "real text"
+
+    @patch("app.services.workflow_service.SmartDocument")
+    async def test_includes_kb_retrieved_sources(self, mock_doc_cls):
+        from app.services.workflow_service import _resolve_run_source_text
+        mock_doc_cls.find_one = AsyncMock(return_value=None)
+        result = MagicMock()
+        result.input_context = {"doc_uuids": []}
+        result.retrieved_sources = [{"content_preview": "2 CFR 200 chunk"}]
+        out = await _resolve_run_source_text(result)
+        assert "2 CFR 200 chunk" in out
+
+    async def test_empty_when_no_sources(self):
+        from app.services.workflow_service import _resolve_run_source_text
+        result = MagicMock()
+        result.input_context = {}
+        result.retrieved_sources = []
+        out = await _resolve_run_source_text(result)
+        assert out == ""
+
+
+class TestFormatValidationReport:
+    """_format_validation_report renders a downloadable report from a run
+    snapshot (pure function — no I/O)."""
+
+    def _snapshot(self):
+        return {
+            "grade": "D",
+            "summary": "4/6 checks passed, 0 warnings, 2 failures",
+            "num_runs": 3,
+            "num_checks": 2,
+            "stability_score": 56.0,
+            "checks": [
+                {"check_id": "c1", "name": "Sections present", "status": "PASS", "detail": "All present", "run_statuses": ["PASS", "PASS", "PASS"]},
+                {"check_id": "c2", "name": "Monetary fidelity", "status": "FAIL", "detail": "FAIN mismatch", "run_statuses": ["FAIL", "WARN", "FAIL"]},
+            ],
+        }
+
+    def _plan(self):
+        return [
+            {"id": "c1", "name": "Sections present", "category": "completeness"},
+            {"id": "c2", "name": "Monetary fidelity", "category": "accuracy"},
+        ]
+
+    def _call(self, fmt):
+        from app.services.workflow_service import _format_validation_report
+        return _format_validation_report(
+            workflow_name="Award Compliance", workflow_id="wf123",
+            plan=self._plan(), snapshot=self._snapshot(),
+            grade="D", score=64.0, checks_passed=4, checks_failed=2,
+            generated_at="2026-06-05T00:00:00+00:00", fmt=fmt,
+        )
+
+    def test_markdown_report(self):
+        filename, content, media = self._call("md")
+        assert filename == "award-compliance-validation-report.md"
+        assert media.startswith("text/markdown")
+        assert "# Validation Report — Award Compliance" in content
+        assert "**Grade:** D (score 64/100)" in content
+        assert "[PASS] Sections present" in content
+        assert "[FAIL] Monetary fidelity" in content
+        assert "FAIN mismatch" in content
+        assert "_completeness_" in content and "_accuracy_" in content
+        assert "Per-run:" in content
+
+    def test_json_report(self):
+        import json
+        filename, content, media = self._call("json")
+        assert filename == "award-compliance-validation-report.json"
+        assert media == "application/json"
+        data = json.loads(content)
+        assert data["grade"] == "D" and data["score"] == 64.0
+        assert data["checks_passed"] == 4 and data["checks_failed"] == 2
+        assert len(data["checks"]) == 2
+        assert data["checks"][1]["status"] == "FAIL"
+        assert data["checks"][0]["category"] == "completeness"
+
+    def test_empty_checks_markdown(self):
+        from app.services.workflow_service import _format_validation_report
+        _, content, _ = _format_validation_report(
+            workflow_name="WF", workflow_id="x", plan=[], snapshot={"checks": []},
+            grade="F", score=0.0, checks_passed=0, checks_failed=0,
+            generated_at="", fmt="md",
+        )
+        assert "_No check results recorded._" in content
+
+    def test_slugify_filename(self):
+        from app.services.workflow_service import _slugify_filename
+        assert _slugify_filename("Award Compliance & Financial!") == "award-compliance-financial"
+        assert _slugify_filename("") == "workflow"
+        assert _slugify_filename("   ") == "workflow"
