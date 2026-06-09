@@ -19,10 +19,10 @@ from app.models.extraction_test_case import ExtractionTestCase
 from app.models.folder import SmartFolder
 from app.models.knowledge import KnowledgeBase, KnowledgeBaseSource
 from app.models.quality_alert import QualityAlert
-from app.models.search_set import SearchSet, SearchSetItem
+from app.models.search_set import SearchSet
 from app.models.validation_run import ValidationRun
 from app.models.verification_session import VerificationField, VerificationSession
-from app.models.workflow import Workflow, WorkflowStep
+from app.models.workflow import Workflow
 from app.services.chat_deps import AgenticChatDeps
 from app.services.document_manager import get_document_manager
 
@@ -279,13 +279,20 @@ async def search_knowledge_base(
         source_map = {s.uuid: s for s in sources}
 
     enriched: list[dict] = []
+    citations: list[dict] = []
     for r in results:
         meta = r.get("metadata", {})
         sid = meta.get("source_id", "")
+        page = meta.get("page")
+        sheet = meta.get("sheet")
         entry: dict = {
             "content": r.get("content", ""),
             "source_name": meta.get("source_name", "unknown"),
         }
+        if isinstance(page, int):
+            entry["page"] = page
+        if isinstance(sheet, str) and sheet:
+            entry["sheet"] = sheet
         src = source_map.get(sid)
         if src:
             entry["source_type"] = src.source_type
@@ -293,7 +300,26 @@ async def search_knowledge_base(
                 entry["document_uuid"] = src.document_uuid
             elif src.source_type == "url" and src.url:
                 entry["url"] = src.url
+            if src.source_reference:
+                entry["source_reference"] = src.source_reference
         enriched.append(entry)
+
+        citations.append({
+            "document_id": sid or None,
+            "document_title": meta.get("source_name", "Unknown"),
+            "page": page if isinstance(page, int) else None,
+            "sheet": sheet if isinstance(sheet, str) else None,
+            "chunk_id": r.get("chunk_id"),
+            "score": r.get("score"),
+            "content_preview": (r.get("content") or "")[:240],
+            "source_reference": src.source_reference if src and src.source_reference else None,
+            "url": src.url if src and src.source_type == "url" and src.url else None,
+        })
+
+    # Citation sidecar: the streaming layer pops this by tool_call_id, emits a
+    # 'sources' chunk, and persists the citations on the assistant message.
+    if citations and context.tool_call_id:
+        context.deps.citation_annotations[context.tool_call_id] = citations
 
     return enriched
 
@@ -433,7 +459,7 @@ async def get_quality_info(
     alerts = await QualityAlert.find(
         QualityAlert.item_kind == item_kind,
         QualityAlert.item_id == item_uuid,
-        QualityAlert.acknowledged != True,
+        QualityAlert.acknowledged != True,  # noqa: E712
     ).sort("-created_at").limit(5).to_list()
 
     result: dict = {
@@ -468,6 +494,56 @@ async def get_quality_info(
 
     result["active_alerts"] = alert_list
 
+    # Latest autovalidate (optimizer) run, if the item has ever been optimized.
+    # A completed, unapplied, not-tied run is a pending recommendation the
+    # agent should surface ("a tuned config scored X vs your current Y").
+    optimization_summary: dict | None = None
+    try:
+        from app.services.optimization_summary import latest_optimization_summary
+
+        opt = await latest_optimization_summary(item_kind, item_uuid)
+        if opt:
+            pending = (
+                opt["status"] == "completed"
+                and not opt.get("applied_at")
+                and not opt.get("tied_with_baseline")
+            )
+            optimization_summary = {
+                "status": opt["status"],
+                "run_uuid": opt["run_uuid"],
+                "optimized_score": opt.get("score"),
+                "baseline_score": opt.get("baseline_score"),
+                "tied_with_baseline": opt.get("tied_with_baseline", False),
+                "applied_at": opt.get("applied_at"),
+                "completed_at": opt.get("completed_at"),
+                "pending_recommendation": pending,
+            }
+            result["optimization"] = optimization_summary
+    except Exception as e:
+        logger.warning("Optimization lookup failed for %s/%s: %s", item_kind, item_uuid, e)
+
+    # Workflows: surface validation-plan staleness so the agent can offer the
+    # one-click regenerate instead of validating against a drifted plan.
+    plan_stale = None
+    if item_kind == "workflow":
+        try:
+            from app.services import workflow_service
+
+            plan_info = await workflow_service.get_validation_plan(item_uuid, context.deps.user)
+            plan_stale = plan_info.get("plan_stale", False)
+            result["validation_plan_stale"] = plan_stale
+            if plan_stale:
+                result["validation_plan_stale_reasons"] = plan_info.get("stale_reasons", [])
+                result["note_plan_stale"] = (
+                    "The validation plan no longer matches the workflow definition. "
+                    "Offer to regenerate it (regenerate_validation_plan) before "
+                    "trusting or re-running validation."
+                )
+        except ValueError:
+            pass  # not found / no access — quality info above still stands
+        except Exception as e:
+            logger.warning("Plan staleness lookup failed for workflow %s: %s", item_uuid, e)
+
     # Emit quality sidecar — streaming layer strips this and sends to frontend
     if latest_run and latest_run.score is not None:
         result["quality"] = {
@@ -478,6 +554,8 @@ async def get_quality_info(
             "num_test_cases": latest_run.num_test_cases,
             "num_runs": latest_run.num_runs,
             "active_alerts": alert_list,
+            "optimization": optimization_summary,
+            "plan_stale": plan_stale,
         }
 
     return result
@@ -517,18 +595,27 @@ async def get_app_help(
             ),
         }
 
+    # White-label: help bodies say "Vandalizer"; branded deployments swap in
+    # the configured org name (same convention as email and prompt branding).
+    org = (context.deps.system_config_doc or {}).get("org_name") or ""
+
+    def _brand(text: str) -> str:
+        if not org or org == "Vandalizer":
+            return text
+        return text.replace("Vandalizer", org)
+
     primary = matches[0]
     result = {
         "matched": True,
         "topic": {
             "id": primary["id"],
-            "title": primary["title"],
-            "body": primary["body"],
+            "title": _brand(primary["title"]),
+            "body": _brand(primary["body"]),
         },
     }
     if len(matches) > 1:
         result["related_topics"] = [
-            {"id": m["id"], "title": m["title"]} for m in matches[1:]
+            {"id": m["id"], "title": _brand(m["title"])} for m in matches[1:]
         ]
     return result
 
@@ -931,7 +1018,7 @@ async def run_extraction(
         alerts = await QualityAlert.find(
             QualityAlert.item_kind == "search_set",
             QualityAlert.item_id == extraction_set_uuid,
-            QualityAlert.acknowledged != True,
+            QualityAlert.acknowledged != True,  # noqa: E712
         ).sort("-created_at").limit(3).to_list()
 
         response["quality"] = {
@@ -1680,6 +1767,362 @@ async def run_validation(
 
 
 # ---------------------------------------------------------------------------
+# Phase 6 — Autovalidate (optimizer) tools
+# ---------------------------------------------------------------------------
+
+# Default optimizer token budget when the user doesn't name one. ~500k tokens
+# is the "typically $1–$5" tier the autovalidate marketing copy promises.
+DEFAULT_OPTIMIZATION_TOKEN_BUDGET = 500_000
+
+_OPTIMIZE_KIND_ALIASES = {
+    "kb": "knowledge_base",
+    "knowledge_base": "knowledge_base",
+    "extraction": "search_set",
+    "search_set": "search_set",
+    "workflow": "workflow",
+}
+
+
+async def _get_optimizable_item(context: RunContext[AgenticChatDeps], item_kind: str, item_uuid: str):
+    """Resolve + manage-level authorize the parent item of an optimization.
+
+    Returns (item, title, error_dict_or_None). Manage level = owner or same
+    team — verified-only visibility is NOT enough to retune someone's config.
+    """
+    user_id = context.deps.user_id
+    team_id = context.deps.team_id
+
+    if item_kind == "knowledge_base":
+        kb = await KnowledgeBase.find_one(KnowledgeBase.uuid == item_uuid)
+        if not kb:
+            return None, None, {"error": f"Knowledge base '{item_uuid}' not found."}
+        if kb.user_id != user_id and not (
+            kb.shared_with_team and team_id and kb.team_id == team_id
+        ):
+            return None, None, {"error": "You need manage access to this knowledge base to optimize it."}
+        return kb, kb.title, None
+
+    if item_kind == "search_set":
+        ss = await SearchSet.find_one(SearchSet.uuid == item_uuid)
+        if not ss:
+            return None, None, {"error": f"Extraction set '{item_uuid}' not found."}
+        if ss.user_id != user_id and not (team_id and ss.team_id == team_id):
+            return None, None, {"error": "You need manage access to this extraction set to optimize it."}
+        return ss, ss.title, None
+
+    if item_kind == "workflow":
+        wf = await Workflow.get(item_uuid)
+        if not wf:
+            return None, None, {"error": f"Workflow '{item_uuid}' not found."}
+        if getattr(wf, "user_id", None) != user_id and not (
+            team_id and getattr(wf, "team_id", None) == team_id
+        ):
+            return None, None, {"error": "You need manage access to this workflow to optimize it."}
+        return wf, wf.name, None
+
+    return None, None, {
+        "error": f"Unknown item_kind '{item_kind}'. Use 'knowledge_base', 'search_set', or 'workflow'."
+    }
+
+
+async def list_optimization_recommendations(
+    context: RunContext[AgenticChatDeps],
+) -> dict:
+    """List pending autovalidate (optimizer) recommendations across KBs, extraction sets, and workflows.
+
+    Vandalizer's quality monitor automatically tunes items in shadow mode when
+    it detects quality drift. Completed shadow runs with a winning config that
+    beats the current one are "pending recommendations" — the user can review
+    and apply them. Use this when the user asks "any optimization suggestions?",
+    "what can be improved?", or after surfacing a quality alert.
+
+    Args:
+        context: The call context.
+    """
+    from app.services.optimization_summary import shadow_inbox
+
+    inbox = await shadow_inbox()
+    # Trim chatty fields the LLM doesn't need; apply_preview alone can be huge.
+    items = [
+        {k: v for k, v in item.items() if k not in ("apply_preview", "trigger_detail")}
+        for item in inbox["items"]
+    ]
+    return {
+        "items": items,
+        "counts": inbox["counts"],
+        "lookback_days": inbox["lookback_days"],
+        "note": (
+            "Items with status=completed, no applied_at, and tied_with_baseline=false "
+            "are pending recommendations. Offer apply_optimization for those."
+        ),
+    }
+
+
+async def get_optimization_run(
+    context: RunContext[AgenticChatDeps],
+    item_kind: str,
+    run_uuid: str,
+) -> dict:
+    """Get status and results of an autovalidate (optimizer) run.
+
+    Use after start_optimization to poll progress, or to inspect a completed
+    run before offering to apply it.
+
+    Args:
+        context: The call context.
+        item_kind: One of 'knowledge_base', 'search_set', or 'workflow' (aliases 'kb' / 'extraction' accepted).
+        run_uuid: UUID of the optimization run.
+    """
+    from app.services.optimization_summary import get_run_by_uuid, summarize_run
+
+    kind = _OPTIMIZE_KIND_ALIASES.get(item_kind)
+    if not kind:
+        return {"error": f"Unknown item_kind '{item_kind}'."}
+    surface = {"knowledge_base": "kb", "search_set": "extraction", "workflow": "workflow"}[kind]
+
+    run = await get_run_by_uuid(surface, run_uuid)
+    if not run:
+        return {"error": f"Optimization run '{run_uuid}' not found."}
+
+    item_id = getattr(run, "kb_uuid", None) or getattr(run, "search_set_uuid", None) or getattr(run, "workflow_id", None)
+    _, _, err = await _get_optimizable_item(context, kind, item_id)
+    if err:
+        return err
+
+    summary = summarize_run(run) or {}
+    summary.pop("apply_preview", None)
+    summary.update({
+        "phase": getattr(run, "phase", None),
+        "progress_message": getattr(run, "progress_message", None),
+        "tokens_used": getattr(run, "tokens_used", None),
+        "estimated_cost_usd": getattr(run, "estimated_cost_usd", None),
+        "winner_selection_reason": getattr(run, "winner_selection_reason", None),
+        "stopped_reason": getattr(run, "stopped_reason", None),
+        "error_message": getattr(run, "error_message", None),
+    })
+    if summary.get("status") == "completed" and not summary.get("applied_at"):
+        if summary.get("tied_with_baseline"):
+            summary["note"] = (
+                "The best trial is statistically tied with the current config — "
+                "applying would not meaningfully change quality."
+            )
+        else:
+            summary["note"] = "Completed and unapplied — offer apply_optimization."
+    return summary
+
+
+async def start_optimization(
+    context: RunContext[AgenticChatDeps],
+    item_kind: str,
+    item_uuid: str,
+    token_budget: int = DEFAULT_OPTIMIZATION_TOKEN_BUDGET,
+    confirmed: bool = False,
+) -> dict:
+    """Start an autovalidate (optimizer) run that finds a better config for a KB, extraction set, or workflow.
+
+    Autovalidate sweeps candidate configurations against the item's test set
+    and reports the best one — nothing changes until the user applies it.
+    Runs cost real LLM tokens (the budget) and take 5–30 minutes.
+
+    Call first with confirmed=false to preview. Then call again with confirmed=true after the user approves.
+
+    Args:
+        context: The call context.
+        item_kind: One of 'knowledge_base', 'search_set', or 'workflow' (aliases 'kb' / 'extraction' accepted).
+        item_uuid: UUID of the item to optimize (workflow id for workflows).
+        token_budget: Max LLM tokens the run may spend. Default 500k (roughly $1–$5 depending on model).
+        confirmed: Must be true to actually start. If false, returns a preview for user confirmation.
+    """
+    from app.services.optimization_actions import (
+        OptimizationActionError,
+        start_extraction_optimization,
+        start_kb_optimization,
+        start_workflow_optimization,
+    )
+
+    kind = _OPTIMIZE_KIND_ALIASES.get(item_kind)
+    if not kind:
+        return {"error": f"Unknown item_kind '{item_kind}'."}
+
+    item, title, err = await _get_optimizable_item(context, kind, item_uuid)
+    if err:
+        return err
+
+    if not confirmed:
+        duration = {
+            "knowledge_base": "10–20 minutes",
+            "search_set": "5–15 minutes",
+            "workflow": "15–30 minutes",
+        }[kind]
+        return {
+            "action": "start_optimization",
+            "preview": (
+                f"Run autovalidate on \"{title}\" with a budget of "
+                f"{token_budget:,} tokens (typically takes {duration}). "
+                "Nothing changes until the winning config is applied."
+            ),
+            "needs_confirmation": True,
+            "token_budget": token_budget,
+        }
+
+    user_id = context.deps.user_id
+    try:
+        if kind == "knowledge_base":
+            run = await start_kb_optimization(item, user_id, token_budget)
+        elif kind == "search_set":
+            run = await start_extraction_optimization(item, user_id, token_budget)
+        else:
+            run = await start_workflow_optimization(str(item.id), user_id, token_budget)
+    except OptimizationActionError as e:
+        return {"error": e.message, "code": e.code, **e.detail}
+
+    return {
+        "run_uuid": run.uuid,
+        "status": "queued",
+        "item": title,
+        "message": (
+            f"Autovalidate started for '{title}'. It runs in the background — "
+            "check progress with get_optimization_run."
+        ),
+    }
+
+
+async def apply_optimization(
+    context: RunContext[AgenticChatDeps],
+    item_kind: str,
+    run_uuid: str,
+    confirmed: bool = False,
+) -> dict:
+    """Apply a completed optimization run's winning config to its KB, extraction set, or workflow.
+
+    Call first with confirmed=false to preview the change (scores, deltas).
+    Then call again with confirmed=true after the user approves. The previous
+    config is snapshotted so the apply can be reverted from the UI.
+
+    Args:
+        context: The call context.
+        item_kind: One of 'knowledge_base', 'search_set', or 'workflow' (aliases 'kb' / 'extraction' accepted).
+        run_uuid: UUID of the completed optimization run to apply.
+        confirmed: Must be true to actually apply. If false, returns a preview for user confirmation.
+    """
+    from app.services.optimization_actions import (
+        OptimizationActionError,
+        apply_extraction_optimization,
+        apply_kb_optimization,
+        apply_workflow_optimization,
+    )
+    from app.services.optimization_summary import get_run_by_uuid
+
+    kind = _OPTIMIZE_KIND_ALIASES.get(item_kind)
+    if not kind:
+        return {"error": f"Unknown item_kind '{item_kind}'."}
+    surface = {"knowledge_base": "kb", "search_set": "extraction", "workflow": "workflow"}[kind]
+
+    run = await get_run_by_uuid(surface, run_uuid)
+    if not run:
+        return {"error": f"Optimization run '{run_uuid}' not found."}
+
+    item_id = getattr(run, "kb_uuid", None) or getattr(run, "search_set_uuid", None) or getattr(run, "workflow_id", None)
+    item, title, err = await _get_optimizable_item(context, kind, item_id)
+    if err:
+        return err
+
+    if run.status != "completed":
+        return {"error": f"Cannot apply — run status is '{run.status}', expected 'completed'."}
+
+    if not confirmed:
+        optimized = getattr(run, "optimized_score", None)
+        baseline = getattr(run, "baseline_default_score", None)
+        delta = ""
+        if optimized is not None and baseline is not None:
+            delta = f" (score {baseline:.2f} → {optimized:.2f})"
+        preview = f"Apply the winning autovalidate config to \"{title}\"{delta}."
+        if getattr(run, "tied_with_baseline", False):
+            preview += (
+                " Note: the winner is statistically tied with the current config — "
+                "applying may not improve quality."
+            )
+        rollup = (getattr(run, "apply_preview", None) or {})
+        result: dict = {
+            "action": "apply_optimization",
+            "preview": preview,
+            "needs_confirmation": True,
+        }
+        if rollup:
+            result["expected_changes"] = {
+                k: rollup.get(k)
+                for k in ("total", "will_change", "improvements", "regressions", "significant_regressions", "net_delta")
+                if k in rollup
+            }
+        return result
+
+    user_id = context.deps.user_id
+    try:
+        if kind == "knowledge_base":
+            outcome = await apply_kb_optimization(item, run, user_id)
+        elif kind == "search_set":
+            outcome = await apply_extraction_optimization(item, run, user_id)
+        else:
+            outcome = await apply_workflow_optimization(item, run, user_id)
+    except OptimizationActionError as e:
+        return {"error": e.message, "code": e.code, **e.detail}
+
+    return {
+        "ok": True,
+        "item": title,
+        "message": f"Applied the optimized config to '{title}'. It can be reverted from the item's autovalidate panel.",
+        "applied_config": outcome.get("applied_config"),
+    }
+
+
+async def regenerate_validation_plan(
+    context: RunContext[AgenticChatDeps],
+    workflow_id: str,
+    confirmed: bool = False,
+) -> dict:
+    """Regenerate a workflow's validation plan when it has gone stale.
+
+    Use when get_quality_info reports validation_plan_stale=true — the saved
+    checks no longer match the workflow definition, so validation grades are
+    unreliable until the plan is regenerated.
+
+    Call first with confirmed=false to preview. Then call again with confirmed=true after the user approves.
+
+    Args:
+        context: The call context.
+        workflow_id: The ID of the workflow whose plan should be regenerated.
+        confirmed: Must be true to actually regenerate. If false, returns a preview for user confirmation.
+    """
+    from app.services import workflow_service
+
+    item, title, err = await _get_optimizable_item(context, "workflow", workflow_id)
+    if err:
+        return err
+
+    if not confirmed:
+        return {
+            "action": "regenerate_validation_plan",
+            "preview": (
+                f"Regenerate the validation plan for \"{title}\" from its current "
+                "definition. The old checks are replaced."
+            ),
+            "needs_confirmation": True,
+        }
+
+    try:
+        checks = await workflow_service.generate_validation_plan(workflow_id, user=context.deps.user)
+    except ValueError as e:
+        return {"error": str(e)}
+
+    return {
+        "ok": True,
+        "workflow": title,
+        "num_checks": len(checks) if isinstance(checks, list) else None,
+        "message": f"Regenerated the validation plan for '{title}'. Validation runs now grade against the current definition.",
+    }
+
+
+# ---------------------------------------------------------------------------
 # Tool registry — imported by llm_service.create_agentic_chat_agent()
 # ---------------------------------------------------------------------------
 
@@ -1711,4 +2154,10 @@ TOOLS = [
     propose_test_case,
     run_validation,
     create_extraction_from_document,
+    # Phase 6 — Autovalidate (optimizer)
+    list_optimization_recommendations,
+    get_optimization_run,
+    start_optimization,
+    apply_optimization,
+    regenerate_validation_plan,
 ]

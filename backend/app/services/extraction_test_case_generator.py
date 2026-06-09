@@ -20,7 +20,6 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any
 from uuid import uuid4
 
 from app.models.document import SmartDocument

@@ -25,6 +25,20 @@ export interface QualityMeta {
   num_test_cases?: number | null
   num_runs?: number | null
   active_alerts?: Array<{ type: string; severity: string; message: string }>
+  // Latest autovalidate (optimizer) run for the item, if any.
+  optimization?: {
+    status: string
+    run_uuid: string
+    optimized_score?: number | null
+    baseline_score?: number | null
+    tied_with_baseline?: boolean
+    applied_at?: string | null
+    completed_at?: string | null
+    pending_recommendation?: boolean
+  } | null
+  // Workflows only: the saved validation plan no longer matches the
+  // workflow definition (regenerate before trusting validation results).
+  plan_stale?: boolean | null
 }
 
 export interface ToolResultInfo {
@@ -111,6 +125,10 @@ export interface Citation {
   chunk_id?: string | null
   score?: number | null
   content_preview?: string
+  // User-verifiable provenance for the KB source (origin URL / citation).
+  source_reference?: string | null
+  // Set when the KB source is a URL — citation chip links out to it.
+  url?: string | null
 }
 
 export interface StreamChunk {

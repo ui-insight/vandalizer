@@ -8,8 +8,6 @@ import re
 import uuid as uuid_mod
 from typing import TYPE_CHECKING
 
-logger = logging.getLogger(__name__)
-
 from beanie import PydanticObjectId
 from bson import ObjectId
 from celery.result import AsyncResult

@@ -29,6 +29,9 @@ const LOADING_WORDS = [
 ]
 
 function StreamingLabel() {
+  const { isCustomized } = useBranding()
+  // 'Vandalizing' is a Joe Vandal in-joke — keep it off white-labeled deployments.
+  const words = isCustomized ? LOADING_WORDS.filter(w => w !== 'Vandalizing') : LOADING_WORDS
   const [index, setIndex] = useState(0)
   const [fade, setFade] = useState(true)
 
@@ -50,7 +53,7 @@ function StreamingLabel() {
       fontSize: 13,
       color: '#9ca3af',
     }}>
-      {LOADING_WORDS[index]}&hellip;
+      {words[index % words.length]}&hellip;
     </span>
   )
 }

@@ -420,12 +420,46 @@ HELP_TOPICS: list[dict] = [
             "- Creating knowledge bases\n"
             "- Adding documents or URLs to a KB\n"
             "- Running workflows\n"
-            "- Saving test cases (guided verification)\n\n"
+            "- Saving test cases (guided verification)\n"
+            "- Starting or applying autovalidate optimization runs\n"
+            "- Regenerating a workflow's validation plan\n\n"
             "**You'll see** a preview message describing what's about to "
             "happen — confirm with *\"go ahead\"*, *\"yes\"*, or *\"confirm\"* "
             "and the agent runs it. Cancel with *\"never mind\"* or just ask "
             "for something different.\n\n"
             "This is by design: the agent never silently writes on your behalf."
+        ),
+    },
+    {
+        "id": "autovalidate",
+        "title": "Autovalidate — automatic quality tuning",
+        "aliases": [
+            "autovalidate", "optimize", "optimizer", "optimization",
+            "tune my kb", "improve accuracy", "make it more accurate",
+            "quality tuning", "best config", "optimizer inbox", "quality inbox",
+            "shadow run", "apply optimization",
+        ],
+        "body": (
+            "**Autovalidate** finds the best configuration for your knowledge "
+            "bases, extraction templates, and workflows by sweeping candidate "
+            "configs against their test sets and scoring each one.\n\n"
+            "- **Knowledge bases** — proves your KB earns its keep: a quality "
+            "score plus a one-click recipe to improve retrieval. Typically "
+            "$1–$5 in tokens and 10–20 minutes.\n"
+            "- **Extraction templates** — scores the template against test "
+            "cases and finds the model/strategy/prompt combination with the "
+            "highest accuracy. Typically $1–$5 and 5–15 minutes.\n"
+            "- **Workflows** — finds the per-step model and prompt combination "
+            "that scores highest on your test inputs. Typically $5–$15 and "
+            "15–30 minutes.\n\n"
+            "**Nothing changes until you click Apply** (or confirm in chat). "
+            "Every run reports the winner against your current config, flags "
+            "statistical ties honestly, and snapshots the previous config so "
+            "applies can be reverted.\n\n"
+            "**Where:** ask the chat to *\"optimize this\"*, use the "
+            "Autovalidate panel in each editor, or review system-suggested "
+            "candidates in **Library → Quality Inbox** (quality monitoring "
+            "auto-tunes items in shadow mode when it detects drift)."
         ),
     },
 ]

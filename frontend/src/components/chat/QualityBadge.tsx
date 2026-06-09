@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Shield, ShieldAlert, ShieldCheck, AlertTriangle } from 'lucide-react'
+import { Shield, ShieldAlert, ShieldCheck, AlertTriangle, Sparkles } from 'lucide-react'
 import type { QualityMeta } from '../../types/chat'
 
 const TIER_CONFIG: Record<string, { bg: string; border: string; text: string; icon: typeof Shield; label: string }> = {
@@ -24,8 +24,6 @@ function formatDate(iso: string | null): string {
 }
 
 export function QualityBadge({ quality }: { quality: QualityMeta }) {
-  if (quality.score == null && !quality.tier) return null
-
   const [showTooltip, setShowTooltip] = useState(false)
   const badgeRef = useRef<HTMLButtonElement>(null)
   const tooltipRef = useRef<HTMLDivElement>(null)
@@ -49,6 +47,8 @@ export function QualityBadge({ quality }: { quality: QualityMeta }) {
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [showTooltip])
+
+  if (quality.score == null && !quality.tier) return null
 
   return (
     <span style={{ position: 'relative', display: 'inline-flex' }}>
@@ -146,6 +146,28 @@ export function QualityBadge({ quality }: { quality: QualityMeta }) {
           <div style={{ color: '#9ca3af', fontSize: 11 }}>
             Last validated: {formatDate(quality.last_validated_at)}
           </div>
+
+          {/* Stale validation plan (workflows) */}
+          {quality.plan_stale && (
+            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #f3f4f6', display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 11, color: '#d97706' }}>
+              <AlertTriangle size={12} style={{ flexShrink: 0, marginTop: 1 }} />
+              <span>Validation plan is out of date with the workflow — regenerate it before trusting this score.</span>
+            </div>
+          )}
+
+          {/* Pending optimization recommendation */}
+          {quality.optimization?.pending_recommendation && (
+            <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #f3f4f6', display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 11, color: '#7c3aed' }}>
+              <Sparkles size={12} style={{ flexShrink: 0, marginTop: 1 }} />
+              <span>
+                Autovalidate found a better config
+                {quality.optimization.optimized_score != null && quality.optimization.baseline_score != null
+                  ? ` (${Math.round(quality.optimization.optimized_score)} vs ${Math.round(quality.optimization.baseline_score)} current)`
+                  : ''}
+                {' '}— review and apply when ready.
+              </span>
+            </div>
+          )}
 
           {/* Alerts */}
           {hasAlerts && (

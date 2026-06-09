@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **Autovalidate from chat.** Five new agentic tools close the loop between v4.5's optimizer and the v5 chat agent: `list_optimization_recommendations` (the shadow-run inbox), `get_optimization_run` (live progress/results), `start_optimization` and `apply_optimization` (both 2-step confirmed; start states the token budget, apply previews the score delta and expected changes), and `regenerate_validation_plan` for stale workflow plans. Start/apply mutations were extracted from the three per-surface routers into `services/optimization_actions.py` so chat and HTTP run the same code path.
+- **Citations from agent-driven KB searches.** `search_knowledge_base` tool calls now emit the same `sources` citation chips as classic KB chat (via a `citation_annotations` sidecar keyed by tool_call_id — citation plumbing stays out of the LLM context). Citations are also persisted on `ChatMessage` for the first time, so they survive history reloads and Stop, and KB-source `source_reference` provenance rides along (URL sources render as clickable chips).
+- **Quality Inbox tab in Library.** The optimizer's shadow-run inbox (previously an orphaned component) is now reachable: Library → Quality Inbox.
+- **Autovalidate help topic** for `get_app_help`, re-homing the value-prop copy from the retired `ValueWelcome` cards.
+
+### Changed
+- **Agentic prompt grounding + optimizer guidance.** The agentic system prompt now carries the KB grounding rules from v4.5's `KB_CHAT_SYSTEM_PROMPT` (inline `[Source: …]` citations, `_Beyond the retrieved sources:_` marking, honest no-answer admissions) scoped to KB tool results, plus when-to-use guidance and an honesty rule (`tied_with_baseline` → say applying won't help) for the new optimizer tools.
+- **`get_quality_info` reports optimization + plan staleness.** The quality sidecar (and `QualityBadge` tooltip) now include the latest autovalidate run — flagging pending recommendations with score deltas — and, for workflows, whether the validation plan has drifted from the definition.
+- **Chat surfaces honor white-label branding.** System prompts, scripted-demo copy (streamed and persisted), and `get_app_help` bodies swap "Vandalizer" for the configured org name, mirroring the email-branding convention; the "Vandalizing" loading word stays off customized deployments.
+
+### Fixed
+- **`useConfirm` shadowing broke the clear-memory confirm.** `Account.tsx` called `confirm()` with a string after the merge made `confirm` the styled-dialog hook — the unawaited Promise was always truthy, so memory cleared without asking. Now uses the styled dialog properly (destructive variant).
+- **`KBSourceResponse` was missing `source_reference`**, breaking the production build (`tsc -b`) at `KBSourceInspectorModal`.
+- **`QualityBadge` violated rules-of-hooks** (early return before hooks) — surfaced as eslint errors once the badge gained conditional content.
+
 ## [5.0.0] — Fully Agentic
 
 The biggest change since launch: chat now drives the entire platform. Documents, knowledge bases, extractions, and workflows are all reachable through one conversation — with quality scores, source citations, and confirmation flows built in.

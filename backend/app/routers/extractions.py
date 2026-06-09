@@ -1656,63 +1656,27 @@ async def start_extraction_optimization(
     Returns ``{run_uuid, status: "queued"}``. The UI polls
     ``GET /search-sets/{uuid}/optimize/{run_uuid}`` for progress.
     """
-    import uuid as _uuid
-
-    from app.models.extraction_optimization_run import ExtractionOptimizationRun
-    from app.services.extraction_optimizer import reap_stale_runs
+    from app.services.optimization_actions import (
+        OptimizationActionError,
+        start_extraction_optimization as _start,
+    )
 
     ss = await _get_search_set_or_404(uuid, user, manage=True)
 
-    # Recover any orphaned run first so a dead worker's "running" doc can't
-    # permanently block new runs via the 409 below.
-    await reap_stale_runs(ss.uuid)
-
-    # Reject if a non-terminal run already exists.
-    active = await ExtractionOptimizationRun.find_one(
-        ExtractionOptimizationRun.search_set_uuid == ss.uuid,
-        {"status": {"$in": ["queued", "running"]}},
-    )
-    if active:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Optimization already in progress (run {active.uuid})",
+    try:
+        run = await _start(
+            ss, user.user_id,
+            token_budget=int(req.token_budget),
+            apply_on_finish=bool(req.apply_on_finish),
+            max_candidates=int(req.max_candidates),
+            include_judge=bool(req.include_judge),
+            test_case_uuids=req.test_case_uuids,
         )
-
-    # Drop blanks/dupes; None means "use every test case" downstream.
-    selected_case_uuids = list(dict.fromkeys(u for u in (req.test_case_uuids or []) if u)) or None
-
-    # Generate the Celery task id up front so it's persisted before dispatch —
-    # no race where the task finishes before we record the id. It's the handle
-    # the cancel endpoint + stale-run watchdog use to hard-revoke a wedged run.
-    celery_task_id = _uuid.uuid4().hex
-
-    run = ExtractionOptimizationRun(
-        search_set_uuid=ss.uuid,
-        user_id=user.user_id,
-        status="queued",
-        token_budget=max(0, int(req.token_budget)),
-        celery_task_id=celery_task_id,
-        options={
-            "apply_on_finish": req.apply_on_finish,
-            "max_candidates": req.max_candidates,
-            "include_judge": req.include_judge,
-            "test_case_uuids": selected_case_uuids,
-        },
-    )
-    await run.insert()
-
-    from app.tasks.extraction_tasks import optimize_extraction_task
-    optimize_extraction_task.apply_async(
-        args=[
-            ss.uuid, user.user_id, run.uuid,
-            max(0, int(req.token_budget)),
-            bool(req.apply_on_finish),
-            max(1, int(req.max_candidates)),
-            bool(req.include_judge),
-            selected_case_uuids,
-        ],
-        task_id=celery_task_id,
-    )
+    except OptimizationActionError as e:
+        raise HTTPException(
+            status_code=409 if e.code == "active_run" else 400,
+            detail=e.message,
+        )
     return {"run_uuid": run.uuid, "status": "queued"}
 
 
@@ -1881,101 +1845,27 @@ async def apply_extraction_optimization(
     )
     if not run:
         raise HTTPException(status_code=404, detail="Optimization run not found")
-    if run.status != "completed":
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cannot apply — run status is '{run.status}', expected 'completed'",
-        )
-    if not run.best_config:
-        raise HTTPException(status_code=400, detail="Run has no best_config to apply")
 
     # Normalize missing body to a defaults instance — UI callers don't send one.
     body = req or ApplyExtractionOptimizationRequest()
 
-    # Cross-field apply-gate. Only meaningful when the run actually evaluated
-    # rules (winner_cross_field_summary populated and has a decisive pass_rate).
-    if (
-        body.min_cf_pass_rate is not None
-        and not body.force
-        and run.winner_cross_field_summary
-    ):
-        cf_pass_rate = run.winner_cross_field_summary.get("pass_rate")
-        if cf_pass_rate is not None and cf_pass_rate < float(body.min_cf_pass_rate):
-            failing = [
-                {
-                    "rule_id": r.get("rule_id"),
-                    "type": r.get("type"),
-                    "label": r.get("label"),
-                    "pass": r.get("pass"),
-                    "fail": r.get("fail"),
-                    "pass_rate": r.get("pass_rate"),
-                }
-                for r in (run.winner_cross_field_rule_breakdown or [])
-                if (r.get("fail") or 0) > 0
-            ]
+    from app.services.optimization_actions import (
+        OptimizationActionError,
+        apply_extraction_optimization as _apply,
+    )
+    try:
+        return await _apply(
+            ss, run, user.user_id,
+            min_cf_pass_rate=body.min_cf_pass_rate,
+            force=body.force,
+        )
+    except OptimizationActionError as e:
+        if e.code == "cross_field_below_threshold":
             raise HTTPException(
                 status_code=409,
-                detail={
-                    "code": "cross_field_below_threshold",
-                    "message": (
-                        f"Winning config's cross-field pass rate is "
-                        f"{cf_pass_rate:.0%}, below the requested minimum of "
-                        f"{float(req.min_cf_pass_rate):.0%}. Re-submit with "
-                        "force=true to apply anyway."
-                    ),
-                    "pass_rate": cf_pass_rate,
-                    "min_required": float(req.min_cf_pass_rate),
-                    "failing_rules": failing,
-                },
+                detail={"code": e.code, "message": e.message, **e.detail},
             )
-
-    # Persist previous override on the run so revert can restore it.
-    run.previous_override = ss.extraction_config_override
-    ss.extraction_config_override = dict(run.best_config)
-    ss.extraction_config_override_set_at = datetime.datetime.now(tz=datetime.timezone.utc)
-    await ss.save()
-    await run.save()
-
-    # Close the loop: re-validate the test set with the applied config so the
-    # completed-state panel can show "optimizer score → real post-apply score."
-    # Synchronous so the UI's refetch sees post_apply_validation populated.
-    from app.services.extraction_optimizer import run_post_apply_validation
-    await run_post_apply_validation(
-        run_doc=run,
-        search_set_uuid=ss.uuid,
-        user_id=user.user_id,
-        source="explicit_apply",
-    )
-
-    # Phase 4: record this apply on the unified quality timeline. Prefer the
-    # authoritative post-apply score (0..1 unit, just stamped onto the run by
-    # run_post_apply_validation) so the timeline marker agrees with the certified
-    # quality tile; fall back to the optimizer's in-run headline only if the
-    # post-apply validation didn't run.
-    try:
-        from app.services import quality_service as _qs
-        _post = run.post_apply_validation or {}
-        _post_unit = _post.get("score")
-        score_pct = (
-            float(_post_unit * 100.0) if _post_unit is not None
-            else float((run.optimized_score or 0.0) * 100.0)
-        )
-        await _qs.record_optimizer_apply(
-            item_kind="search_set",
-            item_id=ss.uuid,
-            item_name=getattr(ss, "title", "") or "",
-            run_type="extraction",
-            score=score_pct,
-            user_id=user.user_id,
-            source_run_uuid=run.uuid,
-            applied_config=ss.extraction_config_override,
-            judge_model=run.judge_model,
-            judge_variance=run.judge_variance,
-        )
-    except Exception:
-        logger.warning("Failed to record optimizer-apply ValidationRun for SearchSet %s", ss.uuid)
-
-    return {"ok": True, "applied_config": ss.extraction_config_override}
+        raise HTTPException(status_code=400, detail=e.message)
 
 
 # ---------------------------------------------------------------------------

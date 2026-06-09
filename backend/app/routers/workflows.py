@@ -1758,48 +1758,29 @@ async def start_workflow_optimization(
         token_budget = int(body.get("token_budget", 0))
     except (TypeError, ValueError):
         raise HTTPException(status_code=400, detail="token_budget must be an integer")
-    if token_budget < 0:
-        raise HTTPException(status_code=400, detail="token_budget must be >= 0")
 
     try:
         max_candidates = int(body.get("max_candidates", 10))
     except (TypeError, ValueError):
         raise HTTPException(status_code=400, detail="max_candidates must be an integer")
-    if max_candidates < 1 or max_candidates > 50:
-        raise HTTPException(status_code=400, detail="max_candidates must be in [1, 50]")
 
-    apply_on_finish = bool(body.get("apply_on_finish", False))
-    include_judge = bool(body.get("include_judge", True))
-
-    from app.models.workflow_optimization_run import WorkflowOptimizationRun
-    active = await WorkflowOptimizationRun.find_one(
-        WorkflowOptimizationRun.workflow_id == workflow_id,
-        {"status": {"$in": ["queued", "running"]}},
+    from app.services.optimization_actions import (
+        OptimizationActionError,
+        start_workflow_optimization as _start,
     )
-    if active:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Optimization already in progress for this workflow (run {active.uuid})",
+    try:
+        run = await _start(
+            workflow_id, user.user_id,
+            token_budget=token_budget,
+            apply_on_finish=bool(body.get("apply_on_finish", False)),
+            max_candidates=max_candidates,
+            include_judge=bool(body.get("include_judge", True)),
         )
-
-    run = WorkflowOptimizationRun(
-        workflow_id=workflow_id,
-        user_id=user.user_id,
-        status="queued",
-        token_budget=token_budget,
-        options={
-            "apply_on_finish": apply_on_finish,
-            "include_judge": include_judge,
-            "max_candidates": max_candidates,
-        },
-    )
-    await run.insert()
-
-    from app.tasks.workflow_optimization_tasks import optimize_workflow_task
-    optimize_workflow_task.delay(
-        workflow_id, user.user_id, run.uuid,
-        token_budget, apply_on_finish, max_candidates, include_judge,
-    )
+    except OptimizationActionError as e:
+        raise HTTPException(
+            status_code=409 if e.code == "active_run" else 400,
+            detail=e.message,
+        )
     return {"run_uuid": run.uuid, "status": "queued"}
 
 
@@ -1911,8 +1892,6 @@ async def apply_workflow_optimization(
     the body — or sending ``{}`` — applies all winning step overrides,
     matching the legacy behavior.
     """
-    import datetime as _dt
-
     wf = await get_authorized_workflow(workflow_id, user, manage=True)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
@@ -1923,74 +1902,18 @@ async def apply_workflow_optimization(
     )
     if not run:
         raise HTTPException(status_code=404, detail="Optimization run not found")
-    if run.status != "completed":
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cannot apply — run status is '{run.status}', expected 'completed'",
-        )
-    if not run.best_config:
-        raise HTTPException(status_code=400, detail="Run has no best_config to apply")
 
-    # Snapshot the previous override so revert is exact.
-    run.previous_override = wf.config_override
-    await run.save()
-
-    winning_overrides: dict = (run.best_config or {}).get("step_overrides") or {}
-    requested_step_ids = req.step_ids if req else None
-    if requested_step_ids is not None:
-        # Validate: every requested step_id must exist in the winning config.
-        unknown = [s for s in requested_step_ids if s not in winning_overrides]
-        if unknown:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unknown step_ids in winning config: {unknown}",
-            )
-        # Subset apply: start from the currently-live step_overrides (so the
-        # user's prior choices on other steps survive) and overlay only the
-        # selected ones from this run's winner.
-        live_overrides: dict = ((wf.config_override or {}).get("step_overrides") or {})
-        merged = dict(live_overrides)
-        for sid in requested_step_ids:
-            merged[sid] = winning_overrides[sid]
-        applied_overrides = merged
-    else:
-        applied_overrides = dict(winning_overrides)
-
-    wf.config_override = {
-        "step_overrides": applied_overrides,
-        "from_run_uuid": run.uuid,
-        "partial": requested_step_ids is not None,
-    }
-    wf.config_override_set_at = _dt.datetime.now(tz=_dt.timezone.utc)
-    await wf.save()
-
-    # Phase 4: record this apply on the unified quality timeline so workflow
-    # applies show up alongside validation runs in the shared QualityTimeline.
+    from app.services.optimization_actions import (
+        OptimizationActionError,
+        apply_workflow_optimization as _apply,
+    )
     try:
-        from app.services import quality_service as _qs
-        score_pct = float((run.optimized_score or 0.0) * 100.0)
-        wf_name = getattr(wf, "name", "") or getattr(wf, "title", "") or ""
-        await _qs.record_optimizer_apply(
-            item_kind="workflow",
-            item_id=str(wf.id),
-            item_name=wf_name,
-            run_type="workflow",
-            score=score_pct,
-            user_id=user.user_id,
-            source_run_uuid=run.uuid,
-            applied_config=wf.config_override,
-            judge_model=run.judge_model,
-            judge_variance=run.judge_variance,
+        return await _apply(
+            wf, run, user.user_id,
+            step_ids=req.step_ids if req else None,
         )
-    except Exception:
-        logger.warning("Failed to record optimizer-apply ValidationRun for workflow %s", wf.id)
-
-    return {
-        "ok": True,
-        "applied_config": wf.config_override,
-        "applied_step_ids": list(applied_overrides.keys()),
-        "partial": requested_step_ids is not None,
-    }
+    except OptimizationActionError as e:
+        raise HTTPException(status_code=400, detail=e.message)
 
 
 @router.post("/{workflow_id}/optimize/{run_uuid}/revert")

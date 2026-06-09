@@ -1344,18 +1344,18 @@ class TestKnowledgeBaseQueryNode:
         result = node.process({"output": "prev"})
         assert result["output"] == ""
 
-    @patch("app.services.document_manager.DocumentManager")
-    def test_no_results(self, mock_dm_cls):
+    @patch("app.services.document_manager.get_document_manager")
+    def test_no_results(self, mock_get_dm):
         mock_dm = MagicMock()
         mock_dm.query_kb.return_value = []
-        mock_dm_cls.return_value = mock_dm
+        mock_get_dm.return_value = mock_dm
 
         node = KnowledgeBaseQueryNode({"kb_uuid": "kb-123", "query": "obscure"})
         result = node.process({"output": "prev"})
         assert result["output"] == ""
 
-    @patch("app.services.document_manager.DocumentManager")
-    def test_emits_retrieved_sources_with_page_and_score(self, mock_dm_cls):
+    @patch("app.services.document_manager.get_document_manager")
+    def test_emits_retrieved_sources_with_page_and_score(self, mock_get_dm):
         """The KB node returns a structured citation list for the workflow
         result to persist, in addition to the joined prompt text."""
         mock_dm = MagicMock()
@@ -1373,7 +1373,7 @@ class TestKnowledgeBaseQueryNode:
                 "score": 0.19,
             },
         ]
-        mock_dm_cls.return_value = mock_dm
+        mock_get_dm.return_value = mock_dm
 
         node = KnowledgeBaseQueryNode({"kb_uuid": "kb-1", "query": "cost share"})
         result = node.process({"output": "prev"})

@@ -32,6 +32,7 @@ class ChatMessage(Document):
     tool_calls: Optional[list[dict]] = None
     tool_results: Optional[list[dict]] = None
     segments: Optional[list[dict]] = None
+    citations: Optional[list[dict]] = None
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
 
     class Settings:
@@ -49,6 +50,8 @@ class ChatMessage(Document):
             d["tool_results"] = self.tool_results
         if self.segments:
             d["segments"] = self.segments
+        if self.citations:
+            d["citations"] = self.citations
         return d
 
     def to_model_messages(self) -> list[ModelMessage]:
@@ -200,6 +203,7 @@ class ChatConversation(Document):
         tool_calls: Optional[list[dict]] = None,
         tool_results: Optional[list[dict]] = None,
         segments: Optional[list[dict]] = None,
+        citations: Optional[list[dict]] = None,
     ) -> ChatMessage:
         msg = ChatMessage(
             role=role,
@@ -209,6 +213,7 @@ class ChatConversation(Document):
             tool_calls=tool_calls or None,
             tool_results=tool_results or None,
             segments=segments or None,
+            citations=citations or None,
         )
         await msg.insert()
         self.messages.append(msg.id)

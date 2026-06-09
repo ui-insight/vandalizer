@@ -4,16 +4,18 @@ import { LibraryList } from '../components/library/LibraryList'
 import { LibraryItemsPanel } from '../components/library/LibraryItemsPanel'
 import { ExploreTab } from '../components/library/ExploreTab'
 import { VerificationQueue } from '../components/library/VerificationQueue'
+import { OptimizerInbox } from '../components/shared/OptimizerInbox'
 import { useLibraries } from '../hooks/useLibrary'
 import { useAuth } from '../hooks/useAuth'
 import type { Library as LibraryType } from '../types/library'
 
-type Tab = 'browse' | 'explore' | 'submissions'
+type Tab = 'browse' | 'explore' | 'submissions' | 'quality'
 
 const TAB_LABELS: Record<Tab, string> = {
   browse: 'Browse',
   explore: 'Explore',
   submissions: 'My Submissions',
+  quality: 'Quality Inbox',
 }
 
 export default function Library() {
@@ -82,6 +84,19 @@ export default function Library() {
           {tab === 'submissions' && (
             <div className="flex-1 overflow-auto p-6">
               <VerificationQueue />
+            </div>
+          )}
+
+          {tab === 'quality' && (
+            <div className="flex-1 overflow-auto p-6">
+              <div className="max-w-3xl mx-auto">
+                <p className="text-sm text-gray-600 mb-4">
+                  When quality monitoring detects a drop, the system auto-tunes the affected
+                  knowledge base, extraction, or workflow in shadow mode. Candidates land here
+                  for review — nothing is applied without your say-so.
+                </p>
+                <OptimizerInbox />
+              </div>
             </div>
           )}
         </div>

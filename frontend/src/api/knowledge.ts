@@ -112,6 +112,8 @@ export interface KBSourceResponse {
   url?: string | null
   url_title?: string | null
   custom_name?: string | null
+  // User-verifiable provenance (origin URL / citation); shown as "Source: …".
+  source_reference?: string | null
   status: 'pending' | 'processing' | 'ready' | 'error'
   error_message?: string | null
   chunk_count: number

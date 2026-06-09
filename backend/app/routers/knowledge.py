@@ -1064,45 +1064,20 @@ async def start_kb_optimization(uuid: str, request: Request, user: User = Depend
         token_budget = int(body.get("token_budget", 0))
     except (TypeError, ValueError):
         raise HTTPException(status_code=400, detail="token_budget must be an integer")
-    if token_budget <= 0:
-        raise HTTPException(status_code=400, detail="token_budget must be > 0")
 
-    include_indexing_track = bool(body.get("include_indexing_track", False))
-    apply_on_finish = bool(body.get("apply_on_finish", False))
-    autogen_coverage = (body.get("autogen_coverage") or "standard").strip()
-    if autogen_coverage not in ("quick", "standard", "exhaustive"):
-        autogen_coverage = "standard"
-
-    # Reject if a non-terminal run already exists for this KB.
-    from app.models.kb_optimization_run import KBOptimizationRun
-    active = await KBOptimizationRun.find_one(
-        KBOptimizationRun.kb_uuid == kb.uuid,
-        {"status": {"$in": ["queued", "running"]}},
-    )
-    if active:
-        raise HTTPException(
-            status_code=409,
-            detail=f"Optimization already in progress for this KB (run {active.uuid})",
+    from app.services.optimization_actions import OptimizationActionError, start_kb_optimization as _start
+    try:
+        run = await _start(
+            kb, user.user_id, token_budget,
+            include_indexing_track=bool(body.get("include_indexing_track", False)),
+            apply_on_finish=bool(body.get("apply_on_finish", False)),
+            autogen_coverage=(body.get("autogen_coverage") or "standard").strip(),
         )
-
-    run = KBOptimizationRun(
-        kb_uuid=kb.uuid,
-        user_id=user.user_id,
-        status="queued",
-        token_budget=token_budget,
-        options={
-            "include_indexing_track": include_indexing_track,
-            "apply_on_finish": apply_on_finish,
-            "autogen_coverage": autogen_coverage,
-        },
-    )
-    await run.insert()
-
-    from app.tasks.kb_validation_tasks import optimize_kb_task
-    optimize_kb_task.delay(
-        kb.uuid, user.user_id, run.uuid, token_budget,
-        include_indexing_track, apply_on_finish,
-    )
+    except OptimizationActionError as e:
+        raise HTTPException(
+            status_code=409 if e.code == "active_run" else 400,
+            detail=e.message,
+        )
     return {"run_uuid": run.uuid, "status": "queued"}
 
 
@@ -1250,51 +1225,12 @@ async def apply_kb_optimization(uuid: str, run_uuid: str, user: User = Depends(g
     )
     if not run:
         raise HTTPException(status_code=404, detail="Optimization run not found")
-    if run.status != "completed":
-        raise HTTPException(
-            status_code=400,
-            detail=f"Cannot apply — run status is '{run.status}', expected 'completed'",
-        )
-    if not run.best_config:
-        raise HTTPException(status_code=400, detail="Run has no best_config to apply")
 
-    import datetime as _dt
-    now = _dt.datetime.now(tz=_dt.timezone.utc)
-    # Snapshot the prior override on the run so Revert can restore it.
-    run.previous_override = dict(kb.rag_config_override) if kb.rag_config_override else None
-    run.applied_at = now
-    run.reverted_at = None
-    kb.rag_config_override = dict(run.best_config)
-    kb.rag_config_override_set_at = now
-    kb.rag_config_override_run_uuid = run.uuid
-    await kb.save()
-    await run.save()
-    # Phase 4: write a corresponding ValidationRun so this apply shows up on
-    # the unified quality timeline. Best-effort — never block the apply on a
-    # telemetry failure.
+    from app.services.optimization_actions import OptimizationActionError, apply_kb_optimization as _apply
     try:
-        from app.services import quality_service as _qs
-        score_pct = float((run.optimized_score or 0.0) * 100.0)
-        await _qs.record_optimizer_apply(
-            item_kind="knowledge_base",
-            item_id=kb.uuid,
-            item_name=getattr(kb, "title", "") or "",
-            run_type="kb_validation",
-            score=score_pct,
-            user_id=user.user_id,
-            source_run_uuid=run.uuid,
-            applied_config=kb.rag_config_override,
-            judge_model=run.judge_model,
-            judge_variance=run.judge_variance,
-        )
-    except Exception:
-        logger.warning("Failed to record optimizer-apply ValidationRun for KB %s", kb.uuid)
-    return {
-        "ok": True,
-        "applied_config": kb.rag_config_override,
-        "previous_override": run.previous_override,
-        "applied_at": now.isoformat(),
-    }
+        return await _apply(kb, run, user.user_id)
+    except OptimizationActionError as e:
+        raise HTTPException(status_code=400, detail=e.message)
 
 
 @router.post("/{uuid}/optimize/{run_uuid}/revert")

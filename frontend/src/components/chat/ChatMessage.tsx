@@ -3,6 +3,7 @@ import DOMPurify from 'dompurify'
 import { ThumbsUp, ThumbsDown, Copy, Check, ChevronRight } from 'lucide-react'
 import { marked } from 'marked'
 import { submitChatFeedback } from '../../api/feedback'
+import { useBranding } from '../../contexts/BrandingContext'
 import { useCertificationPanel } from '../../contexts/CertificationPanelContext'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { ToolCallDisplay, ToolStatusLine, toolResultToText } from './ToolCallDisplay'
@@ -22,6 +23,9 @@ const THINKING_WORDS = [
 ]
 
 function ThinkingLabel() {
+  const { isCustomized } = useBranding()
+  // 'Vandalizing' is a Joe Vandal in-joke — keep it off white-labeled deployments.
+  const words = isCustomized ? THINKING_WORDS.filter(w => w !== 'Vandalizing') : THINKING_WORDS
   const [index, setIndex] = useState(0)
   const [fade, setFade] = useState(true)
 
@@ -43,7 +47,7 @@ function ThinkingLabel() {
       display: 'inline-block',
       minWidth: 80,
     }}>
-      {THINKING_WORDS[index]}&hellip;
+      {words[index % words.length]}&hellip;
     </span>
   )
 }
@@ -343,19 +347,29 @@ export function ChatMessage({
               {message.citations.map((c, i) => {
                 const locator = typeof c.page === 'number' ? `p. ${c.page}` : (c.sheet || null)
                 const label = locator ? `${c.document_title} · ${locator}` : c.document_title
-                const preview = c.content_preview || ''
-                return (
-                  <span
-                    key={`${c.chunk_id ?? c.document_id ?? i}`}
+                const preview = [c.content_preview, c.source_reference ? `Source: ${c.source_reference}` : null]
+                  .filter(Boolean)
+                  .join('\n\n')
+                const chipStyle = {
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  padding: '2px 8px', fontSize: 11, fontWeight: 500,
+                  backgroundColor: '#f3f4f6', color: '#374151',
+                  border: '1px solid #e5e7eb', borderRadius: 999,
+                } as const
+                const key = `${c.chunk_id ?? c.document_id ?? i}`
+                return c.url ? (
+                  <a
+                    key={key}
+                    href={c.url}
+                    target="_blank"
+                    rel="noreferrer"
                     title={preview}
-                    style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 4,
-                      padding: '2px 8px', fontSize: 11, fontWeight: 500,
-                      backgroundColor: '#f3f4f6', color: '#374151',
-                      border: '1px solid #e5e7eb', borderRadius: 999,
-                      cursor: 'help',
-                    }}
+                    style={{ ...chipStyle, cursor: 'pointer', textDecoration: 'none' }}
                   >
+                    {label}
+                  </a>
+                ) : (
+                  <span key={key} title={preview} style={{ ...chipStyle, cursor: 'help' }}>
                     {label}
                   </span>
                 )

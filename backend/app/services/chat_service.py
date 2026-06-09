@@ -187,6 +187,23 @@ def _extract_event_content(event) -> tuple[str | None, bool]:
     return None, False
 
 
+def _brand_org_text(text: str, org: str | None) -> str:
+    """White-label chat-visible copy: swap the default product name for the
+    deployment's org name (same convention as email branding)."""
+    if not org or org == "Vandalizer":
+        return text
+    return text.replace("Vandalizer", org)
+
+
+def _brand_org_json_chunk(chunk: str, org: str | None) -> str:
+    """Brand a serialized stream chunk. The replacement is JSON-escaped so an
+    org name containing quotes can't corrupt the chunk."""
+    if not org or org == "Vandalizer":
+        return chunk
+    import json as _json
+    return chunk.replace("Vandalizer", _json.dumps(org)[1:-1])
+
+
 async def _run_scripted_demo(
     onboarding_context,
     conversation: ChatConversation,
@@ -423,7 +440,16 @@ async def _run_scripted_demo(
         )
 
         # -- Finalize: save to conversation & activity ----------------------------
-        assistant_message = "".join(full_text_parts)
+        # Brand persisted copy the same way the streamed chunks are branded so
+        # history reloads match what the user saw live.
+        _org = (sys_config_doc or {}).get("org_name") or ""
+        assistant_message = _brand_org_text("".join(full_text_parts), _org)
+        if _org and _org != "Vandalizer":
+            demo_segments = [
+                {**seg, "content": _brand_org_text(seg["content"], _org)}
+                if seg.get("kind") == "text" else seg
+                for seg in demo_segments
+            ]
         await _finalize(
             conversation, assistant_message, [doc] if doc else [],
             None, activity_id, user_id,
@@ -486,6 +512,7 @@ async def chat_stream(
     # Bypasses the LLM agent entirely so the demo is 100% reliable.
     # ---------------------------------------------------------------------------
     if run_demo and onboarding_context and onboarding_context.extraction_set_uuid:
+        _demo_org = (sys_config_doc or {}).get("org_name") or ""
         async for chunk in _run_scripted_demo(
             onboarding_context=onboarding_context,
             conversation=conversation,
@@ -494,7 +521,7 @@ async def chat_stream(
             activity_id=activity_id,
             sys_config_doc=sys_config_doc,
         ):
-            yield chunk
+            yield _brand_org_json_chunk(chunk, _demo_org)
         return
 
     # Load documents
@@ -856,6 +883,9 @@ async def chat_stream(
     streamed_tool_calls: list[dict] = []
     streamed_tool_results: list[dict] = []
     streamed_segments: list[dict] = []
+    # Citations accumulated this turn: pre-agent KB context (classic path)
+    # plus any search_knowledge_base tool calls (agentic path).
+    streamed_citations: list[dict] = list(kb_sources)
 
     # Meter every token this chat consumes (see app/services/metering.py). Manual
     # enter/exit avoids re-indenting the large streaming body; __aexit__ in the
@@ -878,7 +908,11 @@ async def chat_stream(
         if deps is not None:
             iter_kwargs["deps"] = deps
         if system_prompt is not None:
-            iter_kwargs["instructions"] = system_prompt
+            # White-label: the canned prompts identify as "Vandalizer"; branded
+            # deployments speak as the configured org instead.
+            iter_kwargs["instructions"] = _brand_org_text(
+                system_prompt, (sys_config_doc or {}).get("org_name") or ""
+            )
 
         async with agent.iter(prompt, **iter_kwargs) as agent_run:
             async for node in agent_run:
@@ -976,6 +1010,19 @@ async def chat_stream(
                                 streamed_segments.append({"kind": "tool_result", "result": result_data})
                                 yield json.dumps({"kind": "tool_result", **result_data}) + "\n"
 
+                                # Citation sidecar (search_knowledge_base): emit a
+                                # 'sources' chunk so the frontend renders citation
+                                # chips for agent-driven KB lookups, same as the
+                                # classic pre-agent KB path.
+                                if deps and event.tool_call_id in deps.citation_annotations:
+                                    tool_citations = deps.citation_annotations.pop(event.tool_call_id)
+                                    streamed_citations.extend(tool_citations)
+                                    yield json.dumps({
+                                        "kind": "sources",
+                                        "content": "",
+                                        "sources": tool_citations,
+                                    }) + "\n"
+
             if agent_run.result:
                 usage = agent_run.result.usage()
                 # Safety-net: strip any residual think tags the parser missed
@@ -1000,6 +1047,7 @@ async def chat_stream(
                     tool_calls=streamed_tool_calls or None,
                     tool_results=streamed_tool_results or None,
                     segments=cleaned_segments or None,
+                    citations=streamed_citations or None,
                 )
 
                 # Stream token usage so the frontend can display context utilization
@@ -1441,6 +1489,7 @@ async def _finalize(
     tool_calls: Optional[list[dict]] = None,
     tool_results: Optional[list[dict]] = None,
     segments: Optional[list[dict]] = None,
+    citations: Optional[list[dict]] = None,
 ) -> None:
     """Save assistant message and update activity metrics."""
     await conversation.add_message(
@@ -1451,6 +1500,7 @@ async def _finalize(
         tool_calls=tool_calls,
         tool_results=tool_results,
         segments=segments,
+        citations=citations,
     )
 
     if activity_id:

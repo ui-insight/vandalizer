@@ -165,7 +165,13 @@ export default function Account() {
   }, [])
 
   const handleClearMemory = async () => {
-    if (!confirm("Clear what the assistant remembers? This only affects suggestions — your documents, templates, and workflows aren't changed.")) return
+    const ok = await confirm({
+      title: 'Clear assistant memory',
+      message: "Clear what the assistant remembers? This only affects suggestions — your documents, templates, and workflows aren't changed.",
+      confirmLabel: 'Clear memory',
+      destructive: true,
+    })
+    if (!ok) return
     setMemoryClearing(true)
     setMemoryError(null)
     try {

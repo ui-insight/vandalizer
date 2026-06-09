@@ -30,3 +30,10 @@ class AgenticChatDeps:
     # and the streaming layer pops entries when emitting tool_result events.
     # This keeps quality signals out of the LLM context entirely.
     quality_annotations: dict[str, dict] = field(default_factory=dict)
+
+    # Sidecar for KB citations — search_knowledge_base writes Citation-shaped
+    # dicts here keyed by tool_call_id; the streaming layer pops them, emits a
+    # 'sources' chunk, and persists them on the assistant message. Same
+    # rationale as quality_annotations: citation plumbing (chunk ids, scores)
+    # stays out of the LLM context.
+    citation_annotations: dict[str, list[dict]] = field(default_factory=dict)
