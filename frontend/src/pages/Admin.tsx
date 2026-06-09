@@ -24,7 +24,7 @@ import {
   getUsageStats, getUsageTimeseries, getUserLeaderboard, getTeamLeaderboard,
   getTeamDetail, getUserDetail, getUserHistory,
   getWorkflowEvents, getSystemConfig, updateSystemConfig, updateCompliancePolicyConfig,
-  addModel, updateModel, deleteModel, setDefaultModel, testOcr, testModel, testPrompt, probeModel, getReadiness, addOAuthProvider,
+  addModel, updateModel, deleteModel, setDefaultModel, testOcr, testWebSearch, testModel, testPrompt, probeModel, getReadiness, addOAuthProvider,
   updateOAuthProvider, deleteOAuthProvider, updateAuthMethods,
   getQualitySummary, getQualityTimeline, runRegressionSuite,
   getQualityAlerts, acknowledgeAlert, getQualityItems, getQualityItemDetail,
@@ -2688,6 +2688,11 @@ function ConfigTab() {
   const [ocrApiKey, setOcrApiKey] = useState('')
   const [ocrTesting, setOcrTesting] = useState(false)
   const [ocrTestResult, setOcrTestResult] = useState<{ ok: boolean; message: string } | null>(null)
+  const [webSearchProvider, setWebSearchProvider] = useState('')
+  const [webSearchEndpoint, setWebSearchEndpoint] = useState('')
+  const [webSearchApiKey, setWebSearchApiKey] = useState('')
+  const [webSearchTesting, setWebSearchTesting] = useState(false)
+  const [webSearchTestResult, setWebSearchTestResult] = useState<{ ok: boolean; message: string } | null>(null)
   const [modelTesting, setModelTesting] = useState<number | null>(null)
   const [modelTestResults, setModelTestResults] = useState<Record<number, ModelTestResult>>({})
   const [expandedModelTest, setExpandedModelTest] = useState<number | null>(null)
@@ -2764,6 +2769,9 @@ function ConfigTab() {
       setThemeRadius(parseInt(c.ui_radius) || 12)
       setOcrEndpoint(c.ocr_endpoint || '')
       setOcrApiKey(c.ocr_api_key || '')
+      setWebSearchProvider(c.web_search_provider || '')
+      setWebSearchEndpoint(c.web_search_endpoint || '')
+      setWebSearchApiKey(c.web_search_api_key || '')
       setAuthMethods(c.auth_methods || ['password'])
       setSupportContacts((c as unknown as Record<string, unknown>).support_contacts as typeof supportContacts || [])
       // Extraction config
@@ -2856,6 +2864,9 @@ function ConfigTab() {
         },
         ocr_endpoint: ocrEndpoint,
         ocr_api_key: ocrApiKey,
+        web_search_provider: webSearchProvider,
+        web_search_endpoint: webSearchEndpoint,
+        web_search_api_key: webSearchApiKey,
       })
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
@@ -3065,6 +3076,19 @@ function ConfigTab() {
       setOcrTestResult({ ok: false, message: e instanceof Error ? e.message : 'Test failed' })
     } finally {
       setOcrTesting(false)
+    }
+  }
+
+  const handleTestWebSearch = async () => {
+    setWebSearchTesting(true)
+    setWebSearchTestResult(null)
+    try {
+      const res = await testWebSearch()
+      setWebSearchTestResult({ ok: true, message: res.message })
+    } catch (e) {
+      setWebSearchTestResult({ ok: false, message: e instanceof Error ? e.message : 'Test failed' })
+    } finally {
+      setWebSearchTesting(false)
     }
   }
 
@@ -3945,6 +3969,66 @@ ${playgroundResult.request.user_prompt}`}
                 {ocrTestResult.message}
               </span>
             )}
+          </div>
+
+          {/* Web Search — powers the agentic chat web_search tool */}
+          <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid #f0f0f0' }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 4 }}>Web Search</div>
+            <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 16 }}>
+              Lets the chat assistant search the web when an answer isn't in the user's documents or knowledge bases. The assistant favors local sources first and only reaches for the web when needed.
+            </div>
+            <div>
+              <label style={labelStyle}>Provider</label>
+              <select
+                value={webSearchProvider} onChange={e => setWebSearchProvider(e.target.value)}
+                style={{ ...inputStyle, maxWidth: 500, background: '#fff', cursor: 'pointer' }}
+              >
+                <option value="">Disabled</option>
+                <option value="tavily">Tavily</option>
+                <option value="searxng">SearXNG (self-hosted)</option>
+                <option value="brave">Brave Search API</option>
+              </select>
+            </div>
+            <div style={{ marginTop: 12 }}>
+              <label style={labelStyle}>Search Endpoint{webSearchProvider === 'tavily' ? ' (optional — defaults to api.tavily.com)' : ''}</label>
+              <input
+                type="url" value={webSearchEndpoint} onChange={e => setWebSearchEndpoint(e.target.value)}
+                placeholder={webSearchProvider === 'searxng' ? 'https://searx.your-domain.edu' : 'https://...'}
+                style={{ ...inputStyle, maxWidth: 500 }}
+              />
+            </div>
+            <div style={{ marginTop: 12 }}>
+              <label style={labelStyle}>API Key{webSearchProvider === 'searxng' ? ' (optional)' : ''}</label>
+              <input
+                type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore
+                name="vandalizer-web-search-api-key"
+                value={webSearchApiKey} onChange={e => setWebSearchApiKey(e.target.value)}
+                placeholder="API key..." style={{ ...inputStyle, maxWidth: 500 }}
+              />
+            </div>
+            <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
+              <button
+                onClick={handleTestWebSearch}
+                disabled={webSearchTesting || !webSearchProvider}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px',
+                  fontSize: 13, fontWeight: 500, borderRadius: 'var(--ui-radius, 12px)',
+                  border: '1px solid #e5e7eb', background: '#fff', cursor: webSearchProvider ? 'pointer' : 'not-allowed',
+                  color: '#374151', opacity: webSearchTesting ? 0.6 : 1,
+                }}
+              >
+                <Play size={14} /> {webSearchTesting ? 'Testing...' : 'Test Search'}
+              </button>
+              {webSearchTestResult && (
+                <span style={{ fontSize: 13, color: webSearchTestResult.ok ? '#059669' : '#dc2626', fontWeight: 500 }}>
+                  {webSearchTestResult.ok ? <CheckCircle2 size={14} style={{ verticalAlign: -2, marginRight: 4 }} /> : <XCircle size={14} style={{ verticalAlign: -2, marginRight: 4 }} />}
+                  {webSearchTestResult.message}
+                </span>
+              )}
+            </div>
+            <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 10 }}>
+              Note: Test Search and chat use the saved configuration — click Save above before testing new values.
+            </div>
           </div>
         </div>
       </div>

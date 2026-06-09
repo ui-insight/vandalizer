@@ -227,6 +227,9 @@ class ConfigUpdateRequest(BaseModel):
     retention_config: Optional[dict] = None
     ocr_endpoint: Optional[str] = None
     ocr_api_key: Optional[str] = None
+    web_search_endpoint: Optional[str] = None
+    web_search_api_key: Optional[str] = None
+    web_search_provider: Optional[str] = None
     llm_endpoint: Optional[str] = None
     default_team_id: Optional[str] = None
     support_contacts: Optional[list[dict]] = None
@@ -1380,6 +1383,9 @@ async def get_config(
         "default_model": cfg.default_model or "",
         "ocr_endpoint": cfg.ocr_endpoint,
         "ocr_api_key": "***" if decrypt_value(cfg.ocr_api_key) else "",
+        "web_search_endpoint": cfg.web_search_endpoint,
+        "web_search_api_key": "***" if decrypt_value(cfg.web_search_api_key) else "",
+        "web_search_provider": cfg.web_search_provider,
         "llm_endpoint": cfg.llm_endpoint,
         "highlight_color": cfg.highlight_color,
         "ui_radius": cfg.ui_radius,
@@ -1415,6 +1421,12 @@ async def update_config(
         cfg.ocr_endpoint = body.ocr_endpoint
     if body.ocr_api_key is not None and body.ocr_api_key != "***":
         cfg.ocr_api_key = encrypt_value(body.ocr_api_key)
+    if body.web_search_endpoint is not None:
+        cfg.web_search_endpoint = body.web_search_endpoint
+    if body.web_search_api_key is not None and body.web_search_api_key != "***":
+        cfg.web_search_api_key = encrypt_value(body.web_search_api_key)
+    if body.web_search_provider is not None:
+        cfg.web_search_provider = body.web_search_provider
     if body.llm_endpoint is not None:
         cfg.llm_endpoint = body.llm_endpoint
     if body.default_team_id is not None:
@@ -2174,6 +2186,34 @@ async def test_ocr(user: User = Depends(get_current_user)):
         raise HTTPException(status_code=504, detail="OCR endpoint timed out")
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"OCR test failed: {e}")
+
+
+@router.post("/config/test-web-search")
+async def test_web_search(user: User = Depends(get_current_user)):
+    """Test the web search endpoint by running a real sample query."""
+    await _require_superadmin(user)
+
+    from app.services import web_search_service
+
+    cfg = await SystemConfig.get_config()
+    sys_config_doc = cfg.model_dump()
+    if not web_search_service.is_configured(sys_config_doc):
+        raise HTTPException(status_code=400, detail="Web search is not configured")
+
+    result = await web_search_service.web_search(
+        query="university research administration",
+        sys_config_doc=sys_config_doc,
+        max_results=3,
+    )
+    if result.get("error"):
+        raise HTTPException(status_code=502, detail=result["error"])
+
+    count = len(result.get("results", []))
+    return {
+        "status": "ok",
+        "result_count": count,
+        "message": f"Web search returned {count} result(s).",
+    }
 
 
 @router.post("/config/test-model/{index}")

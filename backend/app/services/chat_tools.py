@@ -667,6 +667,83 @@ async def fetch_url(
     }
 
 
+async def web_search(
+    context: RunContext[AgenticChatDeps],
+    query: str,
+    max_results: int = 5,
+) -> dict:
+    """Search the public web and return ranked results (title, URL, snippet).
+
+    Prefer the user's own workspace first — use search_documents and
+    search_knowledge_base before this. Reach for web_search only when the answer
+    isn't in the user's documents or knowledge bases, or when the question needs
+    current, external, or public information: latest policy/version numbers,
+    sponsor or agency websites, regulations, or general facts the workspace
+    doesn't contain. When you use a result, cite the source URL.
+
+    Unlike fetch_url (which reads one page you already have the link to), this
+    discovers pages from a query. Follow up with fetch_url on a returned URL when
+    you need the full page text rather than just the snippet.
+
+    Returns an error note if web search isn't configured for this deployment —
+    in that case, answer from the workspace or your general knowledge and tell
+    the user web search isn't enabled.
+
+    Args:
+        context: The call context.
+        query: A natural-language search query.
+        max_results: How many results to return (1-10, default 5).
+    """
+    from app.services import web_search_service
+
+    result = await web_search_service.web_search(
+        query=query,
+        sys_config_doc=context.deps.system_config_doc,
+        max_results=max_results,
+    )
+
+    if result.get("configured") is False:
+        return {
+            "error": result.get("error", "Web search is not configured."),
+            "note": (
+                "Web search isn't enabled for this deployment. Answer from the "
+                "user's workspace or your general knowledge instead, and let them "
+                "know web search isn't configured."
+            ),
+        }
+    if result.get("error") and not result.get("results"):
+        return {"error": result["error"], "results": []}
+
+    results = result.get("results", [])
+
+    # Citation sidecar — mirror search_knowledge_base so web results render as
+    # source chips. The streaming layer pops this by tool_call_id and emits a
+    # 'sources' chunk (see chat_service.py).
+    if results and context.tool_call_id:
+        citations = [
+            {
+                "document_id": None,
+                "document_title": r.get("title") or r.get("url", "Web result"),
+                "page": None,
+                "sheet": None,
+                "chunk_id": None,
+                "score": None,
+                "content_preview": (r.get("snippet") or "")[:240],
+                "source_reference": None,
+                "url": r.get("url"),
+            }
+            for r in results
+            if r.get("url")
+        ]
+        if citations:
+            context.deps.citation_annotations[context.tool_call_id] = citations
+
+    response: dict = {"query": result.get("query", query), "results": results}
+    if result.get("answer"):
+        response["answer"] = result["answer"]
+    return response
+
+
 async def get_document_text(
     context: RunContext[AgenticChatDeps],
     document_uuid: str,
@@ -1619,6 +1696,7 @@ TOOLS = [
     get_app_help,
     # Phase 2 — Extraction
     fetch_url,
+    web_search,
     get_document_text,
     run_extraction,
     # Phase 3 — KB write

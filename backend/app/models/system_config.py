@@ -125,6 +125,13 @@ class SystemConfig(Document):
 
     ocr_endpoint: str = ""
     ocr_api_key: str = ""
+    # Web search (agentic chat tool). Provider is one of "tavily", "searxng",
+    # or "brave"; the web_search_service parses each provider's response shape.
+    # Endpoint is the search API URL (provider-specific); api_key is encrypted
+    # at rest like ocr_api_key.
+    web_search_endpoint: str = ""
+    web_search_api_key: str = ""
+    web_search_provider: str = ""
     llm_endpoint: str = ""
     available_models: list[dict] = []
     # Name of the model to use when no explicit model is chosen. Empty = fall
