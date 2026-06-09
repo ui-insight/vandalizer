@@ -17,6 +17,7 @@ import { QualityBadge } from './QualityBadge'
 import { VerificationSubmitModal } from './VerificationSubmitModal'
 import { AuthorChip } from '../shared/AuthorChip'
 import { useAuth } from '../../hooks/useAuth'
+import { useToast } from '../../contexts/ToastContext'
 import { useShareLink } from '../../lib/shareLink'
 import { relativeTime } from '../../utils/time'
 import type { LibraryItem, LibraryFolder } from '../../types/library'
@@ -39,6 +40,7 @@ interface Props {
 
 export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShare, onRemove, onOpen, onEdit, onMoveToFolder, folders, qualityTier, qualityScore }: Props) {
   const { user } = useAuth()
+  const { toast } = useToast()
   const shareLink = useShareLink()
   const [hovered, setHovered] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
@@ -203,7 +205,15 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                 e.stopPropagation()
                 onFavorite(item.id, !item.favorited)
               }}
-              title={item.favorited ? 'Unfavorite' : 'Favorite (shows in all views)'}
+              title={
+                item.folder
+                  ? item.favorited
+                    ? 'Unfavorite (applies to this item everywhere, not just this folder)'
+                    : 'Favorite (applies to this item everywhere, not just this folder)'
+                  : item.favorited
+                    ? 'Unfavorite'
+                    : 'Favorite (shows in all views)'
+              }
               style={{
                 background: 'none',
                 border: 'none',
@@ -226,7 +236,15 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                 e.stopPropagation()
                 onPin(item.id, !item.pinned)
               }}
-              title={item.pinned ? 'Unpin' : 'Pin (shows in all views)'}
+              title={
+                item.folder
+                  ? item.pinned
+                    ? 'Unpin (applies to this item everywhere, not just this folder)'
+                    : 'Pin (applies to this item everywhere, not just this folder)'
+                  : item.pinned
+                    ? 'Unpin'
+                    : 'Pin (shows in all views)'
+              }
               style={{
                 background: 'none',
                 border: 'none',
@@ -285,7 +303,12 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                 >
                   <MenuItem
                     icon={<Pin size={14} />}
-                    label={item.pinned ? 'Unpin' : 'Pin'}
+                    label={
+                      item.folder
+                        ? item.pinned ? 'Unpin (everywhere)' : 'Pin (everywhere)'
+                        : item.pinned ? 'Unpin' : 'Pin'
+                    }
+                    title={item.folder ? 'Applies to this item everywhere, not just this folder' : undefined}
                     onClick={() => {
                       onPin(item.id, !item.pinned)
                       setMenuOpen(false)
@@ -293,7 +316,12 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
                   />
                   <MenuItem
                     icon={<Star size={14} />}
-                    label={item.favorited ? 'Unfavorite' : 'Favorite'}
+                    label={
+                      item.folder
+                        ? item.favorited ? 'Unfavorite (everywhere)' : 'Favorite (everywhere)'
+                        : item.favorited ? 'Unfavorite' : 'Favorite'
+                    }
+                    title={item.folder ? 'Applies to this item everywhere, not just this folder' : undefined}
                     onClick={() => {
                       onFavorite(item.id, !item.favorited)
                       setMenuOpen(false)
@@ -498,7 +526,10 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
           itemId={item.item_id}
           itemTitle={item.name}
           onClose={() => setShowVerifyModal(false)}
-          onSubmitted={() => setShowVerifyModal(false)}
+          onSubmitted={() => {
+            setShowVerifyModal(false)
+            toast('Submitted for verification', 'success')
+          }}
         />
       )}
     </div>
@@ -508,16 +539,19 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
 function MenuItem({
   icon,
   label,
+  title,
   danger,
   onClick,
 }: {
   icon: React.ReactNode
   label: string
+  title?: string
   danger?: boolean
   onClick: () => void
 }) {
   return (
     <button
+      title={title}
       onClick={(e) => {
         e.stopPropagation()
         onClick()

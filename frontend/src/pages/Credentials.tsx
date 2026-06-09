@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { KeyRound, Plus, Trash2, RefreshCw } from 'lucide-react'
+import { KeyRound, Plus, Pencil, Trash2, RefreshCw } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
 import { useConfirm } from '../components/shared/useConfirm'
 import {
@@ -7,6 +7,7 @@ import {
   deleteCredential,
   invalidateCredentialCache,
   listCredentials,
+  updateCredential,
 } from '../api/credentials'
 import type { Credential, CredentialType } from '../types/credential'
 
@@ -60,6 +61,43 @@ function buildPayload(form: FormState): Record<string, string> {
   return payload
 }
 
+// On edit the secret is never prefilled (the API never returns it), so we only
+// send a secret field when the user typed a new value — blank means "keep the
+// current one". The backend merges these over the stored payload.
+function buildUpdatePayload(form: FormState): Record<string, string> {
+  if (form.type === 'static_header') {
+    const p: Record<string, string> = { header_name: form.header_name }
+    if (form.header_value) p.header_value = form.header_value
+    return p
+  }
+  const p: Record<string, string> = {
+    client_id: form.client_id,
+    token_endpoint: form.token_endpoint,
+  }
+  if (form.scope) p.scope = form.scope
+  if (form.audience) p.audience = form.audience
+  if (form.algorithm && form.algorithm !== 'RS256') p.algorithm = form.algorithm
+  if (form.private_key) p.private_key = form.private_key
+  return p
+}
+
+// True if any non-secret payload field differs from the stored credential, so a
+// rename-only edit doesn't needlessly resend the payload (which would drop the
+// cached bearer token).
+function nonSecretChanged(form: FormState, original: Credential): boolean {
+  const p = original.payload || {}
+  if (form.type === 'static_header') {
+    return form.header_name !== (p.header_name ?? '')
+  }
+  return (
+    form.client_id !== (p.client_id ?? '') ||
+    form.token_endpoint !== (p.token_endpoint ?? '') ||
+    form.scope !== (p.scope ?? '') ||
+    form.audience !== (p.audience ?? '') ||
+    (form.algorithm || 'RS256') !== (p.algorithm || 'RS256')
+  )
+}
+
 export default function Credentials() {
   const confirm = useConfirm()
   const [creds, setCreds] = useState<Credential[]>([])
@@ -68,6 +106,7 @@ export default function Credentials() {
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
 
   const loadCreds = async () => {
     setLoading(true)
@@ -86,21 +125,70 @@ export default function Credentials() {
     loadCreds()
   }, [])
 
-  const handleCreate = async () => {
+  const closeForm = () => {
+    setShowForm(false)
+    setForm(EMPTY_FORM)
+    setEditingId(null)
+  }
+
+  const startCreate = () => {
+    if (showForm && !editingId) {
+      closeForm()
+      return
+    }
+    setEditingId(null)
+    setForm(EMPTY_FORM)
+    setShowForm(true)
+  }
+
+  const startEdit = (cred: Credential) => {
+    const p = cred.payload || {}
+    setForm({
+      name: cred.name,
+      type: cred.type,
+      description: cred.description ?? '',
+      header_name: p.header_name ?? '',
+      header_value: '', // secret never returned — leave blank to keep
+      client_id: p.client_id ?? '',
+      token_endpoint: p.token_endpoint ?? '',
+      private_key: '', // secret never returned — leave blank to keep
+      scope: p.scope ?? '',
+      audience: p.audience ?? '',
+      algorithm: p.algorithm || 'RS256',
+    })
+    setEditingId(cred.id)
+    setShowForm(true)
+  }
+
+  const handleSave = async () => {
     setSaving(true)
     setError(null)
     try {
-      await createCredential({
-        name: form.name,
-        type: form.type,
-        description: form.description || undefined,
-        payload: buildPayload(form),
-      })
-      setForm(EMPTY_FORM)
-      setShowForm(false)
+      if (editingId) {
+        const original = creds.find(c => c.id === editingId)
+        const secretEntered = form.type === 'static_header' ? !!form.header_value : !!form.private_key
+        const data: { name?: string; description?: string; payload?: Record<string, string> } = {
+          name: form.name,
+          description: form.description,
+        }
+        // Only resend the payload when something in it actually changed, so a
+        // pure rename doesn't drop the cached OAuth token.
+        if (original && (secretEntered || nonSecretChanged(form, original))) {
+          data.payload = buildUpdatePayload(form)
+        }
+        await updateCredential(editingId, data)
+      } else {
+        await createCredential({
+          name: form.name,
+          type: form.type,
+          description: form.description || undefined,
+          payload: buildPayload(form),
+        })
+      }
+      closeForm()
       await loadCreds()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create credential')
+      setError(err instanceof Error ? err.message : 'Failed to save credential')
     } finally {
       setSaving(false)
     }
@@ -137,11 +225,13 @@ export default function Credentials() {
 
   const formValid = useMemo(() => {
     if (!form.name.trim()) return false
+    // On edit, the secret may be left blank to keep the stored one.
+    const editing = editingId !== null
     if (form.type === 'static_header') {
-      return !!form.header_name && !!form.header_value
+      return !!form.header_name && (editing || !!form.header_value)
     }
-    return !!form.client_id && !!form.token_endpoint && !!form.private_key
-  }, [form])
+    return !!form.client_id && !!form.token_endpoint && (editing || !!form.private_key)
+  }, [form, editingId])
 
   return (
     <PageLayout>
@@ -149,7 +239,7 @@ export default function Credentials() {
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold text-gray-900">Credentials</h2>
           <button
-            onClick={() => setShowForm(s => !s)}
+            onClick={startCreate}
             className="flex items-center gap-1.5 rounded-md bg-highlight px-3 py-1.5 text-sm font-bold text-highlight-text hover:brightness-90"
           >
             <Plus className="h-4 w-4" />
@@ -170,6 +260,9 @@ export default function Credentials() {
 
         {showForm && (
           <div className="rounded-lg border border-gray-200 bg-white p-4 space-y-3">
+            <h3 className="font-medium text-gray-900">
+              {editingId ? 'Edit credential' : 'New credential'}
+            </h3>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium uppercase text-gray-400 mb-1">Name</label>
@@ -186,7 +279,9 @@ export default function Credentials() {
                 <select
                   value={form.type}
                   onChange={e => setForm({ ...form, type: e.target.value as CredentialType })}
-                  className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-highlight focus:outline-none focus:ring-1 focus:ring-highlight"
+                  disabled={editingId !== null}
+                  title={editingId ? 'Type cannot be changed; delete and recreate to switch types' : undefined}
+                  className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-highlight focus:outline-none focus:ring-1 focus:ring-highlight disabled:bg-gray-100 disabled:text-gray-500"
                 >
                   <option value="static_header">{TYPE_LABELS.static_header}</option>
                   <option value="oauth_client_credentials">
@@ -231,7 +326,7 @@ export default function Credentials() {
                     value={form.header_value}
                     onChange={e => setForm({ ...form, header_value: e.target.value })}
                     className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm font-mono focus:border-highlight focus:outline-none focus:ring-1 focus:ring-highlight"
-                    placeholder="secret"
+                    placeholder={editingId ? 'Leave blank to keep current' : 'secret'}
                   />
                 </div>
               </div>
@@ -305,20 +400,25 @@ export default function Credentials() {
                     className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-xs font-mono focus:border-highlight focus:outline-none focus:ring-1 focus:ring-highlight"
                     placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----"
                   />
+                  {editingId && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      Paste a new key to rotate it. Leave blank to keep the current key.
+                    </p>
+                  )}
                 </div>
               </>
             )}
 
             <div className="flex items-center gap-2 pt-2">
               <button
-                onClick={handleCreate}
+                onClick={handleSave}
                 disabled={!formValid || saving}
                 className="rounded-md bg-highlight px-4 py-1.5 text-sm font-bold text-highlight-text hover:brightness-90 disabled:opacity-50"
               >
-                {saving ? 'Saving...' : 'Save credential'}
+                {saving ? 'Saving...' : editingId ? 'Save changes' : 'Save credential'}
               </button>
               <button
-                onClick={() => { setShowForm(false); setForm(EMPTY_FORM) }}
+                onClick={closeForm}
                 className="rounded-md border border-gray-300 bg-white px-4 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
               >
                 Cancel
@@ -365,6 +465,16 @@ export default function Credentials() {
                       >
                         <RefreshCw className="h-3 w-3" />
                         Invalidate
+                      </button>
+                    )}
+                    {cred.can_manage && (
+                      <button
+                        onClick={() => startEdit(cred)}
+                        title="Edit credential"
+                        className="flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                      >
+                        <Pencil className="h-3 w-3" />
+                        Edit
                       </button>
                     )}
                     {cred.can_manage && (

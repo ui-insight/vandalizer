@@ -37,6 +37,7 @@ import { ExtractionAutovalidatePanel } from '../extractions/ExtractionAutovalida
 import { CrossFieldRulesSection } from '../extractions/CrossFieldRulesSection'
 import { CrossFieldViolationsPanel } from '../extractions/CrossFieldViolationsPanel'
 import { getModels } from '../../api/config'
+import { MAX_NAME_LENGTH, normalizeName } from '../../utils/nameValidation'
 import type { SearchSet, ModelInfo } from '../../types/workflow'
 import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from 'recharts'
 import { QualityBadge } from '../library/QualityBadge'
@@ -173,9 +174,10 @@ export function ExtractionEditorPanel() {
 
   const saveTitle = async () => {
     setEditingTitle(false)
-    if (!openExtractionId || titleDraft === searchSet?.title) return
+    const cleanTitle = normalizeName(titleDraft)
+    if (!openExtractionId || cleanTitle === searchSet?.title) return
     if (blockedByVerified()) return
-    await updateSearchSet(openExtractionId, { title: titleDraft.trim() || searchSet?.title })
+    await updateSearchSet(openExtractionId, { title: cleanTitle || searchSet?.title })
     refresh()
   }
 
@@ -429,6 +431,7 @@ export function ExtractionEditorPanel() {
             <input
               autoFocus
               value={titleDraft}
+              maxLength={MAX_NAME_LENGTH}
               onChange={(e) => setTitleDraft(e.target.value)}
               onBlur={saveTitle}
               onKeyDown={(e) => e.key === 'Enter' && saveTitle()}
@@ -3281,7 +3284,10 @@ function ValidateTab({
                 itemId={searchSetUuid!}
                 itemTitle={itemTitle}
                 onClose={() => setShowSubmitDialog(false)}
-                onSubmitted={() => setSubmitLibraryResult('success')}
+                onSubmitted={() => {
+                  setSubmitLibraryResult('success')
+                  toast('Submitted for verification', 'success')
+                }}
               />
             )}
           </div>

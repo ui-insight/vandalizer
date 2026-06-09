@@ -79,8 +79,8 @@ services:
       - uploads:/app/static/uploads
     ulimits:
       nofile:
-        soft: 8192
-        hard: 8192
+        soft: 65536
+        hard: 65536
     restart: unless-stopped
     deploy:
       resources:
@@ -111,8 +111,8 @@ services:
       - uploads:/app/static/uploads
     ulimits:
       nofile:
-        soft: 8192
-        hard: 8192
+        soft: 65536
+        hard: 65536
     entrypoint: ["sh", "run_celery.sh", "start"]
     restart: unless-stopped
     deploy:

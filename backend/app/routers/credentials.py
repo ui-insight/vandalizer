@@ -177,11 +177,17 @@ async def update_credential(
     if req.description is not None:
         cred.description = req.description
     if req.payload is not None:
+        # Merge over the stored payload so a caller can rotate just the private
+        # key (or change one field) without resending the others — secrets are
+        # never returned, so the client can't echo them back.
+        merged = credentials_service.merge_update_payload(
+            cred.type, cred.payload, req.payload
+        )
         try:
-            credentials_service.validate_payload(cred.type, req.payload)
+            credentials_service.validate_payload(cred.type, merged)
         except credentials_service.CredentialError as e:
             raise HTTPException(status_code=400, detail=str(e))
-        cred.payload = credentials_service.encrypt_payload(cred.type, req.payload)
+        cred.payload = credentials_service.encrypt_payload(cred.type, merged)
         # Drop any cached bearer keyed by this credential.
         credentials_service.invalidate_cached_token(str(cred.id))
     cred.updated_at = _now()

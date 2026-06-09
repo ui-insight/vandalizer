@@ -3,19 +3,21 @@
 from typing import Optional
 from pydantic import BaseModel
 
+from app.utils.naming import EntityName, OptionalEntityName
+
 
 # ---------------------------------------------------------------------------
 # SearchSet
 # ---------------------------------------------------------------------------
 
 class CreateSearchSetRequest(BaseModel):
-    title: str
+    title: EntityName
     set_type: str = "extraction"
     extraction_config: Optional[dict] = None
 
 
 class UpdateSearchSetRequest(BaseModel):
-    title: Optional[str] = None
+    title: OptionalEntityName = None
     extraction_config: Optional[dict] = None
 
 

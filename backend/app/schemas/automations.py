@@ -4,6 +4,8 @@ from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, model_validator
 
+from app.utils.naming import EntityName, OptionalEntityName
+
 TRIGGER_TYPES = ("folder_watch", "m365_intake", "api", "schedule")
 ACTION_TYPES = ("workflow", "extraction", "task")
 
@@ -12,7 +14,7 @@ ActionType = Literal["workflow", "extraction", "task"]
 
 
 class CreateAutomationRequest(BaseModel):
-    name: str
+    name: EntityName
     description: Optional[str] = None
     trigger_type: Optional[TriggerType] = None
     trigger_config: Optional[dict] = None
@@ -35,7 +37,7 @@ class CreateAutomationRequest(BaseModel):
 
 
 class UpdateAutomationRequest(BaseModel):
-    name: Optional[str] = None
+    name: OptionalEntityName = None
     description: Optional[str] = None
     enabled: Optional[bool] = None
     trigger_type: Optional[TriggerType] = None

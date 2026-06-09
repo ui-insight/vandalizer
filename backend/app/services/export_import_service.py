@@ -195,6 +195,12 @@ async def _reconstruct_task_references(
     """
     data = dict(task_data)
 
+    # --- Formatter tasks: canonicalize the template field name ---
+    # Older exports store the format template under "prompt" (the same key the
+    # Prompt task uses). The editor and engine canonical key is "format_template".
+    if task_name in ("Formatter", "Format") and "format_template" not in data and "prompt" in data:
+        data["format_template"] = data.pop("prompt")
+
     # --- Extraction tasks: create a new SearchSet from embedded data ---
     if task_name == "Extraction" and data.get("_embedded_search_set"):
         embedded = data.pop("_embedded_search_set")

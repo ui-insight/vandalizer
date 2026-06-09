@@ -25,6 +25,7 @@ export interface ThemeConfig {
   ui_radius: string
   org_name: string
   logo_data_url: string
+  icon_data_url: string
 }
 
 export function getThemeConfig() {
@@ -36,6 +37,7 @@ export function updateThemeConfig(data: {
   ui_radius?: string
   org_name?: string
   logo_data_url?: string
+  icon_data_url?: string
 }) {
   return apiFetch<ThemeConfig>('/api/config/theme', {
     method: 'PUT',

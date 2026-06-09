@@ -155,10 +155,13 @@ class SystemConfig(Document):
     ui_radius: str = "12px"
 
     # Branding — empty strings mean "use the built-in Vandalizer defaults".
-    # logo_data_url accepts a data: URL (base64-encoded image) so the logo can
-    # be served by the same public theme endpoint without separate storage.
+    # logo_data_url / icon_data_url accept a data: URL (base64-encoded image) so
+    # the brand assets can be served by the same public theme endpoint without
+    # separate storage. logo_data_url is the wordmark; icon_data_url is the small
+    # square mascot/icon shown beside it (replaces the default Joe Vandal mark).
     org_name: str = ""
     logo_data_url: str = ""
+    icon_data_url: str = ""
 
     # Authentication
     auth_methods: list[str] = ["password"]

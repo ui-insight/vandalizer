@@ -686,9 +686,15 @@ async def compact_context(
         system_prompt=COMPACT_SYSTEM_PROMPT,
         system_config_doc=sys_config_doc,
     )
-    result = await agent.run(
-        f"Summarize this conversation:\n\n{conversation_text}"
-    )
+    from app.services.metering import metered_async
+    async with metered_async(
+        "chat_summarize",
+        user_id=user.user_id,
+        team_id=str(user.current_team) if getattr(user, "current_team", None) else None,
+    ):
+        result = await agent.run(
+            f"Summarize this conversation:\n\n{conversation_text}"
+        )
 
     summary = result.output if hasattr(result, "output") else str(result.data)
     cutoff = len(conversation.messages)

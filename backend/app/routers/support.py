@@ -9,6 +9,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 
 from app.dependencies import get_current_user
+from app.models.support import TicketClassification
 from app.models.user import User
 from app.services import support_service
 
@@ -147,9 +148,21 @@ async def create_ticket(
     subject: str = Form(...),
     message: str = Form(...),
     priority: str = Form("normal"),
+    classification: str | None = Form(None),
     files: list[UploadFile] = File(default=[]),
     user: User = Depends(get_current_user),
 ):
+    # Normalize/validate the classification up-front so a bad value returns a
+    # clean 400 rather than a 500 from the enum conversion in the service.
+    classification = (classification or "").strip() or None
+    if classification is not None:
+        valid = {c.value for c in TicketClassification}
+        if classification not in valid:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid classification. Must be one of: {', '.join(sorted(valid))}",
+            )
+
     # Validate all file sizes up-front so we don't create a ticket and then fail
     file_payloads: list[tuple[str, str | None, bytes]] = []
     for f in files:
@@ -167,6 +180,7 @@ async def create_ticket(
         subject=subject,
         message=message,
         priority=priority,
+        classification=classification,
         team_id=team_id,
     )
 
@@ -195,6 +209,7 @@ async def create_ticket(
 async def list_tickets(
     status: str | None = None,
     priority: str | None = None,
+    classification: str | None = None,
     tag: str | None = None,
     category: str | None = None,
     search: str | None = None,
@@ -217,6 +232,7 @@ async def list_tickets(
     - ``search``: case-insensitive match across ticket number, subject,
       requester name/email, and message body.
     - ``priority``: filter to a specific priority (low/normal/high).
+    - ``classification``: filter to a request type (bug/enhancement/feature_request).
     """
     is_support = await _is_support_user(user)
     effective_tag = tag if is_support else None
@@ -224,13 +240,14 @@ async def list_tickets(
     if scope == "mine" or not is_support:
         tickets = await support_service.list_tickets(
             user_id=user.user_id, status=status, priority=priority,
-            tag=effective_tag, category=effective_category,
+            classification=classification, tag=effective_tag,
+            category=effective_category,
             search=search, limit=limit, offset=offset,
         )
     else:
         tickets = await support_service.list_all_tickets(
-            status=status, priority=priority, tag=effective_tag,
-            category=effective_category, search=search,
+            status=status, priority=priority, classification=classification,
+            tag=effective_tag, category=effective_category, search=search,
             limit=limit, offset=offset,
         )
     tickets = [_view(t, is_support) for t in tickets]

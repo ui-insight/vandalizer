@@ -344,6 +344,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
             replace: true,
           })
         })
+    }).catch(() => {
+      // Chunk load failure for the lazy import — don't leak an unhandled
+      // rejection; clear the param so the URL doesn't keep retrying.
+      navigate({
+        search: (prev) => ({ ...emptyWorkspaceSearch(), ...prev, kb: undefined }),
+        replace: true,
+      })
     })
   }, [search.kb, navigate])
 

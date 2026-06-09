@@ -358,12 +358,15 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
         docs = list(db.smart_document.find({"_id": {"$in": doc_ids}}))
         doc_uuids = [d.get("uuid", "") for d in docs]
 
-        # Merge fixed documents from input_config
-        fixed_doc_config = (workflow.get("input_config") or {}).get("fixed_documents", [])
-        for fd in fixed_doc_config:
-            fd_uuid = fd.get("uuid") if isinstance(fd, dict) else str(fd)
-            if fd_uuid and fd_uuid not in doc_uuids:
-                doc_uuids.append(fd_uuid)
+        # Merge fixed documents from input_config — except in "no input" mode,
+        # where the workflow runs with no documents at all.
+        input_cfg = workflow.get("input_config") or {}
+        if input_cfg.get("trigger_type") != "no_input":
+            fixed_doc_config = input_cfg.get("fixed_documents", [])
+            for fd in fixed_doc_config:
+                fd_uuid = fd.get("uuid") if isinstance(fd, dict) else str(fd)
+                if fd_uuid and fd_uuid not in doc_uuids:
+                    doc_uuids.append(fd_uuid)
 
         # Build trigger step data
         trigger_step_data = {"doc_uuids": doc_uuids, "user_id": workflow.get("user_id")}
@@ -424,7 +427,9 @@ def execute_workflow_passive(self, trigger_event_id: str) -> dict:
             allow_code_execution=wf_is_admin,
         )
 
-        final_output, data = engine.execute()
+        from app.services.metering import metered
+        with metered("workflow_passive", user_id=wf_user_id, team_id=workflow.get("team_id")):
+            final_output, data = engine.execute()
 
         # Update result
         completed_at = datetime.now(timezone.utc)
@@ -906,12 +911,14 @@ def process_extraction_outputs(
                 continue
             try:
                 engine = ExtractionEngine(system_config_doc=sys_config, domain=domain)
-                doc_results = engine.extract(
-                    extract_keys=keys,
-                    full_text=doc["raw_text"],
-                    extraction_config_override=extraction_config,
-                    field_metadata=field_metadata,
-                )
+                from app.services.metering import metered
+                with metered("extraction_passive", user_id=user_id):
+                    doc_results = engine.extract(
+                        extract_keys=keys,
+                        full_text=doc["raw_text"],
+                        extraction_config_override=extraction_config,
+                        field_metadata=field_metadata,
+                    )
                 for entity in doc_results:
                     entity["document_id"] = doc_uuid
                     results.append(entity)

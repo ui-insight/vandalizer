@@ -21,6 +21,17 @@ class TicketPriority(str, Enum):
     HIGH = "high"
 
 
+class TicketClassification(str, Enum):
+    """What kind of request a ticket represents, set by the requester at
+    creation time to help support triage, prioritize, report, and route. A bug
+    is a product defect; an enhancement improves something that already works; a
+    feature request asks for something new."""
+
+    BUG = "bug"
+    ENHANCEMENT = "enhancement"
+    FEATURE_REQUEST = "feature_request"
+
+
 class SupportMessage(BaseModel):
     """Embedded message within a ticket conversation."""
 
@@ -63,6 +74,10 @@ class SupportTicket(Document):
     subject: str
     status: TicketStatus = TicketStatus.OPEN
     priority: TicketPriority = TicketPriority.NORMAL
+    # What kind of request this is (bug / enhancement / feature request), chosen
+    # by the requester at creation. Optional so legacy tickets created before
+    # this field shipped still deserialize cleanly.
+    classification: Optional[TicketClassification] = None
 
     # Creator
     user_id: str
@@ -110,6 +125,7 @@ class SupportTicket(Document):
             "ticket_number",
             "user_id",
             "status",
+            "classification",
             "assigned_to",
             "tags",
             "watchers",

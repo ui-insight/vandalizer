@@ -5,6 +5,7 @@ import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useAuth } from '../../hooks/useAuth'
 import * as api from '../../api/knowledge'
 import { listOrganizationsFlat } from '../../api/organizations'
+import { MAX_NAME_LENGTH, normalizeName } from '../../utils/nameValidation'
 import type { Organization } from '../../api/organizations'
 import type { KnowledgeBase, KnowledgeBaseDetail, KnowledgeBaseSource, KBScope } from '../../types/knowledge'
 import { AddUrlsModal } from '../knowledge/AddUrlsModal'
@@ -84,6 +85,31 @@ export function KnowledgePanel() {
   const [savingDescription, setSavingDescription] = useState(false)
   const [inspectingSource, setInspectingSource] = useState<KnowledgeBaseSource | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  const titleInputRef = useRef<HTMLInputElement | null>(null)
+  const cancelTitleEdit = useRef(false)
+  // Single commit path for the inline KB title editor: every exit from edit
+  // mode (Enter, the check button, or tabbing/clicking away) routes through the
+  // input's onBlur to here, so the edit is saved instead of silently discarded.
+  // Escape sets cancelTitleEdit to bail out without saving.
+  const commitTitle = async () => {
+    setEditingTitle(false)
+    if (cancelTitleEdit.current) {
+      cancelTitleEdit.current = false
+      return
+    }
+    const t = normalizeName(titleDraft)
+    if (selectedKB && t && t !== selectedKB.title) {
+      try {
+        await api.updateKnowledgeBase(selectedKB.uuid, { title: t })
+        setSelectedKB(prev => prev ? { ...prev, title: t } : prev)
+        toast('Title updated', 'success')
+        refresh()
+      } catch (err) {
+        console.error('Failed to rename KB:', err)
+        toast(err instanceof Error ? err.message : 'Failed to rename', 'error')
+      }
+    }
+  }
 
   const handleCreate = async (title: string, description: string) => {
     setCreating(true)
@@ -547,31 +573,20 @@ export function KnowledgePanel() {
             <ArrowLeft size={18} style={{ color: '#888' }} />
           </button>
           {editingTitle ? (
-            <form
+            <div
               style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}
-              onSubmit={async (e) => {
-                e.preventDefault()
-                const t = titleDraft.trim()
-                if (t && t !== selectedKB.title) {
-                  try {
-                    await api.updateKnowledgeBase(selectedKB.uuid, { title: t })
-                    setSelectedKB(prev => prev ? { ...prev, title: t } : prev)
-                    toast('Title updated', 'success')
-                    refresh()
-                  } catch (err) {
-                    console.error('Failed to rename KB:', err)
-                    toast(err instanceof Error ? err.message : 'Failed to rename', 'error')
-                  }
-                }
-                setEditingTitle(false)
-              }}
             >
               <input
+                ref={titleInputRef}
                 autoFocus
                 value={titleDraft}
+                maxLength={MAX_NAME_LENGTH}
                 onChange={e => setTitleDraft(e.target.value)}
-                onBlur={() => setEditingTitle(false)}
-                onKeyDown={e => { if (e.key === 'Escape') setEditingTitle(false) }}
+                onBlur={commitTitle}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() }
+                  else if (e.key === 'Escape') { cancelTitleEdit.current = true; e.currentTarget.blur() }
+                }}
                 style={{
                   flex: 1, fontSize: 16, fontWeight: 600, fontFamily: 'inherit',
                   color: '#fff', backgroundColor: '#2a2a2a',
@@ -580,13 +595,16 @@ export function KnowledgePanel() {
                 }}
               />
               <button
-                type="submit"
+                type="button"
+                // Keep focus on the input through mousedown, then blur on click so
+                // the commit runs exactly once via onBlur (no double-save).
                 onMouseDown={e => e.preventDefault()}
+                onClick={() => titleInputRef.current?.blur()}
                 style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, display: 'flex' }}
               >
                 <Check size={16} style={{ color: '#15803d' }} />
               </button>
-            </form>
+            </div>
           ) : (
             <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
               <span

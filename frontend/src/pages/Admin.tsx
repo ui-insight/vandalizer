@@ -19,12 +19,12 @@ import { useAuth } from '../hooks/useAuth'
 import { useTeams } from '../hooks/useTeams'
 import { getThemeConfig, updateThemeConfig } from '../api/config'
 import type { ThemeConfig } from '../api/config'
-import { useBranding, DEFAULT_ORG_NAME } from '../contexts/BrandingContext'
+import { useBranding, DEFAULT_ORG_NAME, DEFAULT_ICON_URL } from '../contexts/BrandingContext'
 import {
   getUsageStats, getUsageTimeseries, getUserLeaderboard, getTeamLeaderboard,
   getTeamDetail, getUserDetail, getUserHistory,
   getWorkflowEvents, getSystemConfig, updateSystemConfig, updateCompliancePolicyConfig,
-  addModel, updateModel, deleteModel, setDefaultModel, testOcr, testModel, testPrompt, probeModel, addOAuthProvider,
+  addModel, updateModel, deleteModel, setDefaultModel, testOcr, testModel, testPrompt, probeModel, getReadiness, addOAuthProvider,
   updateOAuthProvider, deleteOAuthProvider, updateAuthMethods,
   getQualitySummary, getQualityTimeline, runRegressionSuite,
   getQualityAlerts, acknowledgeAlert, getQualityItems, getQualityItemDetail,
@@ -42,7 +42,7 @@ import {
   getPostExperienceResponses, sendTestEmail, adminResendCredentials, adminGetMagicLink,
   adminAddDemoUser,
 } from '../api/demo'
-import type { TestPromptResult } from '../api/admin'
+import type { TestPromptResult, ModelTestResult, ReadinessReport, ReadinessItem } from '../api/admin'
 import { getAdminPromptOverview, adminUpdatePrompt, type PromptOverview } from '../api/feedbackPrompt'
 import * as supportApi from '../api/support'
 import type { SupportTicket, SupportTicketSummary } from '../types/support'
@@ -2466,6 +2466,173 @@ function QualityTab() {
 }
 
 // ──────────────────────────────────────────
+// Model connectivity diagnostics
+// ──────────────────────────────────────────
+
+// Renders the step-by-step result of a model "Test" — on success, why the
+// hook-up is healthy (protocol, endpoint, latency, tokens, the actual reply);
+// on failure, a classified error with a plain-English cause and suggested fix.
+function ModelTestDiagnostics({ result }: { result: ModelTestResult }) {
+  const [showRaw, setShowRaw] = useState(false)
+  const accent = result.ok ? '#16a34a' : '#dc2626'
+  return (
+    <div style={{
+      padding: '12px 16px', fontSize: 13,
+      background: result.ok ? '#f0fdf4' : '#fef2f2',
+      border: '1px solid', borderTop: 'none',
+      borderColor: result.ok ? '#bbf7d0' : '#fecaca',
+      borderRadius: '0 0 var(--ui-radius, 12px) var(--ui-radius, 12px)',
+    }}>
+      <div style={{ fontWeight: 600, color: result.ok ? '#166534' : '#991b1b', marginBottom: 10 }}>
+        {result.summary}
+      </div>
+
+      {/* Step-by-step checks */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+        {result.checks.map((c, idx) => (
+          <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+            {c.ok
+              ? <CheckCircle2 size={15} style={{ color: '#16a34a', flexShrink: 0, marginTop: 1 }} />
+              : <XCircle size={15} style={{ color: '#dc2626', flexShrink: 0, marginTop: 1 }} />}
+            <span style={{ color: '#374151' }}>
+              <span style={{ fontWeight: 600 }}>{c.label}:</span> {c.detail}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Success facts */}
+      {result.ok && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+          {result.protocol && <DiagFact label="Protocol" value={result.protocol} />}
+          {result.endpoint && <DiagFact label="Endpoint" value={result.endpoint} mono />}
+          {typeof result.latency_ms === 'number' && <DiagFact label="Latency" value={`${result.latency_ms} ms`} />}
+          {result.tokens?.total != null && <DiagFact label="Tokens" value={String(result.tokens.total)} />}
+        </div>
+      )}
+      {result.ok && result.response_preview && (
+        <div style={{ marginTop: 10, padding: '8px 10px', background: '#fff', border: '1px solid #d1fae5', borderRadius: 8, fontFamily: 'ui-monospace, monospace', fontSize: 12, color: '#374151' }}>
+          <span style={{ color: '#9ca3af' }}>reply:</span> {result.response_preview}
+        </div>
+      )}
+
+      {/* Failure guidance */}
+      {!result.ok && result.error && (
+        <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+            <AlertCircle size={15} style={{ color: accent, flexShrink: 0, marginTop: 1 }} />
+            <div>
+              <div style={{ fontWeight: 600, color: '#991b1b' }}>{result.error.title}</div>
+              <div style={{ color: '#374151', marginTop: 2 }}>{result.error.why}</div>
+            </div>
+          </div>
+          <div style={{ padding: '8px 10px', background: '#fff', border: '1px solid #fecaca', borderRadius: 8, color: '#374151' }}>
+            <span style={{ fontWeight: 600, color: '#b91c1c' }}>Try this: </span>{result.error.fix}
+          </div>
+          {result.error.raw && (
+            <div>
+              <button
+                onClick={() => setShowRaw(v => !v)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: 12, padding: 0, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+              >
+                {showRaw ? <ChevronUp size={12} /> : <ChevronDown size={12} />} {showRaw ? 'Hide' : 'Show'} raw provider error
+              </button>
+              {showRaw && (
+                <pre style={{ marginTop: 6, padding: '8px 10px', background: '#1f2937', color: '#f9fafb', borderRadius: 8, fontSize: 11, overflowX: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                  {result.error.raw}
+                </pre>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function DiagFact({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '2px 8px', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 9999, fontSize: 12 }}>
+      <span style={{ color: '#9ca3af', fontWeight: 600 }}>{label}</span>
+      <span style={{ color: '#374151', fontFamily: mono ? 'ui-monospace, monospace' : undefined }}>{value}</span>
+    </span>
+  )
+}
+
+// ──────────────────────────────────────────
+// Setup readiness checklist
+// ──────────────────────────────────────────
+
+// A graded "is this install set up" surface. A dismissible banner auto-shows
+// while a blocker (no working LLM) is unresolved; the full checklist always
+// lives at the top of the config page. `onJump` scrolls to the relevant
+// section so each item is one click from being fixed.
+function SetupChecklist({ report, onJump, onDismiss }: { report: ReadinessReport; onJump: (target: string) => void; onDismiss?: () => void }) {
+  const sevColor: Record<string, string> = { blocker: '#dc2626', recommended: '#d97706', optional: '#6b7280' }
+  const statusPill = (item: ReadinessItem) => {
+    if (item.status === 'configured') return { label: 'Done', bg: '#dcfce7', fg: '#166534' }
+    if (item.status === 'incomplete') return { label: 'Needs attention', bg: '#fef9c3', fg: '#854d0e' }
+    return item.severity === 'blocker'
+      ? { label: 'Required', bg: '#fee2e2', fg: '#991b1b' }
+      : { label: 'Recommended', bg: '#ffedd5', fg: '#9a3412' }
+  }
+  return (
+    <div style={{ marginBottom: 20, border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
+      <div style={{ padding: '12px 16px', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 8 }}>
+        {report.ready
+          ? <ShieldCheck size={18} style={{ color: '#16a34a' }} />
+          : <AlertCircle size={18} style={{ color: '#d97706' }} />}
+        <span style={{ fontSize: 14, fontWeight: 700, color: '#111' }}>
+          {report.ready ? 'System ready' : 'Finish setting up your workspace'}
+        </span>
+        {!report.ready && report.blockers_remaining > 0 && (
+          <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 9999, background: '#fee2e2', color: '#991b1b' }}>
+            {report.blockers_remaining} blocker{report.blockers_remaining > 1 ? 's' : ''} left
+          </span>
+        )}
+        <div style={{ flex: 1 }} />
+        {onDismiss && (
+          <button onClick={onDismiss} title="Dismiss" style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 2 }}>
+            <X size={16} />
+          </button>
+        )}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        {report.items.map(item => {
+          const pill = statusPill(item)
+          const done = item.status === 'configured'
+          return (
+            <div key={item.key} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 16px', borderTop: '1px solid #f8fafc' }}>
+              <div style={{ marginTop: 1 }}>
+                {done
+                  ? <CheckCircle2 size={18} style={{ color: '#16a34a' }} />
+                  : <div style={{ width: 18, height: 18, borderRadius: 9999, border: `2px solid ${sevColor[item.severity]}` }} />}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#111' }}>{item.title}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, padding: '1px 7px', borderRadius: 9999, background: pill.bg, color: pill.fg }}>{pill.label}</span>
+                </div>
+                <div style={{ fontSize: 12, color: '#4b5563', marginTop: 2 }}>{item.summary}</div>
+                {!done && <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>Unlocks: {item.unlocks}</div>}
+              </div>
+              {!done && (
+                <button
+                  onClick={() => onJump(item.action_target)}
+                  style={{ flexShrink: 0, padding: '5px 12px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db', background: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#111' }}
+                >
+                  {item.action_label}
+                </button>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────
 // Config Tab
 // ──────────────────────────────────────────
 
@@ -2484,6 +2651,8 @@ function ConfigTab() {
   const [themeOrgName, setThemeOrgName] = useState('')
   const [themeLogo, setThemeLogo] = useState('')
   const [themeLogoError, setThemeLogoError] = useState<string | null>(null)
+  const [themeIcon, setThemeIcon] = useState('')
+  const [themeIconError, setThemeIconError] = useState<string | null>(null)
   const [themeSaving, setThemeSaving] = useState(false)
   const [themeSaved, setThemeSaved] = useState(false)
 
@@ -2518,7 +2687,19 @@ function ConfigTab() {
   const [ocrTesting, setOcrTesting] = useState(false)
   const [ocrTestResult, setOcrTestResult] = useState<{ ok: boolean; message: string } | null>(null)
   const [modelTesting, setModelTesting] = useState<number | null>(null)
-  const [modelTestResults, setModelTestResults] = useState<Record<number, { ok: boolean; message: string }>>({})
+  const [modelTestResults, setModelTestResults] = useState<Record<number, ModelTestResult>>({})
+  const [expandedModelTest, setExpandedModelTest] = useState<number | null>(null)
+
+  // System readiness / setup checklist
+  const [readiness, setReadiness] = useState<ReadinessReport | null>(null)
+  const [setupDismissed, setSetupDismissed] = useState(false)
+  const refreshReadiness = useCallback(async () => {
+    try {
+      setReadiness(await getReadiness())
+    } catch {
+      // Readiness is advisory — never block the config page on it.
+    }
+  }, [])
 
   // Prompt playground
   const [playgroundModel, setPlaygroundModel] = useState('')
@@ -2570,6 +2751,8 @@ function ConfigTab() {
   const [newProvider, setNewProvider] = useState({ provider: 'oauth', display_name: '', client_id: '', client_secret: '', redirect_uri: '', tenant_id: '' })
   const [editingProviderIndex, setEditingProviderIndex] = useState<number | null>(null)
   const [editingProvider, setEditingProvider] = useState({ provider: 'oauth', display_name: '', client_id: '', client_secret: '', redirect_uri: '', tenant_id: '' })
+
+  useEffect(() => { void refreshReadiness() }, [refreshReadiness])
 
   useEffect(() => {
     setLoading(true)
@@ -2628,13 +2811,14 @@ function ConfigTab() {
       setChatRetentionDays((rc.chat_retention_days as number) ?? 365)
       setWorkflowResultRetentionDays((rc.workflow_result_retention_days as number) ?? 365)
       setStaleActivityMinutes((rc.activity_stale_threshold_minutes as number) ?? 30)
-    }).finally(() => setLoading(false))
+    }).catch(() => {}).finally(() => setLoading(false))
 
     getThemeConfig().then(t => {
       setThemeColor(t.highlight_color)
       setThemeRadius(parseInt(t.ui_radius) || 12)
       setThemeOrgName(t.org_name || '')
       setThemeLogo(t.logo_data_url || '')
+      setThemeIcon(t.icon_data_url || '')
     }).catch(() => {})
   }, [])
 
@@ -2673,6 +2857,7 @@ function ConfigTab() {
       })
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
+      void refreshReadiness()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed')
     } finally {
@@ -2689,6 +2874,7 @@ function ConfigTab() {
         ui_radius: `${themeRadius}px`,
         org_name: themeOrgName.trim(),
         logo_data_url: themeLogo,
+        icon_data_url: themeIcon,
       })
       applyThemeToDOM(updated)
       await branding.refresh()
@@ -2715,6 +2901,25 @@ function ConfigTab() {
       setThemeLogo(dataUrl)
     } catch {
       setThemeLogoError('Could not read the selected file.')
+    }
+  }
+
+  const handleIconFile = async (file: File | null) => {
+    setThemeIconError(null)
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setThemeIconError('Please choose an image file (PNG, SVG, JPG).')
+      return
+    }
+    try {
+      const dataUrl = await readFileAsDataUrl(file)
+      if (dataUrl.length > MAX_LOGO_BYTES) {
+        setThemeIconError(`Image too large — keep encoded size under ${Math.round(MAX_LOGO_BYTES / 1024)} KB.`)
+        return
+      }
+      setThemeIcon(dataUrl)
+    } catch {
+      setThemeIconError('Could not read the selected file.')
     }
   }
 
@@ -2772,6 +2977,7 @@ function ConfigTab() {
       setProbeResult(null)
       setShowModelForm(false)
       setEditingModelIndex(null)
+      void refreshReadiness()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save model')
     } finally {
@@ -2827,6 +3033,9 @@ function ConfigTab() {
           ...(res.default_model !== undefined ? { default_model: res.default_model } : {}),
         })
       }
+      // Dropping a model can clear the only configured LLM — re-grade setup.
+      setModelTestResults(prev => { const next = { ...prev }; delete next[index]; return next })
+      void refreshReadiness()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to delete model')
     }
@@ -2838,6 +3047,7 @@ function ConfigTab() {
       const next = cfg?.default_model === name ? '' : name
       const res = await setDefaultModel(next)
       if (cfg) setCfg({ ...cfg, default_model: res.default_model })
+      void refreshReadiness()
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to set default model')
     }
@@ -2861,9 +3071,24 @@ function ConfigTab() {
     setModelTestResults(prev => { const next = { ...prev }; delete next[index]; return next })
     try {
       const res = await testModel(index)
-      setModelTestResults(prev => ({ ...prev, [index]: { ok: true, message: res.message } }))
+      setModelTestResults(prev => ({ ...prev, [index]: res }))
+      // Auto-expand so the admin sees the breakdown — especially on failure.
+      setExpandedModelTest(index)
+      // A successful test means readiness may have changed.
+      if (res.ok) void refreshReadiness()
     } catch (e) {
-      setModelTestResults(prev => ({ ...prev, [index]: { ok: false, message: e instanceof Error ? e.message : 'Test failed' } }))
+      // Transport-level failure (network/permission) — synthesize a result.
+      const message = e instanceof Error ? e.message : 'Test failed'
+      setModelTestResults(prev => ({
+        ...prev,
+        [index]: {
+          ok: false,
+          checks: [{ label: 'Request', ok: false, detail: message }],
+          summary: message,
+          error: { category: 'transport', title: 'Could not run the test', why: message, fix: 'Check that you are still signed in as an admin and the backend is reachable.', raw: message },
+        },
+      }))
+      setExpandedModelTest(index)
     } finally {
       setModelTesting(null)
     }
@@ -2892,6 +3117,7 @@ function ConfigTab() {
     setAuthSaving(true)
     try {
       await updateAuthMethods(authMethods)
+      void refreshReadiness()
     } finally {
       setAuthSaving(false)
     }
@@ -3022,8 +3248,21 @@ function ConfigTab() {
         </div>
       )}
 
+      {/* Setup readiness — auto-shows while a blocker is unresolved; once the
+          system is ready it can be dismissed for the session. */}
+      {readiness && !(readiness.ready && setupDismissed) && (
+        <SetupChecklist
+          report={readiness}
+          onJump={(target) => {
+            const id = `cfg-${target}`
+            document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+          }}
+          onDismiss={readiness.ready ? () => setSetupDismissed(true) : undefined}
+        />
+      )}
+
       {/* Available Models */}
-      <div style={sectionStyle}>
+      <div id="cfg-models" style={sectionStyle}>
         <div style={sectionHeaderStyle}>
           <Cpu size={18} color="#6b7280" /> Available Models
           <div style={{ flex: 1 }} />
@@ -3046,11 +3285,18 @@ function ConfigTab() {
         <div style={sectionBodyStyle}>
           {cfg?.available_models && cfg.available_models.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {cfg.available_models.map((m, i) => (
-                <div key={i} style={{
+              {cfg.available_models.map((m, i) => {
+                const test = modelTestResults[i]
+                const expanded = expandedModelTest === i
+                return (
+                <div key={i} style={{ display: 'flex', flexDirection: 'column' }}>
+                <div style={{
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  padding: '10px 16px', background: '#f9fafb', borderRadius: 'var(--ui-radius, 12px)',
-                  border: '1px solid #e5e7eb',
+                  padding: '10px 16px',
+                  background: test ? (test.ok ? '#f0fdf4' : '#fef2f2') : '#f9fafb',
+                  borderRadius: expanded ? 'var(--ui-radius, 12px) var(--ui-radius, 12px) 0 0' : 'var(--ui-radius, 12px)',
+                  border: '1px solid',
+                  borderColor: test ? (test.ok ? '#bbf7d0' : '#fecaca') : '#e5e7eb',
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                     {/* Identity & capability badges */}
@@ -3088,10 +3334,24 @@ function ConfigTab() {
                     <ModelCharacterBars model={m as ModelInfo} />
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    {modelTestResults[i] && (
-                      <span style={{ fontSize: 12, color: modelTestResults[i].ok ? '#059669' : '#dc2626', marginRight: 4, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={modelTestResults[i].message}>
-                        {modelTestResults[i].ok ? <CheckCircle2 size={14} style={{ verticalAlign: -2 }} /> : <XCircle size={14} style={{ verticalAlign: -2 }} />}
-                      </span>
+                    {test && (
+                      <button
+                        onClick={() => setExpandedModelTest(expanded ? null : i)}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 4, marginRight: 4,
+                          padding: '3px 8px', borderRadius: 9999, cursor: 'pointer', border: '1px solid',
+                          borderColor: test.ok ? '#86efac' : '#fca5a5',
+                          background: test.ok ? '#dcfce7' : '#fee2e2',
+                          color: test.ok ? '#166534' : '#991b1b', fontSize: 12, fontWeight: 600,
+                        }}
+                        title={expanded ? 'Hide details' : 'Show details'}
+                      >
+                        {test.ok ? <CheckCircle2 size={13} /> : <XCircle size={13} />}
+                        <span style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {test.ok ? 'Connected' : (test.error?.title || 'Failed')}
+                        </span>
+                        {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                      </button>
                     )}
                     <button
                       onClick={() => handleSetDefaultModel(m.name)}
@@ -3128,7 +3388,10 @@ function ConfigTab() {
                     </button>
                   </div>
                 </div>
-              ))}
+                {expanded && test && <ModelTestDiagnostics result={test} />}
+                </div>
+                )
+              })}
             </div>
           ) : (
             <div style={{ fontSize: 13, color: '#9ca3af' }}>No models configured.</div>
@@ -3422,7 +3685,7 @@ ${playgroundResult.request.user_prompt}`}
       </div>
 
       {/* Authentication */}
-      <div style={sectionStyle}>
+      <div id="cfg-auth" style={sectionStyle}>
         <div style={sectionHeaderStyle}>
           <Lock size={18} color="#6b7280" /> Authentication
         </div>
@@ -3640,7 +3903,7 @@ ${playgroundResult.request.user_prompt}`}
       </div>
 
       {/* Endpoints */}
-      <div style={sectionStyle}>
+      <div id="cfg-ocr" style={sectionStyle}>
         <div style={sectionHeaderStyle}>
           <Globe size={18} color="#6b7280" /> Endpoints
         </div>
@@ -3770,6 +4033,56 @@ ${playgroundResult.request.user_prompt}`}
               </div>
               {themeLogoError && (
                 <div style={{ fontSize: 12, color: '#b91c1c', marginTop: 6 }}>{themeLogoError}</div>
+              )}
+            </div>
+            <div>
+              <label style={labelStyle}>Icon / Mascot</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                  width: 56, height: 56, borderRadius: 'var(--ui-radius, 12px)',
+                  border: '1px solid #e5e7eb', background: '#f9fafb',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+                }}>
+                  {themeIcon ? (
+                    <img src={themeIcon} alt="Icon preview" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                  ) : (
+                    <img src={DEFAULT_ICON_URL} alt="Default Joe Vandal icon" style={{ maxWidth: '70%', maxHeight: '90%', objectFit: 'contain', opacity: 0.7 }} />
+                  )}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <label style={{
+                    padding: '6px 12px', borderRadius: 'var(--ui-radius, 12px)',
+                    border: '1px solid #d1d5db', background: '#fff',
+                    fontSize: 12, fontWeight: 500, cursor: 'pointer', textAlign: 'center',
+                  }}>
+                    {themeIcon ? 'Replace' : 'Upload'}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/svg+xml,image/webp"
+                      onChange={e => handleIconFile(e.target.files?.[0] || null)}
+                      style={{ display: 'none' }}
+                    />
+                  </label>
+                  {themeIcon && (
+                    <button
+                      type="button"
+                      onClick={() => { setThemeIcon(''); setThemeIconError(null) }}
+                      style={{
+                        padding: '6px 12px', borderRadius: 'var(--ui-radius, 12px)',
+                        border: '1px solid #fee2e2', background: '#fff',
+                        color: '#b91c1c', fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                      }}
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>
+                Small square mark shown beside the logo (header & chat) and as the browser-tab favicon. A square, transparent PNG works best. The default Joe Vandal mark shows only on un-branded deployments — once you set an organization name or logo, leave this blank to hide it, or upload your own.
+              </div>
+              {themeIconError && (
+                <div style={{ fontSize: 12, color: '#b91c1c', marginTop: 6 }}>{themeIconError}</div>
               )}
             </div>
           </div>
@@ -6784,7 +7097,7 @@ export default function Admin() {
   const [trialEnabled, setTrialEnabled] = useState(false)
 
   useEffect(() => {
-    getAuthConfig().then(c => setTrialEnabled(!!c.trial_system_enabled))
+    getAuthConfig().then(c => setTrialEnabled(!!c.trial_system_enabled)).catch(() => {})
   }, [])
 
   const isGlobalAdmin = !!user?.is_admin

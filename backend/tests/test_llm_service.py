@@ -1,5 +1,8 @@
 """Tests for app.services.llm_service — protocol detection."""
 
+import asyncio
+
+from app.services import llm_service
 from app.services.llm_service import (
     SUPPORTED_PROTOCOLS,
     detect_api_protocol,
@@ -66,3 +69,61 @@ class TestNameBasedDetection:
 def test_supported_protocols_contains_all_branches():
     """Guard against the enum drifting away from the routing branches."""
     assert set(SUPPORTED_PROTOCOLS) == {"openai", "anthropic", "openrouter", "ollama", "vllm"}
+
+
+class TestPerLoopHttpClient:
+    """The httpx client must be reused per event loop, never rebuilt per call.
+
+    Regression guard for the file-descriptor leak (prod incident 2026-06-03,
+    Sentry 7517108223): a fresh client per LLM call piled connection pools onto
+    each long-lived worker-thread loop until the process hit [Errno 24].
+    """
+
+    def test_same_loop_returns_same_client(self):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            first = llm_service._get_loop_http_client()
+            second = llm_service._get_loop_http_client()
+            assert first is second, "client must be reused within a loop, not rebuilt per call"
+            assert not first.is_closed
+        finally:
+            loop.run_until_complete(first.aclose())
+            loop.close()
+            asyncio.set_event_loop(None)
+
+    def test_distinct_loops_get_distinct_clients(self):
+        # Each event loop gets its own client — sharing one across loops is what
+        # caused pydantic-ai's "bound to a different event loop" error (#455).
+        loop_a = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop_a)
+        client_a = llm_service._get_loop_http_client()
+
+        loop_b = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop_b)
+        client_b = llm_service._get_loop_http_client()
+        try:
+            assert client_a is not client_b
+        finally:
+            loop_a.run_until_complete(client_a.aclose())
+            loop_b.run_until_complete(client_b.aclose())
+            loop_a.close()
+            loop_b.close()
+            asyncio.set_event_loop(None)
+
+    def test_dropped_loop_is_evicted_from_registry(self):
+        # When a loop is garbage-collected (e.g. a workflow worker thread exits),
+        # its entry must drop out of the WeakKeyDictionary so the client — and
+        # the file descriptors it holds — can be reclaimed.
+        import gc
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        client = llm_service._get_loop_http_client()
+        loop.run_until_complete(client.aclose())
+        loop.close()
+        asyncio.set_event_loop(None)
+        assert loop in llm_service._loop_http_clients
+        del loop, client
+        gc.collect()
+        assert len(llm_service._loop_http_clients) == 0

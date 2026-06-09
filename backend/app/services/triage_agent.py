@@ -145,5 +145,11 @@ Attachments ({work_item_doc.get('attachment_count', 0)} files): {', '.join(attac
 {attachment_text_preview}
 """.strip()
 
-    result = agent.run_sync(context)
+    from app.services.metering import metered
+    with metered(
+        "m365_triage",
+        user_id=work_item_doc.get("user_id"),
+        team_id=work_item_doc.get("team_id"),
+    ):
+        result = agent.run_sync(context)
     return result.output

@@ -221,7 +221,14 @@ export function CertificationPanel() {
 
   const handleValidate = async (moduleId: string) => {
     setValidating(true); setValidationResult(null)
-    try { setValidationResult(await validate(moduleId)) } finally { setValidating(false) }
+    // A bare try/finally re-throws on failure (e.g. a 5xx while the backend is
+    // restarting), escaping as a global "Request failed" unhandled rejection.
+    // Catch, notify, and keep the panel usable.
+    try {
+      setValidationResult(await validate(moduleId))
+    } catch {
+      toast('Could not validate the module right now. Please try again.', 'error')
+    } finally { setValidating(false) }
   }
 
   const handleComplete = async (moduleId: string) => {
@@ -242,12 +249,22 @@ export function CertificationPanel() {
       await provision(moduleId)
       // Invalidate document queries so the file browser shows the new files
       queryClient.invalidateQueries({ queryKey: ['documents'] })
+    } catch {
+      // Bare try/finally re-throws; catch so a failed provision doesn't escape
+      // as a global "Request failed" unhandled rejection.
+      toast('Could not set up the exercise right now. Please try again.', 'error')
     } finally { setProvisioning(false) }
   }
 
   const handleSubmitAssessment = async (moduleId: string, answers: Record<string, string>) => {
     setSubmittingAssessment(true)
-    try { await submitAssessment(moduleId, answers) } finally { setSubmittingAssessment(false) }
+    try {
+      await submitAssessment(moduleId, answers)
+    } catch {
+      // Bare try/finally re-throws; catch so a failed submit doesn't escape as a
+      // global "Request failed" unhandled rejection.
+      toast('Could not submit your answers right now. Please try again.', 'error')
+    } finally { setSubmittingAssessment(false) }
   }
 
   const handleModuleClick = (moduleId: string) => {

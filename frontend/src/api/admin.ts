@@ -386,8 +386,58 @@ export function testOcr() {
   return apiFetch<{ status: string; status_code: number; message: string }>('/api/admin/config/test-ocr', { method: 'POST' })
 }
 
+export type ModelCheck = { label: string; ok: boolean; detail: string }
+
+export type ModelDiagnosticError = {
+  category: string
+  title: string
+  why: string
+  fix: string
+  raw: string
+}
+
+export type ModelTestResult = {
+  ok: boolean
+  model?: string
+  tag?: string
+  protocol?: string
+  endpoint?: string
+  checks: ModelCheck[]
+  latency_ms?: number
+  tokens?: { request: number | null; response: number | null; total: number | null } | null
+  response_preview?: string
+  error?: ModelDiagnosticError | null
+  summary: string
+}
+
 export function testModel(index: number) {
-  return apiFetch<{ status: string; model: string; message: string }>(`/api/admin/config/test-model/${index}`, { method: 'POST' })
+  return apiFetch<ModelTestResult>(`/api/admin/config/test-model/${index}`, { method: 'POST' })
+}
+
+// System readiness — the admin setup checklist
+
+export type ReadinessSeverity = 'blocker' | 'recommended' | 'optional'
+export type ReadinessStatus = 'missing' | 'incomplete' | 'configured'
+
+export type ReadinessItem = {
+  key: string
+  title: string
+  severity: ReadinessSeverity
+  status: ReadinessStatus
+  summary: string
+  unlocks: string
+  action_label: string
+  action_target: string
+}
+
+export type ReadinessReport = {
+  ready: boolean
+  blockers_remaining: number
+  items: ReadinessItem[]
+}
+
+export function getReadiness() {
+  return apiFetch<ReadinessReport>('/api/admin/readiness')
 }
 
 export type TestPromptResult = {

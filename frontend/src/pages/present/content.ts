@@ -80,6 +80,7 @@ const leadership: Track = {
   icon: Landmark,
   valueProps: [
     'Self-hosted — your documents never leave your infrastructure',
+    'Make it your own — your institution’s name, logo, icon, and brand color',
     'Open source (GPL v3) — no per-seat license fee, no vendor lock-in',
     'Works with any AI provider: cloud or fully on-premise / air-gapped',
     'Built at the University of Idaho under NSF GRANTED (Award #2427549)',
@@ -149,6 +150,17 @@ const leadership: Track = {
       ].join('\n'),
     },
     {
+      id: 'yours',
+      title: 'Make it your institution’s tool',
+      body: [
+        '- Set your **name, logo, icon, and brand color** in the admin UI',
+        '- Carries through the header, sign-in, browser tab, chat, and **email**',
+        '- Staff see *your* tool — not a generic "Vandalizer" install',
+        '- A quiet "Powered by Vandalizer" credit and NSF acknowledgement remain',
+      ].join('\n'),
+      note: 'Branding is a runtime setting — applied the moment you save, no redeploy.',
+    },
+    {
       id: 'credibility',
       title: 'Where it comes from',
       body: [
@@ -180,6 +192,11 @@ const leadership: Track = {
       id: 'value',
       heading: 'Why it is safe to adopt',
       body: 'Vandalizer is **self-hosted**: it runs on your own servers and your documents never leave your infrastructure. You choose the AI provider — a cloud model, or a local model running fully air-gapped on premise. It is **open source under GPL v3**, so there is no black box, no vendor lock-in, and no per-seat license fee. Governance is built in: role-based access, review and sign-off steps, an immutable audit log, and configurable data retention.',
+    },
+    {
+      id: 'yours',
+      heading: 'Make it your own',
+      body: 'Vandalizer white-labels to your institution. From the admin console you set the organization name, upload a logo and a square icon, and pick a brand color — and they thread through the header, the sign-in page, the browser tab, the in-app chat, and the system emails your staff receive. To your team it reads as *your* institution’s tool, not a generic deployment, and because branding is a runtime setting it applies the moment you save, with no redeploy. Vandalizer is open source under GPL v3, so a small "Powered by Vandalizer" credit and the NSF GRANTED acknowledgement stay in the footer — creator and funder lineage remain visible.',
     },
     {
       id: 'cost',
@@ -214,6 +231,7 @@ const deploy: Track = {
     '~16 GB RAM on one server; no GPU required with a cloud LLM',
     'LLM endpoints and keys configured at runtime in the admin UI',
     'Self-hosted with encrypted secrets; on-prem / air-gapped option',
+    'White-label in-app — name, logo, icon, color, and email; no redeploy',
   ],
   pitch: {
     spoken:
@@ -295,7 +313,7 @@ const deploy: Track = {
         '- **Back up:** MongoDB data, the uploads volume, and the ChromaDB volume',
         '- Redis is an ephemeral broker — nothing to back up',
         '- Immutable audit log for administrative actions',
-        '- Models, OCR endpoints, auth, and branding all managed from **/admin**',
+        '- Models, OCR endpoints, auth, and **white-label branding** managed from **/admin**',
       ].join('\n'),
     },
     {
@@ -333,7 +351,7 @@ const deploy: Track = {
     {
       id: 'ops',
       heading: 'Day-2 operations',
-      body: 'Back up three things: the MongoDB data volume, the uploads volume, and the ChromaDB volume. Redis is an ephemeral broker and needs no backup. Administrators manage models, OCR endpoints, authentication methods, and branding from the **/admin** console, and every administrative action is recorded in an immutable audit log.',
+      body: 'Back up three things: the MongoDB data volume, the uploads volume, and the ChromaDB volume. Redis is an ephemeral broker and needs no backup. Administrators manage models, OCR endpoints, authentication methods, and **white-label branding** — organization name, logo, icon, brand color, and the styling of outgoing email — from the **/admin** console; branding is a runtime setting stored in the database, so rebranding never requires a redeploy. Every administrative action is recorded in an immutable audit log.',
     },
   ],
 }

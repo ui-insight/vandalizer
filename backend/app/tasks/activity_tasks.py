@@ -248,7 +248,13 @@ def generate_activity_description_task(
             thinking_override=False,
             system_config_doc=sys_cfg,
         )
-        result = chat_agent.run_sync(prompt)
+        # No activity_id: this runs after the activity is finalized, and flush
+        # $sets activity token totals — linking it would clobber the real
+        # workflow/chat/extraction total with the tiny title-gen count. The
+        # ledger still meters it (attributed to the user).
+        from app.services.metering import metered
+        with metered("title_gen", user_id=user_id, team_id=activity.get("team_id")):
+            result = chat_agent.run_sync(prompt)
         description = _clean_title(result.output)
 
         # Truncate to 8 words max; the UI clamps to 2 lines anyway.

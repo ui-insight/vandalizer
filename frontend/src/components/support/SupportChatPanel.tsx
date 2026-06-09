@@ -14,6 +14,7 @@ import {
   Pencil,
   Plus,
   Send,
+  Upload,
   UserPlus,
   X,
 } from 'lucide-react'
@@ -21,6 +22,96 @@ import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../contexts/ToastContext'
 import * as supportApi from '../../api/support'
 import type { SupportTicket, SupportTicketSummary } from '../../types/support'
+
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024
+
+// Drag-and-drop file handling for the support panel.
+//
+// The app installs a global drop guard on `document` (see App.tsx) that cancels
+// any OS file drop landing outside a real drop zone. The support panel is also
+// rendered through a portal to document.body, so it sits outside the React root.
+// Both facts mean React synthetic onDrop handlers are unreliable here: to claim a
+// drop we must attach NATIVE listeners on the zone element and stopPropagation so
+// the event never bubbles up to the global guard.
+//
+// We attach via a CALLBACK ref rather than useEffect+ref: the zone lives behind
+// early returns (the chat view renders a loading spinner first), so a mount-time
+// effect would see a null node and never re-run once the real zone appears. A
+// callback ref fires whenever the node actually mounts/unmounts, so listeners
+// always land on the live element. `onFiles` is read through a ref to keep the
+// callback identity stable (no detach/reattach on every render).
+function useFileDropZone(onFiles: (files: File[]) => void) {
+  const [dragOver, setDragOver] = useState(false)
+  const depth = useRef(0)
+  const onFilesRef = useRef(onFiles)
+  onFilesRef.current = onFiles
+  const cleanupRef = useRef<(() => void) | null>(null)
+
+  const dropRef = useCallback((el: HTMLElement | null) => {
+    // Detach from any previously held node before (re)wiring.
+    if (cleanupRef.current) {
+      cleanupRef.current()
+      cleanupRef.current = null
+    }
+    if (!el) return
+    const hasFiles = (e: DragEvent) => !!e.dataTransfer?.types.includes('Files')
+
+    const onDragEnter = (e: DragEvent) => {
+      if (!hasFiles(e)) return
+      e.preventDefault()
+      e.stopPropagation()
+      depth.current++
+      setDragOver(true)
+    }
+    const onDragOver = (e: DragEvent) => {
+      if (!hasFiles(e)) return
+      e.preventDefault()
+      e.stopPropagation()
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
+    }
+    const onDragLeave = (e: DragEvent) => {
+      if (!hasFiles(e)) return
+      e.preventDefault()
+      e.stopPropagation()
+      depth.current--
+      if (depth.current <= 0) {
+        depth.current = 0
+        setDragOver(false)
+      }
+    }
+    const onDrop = (e: DragEvent) => {
+      if (!hasFiles(e)) return
+      e.preventDefault()
+      e.stopPropagation()
+      depth.current = 0
+      setDragOver(false)
+      if (e.dataTransfer) onFilesRef.current(Array.from(e.dataTransfer.files))
+    }
+
+    el.addEventListener('dragenter', onDragEnter)
+    el.addEventListener('dragover', onDragOver)
+    el.addEventListener('dragleave', onDragLeave)
+    el.addEventListener('drop', onDrop)
+    cleanupRef.current = () => {
+      el.removeEventListener('dragenter', onDragEnter)
+      el.removeEventListener('dragover', onDragOver)
+      el.removeEventListener('dragleave', onDragLeave)
+      el.removeEventListener('drop', onDrop)
+    }
+  }, [])
+
+  return { dragOver, dropRef }
+}
+
+function DropOverlay({ show }: { show: boolean }) {
+  if (!show) return null
+  return (
+    <div className="pointer-events-none absolute inset-0 z-50 m-2 flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-blue-400 bg-blue-50/90">
+      <Upload className="h-7 w-7 text-blue-500" />
+      <p className="text-sm font-medium text-blue-600">Drop files to attach</p>
+    </div>
+  )
+}
 
 function timeAgo(dateStr: string | null): string {
   if (!dateStr) return ''
@@ -41,6 +132,12 @@ const PRIORITY_COLORS = {
   low: 'text-gray-400',
   normal: 'text-blue-500',
   high: 'text-red-500',
+} as const
+
+const CLASSIFICATION_LABELS = {
+  bug: 'Bug',
+  enhancement: 'Enhancement',
+  feature_request: 'Feature Request',
 } as const
 
 // ---------------------------------------------------------------------------
@@ -214,25 +311,30 @@ function NewTicketView({
   const [subject, setSubject] = useState('')
   const [message, setMessage] = useState('')
   const [priority, setPriority] = useState('normal')
+  const [classification, setClassification] = useState('bug')
   const [files, setFiles] = useState<File[]>([])
   const [submitting, setSubmitting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { toast } = useToast()
 
-  const MAX_BYTES = 10 * 1024 * 1024
-
-  const handleFilesPicked = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const picked = Array.from(e.target.files ?? [])
-    if (fileInputRef.current) fileInputRef.current.value = ''
+  const acceptFiles = useCallback((picked: File[]) => {
     const accepted: File[] = []
     for (const f of picked) {
-      if (f.size > MAX_BYTES) {
+      if (f.size > MAX_ATTACHMENT_BYTES) {
         toast(`${f.name} is over 10MB`, 'error')
         continue
       }
       accepted.push(f)
     }
     if (accepted.length) setFiles((prev) => [...prev, ...accepted])
+  }, [toast])
+
+  const { dragOver, dropRef } = useFileDropZone(acceptFiles)
+
+  const handleFilesPicked = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = Array.from(e.target.files ?? [])
+    if (fileInputRef.current) fileInputRef.current.value = ''
+    acceptFiles(picked)
   }
 
   const removeFile = (idx: number) => {
@@ -247,6 +349,7 @@ function NewTicketView({
         subject.trim(),
         message.trim(),
         priority,
+        classification,
         files,
       )
       toast('Ticket created', 'success')
@@ -260,7 +363,8 @@ function NewTicketView({
   }
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
+    <div ref={dropRef} className="relative flex flex-1 flex-col overflow-hidden">
+      <DropOverlay show={dragOver} />
       <div className="flex items-center gap-2 border-b px-4 py-2">
         <button onClick={onBack} className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
           <ArrowLeft className="h-4 w-4" />
@@ -288,6 +392,18 @@ function NewTicketView({
             <option value="low">Low</option>
             <option value="normal">Normal</option>
             <option value="high">High</option>
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-gray-600">Type</label>
+          <select
+            value={classification}
+            onChange={(e) => setClassification(e.target.value)}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+          >
+            <option value="bug">Bug</option>
+            <option value="enhancement">Enhancement</option>
+            <option value="feature_request">Feature Request</option>
           </select>
         </div>
         <div>
@@ -442,6 +558,15 @@ function ChatView({
   const [savingEdit, setSavingEdit] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const messageRef = useRef<HTMLTextAreaElement>(null)
+
+  // Auto-grow the reply textarea to fit its content (up to a max height).
+  useEffect(() => {
+    const el = messageRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`
+  }, [message])
 
   const loadTicket = useCallback(async () => {
     try {
@@ -460,7 +585,7 @@ function ChatView({
     supportApi.markTicketRead(ticketUuid).catch(() => {})
     import('../../api/notifications').then(({ markReadForItem }) => {
       markReadForItem('support_ticket', ticketUuid).catch(() => {})
-    })
+    }).catch(() => {})
     const interval = setInterval(loadTicket, 15000)
     return () => clearInterval(interval)
   }, [loadTicket, ticketUuid])
@@ -494,14 +619,12 @@ function ChatView({
     }
   }
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const picked = Array.from(e.target.files ?? [])
-    if (fileInputRef.current) fileInputRef.current.value = ''
+  const uploadFiles = useCallback(async (picked: File[]) => {
     if (picked.length === 0) return
     const accepted: File[] = []
     for (const f of picked) {
       const sizeMB = (f.size / (1024 * 1024)).toFixed(1)
-      if (f.size > 10 * 1024 * 1024) {
+      if (f.size > MAX_ATTACHMENT_BYTES) {
         toast(`${f.name} is ${sizeMB}MB. Must be under 10MB.`, 'error')
         continue
       }
@@ -525,6 +648,14 @@ function ChatView({
       const msg = err instanceof Error ? err.message : 'Upload failed'
       toast(`Failed to upload file: ${msg}`, 'error')
     }
+  }, [ticketUuid, toast])
+
+  const { dragOver, dropRef } = useFileDropZone(uploadFiles)
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = Array.from(e.target.files ?? [])
+    if (fileInputRef.current) fileInputRef.current.value = ''
+    uploadFiles(picked)
   }
 
   const handleDeleteAttachment = async (attachmentUuid: string, filename: string) => {
@@ -599,7 +730,8 @@ function ChatView({
   const StatusIcon = ticket.status === 'closed' ? CheckCircle2 : ticket.status === 'in_progress' ? Clock : Circle
 
   return (
-    <div className="flex flex-1 flex-col overflow-hidden">
+    <div ref={dropRef} className="relative flex flex-1 flex-col overflow-hidden">
+      <DropOverlay show={dragOver} />
       {/* Chat header */}
       <div className="border-b px-4 py-2">
         <div className="flex items-center gap-2">
@@ -626,6 +758,14 @@ function ChatView({
                   <span className={`text-[10px] font-medium ${PRIORITY_COLORS[ticket.priority]}`}>
                     {ticket.priority}
                   </span>
+                  {ticket.classification && (
+                    <>
+                      <span className="text-[10px] text-gray-300">|</span>
+                      <span className="text-[10px] font-medium text-indigo-500">
+                        {CLASSIFICATION_LABELS[ticket.classification]}
+                      </span>
+                    </>
+                  )}
                   <span className="text-[10px] text-gray-300">|</span>
                   <span className="text-[10px] text-gray-400">{ticket.user_name || ticket.user_id}</span>
                 </>
@@ -894,6 +1034,7 @@ function ChatView({
           </button>
           <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileUpload} />
           <textarea
+            ref={messageRef}
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -905,7 +1046,7 @@ function ChatView({
                   : 'Type a message...'
             }
             rows={1}
-            className={`flex-1 resize-none rounded-lg px-3 py-1.5 text-sm focus:outline-none ${
+            className={`max-h-40 flex-1 resize-none overflow-y-auto rounded-lg px-3 py-1.5 text-sm focus:outline-none ${
               isInternalNote
                 ? 'border border-yellow-400 bg-white focus:border-yellow-500'
                 : 'border border-gray-300 focus:border-blue-500'

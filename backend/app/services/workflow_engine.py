@@ -383,12 +383,19 @@ class MultiTaskNode(Node):
         return task._apply_post_process(result)
 
     def process(self, inputs):
+        import contextvars
         from copy import deepcopy
 
         for task in self.tasks:
             task.inputs = deepcopy(inputs)
+        # Run each node within a copy of the current context so contextvars set
+        # by the caller (notably the LLM metering scope) propagate into the
+        # worker threads — ThreadPoolExecutor does not copy contextvars itself.
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            task_futures = [executor.submit(self.process_task, task) for task in self.tasks]
+            task_futures = [
+                executor.submit(contextvars.copy_context().run, self.process_task, task)
+                for task in self.tasks
+            ]
             results = [future.result() for future in as_completed(task_futures)]
 
         collected = []
@@ -748,18 +755,100 @@ def _open_sync_db():
     return get_sync_db()
 
 
+# Header names whose values are secrets and must never appear in a debug
+# preview, a log line, or the step output. Matched as case-insensitive
+# substrings so e.g. "X-Api-Key" and "Proxy-Authorization" are both caught.
+_SENSITIVE_HEADER_HINTS = (
+    "authorization",
+    "cookie",
+    "token",
+    "secret",
+    "api-key",
+    "apikey",
+    "password",
+    "auth",
+)
+
+_REQUEST_BODY_PREVIEW_LIMIT = 4000
+
+
+def _redact_headers(headers: dict) -> dict:
+    """Copy *headers*, masking the values of any secret-bearing header."""
+    redacted: dict[str, str] = {}
+    for k, v in headers.items():
+        if any(hint in str(k).lower() for hint in _SENSITIVE_HEADER_HINTS):
+            redacted[str(k)] = "<redacted>"
+        else:
+            redacted[str(k)] = str(v)
+    return redacted
+
+
+def _build_request_preview(method: str, url: str, headers: dict, body) -> dict:
+    """A safe, structured snapshot of the request the API node is about to send.
+
+    Used for debugging — surfaced in the step output and logged — so authors can
+    see exactly what went on the wire (the recurring pain behind API-node
+    tickets). Secret header values are redacted; the body is the literal text
+    that will be transmitted, truncated if very large.
+    """
+    if isinstance(body, (dict, list)):
+        body_text = json.dumps(body)
+    elif isinstance(body, str):
+        body_text = body
+    else:
+        body_text = ""
+    byte_len = len(body_text.encode("utf-8"))
+    if len(body_text) > _REQUEST_BODY_PREVIEW_LIMIT:
+        body_text = body_text[:_REQUEST_BODY_PREVIEW_LIMIT] + "…(truncated)"
+    return {
+        "method": method,
+        "url": url,
+        "headers": _redact_headers(headers),
+        "body": body_text,
+        "body_bytes": byte_len,
+    }
+
+
+def _format_request_preview(preview: dict) -> str:
+    """Render a request preview as a readable block for inclusion in output."""
+    lines = [f"{preview.get('method', '')} {preview.get('url', '')}".strip()]
+    headers = preview.get("headers") or {}
+    if headers:
+        lines.append("Headers:")
+        lines.extend(f"  {k}: {v}" for k, v in headers.items())
+    else:
+        lines.append("Headers: (none)")
+    body = preview.get("body") or ""
+    lines.append(f"Body ({preview.get('body_bytes', 0)} bytes):")
+    lines.append(body if body else "(empty)")
+    return "\n".join(lines)
+
+
 class APICallNode(Node):
     def __init__(self, data: dict) -> None:
         super().__init__("APINode")
         self.data = data
 
     def process(self, inputs):
-        url = self.data.get("url", "")
+        from app.utils import templating
+
         method = self.data.get("method", "GET").upper()
-        headers_raw = self.data.get("headers", "")
-        body_raw = self.data.get("body", "")
         auth_strategy = (self.data.get("auth_strategy") or "none").lower()
         credential_id = self.data.get("credential_id") or ""
+
+        # Resolve {{ inputs.output }}-style placeholders against the previous
+        # step's output so authors can reference upstream data instead of
+        # pasting it in literally. URL and headers use raw-string substitution
+        # (they sit inside already-quoted positions); the body is rendered
+        # below with JSON-encoding semantics.
+        try:
+            url = templating.render(self.data.get("url", ""), inputs, json_encode=False)
+            headers_raw = templating.render(
+                self.data.get("headers", ""), inputs, json_encode=False
+            )
+        except templating.TemplateError as e:
+            return {"output": str(e), "input": inputs.get("output"), "step_name": self.name}
+        body_raw = self.data.get("body", "")
         if not url:
             return {"output": "", "input": inputs.get("output"), "step_name": self.name}
 
@@ -840,27 +929,103 @@ class APICallNode(Node):
                 }
 
         body = None
-        if body_raw and method in ("POST", "PUT", "PATCH"):
-            try:
-                body = json.loads(body_raw)
-            except json.JSONDecodeError:
-                body = body_raw
+        body_is_json = False
+        if method in ("POST", "PUT", "PATCH"):
+            if body_raw and body_raw.strip():
+                # Render {{ inputs.output }} placeholders with JSON-encoding so
+                # an envelope like {"records": {{ inputs.output }}} stays valid
+                # JSON whatever the upstream output's type is.
+                try:
+                    rendered_body = templating.render(body_raw, inputs, json_encode=True)
+                except templating.TemplateError as e:
+                    return {
+                        "output": str(e),
+                        "input": inputs.get("output"),
+                        "step_name": self.name,
+                    }
+                try:
+                    parsed = json.loads(rendered_body)
+                except json.JSONDecodeError:
+                    # Not JSON — send the literal text as-is.
+                    body = rendered_body
+                else:
+                    # Objects/arrays go out via httpx's json= (which also sets
+                    # Content-Type). Any other JSON type — a scalar or null —
+                    # is still a body the author configured, so send its raw
+                    # JSON text rather than silently transmitting zero bytes.
+                    body = parsed if isinstance(parsed, (dict, list)) else rendered_body
+                    body_is_json = True
+            else:
+                # Implicit passthrough: an empty body on a write request sends
+                # the previous step's output as-is. This is what lets a
+                # [generate] -> [POST] workflow store its result without the
+                # author wiring up a template at all.
+                upstream = inputs.get("output")
+                if isinstance(upstream, (dict, list)):
+                    body = upstream
+                    body_is_json = True
+                elif isinstance(upstream, str):
+                    # Raw text — its type is unknown, so don't claim it's JSON.
+                    body = upstream
+                elif upstream is not None:
+                    # Scalars (number/bool) — send a JSON literal as the body.
+                    body = json.dumps(upstream)
+                    body_is_json = True
+
+        # When we're sending a JSON body, tag it as such so servers that route
+        # on Content-Type (e.g. Flask's request.json, which 415s without it)
+        # parse it. httpx only sets this automatically on the json= path, not
+        # for JSON we send as a string (scalars/null) — and the author may not
+        # have added the header themselves. Never override an explicit choice.
+        if body_is_json and not any(k.lower() == "content-type" for k in headers):
+            headers["Content-Type"] = "application/json"
+
+        # Snapshot exactly what we're about to send (secrets redacted). This is
+        # attached to the step result so authors can inspect the request when
+        # debugging — and embedded into the error output when it fails, since
+        # that's when they most need to see it.
+        request_preview = _build_request_preview(method, url, headers, body)
+        logger.info(
+            "APINode sending %s %s (%d body bytes)",
+            method, url, request_preview["body_bytes"],
+        )
 
         try:
             with httpx.Client(timeout=30, follow_redirects=True) as client:
                 resp = client.request(method, url, headers=headers, json=body if isinstance(body, (dict, list)) else None, content=body if isinstance(body, str) else None)
                 resp.raise_for_status()
         except httpx.HTTPStatusError as e:
-            return {"output": f"HTTP error: {e.response.status_code} {e.response.text[:500]}", "input": inputs.get("output"), "step_name": self.name}
+            return {
+                "output": (
+                    f"HTTP error: {e.response.status_code} {e.response.text[:500]}\n\n"
+                    f"--- Request sent ---\n{_format_request_preview(request_preview)}"
+                ),
+                "input": inputs.get("output"),
+                "step_name": self.name,
+                "request": request_preview,
+            }
         except httpx.RequestError as e:
-            return {"output": f"Request error: {e}", "input": inputs.get("output"), "step_name": self.name}
+            return {
+                "output": (
+                    f"Request error: {e}\n\n"
+                    f"--- Request sent ---\n{_format_request_preview(request_preview)}"
+                ),
+                "input": inputs.get("output"),
+                "step_name": self.name,
+                "request": request_preview,
+            }
 
         try:
             output = resp.json()
         except Exception:
             output = resp.text
 
-        return {"output": output, "input": inputs.get("output"), "step_name": self.name}
+        return {
+            "output": output,
+            "input": inputs.get("output"),
+            "step_name": self.name,
+            "request": request_preview,
+        }
 
 
 class DocumentRendererNode(Node):

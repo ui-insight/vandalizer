@@ -338,6 +338,15 @@ export function VerificationQueue() {
                                 <Wrench className="h-3 w-3" />
                                 Workshop
                               </button>
+                              {req.status === 'submitted' && (
+                                <button
+                                  onClick={() => handleAction(req.uuid, 'in_review')}
+                                  className="px-3 py-1.5 text-xs font-medium rounded-md bg-yellow-100 text-yellow-800 border border-yellow-300 hover:bg-yellow-200"
+                                  title="Claim this submission and mark it as actively under review"
+                                >
+                                  Mark In Review
+                                </button>
+                              )}
                               <button
                                 onClick={() => { setReviewingId(req.uuid); setReviewOrgIds([]); setReviewCollectionIds([]) }}
                                 className="px-3 py-1.5 text-xs font-medium rounded-md bg-gray-900 text-white hover:bg-gray-800"

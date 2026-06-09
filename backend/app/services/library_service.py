@@ -286,7 +286,10 @@ async def add_item(
 
 
 async def remove_item(library_id: str, item_id: str, user: User) -> bool:
-    lib = await access_control.get_authorized_library(library_id, user, manage=True)
+    # Contribute-level: any team member can remove items from a team library
+    # (personal libraries stay owner-only; verified stays admin-only). This
+    # mirrors that any member can add/share items to the team library.
+    lib = await access_control.get_authorized_library(library_id, user, contribute=True)
     if not lib:
         return False
     item_oid = PydanticObjectId(item_id)

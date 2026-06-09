@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, type DragEvent } from 'react'
-import { Loader2, BookOpen, X, ArrowDown, ChevronRight, Shield, CheckCircle2, Upload, Link2 } from 'lucide-react'
+import { Loader2, BookOpen, X, ArrowDown, ChevronRight, Shield, CheckCircle2, Upload, Link2, Sparkles } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
@@ -10,7 +10,7 @@ import { useChat } from '../../hooks/useChat'
 import { useOnboarding } from '../../hooks/useOnboarding'
 import { useWorkspace, type PendingChatMessage } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
-import { useBranding, DEFAULT_LOGO_URL } from '../../contexts/BrandingContext'
+import { useBranding } from '../../contexts/BrandingContext'
 import { useShareLink } from '../../lib/shareLink'
 import { addLink, removeDocument, removeLink, truncateContext, compactContext, clearContext } from '../../api/chat'
 import { uploadFile } from '../../api/files'
@@ -60,7 +60,7 @@ interface ChatPanelProps {
 
 export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessageConsumed }: ChatPanelProps) {
   const branding = useBranding()
-  const showJoeVandal = branding.logoUrl === DEFAULT_LOGO_URL
+  const brandIcon = branding.iconUrl
   const {
     messages,
     setMessages,
@@ -551,9 +551,9 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                 }}
               />
               <div className="relative z-[1] flex items-center gap-4">
-                {showJoeVandal && (
+                {brandIcon && (
                   <div style={{ animation: 'float 3s ease-in-out infinite' }} className="shrink-0">
-                    <img src="/images/joevandal.png" alt="Joe Vandal" style={{ width: 22, height: 35 }} className="opacity-90" />
+                    <img src={brandIcon} alt={branding.orgName} style={{ width: 22, height: 35, objectFit: 'contain' }} className="opacity-90" />
                   </div>
                 )}
                 <div>
@@ -667,8 +667,10 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                     <Loader2 className="h-7 w-7 opacity-90 animate-spin" />
                   ) : activeKBUuid ? (
                     <BookOpen className="h-7 w-7 opacity-90" />
+                  ) : brandIcon ? (
+                    <img src={brandIcon} alt={branding.orgName} style={{ width: 22, height: 35, objectFit: 'contain' }} className="opacity-90" />
                   ) : (
-                    <img src="/images/joevandal.png" alt="Joe Vandal" style={{ width: 22, height: 35 }} className="opacity-90" />
+                    <Sparkles className="h-7 w-7 opacity-90" />
                   )}
                 </div>
                 <div>

@@ -3,6 +3,7 @@ import { Link, Navigate, useSearch } from '@tanstack/react-router'
 import { useAuth } from '../hooks/useAuth'
 import { getAuthConfig, type AuthConfig } from '../api/auth'
 import { Footer } from '../components/layout/Footer'
+import { useBranding } from '../contexts/BrandingContext'
 import {
   FileText,
   Cpu,
@@ -275,6 +276,7 @@ function safeNextPath(raw: string | undefined): string | null {
 
 export default function Landing() {
   const { user, loading, demoExpired, demoFeedbackToken } = useAuth()
+  const branding = useBranding()
   const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null)
   const search = useSearch({ strict: false }) as Record<string, string | undefined>
   const inviteToken = search?.invite_token
@@ -331,7 +333,7 @@ export default function Landing() {
       {/* Fixed top nav */}
       <nav className="fixed top-0 inset-x-0 z-50 bg-[#0a0a0a]/80 backdrop-blur-md border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
-          <img src="/images/Vandalizer_Wordmark_Color_RGB+W.png" alt="Vandalizer" className="h-10" />
+          <img src={branding.logoDarkUrl} alt={branding.orgName} className="h-10" style={{ maxWidth: 220, objectFit: 'contain' }} />
           <div className="flex items-center gap-4">
             <Link
               to="/docs/present"
@@ -405,9 +407,10 @@ export default function Landing() {
 
           {/* Logo */}
           <img
-            src="/images/Vandalizer_Wordmark_Color_RGB+W.png"
-            alt="Vandalizer"
+            src={branding.logoDarkUrl}
+            alt={branding.orgName}
             className="w-full max-w-[500px] mb-5"
+            style={{ objectFit: 'contain' }}
           />
 
           {/* Tagline */}

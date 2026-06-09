@@ -96,6 +96,41 @@ async def _log_send(
         logger.exception("Failed to persist EmailLog for %s", recipient)
 
 
+#: Brand defaults baked into the email templates below. When an admin customizes
+#: branding in System Config, these are swapped out at send time (see
+#: _apply_branding) so every template — current and future — is white-labeled
+#: without threading branding through 20+ template signatures.
+_EMAIL_DEFAULT_NAME = "Vandalizer"
+_EMAIL_DEFAULT_COLOR = "#f1b300"
+#: The theme's own default highlight; if highlight_color still equals this, the
+#: admin hasn't picked a brand color, so leave the email gold (#f1b300) alone.
+_THEME_DEFAULT_COLOR = "#eab308"
+
+
+async def _apply_branding(subject: str, html_body: str) -> tuple[str, str]:
+    """Swap the baked-in Vandalizer name/color for the deployment's branding.
+
+    Best-effort: any failure (DB unavailable in a worker, etc.) falls back to the
+    default Vandalizer branding rather than blocking the email. The name swap is
+    case-sensitive on the capitalized product name, so lowercase URLs/domains
+    (e.g. https://vandalizer.example.edu) are never rewritten.
+    """
+    try:
+        from app.models.system_config import SystemConfig
+
+        config = await SystemConfig.get_config()
+        org = (config.org_name or "").strip()
+        if org and org != _EMAIL_DEFAULT_NAME:
+            subject = subject.replace(_EMAIL_DEFAULT_NAME, org)
+            html_body = html_body.replace(_EMAIL_DEFAULT_NAME, org)
+        color = (config.highlight_color or "").strip()
+        if color and color.lower() != _THEME_DEFAULT_COLOR:
+            html_body = html_body.replace(_EMAIL_DEFAULT_COLOR, color)
+    except Exception:
+        logger.exception("Failed to apply email branding; sending with defaults")
+    return subject, html_body
+
+
 async def send_email(
     to: str,
     subject: str,
@@ -109,6 +144,8 @@ async def send_email(
     """
     if settings is None:
         settings = Settings()
+
+    subject, html_body = await _apply_branding(subject, html_body)
 
     provider = settings.email_provider if settings.email_provider == "resend" else "smtp"
     if provider == "resend":

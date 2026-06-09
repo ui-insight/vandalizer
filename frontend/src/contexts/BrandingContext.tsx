@@ -5,6 +5,7 @@ import { getContrastTextColor, getComplementaryColor, getHoverColor } from '../u
 export const DEFAULT_ORG_NAME = 'Vandalizer'
 export const DEFAULT_LOGO_URL = '/images/Vandalizer_Wordmark_RGB.png'
 export const DEFAULT_LOGO_DARK_URL = '/images/Vandalizer_Wordmark_Color_RGB+W.png'
+export const DEFAULT_ICON_URL = '/images/joevandal.png'
 
 export interface Branding {
   /** Display name for this deployment. Always non-empty (falls back to "Vandalizer"). */
@@ -13,6 +14,14 @@ export interface Branding {
   logoUrl: string
   /** Logo for dark backgrounds (auth pages, footer). Same as logoUrl when admin uploads a custom one. */
   logoDarkUrl: string
+  /**
+   * Small square mascot/icon shown beside the wordmark (header, chat banners).
+   * - Default (un-branded) deployment: the Joe Vandal mark.
+   * - Custom icon uploaded: that icon.
+   * - Branded (custom logo/name) but no custom icon: `null` — so Joe Vandal does
+   *   NOT leak onto a white-labeled deployment. Render the icon only when set.
+   */
+  iconUrl: string | null
   /** True when the admin has overridden the default name. Used to surface "Powered by Vandalizer" attribution. */
   isCustomized: boolean
   /** Re-fetch from server (called by admin after saving theme). */
@@ -33,13 +42,27 @@ function applyTheme(theme: ThemeConfig) {
 function resolve(theme: ThemeConfig | null): Omit<Branding, 'refresh'> {
   const orgName = (theme?.org_name || '').trim() || DEFAULT_ORG_NAME
   const customLogo = (theme?.logo_data_url || '').trim()
+  const customIcon = (theme?.icon_data_url || '').trim()
   const isCustomized = orgName !== DEFAULT_ORG_NAME || !!customLogo
   return {
     orgName,
     logoUrl: customLogo || DEFAULT_LOGO_URL,
     logoDarkUrl: customLogo || DEFAULT_LOGO_DARK_URL,
+    iconUrl: customIcon || (isCustomized ? null : DEFAULT_ICON_URL),
     isCustomized,
   }
+}
+
+/** Point the browser-tab favicon at a custom icon (data URL) when one is set. */
+function applyFavicon(iconUrl: string | null) {
+  if (!iconUrl || !iconUrl.startsWith('data:')) return
+  let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
+  if (!link) {
+    link = document.createElement('link')
+    link.rel = 'icon'
+    document.head.appendChild(link)
+  }
+  link.href = iconUrl
 }
 
 export function BrandingProvider({ children }: { children: ReactNode }) {
@@ -49,7 +72,9 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
     try {
       const theme = await getThemeConfig()
       applyTheme(theme)
-      setState(resolve(theme))
+      const resolved = resolve(theme)
+      applyFavicon(resolved.iconUrl)
+      setState(resolved)
     } catch {
       // Keep defaults if fetch fails (e.g., not logged in or backend down).
     }
@@ -78,6 +103,7 @@ export function useBranding(): Branding {
       orgName: DEFAULT_ORG_NAME,
       logoUrl: DEFAULT_LOGO_URL,
       logoDarkUrl: DEFAULT_LOGO_DARK_URL,
+      iconUrl: DEFAULT_ICON_URL,
       isCustomized: false,
       refresh: async () => {},
     }

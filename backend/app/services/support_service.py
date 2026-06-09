@@ -16,6 +16,7 @@ from app.models.support import (
     SupportCounter,
     SupportMessage,
     SupportTicket,
+    TicketClassification,
     TicketPriority,
     TicketStatus,
 )
@@ -145,6 +146,11 @@ async def _ticket_to_dict(t: SupportTicket) -> dict:
         "subject": t.subject,
         "status": t.status.value,
         "priority": t.priority.value,
+        "classification": (
+            getattr(t, "classification", None).value
+            if getattr(t, "classification", None)
+            else None
+        ),
         "user_id": t.user_id,
         "user_name": t.user_name,
         "user_email": t.user_email,
@@ -200,6 +206,11 @@ def _ticket_summary(t: SupportTicket) -> dict:
         "subject": t.subject,
         "status": t.status.value,
         "priority": t.priority.value,
+        "classification": (
+            getattr(t, "classification", None).value
+            if getattr(t, "classification", None)
+            else None
+        ),
         "user_id": t.user_id,
         "user_name": t.user_name,
         "assigned_to": t.assigned_to,
@@ -248,6 +259,7 @@ async def create_ticket(
     subject: str,
     message: str,
     priority: str = "normal",
+    classification: str | None = None,
     team_id: str | None = None,
 ) -> dict:
     msg = SupportMessage(
@@ -260,6 +272,9 @@ async def create_ticket(
         ticket_number=await _next_ticket_number(),
         subject=subject,
         priority=TicketPriority(priority),
+        classification=(
+            TicketClassification(classification) if classification else None
+        ),
         user_id=user.user_id,
         user_name=user.name or user.user_id,
         user_email=user.email,
@@ -345,6 +360,7 @@ async def list_tickets(
     user_id: str | None = None,
     status: str | None = None,
     priority: str | None = None,
+    classification: str | None = None,
     assigned_to: str | None = None,
     tag: str | None = None,
     category: str | None = None,
@@ -366,6 +382,8 @@ async def list_tickets(
         eq["status"] = status
     if priority:
         eq["priority"] = priority
+    if classification:
+        eq["classification"] = classification
     if assigned_to:
         eq["assigned_to"] = assigned_to
     if tag:
@@ -389,6 +407,7 @@ async def list_tickets(
 async def list_all_tickets(
     status: str | None = None,
     priority: str | None = None,
+    classification: str | None = None,
     tag: str | None = None,
     category: str | None = None,
     search: str | None = None,
@@ -404,6 +423,8 @@ async def list_all_tickets(
         eq["status"] = status
     if priority:
         eq["priority"] = priority
+    if classification:
+        eq["classification"] = classification
     if tag:
         eq["tags"] = tag
     if category is not None:

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { createCredential } from '../../api/credentials'
 import type { Credential, CredentialType } from '../../types/credential'
@@ -114,13 +115,15 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
     }
   }
 
-  return (
+  // Portal to <body> so the overlay escapes the workflow editor's stacking
+  // context — otherwise the left document panel renders on top of it.
+  return createPortal(
     <div
       onClick={onClose}
       style={{
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
         backgroundColor: 'rgba(0,0,0,0.35)', display: 'flex',
-        alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+        alignItems: 'center', justifyContent: 'center', zIndex: 10000,
       }}
     >
       <div
@@ -336,6 +339,7 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

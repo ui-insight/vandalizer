@@ -329,20 +329,22 @@ class ExtractionEngine:
             try:
                 import fitz  # pymupdf
 
-                doc = fitz.open(file_path)
-                total_pages = len(doc)
-                render_pages = min(total_pages, MAX_PDF_PAGES_FOR_IMAGES)
-                if total_pages > MAX_PDF_PAGES_FOR_IMAGES:
-                    logger.warning(
-                        "PDF %s has %d pages, capping at %d for image rendering",
-                        file_path, total_pages, MAX_PDF_PAGES_FOR_IMAGES,
-                    )
-                pages: list[BinaryContent] = []
-                for page in doc[:render_pages]:
-                    # 144 DPI (2x zoom) balances quality and memory
-                    pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
-                    pages.append(BinaryContent(data=pix.tobytes("png"), media_type="image/png"))
-                doc.close()
+                # Context-managed so the document's file handle is released on
+                # every path, including if get_pixmap/tobytes raises mid-render
+                # (a bare close() after the loop leaks the fd on exceptions).
+                with fitz.open(file_path) as doc:
+                    total_pages = len(doc)
+                    render_pages = min(total_pages, MAX_PDF_PAGES_FOR_IMAGES)
+                    if total_pages > MAX_PDF_PAGES_FOR_IMAGES:
+                        logger.warning(
+                            "PDF %s has %d pages, capping at %d for image rendering",
+                            file_path, total_pages, MAX_PDF_PAGES_FOR_IMAGES,
+                        )
+                    pages: list[BinaryContent] = []
+                    for page in doc[:render_pages]:
+                        # 144 DPI (2x zoom) balances quality and memory
+                        pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+                        pages.append(BinaryContent(data=pix.tobytes("png"), media_type="image/png"))
                 logger.info("Rendered %d/%d page(s) from %s", render_pages, total_pages, file_path)
                 return pages
             except Exception as e:

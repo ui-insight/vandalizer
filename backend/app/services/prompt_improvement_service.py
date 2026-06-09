@@ -79,7 +79,9 @@ async def improve_prompt(
     model = get_agent_model(default_model, system_config_doc=sys_config_doc)
     agent = Agent(model, system_prompt=_SYSTEM_PROMPT, output_type=PromptImprovement)
 
-    result = await agent.run("\n".join(parts))
+    from app.services.metering import metered_async
+    async with metered_async("prompt_improve"):
+        result = await agent.run("\n".join(parts))
     return {
         "improved_prompt": result.output.improved_prompt,
         "rationale": result.output.rationale,

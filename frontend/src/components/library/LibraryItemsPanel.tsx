@@ -86,7 +86,12 @@ export function LibraryItemsPanel({ library, teamId }: Props) {
     if (selectedItem?.id === itemId) {
       setSelectedItem(null)
     }
-    await remove(itemId)
+    try {
+      await remove(itemId)
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : `Failed to delete ${kindLabel}`
+      toast(msg, 'error')
+    }
   }
 
   const handleOpen = (item: LibraryItem) => {
