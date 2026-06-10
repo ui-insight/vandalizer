@@ -1836,6 +1836,31 @@ update_catalog() {
   echo -e "  ${SYM_ARROW}  Using container: ${BOLD}${container_name}${RESET}"
   echo ""
 
+  # --- Guard: seeding runs INSIDE the container, against the seed files baked
+  # into its image — not the files in this checkout. If the running container
+  # was built before the checkout's catalog version, seeding would silently
+  # re-apply the old catalog, record the old version, and the upgrade prompt
+  # would come back on every run. Require a rebuild first.
+  local checkout_catalog container_catalog remote_catalog
+  checkout_catalog=$(tr -d '[:space:]' < "$SEEDS_VERSION_FILE" 2>/dev/null || echo "")
+  remote_catalog=$(catalog_version_latest)
+  if is_newer "$remote_catalog" "$checkout_catalog"; then
+    echo -e "  ${SYM_CROSS}  ${RED}${BOLD}Your checkout is older than the latest catalog.${RESET}"
+    echo -e "  ${DIM}     Checkout catalog: ${checkout_catalog:-unknown}   Latest on origin: ${remote_catalog}${RESET}"
+    echo -e "  ${DIM}     Pull the latest code (which carries the catalog files) first:${RESET}"
+    echo -e "  ${GRAY}       ./setup.sh --upgrade${RESET}"
+    return 1
+  fi
+  container_catalog=$(docker exec "$container_name" cat seeds/VERSION 2>/dev/null | tr -d '[:space:]' || echo "")
+  if [[ -n "$checkout_catalog" ]] && is_newer "$checkout_catalog" "$container_catalog"; then
+    echo -e "  ${SYM_CROSS}  ${RED}${BOLD}The running container is older than your checkout.${RESET}"
+    echo -e "  ${DIM}     Container catalog: ${container_catalog:-unknown}   Checkout catalog: ${checkout_catalog}${RESET}"
+    echo -e "  ${DIM}     The container only knows the catalog its image was built with, so${RESET}"
+    echo -e "  ${DIM}     updating now would re-apply the old catalog. Rebuild first:${RESET}"
+    echo -e "  ${GRAY}       ./setup.sh --redeploy${RESET}  ${DIM}then${RESET}  ${GRAY}./setup.sh --seed${RESET}"
+    return 1
+  fi
+
   # --- Step 1: preview retirements (items dropped from the catalog) ---
   # Dry run makes no changes; it just lists verified items whose seed_id is gone.
   local prune_flag=""
