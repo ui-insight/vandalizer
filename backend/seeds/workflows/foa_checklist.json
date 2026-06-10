@@ -9,7 +9,11 @@
     "description": "Deep extraction workflow for large, complex Funding Opportunity Announcements. Pulls evaluation criteria, review processes, agency priorities, submission requirements, and formatting rules into a single reference document.",
     "collections": [
       "pre-award"
-    ]
+    ],
+    "credit": {
+      "name": "Labib Ehsel",
+      "org": "University of Idaho"
+    }
   },
   "items": [
     {

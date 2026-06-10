@@ -9,7 +9,11 @@
     "description": "Comprehensive extraction for subaward agreements and FDP subawards. Pulls award information, contact details, financial terms, reporting requirements, and compliance obligations from complex multi-attachment packages.",
     "collections": [
       "post-award"
-    ]
+    ],
+    "credit": {
+      "name": "Labib Ehsel",
+      "org": "University of Idaho"
+    }
   },
   "items": [
     {

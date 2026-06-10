@@ -9,7 +9,11 @@
     "description": "To assign a risk level to an award",
     "collections": [
       "post-award"
-    ]
+    ],
+    "credit": {
+      "name": "Labib Ehsel",
+      "org": "University of Idaho"
+    }
   },
   "items": [
     {

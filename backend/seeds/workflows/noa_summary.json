@@ -9,7 +9,11 @@
     "description": "NOA BASIC AWARD & FINANCIAL SUMMARY & NOA COMPLIANCE & ADMINISTRATIVE REQUIREMENTS",
     "collections": [
       "post-award"
-    ]
+    ],
+    "credit": {
+      "name": "Labib Ehsel",
+      "org": "University of Idaho"
+    }
   },
   "items": [
     {

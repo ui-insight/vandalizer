@@ -9,7 +9,11 @@
     "description": "Extract setup details for an NIH grant or cooperative agreement.",
     "collections": [
       "federal-agency"
-    ]
+    ],
+    "credit": {
+      "name": "Labib Ehsel",
+      "org": "University of Idaho"
+    }
   },
   "items": [
     {

@@ -9,7 +9,11 @@
     "description": "Automatically extracts and consolidates Request for Applications into standardized, actionable checklists. Processes dates, eligibility requirements, award information, and submission details.\n",
     "collections": [
       "pre-award"
-    ]
+    ],
+    "credit": {
+      "name": "Labib Ehsel",
+      "org": "University of Idaho"
+    }
   },
   "items": [
     {
