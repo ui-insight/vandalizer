@@ -14,7 +14,7 @@
     "description": "DFARS supplement, DOD grant and agreement regulations (DoDGARs), fundamental research determination, and controlled unclassified information requirements.",
     "sources": [
       {"source_type": "url", "url": "https://www.ecfr.gov/current/title-2/subtitle-B/chapter-XI/subchapter-D/part-1104"},
-      {"source_type": "url", "url": "https://www.acquisition.gov/dfars"},
+      {"source_type": "url", "url": "https://www.acquisition.gov/dfars", "url_title": "DFARS | Acquisition.GOV"},
       {"source_type": "url", "url": "https://basicresearch.defense.gov/about/frequently-asked-questions/"}
     ]
   }]

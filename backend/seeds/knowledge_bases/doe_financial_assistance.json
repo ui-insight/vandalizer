@@ -14,7 +14,7 @@
     "description": "DOE grant and cooperative agreement regulations under 2 CFR 910, merit review processes, and reporting requirements for DOE-funded research.",
     "sources": [
       {"source_type": "url", "url": "https://www.ecfr.gov/current/title-2/subtitle-B/chapter-IX/part-910"},
-      {"source_type": "url", "url": "https://science.osti.gov/grants/Policy-and-Guidance"},
+      {"source_type": "url", "url": "https://science.osti.gov/grants/Policy-and-Guidance", "url_title": "GRANTS Grants Policy and Guidanc... | U.S. DOE Office of Science (SC)"},
       {"source_type": "url", "url": "https://www.energy.gov/management/financial-assistance-guide"}
     ]
   }]

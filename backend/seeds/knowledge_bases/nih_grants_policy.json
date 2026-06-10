@@ -13,9 +13,9 @@
     "title": "NIH Grants Policy Statement",
     "description": "Knowledge base covering NIH application requirements, review criteria, terms of award, and administrative requirements from the NIH GPS.",
     "sources": [
-      {"source_type": "url", "url": "https://grants.nih.gov/grants/policy/nihgps/index.htm"},
-      {"source_type": "url", "url": "https://grants.nih.gov/grants/how-to-apply-application-guide.html"},
-      {"source_type": "url", "url": "https://grants.nih.gov/grants/guide/notice-files/NOT-OD-24-084.html"}
+      {"source_type": "url", "url": "https://grants.nih.gov/grants/policy/nihgps/index.htm", "url_title": "Redirector"},
+      {"source_type": "url", "url": "https://grants.nih.gov/grants/how-to-apply-application-guide.html", "url_title": "How to Apply \u2013 Application Guide | Grants & Funding"},
+      {"source_type": "url", "url": "https://grants.nih.gov/grants/guide/notice-files/NOT-OD-24-084.html", "url_title": "NOT-OD-24-084: Overview of Grant Application and Review Changes for Due Dates on or after January 25, 2025"}
     ]
   }]
 }

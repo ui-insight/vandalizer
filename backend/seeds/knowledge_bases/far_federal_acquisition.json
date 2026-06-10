@@ -13,9 +13,9 @@
     "title": "Federal Acquisition Regulation (FAR)",
     "description": "Covers procurement policies, cost principles, contract clauses, and subcontracting requirements relevant to sponsored research contracts.",
     "sources": [
-      {"source_type": "url", "url": "https://www.acquisition.gov/far"},
-      {"source_type": "url", "url": "https://www.acquisition.gov/far/part-31"},
-      {"source_type": "url", "url": "https://www.acquisition.gov/far/part-42"}
+      {"source_type": "url", "url": "https://www.acquisition.gov/far", "url_title": "FAR | Acquisition.GOV"},
+      {"source_type": "url", "url": "https://www.acquisition.gov/far/part-31", "url_title": "Part 31 - Contract Cost Principles and Procedures | Acquisition.GOV"},
+      {"source_type": "url", "url": "https://www.acquisition.gov/far/part-42", "url_title": "Part 42 - Contract Administration and Audit Services | Acquisition.GOV"}
     ]
   }]
 }
