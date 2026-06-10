@@ -13,9 +13,9 @@
     "title": "NSF PAPPG Reference",
     "description": "Comprehensive knowledge base covering NSF proposal preparation, budget guidelines, merit review criteria, and award conditions from the PAPPG.",
     "sources": [
-      {"source_type": "url", "url": "https://new.nsf.gov/policies/pappg"},
-      {"source_type": "url", "url": "https://new.nsf.gov/funding/preparing-proposal"},
-      {"source_type": "url", "url": "https://new.nsf.gov/funding/proposal-budget"}
+      {"source_type": "url", "url": "https://new.nsf.gov/policies/pappg", "url_title": "NSF Proposal & Award Policies & Procedures Guide (PAPPG) | NSF - U.S. National Science Foundation"},
+      {"source_type": "url", "url": "https://new.nsf.gov/funding/preparing-proposal", "url_title": "Preparing Your Proposal - Funding at NSF | NSF - U.S. National Science Foundation"},
+      {"source_type": "url", "url": "https://new.nsf.gov/funding/proposal-budget", "url_title": "Preparing Your Proposal Budget - Funding at NSF | NSF - U.S. National Science Foundation"}
     ]
   }]
 }
