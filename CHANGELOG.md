@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **Creator credit on verified catalog items.** Approving a verification request now stamps a static credit — "by Jane Doe at University of Idaho" — onto the item's catalog metadata, built from the submission's name/org with the deployment's institution (`SystemConfig.org_name`) as the org fallback. The credit is plain text rather than a user reference, so it survives catalog export and seeding to installs where the creator has no account; the Explore/catalog cards fall back from the live submitter to the static credit. The catalog export embeds it, the seeder applies it from `_seed_meta.credit`, and `setup.sh` now asks for the institution name during install (stored as the branding org name when not already set). Ships with catalog **v1.1.1**, which credits the ten production workflows and the NIHAwardExtract template.
+
 ## [v4.6.0] - 2026-06-10
 
 > **Supersedes v4.5.0.** A `v4.5.0` tag was cut on 2026-06-04, but its release workflow failed during verification, so no images or GitHub release were ever published. Everything intended for v4.5.0 is included below; operators upgrade directly from v4.4.0 → v4.6.0.

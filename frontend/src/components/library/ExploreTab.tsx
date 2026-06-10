@@ -162,8 +162,8 @@ export function ItemDetailModal({
             {item.kind === 'knowledge_base' && item.total_chunks != null && (
               <span className="text-white/70">{item.total_chunks.toLocaleString()} chunks</span>
             )}
-            {item.created_by && (
-              <AuthorChip author={item.created_by} size="md" label="by" tone="on-dark" />
+            {(item.submitted_by || item.credit || item.created_by) && (
+              <AuthorChip author={item.submitted_by || item.credit || item.created_by} size="md" label="by" tone="on-dark" />
             )}
           </div>
         </div>
@@ -337,9 +337,9 @@ function CatalogCard({
         <p className="text-xs text-gray-600 mb-2">{item.description}</p>
       )}
 
-      {item.created_by && (
+      {(item.submitted_by || item.credit || item.created_by) && (
         <div className="mb-2">
-          <AuthorChip author={item.created_by} />
+          <AuthorChip author={item.submitted_by || item.credit || item.created_by} />
         </div>
       )}
 

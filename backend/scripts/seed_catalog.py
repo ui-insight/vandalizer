@@ -168,7 +168,7 @@ async def add_to_collection(collection: VerifiedCollection, item_id: str):
 async def upsert_verified_metadata(
     item_kind: str, item_id: str, display_name: str, description: str,
     quality_tier: str | None = None, quality_score: float | None = None,
-    quality_grade: str | None = None,
+    quality_grade: str | None = None, credit: dict | None = None,
 ):
     """Create or refresh VerifiedItemMetadata.
 
@@ -192,6 +192,9 @@ async def upsert_verified_metadata(
             existing.quality_score = quality_score
         if quality_grade is not None:
             existing.quality_grade = quality_grade
+        if credit and credit.get("name"):
+            existing.credit_name = credit["name"]
+            existing.credit_org = credit.get("org")
         existing.updated_at = now
         await existing.save()
         return existing
@@ -204,6 +207,8 @@ async def upsert_verified_metadata(
         quality_grade=quality_grade,
         quality_score=quality_score,
         organization_ids=[],  # empty = globally visible
+        credit_name=(credit or {}).get("name"),
+        credit_org=(credit or {}).get("org"),
         updated_at=now,
     )
     await meta.insert()
@@ -343,6 +348,7 @@ async def seed_workflow(
             meta.get("display_name", item["name"]),
             meta.get("description", item.get("description", "")),
             quality_tier=meta.get("quality_tier"),
+            credit=meta.get("credit"),
             quality_score=meta.get("quality_score"),
             quality_grade=meta.get("quality_grade"),
         )
@@ -426,6 +432,7 @@ async def seed_workflow(
         meta.get("display_name", item["name"]),
         meta.get("description", item.get("description", "")),
         quality_tier=meta.get("quality_tier"),
+        credit=meta.get("credit"),
         quality_score=meta.get("quality_score"),
         quality_grade=meta.get("quality_grade"),
     )
@@ -527,6 +534,7 @@ async def _refresh_search_set(
         meta.get("display_name", item["title"]),
         meta.get("description", ""),
         quality_tier=meta.get("quality_tier"),
+        credit=meta.get("credit"),
         quality_score=meta.get("quality_score"),
         quality_grade=meta.get("quality_grade"),
     )
@@ -602,6 +610,7 @@ async def seed_search_set(
         meta.get("display_name", item["title"]),
         meta.get("description", ""),
         quality_tier=meta.get("quality_tier"),
+        credit=meta.get("credit"),
         quality_score=meta.get("quality_score"),
         quality_grade=meta.get("quality_grade"),
     )
@@ -703,6 +712,7 @@ async def seed_knowledge_base(
             meta.get("display_name", item["title"]),
             meta.get("description", item.get("description", "")),
             quality_tier=meta.get("quality_tier"),
+            credit=meta.get("credit"),
             quality_score=meta.get("quality_score"),
             quality_grade=meta.get("quality_grade"),
         )
@@ -756,6 +766,7 @@ async def seed_knowledge_base(
         meta.get("display_name", item["title"]),
         meta.get("description", item.get("description", "")),
         quality_tier=meta.get("quality_tier"),
+        credit=meta.get("credit"),
         quality_score=meta.get("quality_score"),
         quality_grade=meta.get("quality_grade"),
     )

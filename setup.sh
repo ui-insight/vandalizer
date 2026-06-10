@@ -820,6 +820,15 @@ bootstrap() {
   fi
 
   echo ""
+  echo -e "  ${SYM_NEURAL}  ${BOLD}Institution${RESET}"
+  echo -e "  ${DIM}     Used for deployment branding and as the default institution on${RESET}"
+  echo -e "  ${DIM}     creator credits (\"by Jane Doe at <institution>\") when items are${RESET}"
+  echo -e "  ${DIM}     verified into the catalog. Leave blank to skip.${RESET}"
+  echo ""
+  local ORG_NAME=""
+  prompt "Institution / organization name" "" ORG_NAME
+
+  echo ""
   echo -e "  ${SYM_NEURAL}  ${BOLD}Verified catalog${RESET}"
   echo -e "  ${DIM}     The bootstrap will also seed research administration content:${RESET}"
   echo -e "  ${DIM}       •  Verified workflows (e.g. proposal review, compliance checks)${RESET}"
@@ -840,7 +849,7 @@ bootstrap() {
 
   if [[ -n "$container_name" ]]; then
     # Pass credentials via stdin to Python — no shell expansion, no temp files
-    bootstrap_output=$(printf '%s\n' "$ADMIN_EMAIL" "$ADMIN_PASSWORD" "$ADMIN_NAME" "$DEFAULT_TEAM_NAME" | \
+    bootstrap_output=$(printf '%s\n' "$ADMIN_EMAIL" "$ADMIN_PASSWORD" "$ADMIN_NAME" "$DEFAULT_TEAM_NAME" "$ORG_NAME" | \
       docker exec -i "$container_name" python -c "
 import sys, os, runpy
 lines = sys.stdin.read().split('\n')
@@ -848,6 +857,7 @@ os.environ['ADMIN_EMAIL'] = lines[0] if len(lines) > 0 else ''
 os.environ['ADMIN_PASSWORD'] = lines[1] if len(lines) > 1 else ''
 os.environ['ADMIN_NAME'] = lines[2] if len(lines) > 2 else ''
 os.environ['DEFAULT_TEAM_NAME'] = lines[3] if len(lines) > 3 else ''
+os.environ['ORG_NAME'] = lines[4] if len(lines) > 4 else ''
 runpy.run_path('bootstrap_install.py', run_name='__main__')
 " 2>&1)
     bootstrap_exit=$?

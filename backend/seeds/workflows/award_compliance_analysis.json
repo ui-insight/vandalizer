@@ -11,7 +11,11 @@
       "post-award",
       "compliance"
     ],
-    "quality_tier": "fair"
+    "quality_tier": "fair",
+    "credit": {
+      "name": "Labib Ehsel",
+      "org": "University of Idaho"
+    }
   },
   "items": [
     {

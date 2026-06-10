@@ -99,7 +99,20 @@ async def main():
         print("New users will auto-join the default team on first registration or SSO login.")
         print("The bootstrap admin keeps its personal team as well; switch teams in the UI if needed.")
 
-    # Step 3: Seed the verified catalog
+    # Step 3: Record the institution name (branding + default credit org for
+    # items verified into the catalog). Never overwrites an admin-set value.
+    org_name = os.environ.get("ORG_NAME", "").strip()
+    if org_name:
+        from app.models.system_config import SystemConfig
+        cfg = await SystemConfig.get_config()
+        if not (cfg.org_name or "").strip():
+            cfg.org_name = org_name
+            await cfg.save()
+            print(f"Institution recorded: {org_name}")
+        else:
+            print(f"Institution already set ({cfg.org_name}); leaving as is.")
+
+    # Step 4: Seed the verified catalog
     await seed_catalog()
 
 

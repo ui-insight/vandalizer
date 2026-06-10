@@ -10,7 +10,11 @@
     "collections": [
       "compliance",
       "financial"
-    ]
+    ],
+    "credit": {
+      "name": "Labib Ehsel",
+      "org": "University of Idaho"
+    }
   },
   "items": [
     {

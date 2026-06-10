@@ -611,6 +611,23 @@ async def export_catalog(user_email: str) -> dict:
     verified = result["items"]
     catalog_items: list[dict] = []
 
+    # Creator credit travels as static text so it survives import/seeding on
+    # installs where the user doesn't exist. Fall back from explicit credit to
+    # the live submitter/creator, with the deployment's institution as org.
+    from app.models.system_config import SystemConfig
+    cfg = await SystemConfig.get_config()
+    deployment_org = (cfg.org_name or "").strip() or None
+
+    def _credit_for(vi: dict) -> dict | None:
+        credit = vi.get("credit")
+        if credit and credit.get("name"):
+            return {"name": credit["name"], "org": credit.get("org") or deployment_org}
+        for ref_key in ("submitted_by", "created_by"):
+            ref = vi.get(ref_key) or {}
+            if ref.get("name") and ref.get("user_id") not in (None, "system"):
+                return {"name": ref["name"], "org": deployment_org}
+        return None
+
     for vi in verified:
         item_kind = vi["kind"]
         item_id = vi["item_id"]
@@ -645,6 +662,7 @@ async def export_catalog(user_email: str) -> dict:
                 "description": vi.get("description"),
                 "quality_tier": vi.get("quality_tier"),
                 "quality_grade": vi.get("quality_grade"),
+                "credit": _credit_for(vi),
             },
             "definition": definition,
         })
@@ -669,6 +687,7 @@ async def export_catalog(user_email: str) -> dict:
                 "description": vi.get("description"),
                 "quality_tier": vi.get("quality_tier"),
                 "quality_grade": vi.get("quality_grade"),
+                "credit": _credit_for(vi),
             },
             "definition": definition,
         })
