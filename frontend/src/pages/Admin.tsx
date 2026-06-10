@@ -6,7 +6,7 @@ import {
   CheckCircle2, XCircle, Clock, Download, TrendingUp, TrendingDown,
   ChevronDown, ChevronUp, ArrowUpDown, Play, Minus, AlertCircle,
   ArrowLeft, FileText, FolderTree, X, Check,
-  Mail, Send, Link, UserPlus, Star, Award, Unlock, KeyRound,
+  Mail, Send, Link, UserPlus, Star, Award, Unlock, KeyRound, PackageOpen,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -67,6 +67,8 @@ import * as auditApi from '../api/audit'
 import type { AuditLogEntry } from '../api/audit'
 import { getAuthConfig } from '../api/auth'
 import { UpdateBanner } from '../components/admin/UpdateBanner'
+import { CatalogUpdateBanner } from '../components/admin/CatalogUpdateBanner'
+import { CatalogTab } from '../components/admin/CatalogTab'
 import { ApiKeysTab } from '../components/admin/ApiKeysTab'
 import { ComplianceTab } from '../components/admin/ComplianceTab'
 
@@ -87,7 +89,7 @@ function readFileAsDataUrl(file: File): Promise<string> {
   })
 }
 
-type Tab = 'usage' | 'users' | 'teams' | 'organizations' | 'workflows' | 'quality' | 'compliance' | 'audit' | 'demo' | 'email' | 'certifications' | 'apikeys' | 'config'
+type Tab = 'usage' | 'users' | 'teams' | 'organizations' | 'workflows' | 'quality' | 'compliance' | 'audit' | 'demo' | 'email' | 'certifications' | 'apikeys' | 'catalog' | 'config'
 
 const TABS: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'usage', label: 'Usage', icon: BarChart3 },
@@ -102,6 +104,7 @@ const TABS: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'email', label: 'Email', icon: Mail },
   { key: 'certifications', label: 'Certifications', icon: Award },
   { key: 'apikeys', label: 'API Keys', icon: KeyRound },
+  { key: 'catalog', label: 'Catalog', icon: PackageOpen },
   { key: 'config', label: 'Config', icon: Settings },
 ]
 
@@ -7091,6 +7094,14 @@ export default function Admin() {
     getAuthConfig().then(c => setTrialEnabled(!!c.trial_system_enabled)).catch(() => {})
   }, [])
 
+  // Honor ?tab=<key> deep links (e.g. the catalog-update notification).
+  useEffect(() => {
+    const requested = new URLSearchParams(window.location.search).get('tab')
+    if (requested && TABS.some(t => t.key === requested)) {
+      setActiveTab(requested as Tab)
+    }
+  }, [])
+
   const isGlobalAdmin = !!user?.is_admin
   const isStaff = !!user?.is_staff
   const isTeamAdmin = currentTeam?.role === 'owner' || currentTeam?.role === 'admin'
@@ -7103,11 +7114,11 @@ export default function Admin() {
   // endpoints accept a team scope. Tabs whose backends require admin/staff (email,
   // plus everything in hiddenForNonAdmin) stay hidden so we never render a tab that
   // can only 403.
-  const hiddenForNonAdmin = ['config', 'quality', 'compliance', 'demo', 'organizations', 'approvals', 'audit', 'certifications', 'apikeys', 'email', 'teams']
+  const hiddenForNonAdmin = ['config', 'catalog', 'quality', 'compliance', 'demo', 'organizations', 'approvals', 'audit', 'certifications', 'apikeys', 'email', 'teams']
   let visibleTabs = isGlobalAdmin
     ? TABS
     : isStaff
-      ? TABS.filter(t => t.key !== 'config')
+      ? TABS.filter(t => t.key !== 'config' && t.key !== 'catalog')
       : TABS.filter(t => !hiddenForNonAdmin.includes(t.key))
 
   if (!trialEnabled) {
@@ -7176,6 +7187,7 @@ export default function Admin() {
         {/* Content */}
         <div style={{ flex: 1, padding: '20px 32px', minWidth: 0 }}>
           <UpdateBanner />
+          {isGlobalAdmin && <CatalogUpdateBanner onView={() => setActiveTab('catalog')} />}
           {activeTab === 'usage' && <UsageTab />}
           {activeTab === 'users' && <UsersTab />}
           {activeTab === 'teams' && <TeamsTab />}
@@ -7188,6 +7200,7 @@ export default function Admin() {
           {activeTab === 'email' && (isGlobalAdmin || isStaff) && <EmailAnalyticsTab />}
           {activeTab === 'certifications' && (isGlobalAdmin || isStaff) && <CertificationsTab />}
           {activeTab === 'apikeys' && (isGlobalAdmin || isStaff) && <ApiKeysTab />}
+          {activeTab === 'catalog' && isGlobalAdmin && <CatalogTab />}
           {activeTab === 'config' && isGlobalAdmin && <ConfigTab />}
         </div>
       </div>

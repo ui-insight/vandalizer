@@ -86,6 +86,7 @@ class KnowledgeBase(Document):
     sources_failed: int = 0
     total_chunks: int = 0
     collection_name: Optional[str] = None
+    resource_config: dict = Field(default_factory=dict)  # provenance markers (e.g. {"seed_id": ...})
     created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
     updated_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
 

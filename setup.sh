@@ -8,7 +8,7 @@
 #    ./setup.sh --repair       Diagnose and fix a broken deployment
 #    ./setup.sh --upgrade      Scan origin for new code & catalog, apply what's outdated
 #    ./setup.sh --redeploy     Rebuild and restart from current code (no git pull)
-#    ./setup.sh --seed         Update verified catalog (add new seed data)
+#    ./setup.sh --seed         Update verified catalog (add/refresh, retire dropped items with your OK)
 #    ./setup.sh --reset-catalog  Wipe catalog metadata and re-seed from current version
 #    ./setup.sh --reingest     Re-ingest all knowledge base content into ChromaDB
 #    ./setup.sh --reset-email  Reconfigure email provider (SMTP or Resend)
@@ -1819,7 +1819,8 @@ update_catalog() {
   section "S" "Update Verified Catalog"
 
   echo -e "  ${DIM}     Re-seeding verified workflows, extractions, and knowledge bases.${RESET}"
-  echo -e "  ${DIM}     Existing items are skipped — only new seed data is added.${RESET}"
+  echo -e "  ${DIM}     New items are added and existing ones refreshed. Items dropped from${RESET}"
+  echo -e "  ${DIM}     the catalog can be retired (removed from explore) with your OK.${RESET}"
   echo ""
 
   # Find the API container
@@ -1835,8 +1836,38 @@ update_catalog() {
   echo -e "  ${SYM_ARROW}  Using container: ${BOLD}${container_name}${RESET}"
   echo ""
 
+  # --- Step 1: preview retirements (items dropped from the catalog) ---
+  # Dry run makes no changes; it just lists verified items whose seed_id is gone.
+  local prune_flag=""
+  local preview
+  if preview=$(docker exec "$container_name" python -m scripts.seed_catalog --prune --dry-run 2>&1); then
+    local retire_count
+    retire_count=$(echo "$preview" | grep -E '^Retiring [0-9]+ item' | head -1 | sed -E 's/^Retiring ([0-9]+) item.*/\1/' || echo "0")
+    if [[ -n "$retire_count" && "$retire_count" -gt 0 ]]; then
+      echo -e "  ${SYM_WARN}  ${YELLOW}${BOLD}${retire_count} item(s) were dropped from the catalog and can be retired:${RESET}"
+      # Show the bullet list of items the prune pass identified.
+      echo "$preview" | grep -E '^  - \[' | while IFS= read -r line; do
+        echo -e "  ${DIM}    ${line}${RESET}"
+      done
+      echo ""
+      echo -e "  ${DIM}     Retiring soft-archives them (verified=False, removed from explore).${RESET}"
+      echo -e "  ${DIM}     The underlying rows are kept, so this is reversible.${RESET}"
+      echo ""
+      echo -ne "  ${SYM_ARROW}  Retire these ${retire_count} item(s) during the update? [y/N]: "
+      local confirm
+      read -r confirm
+      if [[ "$confirm" =~ ^[Yy] ]]; then
+        prune_flag="--prune"
+      else
+        echo -e "  ${DIM}     Keeping them — running an additive update only.${RESET}"
+      fi
+      echo ""
+    fi
+  fi
+
+  # --- Step 2: seed (with --prune only if the user confirmed retirements) ---
   local seed_output
-  if seed_output=$(docker exec "$container_name" python -m scripts.seed_catalog 2>&1); then
+  if seed_output=$(docker exec "$container_name" python -m scripts.seed_catalog $prune_flag 2>&1); then
     # Display the output with indentation
     while IFS= read -r line; do
       echo -e "  ${DIM}     ${line}${RESET}"

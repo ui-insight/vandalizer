@@ -178,6 +178,14 @@ class SystemConfig(Document):
     # compare without execing into the API container.
     catalog_version: Optional[str] = None
     catalog_version_applied_at: Optional[datetime.datetime] = None
+    # In-app catalog upgrade job status (set by the admin-triggered Celery task).
+    # Shape: {"state": running|completed|failed, "target_version": str,
+    #         "started_at": iso, "finished_at": iso, "by": user_id,
+    #         "prune": bool, "summary": {...}, "message": str}
+    catalog_upgrade: Optional[dict] = None
+    # Highest bundled catalog version we have already notified admins about, so
+    # the startup "update available" bell fires once per new version, not per boot.
+    catalog_upgrade_notified_version: Optional[str] = None
 
     # Metadata
     updated_at: Optional[datetime.datetime] = None

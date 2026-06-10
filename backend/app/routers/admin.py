@@ -2329,6 +2329,92 @@ async def get_system_version(user: User = Depends(get_current_user)) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Verified-catalog upgrade (in-app, admin-triggered)
+# ---------------------------------------------------------------------------
+
+
+class CatalogUpgradeRequest(BaseModel):
+    # Whether to also retire (soft-archive) items dropped from the catalog.
+    prune: bool = True
+
+
+@router.get("/catalog/status")
+async def get_catalog_status(user: User = Depends(get_current_user)) -> dict:
+    """Cheap version + job-state check for the banner: applied vs. bundled
+    catalog version, whether an upgrade is available, and any in-flight job."""
+    await _require_admin(user)
+    from scripts.seed_catalog import _read_seed_version, _version_newer
+
+    cfg = await SystemConfig.get_config()
+    bundled = _read_seed_version()
+    return {
+        "applied_version": cfg.catalog_version,
+        "bundled_version": bundled,
+        "update_available": _version_newer(bundled, cfg.catalog_version),
+        "job": cfg.catalog_upgrade,
+    }
+
+
+@router.get("/catalog/preview")
+async def preview_catalog_upgrade(user: User = Depends(get_current_user)) -> dict:
+    """Full diff for the Catalog tab: which items would be added, refreshed, and
+    retired by applying the bundled catalog. Read-only — mutates nothing."""
+    await _require_admin(user)
+    from scripts.seed_catalog import compute_catalog_diff
+
+    diff = await compute_catalog_diff()
+    cfg = await SystemConfig.get_config()
+    diff["job"] = cfg.catalog_upgrade
+    return diff
+
+
+@router.post("/catalog/upgrade")
+async def start_catalog_upgrade(
+    body: CatalogUpgradeRequest,
+    user: User = Depends(get_current_user),
+) -> dict:
+    """Kick off a background catalog upgrade to the bundled version. Refuses if a
+    job is already running or the catalog is already current."""
+    await _require_admin(user)
+    from app.celery_app import celery_app
+    from scripts.seed_catalog import _read_seed_version, _version_newer
+
+    cfg = await SystemConfig.get_config()
+    if cfg.catalog_upgrade and cfg.catalog_upgrade.get("state") == "running":
+        raise HTTPException(status_code=409, detail="A catalog upgrade is already running.")
+
+    bundled = _read_seed_version()
+    if not _version_newer(bundled, cfg.catalog_version):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Catalog is already at {cfg.catalog_version or bundled}; nothing to upgrade.",
+        )
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    cfg.catalog_upgrade = {
+        "state": "running",
+        "target_version": bundled,
+        "started_at": now.isoformat(),
+        "by": user.user_id,
+        "prune": body.prune,
+    }
+    await cfg.save()
+
+    celery_app.send_task(
+        "tasks.catalog.upgrade",
+        args=[bundled, body.prune, user.user_id],
+        queue="default",
+    )
+    await _audit(
+        user,
+        "upgrade_catalog",
+        f"Started catalog upgrade to {bundled} (prune={body.prune})",
+        {"target_version": bundled, "prune": body.prune},
+    )
+    return {"status": "started", "target_version": bundled, "prune": body.prune}
+
+
+# ---------------------------------------------------------------------------
 # Email analytics — deliverability monitoring
 # ---------------------------------------------------------------------------
 
