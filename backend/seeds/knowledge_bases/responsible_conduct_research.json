@@ -13,9 +13,9 @@
     "title": "Responsible Conduct of Research (RCR)",
     "description": "NSF and NIH RCR training requirements, federal research misconduct regulation (42 CFR 93), data management and sharing policies, and authorship standards.",
     "sources": [
-      {"source_type": "url", "url": "https://ori.hhs.gov/federal-research-misconduct-policy"},
+      {"source_type": "url", "url": "https://ori.hhs.gov/federal-research-misconduct-policy", "url_title": "Federal Research Misconduct Policy | ORI - The Office of Research Integrity"},
       {"source_type": "url", "url": "https://www.ecfr.gov/current/title-42/chapter-I/subchapter-D/part-93"},
-      {"source_type": "url", "url": "https://sharing.nih.gov/data-management-and-sharing-policy"}
+      {"source_type": "url", "url": "https://sharing.nih.gov/data-management-and-sharing-policy", "url_title": "Data Management and Sharing Policy | Grants & Funding"}
     ]
   }]
 }
