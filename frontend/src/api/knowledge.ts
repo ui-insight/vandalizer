@@ -112,6 +112,7 @@ export interface KBSourceResponse {
   url?: string | null
   url_title?: string | null
   custom_name?: string | null
+  source_reference?: string | null
   status: 'pending' | 'processing' | 'ready' | 'error'
   error_message?: string | null
   chunk_count: number
