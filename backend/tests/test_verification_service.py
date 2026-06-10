@@ -468,7 +468,7 @@ async def test_update_status_approved_credit_org_falls_back_to_deployment(
     from app.services.verification_service import update_status
 
     req = _make_verification_request(
-        item_kind="workflow", submitter_name="Labib Ehsel", submitter_org=None,
+        item_kind="workflow", submitter_name="Labib Ehsan", submitter_org=None,
     )
     mock_vr.find_one = AsyncMock(return_value=req)
 
@@ -479,7 +479,7 @@ async def test_update_status_approved_credit_org_falls_back_to_deployment(
         await update_status("req-uuid", "approved", "bob")
 
     meta_kwargs = mock_meta.await_args.kwargs
-    assert meta_kwargs["credit_name"] == "Labib Ehsel"
+    assert meta_kwargs["credit_name"] == "Labib Ehsan"
     assert meta_kwargs["credit_org"] == "University of Idaho"
 
 
