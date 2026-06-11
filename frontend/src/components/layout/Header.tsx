@@ -8,12 +8,15 @@ import { FeedbackPromptCard } from '../support/FeedbackPromptCard'
 import { useOptionalWorkspace } from '../../contexts/WorkspaceContext'
 import { useBranding } from '../../contexts/BrandingContext'
 import { useFeedbackPrompt } from '../../hooks/useFeedbackPrompt'
+import { useAppMode } from '../../contexts/AppModeContext'
+import { cn } from '../../lib/cn'
 
 export function Header() {
   const navigate = useNavigate()
   const workspace = useOptionalWorkspace()
   const branding = useBranding()
   const brandIcon = branding.iconUrl
+  const { mode, canToggle, setMode } = useAppMode()
   const [supportOpen, setSupportOpen] = useState(false)
   const [supportTicket, setSupportTicket] = useState<string | undefined>()
   const [promptCardHidden, setPromptCardHidden] = useState(false)
@@ -100,6 +103,30 @@ export function Header() {
             />
           </button>
         </div>
+
+        {/* Center: RA / Developer mode toggle (Developers only) */}
+        {canToggle && (
+          <div className="flex rounded-full border border-gray-200 bg-gray-100 p-0.5 text-xs font-medium">
+            <button
+              onClick={() => setMode('ra')}
+              className={cn(
+                'rounded-full px-3 py-1 transition-all',
+                mode === 'ra' ? 'bg-white shadow text-blue-700' : 'text-gray-500 hover:text-gray-700',
+              )}
+            >
+              RA Mode
+            </button>
+            <button
+              onClick={() => setMode('developer')}
+              className={cn(
+                'rounded-full px-3 py-1 transition-all',
+                mode === 'developer' ? 'bg-white shadow text-blue-700' : 'text-gray-500 hover:text-gray-700',
+              )}
+            >
+              Developer Mode
+            </button>
+          </div>
+        )}
 
         {/* Right: Notifications + Support + Teams dropdown */}
         <div className="flex items-center gap-4">

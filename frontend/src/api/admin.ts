@@ -192,6 +192,7 @@ export interface UserDetailResponse {
   is_admin: boolean
   is_staff: boolean
   is_examiner: boolean
+  app_role: string | null
   tokens_in: number
   tokens_out: number
   workflows_started: number
@@ -363,7 +364,7 @@ export function getIsolatedUsers() {
   return apiFetch<IsolatedUserItem[]>('/api/admin/users/isolated')
 }
 
-export function updateUserRoles(userId: string, roles: { is_admin?: boolean; is_staff?: boolean; is_examiner?: boolean }) {
+export function updateUserRoles(userId: string, roles: { is_admin?: boolean; is_staff?: boolean; is_examiner?: boolean; app_role?: string }) {
   return apiFetch<{ ok: boolean }>(`/api/admin/users/${encodeURIComponent(userId)}/roles`, {
     method: 'PUT',
     body: JSON.stringify(roles),

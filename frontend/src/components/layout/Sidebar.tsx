@@ -3,11 +3,13 @@ import { Link, useRouterState } from '@tanstack/react-router'
 import { cn } from '../../lib/cn'
 import { useAuth } from '../../hooks/useAuth'
 import { useTeams } from '../../hooks/useTeams'
+import { useAppMode } from '../../contexts/AppModeContext'
 
 export function Sidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const { user } = useAuth()
   const { currentTeam } = useTeams()
+  const { isRA } = useAppMode()
 
   const isTeamAdmin = currentTeam?.role === 'owner' || currentTeam?.role === 'admin'
   // Mirror the admin panel's own access rule (Admin.tsx hasAccess): admin, staff, or
@@ -15,19 +17,25 @@ export function Sidebar() {
   // below, and every admin-panel endpoint would 403 them.
   const showAdmin = !!user?.is_admin || !!user?.is_staff || isTeamAdmin
 
-  const links = [
-    { href: '/', label: 'Documents', icon: FileText },
-    { href: '/chat', label: 'Chat', icon: MessageSquare },
-    { href: '/library', label: 'Library', icon: BookOpen },
-    { href: '/workflows', label: 'Workflows', icon: Workflow },
-    { href: '/automation', label: 'Automation', icon: Zap },
-    { href: '/office', label: 'Office 365', icon: Cloud },
-    { href: '/browser-automation', label: 'Browser', icon: Globe },
-    { href: '/teams', label: 'Teams', icon: Users },
-    { href: '/credentials', label: 'Credentials', icon: KeyRound },
-    ...(user?.is_examiner ? [{ href: '/verification', label: 'Verification', icon: ClipboardCheck }] : []),
-    ...(showAdmin ? [{ href: '/admin', label: 'Admin', icon: Shield }] : []),
-  ] as const
+  const links = isRA
+    ? [
+        { href: '/', label: 'Documents', icon: FileText },
+        { href: '/chat', label: 'Chat', icon: MessageSquare },
+        { href: '/workflows', label: 'Workflows', icon: Workflow },
+      ]
+    : [
+        { href: '/', label: 'Documents', icon: FileText },
+        { href: '/chat', label: 'Chat', icon: MessageSquare },
+        { href: '/library', label: 'Library', icon: BookOpen },
+        { href: '/workflows', label: 'Workflows', icon: Workflow },
+        { href: '/automation', label: 'Automation', icon: Zap },
+        { href: '/office', label: 'Office 365', icon: Cloud },
+        { href: '/browser-automation', label: 'Browser', icon: Globe },
+        { href: '/teams', label: 'Teams', icon: Users },
+        { href: '/credentials', label: 'Credentials', icon: KeyRound },
+        ...(user?.is_examiner ? [{ href: '/verification', label: 'Verification', icon: ClipboardCheck }] : []),
+        ...(showAdmin ? [{ href: '/admin', label: 'Admin', icon: Shield }] : []),
+      ]
 
   return (
     <aside className="flex w-56 flex-col border-r border-gray-200 bg-gray-50">

@@ -25,6 +25,7 @@ import {
   improvePrompt,
 } from '../../api/workflows'
 import { RunHistoryTab } from './RunHistoryTab'
+import { useAppMode } from '../../contexts/AppModeContext'
 import type { ValidationCheck, ValidationCheckDefinition, ValidationInputDefinition, QualityHistoryRun, BatchStatus, WorkflowQualityStatus, PromptImprovement } from '../../api/workflows'
 import { ItemPickerModal } from './ItemPickerModal'
 import { getModels } from '../../api/config'
@@ -199,6 +200,7 @@ export function WorkflowEditorPanel() {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const { user } = useAuth()
+  const { isRA } = useAppMode()
   const shareLink = useShareLink()
   const { openWorkflowId, openWorkflowShareToken, openWorkflow, closeWorkflow, consumeWorkflowSession, selectedDocUuids, bumpActivitySignal } = useWorkspace()
   const [workflow, setWorkflow] = useState<Workflow | null>(null)
@@ -542,13 +544,13 @@ export function WorkflowEditorPanel() {
             />
           ) : (
             <div
-              style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', flex: 1 }}
-              onClick={() => { setTitleValue(workflow.name); setEditingTitle(true) }}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: isRA ? 'default' : 'pointer', flex: 1 }}
+              onClick={isRA ? undefined : () => { setTitleValue(workflow.name); setEditingTitle(true) }}
             >
               <span style={{ fontSize: 18, fontWeight: 600, color: '#202124', letterSpacing: '-0.01em' }}>
                 {workflow.name}
               </span>
-              <Pencil style={{ width: 14, height: 14, color: '#9ca3af' }} />
+              {!isRA && <Pencil style={{ width: 14, height: 14, color: '#9ca3af' }} />}
               {((workflow as Workflow & { verified?: boolean }).verified || !canManage) && (
                 <span
                   title={
@@ -601,7 +603,7 @@ export function WorkflowEditorPanel() {
               }
             }}
           />
-          {canManage && (
+          {canManage && !isRA && (
             <button
               onClick={() => shareLink('workflow', workflow.id, workflow.name)}
               title="Copy share link"
@@ -623,7 +625,7 @@ export function WorkflowEditorPanel() {
       </div>
 
       {/* ===== TAB BAR ===== */}
-      <div ref={tabBarRef} style={{ display: 'flex', borderBottom: '1px solid #e5e7eb', padding: tabsCompact ? '0 8px' : '0 24px', backgroundColor: '#fff', flexShrink: 0 }}>
+      {!isRA && <div ref={tabBarRef} style={{ display: 'flex', borderBottom: '1px solid #e5e7eb', padding: tabsCompact ? '0 8px' : '0 24px', backgroundColor: '#fff', flexShrink: 0 }}>
         {TABS.map(tab => {
           const TabIcon = tab.icon
           const badge = tab.key === 'input' ? inputBadge : 0
@@ -676,10 +678,40 @@ export function WorkflowEditorPanel() {
             </button>
           )
         })}
-      </div>
+      </div>}
+
+      {/* ===== RA OUTPUT AREA ===== */}
+      {isRA && (
+        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, padding: 24 }}>
+          {(runner.running || runner.status) && !runner.batchStatus && (
+            <WorkflowOutputCard
+              status={runner.status}
+              sessionId={runner.sessionId}
+              workflowName={workflow?.name}
+              running={runner.running}
+              runElapsed={runElapsed}
+              showDownloadPopup={showDownloadPopup}
+              setShowDownloadPopup={setShowDownloadPopup}
+            />
+          )}
+          {runner.batchStatus && (
+            <BatchOutputCard
+              batchStatus={runner.batchStatus}
+              running={runner.running}
+              runElapsed={runElapsed}
+            />
+          )}
+          {!runner.running && !runner.status && !runner.batchStatus && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', paddingTop: 60, color: '#9ca3af', gap: 12, textAlign: 'center' }}>
+              <Play style={{ width: 36, height: 36, color: '#d1d5db' }} />
+              <p style={{ margin: 0, fontSize: 14 }}>Results will appear here after you run the workflow.</p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ===== TAB CONTENT ===== */}
-      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+      <div style={{ flex: isRA ? 0 : 1, overflow: isRA ? 'hidden' : 'auto', maxHeight: isRA ? 0 : undefined, minHeight: 0 }}>
         {activeTab === 'design' && (
           <>
             <DesignCanvas
@@ -794,7 +826,7 @@ export function WorkflowEditorPanel() {
       </div>
 
       {/* Nudge banner for unvalidated workflows after run */}
-      {activeTab === 'design' && !nudgeDismissed && qualityStatus?.status === 'unvalidated' && runner.status?.status === 'completed' && (
+      {!isRA && activeTab === 'design' && !nudgeDismissed && qualityStatus?.status === 'unvalidated' && runner.status?.status === 'completed' && (
         <div style={{
           padding: '8px 24px', backgroundColor: '#eff6ff', borderTop: '1px solid #dbeafe',
           display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,

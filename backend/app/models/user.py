@@ -24,6 +24,7 @@ class User(Document):
     demo_expires_at: Optional[datetime.datetime] = None
     demo_status: Optional[str] = None  # active | expired | locked
     organization_id: Optional[str] = None  # org uuid for university hierarchy
+    app_role: Optional[str] = None  # "research_admin" | "developer" | None (None = developer)
 
     # Engagement tracking
     last_login_at: Optional[datetime.datetime] = None
