@@ -6,6 +6,7 @@ import { TeamProvider } from './contexts/TeamContext'
 import { ToastProvider } from './contexts/ToastContext'
 import { CertificationPanelProvider } from './contexts/CertificationPanelContext'
 import { BrandingProvider } from './contexts/BrandingContext'
+import { AppModeProvider } from './contexts/AppModeContext'
 import { CertificationPanel } from './components/certification/CertificationPanel'
 import { ConfirmProvider } from './components/shared/useConfirm'
 import { queryClient } from './lib/queryClient'
@@ -85,6 +86,7 @@ export default function App() {
       <QueryClientProvider client={queryClient}>
         <BrandingProvider>
           <AuthProvider>
+            <AppModeProvider>
             <TeamProvider>
               <ToastProvider>
                 <ConfirmProvider>
@@ -95,6 +97,7 @@ export default function App() {
                 </ConfirmProvider>
               </ToastProvider>
             </TeamProvider>
+            </AppModeProvider>
           </AuthProvider>
         </BrandingProvider>
       </QueryClientProvider>

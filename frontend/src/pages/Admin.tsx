@@ -183,6 +183,7 @@ function RoleBadge({ role }: { role: string }) {
     admin: { bg: '#fef3c7', text: '#92400e' },
     staff: { bg: '#dcfce7', text: '#166534' },
     examiner: { bg: '#dbeafe', text: '#1e40af' },
+    research_admin: { bg: '#f0e6ff', text: '#6d28d9' },
   }
   const c = colors[role] || { bg: '#f3f4f6', text: '#374151' }
   return (
@@ -598,6 +599,7 @@ function UserDrillDown({ userId, onBack }: { userId: string; onBack: () => void 
             {data.is_admin && <RoleBadge role="admin" />}
             {data.is_staff && <RoleBadge role="staff" />}
             {data.is_examiner && <RoleBadge role="examiner" />}
+            {data.app_role === 'research_admin' && <RoleBadge role="research_admin" />}
           </div>
           <div style={{ fontSize: 13, color: '#6b7280' }}>{data.email || data.user_id}</div>
         </div>
@@ -639,6 +641,53 @@ function UserDrillDown({ userId, onBack }: { userId: string; onBack: () => void 
                     width: 18, height: 18, borderRadius: 4,
                     border: active ? '2px solid #22c55e' : '2px solid #d1d5db',
                     background: active ? '#22c55e' : '#fff',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    {active && <Check size={12} color="#fff" />}
+                  </div>
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* App Role */}
+        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', padding: '16px 20px' }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 12 }}>App Role</div>
+          <div style={{ display: 'flex', gap: 12 }}>
+            {([['developer', 'Developer'], ['research_admin', 'Research Administrator']] as const).map(([value, label]) => {
+              const active = value === 'research_admin'
+                ? data.app_role === 'research_admin'
+                : !data.app_role || data.app_role === 'developer'
+              return (
+                <button
+                  key={value}
+                  disabled={savingRoles}
+                  onClick={async () => {
+                    setSavingRoles(true)
+                    try {
+                      await updateUserRoles(userId, { app_role: value })
+                      setData(prev => prev ? { ...prev, app_role: value === 'developer' ? null : value } : prev)
+                    } finally {
+                      setSavingRoles(false)
+                    }
+                  }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '8px 16px', borderRadius: 'var(--ui-radius, 12px)',
+                    border: active ? '2px solid #3b82f6' : '2px solid #e5e7eb',
+                    background: active ? '#eff6ff' : '#fff',
+                    cursor: savingRoles ? 'wait' : 'pointer',
+                    fontSize: 13, fontWeight: 600,
+                    color: active ? '#1d4ed8' : '#6b7280',
+                    opacity: savingRoles ? 0.6 : 1,
+                  }}
+                >
+                  <div style={{
+                    width: 18, height: 18, borderRadius: 4,
+                    border: active ? '2px solid #3b82f6' : '2px solid #d1d5db',
+                    background: active ? '#3b82f6' : '#fff',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
                     {active && <Check size={12} color="#fff" />}

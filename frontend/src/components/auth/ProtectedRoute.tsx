@@ -4,9 +4,15 @@ import {
   consumePendingInviteToken,
   consumePendingJoinLinkToken,
 } from '../../lib/pendingInvite'
+import { useAppMode } from '../../contexts/AppModeContext'
+
+const RA_ALLOWED_PREFIXES = ['/', '/chat', '/workflows']
+const isAllowedForRA = (path: string) =>
+  path === '/' || RA_ALLOWED_PREFIXES.slice(1).some(p => path.startsWith(p))
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, demoExpired, demoFeedbackToken } = useAuth()
+  const { isRA } = useAppMode()
 
   if (loading) {
     return (
@@ -40,6 +46,10 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const pendingJoin = consumePendingJoinLinkToken()
   if (pendingJoin) {
     return <Navigate to="/join" search={{ token: pendingJoin }} />
+  }
+
+  if (isRA && !isAllowedForRA(window.location.pathname)) {
+    return <Navigate to="/" search={{ mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined, workflow_share_token: undefined }} />
   }
 
   return <>{children}</>

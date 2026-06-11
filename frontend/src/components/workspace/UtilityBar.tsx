@@ -1,15 +1,29 @@
+import { useEffect } from 'react'
 import { MessageSquare, FolderOpen, Workflow, BookOpen } from 'lucide-react'
 import { useWorkspace, type WorkspaceMode } from '../../contexts/WorkspaceContext'
+import { useAppMode } from '../../contexts/AppModeContext'
 
-const MODES: { mode: WorkspaceMode; icon: typeof MessageSquare; label: string }[] = [
+const ALL_MODES: { mode: WorkspaceMode; icon: typeof MessageSquare; label: string }[] = [
   { mode: 'chat', icon: MessageSquare, label: 'Chat' },
   { mode: 'files', icon: FolderOpen, label: 'Files' },
   { mode: 'automations', icon: Workflow, label: 'Automations' },
   { mode: 'knowledge', icon: BookOpen, label: 'Knowledge' },
 ]
 
+const RA_MODES = new Set<WorkspaceMode>(['chat', 'files'])
+
 export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomation?: boolean }) {
   const { workspaceMode, setWorkspaceMode, resetToHome } = useWorkspace()
+  const { isRA } = useAppMode()
+
+  const MODES = isRA ? ALL_MODES.filter(m => RA_MODES.has(m.mode)) : ALL_MODES
+
+  // Redirect out of restricted modes when switching to RA
+  useEffect(() => {
+    if (isRA && !RA_MODES.has(workspaceMode)) {
+      setWorkspaceMode('files')
+    }
+  }, [isRA, workspaceMode, setWorkspaceMode])
 
   return (
     <div

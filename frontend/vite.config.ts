@@ -30,6 +30,7 @@ export default defineConfig({
     sourcemap: uploadSourceMaps,
   },
   server: {
+    allowedHosts: true,
     proxy: {
       '/api': 'http://localhost:8001',
     },

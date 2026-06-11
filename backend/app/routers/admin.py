@@ -345,6 +345,7 @@ class UserDetailResponse(BaseModel):
     is_admin: bool = False
     is_staff: bool = False
     is_examiner: bool = False
+    app_role: Optional[str] = None
     tokens_in: int = 0
     tokens_out: int = 0
     workflows_started: int = 0
@@ -1056,6 +1057,7 @@ async def user_detail(
             if show_platform_role_flags
             else False
         ),
+        app_role=getattr(target_user, "app_role", None) if show_platform_role_flags else None,
         tokens_in=tokens_in, tokens_out=tokens_out,
         workflows_started=workflows_started,
         workflows_completed=workflows_completed,
@@ -1206,6 +1208,7 @@ class UpdateRolesRequest(BaseModel):
     is_admin: Optional[bool] = None
     is_staff: Optional[bool] = None
     is_examiner: Optional[bool] = None
+    app_role: Optional[str] = None
 
 
 @router.put("/users/{user_id}/roles")
@@ -1226,11 +1229,13 @@ async def update_user_roles(
         target.is_staff = body.is_staff
     if body.is_examiner is not None:
         target.is_examiner = body.is_examiner
+    if body.app_role is not None:
+        target.app_role = body.app_role if body.app_role != "developer" else None
     await target.save()
 
     await _audit(
         user, "update_user_roles",
-        f"Updated roles for {user_id}: admin={target.is_admin}, staff={target.is_staff}, examiner={target.is_examiner}",
+        f"Updated roles for {user_id}: admin={target.is_admin}, staff={target.is_staff}, examiner={target.is_examiner}, app_role={target.app_role}",
     )
 
     return {"ok": True}

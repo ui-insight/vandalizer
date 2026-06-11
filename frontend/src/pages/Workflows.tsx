@@ -7,6 +7,7 @@ import { useToast } from '../contexts/ToastContext'
 import { useAuth } from '../hooks/useAuth'
 import { AuthorChip } from '../components/shared/AuthorChip'
 import { useConfirm } from '../components/shared/useConfirm'
+import { useAppMode } from '../contexts/AppModeContext'
 
 type SortKey = 'name' | 'runs' | 'steps'
 
@@ -16,6 +17,7 @@ export default function Workflows() {
   const { toast } = useToast()
   const { user } = useAuth()
   const confirm = useConfirm()
+  const { isRA } = useAppMode()
   const [newName, setNewName] = useState('')
   const [creating, setCreating] = useState(false)
   const [importing, setImporting] = useState(false)
@@ -80,8 +82,8 @@ export default function Workflows() {
           <span className="text-sm text-gray-400">{workflows.length} total</span>
         </div>
 
-        {/* Create new */}
-        <div className="mb-4">
+        {/* Create new — hidden in RA mode */}
+        {!isRA && <div className="mb-4">
           <div className="flex gap-2">
             <input
               type="text"
@@ -120,7 +122,7 @@ export default function Workflows() {
               }}
             />
           </div>
-        </div>
+        </div>}
 
         {/* Search & Sort */}
         <div className="flex items-center gap-3 mb-4">
