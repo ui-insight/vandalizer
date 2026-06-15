@@ -630,7 +630,7 @@ class TestAuthConfig:
                 "client_id": "id",
                 "client_secret": "secret",
                 "tenant_id": "tenant",
-                "label": "Sign in with Azure",
+                "display_name": "Sign in with Azure",
             }
         ]
 
