@@ -1,0 +1,115 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "workflow",
+  "exported_by": "seed",
+  "_seed_meta": {
+    "seed_id": "wf-award-compliance-analysis",
+    "display_name": "Award Notice/Agreement Compliance Analysis 1.0",
+    "description": "Transforms Federal Award Notices and Agreements into actionable compliance frameworks. Extracts administrative requirements, financial obligations, and reporting requirements for post-award teams.",
+    "collections": [
+      "post-award",
+      "compliance"
+    ],
+    "quality_tier": "fair",
+    "credit": {
+      "name": "Labib Ehsan",
+      "org": "University of Idaho"
+    }
+  },
+  "items": [
+    {
+      "name": "Award Notice/Agreement Compliance Analysis 1.0",
+      "description": "Extract and organize all compliance requirements, terms, conditions, and administrative obligations from Award Notices",
+      "steps": [
+        {
+          "name": "Extraction",
+          "data": {},
+          "is_output": false,
+          "tasks": [
+            {
+              "name": "Prompt",
+              "data": {
+                "prompt": "You are analyzing a Federal Award Notice/Agreement document. Extract ALL terms, conditions, and compliance requirements to create a comprehensive post-award compliance framework.\nThoroughly search the entire document, including attachments, appendices, and referenced documents. Pay special attention to sections titled:\n\n\"Terms and Conditions\"\n\"Special Terms and Conditions\"\n\"Administrative Requirements\"\n\"Programmatic Requirements\"\n\"High Risk Terms\"\n\"Award Specific Requirements\"\n\"Federal Requirements\"\n\"Regulatory Requirements\"\n\nCreate a comprehensive response with these sections:\n\nSTANDARD FEDERAL REQUIREMENTS:\n\nUniform Guidance (2 CFR 200) applicability\nResearch Terms and Conditions (RTCs) applicability\nAgency-specific regulations referenced\nStatutory requirements mentioned\n\n\nADMINISTRATIVE TERMS & CONDITIONS:\n\nFinancial reporting requirements (frequency, deadlines, systems)\nProgress reporting requirements (type, frequency, format)\nPrior approval requirements (categorized by type)\nBudget modification restrictions\nAudit and record-keeping requirements\nProperty management requirements\n\n\nPROGRAMMATIC TERMS & CONDITIONS:\n\nSubstantial involvement requirements (if cooperative agreement)\nTechnical reporting specifications\nDeliverable requirements and deadlines\nPerformance metrics and measurement requirements\nCollaboration/partnership obligations\n\n\nHIGH-RISK OR SPECIAL CONDITIONS:\n\nEnhanced monitoring requirements\nAdditional reporting obligations\nSpecific restrictions or limitations\nSpecial approval processes\nRisk mitigation measures\n\n\nCOMPLIANCE CALENDAR:\nCreate a table with:\n\nRequirement Type\nSpecific Deadline/Frequency\nResponsible Party\nConsequences of Non-compliance\n\n\n\nBe thorough. Search for keywords: 'condition,' 'requirement,' 'must,' 'shall,' 'comply,' 'report,' 'submit,' 'approve,' 'prior,' 'deadline,' 'CFR,' 'federal,' 'audit,' 'monitor.'\nIf information is not found for any section, explicitly state 'Not specified in the document' rather than omitting the section."
+              }
+            },
+            {
+              "name": "Prompt",
+              "data": {
+                "prompt": "You are analyzing a Federal Award Notice/Agreement document. Extract ALL financial management requirements, budget details, and fiscal compliance obligations to establish proper financial oversight.\nThoroughly search the entire document, including budget attachments and financial terms. Pay special attention to sections titled:\n\n\"Award Amount\"\n\"Budget Information\"\n\"Financial Management\"\n\"Cost Sharing/Matching\"\n\"Indirect Costs\"\n\"Financial Reporting\"\n\"Payment/Drawdown Information\"\n\nCreate a comprehensive response with these sections:\n\nAWARD FINANCIAL DETAILS:\n\nTotal Award Amount\nBudget Period Amounts (by year)\nFederal Share vs. Non-Federal Share\nCost Sharing/Matching Requirements (amount and type)\nIndirect Cost Rate and Base\nPeriod of Performance dates\n\n\nBUDGET CATEGORIES & RESTRICTIONS:\nCreate a table with:\n\nBudget Category (Personnel, Equipment, etc.)\nApproved Amount\nSpecific Restrictions or Limitations\nPrior Approval Requirements\n\n\nFINANCIAL REPORTING REQUIREMENTS:\n\nFederal Financial Report (FFR) frequency and deadlines\nPayment Management System (PMS) requirements\nCash management and drawdown procedures\nFinancial monitoring and oversight requirements\n\n\nALLOWABLE COSTS FRAMEWORK:\n\nReference to applicable cost principles (2 CFR 200, etc.)\nSpecific allowable cost guidance\nUnallowable costs explicitly mentioned\nEquipment purchase approval requirements\n\n\nFINANCIAL COMPLIANCE OBLIGATIONS:\n\nAudit requirements (Single Audit thresholds)\nRecord retention requirements\nFinancial monitoring and internal controls\nCost allocation and documentation standards\n\n\n\nBe thorough. Search for keywords: 'budget,' 'cost,' 'financial,' 'funding,' 'allowable,' 'report,' 'FFR,' 'PMS,' 'drawdown,' 'match,' 'share,' 'indirect,' 'audit,' 'record.'\nIf information is not found for any section, explicitly state 'Not specified in the document' rather than omitting the section."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Formatting",
+          "data": {},
+          "is_output": false,
+          "tasks": [
+            {
+              "name": "Formatter",
+              "data": {
+                "prompt": "Role: You are an expert AI assistant specializing in organizing complex grant award information. Your primary function is to synthesize and reformat raw data extractions into a single, professional, and easily digestible summary document for grant managers and researchers.\n\nGoal: Your task is to process the two provided raw text extractions—one on compliance and one on financial management—and merge them into a single, cohesive summary. The final output should be well-structured, free of redundancy, and easy to read.\n\nKey Instructions:\n1.  Synthesize and De-duplicate: Combine all information from both text inputs. If the same fact (e.g., award period) appears in both, present it only once in the appropriate section of the final summary.\n2.  Preserve All Facts: Accurately transfer all specific data points, including dollar amounts, dates, award numbers, agency names, and referenced regulations (e.g., 2 CFR 200, PAPPG).\n3.  Maintain Clarity on Missing Information: If the source text explicitly states that a detail is \"Not specified in the document,\" retain that note. Do not infer or invent missing details.\n4.  Use Professional Formatting: Employ Markdown formatting, including bold text for emphasis, tables for structured data, and horizontal rules to separate sections, as specified in the structure below.\n\n---\n\n### Desired Output Structure\n\nPlease format the combined information *exactly* according to the following template.\n\n### **NSF Award Compliance & Financial Overview**\n\nThis document provides a consolidated summary of the compliance framework and financial management requirements for the specified National Science Foundation (NSF) award.\n\n* **Project Title:** [Extract Project Title]\n* **Awardee:** [Extract Awardee Name]\n* **NSF Award Number (FAIN):** [Extract FAIN]\n* **Period of Performance:** [Extract Start Date] – [Extract End Date]\n\n---\n\n### **Financial Summary**\n\n| Financial Item                  | Details                                        |\n| :------------------------------ | :--------------------------------------------- |\n| **Total Intended Award Amount** | [Extract Amount]                               |\n| **Amount Obligated to Date** | [Extract Amount]                               |\n| **Cost Sharing / Matching** | [Extract Requirement, e.g., \"$0 (Not required)\"] |\n| **Indirect Cost (F&A) Rate** | [Extract Rate and Base, e.g., \"FY22: 48.5% MTDC\"] |\n\n---\n\n### **Approved Budget & Restrictions**\n\n| Budget Category         | Approved Amount | Specific Restrictions & Notes                                                                          |\n| :---------------------- | :-------------- | :----------------------------------------------------------------------------------------------------- |\n| [Populate all budget categories listed in the source, e.g., Postdoctoral Personnel, Domestic Travel, etc. If an amount is $0, state it clearly.] | [Extract $$]    | [Combine all relevant restrictions. Example: \"International travel is **not** an allowable cost.\"]      |\n| [Example: Senior & Other Personnel] | [$0]            | [Example: \"No salaries for senior personnel, graduate/undergraduate students, or secretarial/clerical staff are approved.\"] |\n\n---\n\n### **Governing Regulations**\n\nCompliance for this award is governed by a hierarchy of regulations. For any terms not specified directly in the award notice, the following documents apply:\n\n* **Uniform Guidance (2 CFR 200):** [Note its role if mentioned]\n* **NSF Research Terms and Conditions (RTCs):** [Include date, e.g., \"Dated 11/12/2020\"]\n* **NSF Agency-Specific Requirements:** [Include date, e.g., \"Dated 10/04/2021\"]\n* **NSF Proposal & Award Policies & Procedures Guide (PAPPG):** [Note any specific chapters mentioned]\n* **NSF Solicitation:** [Include solicitation number/name]\n* **Statutory Authority:** [Include act name, e.g., \"National Science Foundation Act of 1950\"]\n\n---\n\n### **Key Administrative & Reporting Requirements**\n\n| Requirement Area       | Details                                                                                                                                                                                            |\n| :--------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |\n| **Financial & Progress Reporting** | [Summarize requirements. Note if deadlines are unspecified and refer to RTCs.]                                                                                                           |\n| **Prior Approval** | [Summarize prior approval rules, referencing PAPPG if mentioned.]                                                                                                                                  |\n| **Budget Modifications** | [State specific restrictions, especially regarding indirect cost rates.]                                                                                                                           |\n| **Audit & Record-Keeping** | [Note that standard requirements from 2 CFR 200 apply, including the Single Audit threshold.]                                                                                                     |\n| **Special Conditions** | [Summarize any unique conditions, such as PI transfer approval, noting the awardee's assumption of full responsibility.]                                                                             |"
+              }
+            }
+          ]
+        }
+      ],
+      "input_config": {
+        "trigger_type": "manual"
+      },
+      "output_config": {
+        "storage": {
+          "enabled": true,
+          "destination_folder": "934eaa508073436c94b9b1c8b2c8e110",
+          "file_naming": "APHIS Award Term Comparison_June2026"
+        }
+      },
+      "validation_plan": [
+        {
+          "id": "9e1005d3-8634-4732-9420-61adbc2cc217",
+          "name": "Header Fields Presence",
+          "description": "Confirm that the final document begins with the **NSF Award Compliance & Financial Overview** heading followed by a bullet list containing *Project Title*, *Awardee*, *NSF Award Number (FAIN)*, and *Period of Performance* in the exact order and format shown in the template.",
+          "category": "completeness"
+        },
+        {
+          "id": "22b02ffd-a198-4aeb-8189-c2bd176e4db5",
+          "name": "All Compliance Sections Included",
+          "description": "Verify that the output contains each of the five required compliance sections—**STANDARD FEDERAL REQUIREMENTS**, **ADMINISTRATIVE TERMS & CONDITIONS**, **PROGRAMMATIC TERMS & CONDITIONS**, **HIGH-RISK OR SPECIAL CONDITIONS**, and **COMPLIANCE CALENDAR**—with their headings spelled exactly as shown. Each section must appear once, even if its content is only the phrase “Not specified in the document.”",
+          "category": "completeness"
+        },
+        {
+          "id": "f78e6e90-3d08-44d3-b885-7115ec3a808d",
+          "name": "Financial Summary Table Structure",
+          "description": "Check that a markdown table titled **Financial Summary** is present, with two columns labeled “Financial Item” and “Details”. The table must include rows for at least: Total Award Amount, Budget Period Amounts (by year), Federal Share vs. Non‑Federal Share, Cost Sharing/Matching Requirements, Indirect Cost Rate and Base, and Period of Performance dates. Empty cells should contain the exact phrase “Not specified in the document”.",
+          "category": "completeness"
+        },
+        {
+          "id": "e65ec1fa-eb5b-45d8-86bc-10cb14580533",
+          "name": "No Hallucinated or Modified Data",
+          "description": "Inspect all numeric values, dates, percentages, regulation citations (e.g., “2 CFR 200”), and dollar amounts. They must match the phrasing and figures from the raw extraction steps. Any value that does not appear in the source extractions indicates a hallucination and fails this check.",
+          "category": "accuracy"
+        },
+        {
+          "id": "6b5dcaba-a95f-41fe-ac56-1bee8c7f7a85",
+          "name": "Preserve Missing‑Info Notation",
+          "description": "For any field where the extraction step explicitly reported “Not specified in the document”, ensure the same exact phrase appears in the final output at the appropriate location. The formatter must not replace it with guesses, blanks, or alternative wording such as “N/A”.",
+          "category": "content"
+        },
+        {
+          "id": "bffd4ee9-97d9-4c9f-b698-b5a286dbe0aa",
+          "name": "Markdown Formatting Consistency",
+          "description": "Validate that the document uses proper Markdown: level‑2 headings (###) for each major section, bold text (**…**) for emphasized labels, horizontal rules (---) separating the overview from the financial and compliance parts, and correctly formatted tables with pipe delimiters and aligned columns. No raw JSON or plain‑text blocks should be present.",
+          "category": "formatting"
+        },
+        {
+          "id": "c5e46a68-a51b-40eb-9003-fbbbadd5dd1d",
+          "name": "De‑duplication of Overlapping Facts",
+          "description": "Cross‑check that any fact appearing in both the compliance extraction and the financial extraction (e.g., award period dates, total award amount) is presented only once in the merged summary. Duplicate entries of the same fact in separate sections constitute a failure.",
+          "category": "content"
+        }
+      ],
+      "validation_inputs": []
+    }
+  ]
+}

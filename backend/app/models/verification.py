@@ -97,6 +97,12 @@ class VerifiedItemMetadata(Document):
     markdown: Optional[str] = None
     organization_ids: list[str] = Field(default_factory=list)  # Org UUIDs for visibility scoping
 
+    # Static creator credit ("by Jane Doe at University of Idaho"). Plain text,
+    # not a user reference — it must survive catalog export/seeding to installs
+    # where the original user account doesn't exist.
+    credit_name: Optional[str] = None
+    credit_org: Optional[str] = None
+
     # Quality fields (populated by quality_service)
     quality_score: Optional[float] = None
     quality_tier: Optional[str] = None

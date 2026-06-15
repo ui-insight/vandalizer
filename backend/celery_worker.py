@@ -28,3 +28,4 @@ from app.tasks import passive_tasks  # noqa: F401  — tasks.passive.process_*, 
 from app.tasks import classification_tasks  # noqa: F401  — tasks.document.classify
 from app.tasks import demo_tasks  # noqa: F401  — tasks.demo.*
 from app.tasks import approval_tasks  # noqa: F401  — tasks.approvals.*
+from app.tasks import catalog_tasks  # noqa: F401  — tasks.catalog.upgrade

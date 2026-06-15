@@ -29,6 +29,9 @@ class DemoApplication(Document):
     recapture_step: int = 0  # 0=not started, 1-3=sent step N
     recapture_next_at: Optional[datetime.datetime] = None  # when to send next recapture email
 
+    # Self-serve renewals taken from the end-of-trial screen (capped)
+    trial_extensions_used: int = 0
+
     class Settings:
         name = "demo_application"
 

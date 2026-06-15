@@ -450,8 +450,41 @@ async def test_update_status_approved(mock_vr, mock_to_dict, mock_notify, mock_m
     req.save.assert_awaited()
     mock_mark.assert_awaited_once_with(req.item_id, "workflow")
     mock_meta.assert_awaited_once()
+    # Approval stamps a static creator credit from the submission so
+    # attribution survives catalog export to other installs.
+    assert mock_meta.await_args.kwargs["credit_name"] == "Alice"
     mock_add_col.assert_awaited_once_with("col-1", str(req.item_id))
     mock_notify.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+@patch(f"{MODULE}.add_to_collection", new_callable=AsyncMock)
+@patch(f"{MODULE}.update_item_metadata", new_callable=AsyncMock)
+@patch(f"{MODULE}._mark_item_verified", new_callable=AsyncMock)
+@patch(f"{MODULE}._notify_submitter", new_callable=AsyncMock)
+@patch(f"{MODULE}._request_to_dict", new_callable=AsyncMock, return_value={"uuid": "req-uuid", "status": "approved"})
+@patch(f"{MODULE}.VerificationRequest")
+async def test_update_status_approved_credit_org_falls_back_to_deployment(
+    mock_vr, mock_to_dict, mock_notify, mock_mark, mock_meta, mock_add_col,
+):
+    """When the submitter gave no org, the credit org falls back to the
+    deployment's institution (SystemConfig.org_name)."""
+    from app.services.verification_service import update_status
+
+    req = _make_verification_request(
+        item_kind="workflow", submitter_name="Labib Ehsan", submitter_org=None,
+    )
+    mock_vr.find_one = AsyncMock(return_value=req)
+
+    cfg = MagicMock()
+    cfg.org_name = "University of Idaho"
+    with patch("app.models.system_config.SystemConfig.get_config",
+               new_callable=AsyncMock, return_value=cfg):
+        await update_status("req-uuid", "approved", "bob")
+
+    meta_kwargs = mock_meta.await_args.kwargs
+    assert meta_kwargs["credit_name"] == "Labib Ehsan"
+    assert meta_kwargs["credit_org"] == "University of Idaho"
 
 
 @pytest.mark.asyncio
@@ -482,11 +515,12 @@ async def test_update_status_not_found(mock_vr):
 
 
 @pytest.mark.asyncio
+@patch(f"{MODULE}.update_item_metadata", new_callable=AsyncMock)
 @patch(f"{MODULE}._mark_kb_verified", new_callable=AsyncMock)
 @patch(f"{MODULE}._notify_submitter", new_callable=AsyncMock)
 @patch(f"{MODULE}._request_to_dict", new_callable=AsyncMock, return_value={"uuid": "req-uuid", "status": "approved"})
 @patch(f"{MODULE}.VerificationRequest")
-async def test_update_status_approved_kb(mock_vr, mock_to_dict, mock_notify, mock_mark_kb):
+async def test_update_status_approved_kb(mock_vr, mock_to_dict, mock_notify, mock_mark_kb, mock_meta):
     from app.services.verification_service import update_status
 
     req = _make_verification_request(item_kind="knowledge_base")

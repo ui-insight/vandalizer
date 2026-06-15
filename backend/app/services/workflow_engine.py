@@ -400,9 +400,19 @@ class MultiTaskNode(Node):
 
         collected = []
         task_step_name = self.name
+        merged_sources: list[dict] = []
+        warnings: list[str] = []
         for result in results:
             if result.get("_approval_pause"):
                 return result
+            # Citations and warnings must survive the wrapper even when a task
+            # produced no output (e.g. a failed KB lookup reports a warning).
+            sources = result.get("retrieved_sources")
+            if isinstance(sources, list):
+                merged_sources.extend(sources)
+            warning = result.get("warning")
+            if isinstance(warning, str) and warning:
+                warnings.append(warning)
             result_output = result.get("output")
             if result_output is None:
                 continue
@@ -417,7 +427,12 @@ class MultiTaskNode(Node):
         # Unwrap single-element lists for cleaner downstream data flow
         final_output = collected[0] if len(collected) == 1 else collected
 
-        return {"input": inputs.get("input"), "output": final_output, "step_name": task_step_name}
+        out = {"input": inputs.get("input"), "output": final_output, "step_name": task_step_name}
+        if merged_sources:
+            out["retrieved_sources"] = merged_sources
+        if warnings:
+            out["warning"] = " | ".join(warnings)
+        return out
 
 
 # ---------------------------------------------------------------------------
@@ -1239,33 +1254,116 @@ class BrowserAutomationNode(Node):
             service.end_session(session_id)
 
 
+KB_PASSAGES_HEADER = (
+    "Retrieved knowledge-base passages. These are partial excerpts ranked by "
+    "similarity to the search query — they may be incomplete or off-topic, and "
+    "the best answer may not be among them. Treat them as evidence to read "
+    "critically, not as a complete document."
+)
+
+KB_ANSWER_INSTRUCTION = (
+    "Answer the QUESTION below using ONLY the retrieved knowledge-base "
+    "passages in the CONTEXT block.\n"
+    "- The passages are partial excerpts ranked by similarity to the "
+    "question. They may be incomplete, off-topic, or contradictory — read "
+    "each one before relying on it, and ignore passages that are clearly "
+    "irrelevant.\n"
+    "- Cite the source line shown above each passage (filename plus "
+    "page/sheet, e.g. [PAPPG.pdf · p. 234]) for every factual claim. Never "
+    "attribute a claim to a passage that does not support it.\n"
+    "- If the passages do not contain a clear answer, say so explicitly "
+    "instead of guessing.\n\n"
+)
+
+
 class KnowledgeBaseQueryNode(Node):
-    """Workflow step that queries a knowledge base and returns matching chunks as context."""
+    """Workflow step that queries a knowledge base via RAG.
+
+    Two modes, selected by ``data["mode"]``:
+
+    * ``"passages"`` (default) — returns the matching chunks as a framed
+      plain-text context block for downstream steps to read losslessly.
+    * ``"answer"`` — additionally runs an LLM over the retrieved passages and
+      returns a grounded, citation-bearing answer.
+
+    The query supports ``{{ inputs.output }}`` placeholders so the lookup can
+    be driven by upstream step output. Both modes emit ``retrieved_sources``
+    citations. Misconfiguration, retrieval failures, and empty result sets
+    surface a ``warning`` (persisted on the step result) instead of silently
+    passing empty context downstream.
+    """
 
     def __init__(self, data: dict) -> None:
         super().__init__("KnowledgeBaseQuery")
         self.data = data
 
+    def _result(self, output, inputs, *, warning=None, sources=None):
+        result = {"output": output, "input": inputs.get("output"), "step_name": self.name}
+        if warning:
+            result["warning"] = warning
+        if sources:
+            result["retrieved_sources"] = sources
+        return result
+
     def process(self, inputs):
         from app.services.document_manager import get_document_manager
+        from app.utils import templating
 
-        kb_uuid = self.data.get("kb_uuid", "").strip()
-        query = self.data.get("query", "").strip()
-        k = int(self.data.get("k", 8))
+        kb_uuid = (self.data.get("kb_uuid") or "").strip()
+        mode = (self.data.get("mode") or "passages").strip().lower()
+        try:
+            k = int(self.data.get("k") or 8)
+        except (TypeError, ValueError):
+            k = 8
+        try:
+            min_similarity = float(self.data.get("min_similarity") or 0.0)
+        except (TypeError, ValueError):
+            min_similarity = 0.0
 
         if not kb_uuid:
-            return {"output": "", "input": inputs.get("output"), "step_name": self.name}
+            return self._result(
+                "", inputs,
+                warning="Knowledge Base Query is not configured: no knowledge base selected.",
+            )
 
+        raw_query = (self.data.get("query") or "").strip()
+        if not raw_query:
+            return self._result(
+                "", inputs,
+                warning="Knowledge Base Query is not configured: the query is empty.",
+            )
+
+        try:
+            query = templating.render(raw_query, inputs, json_encode=False).strip()
+        except templating.TemplateError as e:
+            return self._result(str(e), inputs, warning=str(e))
         if not query:
-            return {"output": "", "input": inputs.get("output"), "step_name": self.name}
+            return self._result(
+                "", inputs,
+                warning="Knowledge Base Query skipped: the query template rendered to an empty string.",
+            )
 
         self.report_progress("Querying knowledge base…")
 
         dm = get_document_manager()
-        results = dm.query_kb(kb_uuid, query, k=k)
+        try:
+            results = dm.query_kb(kb_uuid, query, k=k)
+        except Exception as e:
+            logger.error("KB query failed for kb_uuid=%s: %s", kb_uuid, e)
+            warning = f"Knowledge base lookup failed: {e}"
+            return self._result(warning, inputs, warning=warning)
+
+        if min_similarity > 0:
+            results = [
+                r for r in results
+                if not isinstance(r.get("similarity"), (int, float))
+                or r["similarity"] >= min_similarity
+            ]
 
         if not results:
-            return {"output": "", "input": inputs.get("output"), "step_name": self.name}
+            self.report_progress("No matching passages found")
+            warning = f"The knowledge base returned no matching passages for the query: {query!r}."
+            return self._result(f"({warning})", inputs, warning=warning)
 
         # Format as plain text context block so downstream LLM steps can use it naturally
         parts = []
@@ -1288,16 +1386,25 @@ class KnowledgeBaseQueryNode(Node):
                 "sheet": sheet if isinstance(sheet, str) else None,
                 "chunk_id": r.get("chunk_id"),
                 "score": r.get("score"),
+                "similarity": r.get("similarity"),
                 "content_preview": (r.get("content") or "")[:240],
             })
 
-        output = "\n\n---\n\n".join(parts)
-        return {
-            "output": output,
-            "input": inputs.get("output"),
-            "step_name": self.name,
-            "retrieved_sources": sources,
-        }
+        passages = "\n\n---\n\n".join(parts)
+
+        if mode != "answer":
+            return self._result(f"{KB_PASSAGES_HEADER}\n\n{passages}", inputs, sources=sources)
+
+        self.report_progress("Synthesizing answer from retrieved passages…")
+        answer = llm_chat_model(
+            model=self.data.get("model"),
+            prompt=KB_ANSWER_INSTRUCTION + f"QUESTION:\n{query}",
+            data=passages,
+            include_next_step=False,
+            system_config_doc=self._sys_cfg,
+            usage_acc=self._usage_acc,
+        )
+        return self._result(answer, inputs, sources=sources)
 
 
 # ---------------------------------------------------------------------------
@@ -1316,6 +1423,7 @@ class WorkflowEngine:
         self.connections = []
         self.graph = graphlib.TopologicalSorter()
         self.usage = UsageAccumulator()
+        self._topological_order: list[Node] | None = None
 
     def add_node(self, node: Node) -> None:
         self.graph.add(node)
@@ -1324,7 +1432,16 @@ class WorkflowEngine:
         self.graph.add(from_node, to_node)
 
     def get_topological_order(self) -> list[Node]:
-        return list(reversed(tuple(self.graph.static_order())))
+        # graphlib's static_order() calls prepare() internally, and a
+        # TopologicalSorter can only be prepared once — a second call raises
+        # "cannot prepare() more than once". The DAG is fixed once the engine
+        # is built, so compute the order a single time and reuse it. Without
+        # this, pausing on an Approval Gate crashed the run: execute() walks
+        # the graph, then _pause_for_approval() re-calls this to locate the
+        # Approval step and tripped the double-prepare error.
+        if self._topological_order is None:
+            self._topological_order = list(reversed(tuple(self.graph.static_order())))
+        return self._topological_order
 
     def execute(self, workflow_result_updater=None, start_index=0, initial_output=None,
                 should_cancel=None):
@@ -1403,6 +1520,9 @@ class WorkflowEngine:
             sources = latest_output.get("retrieved_sources")
             if isinstance(sources, list) and sources:
                 entry["retrieved_sources"] = sources
+            warning = latest_output.get("warning")
+            if isinstance(warning, str) and warning:
+                entry["warning"] = warning
             data.append(entry)
 
         if latest_output is None:

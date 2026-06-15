@@ -1,0 +1,44 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "workflow",
+  "exported_by": "seed",
+  "_seed_meta": {
+    "seed_id": "wf-budget-generator",
+    "display_name": "Budget Generator",
+    "description": "",
+    "collections": [
+      "pre-award",
+      "financial"
+    ],
+    "credit": {
+      "name": "Ezekiel Morrison",
+      "org": "University of Idaho"
+    }
+  },
+  "items": [
+    {
+      "name": "Budget Generator",
+      "description": "",
+      "steps": [
+        {
+          "name": "Generator",
+          "data": {},
+          "is_output": false,
+          "tasks": [
+            {
+              "name": "Prompt",
+              "data": {
+                "prompt": "Please analyze this budget. Create a complete budget justification."
+              }
+            }
+          ]
+        }
+      ],
+      "input_config": {},
+      "output_config": {},
+      "validation_plan": [],
+      "validation_inputs": []
+    }
+  ]
+}

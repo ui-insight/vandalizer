@@ -95,6 +95,7 @@ export interface WorkflowCitation {
   sheet?: string | null;
   chunk_id?: string | null;
   score?: number | null;
+  similarity?: number | null;
   content_preview?: string;
 }
 

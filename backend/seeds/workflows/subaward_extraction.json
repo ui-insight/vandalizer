@@ -1,0 +1,86 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "workflow",
+  "exported_by": "seed",
+  "_seed_meta": {
+    "seed_id": "wf-subaward-extraction",
+    "display_name": "Subaward Extraction Workflow 1.0",
+    "description": "Comprehensive extraction for subaward agreements and FDP subawards. Pulls award information, contact details, financial terms, reporting requirements, and compliance obligations from complex multi-attachment packages.",
+    "collections": [
+      "post-award"
+    ],
+    "credit": {
+      "name": "Labib Ehsan",
+      "org": "University of Idaho"
+    }
+  },
+  "items": [
+    {
+      "name": "Subaward Extraction Workflow 1.0",
+      "description": "",
+      "steps": [
+        {
+          "name": "Extraction",
+          "data": {},
+          "is_output": false,
+          "tasks": [
+            {
+              "name": "Prompt",
+              "data": {
+                "prompt": "<task>\nExtract core identifying information and party details from this Subaward Agreement document with 100% accuracy.\n</task>\n\n<critical_instruction>\nExtract information exactly as written in the document. Do not modify, abbreviate, or interpret any text.\n</critical_instruction>\n\n<extraction_targets>\n- Pass-Through Entity (PTE) Name\n- Subrecipient Name  \n- PTE Federal Award Number (FAIN)\n- Subaward Number\n- Project Title\n- Federal Awarding Agency\n</extraction_targets>\n\n<verification_requirement>\nAfter extraction, verify each item appears exactly as shown in the source document before finalizing.\n</verification_requirement>\n\n<output_format>\n**Pass-Through Entity (PTE) Name:** [exact text]\n**Subrecipient Name:** [exact text] \n**PTE Federal Award Number:** [exact number]\n**Subaward Number:** [exact number]\n**Project Title:** [exact title]\n**Federal Awarding Agency:** [exact agency name]\n</output_format>"
+              }
+            },
+            {
+              "name": "Prompt",
+              "data": {
+                "prompt": "<task>\nExtract personnel contact information for both PTE and Subrecipient with character-perfect accuracy for emails and phone numbers.\n</task>\n\n<critical_requirements>\n1. Transcribe email addresses exactly character-for-character\n2. Transcribe phone numbers exactly as shown\n3. Extract information from contact sections/attachments\n4. Map phone numbers only to explicitly stated roles\n</critical_requirements>\n\n<search_locations>\nFocus on Attachment A (PTE contacts) and Attachment B (Subrecipient contacts)\n</search_locations>\n\n<extraction_targets>\nFor both PTE and Subrecipient:\n- Principal Investigator (PI) Name, Email, Phone\n- Administrative Contact Name, Email, Phone  \n- Financial Contact Name, Email, Phone\n- Authorized Official Name(s), Email, Phone\n</extraction_targets>\n\n<output_format>\n**PASS-THROUGH ENTITY CONTACTS:**\n- **Principal Investigator Name:** [name]\n- **Principal Investigator Email:** [exact email or \"Not specified\"]\n- **Principal Investigator Phone:** [exact phone or \"Not specified\"]\n[Continue for all contact types]\n\n**SUBRECIPIENT CONTACTS:**\n[Same format as above]\n</output_format>\n\n<verification_step>\nDouble-check all email addresses and phone numbers against source document before finalizing.\n</verification_step>"
+              }
+            },
+            {
+              "name": "Prompt",
+              "data": {
+                "prompt": "<task>\nExtract dates and monetary values with absolute precision. Any error in monetary amounts is unacceptable.\n</task>\n\n<critical_monetary_extraction>\n1. Extract monetary values exactly as written including currency symbols and decimals\n2. Verify extracted amounts against multiple locations in document\n3. Do not add extra digits or modify any numbers\n4. Cross-reference budget sections for accuracy\n</critical_monetary_extraction>\n\n<extraction_targets>\n- Subaward Budget Period Start Date\n- Subaward Budget Period End Date  \n- Prime Award Period Start/End (if specified)\n- Amount Funded This Action (VERIFY CAREFULLY)\n- Incrementally Estimated Total (if specified)\n- Total Direct Costs (if specified)\n- Total Indirect Costs (if specified)\n- Cost Type\n</extraction_targets>\n\n<verification_protocol>\nAfter extracting monetary values, locate them in at least 2 places in the document to confirm accuracy.\n</verification_protocol>\n\n<output_format>\n**Subaward Budget Period Start Date:** [MM/DD/YYYY]\n**Subaward Budget Period End Date:** [MM/DD/YYYY]\n**Amount Funded This Action:** [exact amount with currency]\n[Continue for all items]\n</output_format>"
+              }
+            },
+            {
+              "name": "Prompt",
+              "data": {
+                "prompt": "<task>\nExtract financial policies, rates, and requirements from the subaward agreement and referenced documents.\n</task>\n\n<search_strategy>\n1. Review main terms and conditions\n2. Check special conditions sections\n3. Examine referenced attachments\n4. Look for flow-down requirements from prime award\n</search_strategy>\n\n<extraction_targets>\n- Invoicing Frequency\n- Final Invoice Due Date\n- Required Invoice Elements\n- Indirect Cost (F&A) Rate and Base\n- Cost Sharing Requirements\n- Carryforward Policy\n- Unrecovered Indirect Cost Allowance\n</extraction_targets>\n\n<rate_extraction_precision>\nFor F&A rates: Extract exact percentage and specify calculation base (MTDC, TDC, etc.)\n</rate_extraction_precision>\n\n<output_format>\n**Invoicing Frequency:** [frequency requirement]\n**Final Invoice Due Date:** [specific timeframe]\n**Indirect Cost (F&A) Rate Applied:** [exact percentage]\n**Indirect Cost (F&A) Base:** [calculation base]\n[Continue for all policies]\n</output_format>"
+              }
+            },
+            {
+              "name": "Prompt",
+              "data": {
+                "prompt": "<task>\nExtract ONLY explicitly required reports as mandated by this specific subaward agreement.\n</task>\n\n<inclusion_criteria>\nOnly include reports that are:\n- Explicitly stated as required\n- Marked with checkboxes or selection indicators  \n- Listed in \"required reports\" sections\n- Specified with \"Subrecipient shall submit\" language\n</inclusion_criteria>\n\n<exclusion_criteria>\nDo NOT include:\n- Reports mentioned as possibilities\n- Unchecked options\n- General references without specific requirements\n</exclusion_criteria>\n\n<search_locations>\n- Attachment 4 (Reporting and Prior Approval Terms)\n- Main terms and conditions\n- Special terms sections\n</search_locations>\n\n<output_format>\n**TECHNICAL REPORTS:**\n- **Type/Frequency:** [specific requirement]\n- **Due Date/Timing:** [exact deadline]\n- **Recipient Contact:** [who receives it]\n\n**FINANCIAL REPORTS:**\n[Same format]\n\n**INVENTION REPORTING:**\n[Same format]\n</output_format>"
+              }
+            },
+            {
+              "name": "Prompt",
+              "data": {
+                "prompt": "<task>\nExtract compliance requirements, regulations, and special terms from all sections of the subaward agreement.\n</task>\n\n<search_comprehensively>\n1. General terms and conditions\n2. Special conditions\n3. Certifications and assurances\n4. Referenced/incorporated documents\n5. Flow-down requirements from prime award\n</search_comprehensively>\n\n<extraction_targets>\n- Governing Regulations/Terms\n- Prior Approval Handling\n- Specific Prior Approval Requirements\n- COI Policy Application\n- Data Rights/Sharing Terms\n- Copyright Terms\n- Certification Requirements\n- Audit Requirements\n- Termination Clauses\n- Record Retention\n</extraction_targets>\n\n<source_attribution>\nFor each requirement, note the source (e.g., \"per 2 CFR 200\", \"flowed down from prime award\")\n</source_attribution>\n\n<output_format>\n**Governing Regulations/Terms:** [list with sources]\n**Prior Approval Handling:** [general policy]\n**Specific Prior Approval Requirements:** [detailed list]\n[Continue for all compliance areas]\n</output_format>"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Formatting",
+          "data": {},
+          "is_output": false,
+          "tasks": [
+            {
+              "name": "Formatter",
+              "data": {
+                "prompt": "<task>\nCreate a comprehensive, accurate subaward summary with enhanced formatting and complete information extraction.\n</task>\n\n<critical_accuracy_check>\nVERIFY monetary amounts against source document - common errors include:\n- Missing/extra commas in large numbers\n- Transposed digits\n- Wrong decimal places\n</critical_accuracy_check>\n\n<enhanced_structure>\n**Basic Award Information**\n- Pass-Through Entity (PTE) Name: [content]\n- Subrecipient Name: [content]\n- PTE Federal Award Number: [content]\n- Subaward Number: [content]\n- Project Title: [content]\n- Federal Awarding Agency: [content]\n\n**Project Periods**\n- Subaward Period: [start] - [end]\n- Prime Award Period: [start] - [end] (if specified)\n\n**Pass-Through Entity (PTE) Contacts**\n| Role | Name | Email | Phone |\n|------|------|-------|-------|\n| Principal Investigator | [name] | [email] | [formatted phone] |\n| Administrative Contact | [name] | [email] | [formatted phone] |\n| Financial Contact | [name] | [email] | [formatted phone] |\n| Authorized Official | [name] | [email] | [formatted phone] |\n\n**Subrecipient Contacts**\n| Role | Name | Email | Phone |\n|------|------|-------|-------|\n| Principal Investigator | [name] | [email] | [formatted phone] |\n| Administrative Contact | [name] | [email] | [formatted phone] |\n| Financial Contact | [name] | [email] | [formatted phone] |\n| Authorized Official | [name] | [email] | [formatted phone] |\n\n**Financial Summary**\n- Total Subaward Amount: [VERIFY CAREFULLY]\n- Total Direct Costs: [amount]\n- Total Indirect Costs (F&A): [amount]\n- Cost Type: [type]\n\n**Financial Policies**\n- Invoicing Frequency: [frequency]\n- Final Invoice Due: [deadline]\n- Required Invoice Elements: [concise list]\n- Indirect Cost Rate: [rate]% on [base]\n- Cost Sharing Required: [yes/no]\n- Carryforward Policy: [policy]\n\n**Reporting Requirements**\n- **Technical Reports:**\n  ○ Monthly: [deadline and recipient]\n  ○ Quarterly: [deadline and recipient]  \n  ○ Annual: [deadline and recipient]\n  ○ Final: [deadline and recipient]\n- **Financial Reports:**\n  ○ Final statement: [deadline]\n- **Invention Reporting:**\n  ○ Disclosure: [deadline]\n  ○ Final report: [deadline]\n\n**Prior Approval Requirements**\n- General Rule: [who to contact for approvals]\n- Specific Requirements:\n  ○ No-cost extensions: [requirement]\n  ○ PI/Key Personnel changes: [requirement]\n  ○ [Other specific requirements]\n\n**Key Compliance Requirements**\n- Governing Regulations: [primary regulations]\n- Financial COI Policy: [whose policy applies]\n- Data Rights: [summary of key provisions]\n- Certifications Required: [list main certifications]\n- Termination: [notice period and conditions]\n- Record Retention: [requirements if specified]\n</enhanced_structure>\n\n<formatting_improvements>\n1. Format phone numbers consistently (add dashes where missing)\n2. Verify all monetary amounts against source document\n3. Include complete financial breakdown\n4. Add project period information\n5. Expand prior approval section\n6. Use clear, scannable formatting\n7. Group related information logically\n</formatting_improvements>\n\n<accuracy_verification>\nBefore finalizing:\n1. Cross-check all monetary values in multiple document locations\n2. Verify contact information character-by-character\n3. Confirm all dates are correctly extracted\n4. Ensure no critical compliance requirements are omitted\n</accuracy_verification>"
+              }
+            }
+          ]
+        }
+      ],
+      "input_config": {},
+      "output_config": {},
+      "validation_plan": [],
+      "validation_inputs": []
+    }
+  ]
+}

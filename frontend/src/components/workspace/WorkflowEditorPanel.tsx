@@ -8,8 +8,7 @@ import {
   ChevronDown, ChevronRight, ArrowUp, ArrowDown,
   Circle, Hand, Keyboard, Sparkles, ShieldCheck, Type,
   ArrowRight, Pause, TrendingUp, RefreshCw,
-  Upload, Clock, Copy, Check, FolderInput, Link2,
-  AlertTriangle, Info,
+  Upload, Clock, Copy, Check, FolderInput, Link2, Info, AlertTriangle,
 } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
@@ -100,10 +99,10 @@ const TASK_TYPES: TaskTypeDef[] = [
     description: 'Runs a small block of code against the step input for custom transforms.' },
   { name: 'CrawlerNode', label: 'Crawler Node', icon: Bug, color: '#84cc16', categories: ['all', 'web'], enabled: true,
     description: 'Recursively follows links from a starting URL and collects page contents for downstream steps.' },
-  { name: 'ResearchNode', label: 'Research Node', icon: Search, color: '#8b5cf6', categories: ['all', 'web'], enabled: true,
-    description: 'Runs an LLM-driven web search and synthesizes the findings into a written report.' },
+  { name: 'ResearchNode', label: 'Research Node', icon: Search, color: '#8b5cf6', categories: ['all', 'text'], enabled: true,
+    description: 'Two-pass analysis of the step input: first finds key points, then synthesizes them into a written report. Works on your documents — no URL needed.' },
   { name: 'KnowledgeBaseQuery', label: 'Knowledge Base Query', icon: Sparkles, color: '#0ea5e9', categories: ['all', 'text'], enabled: true,
-    description: 'Queries a connected knowledge base via RAG and returns the matching passages.' },
+    description: 'Asks a question of a connected knowledge base via RAG and returns a cited answer, or the raw matching passages.' },
   { name: 'APINode', label: 'API Node', icon: Zap, color: '#f97316', categories: ['all', 'web'], enabled: true,
     description: 'Calls an external HTTP API and returns the parsed response for downstream steps to use.' },
   { name: 'DocumentRenderer', label: 'Document Renderer', icon: FileText, color: '#0d9488', categories: ['all', 'output'], enabled: true,
@@ -218,6 +217,8 @@ export function WorkflowEditorPanel() {
   const [newStepName, setNewStepName] = useState('')
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleValue, setTitleValue] = useState('')
+  const [editingDesc, setEditingDesc] = useState(false)
+  const [descValue, setDescValue] = useState('')
   const [showDownloadPopup, setShowDownloadPopup] = useState(false)
   const [editingTask, setEditingTask] = useState<WorkflowTask | null>(null)
   const runner = useWorkflowRunner()
@@ -229,6 +230,7 @@ export function WorkflowEditorPanel() {
   const [nudgeDismissed, setNudgeDismissed] = useState(false)
   const runTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const titleInputRef = useRef<HTMLInputElement>(null)
+  const descInputRef = useRef<HTMLTextAreaElement>(null)
   const newStepInputRef = useRef<HTMLInputElement>(null)
   const importInputRef = useRef<HTMLInputElement>(null)
   const tabBarRef = useRef<HTMLDivElement>(null)
@@ -308,6 +310,13 @@ export function WorkflowEditorPanel() {
   }, [editingTitle])
 
   useEffect(() => {
+    if (editingDesc && descInputRef.current) {
+      descInputRef.current.focus()
+      descInputRef.current.select()
+    }
+  }, [editingDesc])
+
+  useEffect(() => {
     if (showNewStepModal && newStepInputRef.current) {
       newStepInputRef.current.focus()
     }
@@ -346,6 +355,28 @@ export function WorkflowEditorPanel() {
     refresh()
   }
 
+  const handleDescSave = async () => {
+    if (!openWorkflowId) {
+      setEditingDesc(false)
+      return
+    }
+    if (confirmCopyOnEdit()) {
+      setEditingDesc(false)
+      return
+    }
+    const cleanDesc = descValue.trim()
+    // No-op if unchanged, so a stray click-then-blur doesn't fire a needless PATCH.
+    if (cleanDesc === (workflow?.description ?? '').trim()) {
+      setEditingDesc(false)
+      return
+    }
+    // Send an empty string (not undefined) so a cleared description actually clears
+    // server-side — the backend only writes the field when it's not None.
+    await updateWorkflow(openWorkflowId, { description: cleanDesc })
+    setEditingDesc(false)
+    refresh()
+  }
+
   const handleAddStep = async () => {
     if (!openWorkflowId || !newStepName.trim()) return
     if (confirmCopyOnEdit()) {
@@ -379,7 +410,12 @@ export function WorkflowEditorPanel() {
       return
     }
     try {
-      const created = await addTask(editingStepId, { name: taskType.name })
+      // New KB Query steps default to answer mode (the intuitive behavior);
+      // pre-existing steps without a mode keep returning raw passages.
+      const created = await addTask(editingStepId, {
+        name: taskType.name,
+        ...(taskType.name === 'KnowledgeBaseQuery' ? { data: { mode: 'answer' } } : {}),
+      })
       setShowTaskPicker(false)
       await refresh()
       if (created?.id) {
@@ -619,9 +655,43 @@ export function WorkflowEditorPanel() {
             <X style={{ width: 20, height: 20 }} />
           </button>
         </div>
-        {workflow.description && (
-          <div style={{ fontSize: 13, color: '#5f6368', marginTop: 4 }}>{workflow.description}</div>
-        )}
+        {editingDesc ? (
+          <textarea
+            ref={descInputRef}
+            value={descValue}
+            rows={2}
+            placeholder="A one sentence description of the workflow's purpose."
+            onChange={e => setDescValue(e.target.value)}
+            onBlur={handleDescSave}
+            onKeyDown={e => {
+              // Enter saves; Shift+Enter inserts a newline. Escape cancels.
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleDescSave() }
+              if (e.key === 'Escape') setEditingDesc(false)
+            }}
+            style={{
+              fontSize: 13, color: '#202124', border: '1px solid #d1d5db', borderRadius: 4,
+              padding: '4px 8px', fontFamily: 'inherit', outline: 'none', resize: 'vertical',
+              width: '100%', marginTop: 6,
+            }}
+          />
+        ) : workflow.description ? (
+          <div
+            onClick={() => { setDescValue(workflow.description ?? ''); setEditingDesc(true) }}
+            title="Click to edit description"
+            style={{ display: 'flex', alignItems: 'flex-start', gap: 6, cursor: 'pointer', fontSize: 13, color: '#5f6368', marginTop: 4 }}
+          >
+            <span>{workflow.description}</span>
+            <Pencil style={{ width: 12, height: 12, color: '#9ca3af', flexShrink: 0, marginTop: 2 }} />
+          </div>
+        ) : canManage ? (
+          <div
+            onClick={() => { setDescValue(''); setEditingDesc(true) }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13, color: '#9ca3af', marginTop: 4 }}
+          >
+            <Pencil style={{ width: 12, height: 12 }} />
+            <span>Add a description</span>
+          </div>
+        ) : null}
       </div>
 
       {/* ===== TAB BAR ===== */}
@@ -2150,9 +2220,9 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
   const color = getTaskColor(task.name)
   const taskIcon = getTaskIcon(task.name)
 
-  // Load models for LLM task types
+  // Load models for LLM task types (KB Query needs them for answer mode)
   useEffect(() => {
-    if (LLM_TASKS.includes(task.name)) {
+    if (LLM_TASKS.includes(task.name) || task.name === 'KnowledgeBaseQuery') {
       getModels().then(setModels).catch(() => {})
     }
   }, [task.name])
@@ -2955,7 +3025,34 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                 </div>
                 <div style={{ marginBottom: 16 }}>
                   <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
-                    Search Query
+                    Return
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <select
+                      value={getTextValue('mode') || 'passages'}
+                      onChange={e => setTextValue('mode', e.target.value)}
+                      style={{
+                        width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
+                        border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#fff',
+                        color: '#374151', appearance: 'none', paddingRight: 32,
+                      }}
+                    >
+                      <option value="answer">Synthesized answer — LLM answers the question, with citations</option>
+                      <option value="passages">Matching passages — raw retrieved chunks for the next step</option>
+                    </select>
+                    <ChevronDown style={{
+                      position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
+                      width: 14, height: 14, color: '#9ca3af', pointerEvents: 'none',
+                    }} />
+                  </div>
+                  <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+                    Use passages when a later step needs the raw evidence (extraction, form filling);
+                    use a synthesized answer when this step should resolve the question itself.
+                  </div>
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                    {(getTextValue('mode') || 'passages') === 'answer' ? 'Question' : 'Search Query'}
                   </label>
                   <textarea
                     value={getTextValue('query')}
@@ -2969,25 +3066,49 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                     }}
                   />
                   <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
-                    The top matching chunks are returned as text and passed to the next step.
+                    Supports {'{{ inputs.output }}'} to query with the previous step's output —
+                    e.g. look up the sponsor name an earlier step extracted.
                   </div>
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
-                    Results to retrieve
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={20}
-                    value={getTextValue('k') || '8'}
-                    onChange={e => setTextValue('k', e.target.value)}
-                    style={{
-                      width: 80, padding: '8px 12px', fontSize: 13,
-                      fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
-                      outline: 'none', boxSizing: 'border-box',
-                    }}
-                  />
+                <div style={{ display: 'flex', gap: 16 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                      Results to retrieve
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={20}
+                      value={getTextValue('k') || '8'}
+                      onChange={e => setTextValue('k', e.target.value)}
+                      style={{
+                        width: 80, padding: '8px 12px', fontSize: 13,
+                        fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
+                        outline: 'none', boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                      Minimum relevance
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={getTextValue('min_similarity') || '0'}
+                      onChange={e => setTextValue('min_similarity', e.target.value)}
+                      style={{
+                        width: 80, padding: '8px 12px', fontSize: 13,
+                        fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
+                        outline: 'none', boxSizing: 'border-box',
+                      }}
+                    />
+                    <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
+                      Drop passages below this similarity (0–1; 0 keeps all).
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -3463,8 +3584,10 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
               )
             })()}
 
-            {/* Model override for LLM tasks */}
-            {LLM_TASKS.includes(task.name) && models.length > 0 && (
+            {/* Model override for LLM tasks (KB Query only calls an LLM in answer mode) */}
+            {(LLM_TASKS.includes(task.name)
+              || (task.name === 'KnowledgeBaseQuery' && (getTextValue('mode') || 'passages') === 'answer'))
+              && models.length > 0 && (
               <div style={{ marginTop: 16 }}>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
                   Model Override <span style={{ fontWeight: 400, color: '#9ca3af' }}>(optional)</span>
@@ -4055,6 +4178,33 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
     ].join('\n')
   }
 
+  // Steps can attach a warning under steps_output[step].warning (e.g. a KB
+  // query that matched nothing, or a misconfigured lookup). Surface it so a
+  // run that "succeeded" on thin context doesn't read as a clean pass.
+  const stepWarnings = Object.entries((status?.steps_output ?? {}) as Record<string, unknown>)
+    .map(([step, val]) => {
+      const warning = val && typeof val === 'object' ? (val as Record<string, unknown>).warning : undefined
+      return typeof warning === 'string' && warning ? { step, warning } : null
+    })
+    .filter((x): x is { step: string; warning: string } => x !== null)
+
+  const stepWarningsPanel = stepWarnings.length > 0 ? (
+    <div style={{ marginTop: 12 }}>
+      {stepWarnings.map(({ step, warning }) => (
+        <div key={step} style={{
+          display: 'flex', alignItems: 'flex-start', gap: 8,
+          border: '1px solid #fde68a', backgroundColor: '#fffbeb', borderRadius: 6,
+          padding: '8px 12px', marginBottom: 8, fontSize: 12, color: '#92400e',
+        }}>
+          <AlertTriangle style={{ width: 14, height: 14, flexShrink: 0, marginTop: 1 }} />
+          <div>
+            <span style={{ fontWeight: 600 }}>{step}:</span> {warning}
+          </div>
+        </div>
+      ))}
+    </div>
+  ) : null
+
   const apiRequestPanel = apiRequests.length > 0 ? (
     <div style={{ marginTop: 12 }}>
       {apiRequests.map(({ step, req }) => (
@@ -4253,6 +4403,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
             }}
             dangerouslySetInnerHTML={{ __html: renderOutput(output) }}
           />
+          {stepWarningsPanel}
           {apiRequestPanel}
           <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
           <div style={{ position: 'relative', display: 'inline-block' }}>
@@ -4343,6 +4494,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
               docs={status.error_payload?.oversize_documents ?? []}
             />
           )}
+          {stepWarningsPanel}
           {apiRequestPanel}
         </div>
       )}
@@ -4378,10 +4530,12 @@ function WorkflowSourcesPanel({ sources }: { sources: WorkflowCitation[] }) {
           {sources.map((c, i) => {
             const locator = typeof c.page === 'number' ? `p. ${c.page}` : (c.sheet || null)
             const label = locator ? `${c.document_title} · ${locator}` : c.document_title
+            const relevance = typeof c.similarity === 'number' ? `${Math.round(c.similarity * 100)}% match` : null
+            const tooltip = [relevance, c.content_preview || null].filter(Boolean).join(' — ')
             return (
               <span
                 key={`${c.chunk_id ?? c.document_id ?? i}`}
-                title={c.content_preview || ''}
+                title={tooltip}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 4,
                   padding: '2px 8px', fontSize: 11, fontWeight: 500,

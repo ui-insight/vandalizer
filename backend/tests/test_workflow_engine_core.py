@@ -133,6 +133,23 @@ class TestWorkflowEngineTopology:
         order = engine.get_topological_order()
         assert order == [n1, n2, n3]
 
+    def test_repeated_calls_do_not_raise(self):
+        # Regression: graphlib's TopologicalSorter can only be prepared once,
+        # so a second static_order() used to raise "cannot prepare() more than
+        # once". execute() walks the graph and _pause_for_approval() walks it
+        # again to locate the Approval step, which crashed approval-gate runs.
+        # get_topological_order() must be callable repeatedly.
+        engine = WorkflowEngine()
+        n1 = DocumentNode({"doc_uuids": ["a"]})
+        n2 = AddDocumentNode({"doc_texts": ["text"]})
+        engine.add_node(n1)
+        engine.add_node(n2)
+        engine.connect(n1, n2)
+        first = engine.get_topological_order()
+        second = engine.get_topological_order()
+        assert first == [n1, n2]
+        assert second == first
+
 
 # ---------------------------------------------------------------------------
 # WorkflowEngine - Execute
@@ -355,6 +372,32 @@ class TestMultiTaskNode:
         multi.add_task(task2)
         result = multi.process({"output": "prev"})
         assert result["output"] == "good"
+
+    def test_retrieved_sources_and_warning_propagate(self):
+        """Citations and warnings emitted by a wrapped task (e.g. a KB query)
+        must survive MultiTaskNode aggregation so the engine can persist them."""
+        multi = MultiTaskNode("KB Step")
+
+        class CitingNode(Node):
+            def process(self, inputs):
+                return {
+                    "output": "passages",
+                    "step_name": "KnowledgeBaseQuery",
+                    "retrieved_sources": [{"document_title": "a.pdf"}],
+                }
+
+        class WarningNode(Node):
+            def process(self, inputs):
+                return {"output": None, "step_name": "KnowledgeBaseQuery",
+                        "warning": "no matching passages"}
+
+        multi.add_task(CitingNode("citing"))
+        multi.add_task(WarningNode("warning"))
+        result = multi.process({"output": "prev"})
+
+        assert result["retrieved_sources"] == [{"document_title": "a.pdf"}]
+        assert "no matching passages" in result["warning"]
+        assert result["output"] == "passages"
 
     def test_inputs_deepcopied(self):
         """Each task gets its own copy of inputs."""

@@ -24,7 +24,8 @@ interface Props {
 export function AuthorChip({ author, size = 'sm', label, tone = 'default', className }: Props) {
   if (!author) return null
 
-  const display = author.name || author.email || author.user_id
+  const base = author.name || author.email || author.user_id
+  const display = author.org ? `${base} at ${author.org}` : base
   const fontSize = size === 'sm' ? 11 : 12
   const iconSize = size === 'sm' ? 10 : 12
 

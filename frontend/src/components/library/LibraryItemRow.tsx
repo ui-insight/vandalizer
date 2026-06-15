@@ -137,6 +137,21 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
             <Pin size={12} style={{ color: 'var(--library-highlight, #eab308)', flexShrink: 0 }} />
           )}
         </div>
+        {item.kind === 'workflow' && item.description && (
+          <div
+            title={item.description}
+            style={{
+              fontSize: 12,
+              color: '#5f6368',
+              marginTop: 2,
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
+            {item.description}
+          </div>
+        )}
         <div style={{ fontSize: 12, color: '#70757a', marginTop: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
           <span>{kindLabel}</span>
           {item.verified && (

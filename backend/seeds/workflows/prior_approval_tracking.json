@@ -1,0 +1,57 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "workflow",
+  "exported_by": "seed",
+  "_seed_meta": {
+    "seed_id": "wf-prior-approval-tracking",
+    "display_name": "Prior Approval Requirements Tracking",
+    "description": "Identifies all activities requiring written agency approval on federal awards. Extracts budget changes, equipment purchases, PI changes, and foreign travel requirements into a trackable reference document.",
+    "collections": [
+      "post-award",
+      "compliance"
+    ],
+    "credit": {
+      "name": "Labib Ehsan",
+      "org": "University of Idaho"
+    }
+  },
+  "items": [
+    {
+      "name": "Prior Approval Requirements Tracking",
+      "description": "Identify and to track all activities requiring federal agency prior approval to prevent compliance violations",
+      "steps": [
+        {
+          "name": "Extraction",
+          "data": {},
+          "is_output": false,
+          "tasks": [
+            {
+              "name": "Prompt",
+              "data": {
+                "prompt": "You are analyzing a Federal Award Notice/Agreement document. Extract ALL prior approval requirements to create a comprehensive tracking system for activities requiring federal agency authorization.\nThoroughly search the entire document for prior approval requirements. Pay special attention to sections referencing:\n\n\"Prior Approval\"\n\"Pre-approval\"\n\"Written Approval\"\n\"Agency Approval\"\n\"2 CFR 200\" sections\n\"Research Terms and Conditions\" (RTCs)\n\nCreate a comprehensive response with these sections:\n\nBUDGET-RELATED PRIOR APPROVALS:\n\nRe-budgeting thresholds and restrictions\nEquipment purchases requiring approval\nSubcontracting/subaward approvals\nCost sharing changes\nPersonnel effort modifications\n\n\nSCOPE & TIMELINE APPROVALS:\n\nScope of work changes\nPrincipal Investigator changes\nKey personnel changes\nNo-cost extension requests\nPerformance site changes\n\n\nADMINISTRATIVE APPROVALS:\n\nForeign travel approvals\nConference/meeting expenditures\nParticipant support costs\nProperty acquisition or disposition\nIntellectual property arrangements\n\n\nAPPROVAL PROCEDURES:\nCreate a table with:\n\nApproval Type\nThreshold/Trigger\nRequired Documentation\nApproval Authority\nProcessing Timeline\nConsequences of Non-compliance\n\n\nWAIVED APPROVALS:\n\nResearch Terms and Conditions (RTC) waivers\nAgency-specific approval delegations\nStreamlined approval processes\n\n\n\nBe thorough. Search for keywords: 'prior approval,' 'pre-approval,' 'written approval,' 'agency approval,' 'permission,' 'authorize,' 'CFR 200,' 'RTC,' 'waive,' 'delegate,' 'threshold.'\nIf information is not found for any section, explicitly state 'Not specified in the document' rather than omitting the section. Please be 100% accurate."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Formatting",
+          "data": {},
+          "is_output": false,
+          "tasks": [
+            {
+              "name": "Formatter",
+              "data": {
+                "prompt": "You are a document formatting specialist. Take the provided Prior Approval Requirements analysis output and reformat it for maximum readability while preserving ALL information exactly as provided.\n\nFORMATTING REQUIREMENTS:\n1. Keep all section headers bolded with ** markdown\n2. Convert each bullet point category to bold format: **Category Name:** \n3. Maintain all original content word-for-word after the colon\n4. Convert the APPROVAL PROCEDURES section to a proper markdown table with borders\n5. Preserve the exact same structure and order for all other sections\n6. Do not add, remove, or modify any substantive information\n7. Use consistent bullet formatting throughout\n\nINPUT FORMAT EXAMPLE:\n* Re-budgeting thresholds and restrictions: Not specified in the document.\n\nOUTPUT FORMAT REQUIRED:\n* **Re-budgeting thresholds and restrictions:** Not specified in the document.\n\nTABLE FORMATTING REQUIREMENTS:\n- Convert the APPROVAL PROCEDURES section to this exact markdown table format:\n- Must include the header separator row with dashes\n- Use proper markdown table syntax with | separators\n\nREQUIRED TABLE FORMAT:\n| Approval Type | Threshold/Trigger | Required Documentation | Approval Authority | Processing Timeline | Consequences of Non-compliance |\n|---------------|-------------------|------------------------|-------------------|---------------------|-------------------------------|\n| [data] | [data] | [data] | [data] | [data] | [data] |\n\nTRANSFORMATION RULES:\n- Change: * Category name: content\n- To: * **Category name:** content\n- Keep all section headers exactly as they are\n- Maintain all \"Not specified in the document\" statements exactly\n- Preserve any detailed information exactly as written\n- Do not summarize, paraphrase, or alter any content\n- For APPROVAL PROCEDURES: Extract each row of data and format as proper markdown table with header separators\n\nApply this formatting transformation to the entire provided Prior Approval Requirements analysis output. The goal is enhanced readability through consistent bolding and proper table formatting with visible borders while maintaining 100% information fidelity"
+              }
+            }
+          ]
+        }
+      ],
+      "input_config": {},
+      "output_config": {},
+      "validation_plan": [],
+      "validation_inputs": []
+    }
+  ]
+}

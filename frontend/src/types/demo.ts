@@ -42,6 +42,22 @@ export interface FeedbackInfo {
   already_completed: boolean
 }
 
+export interface TrialEndInfo {
+  name: string
+  organization: string
+  engagement: 'low' | 'engaged'
+  extensions_used: number
+  max_extensions: number
+  can_self_extend: boolean
+  already_extended: boolean
+}
+
+export interface TrialExtensionResult {
+  ok: boolean
+  message: string
+  expires_at: string | null
+}
+
 export interface DemoApplication {
   uuid: string
   name: string

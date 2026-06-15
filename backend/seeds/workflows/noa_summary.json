@@ -1,0 +1,68 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "workflow",
+  "exported_by": "seed",
+  "_seed_meta": {
+    "seed_id": "wf-noa-summary",
+    "display_name": "NOA Summary",
+    "description": "NOA BASIC AWARD & FINANCIAL SUMMARY & NOA COMPLIANCE & ADMINISTRATIVE REQUIREMENTS",
+    "collections": [
+      "post-award"
+    ],
+    "credit": {
+      "name": "Labib Ehsan",
+      "org": "University of Idaho"
+    }
+  },
+  "items": [
+    {
+      "name": "NOA Summary",
+      "description": "NOA BASIC AWARD & FINANCIAL SUMMARY & NOA COMPLIANCE & ADMINISTRATIVE REQUIREMENTS",
+      "steps": [
+        {
+          "name": "Prompt Tasks",
+          "data": {},
+          "is_output": false,
+          "tasks": [
+            {
+              "name": "Prompt",
+              "data": {
+                "type": "prompt",
+                "search_set_item_id": "6851c6383e09df7d323b84f2",
+                "search_set_item_title": "NOA BASIC AWARD & FINANCIAL SUMMARY (NOA Summary))",
+                "prompt": "You are analyzing a federal grant Notice of Award for university contract review. Extract ALL basic award information and financial terms. Be 100% accurate and review the entire document.\n\nAWARD IDENTIFICATION:\n- Award Number:\n- FAIN (Federal Award Identification Number):\n- Agency/Institute:\n- Program Title:\n- Award Type (New/Renewal/etc.):\n- Is this R&D (Yes/No):\n\nKEY PERSONNEL:\n- Principal Investigator(s):\n- Contact PI:\n- Authorized Official:\n- Federal Program Officer:\n- Federal Grants Management Officer:\n\nFINANCIAL SUMMARY:\n- Total Federal Award Amount:\n- Current Budget Period Amount:\n- Direct Costs:\n- Indirect Costs:\n- Indirect Cost Rate and Base:\n- Cost Sharing Required (Amount/Type):\n\nAWARD PERIODS:\n- Current Budget Period (Start/End Dates):\n- Total Project Period (Start/End Dates):\n- Future Year Funding (if listed):\n\nFINANCIAL RESTRICTIONS:\n- Salary Cap (Yes/No with amount):\n- Equipment Purchase Restrictions:\n- Travel Restrictions:\n- Other Cost Limitations:\n\nBASIC COMPLIANCE ALERTS:\n- Human Subjects/IRB Required:\n- Animal Use Required:\n- Clinical Trial (Yes/No):\n- FCOI Reporting Required:\n- Data Management Plan Required:\n\nCONSORTIUM/SUBAWARDS:\n- Subawards Included (Yes/No):\n- Partner Institutions:\n\nIf information is not found, state \"Not specified.\" Quote exact dollar amounts and dates from the document."
+              }
+            },
+            {
+              "name": "Prompt",
+              "data": {
+                "type": "prompt",
+                "search_set_item_id": "6851c6553e09df7d323b84f3",
+                "search_set_item_title": " NOA COMPLIANCE & ADMINISTRATIVE REQUIREMENTS",
+                "prompt": "You are analyzing a federal grant Notice of Award for university contract review. Extract ALL compliance requirements, administrative obligations, and special conditions. Be 100% accurate and review the entire document.\n\nDETAILED COMPLIANCE REQUIREMENTS:\n- Human Subjects Protection Details:\n- IRB/sIRB Requirements:\n- FCOI Reporting Specifics:\n- Data Management & Sharing Requirements:\n- Civil Rights/Non-Discrimination Requirements:\n- Publication/Acknowledgment Requirements:\n- Public Access Policy Requirements:\n\nADMINISTRATIVE OBLIGATIONS:\n- Reporting Requirements (type/frequency):\n- Prior Approval Requirements:\n- Record Keeping Requirements:\n- Audit Requirements:\n- System Registration Requirements (SAM, etc.):\n\nSPECIAL TERMS & CONDITIONS:\nExtract any award-specific conditions, restrictions, or requirements that deviate from standard terms.\n\nPROGRAM INCOME & CARRYOVER:\n- Program Income Treatment:\n- Carryover Provisions:\n- Budget Flexibility:\n\nCRITICAL DEADLINES:\n- Report Due Dates:\n- Budget Period Ends:\n- Other Important Deadlines:\n\nRISK FACTORS & ACTION ITEMS:\n- High-Risk Compliance Areas:\n- Unusual/Non-Standard Terms:\n- Immediate Action Items with Deadlines:\n- Training/Setup Requirements:\n\nCONTACT INFORMATION:\n- Who to contact for business matters:\n- Who to contact for technical matters:\n- Emergency/hotline information:\n\nSearch for keywords: \"must,\" \"shall,\" \"required,\" \"prior approval,\" \"compliance,\" \"report,\" \"deadline,\" \"restriction.\" If information is not found, state \"Not specified.\" Flag any unusual terms for legal review."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Formatting NOA",
+          "data": {},
+          "is_output": false,
+          "tasks": [
+            {
+              "name": "Formatter",
+              "data": {
+                "prompt": "Role: You are an AI assistant expert in federal grant administration. Your task is to process raw text extracted from a Notice of Award (NOA) and its related compliance analysis, and synthesize them into a single, comprehensive, and actionable Grant Award Summary for a university's Office of Sponsored Programs.\n\nGoal: Transform the provided information into a logically structured document that prioritizes key data, financial terms, deadlines, and significant compliance risks. The final output must be easy to scan and use for post-award management.\n\nKey Instructions:\n\nSynthesize and De-duplicate: Combine information from all provided text blocks into a single, cohesive summary. If the same fact (e.g., Award Number) is mentioned multiple times, present it only once in the most logical location.\n\nPrioritize Actionable Information: Use tables for key data like finances and deadlines. Use bold text to emphasize critical restrictions, required approvals, and non-standard terms.\n\nStructure for Usability: Organize the output according to the precise five-part structure below. Do not deviate from these section headings and order.\n\nPreserve Critical Language: If the source specifies a requirement (e.g., \"must be approved,\" \"must be submitted in writing\"), retain that imperative language. If the source states information is \"Not specified,\" preserve that note.\n\nDesired Output Structure\nPlease format the combined information exactly according to the following template:\n\nPart 1: Key Personnel & Contacts\n(A list of all project personnel and federal contacts.)\n\nPart 2: Grant Summary At-a-Glance\n(A high-level table with the most essential award details.)\n\nPart 3: Financial & Period of Performance\n(A detailed breakdown of all financial figures, rates, and key dates.)\n\nPart 4: Reporting & Critical Deadlines\n(A clear schedule of all required reports and their due dates.)\n\nPart 5: Key Compliance & Administrative Requirements\n(A summary of standard and special obligations, organized by topic for easy reference.)"
+              }
+            }
+          ]
+        }
+      ],
+      "input_config": {},
+      "output_config": {},
+      "validation_plan": [],
+      "validation_inputs": []
+    }
+  ]
+}

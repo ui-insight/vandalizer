@@ -428,8 +428,8 @@ export function VerifiedCatalog() {
                         {new Date(item.created_at).toLocaleDateString()}
                       </span>
                     )}
-                    {(item.submitted_by || item.created_by) && (
-                      <AuthorChip author={item.submitted_by || item.created_by} label="by" />
+                    {(item.submitted_by || item.credit || item.created_by) && (
+                      <AuthorChip author={item.submitted_by || item.credit || item.created_by} label="by" />
                     )}
                   </div>
                   {item.description && (

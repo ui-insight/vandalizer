@@ -369,11 +369,20 @@ class DocumentManager:
             dists_list = (results.get("distances") or [[]])[0]
             for i, doc in enumerate(results["documents"][0]):
                 metadata = results["metadatas"][0][i] if results.get("metadatas") else {}
+                dist = dists_list[i] if i < len(dists_list) else None
+                # Chroma returns squared-L2 distances and the default embedding
+                # function yields unit vectors, so d = 2(1 - cos); map back to
+                # cosine similarity clamped to [0, 1] for consumers that want a
+                # higher-is-better relevance signal.
+                similarity = None
+                if isinstance(dist, (int, float)):
+                    similarity = max(0.0, min(1.0, 1.0 - dist / 2.0))
                 output.append({
                     "content": doc,
                     "metadata": metadata,
                     "chunk_id": ids_list[i] if i < len(ids_list) else None,
-                    "score": dists_list[i] if i < len(dists_list) else None,
+                    "score": dist,
+                    "similarity": similarity,
                 })
         return output
 

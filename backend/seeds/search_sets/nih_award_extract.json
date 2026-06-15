@@ -1,0 +1,445 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "search_set",
+  "exported_by": "seed",
+  "_seed_meta": {
+    "seed_id": "ss-nih-award-extract",
+    "display_name": "NIHAwardExtract",
+    "description": "Extract setup details for an NIH grant or cooperative agreement.",
+    "collections": [
+      "federal-agency"
+    ],
+    "credit": {
+      "name": "Barrie Robison",
+      "org": "University of Idaho"
+    }
+  },
+  "items": [
+    {
+      "title": "NIHAwardExtract",
+      "set_type": "extraction",
+      "extraction_config": {
+        "mode": "one_pass",
+        "one_pass": {
+          "structured": true
+        },
+        "key_chunking": {
+          "enabled": true
+        },
+        "repetition": {
+          "enabled": true
+        }
+      },
+      "items": [
+        {
+          "searchphrase": "Federal Award Date",
+          "searchtype": "extraction",
+          "title": "Federal Award Date",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Recipient Name",
+          "searchtype": "extraction",
+          "title": "Recipient Name",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Recipient Address",
+          "searchtype": "extraction",
+          "title": "Recipient Address",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Congressional District of Recipient",
+          "searchtype": "extraction",
+          "title": "Congressional District of Recipient",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Payment System Identifier",
+          "searchtype": "extraction",
+          "title": "Payment System Identifier",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Employer Identification Number",
+          "searchtype": "extraction",
+          "title": "Employer Identification Number",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Data Universal Numbering System",
+          "searchtype": "extraction",
+          "title": "Data Universal Numbering System",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Recipient Unique Entity Identifier",
+          "searchtype": "extraction",
+          "title": "Recipient Unique Entity Identifier",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Principal Investigator Email",
+          "searchtype": "extraction",
+          "title": "Principal Investigator Email",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Principal Investigator Phone",
+          "searchtype": "extraction",
+          "title": "Principal Investigator Phone",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Authorized Official",
+          "searchtype": "extraction",
+          "title": "Authorized Official",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Award Number",
+          "searchtype": "extraction",
+          "title": "Award Number",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Unique Federal Award Identification Number",
+          "searchtype": "extraction",
+          "title": "Unique Federal Award Identification Number",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Statutory Authority",
+          "searchtype": "extraction",
+          "title": "Statutory Authority",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Federal Award Project Title",
+          "searchtype": "extraction",
+          "title": "Federal Award Project Title",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Assistance Listing Number",
+          "searchtype": "extraction",
+          "title": "Assistance Listing Number",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Assistance Listing Program Title",
+          "searchtype": "extraction",
+          "title": "Assistance Listing Program Title",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Award Action Type",
+          "searchtype": "extraction",
+          "title": "Award Action Type",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Is the Award R D",
+          "searchtype": "extraction",
+          "title": "Is the Award R D",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Awarding Agency Contact Name",
+          "searchtype": "extraction",
+          "title": "Awarding Agency Contact Name",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Awarding Agency Contact Email",
+          "searchtype": "extraction",
+          "title": "Awarding Agency Contact Email",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Awarding Agency Contact Phone",
+          "searchtype": "extraction",
+          "title": "Awarding Agency Contact Phone",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Program Official Contact Name",
+          "searchtype": "extraction",
+          "title": "Program Official Contact Name",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Program Official Title",
+          "searchtype": "extraction",
+          "title": "Program Official Title",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Program Official Email",
+          "searchtype": "extraction",
+          "title": "Program Official Email",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Program Official Phone",
+          "searchtype": "extraction",
+          "title": "Program Official Phone",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Budget Period Start Date",
+          "searchtype": "extraction",
+          "title": "Budget Period Start Date",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Budget Period End Date",
+          "searchtype": "extraction",
+          "title": "Budget Period End Date",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Total Amount of Federal Funds Obligated",
+          "searchtype": "extraction",
+          "title": "Total Amount of Federal Funds Obligated",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Direct Cost Amount",
+          "searchtype": "extraction",
+          "title": "Direct Cost Amount",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Indirect Cost Amount",
+          "searchtype": "extraction",
+          "title": "Indirect Cost Amount",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Total Amount of Federal Funds Obligated This Budget Period",
+          "searchtype": "extraction",
+          "title": "Total Amount of Federal Funds Obligated This Budget Period",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Total Approved Cost Sharing or Matching",
+          "searchtype": "extraction",
+          "title": "Total Approved Cost Sharing or Matching",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Total Federal and Non-Federal Approved This Budget Period",
+          "searchtype": "extraction",
+          "title": "Total Federal and Non-Federal Approved This Budget Period",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Project Period Start Date",
+          "searchtype": "extraction",
+          "title": "Project Period Start Date",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Project Period End Date",
+          "searchtype": "extraction",
+          "title": "Project Period End Date",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Total Amount of the Federal Award Including Approved Cost",
+          "searchtype": "extraction",
+          "title": "Total Amount of the Federal Award Including Approved Cost",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Grants Management Officer",
+          "searchtype": "extraction",
+          "title": "Grants Management Officer",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Remarks",
+          "searchtype": "extraction",
+          "title": "Remarks",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Salaries and Wages",
+          "searchtype": "extraction",
+          "title": "Salaries and Wages",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Fringe Benefits",
+          "searchtype": "extraction",
+          "title": "Fringe Benefits",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Personnel Costs Subtotal",
+          "searchtype": "extraction",
+          "title": "Personnel Costs Subtotal",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Consultant Services",
+          "searchtype": "extraction",
+          "title": "Consultant Services",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Travel",
+          "searchtype": "extraction",
+          "title": "Travel",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Subawards Consortium Contractual Costs",
+          "searchtype": "extraction",
+          "title": "Subawards Consortium Contractual Costs",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Federal Direct Costs",
+          "searchtype": "extraction",
+          "title": "Federal Direct Costs",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Federal Facilities and Administrative Costs",
+          "searchtype": "extraction",
+          "title": "Federal Facilities and Administrative Costs",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Approved Budget",
+          "searchtype": "extraction",
+          "title": "Approved Budget",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Total Federal Funds Authorized",
+          "searchtype": "extraction",
+          "title": "Total Federal Funds Authorized",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Total Federal Award Amount",
+          "searchtype": "extraction",
+          "title": "Total Federal Award Amount",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Amount of This Action Federal Share",
+          "searchtype": "extraction",
+          "title": "Amount of This Action Federal Share",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Document Number",
+          "searchtype": "extraction",
+          "title": "Document Number",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "PMS Account Type",
+          "searchtype": "extraction",
+          "title": "PMS Account Type",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Fiscal Year",
+          "searchtype": "extraction",
+          "title": "Fiscal Year",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Project Director or Principal Investigator",
+          "searchtype": "extraction",
+          "title": "Project Director or Principal Investigator",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Authorized Carryover",
+          "searchtype": "extraction",
+          "title": "Authorized Carryover",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Offset",
+          "searchtype": "extraction",
+          "title": "Offset",
+          "is_optional": false,
+          "enum_values": []
+        },
+        {
+          "searchphrase": "Authorized Treatment of Program Income",
+          "searchtype": "extraction",
+          "title": "Authorized Treatment of Program Income",
+          "is_optional": false,
+          "enum_values": []
+        }
+      ],
+      "test_cases": []
+    }
+  ]
+}

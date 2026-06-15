@@ -18,6 +18,21 @@ mkdir -p "$LOG_DIR" "$PID_DIR"
 
 CELERY_APP="celery_worker.celery_app"
 
+# Resolve how to invoke celery. In the Docker image the venv bin dir is on
+# PATH (see Dockerfile) so `celery` resolves directly; in a local uv-managed
+# checkout it is not, so fall back to `uv run celery`. Unquoted expansion of
+# $CELERY below splits "uv run celery" into separate words (POSIX-safe; the
+# container runs this under `sh`, so no bash arrays).
+if command -v celery >/dev/null 2>&1; then
+    CELERY="celery"
+elif command -v uv >/dev/null 2>&1; then
+    CELERY="uv run celery"
+else
+    echo "Error: 'celery' is not on PATH and 'uv' is unavailable." >&2
+    echo "Activate the virtualenv or install uv (https://docs.astral.sh/uv/), then retry." >&2
+    exit 1
+fi
+
 start_worker() {
     local name="$1"
     local queues="$2"
@@ -27,7 +42,7 @@ start_worker() {
     rm -f "$PID_DIR/$name.pid"
 
     echo "Starting worker: $name (queues=$queues, concurrency=$concurrency)"
-    celery -A "$CELERY_APP" worker \
+    $CELERY -A "$CELERY_APP" worker \
         --queues="$queues" \
         --concurrency="$concurrency" \
         --hostname="$name@%h" \
@@ -52,7 +67,7 @@ case "${1:-help}" in
 
         echo "Starting Celery Beat..."
         rm -f "$PID_DIR/beat.pid"
-        celery -A "$CELERY_APP" beat \
+        $CELERY -A "$CELERY_APP" beat \
             --loglevel=info \
             --logfile="$LOG_DIR/beat.log" \
             --pidfile="$PID_DIR/beat.pid" \
@@ -62,7 +77,11 @@ case "${1:-help}" in
 
         # In Docker, keep the script alive so the container doesn't exit.
         # Detached workers run as child processes — wait for any to exit.
-        if [ -f /.dockerenv ] || [ -f /proc/1/cgroup ] 2>/dev/null; then
+        # Detect a real container. `/.dockerenv` is Docker-specific; the cgroup
+        # check greps for container runtime markers because /proc/1/cgroup exists
+        # on every Linux host (a bare `-f` test would falsely trigger on local
+        # Linux dev machines and hang the script in the stay-alive loop below).
+        if [ -f /.dockerenv ] || grep -qaE 'docker|containerd|kubepods' /proc/1/cgroup 2>/dev/null; then
             echo "Running in container — staying alive to keep container running."
             # Wait forever, monitoring worker health
             while true; do

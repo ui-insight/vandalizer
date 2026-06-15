@@ -79,6 +79,14 @@ async def lifespan(app: FastAPI):  # type: ignore[no-untyped-def]
         from app.services.feedback_prompt_service import seed_default_prompts
         await seed_default_prompts()
 
+    # One-time bell notification to admins when the bundled catalog is newer
+    # than what's applied. Best-effort — never block startup on it.
+    try:
+        from app.services.catalog_service import notify_admins_of_catalog_update_if_new
+        await notify_admins_of_catalog_update_if_new()
+    except Exception:
+        logger.warning("Catalog update check failed during startup", exc_info=True)
+
     yield
     logger.info("Shutting down Vandalizer backend")
 

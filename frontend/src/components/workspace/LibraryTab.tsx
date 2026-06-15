@@ -6,6 +6,7 @@ import { useToast } from '../../contexts/ToastContext'
 import { useLibraries, useLibraryItems } from '../../hooks/useLibrary'
 import { LibraryItemRow } from '../library/LibraryItemRow'
 import { ExploreTab } from '../library/ExploreTab'
+import { OptimizerInbox } from '../shared/OptimizerInbox'
 import { ShareWithTeamDialog } from '../library/ShareWithTeamDialog'
 import { useConfirm } from '../shared/useConfirm'
 
@@ -41,7 +42,7 @@ import {
 import type { VerifiedCollection } from '../../types/library'
 import { useLibraryFolders } from '../../hooks/useLibrary'
 
-type ScopeTab = 'mine' | 'team' | 'explore'
+type ScopeTab = 'mine' | 'team' | 'explore' | 'quality'
 type ViewFilter = 'all' | 'favorites' | 'pinned' | string  // string allows folder UUIDs
 type KindFilter = 'all' | 'workflow' | 'search_set'
 type SortOption = 'recent' | 'az'
@@ -621,6 +622,7 @@ export function LibraryTab() {
             { key: 'mine' as const, label: 'Mine' },
             { key: 'team' as const, label: 'Team' },
             { key: 'explore' as const, label: 'Explore' },
+            { key: 'quality' as const, label: 'Quality Inbox' },
           ]).map(({ key, label }) => {
             const active = scope === key
             return (
@@ -656,8 +658,8 @@ export function LibraryTab() {
           })}
         </div>
 
-        {/* Row 3: Filter chips + sort (hidden when Explore is active — it has its own) */}
-        <div style={{ display: scope === 'explore' ? 'none' : 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingBottom: 2 }}>
+        {/* Row 3: Filter chips + sort (hidden for Explore — it has its own — and Quality Inbox) */}
+        <div style={{ display: scope === 'explore' || scope === 'quality' ? 'none' : 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingBottom: 2 }}>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             {([
               { value: 'all' as const, label: 'All' },
@@ -725,10 +727,21 @@ export function LibraryTab() {
         </div>
       </div>
 
-      {/* ── Body: Explore tab gets its own view; mine/team keep sidebar + results ── */}
+      {/* ── Body: Explore + Quality Inbox get their own views; mine/team keep sidebar + results ── */}
       {scope === 'explore' ? (
         <div style={{ display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0, overflow: 'hidden' }}>
           <ExploreTab />
+        </div>
+      ) : scope === 'quality' ? (
+        <div style={{ flexGrow: 1, minHeight: 0, overflowY: 'auto', padding: 24 }}>
+          <div style={{ maxWidth: 768, margin: '0 auto' }}>
+            <p style={{ fontSize: 13, color: '#5f6368', marginBottom: 16 }}>
+              When quality monitoring detects a drop, the system auto-tunes the affected
+              knowledge base, extraction, or workflow in shadow mode. Candidates land here
+              for review — nothing is applied without your say-so.
+            </p>
+            <OptimizerInbox />
+          </div>
         </div>
       ) : (
       <div style={{ display: 'flex', flexGrow: 1, minHeight: 0, overflow: 'hidden' }}>

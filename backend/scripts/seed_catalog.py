@@ -12,6 +12,8 @@ Usage:
     python -m scripts.seed_catalog --only extractions,knowledge-bases
     python -m scripts.seed_catalog --only kbs                   # alias for knowledge-bases
     python -m scripts.seed_catalog --reset                      # wipe catalog metadata, then re-seed
+    python -m scripts.seed_catalog --prune                      # seed, then retire items dropped from the catalog
+    python -m scripts.seed_catalog --prune --dry-run            # preview what --prune would retire (no changes)
 
 The --reset flag clears the catalog "metadata layer" (VerifiedCollection,
 VerifiedItemMetadata, verified LibraryItem records, and the verified Library
@@ -19,6 +21,16 @@ container) before re-seeding. The underlying Workflow / SearchSet /
 KnowledgeBase documents (and any user-added LibraryItem bookmarks pointing
 at them) are NOT deleted — the seed pass re-attaches existing entities to
 fresh metadata via their stored seed_id markers.
+
+The --prune flag handles the inverse: catalog UPGRADES that *remove* items.
+Every seeded entity carries a seed_id (workflows/KBs in resource_config,
+search sets in extraction_config). After seeding, prune compares the seed_ids
+live in the seed files against the verified rows in the database and
+soft-archives any verified item whose seed_id is gone — flipping it to
+verified=False and detaching it from the explore catalog (LibraryItem,
+VerifiedItemMetadata, collection membership) while preserving the underlying
+row so the change is reversible. Items without a seed_id are never touched.
+Pair with --dry-run to preview the retirement list before applying it.
 """
 
 import argparse
@@ -156,7 +168,7 @@ async def add_to_collection(collection: VerifiedCollection, item_id: str):
 async def upsert_verified_metadata(
     item_kind: str, item_id: str, display_name: str, description: str,
     quality_tier: str | None = None, quality_score: float | None = None,
-    quality_grade: str | None = None,
+    quality_grade: str | None = None, credit: dict | None = None,
 ):
     """Create or refresh VerifiedItemMetadata.
 
@@ -180,6 +192,9 @@ async def upsert_verified_metadata(
             existing.quality_score = quality_score
         if quality_grade is not None:
             existing.quality_grade = quality_grade
+        if credit and credit.get("name"):
+            existing.credit_name = credit["name"]
+            existing.credit_org = credit.get("org")
         existing.updated_at = now
         await existing.save()
         return existing
@@ -192,6 +207,8 @@ async def upsert_verified_metadata(
         quality_grade=quality_grade,
         quality_score=quality_score,
         organization_ids=[],  # empty = globally visible
+        credit_name=(credit or {}).get("name"),
+        credit_org=(credit or {}).get("org"),
         updated_at=now,
     )
     await meta.insert()
@@ -331,6 +348,7 @@ async def seed_workflow(
             meta.get("display_name", item["name"]),
             meta.get("description", item.get("description", "")),
             quality_tier=meta.get("quality_tier"),
+            credit=meta.get("credit"),
             quality_score=meta.get("quality_score"),
             quality_grade=meta.get("quality_grade"),
         )
@@ -414,6 +432,7 @@ async def seed_workflow(
         meta.get("display_name", item["name"]),
         meta.get("description", item.get("description", "")),
         quality_tier=meta.get("quality_tier"),
+        credit=meta.get("credit"),
         quality_score=meta.get("quality_score"),
         quality_grade=meta.get("quality_grade"),
     )
@@ -515,6 +534,7 @@ async def _refresh_search_set(
         meta.get("display_name", item["title"]),
         meta.get("description", ""),
         quality_tier=meta.get("quality_tier"),
+        credit=meta.get("credit"),
         quality_score=meta.get("quality_score"),
         quality_grade=meta.get("quality_grade"),
     )
@@ -590,6 +610,7 @@ async def seed_search_set(
         meta.get("display_name", item["title"]),
         meta.get("description", ""),
         quality_tier=meta.get("quality_tier"),
+        credit=meta.get("credit"),
         quality_score=meta.get("quality_score"),
         quality_grade=meta.get("quality_grade"),
     )
@@ -629,16 +650,25 @@ async def seed_knowledge_base(
     data: dict, meta: dict, verified_lib: Library, slug_to_collection: dict[str, VerifiedCollection],
 ) -> SeedResult:
     """Seed a single knowledge base. Returns "created", "updated", or "skipped"."""
+    seed_id = meta["seed_id"]
     item = data["items"][0]
 
-    existing = await KnowledgeBase.find_one(
-        KnowledgeBase.title == item["title"],
-        KnowledgeBase.verified == True,  # noqa: E712
-    )
+    # Match on seed_id (provenance) first; fall back to title for legacy KBs
+    # seeded before seed_id tracking existed, then stamp them so future runs
+    # (and the prune pass) can identify them by seed_id.
+    existing = await KnowledgeBase.find_one({"resource_config.seed_id": seed_id})
+    if not existing:
+        existing = await KnowledgeBase.find_one(
+            KnowledgeBase.title == item["title"],
+            KnowledgeBase.verified == True,  # noqa: E712
+        )
     if existing:
         from app.services.knowledge_service import _ingest_url_source
 
         changed = False
+        if existing.resource_config.get("seed_id") != seed_id:
+            existing.resource_config = {**existing.resource_config, "seed_id": seed_id}
+            changed = True
         new_desc = item.get("description")
         if new_desc is not None and existing.description != new_desc:
             existing.description = new_desc
@@ -682,6 +712,7 @@ async def seed_knowledge_base(
             meta.get("display_name", item["title"]),
             meta.get("description", item.get("description", "")),
             quality_tier=meta.get("quality_tier"),
+            credit=meta.get("credit"),
             quality_score=meta.get("quality_score"),
             quality_grade=meta.get("quality_grade"),
         )
@@ -700,6 +731,7 @@ async def seed_knowledge_base(
         space="global",
         verified=True,
         status="ready",
+        resource_config={"seed_id": seed_id},
         created_at=now,
         updated_at=now,
     )
@@ -734,6 +766,7 @@ async def seed_knowledge_base(
         meta.get("display_name", item["title"]),
         meta.get("description", item.get("description", "")),
         quality_tier=meta.get("quality_tier"),
+        credit=meta.get("credit"),
         quality_score=meta.get("quality_score"),
         quality_grade=meta.get("quality_grade"),
     )
@@ -745,6 +778,180 @@ async def seed_knowledge_base(
             await add_to_collection(col, str(kb.id))
 
     return "created"
+
+
+# ---------------------------------------------------------------------------
+# Prune (retire stale seeded items)
+# ---------------------------------------------------------------------------
+
+# Per-type wiring for prune: how to find the seed_id on a live document, the
+# seed directory to scan, the LibraryItemKind, and the metadata item_kind string.
+_PRUNE_SPEC = {
+    TYPE_WORKFLOWS: {
+        "model": Workflow,
+        "dir": "workflows",
+        "cfg_field": "resource_config",
+        "title_key": "name",  # field in seed items[0] holding the entity title
+        "library_kind": LibraryItemKind.WORKFLOW,
+        "meta_kind": "workflow",
+        "label": "workflow",
+        # Workflows have carried a seed_id in resource_config since their first
+        # seed, so seed_id alone is a reliable identity — no title fallback.
+        "title_fallback": False,
+    },
+    TYPE_EXTRACTIONS: {
+        "model": SearchSet,
+        "dir": "search_sets",
+        "cfg_field": "extraction_config",
+        "title_key": "title",
+        "library_kind": LibraryItemKind.SEARCH_SET,
+        "meta_kind": "search_set",
+        "label": "search set",
+        "title_fallback": False,
+    },
+    TYPE_KNOWLEDGE_BASES: {
+        "model": KnowledgeBase,
+        "dir": "knowledge_bases",
+        "cfg_field": "resource_config",
+        "title_key": "title",
+        "library_kind": LibraryItemKind.KNOWLEDGE_BASE,
+        "meta_kind": "knowledge_base",
+        "label": "knowledge base",
+        # KBs only gained seed_id tracking recently, so legacy rows have none.
+        # Fall back to matching system-seeded KBs by title against the manifest.
+        "title_fallback": True,
+    },
+}
+
+
+def _collect_live_manifest(selected: set[str]) -> dict[str, dict[str, set[str]]]:
+    """Scan the seed files for the selected types and return, per type, the
+    seed_ids and entity titles the catalog currently ships. The prune pass diffs
+    live items against this: a verified item whose seed_id (or, for legacy rows
+    without one, whose title) is absent here was dropped from the catalog."""
+    live: dict[str, dict[str, set[str]]] = {}
+    for type_name in selected:
+        spec = _PRUNE_SPEC[type_name]
+        type_dir = SEEDS_DIR / spec["dir"]
+        ids: set[str] = set()
+        titles: set[str] = set()
+        if type_dir.exists():
+            for seed_file in sorted(type_dir.glob("*.json")):
+                data = json.loads(seed_file.read_text())
+                seed_id = data.get("_seed_meta", {}).get("seed_id")
+                if seed_id:
+                    ids.add(seed_id)
+                items = data.get("items") or []
+                if items:
+                    title = items[0].get(spec["title_key"])
+                    if title:
+                        titles.add(title)
+        live[type_name] = {"ids": ids, "titles": titles}
+    return live
+
+
+async def _retire_item(type_name: str, doc, verified_lib: Library, dry_run: bool) -> None:
+    """Soft-archive a single seeded item: flip the underlying row to
+    verified=False and strip every catalog attachment (verified LibraryItem,
+    VerifiedItemMetadata, collection membership). The underlying
+    Workflow/SearchSet/KnowledgeBase row is preserved so the change is
+    reversible. A no-op when dry_run is True."""
+    if dry_run:
+        return
+    spec = _PRUNE_SPEC[type_name]
+    item_id_str = str(doc.id)
+
+    # Detach the verified LibraryItem(s) and pull them from the verified library.
+    lib_items = await LibraryItem.find(
+        LibraryItem.item_id == doc.id,
+        LibraryItem.kind == spec["library_kind"],
+        LibraryItem.verified == True,  # noqa: E712
+    ).to_list()
+    for li in lib_items:
+        if li.id in verified_lib.items:
+            verified_lib.items.remove(li.id)
+        await li.delete()
+
+    # Drop the verified metadata record.
+    await VerifiedItemMetadata.find(
+        VerifiedItemMetadata.item_kind == spec["meta_kind"],
+        VerifiedItemMetadata.item_id == item_id_str,
+    ).delete()
+
+    # Remove the item from any collection that references it.
+    async for col in VerifiedCollection.find(VerifiedCollection.item_ids == item_id_str):
+        col.item_ids = [i for i in col.item_ids if i != item_id_str]
+        col.updated_at = datetime.datetime.now(datetime.timezone.utc)
+        await col.save()
+
+    # Finally, unverify the underlying row (kept for reversibility).
+    doc.verified = False
+    if hasattr(doc, "updated_at"):
+        doc.updated_at = datetime.datetime.now(datetime.timezone.utc)
+    await doc.save()
+
+
+async def prune_stale_seeded_items(
+    selected: set[str], dry_run: bool = False,
+) -> list[dict]:
+    """Retire verified items whose seed_id is no longer present in the seed
+    files for their type. Only types in ``selected`` are considered, so a
+    partial run (e.g. --only workflows) never touches other types.
+
+    Items without a seed_id are ignored unless the type opts into a title
+    fallback (knowledge bases, whose legacy rows predate seed_id tracking) and
+    the row is system-seeded — this avoids retiring user-created entities or
+    internal artifacts (e.g. a workflow's inline-extraction SearchSet).
+    Returns a list of retired-item descriptors.
+    """
+    live = _collect_live_manifest(selected)
+    verified_lib = await get_or_create_verified_library()
+    retired: list[dict] = []
+
+    for type_name in sorted(selected):
+        spec = _PRUNE_SPEC[type_name]
+        model = spec["model"]
+        cfg_field = spec["cfg_field"]
+        live_ids = live[type_name]["ids"]
+        live_titles = live[type_name]["titles"]
+
+        # Verified rows that either carry a seed_id marker or — for types with a
+        # title fallback — are system-seeded (so legacy unstamped rows are seen).
+        query: dict = {"verified": True}
+        if spec["title_fallback"]:
+            query["$or"] = [
+                {f"{cfg_field}.seed_id": {"$exists": True, "$ne": None}},
+                {"user_id": SYSTEM_USER},
+            ]
+        else:
+            query[f"{cfg_field}.seed_id"] = {"$exists": True, "$ne": None}
+        candidates = await model.find(query).to_list()
+
+        for doc in candidates:
+            seed_id = (getattr(doc, cfg_field, {}) or {}).get("seed_id")
+            if seed_id:
+                stale = seed_id not in live_ids
+            elif spec["title_fallback"] and getattr(doc, "user_id", None) == SYSTEM_USER:
+                # Legacy system-seeded row with no seed_id: match by title. After
+                # a seed pass, a kept item is always stamped, so this only flags
+                # genuinely-dropped items; in --dry-run it relies on the title.
+                stale = getattr(doc, "title", None) not in live_titles
+            else:
+                continue
+            if not stale:
+                continue
+            await _retire_item(type_name, doc, verified_lib, dry_run)
+            retired.append({
+                "type": type_name,
+                "label": spec["label"],
+                "seed_id": seed_id or "(legacy/no seed_id)",
+                "name": getattr(doc, "name", None) or getattr(doc, "title", None) or str(doc.id),
+                "id": str(doc.id),
+            })
+
+    if not dry_run and retired:
+        await verified_lib.save()
+    return retired
 
 
 # ---------------------------------------------------------------------------
@@ -776,6 +983,124 @@ async def reset_verified_catalog() -> dict[str, int]:
     deleted["libraries"] = getattr(res, "deleted_count", 0) or 0
 
     return deleted
+
+
+# ---------------------------------------------------------------------------
+# Diff / preview (powers the in-app "catalog update available" feature)
+# ---------------------------------------------------------------------------
+
+def _version_newer(candidate: str | None, current: str | None) -> bool:
+    """True if dotted-numeric ``candidate`` is a higher version than ``current``.
+    An absent current version means anything is newer. Non-numeric versions fall
+    back to a simple inequality so we still surface a change."""
+    if not candidate:
+        return False
+    if not current:
+        return True
+
+    def _parts(v: str):
+        try:
+            return tuple(int(x) for x in v.strip().split("."))
+        except ValueError:
+            return None
+
+    cp, kp = _parts(candidate), _parts(current)
+    if cp is None or kp is None:
+        return candidate != current
+    return cp > kp
+
+
+def _scan_seed_entries(type_name: str) -> list[dict]:
+    """Read the seed files for a type and return one entry per item:
+    {seed_id, name, title}. ``name`` is the human display label, ``title`` the
+    underlying entity title used for legacy (seed_id-less) matching."""
+    spec = _PRUNE_SPEC[type_name]
+    type_dir = SEEDS_DIR / spec["dir"]
+    entries: list[dict] = []
+    if not type_dir.exists():
+        return entries
+    for seed_file in sorted(type_dir.glob("*.json")):
+        data = json.loads(seed_file.read_text())
+        meta = data.get("_seed_meta", {})
+        seed_id = meta.get("seed_id")
+        if not seed_id:
+            continue
+        items = data.get("items") or []
+        title = items[0].get(spec["title_key"]) if items else None
+        entries.append({
+            "seed_id": seed_id,
+            "title": title,
+            "name": meta.get("display_name") or title or seed_id,
+        })
+    return entries
+
+
+async def _db_identity(type_name: str) -> tuple[set[str], set[str]]:
+    """Return (seed_ids, titles) for the verified rows of a type already in the
+    DB — the 'what's installed' side of the diff."""
+    spec = _PRUNE_SPEC[type_name]
+    model = spec["model"]
+    cfg_field = spec["cfg_field"]
+    rows = await model.find({"verified": True}).to_list()
+    ids: set[str] = set()
+    titles: set[str] = set()
+    for row in rows:
+        sid = (getattr(row, cfg_field, {}) or {}).get("seed_id")
+        if sid:
+            ids.add(sid)
+        title = getattr(row, "title", None) or getattr(row, "name", None)
+        if title and getattr(row, "user_id", None) == SYSTEM_USER:
+            titles.add(title)
+    return ids, titles
+
+
+async def compute_catalog_diff(types: set[str] | None = None) -> dict:
+    """Compute what a catalog upgrade would change, without mutating anything.
+
+    Returns the applied vs. bundled version, whether an upgrade is available,
+    and the lists of items that would be added and retired plus a refreshed
+    count. Powers the admin "catalog update available" banner and preview.
+    """
+    selected = set(types) if types else set(ALL_TYPES)
+    bundled = _read_seed_version()
+
+    from app.models.system_config import SystemConfig
+    cfg = await SystemConfig.get_config()
+    applied = cfg.catalog_version
+
+    new_items: list[dict] = []
+    refreshed = 0
+    for type_name in sorted(selected):
+        spec = _PRUNE_SPEC[type_name]
+        db_ids, db_titles = await _db_identity(type_name)
+        for entry in _scan_seed_entries(type_name):
+            known = entry["seed_id"] in db_ids or (
+                spec["title_fallback"] and entry.get("title") in db_titles
+            )
+            if known:
+                refreshed += 1
+            else:
+                new_items.append({
+                    "type": type_name,
+                    "label": spec["label"],
+                    "seed_id": entry["seed_id"],
+                    "name": entry["name"],
+                })
+
+    retiring = await prune_stale_seeded_items(selected, dry_run=True)
+
+    return {
+        "applied_version": applied,
+        "bundled_version": bundled,
+        "update_available": _version_newer(bundled, applied),
+        "counts": {
+            "new": len(new_items),
+            "refreshed": refreshed,
+            "retiring": len(retiring),
+        },
+        "new": new_items,
+        "retiring": retiring,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -822,6 +1147,7 @@ async def seed_catalog(types: set[str] | None = None):
             print(f"  = {name} (skipped)")
 
     summary: list[str] = []
+    counts_by_type: dict[str, dict[str, int]] = {}
 
     # --- Phase 2: Workflows ---
     if TYPE_WORKFLOWS in selected:
@@ -841,6 +1167,7 @@ async def seed_catalog(types: set[str] | None = None):
             f"{wf_counts.get('updated', 0)} updated, "
             f"{wf_counts.get('skipped', 0)} skipped"
         )
+        counts_by_type[TYPE_WORKFLOWS] = wf_counts
 
     # --- Phase 3: Search Sets (extractions) ---
     if TYPE_EXTRACTIONS in selected:
@@ -860,6 +1187,7 @@ async def seed_catalog(types: set[str] | None = None):
             f"{ss_counts.get('updated', 0)} updated, "
             f"{ss_counts.get('skipped', 0)} skipped"
         )
+        counts_by_type[TYPE_EXTRACTIONS] = ss_counts
 
     # --- Phase 4: Knowledge Bases ---
     if TYPE_KNOWLEDGE_BASES in selected:
@@ -880,6 +1208,7 @@ async def seed_catalog(types: set[str] | None = None):
             f"{kb_counts.get('updated', 0)} updated, "
             f"{kb_counts.get('skipped', 0)} skipped"
         )
+        counts_by_type[TYPE_KNOWLEDGE_BASES] = kb_counts
 
     # --- Save verified library ---
     await verified_lib.save()
@@ -897,6 +1226,17 @@ async def seed_catalog(types: set[str] | None = None):
 
     # --- Summary ---
     print("\nDone! " + " | ".join(summary))
+
+    def _totals(key: str) -> int:
+        return sum(c.get(key, 0) for c in counts_by_type.values())
+
+    return {
+        "version": seed_version,
+        "by_type": counts_by_type,
+        "created": _totals("created"),
+        "updated": _totals("updated"),
+        "skipped": _totals("skipped"),
+    }
 
 
 async def main():
@@ -933,11 +1273,36 @@ async def main():
             "Workflow/SearchSet/KnowledgeBase rows are preserved."
         ),
     )
+    parser.add_argument(
+        "--prune",
+        action="store_true",
+        help=(
+            "After seeding, retire verified items whose seed_id is no longer in "
+            "the seed files (soft-archive: verified=False, removed from the "
+            "explore catalog, underlying row kept). Use to drop items dropped "
+            "from the catalog on an upgrade."
+        ),
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help=(
+            "Preview the prune pass only: list the items that --prune would "
+            "retire, without seeding or modifying anything. Implies --prune."
+        ),
+    )
     args = parser.parse_args()
     types = _parse_types(args.only)
 
     settings = Settings()
     await init_db(settings)
+
+    # Dry run: preview retirements only — no seeding, no mutations.
+    if args.dry_run:
+        stale = await prune_stale_seeded_items(types, dry_run=True)
+        _print_prune_summary(stale, dry_run=True)
+        return
+
     if args.reset:
         print("Resetting verified catalog metadata...")
         deleted = await reset_verified_catalog()
@@ -948,6 +1313,24 @@ async def main():
             f"{deleted['libraries']} verified library container(s)."
         )
     await seed_catalog(types=types)
+
+    if args.prune:
+        retired = await prune_stale_seeded_items(types, dry_run=False)
+        _print_prune_summary(retired, dry_run=False)
+
+
+def _print_prune_summary(items: list[dict], dry_run: bool) -> None:
+    """Render the prune result. The 'Retiring N item(s)' line is machine-readable
+    — setup.sh greps it to decide whether to prompt for confirmation."""
+    verb = "Would retire" if dry_run else "Retired"
+    print(f"\n--- Prune ({'dry run' if dry_run else 'applied'}) ---")
+    print(f"Retiring {len(items)} item(s) no longer in the catalog.")
+    for it in items:
+        print(f"  - [{it['label']}] {it['name']}  (seed_id={it['seed_id']})")
+    if not items:
+        print("  (nothing to retire — every verified seeded item is still in the seed files)")
+    else:
+        print(f"{verb} {len(items)} stale catalog item(s).")
 
 
 if __name__ == "__main__":

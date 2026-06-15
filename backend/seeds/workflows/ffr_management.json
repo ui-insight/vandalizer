@@ -1,0 +1,57 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "workflow",
+  "exported_by": "seed",
+  "_seed_meta": {
+    "seed_id": "wf-ffr-management",
+    "display_name": "Federal Financial Reporting (FFR) Management",
+    "description": "Specialized workflow for Federal Financial Report (SF-425) requirements. Extracts submission schedules, cash management requirements, compliance deadlines, and generates automated preparation calendars.",
+    "collections": [
+      "post-award",
+      "financial"
+    ],
+    "credit": {
+      "name": "Labib Ehsan",
+      "org": "University of Idaho"
+    }
+  },
+  "items": [
+    {
+      "name": "Federal Financial Reporting (FFR) Management",
+      "description": "Analyzing Award Notices to extract all financial reporting requirements and create automated tracking systems for FFR preparation, submission deadlines, and compliance monitoring.",
+      "steps": [
+        {
+          "name": "Extraction",
+          "data": {},
+          "is_output": false,
+          "tasks": [
+            {
+              "name": "Prompt",
+              "data": {
+                "prompt": "You are analyzing a Federal Award Notice/Agreement document. Extract ALL Federal Financial Report (FFR) requirements and financial reporting obligations to ensure timely and accurate compliance.\nThoroughly search the entire document for financial reporting requirements. Pay special attention to sections containing:\n\n\"Financial Reporting Requirements\"\n\"SF-425\" or \"Federal Financial Report\"\n\"Payment Management System\" or \"PMS\"\n\"Reporting Schedule\"\n\"Financial Monitoring\"\n\nCreate a comprehensive response with these sections:\n\nFFR SUBMISSION SCHEDULE:\n\nAnnual FFR due dates (90 or 120 days after budget period end)\nFinal FFR deadline (typically 120 days after project end)\nInterim reporting requirements (if any)\nCash transaction reporting requirements\n\n\nSUBMISSION SYSTEM & PROCEDURES:\n\nPayment Management System (PMS) access requirements\neRA Commons integration (if NIH/HHS)\nSubmission authorization roles and responsibilities\nTechnical submission requirements\n\n\nREQUIRED FINANCIAL DATA:\n\nExpenditure reporting by cost category\nCash transaction documentation\nUnliquidated obligations tracking\nProgram income reporting (if applicable)\nCost sharing documentation requirements\n\n\nCOMPLIANCE & CONSEQUENCES:\n\nLate submission penalties\nAccount restriction procedures\nImpact on future funding\nRequired documentation and backup\n\n\nPREPARATION TIMELINE:\nCreate a countdown schedule:\n\nDays before period end: Required preparation actions\nKey milestones for data collection and review\nApproval and submission deadlines\n\n\n\nBe thorough. Search for keywords: 'FFR,' 'SF-425,' 'financial report,' 'PMS,' 'expenditure,' 'deadline,' 'submit,' 'days,' 'budget period,' 'project end,' 'liquidation,' 'drawdown.'\nIf information is not found for any section, explicitly state 'Not specified in the document' rather than omitting the section. Please be 100% accurate."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Format/Bold",
+          "data": {},
+          "is_output": false,
+          "tasks": [
+            {
+              "name": "Formatter",
+              "data": {
+                "prompt": "You are a document formatting specialist. Take the provided FFR analysis output and reformat it for maximum readability while preserving ALL information exactly as provided.\n\nFORMATTING REQUIREMENTS:\n1. Keep all section headers bolded with ** markdown\n2. Convert each bullet point category to bold format: **Category Name:** \n3. Maintain all original content word-for-word after the colon\n4. Preserve the exact same structure and order\n5. Do not add, remove, or modify any substantive information\n6. Use consistent bullet formatting throughout\n\nINPUT FORMAT EXAMPLE:\n* Annual FFR due dates: Not specified in the document\n\nOUTPUT FORMAT REQUIRED:\n* **Annual FFR due dates:** Not specified in the document\n\nTRANSFORMATION RULES:\n- Change: * Category name: content\n- To: * **Category name:** content\n- Keep all section headers exactly as they are\n- Maintain all \"Not specified in the document\" statements exactly\n- Preserve any detailed information exactly as written\n- Do not summarize, paraphrase, or alter any content\n\nApply this formatting transformation to the entire provided FFR analysis output. The goal is enhanced readability through consistent bolding of category names while maintaining 100% information fidelity."
+              }
+            }
+          ]
+        }
+      ],
+      "input_config": {},
+      "output_config": {},
+      "validation_plan": [],
+      "validation_inputs": []
+    }
+  ]
+}

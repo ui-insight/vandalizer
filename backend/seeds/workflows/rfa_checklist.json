@@ -1,0 +1,144 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "workflow",
+  "exported_by": "seed",
+  "_seed_meta": {
+    "seed_id": "wf-rfa-checklist",
+    "display_name": "RFA (Working Complete Checklist)",
+    "description": "Automatically extracts and consolidates Request for Applications into standardized, actionable checklists. Processes dates, eligibility requirements, award information, and submission details.\n",
+    "collections": [
+      "pre-award"
+    ],
+    "credit": {
+      "name": "Labib Ehsan",
+      "org": "University of Idaho"
+    }
+  },
+  "items": [
+    {
+      "name": "RFA (Working Complete Checklist)",
+      "description": "",
+      "steps": [
+        {
+          "name": "Extraction",
+          "data": {},
+          "is_output": false,
+          "tasks": [
+            {
+              "name": "Prompt",
+              "data": {
+                "prompt": "We are building a checklist based on this Grant RFA document. I want you to thoroughly analyze this document and make me a list of all the dates and deadlines mentioned in it. Additionally, if there is specific information pertaining to each date, list it next to its corresponding date.\n\nCreate a comprehensive table with 'Item', 'Date/Time', and 'Notes' as the headers.\n\nFormat the output as follows: DATES & DEADLINES:\n\nItem\tDate/Time\tNotes\n[Original label from document]\t[Complete date and time information]\t[Specific notes, requirements, or conditions]\nEnsure the table has lines/borders for better readability. Please do not miss any information pertaining to each date or deadline. Thoroughly analyze the document before responding, and please be 100% accurate."
+              }
+            },
+            {
+              "name": "Prompt",
+              "data": {
+                "type": "prompt",
+                "search_set_item_id": "682e06503885da85222da0fb",
+                "search_set_item_title": "Eligible Institutions (RFA)",
+                "prompt": "We are building a checklist based on this Grant RFA document. I want you to thoroughly analyze this document and tell me what the Eligible Institutions for this award are. Organize it as follows:\n\nEligible Institutions:\n\nList each type of eligible institution.\nInclude any subcategories or specific examples, or any other related information.\nInclude any compliance requirements\nPlease do not miss any information pertaining to eligible institutions but do not mention duplicate information in your response. Thoroughly analyze the document before responding, and please be 100% accurate."
+              }
+            },
+            {
+              "name": "Prompt",
+              "data": {
+                "type": "prompt",
+                "search_set_item_id": "682e067d3885da85222da0fc",
+                "search_set_item_title": "Eligible Individuals (RFA)",
+                "prompt": "We are building a checklist based on this Grant RFA document. I want you to thoroughly analyze this document and tell me what the Eligible Individuals for this award are. Organize it as follows:\n\nEligible Individuals:\n\nList each type of eligible Individual.\nList the criteria for eligible individuals.\nInclude any compliance requirements\nInclude any specific conditions or preferences, and any other related information\nPlease do not miss any information pertaining to Eligible Individuals, but do not mention duplicate information in your response. Thoroughly analyze the document before responding, and please be 100% accurate."
+              }
+            },
+            {
+              "name": "Prompt",
+              "data": {
+                "type": "prompt",
+                "search_set_item_id": "682e069c3885da85222da0fd",
+                "search_set_item_title": "Award Information (RFA)",
+                "prompt": "We are building a checklist based on this Grant RFA document. I want you to thoroughly analyze this document and tell me the award information. Format the output as follows:\n\n**Award Information:**\n\n1. **Anticipated Award Duration:**\n   - [Duration details]\n\n2. **Amount per Award:**\n   - [Amount details]\n   - [Additional matching funds information]\n   - [Indirect costs details]\n   - [Restrictions on costs]\n\n3. **Anticipated Number of Awards:**\n   - [Number of awards details]\n\n4. **Anticipated Award Date:**\n   - [Award date details]\nPlease do not miss any information pertaining to the award. Thoroughly analyze the document before responding, and please be 100% accurate."
+              }
+            },
+            {
+              "name": "Prompt",
+              "data": {
+                "type": "prompt",
+                "search_set_item_id": "682e06c73885da85222da0fe",
+                "search_set_item_title": "Application Components (RFA)",
+                "prompt": "We are building a checklist based on this Grant RFA document. I want you to thoroughly analyze this document and extract a comprehensive list of all application components required and optional for submission.\n\n**Important: Different agencies use different terminology for application requirements sections. Look for sections with titles such as:**\n- \"Application Components\"\n- \"Proposal Preparation and Submission Instructions\"\n- \"Application and Submission Information\"\n- \"Required Documents\"\n- \"Submission Requirements\"\n- \"Proposal Requirements\"\n- \"Proposal Content\"\n- \"Required Application Materials\"\n- \"How to Apply\"\n\n**Even if these exact section titles aren't present, identify application components by looking for:**\n1. Structured lists of requirements (numbered or bulleted)\n2. Language indicating necessity (\"must include,\" \"required,\" \"shall contain\")\n3. Language indicating optionality (\"optional,\" \"may include,\" \"if applicable\")\n4. Sections describing what should be submitted or included in proposals\n5. Directions about proposal format, organization, or content\n6. Checklists or tables summarizing required elements\n\nPlease organize your response as follows:\n\n**REQUIRED APPLICATION COMPONENTS:**\n- Create a detailed table with 'Component Name', 'Description/Details', and 'Special Requirements' as headers\n- For each required component list:\n  * The exact name of the component as stated in the document\n  * Brief description of what the component should contain\n  * Any specific requirements (page limits, format specifications, word counts, etc.)\n\n**OPTIONAL APPLICATION COMPONENTS:**\n- Create a detailed table with same format as required components\n- Include ANY components that:\n  * Are explicitly marked as optional\n  * Are permitted but not required\n  * Are described as components that \"may be included\" or similar phrasing\n  * Are referenced to external documents (e.g., \"as permitted by the NSF PAPPG\")\n\n**SUBMISSION DETAILS:**\n- List submission method and portal information\n- Note any file format requirements\n- Include rules for collaborative proposals or multi-institutional submissions\n- Detail any specific file naming conventions\n- Include any submission deadlines or timelines\n\n**SPECIAL REQUIREMENTS:**\n- Capture any unique aspects of this RFA not covered in other sections\n- Include special conditions, review criteria, or unusual instructions\n- Note any post-award requirements that would impact application preparation\n\nIf the application has different phases (e.g., pre-application, letter of intent, full application, nomination before full proposal), please provide separate sections for each phase with their respective components.\n\nWhen determining if something is required versus optional:\n1. Look for explicit language (\"must include,\" \"is required,\" etc.)\n2. Look for permissive language (\"may include,\" \"are allowed,\" etc.)\n3. Pay attention to contextual clues about requirements\n4. Include items referenced from external documents if their inclusion is allowed\n\nPlease be thorough and examine the ENTIRE document, including attachments, appendices, and footnotes. Some requirements may be scattered throughout different sections rather than consolidated in a dedicated \"application components\" section. Also pay special attention to sections like \"Eligibility Information\", \"Award Information\", and \"Review Criteria\" as these often contain implicit application requirements.\n\nAfter your initial analysis, double-check that you've captured ALL application components mentioned anywhere in the document before finalizing your response. Aim for 100% accuracy and completeness."
+              }
+            },
+            {
+              "name": "Prompt",
+              "data": {
+                "type": "prompt",
+                "search_set_item_id": "682e07293885da85222da0ff",
+                "search_set_item_title": "Budget Rules, Limitations, Policies, and Efforts (RFA)",
+                "prompt": "We are building a checklist based on this Grant RFA document. I want you to Extract a comprehensive and accurate summary of all budget-related **rules, limitations, policies, and effort commitments** specified within this grant RFA document focusing on information needed to construct a compliant budget.\n\n**Instructions:**\nThoroughly analyze the entire provided document, including the main body, appendices, footnotes, tables, and any referenced external guidelines (like agency-specific cost principles or the Uniform Guidance 2 CFR 200, if mentioned). Your objective is to capture every detail pertinent to the *rules and constraints* of budget preparation and management.\n\n**Key Areas and Information to Extract:**\n\n**1. Funding Limits & Constraints:**\n    * **Total Program Funding:** If mentioned, state the total amount allocated *for the entire program* (contextual information).\n    * **Funding per Year:** Detail any specific limits or expectations for funding amounts *per budget year*.\n    * **Category-Specific Limits:** Identify any caps or limits on specific budget categories (e.g., maximum for equipment, travel restrictions, indirect cost limits *not covered in section 3*).\n\n**2. Cost Sharing / Matching:**\n    * **Requirement:** Is cost sharing mandatory, voluntary, or prohibited? Quote specific language.\n    * **Type:** If required or allowed, specify the type (e.g., cash, in-kind, third-party).\n    * **Rate/Amount:** Detail the required percentage or specific amount of cost share.\n    * **Calculation Basis:** Explain how the cost share is calculated (e.g., percentage of total project costs, percentage of requested sponsor funds).\n    * **Documentation:** Describe any required documentation for cost share commitments (e.g., letters, specific budget justification details related *only* to cost share).\n    * **Source Restrictions:** Note any limitations on sources of cost-sharing funds.\n\n**3. Indirect Costs (F&A - Facilities & Administrative Costs):**\n    * **Policy:** State the agency's policy on indirect costs (e.g., use of federally negotiated rate, specific capped rate, total direct cost base, modified total direct cost base, prohibition).\n    * **Rate:** Specify the allowable rate or cap (e.g., \"use negotiated rate,\" \"capped at 10% MTDC,\" \"8% TDC\").\n    * **Base:** Identify the base to which the rate is applied (e.g., MTDC, TDC, Salaries & Wages). List exclusions if MTDC is specified.\n    * **Documentation:** Note any specific requirements for documenting the F&A rate in the budget itself (distinct from the justification document).\n    * **Restrictions:** Mention any specific cost categories excluded from the F&A base beyond standard MTDC exclusions or if unrecovered indirect costs are unallowable.\n\n**4. Allowable Costs:**\n    * List specific categories of costs explicitly mentioned as **allowable**.\n    * Note any specific conditions or limitations placed on otherwise allowable costs (e.g., travel must be coach class, equipment requires pre-approval).\n    * Reference any external cost principles documents cited (e.g., 2 CFR 200, agency-specific guidelines).\n\n**5. Unallowable Costs:**\n    * List specific categories of costs explicitly mentioned as **unallowable** or prohibited (e.g., construction, entertainment, lobbying, alcohol).\n    * Note any costs typically allowable under federal guidelines that are specifically disallowed by this solicitation.\n\n**6. Personnel Effort & Budgeting:**\n    * **PI/Key Personnel Effort:** Are there minimum or maximum effort requirements for the Principal Investigator or other key personnel?\n    * **Salary Caps:** Are there any institutional or sponsor-imposed salary caps mentioned?\n    * **Consultants/Collaborators:** Note any specific rules or limitations regarding budgeting for consultants or collaborators.\n    * **Student/Postdoc Support:** Detail any specific guidelines or limits on supporting students or postdoctoral researchers (e.g., stipend levels, tuition remission rules).\n\n**7. Other Budgetary Considerations:**\n    * **Program Income:** Are there rules regarding the treatment of program income?\n    * **Pre-Award Costs:** Are pre-award costs allowable? If so, under what conditions and timeframes?\n    * **Budget Revisions:** Are there rules mentioned regarding budget revisions post-award?\n    * **Specific Forms:** Are specific budget forms required (e.g., SF424 R&R Budget forms)? *(Note: This might overlap slightly with Application Components, but budget form requirements are often stated alongside budget rules).*\n\n**Search Strategy Guidance:**\n* Look for dedicated sections like \"Budget Information,\" \"Award Information,\" \"Cost Principles,\" \"Budget Guidelines,\" \"Financial Information,\" \"Allowable Costs,\" \"Cost Sharing.\"\n* Scan sections on \"Proposal Preparation,\" \"Application Guidelines,\" and \"Review Criteria\" as they often contain budget-related constraints.\n* Pay close attention to definitions, footnotes, and appendices.\n* Keywords to search for: \"budget,\" \"cost,\" \"funding,\" \"allowable,\" \"unallowable,\" \"prohibited,\" \"indirect,\" \"F&A,\" \"overhead,\" \"cost share,\" \"match,\" \"effort,\" \"salary,\" \"stipend,\" \"travel,\" \"equipment,\" \"limit,\" \"cap,\" \"restriction,\" \"rate,\" \"base,\" \"policy.\"\n\n**Output Format:**\nOrganize the extracted information clearly under the headings listed above (1-7). Use bullet points for detailed items within each section. Quote specific dollar amounts, percentages, rates, and relevant policy language directly from the document where possible. If information for a category is not found, explicitly state \"Not specified\" or \"No information found.\"\n\n**Final Check:** Before concluding, reread your extracted summary and compare it against the document one last time to ensure no critical budget *rules or constraints* have been overlooked. Aim for 100% accuracy and completeness regarding all financial and budgetary aspects relevant to budget preparation."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Formatting Prompt",
+          "data": {},
+          "is_output": false,
+          "tasks": [
+            {
+              "name": "Prompt",
+              "data": {
+                "prompt": "   **Task:** Synthesize and format the provided collection of extracted grant information (covering dates, eligibility, award details, application components, submission details, special requirements, and budget rules) into a single, comprehensive, accurate, and easy-to-follow checklist. The absolute priorities are clarity and the **strict elimination of any redundant information**.\n\n**Input:** A collection of text outputs generated by previous analysis steps, containing details on:\n* Dates & Deadlines (likely in table format)\n* Eligible Institutions (list/criteria)\n* Eligible Individuals (list/criteria)\n* Award Information (duration, amount, number, date; may contain preliminary mentions of matching/indirect costs/restrictions)\n* Application Components (Required/Optional tables with name, description, special requirements like page limits)\n* Submission Details (method, portal, formats, collaboration rules, naming)\n* Special Requirements (unique RFA aspects, conditions, review criteria)\n* Budget Requirements & Policies (detailed rules on funding limits, cost sharing, F&A, allowable/unallowable costs, personnel, etc.)\n\n**Instructions:**\n\n1.  **Consolidate & Deduplicate:** Analyze the entire input. Identify and merge overlapping information. Each unique piece of data must appear **only once** in the most logical section of the final checklist, following the placement rules below.\n2.  **Structure:** Organize the consolidated information into the following primary sections with clear headings:\n    * DATES & DEADLINES\n    * ELIGIBILITY\n    * AWARD INFORMATION\n    * APPLICATION COMPONENTS\n    * BUDGET REQUIREMENTS & POLICIES\n    * SUBMISSION DETAIL\n    * SPECIAL REQUIREMENTS (Use only for unique items not fitting elsewhere)\n    * IMPORTANT NOTES\n\n3.  **General Formatting:**\n    * Use bulleted lists (`*` or `-`) consistently for items within sections.\n    * Use **bold text** for key requirements, limits, or critical action items.\n    * Use *italics* sparingly for emphasis on critical deadlines or warnings.\n\n4.  **Section-Specific Content Placement Rules (Strict Adherence Required):**\n\n    * **DATES & DEADLINES:**\n        * Use the input table format (`Deadline/Event`, `Date/Time`, `Notes`). Ensure all unique dates from the input are included chronologically.\n\n    * **ELIGIBILITY:**\n        * Create subsections: `Eligible Institutions`, `Eligible Individuals`.\n        * Consolidate all criteria and limitations for each from the respective input sections. Note key limitations (e.g., **one nomination per institution**).\n\n    * **AWARD INFORMATION:**\n        * This section is the **sole location** for the primary award parameters: **Anticipated Award Duration**, **Total Amount per Award** (overall ceiling/range), **Anticipated Number of Awards**, **Anticipated Award Date**.\n        * *Deduplication Rule:* While the input for this section might mention matching/indirect costs/restrictions, place the *detailed rules* for these ONLY in the `BUDGET REQUIREMENTS & POLICIES` section. Briefly mention *if* matching is optional/required here if stated alongside the award amount, but the detailed policy goes in Budget.\n\n    * **BUDGET REQUIREMENTS & POLICIES:**\n        * This section is the **sole location** for all detailed financial rules extracted by the budget prompt:\n            * *Cost Sharing/Matching:* Requirement, Rate/Amount, Type, Documentation Rules.\n            * *Indirect Costs (F&A):* Policy, **Rate**, **Base**, Restrictions (e.g., unrecovered IDC unallowable).\n            * *Funding Limits:* **Category-specific caps**, per-year limits. (Exclude the overall award ceiling/range, which belongs in `AWARD INFORMATION`).\n            * *Allowable/Unallowable Costs:* List specific examples/prohibitions.\n            * *Personnel:* Effort rules, **Salary Caps**, consultant/student rules.\n            * *Other:* Pre-award costs, budget revisions, program income, required budget forms (if extracted here).\n        * *Deduplication Rule:* Do **not** repeat the overall Award Amount or Duration here.\n\n   * **APPLICATION COMPONENTS:**\n        * Create subsections: `REQUIRED Components`, `OPTIONAL Components`.\n        * Use the input table format (`Component Name`, `Description/Details`, `Special Requirements`) for BOTH subsections. Ensure all unique components are listed.\n        * **Always format as two separate tables:**\n            - **REQUIRED Components table:** Must always be present with extracted required components\n            - **OPTIONAL Components table:** Must always be present. If no optional components are found in the extraction, create the table with a single row stating \"Not specified in this document\" in the Component Name column, with empty Description/Details and Special Requirements columns.\n        * Include requirements for documents like the Budget Justification here.\n        * *Placement Rule:* Information extracted under \"Special Requirements\" *within the Application Components prompt* that clearly applies to a *specific component* (like a page limit) should stay with that component here. General RFA-wide special requirements belong in the main `SPECIAL REQUIREMENTS` section below.\n\n\n    * **SUBMISSION DETAILS:**\n        * Consolidate all information extracted under this heading by the Application Components prompt: **Method/Portal**, **Technical Requirements** (formats, naming), **Collaboration Rules**.\n\n    * **SPECIAL REQUIREMENTS:**\n        * Consolidate unique RFA aspects, conditions, or review criteria extracted under this heading by the Application Components prompt that do **not** logically fit into other sections.\n\n    * **IMPORTANT NOTES:**\n        * Add critical warnings, common pitfalls, or essential context identified during extraction or synthesis.\n\n5.  **Final Review (Mandatory):** Before outputting:\n    * **Completeness Check:** Is ALL unique input information present?\n    * **Deduplication Check:** Is ANY information repeated? (Pay extreme attention to Award Info vs. Budget rules). Remove duplicates based on placement rules.\n    * **Placement Check:** Is every item in the correct section per the rules?\n    * **Clarity Check:** Is the checklist clear, organized, and easy to understand?\n\n**Output:** A single, well-formatted Markdown checklist adhering strictly to the structure, content placement rules, and deduplication requirements."
+              }
+            }
+          ]
+        }
+      ],
+      "input_config": {},
+      "output_config": {},
+      "validation_plan": [
+        {
+          "id": "1d23e996-a15b-4383-a7e8-f04aaad59ddc",
+          "name": "Primary Sections Presence",
+          "description": "Verify that the final checklist contains all eight primary headings in the exact order and spelling: **DATES & DEADLINES**, **ELIGIBILITY**, **AWARD INFORMATION**, **APPLICATION COMPONENTS**, **BUDGET REQUIREMENTS & POLICIES**, **SUBMISSION DETAIL**, **SPECIAL REQUIREMENTS**, and **IMPORTANT NOTES**. Each heading should be on its own line and formatted as a level‑2 markdown heading (e.g., `## DATES & DEADLINES`).",
+          "category": "completeness"
+        },
+        {
+          "id": "efef8ec2-95c7-40d4-9b45-619c789ec516",
+          "name": "Dates & Deadlines Table Format",
+          "description": "Check that the **DATES & DEADLINES** section contains a markdown table with three columns titled exactly `Item`, `Date/Time`, and `Notes`. The table must include the header row, a separator row (e.g., `---|---|---`), and at least one data row. Verify that pipe (`|`) characters are used to create borders and that no date information is omitted.",
+          "category": "formatting"
+        },
+        {
+          "id": "3401177f-3ffc-4535-8903-4369e02b8b5a",
+          "name": "Eligibility Content Coverage",
+          "description": "Within the **ELIGIBILITY** section confirm there are two distinct bullet‑list subsections labeled **Eligible Institutions** and **Eligible Individuals** (or clearly identifiable headings). Each bullet must list a type of institution/individual and include any associated compliance requirements or sub‑category details extracted from the source RFA. No eligible type should be missing.",
+          "category": "completeness"
+        },
+        {
+          "id": "ce9a06f4-21df-4d71-9620-6c6925fa87d3",
+          "name": "Award Information Completeness",
+          "description": "Ensure the **AWARD INFORMATION** section lists all four required items with the exact labels: **Anticipated Award Duration**, **Amount per Award**, **Anticipated Number of Awards**, and **Anticipated Award Date**. Each item should be followed by its corresponding details (e.g., duration length, dollar amount, number of awards, award date) and any sub‑points such as matching funds or indirect‑cost restrictions.",
+          "category": "completeness"
+        },
+        {
+          "id": "f6138c75-330a-400a-83d1-fdfc395e187c",
+          "name": "Application Components Tables",
+          "description": "Confirm that the **APPLICATION COMPONENTS** section contains two separate markdown tables titled **REQUIRED APPLICATION COMPONENTS** and **OPTIONAL APPLICATION COMPONENTS**. Each table must have three columns exactly named `Component Name`, `Description/Details`, and `Special Requirements`. Both tables should include at least one row of data (optional table can be empty only if the source RFA truly has no optional components).",
+          "category": "formatting"
+        },
+        {
+          "id": "a1cf65c8-b6da-4ff4-8207-100ab3f92f88",
+          "name": "Budget Requirements Sub‑headings",
+          "description": "In the **BUDGET REQUIREMENTS & POLICIES** section check for the presence of the three key sub‑headings: **Funding Limits & Constraints**, **Cost Sharing / Matching**, and **Indirect Costs (F&A)**. Under each sub‑heading there must be at least one bullet point that captures a specific rule, limit, or policy extracted from the RFA (e.g., total program funding amount, mandatory cost‑share percentage, indirect‑cost rate).",
+          "category": "completeness"
+        },
+        {
+          "id": "472bd2b5-1fb4-4ef1-90fc-94a0ec8765e0",
+          "name": "Formatting Consistency & Redundancy Elimination",
+          "description": "Review the entire checklist for consistent markdown formatting: headings use `##`, bullet points use `*` (or `-`) uniformly, bold text (`**bold**`) is applied to all key requirements or limits, and italics are used sparingly. Additionally, scan for any identical sentence or bullet that appears more than once; the checklist must not contain duplicated information.",
+          "category": "formatting"
+        }
+      ],
+      "validation_inputs": []
+    }
+  ]
+}

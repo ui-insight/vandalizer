@@ -8,7 +8,7 @@
 #    ./setup.sh --repair       Diagnose and fix a broken deployment
 #    ./setup.sh --upgrade      Scan origin for new code & catalog, apply what's outdated
 #    ./setup.sh --redeploy     Rebuild and restart from current code (no git pull)
-#    ./setup.sh --seed         Update verified catalog (add new seed data)
+#    ./setup.sh --seed         Update verified catalog (add/refresh, retire dropped items with your OK)
 #    ./setup.sh --reset-catalog  Wipe catalog metadata and re-seed from current version
 #    ./setup.sh --reingest     Re-ingest all knowledge base content into ChromaDB
 #    ./setup.sh --reset-email  Reconfigure email provider (SMTP or Resend)
@@ -590,6 +590,23 @@ build_image() {
   local label="$2"
   local logfile="${SETUP_LOG}.${service}"
 
+  # Stamp the image with a real version on EVERY build path (full setup,
+  # redeploy, and upgrade all funnel through build_image). compose passes
+  # ${VERSION} as the backend build-arg -> /app/VERSION -> /api/config/version,
+  # shown in the account-menu footer. Computed once; the export persists in this
+  # shell for sibling builds (e.g. the direct `compose build celery`).
+  # Precedence: explicit VERSION env > .vandalizer_version (image deploys) >
+  # git describe > "dev" when none are available (tarball / no git).
+  if [[ -z "${VERSION:-}" ]]; then
+    if [[ -f "$CODE_VERSION_FILE" ]]; then
+      VERSION=$(tr -d '[:space:]' < "$CODE_VERSION_FILE")
+    else
+      VERSION=$(git describe --tags --always 2>/dev/null || echo dev)
+    fi
+    export VERSION
+    echo -e "  ${SYM_CHECK}  Build version: ${BOLD}${VERSION}${RESET}"
+  fi
+
   echo -e "  ${SYM_NEURAL}  ${BOLD}Building ${label}...${RESET}"
 
   # Run build in background, tee to logfile
@@ -820,6 +837,15 @@ bootstrap() {
   fi
 
   echo ""
+  echo -e "  ${SYM_NEURAL}  ${BOLD}Institution${RESET}"
+  echo -e "  ${DIM}     Used for deployment branding and as the default institution on${RESET}"
+  echo -e "  ${DIM}     creator credits (\"by Jane Doe at <institution>\") when items are${RESET}"
+  echo -e "  ${DIM}     verified into the catalog. Leave blank to skip.${RESET}"
+  echo ""
+  local ORG_NAME=""
+  prompt "Institution / organization name" "" ORG_NAME
+
+  echo ""
   echo -e "  ${SYM_NEURAL}  ${BOLD}Verified catalog${RESET}"
   echo -e "  ${DIM}     The bootstrap will also seed research administration content:${RESET}"
   echo -e "  ${DIM}       •  Verified workflows (e.g. proposal review, compliance checks)${RESET}"
@@ -840,7 +866,7 @@ bootstrap() {
 
   if [[ -n "$container_name" ]]; then
     # Pass credentials via stdin to Python — no shell expansion, no temp files
-    bootstrap_output=$(printf '%s\n' "$ADMIN_EMAIL" "$ADMIN_PASSWORD" "$ADMIN_NAME" "$DEFAULT_TEAM_NAME" | \
+    bootstrap_output=$(printf '%s\n' "$ADMIN_EMAIL" "$ADMIN_PASSWORD" "$ADMIN_NAME" "$DEFAULT_TEAM_NAME" "$ORG_NAME" | \
       docker exec -i "$container_name" python -c "
 import sys, os, runpy
 lines = sys.stdin.read().split('\n')
@@ -848,6 +874,7 @@ os.environ['ADMIN_EMAIL'] = lines[0] if len(lines) > 0 else ''
 os.environ['ADMIN_PASSWORD'] = lines[1] if len(lines) > 1 else ''
 os.environ['ADMIN_NAME'] = lines[2] if len(lines) > 2 else ''
 os.environ['DEFAULT_TEAM_NAME'] = lines[3] if len(lines) > 3 else ''
+os.environ['ORG_NAME'] = lines[4] if len(lines) > 4 else ''
 runpy.run_path('bootstrap_install.py', run_name='__main__')
 " 2>&1)
     bootstrap_exit=$?
@@ -1692,6 +1719,80 @@ redeploy() {
   echo -e "  ${BRIGHT_GREEN}${BOLD}Redeploy complete.${RESET}"
 }
 
+# Capture the institution/org name during redeploy ONLY when it was never set
+# (e.g. the operator skipped it at first install). org_name lives in the DB
+# (SystemConfig.org_name) and survives rebuilds, so we never re-ask once it's set,
+# and we never prompt non-interactively (auto-update/cron must not block).
+prompt_org_name_if_unset() {
+  [[ -t 0 ]] || return 0   # non-interactive (e.g. auto-update) — skip silently
+
+  local mongo_container api_container mongo_db current_org
+  mongo_container=$($COMPOSE_CMD ps --format '{{.Service}} {{.Name}}' 2>/dev/null | awk '$1=="mongo"{print $2}' || true)
+  api_container=$($COMPOSE_CMD ps --format '{{.Service}} {{.Name}}' 2>/dev/null | awk '$1=="api"{print $2}' || true)
+  [[ -n "$mongo_container" && -n "$api_container" ]] || return 0
+
+  mongo_db="vandalizer"
+  if [[ -f "$ENV_FILE" ]]; then
+    local env_db
+    env_db=$(grep -E "^MONGO_DB=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d'=' -f2-)
+    [[ -n "$env_db" ]] && mongo_db="$env_db"
+  fi
+
+  # Read the current org name. On any query error, skip — better to stay quiet
+  # than nag on a transient DB hiccup.
+  current_org=$(docker exec "$mongo_container" mongosh --quiet --eval \
+    "print(((db.getSiblingDB('${mongo_db}').system_config.findOne()||{}).org_name)||'')" 2>/dev/null | tr -d '\r' || echo "__ERR__")
+  [[ "$current_org" == "__ERR__" ]] && return 0
+  [[ -n "${current_org// /}" ]] && return 0   # already set — nothing to do
+
+  echo ""
+  echo -e "  ${SYM_NEURAL}  ${BOLD}Institution${RESET}"
+  echo -e "  ${DIM}     No institution/organization name is set for this deployment.${RESET}"
+  echo -e "  ${DIM}     Used for branding and creator credit on verified catalog items.${RESET}"
+  echo -e "  ${DIM}     Leave blank to skip (set it later in Admin → Theme).${RESET}"
+  echo ""
+  local ORG_NAME=""
+  prompt "Institution / organization name" "" ORG_NAME
+  if [[ -z "${ORG_NAME// /}" ]]; then
+    echo -e "  ${DIM}     Skipped — no institution name set.${RESET}"
+    return 0
+  fi
+
+  # Persist through the app's own code: get_config() creates/defaults the
+  # singleton safely and never overwrites an already-set value.
+  local out
+  out=$(printf '%s' "$ORG_NAME" | docker exec -i "$api_container" python -c "
+import sys, os, asyncio
+os.environ['ORG_NAME'] = sys.stdin.read().strip()
+from app.config import Settings
+from app.database import init_db
+async def main():
+    org = os.environ['ORG_NAME'].strip()
+    if not org:
+        return
+    await init_db(Settings())
+    from app.models.system_config import SystemConfig
+    cfg = await SystemConfig.get_config()
+    if not (cfg.org_name or '').strip():
+        cfg.org_name = org
+        await cfg.save()
+        print('ORG_SET:' + org)
+    else:
+        print('ORG_KEPT:' + cfg.org_name)
+asyncio.run(main())
+" 2>&1 || true)
+
+  if echo "$out" | grep -q "ORG_SET:"; then
+    echo -e "  ${SYM_CHECK}  Institution recorded: ${BOLD}${ORG_NAME}${RESET}"
+  elif echo "$out" | grep -q "ORG_KEPT:"; then
+    echo -e "  ${SYM_CHECK}  Institution already set; left as is."
+  else
+    echo -e "  ${SYM_WARN}  ${YELLOW}Could not record institution name (set it later in Admin → Theme).${RESET}"
+    log "prompt_org_name_if_unset output:"
+    log "$out"
+  fi
+}
+
 # Shared rebuild+restart logic used by upgrade and redeploy
 do_redeploy() {
   echo ""
@@ -1728,6 +1829,9 @@ do_redeploy() {
   wait_healthy "api" "API server" 90
   wait_for_api 90
   wait_healthy "frontend" "Frontend" 60
+
+  # One-time: capture the institution name if this deployment never set one.
+  prompt_org_name_if_unset
 
   # Clean up dangling images and build cache to reclaim disk space
   echo ""
@@ -1819,7 +1923,8 @@ update_catalog() {
   section "S" "Update Verified Catalog"
 
   echo -e "  ${DIM}     Re-seeding verified workflows, extractions, and knowledge bases.${RESET}"
-  echo -e "  ${DIM}     Existing items are skipped — only new seed data is added.${RESET}"
+  echo -e "  ${DIM}     New items are added and existing ones refreshed. Items dropped from${RESET}"
+  echo -e "  ${DIM}     the catalog can be retired (removed from explore) with your OK.${RESET}"
   echo ""
 
   # Find the API container
@@ -1835,8 +1940,63 @@ update_catalog() {
   echo -e "  ${SYM_ARROW}  Using container: ${BOLD}${container_name}${RESET}"
   echo ""
 
+  # --- Guard: seeding runs INSIDE the container, against the seed files baked
+  # into its image — not the files in this checkout. If the running container
+  # was built before the checkout's catalog version, seeding would silently
+  # re-apply the old catalog, record the old version, and the upgrade prompt
+  # would come back on every run. Require a rebuild first.
+  local checkout_catalog container_catalog remote_catalog
+  checkout_catalog=$(tr -d '[:space:]' < "$SEEDS_VERSION_FILE" 2>/dev/null || echo "")
+  remote_catalog=$(catalog_version_latest)
+  if is_newer "$remote_catalog" "$checkout_catalog"; then
+    echo -e "  ${SYM_CROSS}  ${RED}${BOLD}Your checkout is older than the latest catalog.${RESET}"
+    echo -e "  ${DIM}     Checkout catalog: ${checkout_catalog:-unknown}   Latest on origin: ${remote_catalog}${RESET}"
+    echo -e "  ${DIM}     Pull the latest code (which carries the catalog files) first:${RESET}"
+    echo -e "  ${GRAY}       ./setup.sh --upgrade${RESET}"
+    return 1
+  fi
+  container_catalog=$(docker exec "$container_name" cat seeds/VERSION 2>/dev/null | tr -d '[:space:]' || echo "")
+  if [[ -n "$checkout_catalog" ]] && is_newer "$checkout_catalog" "$container_catalog"; then
+    echo -e "  ${SYM_CROSS}  ${RED}${BOLD}The running container is older than your checkout.${RESET}"
+    echo -e "  ${DIM}     Container catalog: ${container_catalog:-unknown}   Checkout catalog: ${checkout_catalog}${RESET}"
+    echo -e "  ${DIM}     The container only knows the catalog its image was built with, so${RESET}"
+    echo -e "  ${DIM}     updating now would re-apply the old catalog. Rebuild first:${RESET}"
+    echo -e "  ${GRAY}       ./setup.sh --redeploy${RESET}  ${DIM}then${RESET}  ${GRAY}./setup.sh --seed${RESET}"
+    return 1
+  fi
+
+  # --- Step 1: preview retirements (items dropped from the catalog) ---
+  # Dry run makes no changes; it just lists verified items whose seed_id is gone.
+  local prune_flag=""
+  local preview
+  if preview=$(docker exec "$container_name" python -m scripts.seed_catalog --prune --dry-run 2>&1); then
+    local retire_count
+    retire_count=$(echo "$preview" | grep -E '^Retiring [0-9]+ item' | head -1 | sed -E 's/^Retiring ([0-9]+) item.*/\1/' || echo "0")
+    if [[ -n "$retire_count" && "$retire_count" -gt 0 ]]; then
+      echo -e "  ${SYM_WARN}  ${YELLOW}${BOLD}${retire_count} item(s) were dropped from the catalog and can be retired:${RESET}"
+      # Show the bullet list of items the prune pass identified.
+      echo "$preview" | grep -E '^  - \[' | while IFS= read -r line; do
+        echo -e "  ${DIM}    ${line}${RESET}"
+      done
+      echo ""
+      echo -e "  ${DIM}     Retiring soft-archives them (verified=False, removed from explore).${RESET}"
+      echo -e "  ${DIM}     The underlying rows are kept, so this is reversible.${RESET}"
+      echo ""
+      echo -ne "  ${SYM_ARROW}  Retire these ${retire_count} item(s) during the update? [y/N]: "
+      local confirm
+      read -r confirm
+      if [[ "$confirm" =~ ^[Yy] ]]; then
+        prune_flag="--prune"
+      else
+        echo -e "  ${DIM}     Keeping them — running an additive update only.${RESET}"
+      fi
+      echo ""
+    fi
+  fi
+
+  # --- Step 2: seed (with --prune only if the user confirmed retirements) ---
   local seed_output
-  if seed_output=$(docker exec "$container_name" python -m scripts.seed_catalog 2>&1); then
+  if seed_output=$(docker exec "$container_name" python -m scripts.seed_catalog $prune_flag 2>&1); then
     # Display the output with indentation
     while IFS= read -r line; do
       echo -e "  ${DIM}     ${line}${RESET}"

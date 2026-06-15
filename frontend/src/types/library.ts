@@ -5,6 +5,8 @@ export interface AuthorRef {
   user_id: string
   name: string | null
   email: string | null
+  /** Institution for static catalog credits ("by Jane Doe at University of Idaho"). */
+  org?: string | null
 }
 
 export interface Library {
@@ -167,6 +169,8 @@ export interface VerifiedCatalogItem {
   source_uuid?: string
   created_by?: AuthorRef | null
   submitted_by?: AuthorRef | null
+  /** Static creator credit that survives catalog distribution to other installs. */
+  credit?: AuthorRef | null
 }
 
 export interface VerifiedCollection {

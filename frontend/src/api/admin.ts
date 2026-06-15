@@ -15,6 +15,60 @@ export function getVersionStatus() {
   return apiFetch<VersionStatus>('/api/admin/system/version')
 }
 
+// Verified-catalog upgrade
+
+export interface CatalogJob {
+  state: 'running' | 'completed' | 'failed'
+  target_version: string
+  started_at?: string
+  finished_at?: string
+  by?: string
+  prune?: boolean
+  message?: string
+  summary?: {
+    created: number
+    updated: number
+    retired: number
+    retired_items?: CatalogItem[]
+  }
+}
+
+export interface CatalogStatus {
+  applied_version: string | null
+  bundled_version: string
+  update_available: boolean
+  job: CatalogJob | null
+}
+
+export interface CatalogItem {
+  type: string
+  label: string
+  seed_id: string
+  name: string
+  id?: string
+}
+
+export interface CatalogPreview extends CatalogStatus {
+  counts: { new: number; refreshed: number; retiring: number }
+  new: CatalogItem[]
+  retiring: CatalogItem[]
+}
+
+export function getCatalogStatus() {
+  return apiFetch<CatalogStatus>('/api/admin/catalog/status')
+}
+
+export function getCatalogPreview() {
+  return apiFetch<CatalogPreview>('/api/admin/catalog/preview')
+}
+
+export function applyCatalogUpgrade(prune: boolean) {
+  return apiFetch<{ status: string; target_version: string; prune: boolean }>(
+    '/api/admin/catalog/upgrade',
+    { method: 'POST', body: JSON.stringify({ prune }) },
+  )
+}
+
 // Usage
 
 export interface UsageStats {

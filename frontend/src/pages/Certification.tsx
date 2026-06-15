@@ -441,27 +441,27 @@ export const MODULES: ModuleDefinition[] = [
     number: 6,
     title: 'Advanced Nodes',
     subtitle: 'Parallel Tasks & Power Nodes',
-    description: 'Process a sample budget justification document using Code Execution to validate totals and parallel tasks for concurrent processing.',
+    description: 'Process a sample budget justification document using an advanced node (the Research node) to analyze the figures, plus parallel tasks for concurrent processing.',
     objectives: [
       'Add the sample budget justification to your workspace',
-      'Use a Code Execution node to compute and verify budget totals',
+      'Use an advanced node (Research, API, or Crawler) to analyze the budget',
       'Run 2+ tasks in parallel within a single step',
     ],
     tips: [
       'The budget has personnel costs, supplies, travel, and subaward line items that should sum to $542,800',
-      'Use Code Execution to parse extracted numbers and compute sums for validation',
-      'Add a parallel Prompt task alongside Code Execution to generate a budget narrative',
+      'Use the Research node to analyze the extracted figures and check whether the line items add up — it runs two LLM passes over the data, no URL or API key required',
+      'Add a parallel Prompt task alongside the Research node to generate a budget narrative',
     ],
     lessons: [
       {
         title: 'Beyond extraction and prompts',
-        content: 'Vandalizer has 17 different node types. So far you\'ve used Extraction, Prompt, and Format \u2014 but the advanced nodes let you go much further:\n\n\u2022 **Code Execution** \u2014 Run sandboxed Python to transform data, do calculations, or apply custom logic.\n\u2022 **API Call** \u2014 Make HTTP requests to external services.\n\u2022 **Research** \u2014 Two-pass analysis: first analyzes the data, then synthesizes findings.\n\u2022 **Crawler** \u2014 Fetch and extract text from websites.\n\u2022 **Add Document / Add Website** \u2014 Inject additional context mid-workflow.\n\u2022 **Browser Automation** \u2014 Drive a Chrome browser session for complex web interactions.',
+        content: 'Vandalizer has 17 different node types. So far you\'ve used Extraction, Prompt, and Format \u2014 but the advanced nodes let you go much further:\n\n\u2022 **Research** \u2014 Two-pass analysis: first analyzes the data, then synthesizes findings into a report. Works on your document \u2014 no URL or API key needed.\n\u2022 **API Call** \u2014 Make HTTP requests to external services.\n\u2022 **Crawler** \u2014 Fetch and extract text from websites.\n\u2022 **Add Document / Add Website** \u2014 Inject additional context mid-workflow.\n\u2022 **Code Execution** \u2014 Run sandboxed Python for calculations or custom logic. This is an admin-only power node and is not in the standard palette, so you won\'t use it in this challenge.',
         variant: 'concept',
       },
       {
         title: 'Code Execution: custom logic in your pipeline',
         objective: 'After this lesson, you\'ll know which kinds of logic belong in Code Execution rather than Prompt nodes.',
-        content: 'The Code Execution node lets you write Python that runs inside your workflow. This is powerful for:\n\n\u2022 **Data transformation** \u2014 Normalize dates, convert currencies, merge fields.\n\u2022 **Calculations** \u2014 Compute totals, percentages, or ratios from extracted numbers.\n\u2022 **Filtering** \u2014 Remove irrelevant results or flag outliers.\n\u2022 **Format conversion** \u2014 Reshape JSON into a different structure.\n\nThe code runs in a sandbox: no file system access, no network access, no imports beyond the standard library.',
+        content: 'The Code Execution node lets you write Python that runs inside your workflow. It is an **admin-only power node** that is not in the standard palette \u2014 you won\'t add it in this module, but it\'s worth knowing when it\'s the right tool. It is powerful for:\n\n\u2022 **Data transformation** \u2014 Normalize dates, convert currencies, merge fields.\n\u2022 **Calculations** \u2014 Compute totals, percentages, or ratios from extracted numbers.\n\u2022 **Filtering** \u2014 Remove irrelevant results or flag outliers.\n\u2022 **Format conversion** \u2014 Reshape JSON into a different structure.\n\nThe code runs in a sandbox: no file system access, no network access, no imports beyond the standard library. For document analysis without code \u2014 like checking whether a budget adds up \u2014 the Research node is the everyday equivalent.',
         variant: 'concept',
         knowledgeCheck: {
           question: 'Which task should use Code Execution instead of a Prompt node?',
@@ -475,13 +475,13 @@ export const MODULES: ModuleDefinition[] = [
       },
       {
         title: 'Running tasks in parallel',
-        content: 'Within a single step, you can add multiple tasks. These tasks run concurrently \u2014 the workflow engine uses a thread pool to execute them simultaneously.\n\nThis is useful when you need multiple independent operations:\n\u2022 Extract from two different Extractions at the same time\n\u2022 Call multiple APIs in parallel\n\u2022 Run an extraction while simultaneously fetching enrichment data from a website\n\nTo add parallel tasks, open a step in the workflow editor and click "Add Task" multiple times.',
+        content: 'Within a single step, you can add multiple tasks. These tasks run concurrently \u2014 the workflow engine starts them all at the same time and waits for them to finish together, instead of running them one after another.\n\nThis is useful when you need multiple independent operations:\n\u2022 Extract from two different Extractions at the same time\n\u2022 Call multiple APIs in parallel\n\u2022 Run an extraction while simultaneously fetching enrichment data from a website\n\nTo add parallel tasks, open a step in the workflow editor and click "Add Task" multiple times.',
         variant: 'concept',
         knowledgeCheck: {
           question: 'When you add multiple tasks to a single step, how do they run?',
           options: [
             { text: 'One at a time, in the order you added them', correct: false, explanation: 'Sequential execution would defeat the purpose of parallel tasks. Vandalizer runs them concurrently.' },
-            { text: 'Concurrently, using a thread pool', correct: true, explanation: 'Correct! Multiple tasks within a step run in parallel via a thread pool. Their results are collected and passed to the next step.' },
+            { text: 'Concurrently — they all run at the same time', correct: true, explanation: 'Correct! Multiple tasks within a step run in parallel — they all start at roughly the same time, and the step waits for them all to finish. Their results are collected and passed to the next step.' },
             { text: 'In a random order determined by server load', correct: false, explanation: 'Tasks run concurrently, not in a random order. All start at roughly the same time.' },
             { text: 'Only the first task runs; the rest are treated as fallbacks if it fails', correct: false, explanation: 'All tasks run. There\'s no fallback logic between tasks in a step.' },
           ],
@@ -489,7 +489,7 @@ export const MODULES: ModuleDefinition[] = [
       },
       {
         title: 'Build a workflow with advanced nodes',
-        content: '1. Create a workflow with at least 3 steps.\n2. In one step, add a Code Execution task. Write Python that transforms the previous step\'s output.\n3. Or, add an API Call task that fetches data from an external source.\n4. In another step, add 2 tasks to run in parallel.\n5. Run the workflow and review how parallel tasks\' outputs are combined.',
+        content: '1. Create a workflow with at least 3 steps.\n2. In one step, add a **Research** task. Give it a question like "Do these budget line items add up to the stated total?" and point its input at the document or the previous step\'s output.\n3. In the same step, add a second task (for example a Prompt task that writes a narrative summary) so two tasks run in parallel.\n4. Run the workflow and review how the parallel tasks\' outputs are combined.\n5. (Optional) Swap the Research node for an API Call or Crawler node to see other advanced node types.',
         variant: 'walkthrough',
       },
       {

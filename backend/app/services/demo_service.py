@@ -7,10 +7,13 @@ from typing import Optional
 
 
 from app.config import Settings
+from app.models.chat import ChatConversation
 from app.models.demo import DemoApplication, PostExperienceResponse
+from app.models.document import SmartDocument
 from app.models.email_log import EmailLog
 from app.models.team import Team, TeamMembership
 from app.models.user import User
+from app.models.workflow import Workflow, WorkflowResult
 from app.services.email_service import (
     send_email,
     test_email,
@@ -18,6 +21,7 @@ from app.services.email_service import (
     activation_email,
     expiry_warning_email,
     trial_expired_email,
+    trial_extended_email,
     recapture_email,
 )
 from app.utils.security import hash_password
@@ -28,6 +32,13 @@ logger = logging.getLogger(__name__)
 MAX_ACTIVE_DEMOS = 50
 MAX_PER_ORGANIZATION = 5
 TRIAL_DAYS = 14
+
+# Self-serve renewal from the end-of-trial screen
+MAX_SELF_EXTENSIONS = 2
+# A trial user who logged in but produced fewer than this many meaningful
+# artifacts (documents + workflow runs + chats) "didn't really get a chance to
+# try it" — the end screen offers them a frictionless one-click extension.
+LOW_ENGAGEMENT_MAX_ARTIFACTS = 3
 
 MAGIC_LINK_TTL_SECONDS = 48 * 60 * 60
 
@@ -290,9 +301,9 @@ async def check_expirations(settings: Settings | None = None) -> int:
                 user.demo_status = "locked"
                 await user.save()
 
-        # Send feedback email
-        feedback_url = f"{settings.frontend_url}/demo/feedback?token={app.post_questionnaire_token}"
-        subject, html = trial_expired_email(app.name, feedback_url)
+        # Send the friendly end-of-trial email pointing at the renew/feedback screen
+        trial_end_url = f"{settings.frontend_url}/demo/trial-end?token={app.post_questionnaire_token}"
+        subject, html = trial_expired_email(app.name, trial_end_url)
         await send_email(app.email, subject, html, settings, email_type="trial_expired")
         count += 1
 
@@ -467,6 +478,8 @@ async def admin_restart_trial(demo_uuid: str) -> bool:
     app.expired_at = None
     app.recapture_step = 0
     app.recapture_next_at = now + datetime.timedelta(days=_RECAPTURE_SCHEDULE_DAYS[0])
+    # Admin restart restores a fresh self-serve renewal runway.
+    app.trial_extensions_used = 0
     await app.save()
 
     if app.user_id:
@@ -477,6 +490,119 @@ async def admin_restart_trial(demo_uuid: str) -> bool:
             await user.save()
 
     return True
+
+
+async def compute_trial_engagement(user_id: str | None) -> str:
+    """Classify how much a trial user actually used the product.
+
+    Returns "low" if they never logged in or produced fewer than
+    LOW_ENGAGEMENT_MAX_ARTIFACTS meaningful artifacts (documents + workflow runs
+    + chats with messages), else "engaged".
+    """
+    if not user_id:
+        return "low"
+
+    user = await User.find_one(User.user_id == user_id)
+    if not user or user.last_login_at is None:
+        return "low"
+
+    docs = await SmartDocument.find(SmartDocument.user_id == user_id).count()
+
+    workflows = await Workflow.find(Workflow.user_id == user_id).to_list()
+    workflow_ids = [w.id for w in workflows]
+    runs = (
+        await WorkflowResult.find({"workflow": {"$in": workflow_ids}}).count()
+        if workflow_ids
+        else 0
+    )
+
+    chats = await ChatConversation.find(
+        {"user_id": user_id, "messages": {"$ne": []}}
+    ).count()
+
+    total = docs + runs + chats
+    return "low" if total < LOW_ENGAGEMENT_MAX_ARTIFACTS else "engaged"
+
+
+async def get_trial_end_info(token: str) -> Optional[dict]:
+    """Validate an end-of-trial token and return the data the screen needs."""
+    app = await DemoApplication.find_one(
+        DemoApplication.post_questionnaire_token == token
+    )
+    if not app:
+        return None
+
+    engagement = await compute_trial_engagement(app.user_id)
+    return {
+        "name": app.name,
+        "organization": app.organization,
+        "engagement": engagement,
+        "extensions_used": app.trial_extensions_used,
+        "max_extensions": MAX_SELF_EXTENSIONS,
+        "can_self_extend": app.trial_extensions_used < MAX_SELF_EXTENSIONS,
+        "already_extended": app.trial_extensions_used > 0,
+    }
+
+
+async def self_extend_trial(
+    token: str, notes: dict | None = None, settings: Settings | None = None
+) -> dict:
+    """Self-serve trial renewal from the end-of-trial screen.
+
+    Extends the trial by TRIAL_DAYS and unlocks the account, up to
+    MAX_SELF_EXTENSIONS times. Optional post-trial notes are persisted as a
+    PostExperienceResponse. Returns {"ok": bool, ...}.
+    """
+    if settings is None:
+        settings = Settings()
+
+    app = await DemoApplication.find_one(
+        DemoApplication.post_questionnaire_token == token
+    )
+    if not app:
+        return {"ok": False, "reason": "invalid"}
+
+    if app.trial_extensions_used >= MAX_SELF_EXTENSIONS:
+        return {"ok": False, "reason": "cap_reached"}
+
+    # Persist any post-trial notes the user left (reuses the feedback model).
+    if notes:
+        await PostExperienceResponse(
+            uuid=secrets.token_urlsafe(12),
+            demo_application_id=app.id,
+            responses={"kind": "renewal_notes", **notes},
+            created_at=datetime.datetime.now(datetime.timezone.utc),
+        ).insert()
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    new_expires = now + datetime.timedelta(days=TRIAL_DAYS)
+
+    app.status = "active"
+    app.expires_at = new_expires
+    app.expired_at = None
+    app.trial_extensions_used += 1
+    app.recapture_step = 0
+    app.recapture_next_at = now + datetime.timedelta(days=_RECAPTURE_SCHEDULE_DAYS[0])
+    await app.save()
+
+    if app.user_id:
+        user = await User.find_one(User.user_id == app.user_id)
+        if user:
+            user.demo_status = "active"
+            user.demo_expires_at = new_expires
+            await user.save()
+
+    # Confirmation email
+    expires_str = new_expires.strftime("%B %d, %Y")
+    subject, html = trial_extended_email(app.name, expires_str, settings.frontend_url)
+    await send_email(app.email, subject, html, settings, email_type="trial_extended")
+
+    logger.info(
+        "Self-serve trial extension for %s (#%d)",
+        app.email,
+        app.trial_extensions_used,
+    )
+    return {"ok": True, "expires_at": new_expires.isoformat()}
 
 
 async def admin_add_demo_user(

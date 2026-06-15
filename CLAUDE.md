@@ -20,7 +20,7 @@ uvicorn app.main:app --reload --port 8001
 
 # Celery workers
 cd backend
-./run_celery.sh
+./run_celery.sh start
 
 # Frontend
 cd frontend

@@ -131,15 +131,17 @@
     }
   },
   "advanced_nodes": {
-    "overview": "Use advanced workflow nodes (Code Execution, parallel tasks) to process a sample budget justification. Click **Set Up Lab** to add the PDF, then design a workflow with advanced node types using chat to scaffold and refine it.",
+    "overview": "Use advanced workflow nodes (the Research node) and parallel tasks to process a sample budget justification. Click **Set Up Lab** to add the PDF, then build a workflow with an advanced node and a step that runs two tasks at once.",
     "documents": ["budget-justification.pdf"],
     "instructions": [
       "Click **Set Up Lab** to add the sample budget justification to your workspace.",
-      "In chat, sketch the workflow: *\"Design a 3-step workflow for budget verification. Step 1 extracts salary, supplies, travel, subawards, and indirect costs. Step 2 runs Python to sum line items and check totals. Step 3 (parallel to step 2) generates a budget narrative summary with a Prompt task.\"*",
-      "Open the workflow in the editor, add the Code Execution node and verify the Python sums line items correctly.",
-      "Ensure Step 2 has two parallel tasks: the Code Execution task and the Prompt narrative task.",
-      "From chat, run the workflow on **budget-justification.pdf**.",
-      "Confirm the Code Execution node produced computed totals and both parallel tasks completed."
+      "Create a workflow that processes the budget document using advanced nodes:",
+      "  **Step 1** — Extraction: Extract the salary table, supply costs, travel, subawards, and indirect costs.",
+      "  **Step 2** — Research node: Ask it to analyze the extracted figures and check whether the line items add up to the stated total. The Research node makes two LLM passes over the data — no URL or API key needed.",
+      "  **Step 2 (parallel)** — Add a second task to the same step: a Prompt task that writes a short budget narrative summary. Two tasks in one step run concurrently.",
+      "Run the workflow against **budget-justification.pdf**.",
+      "Verify the Research node produces a report and that both parallel tasks complete.",
+      "Note: the **Code Execution** node (sandboxed Python) is an admin-only power node and is not in the standard palette — the Research node covers this exercise for everyone."
     ],
     "expected_fields": [
       "Personnel", "Fringe Benefits", "Supplies", "Travel", "Subaward Costs",
@@ -150,7 +152,7 @@
       "Indirect Cost Rate": ["52%", "52", "0.52"]
     },
     "star_criteria": {
-      "1": "Use an advanced node type (Code, API, Research, Crawler, or Browser) + parallel tasks",
+      "1": "Use one advanced node (Research, API, or Crawler) and a step with 2+ parallel tasks",
       "2": "Use 2+ different advanced node types",
       "3": "Run 3+ parallel tasks within a single step"
     }

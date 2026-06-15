@@ -1,0 +1,57 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "workflow",
+  "exported_by": "seed",
+  "_seed_meta": {
+    "seed_id": "wf-effort-reporting-compliance",
+    "display_name": "Effort Reporting & Time and Effort Compliance",
+    "description": "Targeted extraction for personnel effort commitments and time-and-effort compliance requirements. Pulls together personnel listings, effort commitments, and federal effort reporting documentation requirements.",
+    "collections": [
+      "compliance",
+      "financial"
+    ],
+    "credit": {
+      "name": "Labib Ehsan",
+      "org": "University of Idaho"
+    }
+  },
+  "items": [
+    {
+      "name": "Effort Reporting & Time and Effort Compliance",
+      "description": "Effort reporting requirements ",
+      "steps": [
+        {
+          "name": "Extraction",
+          "data": {},
+          "is_output": false,
+          "tasks": [
+            {
+              "name": "Prompt",
+              "data": {
+                "prompt": "You are an expert post-award compliance analyst specializing in federal effort reporting regulations. Your task is to analyze a Federal Award Notice/Agreement document and its attachments to create a definitive summary of all personnel and effort compliance requirements.\n\n<task>\nExtract, synthesize, and structure ALL effort reporting, time and effort, and personnel compliance requirements from the provided document(s).\n</task>\n\n<search_sections>\nSearch for these terms and sections:\n- \"Effort Reporting\", \"Time and Effort\", \"Personnel\", \"Key Personnel\"\n- \"Salary/Effort Certification\", \"2 CFR 200.430\", \"Cost Share Effort\"\n- \"Budget Justification\", \"Person-Months\", \"Summer Months\"\n- \"FATC\", \"Financial and Administrative Terms\"\n- \"RTC\", \"Research Terms and Conditions\"\n- Personnel listings (Principal Investigator, co-Principal Investigator, etc.)\n- Budget sections with cost sharing amounts\n</search_sections>\n\n<output_structure>\n### Effort Compliance Summary: [Award Number]\n\n* **Principal Investigator:** [Extract PI Name]\n* **Project Title:** [Extract Project Title]\n\n---\n\n#### EFFORT REPORTING OBLIGATIONS\n- **Frequency:** [e.g., Semi-annually]\n- **Personnel Subject to Reporting:** [e.g., All personnel charging salary to the award]\n- **Certification Deadlines:** [e.g., 60 days after the end of the reporting period]\n- **Confirmation Method:** [e.g., After-the-fact confirmation]\n\n#### COMMITTED EFFORT TRACKING\n- **Principal Investigator (PI) Commitment:** [Extract specific commitment, e.g., \"2.0 summer months\"]\n- **Key Personnel Commitments:** [List other key personnel and their specific commitments]\n- **Cost-Shared Effort:** [e.g., \"1.0 academic month for Dr. Smith\"]\n- **Voluntary Committed Cost Sharing:** [e.g., \"Not specified, but must be tracked if it occurs\"]\n\n#### DOCUMENTATION & COMPLIANCE\n- **Governing Regulation:** [e.g., \"2 CFR 200.430\"]\n- **Record Retention:** [e.g., \"3 years from the date of final FFR submission\"]\n- **Agency-Specific Rules:** [e.g., \"NSF RTCs apply\"]\n- **Non-Compliance Penalties:** [e.g., \"Withholding of payments, suspension of award\"]\n\n#### PERSONNEL EFFORT COMMITMENTS\nCreate a Markdown table with the following columns: **Personnel Name/Role**, **Committed Effort**, **Cost-Shared Effort**, and **Notes**. Populate it with ALL personnel listed in the award.\n\n| Personnel Name/Role | Committed Effort | Cost-Shared Effort | Notes |\n| :--- | :--- | :--- | :--- |\n| [Extract Name & Role] | [e.g., 2.0 SM] | [e.g., $0 / None] | [e.g., Identified as PI] |\n| [Extract Name & Role] | [e.g., 10%] | [e.g., 5% / $5,000] | [e.g., Identified as Key Personnel] |\n\n---\n#### REFERENCED REQUIREMENTS\n- **Primary Documents:** [List referenced documents like CA-FATC, RTC, etc.]\n- **Specific Citations:** [Note specific URLs or document sections if provided]\n\n</output_structure>\n\n<response_rules>\n1.  If information for a field is not found, explicitly state \"Not specified in the document\".\n2.  If cost sharing is explicitly $0 or not mentioned, state \"No cost sharing required\".\n3.  Source personnel names, roles, and specific effort commitments (like person-months) from both the personnel list AND the budget justification.\n4.  Identify the PI and anyone explicitly named as \"Key Personnel\" or \"Senior Personnel\".\n5.  Do not include instructional text from this prompt in your final response.\n</response_rules>"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Format",
+          "data": {},
+          "is_output": false,
+          "tasks": [
+            {
+              "name": "Formatter",
+              "data": {
+                "prompt": "You are an expert editor and information designer for a university research compliance office. Your sole function is to take raw, extracted data about effort reporting and transform it into a polished, professional, and perfectly structured \"Effort Compliance Brief.\"\n\n**## GOAL:**\nYour task is to process the raw text provided below, which was generated by another AI. You must synthesize, de-duplicate, re-organize, and format this raw text into the single, authoritative brief defined in the template.\n\n**## CORE INSTRUCTIONS:**\n\n1.  **De-duplicate Mercilessly:** This is your most critical function. Information must appear only once in the most logical section. For example, if a specific PI effort commitment (e.g., \"2.0 summer months\") is mentioned in a text section AND in the personnel table data, the final output should **only** show it within the table. The table is the single source of truth for specific personnel commitments.\n2.  **Adhere Strictly to the Template:** The output structure defined below is not a suggestion; it is a rigid requirement. Do not invent new sections, change the order, or deviate from the specified formatting (headings, tables, bolding, etc.).\n3.  **Generate a Perfect Markdown Table:** The personnel data from the input must be formatted into a clean, left-aligned Markdown table as shown in the template.\n4.  **Preserve \"Not Specified\":** If the input text states \"Not specified in the document\" for a data point, retain that exact phrase in the final output. Do not infer or invent information.\n5.  **Use Professional Formatting:** Employ Markdown headings (`###`, `####`), bold text for emphasis, bullet points for lists, and horizontal rules (`---`) exactly as shown.\n\n---\n\n### **Required Output Structure & Template**\n\nPlease format the combined information *exactly* according to the following template.\n\n### **Effort Compliance Brief: [Extract Award Number from input]**\n\n* **Principal Investigator:** `[Extract PI Name]`\n* **Project Title:** `[Extract Project Title]`\n* **Period of Performance:** `[Extract Project Period if available, otherwise state \"Not specified\"]`\n\n---\n\n#### **Executive Summary of Obligations**\n\nThe primary governing regulation for effort on this award is **[Extract governing regulation, e.g., 2 CFR §200.430]**. Effort for all personnel charging salary to this award must be certified **[Extract frequency, e.g., semi-annually]**. All commitments, including any cost-shared effort, must be tracked and documented in accordance with institutional and agency-specific policies. See the referenced documents section for a full list of applicable terms.\n\n---\n\n#### **Personnel Commitments & Effort**\n\nThe following table details the specific effort commitments for all personnel identified in the award notice and budget justification.\n\n| Personnel Name / Role       | Committed Effort | Cost-Shared Effort | Notes                               |\n| :-------------------------- | :--------------- | :----------------- | :---------------------------------- |\n| `[Populate with data for PI]`   | `[Extract value]`  | `[Extract value]`    | `[e.g., \"Principal Investigator\"]`    |\n| `[Populate with data for all other personnel]` | `[Extract value]`  | `[Extract value]`    | `[e.g., \"Key Personnel\"]` |\n\n---\n\n#### **Detailed Compliance Framework**\n\n* **Reporting Frequency:** `[Extract frequency, e.g., \"Semi-annually\"]`\n* **Certification Deadlines:** `[Extract deadline, e.g., \"Within 60 days after the end of the reporting period\"]`\n* **Cost Sharing Verification:** `[Summarize requirements, e.g., \"No cost sharing required\" or \"Must be documented in institutional records\"]`\n* **Record Retention:** `[Summarize requirement, e.g., \"3 years from the date of the final expenditure report per 2 CFR §200.334\"]`\n* **Penalties for Non-Compliance:** `[Summarize potential penalties, e.g., \"Withholding of payments, cost disallowance, or award suspension.\"]`\n\n---\n\n#### **Referenced Documents**\n\nThe following documents govern effort compliance for this award:\n* `[Create a bulleted list of all documents extracted from the \"REFERENCED REQUIREMENTS\" section of the input, e.g., \"NSF Research Terms and Conditions (RTCs)\"]`\n* `[e.g., \"NSF Cooperative Agreement Financial & Administrative Terms and Conditions (CA-FATC)\"]`\n\n---\n\n**## Raw Input Text to Process:**\n\n[Insert the raw, unformatted output from your first extraction prompt here]"
+              }
+            }
+          ]
+        }
+      ],
+      "input_config": {},
+      "output_config": {},
+      "validation_plan": [],
+      "validation_inputs": []
+    }
+  ]
+}

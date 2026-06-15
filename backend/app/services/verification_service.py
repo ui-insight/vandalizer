@@ -306,13 +306,32 @@ async def update_status(
         else:
             await _mark_item_verified(req.item_id, req.item_kind)
 
-        # Assign org visibility if provided
-        if organization_ids is not None:
+        # Stamp a static creator credit ("by Jane Doe at University of Idaho")
+        # so attribution survives catalog export/seeding to installs where the
+        # submitter's user account doesn't exist. Falls back to the submitter's
+        # display name and the deployment's institution (branding org_name).
+        credit_name = (req.submitter_name or "").strip()
+        if not credit_name:
+            ref = await resolve_author(req.submitter_user_id)
+            credit_name = (ref.name or "").strip() if ref else ""
+        credit_org = (req.submitter_org or "").strip()
+        if not credit_org:
+            try:
+                from app.models.system_config import SystemConfig
+                cfg = await SystemConfig.get_config()
+                credit_org = (cfg.org_name or "").strip()
+            except Exception:
+                credit_org = ""  # credit still records the name alone
+
+        # Assign org visibility / credit (single metadata upsert)
+        if organization_ids is not None or credit_name:
             await update_item_metadata(
                 item_kind=req.item_kind,
                 item_id=str(req.item_id),
                 user_id=reviewer_user_id,
                 organization_ids=organization_ids,
+                credit_name=credit_name or None,
+                credit_org=credit_org or None,
             )
 
         # Add to collections if provided
@@ -671,6 +690,14 @@ async def list_verified_items(
             "validation_run_count": meta.validation_run_count if meta else 0,
             "submitted_by": submitter_ref.model_dump() if submitter_ref else None,
             "created_by": creator_ref.model_dump() if creator_ref else None,
+            # Static credit shaped like an AuthorRef so the UI can fall back
+            # to it when the live submitter/creator doesn't exist locally
+            # (e.g. items distributed via the seeded catalog).
+            "credit": (
+                {"user_id": "credit", "name": meta.credit_name, "email": None,
+                 "org": meta.credit_org}
+                if meta and meta.credit_name else None
+            ),
         }
 
         # KB-specific metrics (from batch)
@@ -726,6 +753,8 @@ async def get_item_metadata(item_kind: str, item_id: str) -> dict | None:
         "description": meta.description,
         "markdown": meta.markdown,
         "organization_ids": meta.organization_ids,
+        "credit_name": meta.credit_name,
+        "credit_org": meta.credit_org,
         "updated_at": meta.updated_at.isoformat() if meta.updated_at else None,
         "updated_by_user_id": meta.updated_by_user_id,
         "quality_score": meta.quality_score,
@@ -753,6 +782,8 @@ async def update_item_metadata(
     description: str | None = None,
     markdown: str | None = None,
     organization_ids: list[str] | None = None,
+    credit_name: str | None = None,
+    credit_org: str | None = None,
 ) -> dict:
     """Upsert metadata for a verified item."""
     now = datetime.datetime.now(datetime.timezone.utc)
@@ -769,6 +800,10 @@ async def update_item_metadata(
             meta.markdown = markdown
         if organization_ids is not None:
             meta.organization_ids = organization_ids
+        if credit_name is not None:
+            meta.credit_name = credit_name
+        if credit_org is not None:
+            meta.credit_org = credit_org
         meta.updated_at = now
         meta.updated_by_user_id = user_id
         await meta.save()
@@ -780,6 +815,8 @@ async def update_item_metadata(
             description=description,
             markdown=markdown,
             organization_ids=organization_ids or [],
+            credit_name=credit_name,
+            credit_org=credit_org,
             updated_at=now,
             updated_by_user_id=user_id,
         )

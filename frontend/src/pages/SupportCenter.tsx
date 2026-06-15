@@ -276,7 +276,16 @@ function ListView({
       <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
         <div style={{ padding: '14px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <div style={{ fontSize: 15, fontWeight: 600 }}>Tickets</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+              <div style={{ fontSize: 15, fontWeight: 600 }}>Tickets</div>
+              {!loading && (
+                <span style={{ fontSize: 13, color: '#6b7280' }}>
+                  {hasFilters
+                    ? `Showing ${tickets.length} ${tickets.length === 1 ? 'ticket' : 'tickets'}`
+                    : `${tickets.length} ${tickets.length === 1 ? 'ticket' : 'tickets'}`}
+                </span>
+              )}
+            </div>
             {/* Search — matches ticket number, subject, requester, message body. */}
             <div style={{ position: 'relative', flex: '1 1 260px', maxWidth: 380 }}>
               <Search

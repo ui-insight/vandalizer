@@ -94,6 +94,7 @@ class KnowledgeBase(Document):
     rag_config_override: Optional[dict] = None
     rag_config_override_set_at: Optional[datetime.datetime] = None
     rag_config_override_run_uuid: Optional[str] = None  # which optimization run produced it
+    resource_config: dict = Field(default_factory=dict)  # provenance markers (e.g. {"seed_id": ...})
     created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
     updated_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
 

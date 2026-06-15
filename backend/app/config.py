@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     upload_dir: str = "../app/static/uploads"
     frontend_url: str = "http://localhost:5173"
     environment: str = "development"
+    # Human-readable name for THIS deployment, shown in the UI version footer so
+    # users can tell environments apart (e.g. "U of I Prod", "National Trial Prod").
+    # `environment` alone can't: both prods report "production". Falls back to
+    # `environment` when unset.
+    deployment_label: str = ""
     insight_endpoint: str = ""
     chromadb_persist_dir: str = "../app/static/db"
     # If set (e.g. "chromadb:8000"), connect to a Chroma server via HttpClient.

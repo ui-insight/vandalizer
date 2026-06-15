@@ -1,0 +1,56 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "workflow",
+  "exported_by": "seed",
+  "_seed_meta": {
+    "seed_id": "wf-noa-risk-analysis",
+    "display_name": "NOA Risk Analysis",
+    "description": "To assign a risk level to an award",
+    "collections": [
+      "post-award"
+    ],
+    "credit": {
+      "name": "Cindy Chipman",
+      "org": "University of Idaho"
+    }
+  },
+  "items": [
+    {
+      "name": "NOA Risk Analysis",
+      "description": "To assign a risk level to an award",
+      "steps": [
+        {
+          "name": "Analyze risk",
+          "data": {},
+          "is_output": false,
+          "tasks": [
+            {
+              "name": "Prompt",
+              "data": {
+                "prompt": "Using \"Risk_Domains.docx\" evaluate the risk of the attached Notice of Award"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Present the results as a table ",
+          "data": {},
+          "is_output": false,
+          "tasks": [
+            {
+              "name": "Formatter",
+              "data": {
+                "prompt": "Please provide the results as a table with risk in one column and the amount of risk on a scale of 1-5 in the next column.  1 is low risk and 5 is high risk.  Provide the results as a markdown table."
+              }
+            }
+          ]
+        }
+      ],
+      "input_config": {},
+      "output_config": {},
+      "validation_plan": [],
+      "validation_inputs": []
+    }
+  ]
+}
