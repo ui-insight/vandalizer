@@ -1719,6 +1719,80 @@ redeploy() {
   echo -e "  ${BRIGHT_GREEN}${BOLD}Redeploy complete.${RESET}"
 }
 
+# Capture the institution/org name during redeploy ONLY when it was never set
+# (e.g. the operator skipped it at first install). org_name lives in the DB
+# (SystemConfig.org_name) and survives rebuilds, so we never re-ask once it's set,
+# and we never prompt non-interactively (auto-update/cron must not block).
+prompt_org_name_if_unset() {
+  [[ -t 0 ]] || return 0   # non-interactive (e.g. auto-update) — skip silently
+
+  local mongo_container api_container mongo_db current_org
+  mongo_container=$($COMPOSE_CMD ps --format '{{.Service}} {{.Name}}' 2>/dev/null | awk '$1=="mongo"{print $2}' || true)
+  api_container=$($COMPOSE_CMD ps --format '{{.Service}} {{.Name}}' 2>/dev/null | awk '$1=="api"{print $2}' || true)
+  [[ -n "$mongo_container" && -n "$api_container" ]] || return 0
+
+  mongo_db="vandalizer"
+  if [[ -f "$ENV_FILE" ]]; then
+    local env_db
+    env_db=$(grep -E "^MONGO_DB=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d'=' -f2-)
+    [[ -n "$env_db" ]] && mongo_db="$env_db"
+  fi
+
+  # Read the current org name. On any query error, skip — better to stay quiet
+  # than nag on a transient DB hiccup.
+  current_org=$(docker exec "$mongo_container" mongosh --quiet --eval \
+    "print(((db.getSiblingDB('${mongo_db}').system_config.findOne()||{}).org_name)||'')" 2>/dev/null | tr -d '\r' || echo "__ERR__")
+  [[ "$current_org" == "__ERR__" ]] && return 0
+  [[ -n "${current_org// /}" ]] && return 0   # already set — nothing to do
+
+  echo ""
+  echo -e "  ${SYM_NEURAL}  ${BOLD}Institution${RESET}"
+  echo -e "  ${DIM}     No institution/organization name is set for this deployment.${RESET}"
+  echo -e "  ${DIM}     Used for branding and creator credit on verified catalog items.${RESET}"
+  echo -e "  ${DIM}     Leave blank to skip (set it later in Admin → Theme).${RESET}"
+  echo ""
+  local ORG_NAME=""
+  prompt "Institution / organization name" "" ORG_NAME
+  if [[ -z "${ORG_NAME// /}" ]]; then
+    echo -e "  ${DIM}     Skipped — no institution name set.${RESET}"
+    return 0
+  fi
+
+  # Persist through the app's own code: get_config() creates/defaults the
+  # singleton safely and never overwrites an already-set value.
+  local out
+  out=$(printf '%s' "$ORG_NAME" | docker exec -i "$api_container" python -c "
+import sys, os, asyncio
+os.environ['ORG_NAME'] = sys.stdin.read().strip()
+from app.config import Settings
+from app.database import init_db
+async def main():
+    org = os.environ['ORG_NAME'].strip()
+    if not org:
+        return
+    await init_db(Settings())
+    from app.models.system_config import SystemConfig
+    cfg = await SystemConfig.get_config()
+    if not (cfg.org_name or '').strip():
+        cfg.org_name = org
+        await cfg.save()
+        print('ORG_SET:' + org)
+    else:
+        print('ORG_KEPT:' + cfg.org_name)
+asyncio.run(main())
+" 2>&1 || true)
+
+  if echo "$out" | grep -q "ORG_SET:"; then
+    echo -e "  ${SYM_CHECK}  Institution recorded: ${BOLD}${ORG_NAME}${RESET}"
+  elif echo "$out" | grep -q "ORG_KEPT:"; then
+    echo -e "  ${SYM_CHECK}  Institution already set; left as is."
+  else
+    echo -e "  ${SYM_WARN}  ${YELLOW}Could not record institution name (set it later in Admin → Theme).${RESET}"
+    log "prompt_org_name_if_unset output:"
+    log "$out"
+  fi
+}
+
 # Shared rebuild+restart logic used by upgrade and redeploy
 do_redeploy() {
   echo ""
@@ -1755,6 +1829,9 @@ do_redeploy() {
   wait_healthy "api" "API server" 90
   wait_for_api 90
   wait_healthy "frontend" "Frontend" 60
+
+  # One-time: capture the institution name if this deployment never set one.
+  prompt_org_name_if_unset
 
   # Clean up dangling images and build cache to reclaim disk space
   echo ""
