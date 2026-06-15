@@ -3,7 +3,6 @@ import { CircleHelp } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
 import { TeamsDropdown } from './TeamsDropdown'
 import { NotificationBell } from './NotificationBell'
-import { VersionBadge } from './VersionBadge'
 import { SupportChatPanel } from '../support/SupportChatPanel'
 import { FeedbackPromptCard } from '../support/FeedbackPromptCard'
 import { useOptionalWorkspace } from '../../contexts/WorkspaceContext'
@@ -104,7 +103,6 @@ export function Header() {
 
         {/* Right: Notifications + Support + Teams dropdown */}
         <div className="flex items-center gap-4">
-          <VersionBadge />
           <NotificationBell />
           <button
             onClick={handleSupportClick}

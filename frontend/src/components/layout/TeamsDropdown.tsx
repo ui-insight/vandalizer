@@ -4,6 +4,7 @@ import { Link } from '@tanstack/react-router'
 import { useTeams } from '../../hooks/useTeams'
 import { useAuth } from '../../hooks/useAuth'
 import { useCertificationPanel } from '../../contexts/CertificationPanelContext'
+import { VersionMenuFooter } from './VersionMenuFooter'
 
 export function TeamsDropdown() {
   const { teams, currentTeam, switchTeam } = useTeams()
@@ -174,6 +175,9 @@ export function TeamsDropdown() {
             <LogOut className="h-4 w-4 shrink-0" style={{ width: 18 }} />
             <span>Logout</span>
           </button>
+
+          {/* Deployment / build info */}
+          <VersionMenuFooter />
         </div>
       )}
     </div>
