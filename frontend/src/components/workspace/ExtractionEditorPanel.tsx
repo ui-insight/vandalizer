@@ -28,6 +28,7 @@ import {
   exportExtractionPdf,
   generateExampleTemplate,
   exportSearchSetUrl,
+  downloadValidationResults,
   importSearchSet,
   getExtractionHistory,
 } from '../../api/extractions'
@@ -2520,6 +2521,19 @@ function ValidateTab({
   const fillAbortRef = useRef<AbortController | null>(null)
   const [showSubmitDialog, setShowSubmitDialog] = useState(false)
   const [submitLibraryResult, setSubmitLibraryResult] = useState<'success' | 'error' | null>(null)
+  const [downloadingResults, setDownloadingResults] = useState(false)
+
+  const handleDownloadResults = async () => {
+    if (downloadingResults) return
+    setDownloadingResults(true)
+    try {
+      await downloadValidationResults(searchSetUuid)
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Download failed', 'error')
+    } finally {
+      setDownloadingResults(false)
+    }
+  }
   const progress = useValidationProgress(validating, sources.length, numRuns, items.length, extractionConfig)
 
   // Debounce timers keyed by source id
@@ -3360,17 +3374,36 @@ function ValidateTab({
         <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: '#202124' }}>Detailed breakdown</div>
-            <button
-              onClick={() => downloadValidationCSV(results)}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 5,
-                padding: '5px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                borderRadius: 6, border: '1px solid #d1d5db', backgroundColor: '#fff',
-                color: '#374151', cursor: 'pointer',
-              }}
-            >
-              <Download style={{ width: 13, height: 13 }} /> Download CSV
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button
+                onClick={() => downloadValidationCSV(results)}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  padding: '5px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                  borderRadius: 6, border: '1px solid #d1d5db', backgroundColor: '#fff',
+                  color: '#374151', cursor: 'pointer',
+                }}
+              >
+                <Download style={{ width: 13, height: 13 }} /> Download CSV
+              </button>
+              <button
+                onClick={handleDownloadResults}
+                disabled={downloadingResults}
+                title="Download the raw results (JSON + CSV) — every replicate's extracted value for every document, for archival and cross-model comparison"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  padding: '5px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                  borderRadius: 6, border: '1px solid #d1d5db', backgroundColor: '#fff',
+                  color: '#374151', cursor: downloadingResults ? 'wait' : 'pointer',
+                  opacity: downloadingResults ? 0.6 : 1,
+                }}
+              >
+                {downloadingResults
+                  ? <Loader2 style={{ width: 13, height: 13, animation: 'spin 1s linear infinite' }} />
+                  : <Download style={{ width: 13, height: 13 }} />}
+                Download raw data
+              </button>
+            </div>
           </div>
 
           {/* The official, certified score lives in the auto-tune panel above
