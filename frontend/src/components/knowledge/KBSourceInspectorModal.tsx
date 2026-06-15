@@ -19,6 +19,10 @@ export function KBSourceInspectorModal({ kbUuid, source, onClose, onUpdated }: P
   // default when nothing was entered yet; the user can override either type.
   const [sourceDraft, setSourceDraft] = useState('')
   const [savingSource, setSavingSource] = useState(false)
+  // For document sources, default to the extracted text the KB actually
+  // indexed (what "view the source" should mean), with a toggle to the
+  // original file.
+  const [docView, setDocView] = useState<'text' | 'file'>('text')
 
   useEffect(() => {
     let cancelled = false
@@ -102,6 +106,24 @@ export function KBSourceInspectorModal({ kbUuid, source, onClose, onUpdated }: P
               {source.status !== 'ready' && <> · {source.status}</>}
             </div>
           </div>
+          {isDoc && source.document_uuid && (
+            <div style={{ display: 'inline-flex', border: '1px solid #2e2e2e', borderRadius: 5, overflow: 'hidden' }}>
+              {(['text', 'file'] as const).map(mode => (
+                <button
+                  key={mode}
+                  onClick={() => setDocView(mode)}
+                  style={{
+                    fontSize: 12, padding: '4px 10px', fontFamily: 'inherit', cursor: 'pointer',
+                    border: 'none',
+                    backgroundColor: docView === mode ? '#2e2e2e' : 'transparent',
+                    color: docView === mode ? '#fff' : '#9ca3af',
+                  }}
+                >
+                  {mode === 'text' ? 'Text' : 'File'}
+                </button>
+              ))}
+            </div>
+          )}
           {!isDoc && source.url && (
             <a
               href={source.url}
@@ -168,7 +190,7 @@ export function KBSourceInspectorModal({ kbUuid, source, onClose, onUpdated }: P
 
         {/* Body */}
         <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex' }}>
-          {isDoc ? (
+          {isDoc && docView === 'file' ? (
             source.document_uuid ? (
               <div style={{ flex: 1, minWidth: 0, minHeight: 0 }}>
                 <DocumentViewer docUuid={source.document_uuid} />
@@ -177,11 +199,12 @@ export function KBSourceInspectorModal({ kbUuid, source, onClose, onUpdated }: P
               <EmptyState message="No document associated with this source." />
             )
           ) : (
-            <UrlInspector
+            <SourceContentInspector
               loading={loading}
               error={error}
               detail={detail}
               fallbackUrl={source.url}
+              isDoc={isDoc}
             />
           )}
         </div>
@@ -201,13 +224,14 @@ function EmptyState({ message }: { message: string }) {
   )
 }
 
-function UrlInspector({
-  loading, error, detail, fallbackUrl,
+function SourceContentInspector({
+  loading, error, detail, fallbackUrl, isDoc = false,
 }: {
   loading: boolean
   error: string | null
   detail: KnowledgeBaseSourceDetail | null
   fallbackUrl?: string
+  isDoc?: boolean
 }) {
   if (loading) {
     return (
@@ -245,19 +269,23 @@ function UrlInspector({
         display: 'grid', gridTemplateColumns: '120px 1fr', gap: '4px 12px',
         fontSize: 12, color: '#cbd5e1', marginBottom: 16,
       }}>
-        <div style={{ color: '#888' }}>URL</div>
-        <div style={{ wordBreak: 'break-all' }}>
-          {detail.url ? (
-            <a
-              href={detail.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: '#60a5fa', textDecoration: 'none' }}
-            >
-              {detail.url}
-            </a>
-          ) : (fallbackUrl || '—')}
-        </div>
+        {!isDoc && (
+          <>
+            <div style={{ color: '#888' }}>URL</div>
+            <div style={{ wordBreak: 'break-all' }}>
+              {detail.url ? (
+                <a
+                  href={detail.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: '#60a5fa', textDecoration: 'none' }}
+                >
+                  {detail.url}
+                </a>
+              ) : (fallbackUrl || '—')}
+            </div>
+          </>
+        )}
         {detail.url_title && (
           <>
             <div style={{ color: '#888' }}>Page title</div>

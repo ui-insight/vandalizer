@@ -583,10 +583,17 @@ async def get_source_detail(uuid: str, source_uuid: str, user: User = Depends(ge
         raise HTTPException(status_code=404, detail="Source not found")
 
     document_title: str | None = None
+    # The inspector shows the full ingested text. URL sources cache it on
+    # ``source.content``; document sources don't, so fall back to the
+    # SmartDocument's extracted ``raw_text`` (the same text that was chunked
+    # into the KB) — mirroring what export_knowledge_base does.
+    content = source.content
     if source.source_type == "document" and source.document_uuid:
         doc = await SmartDocument.find_one(SmartDocument.uuid == source.document_uuid)
         if doc:
             document_title = doc.title
+            if not content:
+                content = doc.raw_text or None
 
     # Crawled children (only meaningful when this source is itself a crawl parent)
     children = await KnowledgeBaseSource.find(
@@ -596,7 +603,7 @@ async def get_source_detail(uuid: str, source_uuid: str, user: User = Depends(ge
 
     return KBSourceDetailResponse(
         **_source_response(source, document_title=document_title).model_dump(),
-        content=source.content,
+        content=content,
         crawl_enabled=bool(source.crawl_enabled),
         max_crawl_pages=int(source.max_crawl_pages or 5),
         parent_source_uuid=source.parent_source_uuid,
