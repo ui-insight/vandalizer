@@ -3,6 +3,7 @@ import { useNavigate } from '@tanstack/react-router'
 import { Plus, FolderKanban } from 'lucide-react'
 import { useProjects } from '../../hooks/useProjects'
 import { ProjectStateBadge } from '../projects/ProjectStateBadge'
+import { ProjectSummaryStats } from '../projects/ProjectSummaryStats'
 import { ProjectsExplainer } from '../projects/ProjectsExplainer'
 
 /**
@@ -89,6 +90,7 @@ export function ProjectsPanel() {
                 {p.description && (
                   <span className="mt-1 line-clamp-1 text-xs text-gray-500">{p.description}</span>
                 )}
+                <ProjectSummaryStats capabilities={p.capabilities} className="mt-2" />
               </button>
             ))
           )}

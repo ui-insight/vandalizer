@@ -1,17 +1,62 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { Plus, Search, FolderKanban, Users } from 'lucide-react'
+import { Plus, Search, FolderKanban } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
-import { ProjectStateBadge } from '../components/projects/ProjectStateBadge'
+import { ProjectExplorerCard } from '../components/projects/ProjectExplorerCard'
 import { ProjectsExplainer } from '../components/projects/ProjectsExplainer'
 import { useProjects } from '../hooks/useProjects'
+import { useToast } from '../contexts/ToastContext'
+import { useConfirm } from '../components/shared/useConfirm'
+import type { Project, ProjectState } from '../types/project'
 
 export default function Projects() {
   const navigate = useNavigate()
-  const { projects, loading, create } = useProjects()
+  const { projects, loading, create, update, remove } = useProjects()
+  const { toast } = useToast()
+  const confirm = useConfirm()
   const [newName, setNewName] = useState('')
   const [creating, setCreating] = useState(false)
   const [search, setSearch] = useState('')
+
+  const enterWorkspace = (uuid: string) =>
+    navigate({ to: '/', search: { mode: 'files', tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined, project: uuid, workflow_share_token: undefined } })
+
+  const handleRename = async (uuid: string, title: string) => {
+    try {
+      await update(uuid, { title })
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Failed to rename project', 'error')
+    }
+  }
+
+  const handleSetState = async (uuid: string, state: ProjectState) => {
+    try {
+      await update(uuid, { state })
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Failed to update status', 'error')
+    }
+  }
+
+  const handleDelete = async (p: Project) => {
+    const ok = await confirm({
+      title: 'Delete project?',
+      message: (
+        <>
+          Delete <strong>{p.title}</strong>? This removes the project and its
+          sharing — your files and folders are kept.
+        </>
+      ),
+      confirmLabel: 'Delete project',
+      destructive: true,
+    })
+    if (!ok) return
+    try {
+      await remove(p.uuid)
+      toast('Project deleted', 'success')
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Failed to delete', 'error')
+    }
+  }
 
   const filtered = useMemo(() => {
     if (!search.trim()) return projects
@@ -101,27 +146,17 @@ export default function Projects() {
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
             {filtered.map(p => (
-              <button
+              <ProjectExplorerCard
                 key={p.uuid}
-                onClick={() => navigate({ to: '/', search: { mode: 'files', tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined, project: p.uuid, workflow_share_token: undefined } })}
-                className="flex flex-col items-start rounded-lg border border-gray-200 bg-white p-4 text-left hover:border-highlight transition-colors"
-              >
-                <div className="flex w-full items-center justify-between gap-2">
-                  <span className="font-medium text-gray-900 truncate">{p.title}</span>
-                  <ProjectStateBadge state={p.state} />
-                </div>
-                {p.description && (
-                  <span className="mt-1 text-sm text-gray-500 line-clamp-2">{p.description}</span>
-                )}
-                <div className="mt-3 flex items-center gap-3 text-xs text-gray-400">
-                  {p.team_id && (
-                    <span className="inline-flex items-center gap-1">
-                      <Users size={12} /> Team
-                    </span>
-                  )}
-                  <span>Updated {new Date(p.updated_at).toLocaleDateString()}</span>
-                </div>
-              </button>
+                project={p}
+                canManage={p.role === 'owner' || p.role === 'editor'}
+                canDelete={p.role === 'owner'}
+                onOpen={() => enterWorkspace(p.uuid)}
+                onOpenHome={() => navigate({ to: '/projects/$uuid', params: { uuid: p.uuid } })}
+                onRename={title => handleRename(p.uuid, title)}
+                onSetState={state => handleSetState(p.uuid, state)}
+                onDelete={() => handleDelete(p)}
+              />
             ))}
           </div>
         )}

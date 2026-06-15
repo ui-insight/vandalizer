@@ -35,7 +35,7 @@ async def create_project(
 @router.get("")
 async def list_projects(user: User = Depends(get_current_user)):
     projects = await project_service.list_projects(user)
-    return [project_service.serialize_project(p) for p in projects]
+    return [await project_service.summarize_project(p, user) for p in projects]
 
 
 @router.get("/{project_uuid}")
@@ -115,6 +115,10 @@ async def update_project(
     project = await project_service.get_authorized_project(project_uuid, user)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+    if not await project_service.can_manage_project(project, user):
+        raise HTTPException(
+            status_code=403, detail="Only the project owner or an editor can edit it"
+        )
     if body.state is not None and body.state not in PROJECT_STATES:
         raise HTTPException(
             status_code=400,

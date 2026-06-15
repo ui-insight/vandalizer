@@ -26,6 +26,11 @@ export interface Project {
   kb_uuid: string | null
   created_at: string
   updated_at: string
+  // Present on list responses (`GET /api/projects`) so explorer cards can show
+  // what's inside, and which manage actions to offer, without a per-project
+  // overview fetch. Omitted on create/update responses.
+  capabilities?: ProjectCapabilities
+  role?: ProjectRole
 }
 
 export interface ProjectCapabilities {

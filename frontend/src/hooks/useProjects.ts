@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import * as api from '../api/projects'
 import type { Project, ProjectOverview, ProjectState } from '../types/project'
 
+type ProjectUpdate = { title?: string; description?: string; state?: ProjectState }
+
 export function useProjects() {
   const qc = useQueryClient()
   const queryKey = ['projects'] as const
@@ -22,12 +24,24 @@ export function useProjects() {
     onSuccess: () => qc.invalidateQueries({ queryKey }),
   })
 
+  const updateMutation = useMutation({
+    mutationFn: ({ uuid, data }: { uuid: string; data: ProjectUpdate }) =>
+      api.updateProject(uuid, data),
+    onSuccess: (_res, { uuid }) => {
+      qc.invalidateQueries({ queryKey })
+      qc.invalidateQueries({ queryKey: ['project', uuid] })
+    },
+  })
+
   const create = (title: string, description?: string) =>
     createMutation.mutateAsync({ title, description })
 
   const remove = (uuid: string) => removeMutation.mutateAsync(uuid)
 
-  return { projects, loading, create, remove }
+  const update = (uuid: string, data: ProjectUpdate) =>
+    updateMutation.mutateAsync({ uuid, data })
+
+  return { projects, loading, create, remove, update }
 }
 
 export function useProject(uuid: string) {

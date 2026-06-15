@@ -466,10 +466,11 @@ async def get_project_document_uuids(project: Project) -> list[str]:
     return [d.uuid for d in docs]
 
 
-async def get_project_overview(project: Project, user: User) -> dict:
-    """A self-contained snapshot: every capability and what's in it.
+async def get_project_capabilities(project: Project) -> dict:
+    """Count what's inside a project: files, indexed docs, pins, members.
 
-    Powers the project home so it's clear at a glance what the project holds.
+    Shared by the project home (overview) and the project list, so an explorer
+    card can show the same at-a-glance "what's in here" summary as the home.
     """
     folder_uuids = await _project_folder_uuids(project.root_folder_uuid)
     file_count = await SmartDocument.find(
@@ -495,18 +496,39 @@ async def get_project_overview(project: Project, user: User) -> dict:
     ).count()
 
     return {
+        "files": {"count": file_count, "folders": len(folder_uuids) - 1},
+        "knowledge": {"ready": bool(project.kb_uuid), "documents": indexed},
+        "workflows": {"count": pin_counts["workflow"]},
+        "extractions": {"count": pin_counts["extraction"]},
+        "automations": {"count": pin_counts["automation"]},
+        "external_kbs": {"count": pin_counts["knowledge_base"]},
+        # owner + invited collaborators
+        "members": {"count": member_count + 1},
+    }
+
+
+async def get_project_overview(project: Project, user: User) -> dict:
+    """A self-contained snapshot: every capability and what's in it.
+
+    Powers the project home so it's clear at a glance what the project holds.
+    """
+    return {
         **serialize_project(project),
         "role": await get_project_role(project, user),
-        "capabilities": {
-            "files": {"count": file_count, "folders": len(folder_uuids) - 1},
-            "knowledge": {"ready": bool(project.kb_uuid), "documents": indexed},
-            "workflows": {"count": pin_counts["workflow"]},
-            "extractions": {"count": pin_counts["extraction"]},
-            "automations": {"count": pin_counts["automation"]},
-            "external_kbs": {"count": pin_counts["knowledge_base"]},
-            # owner + invited collaborators
-            "members": {"count": member_count + 1},
-        },
+        "capabilities": await get_project_capabilities(project),
+    }
+
+
+async def summarize_project(project: Project, user: User) -> dict:
+    """List-card view: the base project, the viewer's role, and capability counts.
+
+    Lets the project explorer show what's inside each project — and which manage
+    actions to offer — without a separate per-project overview fetch.
+    """
+    return {
+        **serialize_project(project),
+        "role": await get_project_role(project, user),
+        "capabilities": await get_project_capabilities(project),
     }
 
 
