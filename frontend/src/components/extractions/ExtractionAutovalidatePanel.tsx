@@ -16,6 +16,7 @@ import { RotateCcw, Sparkles } from 'lucide-react'
 import {
   getActiveExtractionOptimization,
   getExtractionOptimization,
+  listExtractionOptimizationHistory,
   cancelExtractionOptimization,
   applyExtractionOptimization,
   revertExtractionConfig,
@@ -87,20 +88,34 @@ export function ExtractionAutovalidatePanel({ searchSetUuid, canManage, onApplie
   useEffect(() => {
     mountedRef.current = true
     setLoading(true)
-    getActiveExtractionOptimization(searchSetUuid)
-      .then(out => {
+    ;(async () => {
+      try {
+        const out = await getActiveExtractionOptimization(searchSetUuid)
         if (!mountedRef.current) return
         if (out.run) {
           setRun(out.run)
           if (out.run.status === 'queued' || out.run.status === 'running') {
             startPolling(out.run.uuid)
           }
+          return
         }
-      })
-      .catch(e => {
+        // No active run — restore the most recent finished one so a completed
+        // result survives tab switches and page reloads instead of dropping
+        // back to the idle hero (mirrors KB AutovalidateTab). Summaries omit
+        // per-trial detail, so fetch the full run before rendering.
+        const history = await listExtractionOptimizationHistory(searchSetUuid, { limit: 1 })
+        if (!mountedRef.current) return
+        const latest = history.items[0]
+        if (latest) {
+          const full = await getExtractionOptimization(searchSetUuid, latest.uuid)
+          if (mountedRef.current) setRun(full)
+        }
+      } catch (e) {
         if (mountedRef.current) console.error('getActiveExtractionOptimization failed', e)
-      })
-      .finally(() => { if (mountedRef.current) setLoading(false) })
+      } finally {
+        if (mountedRef.current) setLoading(false)
+      }
+    })()
     listTestCases(searchSetUuid)
       .then(cases => { if (mountedRef.current) setTestCaseCount(cases.length) })
       .catch(() => { if (mountedRef.current) setTestCaseCount(0) })
@@ -624,7 +639,7 @@ function IdleHero({
         }}
       >
         <Sparkles size={14} />
-        Start tuning
+        Validate & improve
       </button>
     </div>
   )

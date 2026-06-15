@@ -13,6 +13,7 @@ export async function streamChat(
   isFirstSession?: boolean,
   runDemo?: boolean,
   signal?: AbortSignal,
+  projectUuid?: string,
 ): Promise<{ conversationUuid: string; activityId: string }> {
   const res = await rawFetch('/api/chat', {
     method: 'POST',
@@ -28,6 +29,7 @@ export async function streamChat(
       ...(folderUuids?.length ? { folder_uuids: folderUuids } : {}),
       ...(isFirstSession ? { is_first_session: true } : {}),
       ...(runDemo ? { run_demo: true } : {}),
+      ...(projectUuid ? { project_uuid: projectUuid } : {}),
     }),
   })
 

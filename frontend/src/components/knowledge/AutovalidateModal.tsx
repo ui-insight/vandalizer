@@ -10,6 +10,7 @@ import {
   type KBTestQuery,
   type StartOptimizationOptions,
   type OptimizationCoverage,
+  type TestSetBuildMode,
 } from '../../api/knowledge'
 import {
   QueryFormFields,
@@ -43,6 +44,8 @@ interface KBWizardOptions {
   tier: Tier
   customTokens: number
   coverage: OptimizationCoverage
+  /** How the eval set is built: reuse saved questions, generate fresh, or both. */
+  testSetMode: TestSetBuildMode
   applyOnFinish: boolean
   /** Persisted from PreviewStep — feeds BaselineStep so the probe runs on the
    * same questions the user just reviewed. */
@@ -57,6 +60,9 @@ const INITIAL_OPTIONS: KBWizardOptions = {
   tier: 'standard',
   customTokens: 1_000_000,
   coverage: 'standard',
+  // Default to reusing saved questions; the Test-set step flips this to
+  // 'generate' automatically when the KB has none yet.
+  testSetMode: 'existing',
   applyOnFinish: false,
   sampleQueryIds: [],
   noKbScore: null,
@@ -94,8 +100,14 @@ export function AutovalidateModal({ kbUuid, onConfirm, onClose, onSwitchToQuerie
       label: 'Test set',
       render: (opts, set) => (
         <TestSetStep
+          kbUuid={kbUuid}
+          mode={opts.testSetMode}
           coverage={opts.coverage}
-          onChange={(c) => set(o => ({ ...o, coverage: c }))}
+          // Changing how the set is built invalidates the previously reviewed
+          // set and the baseline measured on it — clear both so Preview and
+          // Baseline rebuild for the new selection.
+          onModeChange={(m) => set(o => ({ ...o, testSetMode: m, sampleQueryIds: [], noKbScore: null }))}
+          onCoverageChange={(c) => set(o => ({ ...o, coverage: c, sampleQueryIds: [], noKbScore: null }))}
           onSwitchToQueries={onSwitchToQueries}
           onClose={onClose}
         />
@@ -107,6 +119,7 @@ export function AutovalidateModal({ kbUuid, onConfirm, onClose, onSwitchToQuerie
       render: (opts, set) => (
         <PreviewStep
           kbUuid={kbUuid}
+          buildMode={opts.testSetMode}
           coverage={opts.coverage}
           sampleQueryIds={opts.sampleQueryIds}
           onReady={(ids) => set(o => ({ ...o, sampleQueryIds: ids }))}
@@ -185,6 +198,10 @@ export function AutovalidateModal({ kbUuid, onConfirm, onClose, onSwitchToQuerie
       apply_on_finish: opts.applyOnFinish,
       autogen_coverage: opts.coverage,
       include_indexing_track: false,
+      test_set_build_mode: opts.testSetMode,
+      // The exact set the user reviewed in Preview — makes the run grade against
+      // precisely these questions regardless of what else is saved on the KB.
+      test_query_uuids: opts.sampleQueryIds,
     })
   }
 
@@ -245,22 +262,76 @@ function ConceptStep() {
   )
 }
 
+const COVERAGE_COUNTS: Record<OptimizationCoverage, number> = { quick: 5, standard: 10, exhaustive: 25 }
+
 function TestSetStep({
-  coverage, onChange, onSwitchToQueries, onClose,
+  kbUuid, mode, coverage, onModeChange, onCoverageChange, onSwitchToQueries, onClose,
 }: {
+  kbUuid: string
+  mode: TestSetBuildMode
   coverage: OptimizationCoverage
-  onChange: (c: OptimizationCoverage) => void
+  onModeChange: (m: TestSetBuildMode) => void
+  onCoverageChange: (c: OptimizationCoverage) => void
   onSwitchToQueries?: () => void
   onClose: () => void
 }) {
   const [showExample, setShowExample] = useState(false)
+  // Live count of saved questions — decides which modes are available and
+  // drives the "9 saved + 25 new = 34" math. Null while still loading.
+  const [existingCount, setExistingCount] = useState<number | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    listKBTestQueries(kbUuid)
+      .then(out => {
+        if (cancelled) return
+        const n = out.test_queries.length
+        setExistingCount(n)
+        // With no saved questions, "use saved" and "combine" aren't possible —
+        // fall back to generating a fresh set.
+        if (n === 0 && mode !== 'generate') onModeChange('generate')
+      })
+      .catch(() => { if (!cancelled) setExistingCount(0) })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kbUuid])
+
+  const hasExisting = (existingCount ?? 0) > 0
+  const genCount = COVERAGE_COUNTS[coverage]
+  const showCoverage = mode === 'generate' || mode === 'combined'
+
+  const MODES: { id: TestSetBuildMode; title: string; sub: string; disabled: boolean }[] = [
+    {
+      id: 'existing',
+      title: 'Use my saved questions',
+      sub: existingCount == null
+        ? 'Reuse the test questions already on this KB.'
+        : `Grade against your ${existingCount} saved question${existingCount === 1 ? '' : 's'}.`,
+      disabled: !hasExisting,
+    },
+    {
+      id: 'generate',
+      title: 'Generate new questions',
+      sub: `Write a fresh set from your documents (up to ${genCount}).`,
+      disabled: false,
+    },
+    {
+      id: 'combined',
+      title: 'Combine saved + generated',
+      sub: hasExisting && existingCount != null
+        ? `${existingCount} saved + up to ${genCount} new = up to ${existingCount + genCount} questions.`
+        : 'Keep your saved questions and add freshly generated ones.',
+      disabled: !hasExisting,
+    },
+  ]
+
   return (
     <div style={{ fontSize: 13, color: '#ccc', lineHeight: 1.5 }}>
-      <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: '#fff' }}>Test set source</h4>
+      <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: '#fff' }}>How should we build the test set?</h4>
       <p style={{ margin: '0 0 12px 0', color: '#bbb' }}>
-        If you've already written test questions, we'll use those. Otherwise
-        we'll generate them from your documents — <b>and you'll review them
-        before tuning starts</b>. Pick how thorough that generation should be:
+        Tuning grades each trial against these questions. As your KB grows, generate
+        new ones so recently added sources get covered — <b>you'll review the full
+        set before tuning starts</b>.
       </p>
       <button
         type="button"
@@ -288,33 +359,66 @@ function TestSetStep({
         </div>
       )}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {(['quick', 'standard', 'exhaustive'] as const).map(c => {
-          const active = coverage === c
-          const counts: Record<typeof c, number> = { quick: 5, standard: 10, exhaustive: 25 } as Record<OptimizationCoverage, number>
+        {MODES.map(m => {
+          const active = mode === m.id
           return (
             <button
-              key={c}
-              onClick={() => onChange(c)}
+              key={m.id}
+              onClick={() => !m.disabled && onModeChange(m.id)}
+              disabled={m.disabled}
+              title={m.disabled ? 'No saved questions on this KB yet.' : undefined}
               style={{
                 display: 'flex', alignItems: 'center', gap: 10,
                 padding: '8px 12px', textAlign: 'left',
                 backgroundColor: active ? 'rgba(124, 58, 237, 0.12)' : '#262626',
                 border: '1px solid ' + (active ? '#7c3aed' : '#333'),
-                borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', color: '#e5e5e5',
+                borderRadius: 6, cursor: m.disabled ? 'not-allowed' : 'pointer',
+                fontFamily: 'inherit', color: m.disabled ? '#666' : '#e5e5e5',
+                opacity: m.disabled ? 0.6 : 1,
               }}
             >
               <Radio active={active} />
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, textTransform: 'capitalize' }}>{c}</div>
-                <div style={{ fontSize: 11, color: '#888' }}>up to {counts[c]} questions</div>
+                <div style={{ fontSize: 12, fontWeight: 600 }}>{m.title}</div>
+                <div style={{ fontSize: 11, color: '#888' }}>{m.sub}</div>
               </div>
             </button>
           )
         })}
       </div>
-      <p style={{ marginTop: 10, fontSize: 11, color: '#888' }}>
-        Generated queries persist after the run, so future re-runs reuse them.
-      </p>
+
+      {showCoverage && (
+        <div style={{ marginTop: 12 }}>
+          <div style={{ fontSize: 11, color: '#bbb', marginBottom: 6 }}>How many new questions to generate:</div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {(['quick', 'standard', 'exhaustive'] as const).map(c => {
+              const active = coverage === c
+              return (
+                <button
+                  key={c}
+                  onClick={() => onCoverageChange(c)}
+                  style={{
+                    flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+                    padding: '6px 8px', textAlign: 'center',
+                    backgroundColor: active ? 'rgba(124, 58, 237, 0.12)' : '#262626',
+                    border: '1px solid ' + (active ? '#7c3aed' : '#333'),
+                    borderRadius: 6, cursor: 'pointer', fontFamily: 'inherit', color: '#e5e5e5',
+                  }}
+                >
+                  <span style={{ fontSize: 12, fontWeight: 600, textTransform: 'capitalize' }}>{c}</span>
+                  <span style={{ fontSize: 11, color: '#888' }}>up to {COVERAGE_COUNTS[c]}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {showCoverage && (
+        <p style={{ marginTop: 10, fontSize: 11, color: '#888' }}>
+          Generated queries are saved to this KB, so future re-runs can reuse them.
+        </p>
+      )}
       {onSwitchToQueries && (
         <button
           onClick={() => { onClose(); onSwitchToQueries() }}
@@ -333,19 +437,21 @@ function TestSetStep({
 }
 
 function PreviewStep({
-  kbUuid, coverage, sampleQueryIds, onReady, onSwitchToQueries, onClose,
+  kbUuid, buildMode, coverage, sampleQueryIds, onReady, onSwitchToQueries, onClose,
 }: {
   kbUuid: string
+  buildMode: TestSetBuildMode
   coverage: OptimizationCoverage
   sampleQueryIds: string[]
   onReady: (ids: string[]) => void
   onSwitchToQueries?: () => void
   onClose: () => void
 }) {
-  // States: 'loading' (fetching existing OR generating), 'preview' (have queries),
-  // or 'error'. ``mode`` distinguishes whether queries pre-existed or got generated.
+  // States: 'loading' (fetching existing and/or generating), 'preview' (have
+  // queries), or 'error'. ``composition`` records how many of the reviewed
+  // questions were saved vs freshly generated, for the heading + combine math.
   const [queries, setQueries] = useState<KBTestQuery[]>([])
-  const [mode, setMode] = useState<'existing' | 'generated' | null>(null)
+  const [composition, setComposition] = useState<{ existing: number; generated: number } | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [attempt, setAttempt] = useState(0)
@@ -398,25 +504,48 @@ function PreviewStep({
     setError(null)
     ;(async () => {
       try {
-        const existing = await listKBTestQueries(kbUuid)
-        if (cancelled) return
-        if (existing.test_queries.length > 0) {
+        // Revisiting the step (mode/coverage unchanged) — reuse the exact set we
+        // already built and reviewed instead of generating a second batch. The
+        // wizard clears ``sampleQueryIds`` whenever mode or coverage changes, so
+        // a non-empty list here means "same selection as before".
+        if (sampleQueryIds.length > 0) {
+          const all = await listKBTestQueries(kbUuid)
           if (cancelled) return
-          setQueries(existing.test_queries)
-          setMode('existing')
-          onReady(existing.test_queries.map(q => q.uuid))
-          setLoading(false)
-          return
+          const chosen = all.test_queries.filter(q => sampleQueryIds.includes(q.uuid))
+          if (chosen.length > 0) {
+            setQueries(chosen)
+            onReady(chosen.map(q => q.uuid))
+            setLoading(false)
+            return
+          }
         }
-        const generated = await generateKBTestQueries(kbUuid, { coverage, async: false })
-        if (cancelled) return
-        if ('test_queries' in generated) {
-          setQueries(generated.test_queries)
-          setMode('generated')
-          onReady(generated.test_queries.map(q => q.uuid))
-        } else {
-          setError('Generation was queued instead of returning inline — try again.')
+
+        let existingQs: KBTestQuery[] = []
+        if (buildMode === 'existing' || buildMode === 'combined') {
+          const existing = await listKBTestQueries(kbUuid)
+          if (cancelled) return
+          existingQs = existing.test_queries
         }
+
+        let generatedQs: KBTestQuery[] = []
+        if (buildMode === 'generate' || buildMode === 'combined') {
+          const generated = await generateKBTestQueries(kbUuid, { coverage, async: false })
+          if (cancelled) return
+          if ('test_queries' in generated) {
+            generatedQs = generated.test_queries
+          } else {
+            setError('Generation was queued instead of returning inline — try again.')
+            setLoading(false)
+            return
+          }
+        }
+
+        // De-dupe in case generation echoed back an already-saved question.
+        const seen = new Set(existingQs.map(q => q.uuid))
+        const merged = [...existingQs, ...generatedQs.filter(q => !seen.has(q.uuid))]
+        setQueries(merged)
+        setComposition({ existing: existingQs.length, generated: merged.length - existingQs.length })
+        onReady(merged.map(q => q.uuid))
       } catch (e) {
         if (!cancelled) setError((e as Error).message || 'Failed to load test questions.')
       } finally {
@@ -425,12 +554,13 @@ function PreviewStep({
     })()
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kbUuid, coverage, attempt])
+  }, [kbUuid, buildMode, coverage, attempt])
 
+  const willGenerate = sampleQueryIds.length === 0 && (buildMode === 'generate' || buildMode === 'combined')
   if (loading) {
     return (
       <WizardLoadingStep
-        message={sampleQueryIds.length > 0 ? 'Loading your test questions…' : 'Writing test questions from your documents…'}
+        message={willGenerate ? 'Writing test questions from your documents…' : 'Loading your test questions…'}
         sub="This usually takes 15–45 seconds."
       />
     )
@@ -445,18 +575,27 @@ function PreviewStep({
     )
   }
 
+  const heading = buildMode === 'existing'
+    ? 'Your saved test questions'
+    : buildMode === 'combined'
+      ? 'Your test set'
+      : 'Generated test questions'
+
   return (
     <div style={{ fontSize: 13, color: '#ccc', lineHeight: 1.5 }}>
-      <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: '#fff' }}>
-        {mode === 'existing' ? 'Your saved test questions' : 'Generated test questions'}
-      </h4>
+      <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: '#fff' }}>{heading}</h4>
       <p style={{ margin: '0 0 10px 0', color: '#bbb' }}>
-        {mode === 'existing' ? (
+        {buildMode === 'existing' ? (
           <>We'll grade each tuning trial against these <b>{queries.length}</b> questions using a <TermDef term="judge">judge</TermDef>.</>
         ) : (
           <>Tuning quality depends on these. Scan them and fix anything that looks off — edit or remove a question right here before continuing.</>
         )}
       </p>
+      {buildMode === 'combined' && composition && composition.generated > 0 && (
+        <div style={{ margin: '0 0 10px 0', fontSize: 11, color: '#a78bfa' }}>
+          {composition.existing} saved + {composition.generated} generated = <b>{queries.length}</b> total
+        </div>
+      )}
       {actionError && (
         <div style={{ margin: '0 0 8px 0', fontSize: 11, color: '#f87171' }}>{actionError}</div>
       )}

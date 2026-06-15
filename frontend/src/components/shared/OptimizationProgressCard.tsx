@@ -251,9 +251,24 @@ function formatElapsed(seconds: number) {
  * is queued/running. Returns null when there's no start timestamp yet or the
  * run is no longer active, so callers can omit the readout entirely.
  */
+/**
+ * Epoch ms for a server timestamp, treating timezone-less ISO strings as UTC.
+ *
+ * Datetimes read back from Mongo can serialize without an offset (the Motor
+ * client isn't tz_aware). Left as-is, the browser parses such a string as
+ * *local* time, which for users west of UTC puts the start in the future and
+ * pins elapsed at 0s. Forcing UTC when no offset is present keeps the readout
+ * correct even if a backend serializer slips — the failure mode that kept the
+ * workflow tuning elapsed-time readout broken across earlier fixes.
+ */
+export function parseServerTimeMs(ts: string): number {
+  const hasTz = /[zZ]$|[+-]\d{2}:?\d{2}$/.test(ts)
+  return new Date(hasTz ? ts : ts + 'Z').getTime()
+}
+
 function useElapsedSeconds(startedAt: string | null | undefined, status: string): number | null {
   const active = status === 'queued' || status === 'running'
-  const startMs = startedAt ? new Date(startedAt).getTime() : NaN
+  const startMs = startedAt ? parseServerTimeMs(startedAt) : NaN
   const [elapsed, setElapsed] = useState<number>(() =>
     active && Number.isFinite(startMs) ? Math.max(0, Math.round((Date.now() - startMs) / 1000)) : 0,
   )

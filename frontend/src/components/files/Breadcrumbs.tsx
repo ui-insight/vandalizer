@@ -3,11 +3,15 @@ import { ArrowLeft } from 'lucide-react'
 interface BreadcrumbsProps {
   items: Array<{ uuid: string; title: string }>
   onNavigate: (folderId: string | null) => void
+  // The home/floor the trail bottoms out at. null = global root. When set
+  // (project scope), "Home" and "Up" land here instead of the global root.
+  floor?: string | null
+  homeLabel?: string
 }
 
-export function Breadcrumbs({ items, onNavigate }: BreadcrumbsProps) {
+export function Breadcrumbs({ items, onNavigate, floor = null, homeLabel = 'Home' }: BreadcrumbsProps) {
   const atRoot = items.length === 0
-  const parentId = items.length >= 2 ? items[items.length - 2].uuid : null
+  const parentId = items.length >= 2 ? items[items.length - 2].uuid : floor
   const currentTitle = items.length > 0 ? items[items.length - 1].title : null
   const ancestors = items.slice(0, -1)
 
@@ -38,15 +42,15 @@ export function Breadcrumbs({ items, onNavigate }: BreadcrumbsProps) {
       <ol className="inline-flex items-center gap-1 list-none m-0 p-0">
         <li className="inline-flex items-center text-sm">
           {atRoot ? (
-            <span style={{ color: '#111', fontWeight: 600 }}>Home</span>
+            <span style={{ color: '#111', fontWeight: 600 }}>{homeLabel}</span>
           ) : (
             <button
               type="button"
-              onClick={() => onNavigate(null)}
+              onClick={() => onNavigate(floor)}
               className="bg-transparent border-0 cursor-pointer p-0 text-gray-600 hover:text-gray-900 hover:underline"
               style={{ fontWeight: 400 }}
             >
-              Home
+              {homeLabel}
             </button>
           )}
         </li>

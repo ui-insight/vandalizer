@@ -80,6 +80,9 @@ class KnowledgeBase(Document):
     shared_with_team: bool = False
     team_owned: bool = False
     verified: bool = False
+    # An implicit KB is owned by a Project (its auto-ingesting collection). It is
+    # never shown in the normal KB lists — it's reached only through its project.
+    implicit: bool = False
     organization_ids: list[str] = Field(default_factory=list)  # Org UUIDs for visibility scoping
     tags: list[str] = Field(default_factory=list)  # User-defined free-form tags (e.g. version, status)
     status: str = "empty"  # empty | building | ready | error

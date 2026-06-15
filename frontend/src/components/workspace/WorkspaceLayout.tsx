@@ -5,6 +5,8 @@ import { PanelResizer } from './PanelResizer'
 import { LeftPanel } from './LeftPanel'
 import { RightPanel } from './RightPanel'
 import { UtilityBar } from './UtilityBar'
+import { ProjectContextBar } from './ProjectContextBar'
+import { ProjectsPanel } from './ProjectsPanel'
 import { AutomationsPanel } from './AutomationsPanel'
 import { KnowledgePanel } from './KnowledgePanel'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
@@ -50,11 +52,13 @@ export function WorkspaceLayout() {
   const isChat = workspaceMode === 'chat'
   const isAutomations = workspaceMode === 'automations'
   const isKnowledge = workspaceMode === 'knowledge'
+  const isProjects = workspaceMode === 'projects'
 
   // Layout: [UtilityBar 48px] [Content per mode] [ActivityRail(right)]
   return (
     <div className="flex h-screen flex-col">
       <Header />
+      <ProjectContextBar />
       <div className="flex flex-1 overflow-hidden">
         <UtilityBar hasActiveAutomation={automationActivity.hasActive} />
         <div
@@ -74,7 +78,7 @@ export function WorkspaceLayout() {
               transition: isDragging ? 'none' : 'width 0.3s ease',
             }}
           >
-            {isAutomations ? <AutomationsPanel activeIds={automationActivity.activeIds} /> : isKnowledge ? <KnowledgePanel /> : <LeftPanel />}
+            {isProjects ? <ProjectsPanel /> : isAutomations ? <AutomationsPanel activeIds={automationActivity.activeIds} /> : isKnowledge ? <KnowledgePanel /> : <LeftPanel />}
           </div>
 
           {/* Resizer — hidden in chat mode */}

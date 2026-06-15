@@ -237,7 +237,7 @@ export function WorkflowAutovalidateWizard({ workflowId, onClose, onStarted }: P
     const parts: string[] = []
     if (cost_label) parts.push(cost_label)
     if (time) parts.push(`~${time}`)
-    return parts.length > 0 ? `Start tuning — ${parts.join(', ')}` : 'Start tuning'
+    return parts.length > 0 ? `Validate & improve — ${parts.join(', ')}` : 'Validate & improve'
   }
 
   return (
@@ -246,7 +246,7 @@ export function WorkflowAutovalidateWizard({ workflowId, onClose, onStarted }: P
       initialOptions={INITIAL_OPTIONS}
       onConfirm={handleConfirm}
       onClose={onClose}
-      title="Tune this workflow"
+      title="Validate & improve this workflow"
       confirmLabel={confirmLabel}
     />
   )
@@ -261,13 +261,14 @@ export function WorkflowAutovalidateWizard({ workflowId, onClose, onStarted }: P
 function ConceptStep() {
   return (
     <div style={{ fontSize: 13, color: '#ccc', lineHeight: 1.6 }}>
-      <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: '#fff' }}>What is workflow tuning?</h4>
+      <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: '#fff' }}>What happens when you run this?</h4>
       <p style={{ margin: '0 0 10px 0' }}>
-        We try many ways of running your workflow — each per-step combination of model and
+        First we run your workflow as-is and score it against your{' '}
+        <TermDef term="test-set">expected outputs</TermDef> — that's your validation score.
+        Then we try other ways of running it — each per-step combination of model and
         prompt-style is a <TermDef term="candidate">candidate</TermDef> — and keep whichever
-        scores best against your <TermDef term="test-set">expected outputs</TermDef>. Another
-        AI — the <TermDef term="judge">judge</TermDef> — grades each result so wording
-        differences don't unfairly penalize a good answer.
+        scores best. Another AI — the <TermDef term="judge">judge</TermDef> — grades each
+        result so wording differences don't unfairly penalize a good answer.
       </p>
       <h4 style={{ margin: '0 0 6px 0', fontSize: 13, color: '#fff' }}>What it changes</h4>
       <ul style={{ margin: '0 0 10px 0', paddingLeft: 18, color: '#bbb' }}>

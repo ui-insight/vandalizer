@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ShieldCheck, Loader2, Sparkles } from 'lucide-react'
 import {
   listKBTestQueries,
   getKBQuality,
+  runKBValidationAsync,
   type KBTestQuery,
+  type KBValidationMode,
   type KBValidationResult,
 } from '../../api/knowledge'
 import { AutovalidateTab } from './AutovalidateTab'
@@ -17,6 +19,27 @@ interface Props {
   kbUuid: string
   kbReady: boolean
   canManage: boolean
+}
+
+// Validation runs off the request/response path (a background Celery task), so
+// the UI polls the quality history until the new run lands instead of blocking
+// on a single long HTTP call that would trip the 60s client fetch timeout.
+const POLL_INTERVAL_MS = 4000
+const MAX_POLL_MS = 10 * 60 * 1000 // give up after 10 min; the run still lands in History
+const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
+
+// One row of GET /knowledge/{uuid}/quality history. ``result_snapshot`` carries
+// the full KBValidationResult the Run-now tab renders, so we can hydrate the
+// rich result view straight from the polled history without a second fetch.
+type KBHistoryItem = {
+  uuid?: string
+  score?: number
+  judge_model?: string | null
+  num_queries_judged?: number | null
+  num_test_queries?: number | null
+  mode?: string | null
+  created_at?: string | null
+  result_snapshot?: KBValidationResult | null
 }
 
 const TAB_LABELS: { id: Tab; label: string; icon?: typeof Sparkles }[] = [
@@ -44,6 +67,17 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage }: Props) {
   const [latestRun, setLatestRun] = useState<KBValidationResult | null>(null)
   const [latestQuality, setLatestQuality] = useState<LatestQualitySummary | null>(null)
   const [loading, setLoading] = useState(false)
+  // Run state lives here (not in KBValidationRunTab) so an in-flight validation
+  // survives tab switches — the Run now tab is conditionally rendered and would
+  // otherwise unmount mid-run, dropping its `running`/`error` local state and
+  // showing the idle "Run Validation" button as if nothing were happening.
+  const [running, setRunning] = useState(false)
+  const [runError, setRunError] = useState<string | null>(null)
+  // Guards against committing poll results after the panel unmounts (KB closed
+  // mid-run). The polling loop awaits across many seconds, so it can resolve
+  // long after React has torn the component down.
+  const mountedRef = useRef(true)
+  useEffect(() => () => { mountedRef.current = false }, [])
 
   const refreshQueries = useCallback(async () => {
     try {
@@ -54,29 +88,89 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage }: Props) {
     }
   }, [kbUuid])
 
+  const fetchHistory = useCallback(async (): Promise<KBHistoryItem[]> => {
+    const out = await getKBQuality(kbUuid)
+    return (out.history as KBHistoryItem[]) ?? []
+  }, [kbUuid])
+
+  const applyLatestQuality = useCallback((history: KBHistoryItem[]) => {
+    const last = history[0]
+    setLatestQuality(last?.score != null ? {
+      score: Number(last.score),
+      judgeModel: last.judge_model ?? null,
+      numQueries: last.num_queries_judged ?? last.num_test_queries ?? null,
+      mode: last.mode ?? null,
+      createdAt: last.created_at ?? null,
+    } : null)
+  }, [])
+
   const refreshHistory = useCallback(async () => {
     try {
-      const out = await getKBQuality(kbUuid)
-      const history = (out.history as Array<{
-        score?: number
-        judge_model?: string | null
-        num_queries_judged?: number | null
-        num_test_queries?: number | null
-        mode?: string | null
-        created_at?: string | null
-      }>)
-      const last = history[0]
-      setLatestQuality(last?.score != null ? {
-        score: Number(last.score),
-        judgeModel: last.judge_model ?? null,
-        numQueries: last.num_queries_judged ?? last.num_test_queries ?? null,
-        mode: last.mode ?? null,
-        createdAt: last.created_at ?? null,
-      } : null)
+      applyLatestQuality(await fetchHistory())
     } catch (e) {
       console.error('getKBQuality failed', e)
     }
-  }, [kbUuid])
+  }, [fetchHistory, applyLatestQuality])
+
+  // Run validation as a background task and poll for the result. The synchronous
+  // endpoint can take minutes for a large eval set and would blow past the
+  // client's 60s fetch timeout — the request aborted with "Request timed out"
+  // even though the server finished and persisted the run (it only surfaced
+  // later in History). Instead we enqueue the Celery task and poll the quality
+  // history until the new ValidationRun lands, then render its full snapshot.
+  const runValidation = useCallback(async (mode: KBValidationMode) => {
+    setRunning(true)
+    setRunError(null)
+    try {
+      // Remember the runs that already exist so we can spot the new one.
+      let priorUuids = new Set<string>()
+      try {
+        priorUuids = new Set(
+          (await fetchHistory()).map(h => h.uuid).filter((u): u is string => !!u),
+        )
+      } catch {
+        // Non-fatal — worst case we match the first completed run we see.
+      }
+
+      await runKBValidationAsync(kbUuid, { mode })
+
+      const deadline = Date.now() + MAX_POLL_MS
+      let result: KBValidationResult | null = null
+      while (Date.now() < deadline) {
+        await sleep(POLL_INTERVAL_MS)
+        if (!mountedRef.current) return
+        let history: KBHistoryItem[]
+        try {
+          history = await fetchHistory()
+        } catch {
+          continue // transient fetch error — keep polling
+        }
+        // The freshest run we haven't seen before that carries a full validation
+        // payload (skips lightweight optimizer-apply / passive rows).
+        const fresh = history.find(
+          h => h.uuid && !priorUuids.has(h.uuid) && h.result_snapshot?.retrieval_precision,
+        )
+        if (fresh?.result_snapshot) {
+          result = fresh.result_snapshot
+          applyLatestQuality(history)
+          break
+        }
+      }
+      if (!mountedRef.current) return
+      if (result) {
+        setLatestRun(result)
+      } else {
+        setRunError(
+          'Validation is still running — large evaluation sets can take several ' +
+          'minutes. It will appear in the History tab when it finishes.',
+        )
+      }
+    } catch (e) {
+      if (mountedRef.current) setRunError((e as Error).message)
+    } finally {
+      if (mountedRef.current) setRunning(false)
+    }
+  }, [kbUuid, fetchHistory, applyLatestQuality])
 
   useEffect(() => {
     setLoading(true)
@@ -229,12 +323,13 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage }: Props) {
         />
       ) : tab === 'run' ? (
         <KBValidationRunTab
-          kbUuid={kbUuid}
           kbReady={kbReady}
           canManage={canManage}
           numQueries={queries.length}
           latestRun={latestRun}
-          onRun={(r) => { setLatestRun(r); refreshHistory() }}
+          running={running}
+          error={runError}
+          onRun={runValidation}
         />
       ) : (
         <KBQualityHistoryTab kbUuid={kbUuid} onSwitchToAutovalidate={() => setTab('autovalidate')} />

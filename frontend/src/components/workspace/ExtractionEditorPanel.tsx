@@ -1,13 +1,15 @@
 import React, { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ExtractionTutorial } from './ExtractionTutorial'
-import { X, Pencil, Loader2, Copy, Trash2, GripVertical, Plus, ChevronDown, ChevronRight, Play, TrendingUp, Sparkles, FileText, AlertTriangle, Eye, Shield, ShieldCheck, Download, Check, PenTool, Wrench, ClipboardCheck, SlidersHorizontal, Clock, Link2 } from 'lucide-react'
+import { X, Pencil, Loader2, Copy, Trash2, GripVertical, Plus, ChevronDown, ChevronRight, Play, TrendingUp, Sparkles, FileText, AlertTriangle, Eye, Shield, ShieldCheck, Download, Check, PenTool, Wrench, ClipboardCheck, SlidersHorizontal, Clock, Link2, FolderInput } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
 import { useAuth } from '../../hooks/useAuth'
 import { useShareLink } from '../../lib/shareLink'
 import { useConfirm } from '../shared/useConfirm'
 import { useSearchSetItems } from '../../hooks/useExtractions'
+import { getProjectDocuments } from '../../api/projects'
+import { uploadFile } from '../../api/files'
 import {
   getSearchSet,
   updateSearchSet,
@@ -26,6 +28,7 @@ import {
   exportExtractionPdf,
   generateExampleTemplate,
   exportSearchSetUrl,
+  downloadValidationResults,
   importSearchSet,
   getExtractionHistory,
 } from '../../api/extractions'
@@ -74,7 +77,7 @@ interface ExtractionConfig {
 
 export function ExtractionEditorPanel() {
   const queryClient = useQueryClient()
-  const { openExtractionId, openExtraction, closeExtraction, selectedDocUuids, selectedDocNames, setHighlightTerms, bumpActivitySignal, consumeExtractionResults } = useWorkspace()
+  const { openExtractionId, openExtraction, closeExtraction, selectedDocUuids, selectedDocNames, setHighlightTerms, bumpActivitySignal, consumeExtractionResults, activeProjectUuid, activeProjectRootFolder } = useWorkspace()
   const { toast } = useToast()
   const { user } = useAuth()
   const shareLink = useShareLink()
@@ -192,7 +195,22 @@ export function ExtractionEditorPanel() {
 
   // --- Run ---
   const handleRun = async () => {
-    if (!openExtractionId || selectedDocUuids.length === 0) return
+    if (!openExtractionId) return
+    // Default to the whole project when nothing is explicitly selected, so you
+    // can run an extraction "on the project" without hand-picking files.
+    let docUuids = selectedDocUuids
+    if (docUuids.length === 0) {
+      if (!activeProjectUuid) return
+      try {
+        docUuids = (await getProjectDocuments(activeProjectUuid)).document_uuids
+      } catch {
+        docUuids = []
+      }
+      if (docUuids.length === 0) {
+        toast('No files in this project to run on yet', 'info')
+        return
+      }
+    }
     setRunning(true)
     // Bump activity signal now so the side rail starts polling immediately and
     // picks up the running record the backend creates — otherwise no entry
@@ -201,7 +219,7 @@ export function ExtractionEditorPanel() {
     try {
       const resp = await runExtractionSync({
         search_set_uuid: openExtractionId,
-        document_uuids: selectedDocUuids,
+        document_uuids: docUuids,
         combined_context: combinedContext,
       })
       // Build result sets — one per entity object returned
@@ -220,9 +238,9 @@ export function ExtractionEditorPanel() {
       const finalSets = sets.length > 0 ? sets : [{}]
       // Snapshot doc names at run time so exports stay correct if the user
       // changes selection afterward.
-      const runDocNames: string[] = combinedContext && selectedDocUuids.length > 1
-        ? [`Combined (${selectedDocUuids.length} docs)`]
-        : selectedDocUuids.map(uuid => selectedDocNames[uuid] ?? uuid)
+      const runDocNames: string[] = combinedContext && docUuids.length > 1
+        ? [`Combined (${docUuids.length} docs)`]
+        : docUuids.map(uuid => selectedDocNames[uuid] ?? uuid)
       setResultSets(finalSets)
       setResultDocNames(finalSets.map((_, i) => runDocNames[i] ?? `Result ${i + 1}`))
       setActiveResultIdx(0)
@@ -258,7 +276,7 @@ export function ExtractionEditorPanel() {
     toast('JSON downloaded', 'success')
   }
 
-  const handleExportCSV = () => {
+  const buildResultsCSV = (): string => {
     const escape = (v: string) => `"${v.replace(/"/g, '""')}"`
     const allSets = resultSets.length > 0 ? resultSets : [results]
     // Union of keys across all sets, preserving the first set's order.
@@ -275,8 +293,11 @@ export function ExtractionEditorPanel() {
       const docName = resultDocNames[i] ?? (allSets.length === 1 ? '' : `Result ${i + 1}`)
       return [escape(docName), ...keys.map(k => escape(String(set[k] ?? '')))].join(',')
     })
-    const csv = header + '\n' + rows.join('\n') + '\n'
-    const blob = new Blob([csv], { type: 'text/csv' })
+    return header + '\n' + rows.join('\n') + '\n'
+  }
+
+  const handleExportCSV = () => {
+    const blob = new Blob([buildResultsCSV()], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -284,6 +305,27 @@ export function ExtractionEditorPanel() {
     a.click()
     URL.revokeObjectURL(url)
     toast('CSV downloaded', 'success')
+  }
+
+  // Save results back into the project as a CSV file. It rides the normal
+  // upload pipeline → gets indexed → becomes answerable in project chat.
+  // This closes the extraction half of the enrich flywheel.
+  const handleSaveToProject = async () => {
+    if (!activeProjectRootFolder) return
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve((reader.result as string).split(',')[1] ?? '')
+        reader.onerror = reject
+        reader.readAsDataURL(new Blob([buildResultsCSV()], { type: 'text/csv' }))
+      })
+      const fileName = `${searchSet?.title || 'extraction'}-results-${new Date().toISOString().slice(0, 10)}.csv`
+      await uploadFile({ contentAsBase64String: base64, fileName, extension: 'csv', folder: activeProjectRootFolder })
+      toast('Saved to project — indexing for chat…', 'success')
+      bumpActivitySignal()
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Failed to save to project', 'error')
+    }
   }
 
   // --- Tools ---
@@ -490,7 +532,11 @@ export function ExtractionEditorPanel() {
             </div>
           )}
           <div style={{ fontSize: 12, color: '#5f6368', marginTop: 2 }}>
-            {selectedDocUuids.length} document{selectedDocUuids.length !== 1 ? 's' : ''} selected
+            {selectedDocUuids.length > 0
+              ? `${selectedDocUuids.length} document${selectedDocUuids.length !== 1 ? 's' : ''} selected`
+              : activeProjectUuid
+                ? 'All project files'
+                : '0 documents selected'}
           </div>
         </div>
         <button
@@ -619,6 +665,7 @@ export function ExtractionEditorPanel() {
           onExportCSV={handleExportCSV}
           onExportJSON={handleExportJSON}
           onExportCopy={handleExportCopy}
+          onSaveToProject={activeProjectRootFolder ? handleSaveToProject : undefined}
           onRemoveItem={remove}
           onUpdateItem={update}
           onReorder={reorder}
@@ -822,10 +869,12 @@ export function ExtractionEditorPanel() {
           )}
           <button
             onClick={handleRun}
-            disabled={running || selectedDocUuids.length === 0}
+            disabled={running || (selectedDocUuids.length === 0 && !activeProjectUuid)}
             title={
               selectedDocUuids.length === 0
-                ? 'Select one or more documents to run an extraction'
+                ? (activeProjectUuid
+                    ? 'Run this extraction on all files in this project'
+                    : 'Select one or more documents to run an extraction')
                 : selectedDocUuids.length === 1
                   ? 'Run this extraction on the selected document'
                   : combinedContext
@@ -842,7 +891,7 @@ export function ExtractionEditorPanel() {
               fontFamily: 'inherit',
               borderRadius: 'var(--ui-radius, 8px)',
               border: 'none',
-              cursor: running || selectedDocUuids.length === 0 ? 'not-allowed' : 'pointer',
+              cursor: running || (selectedDocUuids.length === 0 && !activeProjectUuid) ? 'not-allowed' : 'pointer',
               whiteSpace: 'nowrap',
               flexShrink: 0,
             }}
@@ -912,6 +961,7 @@ function DesignTab({
   onExportCSV,
   onExportJSON,
   onExportCopy,
+  onSaveToProject,
   onRemoveItem,
   onUpdateItem,
   onReorder,
@@ -931,6 +981,7 @@ function DesignTab({
   onExportCSV: () => void
   onExportJSON: () => void
   onExportCopy: () => void
+  onSaveToProject?: () => void
   onRemoveItem: (id: string) => void
   onUpdateItem: (id: string, data: { searchphrase?: string; title?: string; is_optional?: boolean; enum_values?: string[] }) => void
   onReorder: (itemIds: string[]) => void
@@ -1040,6 +1091,7 @@ function DesignTab({
                 }}
               >
                 {[
+                  ...(onSaveToProject ? [{ label: 'Save to project', icon: <FolderInput style={{ width: 13, height: 13 }} />, action: onSaveToProject }] : []),
                   { label: 'Download CSV', icon: <Download style={{ width: 13, height: 13 }} />, action: onExportCSV },
                   { label: 'Download JSON', icon: <Download style={{ width: 13, height: 13 }} />, action: onExportJSON },
                   { label: 'Copy to Clipboard', icon: <Copy style={{ width: 13, height: 13 }} />, action: onExportCopy },
@@ -2469,6 +2521,19 @@ function ValidateTab({
   const fillAbortRef = useRef<AbortController | null>(null)
   const [showSubmitDialog, setShowSubmitDialog] = useState(false)
   const [submitLibraryResult, setSubmitLibraryResult] = useState<'success' | 'error' | null>(null)
+  const [downloadingResults, setDownloadingResults] = useState(false)
+
+  const handleDownloadResults = async () => {
+    if (downloadingResults) return
+    setDownloadingResults(true)
+    try {
+      await downloadValidationResults(searchSetUuid)
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Download failed', 'error')
+    } finally {
+      setDownloadingResults(false)
+    }
+  }
   const progress = useValidationProgress(validating, sources.length, numRuns, items.length, extractionConfig)
 
   // Debounce timers keyed by source id
@@ -2705,8 +2770,25 @@ function ValidateTab({
 
   return (
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* 1. Test cases — the shared input to tuning + detailed validation. Kept
-          on top so the auto-tune flow below always has something to score. */}
+      <div>
+        <div style={{ fontSize: 14, fontWeight: 600, color: '#202124', marginBottom: 4 }}>
+          Validate & Improve
+        </div>
+        <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
+          One click scores this extraction against your test cases and tries better settings.
+          The sections below hold the test data and per-field diagnostics.
+        </div>
+      </div>
+
+      {/* Validate & improve (autovalidate) — THE validation flow and the single
+          scoring surface. Apply writes the certified ValidationRun / quality tile. */}
+      <ExtractionAutovalidatePanel
+        searchSetUuid={searchSetUuid}
+        canManage={true}
+        onApplied={() => { onValidationComplete?.(); void reloadQualityHistory() }}
+      />
+
+      {/* Test cases — the shared input to tuning + detailed validation. */}
       <div>
         <div
           style={{
@@ -3049,14 +3131,6 @@ function ValidateTab({
         )}
       </div>
 
-      {/* Tune this extraction (autovalidate optimizer) — the single scoring
-          surface. Apply writes the certified ValidationRun / quality tile. */}
-      <ExtractionAutovalidatePanel
-        searchSetUuid={searchSetUuid}
-        canManage={true}
-        onApplied={() => { onValidationComplete?.(); void reloadQualityHistory() }}
-      />
-
       {/* Cross-field rules — feed into the optimizer's fitness function */}
       <CrossFieldRulesSection
         searchSetUuid={searchSetUuid}
@@ -3073,7 +3147,7 @@ function ValidateTab({
         </div>
         <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
           Run the test cases as-is and inspect expected vs. extracted values per source and field.
-          For the official score and tuning, use “Tune this extraction” above.
+          For the official score, use “Validate & improve” at the top.
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <label style={{ fontSize: 13, color: '#5f6368' }}>Replicates:</label>
@@ -3300,17 +3374,36 @@ function ValidateTab({
         <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: '#202124' }}>Detailed breakdown</div>
-            <button
-              onClick={() => downloadValidationCSV(results)}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 5,
-                padding: '5px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                borderRadius: 6, border: '1px solid #d1d5db', backgroundColor: '#fff',
-                color: '#374151', cursor: 'pointer',
-              }}
-            >
-              <Download style={{ width: 13, height: 13 }} /> Download CSV
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button
+                onClick={() => downloadValidationCSV(results)}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  padding: '5px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                  borderRadius: 6, border: '1px solid #d1d5db', backgroundColor: '#fff',
+                  color: '#374151', cursor: 'pointer',
+                }}
+              >
+                <Download style={{ width: 13, height: 13 }} /> Download CSV
+              </button>
+              <button
+                onClick={handleDownloadResults}
+                disabled={downloadingResults}
+                title="Download the raw results (JSON + CSV) — every replicate's extracted value for every document, for archival and cross-model comparison"
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 5,
+                  padding: '5px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                  borderRadius: 6, border: '1px solid #d1d5db', backgroundColor: '#fff',
+                  color: '#374151', cursor: downloadingResults ? 'wait' : 'pointer',
+                  opacity: downloadingResults ? 0.6 : 1,
+                }}
+              >
+                {downloadingResults
+                  ? <Loader2 style={{ width: 13, height: 13, animation: 'spin 1s linear infinite' }} />
+                  : <Download style={{ width: 13, height: 13 }} />}
+                Download raw data
+              </button>
+            </div>
           </div>
 
           {/* The official, certified score lives in the auto-tune panel above

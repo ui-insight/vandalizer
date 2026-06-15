@@ -346,6 +346,210 @@ async def download_validation_zip(uuid: str, user: User = Depends(get_current_us
     )
 
 
+def _build_validation_results_export(
+    *,
+    ss_uuid: str,
+    ss_title: str,
+    vr,
+    doc_by_case: dict[str, dict],
+    exported_by_user_id: str,
+    exported_at: str,
+) -> tuple[dict, list[list]]:
+    """Reshape a persisted validation run into an export payload + flat CSV rows.
+
+    Pure (no I/O) so it's unit-testable. ``vr`` is a ValidationRun whose
+    ``result_snapshot`` holds the full per-replicate result; ``doc_by_case`` maps
+    a test-case uuid to ``{"document_uuid", "source_type"}`` recovered from the
+    current test cases (best-effort — a since-deleted case just resolves to
+    None). Returns ``(json_payload, csv_rows)`` where each CSV row is one
+    (document, field, replicate) observation.
+    """
+    snap = vr.result_snapshot or {}
+    # The snapshot key has been "test_cases" historically; tolerate "sources".
+    cases = snap.get("test_cases") or snap.get("sources") or []
+    num_runs = snap.get("num_runs") or getattr(vr, "num_runs", None) or 1
+
+    documents: list[dict] = []
+    csv_rows: list[list] = []
+    for tcr in cases:
+        tc_uuid = tcr.get("uuid") or tcr.get("test_case_uuid") or ""
+        label = tcr.get("label") or tcr.get("source_label") or ""
+        doc_info = doc_by_case.get(tc_uuid, {})
+        document_uuid = doc_info.get("document_uuid")
+        source_type = doc_info.get("source_type") or tcr.get("source_type")
+
+        fields_out: list[dict] = []
+        for fr in tcr.get("fields", []):
+            field_name = fr.get("field_name", "")
+            expected = fr.get("expected")
+            extracted = fr.get("extracted_values", []) or []
+            fields_out.append({
+                "field_name": field_name,
+                "expected": expected,
+                # One entry per replicate (run), in run order.
+                "replicates": [{"run": i + 1, "value": v} for i, v in enumerate(extracted)],
+                "most_common_value": fr.get("most_common_value"),
+                "accuracy": fr.get("accuracy"),
+                "consistency": fr.get("consistency"),
+                "error_types": fr.get("error_types", {}),
+            })
+            for i, v in enumerate(extracted):
+                csv_rows.append([
+                    tc_uuid,
+                    label,
+                    document_uuid or "",
+                    field_name,
+                    "" if expected is None else expected,
+                    i + 1,
+                    "" if v is None else v,
+                ])
+
+        documents.append({
+            "test_case_uuid": tc_uuid,
+            "label": label,
+            "source_type": source_type,
+            "document_uuid": document_uuid,
+            "overall_accuracy": tcr.get("overall_accuracy"),
+            "overall_consistency": tcr.get("overall_consistency"),
+            "per_run_correct": tcr.get("per_run_correct", []),
+            "fields": fields_out,
+        })
+
+    payload = {
+        "format": "vandalizer.validation-results.v1",
+        "exported_at": exported_at,
+        "exported_by_user_id": exported_by_user_id,
+        "search_set": {"uuid": ss_uuid, "title": ss_title},
+        "validation_run": {
+            "uuid": vr.uuid,
+            "created_at": vr.created_at.isoformat() if getattr(vr, "created_at", None) else None,
+            "model": vr.model,
+            "num_runs": num_runs,
+            "num_test_cases": getattr(vr, "num_test_cases", None),
+            "accuracy": vr.accuracy,
+            "consistency": vr.consistency,
+            "score": vr.score,
+            "aggregate_accuracy": snap.get("aggregate_accuracy"),
+            "aggregate_consistency": snap.get("aggregate_consistency"),
+        },
+        "documents": documents,
+    }
+    return payload, csv_rows
+
+
+@router.get("/search-sets/{uuid}/download-results")
+async def download_validation_results(
+    uuid: str,
+    run_uuid: Optional[str] = Query(default=None),
+    user: User = Depends(get_current_user),
+):
+    """Download the raw results of a validation run: the extracted value for
+    every replicate of every document/field, with expected values and per-field
+    accuracy/consistency. Defaults to the most recent extraction validation run
+    for this search set; pass ``run_uuid`` to export a specific run.
+
+    Companion to ``download-validation`` (which exports the validation *setup*) —
+    this exports the *results*, so they can be ingested into an external
+    evaluation data repository and compared against other models/platforms.
+    """
+    import datetime
+    import io
+    import zipfile
+
+    ss = await _get_search_set_or_404(uuid, user)
+
+    from app.models.validation_run import ValidationRun
+
+    if run_uuid:
+        vr = await ValidationRun.find_one(
+            ValidationRun.uuid == run_uuid,
+            ValidationRun.item_id == ss.uuid,
+            ValidationRun.item_kind == "search_set",
+        )
+    else:
+        latest = await (
+            ValidationRun.find(
+                ValidationRun.item_id == ss.uuid,
+                ValidationRun.item_kind == "search_set",
+                ValidationRun.run_type == "extraction",
+            )
+            .sort("-created_at")
+            .limit(1)
+            .to_list()
+        )
+        vr = latest[0] if latest else None
+
+    if not vr:
+        raise HTTPException(
+            status_code=404,
+            detail="No validation results found. Run a validation first.",
+        )
+
+    # Recover the source document reference per test case (the snapshot keeps the
+    # case uuid/label but not the doc link). Best-effort by uuid.
+    doc_by_case = {
+        tc.uuid: {"document_uuid": tc.document_uuid, "source_type": tc.source_type}
+        for tc in await val_svc.list_test_cases(ss.uuid)
+    }
+
+    payload, csv_rows = _build_validation_results_export(
+        ss_uuid=ss.uuid,
+        ss_title=ss.title,
+        vr=vr,
+        doc_by_case=doc_by_case,
+        exported_by_user_id=user.user_id,
+        exported_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+    )
+
+    def _safe(name: str | None, fallback: str) -> str:
+        cleaned = "".join(c if c.isalnum() or c in " _-." else "_" for c in (name or "")).strip()
+        return cleaned or fallback
+
+    safe_title = _safe(ss.title, "extraction")
+
+    # Build the tidy CSV (one row per document × field × replicate) by hand —
+    # the values are already escaped-safe small strings; quote anything risky.
+    def _csv_cell(v) -> str:
+        s = str(v)
+        if any(c in s for c in (",", '"', "\n", "\r")):
+            return '"' + s.replace('"', '""') + '"'
+        return s
+
+    csv_lines = ["test_case_uuid,document_label,document_uuid,field_name,expected,run,extracted_value"]
+    csv_lines.extend(",".join(_csv_cell(c) for c in row) for row in csv_rows)
+    csv_text = "\n".join(csv_lines) + "\n"
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("validation-results.json", json.dumps(payload, indent=2, default=str))
+        zf.writestr("extracted-values.csv", csv_text)
+        zf.writestr(
+            "README.txt",
+            (
+                "Vandalizer validation results export\n"
+                "====================================\n\n"
+                f"Extraction: {ss.title}\n"
+                f"Validation run: {vr.uuid}\n"
+                f"Documents: {len(payload['documents'])}\n"
+                f"Replicates per document/field: {payload['validation_run']['num_runs']}\n\n"
+                "validation-results.json — structured results: for every document and\n"
+                "  field, the expected value and the extracted value of each replicate\n"
+                "  (run), plus per-field accuracy/consistency and run-level metadata.\n"
+                "extracted-values.csv — the same raw data in tidy long form, one row\n"
+                "  per (document, field, replicate): test_case_uuid, document_label,\n"
+                "  document_uuid, field_name, expected, run, extracted_value. Convenient\n"
+                "  for ingestion and for comparing against other models/platforms.\n"
+            ),
+        )
+
+    buf.seek(0)
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{safe_title}_validation-results.zip"'},
+    )
+
+
 @router.post("/search-sets/import", response_model=SearchSetResponse)
 async def import_search_set(
     file: UploadFile = File(...),
@@ -1462,6 +1666,23 @@ async def clear_tuning_result(uuid: str, user: User = Depends(get_current_user))
 # ---------------------------------------------------------------------------
 
 
+def _iso_utc(dt):
+    """ISO-8601 string with an explicit UTC offset.
+
+    Datetimes read back from Mongo are naive (the Motor client isn't tz_aware),
+    so a bare ``.isoformat()`` emits no offset and browsers parse it as *local*
+    time. For users west of UTC that pushes ``started_at`` into the future, so
+    the live elapsed-time readout clamps to 0s for the whole run. Treat naive
+    values as UTC so the wire format is unambiguous.
+    """
+    if dt is None:
+        return None
+    import datetime as _dt
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=_dt.timezone.utc)
+    return dt.astimezone(_dt.timezone.utc).isoformat()
+
+
 def _serialize_extraction_optimization_run(run) -> dict:
     return {
         "uuid": run.uuid,
@@ -1497,10 +1718,10 @@ def _serialize_extraction_optimization_run(run) -> dict:
         "apply_preview": getattr(run, "apply_preview", None),
         "options": run.options,
         "error_message": run.error_message,
-        "started_at": run.started_at.isoformat() if run.started_at else None,
-        "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+        "started_at": _iso_utc(run.started_at),
+        "completed_at": _iso_utc(run.completed_at),
         "cancel_requested": run.cancel_requested,
-        "cancel_requested_at": run.cancel_requested_at.isoformat() if getattr(run, "cancel_requested_at", None) else None,
+        "cancel_requested_at": _iso_utc(getattr(run, "cancel_requested_at", None)),
     }
 
 
@@ -1710,8 +1931,8 @@ def _summarise_extraction_optimization_run(run) -> dict:
         "uuid": run.uuid,
         "search_set_uuid": run.search_set_uuid,
         "status": run.status,
-        "started_at": run.started_at.isoformat() if run.started_at else None,
-        "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+        "started_at": _iso_utc(run.started_at),
+        "completed_at": _iso_utc(run.completed_at),
         "token_budget": run.token_budget,
         "tokens_used": run.tokens_used,
         "baseline_no_tool_score": run.baseline_no_tool_score,

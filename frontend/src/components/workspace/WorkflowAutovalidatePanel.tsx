@@ -1,6 +1,11 @@
 /**
  * Workflow Autovalidate panel — the v2 replacement for WorkflowOptimizationPanel.
  *
+ * Presented as "Validate & improve": this is the workflow's primary validation
+ * surface, not a separate tuning add-on. The baseline trial scores the current
+ * configuration (that IS the validation); the remaining trials look for a
+ * better one, and Apply writes it back.
+ *
  * Consumes the shared autovalidate components so the workflow surface matches
  * KB and extraction:
  *
@@ -20,6 +25,7 @@ import {
   cancelWorkflowOptimization,
   getActiveWorkflowOptimization,
   getWorkflowOptimization,
+  listWorkflowOptimizationHistory,
   revertWorkflowOptimization,
   type WorkflowOptimizationRun,
   type WorkflowOptimizationTrial,
@@ -39,7 +45,18 @@ import { DOMAIN_LABELS } from '../shared/labels'
 import { WhenToRunDisclosure } from '../shared/WhenToRunDisclosure'
 
 
-export function WorkflowAutovalidatePanel({ workflowId }: { workflowId: string }) {
+export function WorkflowAutovalidatePanel({
+  workflowId,
+  testDataSummary,
+  onOpenTestData,
+}: {
+  workflowId: string
+  /** Counts shown under the description so users can see what the run will
+   * score against without expanding the setup section. */
+  testDataSummary?: { inputs: number; expectedOutputs: number; checks: number }
+  /** Opens the "Test data & quality checks" section in the parent tab. */
+  onOpenTestData?: () => void
+}) {
   const [run, setRun] = useState<WorkflowOptimizationRun | null>(null)
   const [showWizard, setShowWizard] = useState(false)
   const [cancelling, setCancelling] = useState(false)
@@ -55,12 +72,33 @@ export function WorkflowAutovalidatePanel({ workflowId }: { workflowId: string }
     }
   }, [])
 
-  // Load any in-progress run on mount.
+  // Load any in-progress run on mount; with none, fall back to the most
+  // recent finished run so a completed result survives tab switches and
+  // page reloads instead of dropping back to the idle hero (mirrors the KB
+  // AutovalidateTab). History summaries omit per-trial detail, so fetch the
+  // full run before rendering.
   useEffect(() => {
-    getActiveWorkflowOptimization(workflowId)
-      .then(({ run: r }) => { if (r) setRun(r) })
-      .catch(() => {})
-    return () => stopPoll()
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { run: active } = await getActiveWorkflowOptimization(workflowId)
+        if (cancelled) return
+        if (active) {
+          setRun(active)
+          return
+        }
+        const history = await listWorkflowOptimizationHistory(workflowId, { limit: 1 })
+        if (cancelled) return
+        const latest = history.items[0]
+        if (latest) {
+          const full = await getWorkflowOptimization(workflowId, latest.uuid)
+          if (!cancelled) setRun(full)
+        }
+      } catch {
+        /* no run to restore — idle hero */
+      }
+    })()
+    return () => { cancelled = true; stopPoll() }
   }, [workflowId, stopPoll])
 
   // Poll while running.
@@ -174,13 +212,33 @@ export function WorkflowAutovalidatePanel({ workflowId }: { workflowId: string }
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Sparkles size={16} style={{ color: '#a78bfa' }} />
             <div style={{ fontSize: 15, fontWeight: 600, color: '#fff' }}>
-              Tune this workflow
+              Validate & improve
             </div>
           </div>
           <div style={{ fontSize: 13, color: '#bbb', marginTop: 4, lineHeight: 1.5 }}>
-            Try different per-step model and prompt-style combinations against your expected
-            outputs. Apply the best config back with one click.
+            Runs this workflow against your test data, scores the output, and tries better
+            per-step model and prompt combinations. Apply the best configuration with one click.
           </div>
+          {testDataSummary && (
+            <div style={{ fontSize: 12, color: '#888', marginTop: 6 }}>
+              Scores against {testDataSummary.expectedOutputs} expected{' '}
+              {testDataSummary.expectedOutputs === 1 ? 'output' : 'outputs'} and{' '}
+              {testDataSummary.checks} quality {testDataSummary.checks === 1 ? 'check' : 'checks'}.
+              {onOpenTestData && (
+                <button
+                  type="button"
+                  onClick={onOpenTestData}
+                  style={{
+                    marginLeft: 6, background: 'none', border: 'none', padding: 0,
+                    color: '#a78bfa', fontSize: 12, cursor: 'pointer',
+                    fontFamily: 'inherit', textDecoration: 'underline',
+                  }}
+                >
+                  Edit test data
+                </button>
+              )}
+            </div>
+          )}
           <div style={{ marginTop: 10 }}>
             <WhenToRunDisclosure kind="workflow" />
           </div>
@@ -199,7 +257,7 @@ export function WorkflowAutovalidatePanel({ workflowId }: { workflowId: string }
             }}
           >
             <Sparkles size={14} />
-            {run ? 'Re-run tuning' : 'Tune workflow'}
+            {run ? 'Validate & improve again' : 'Validate & improve'}
           </button>
         )}
       </div>

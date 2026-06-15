@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useLayoutEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 
 type TermKey =
   | 'judge'
@@ -68,42 +69,71 @@ export function TermDef({ term, children, theme = 'dark' }: TermDefProps) {
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLSpanElement | null>(null)
   const tipRef = useRef<HTMLSpanElement | null>(null)
-  // Horizontal shift (px) applied to keep the tooltip inside the viewport.
-  // Without it, a trigger near the right edge pushes the tooltip off-screen,
-  // which spawns a horizontal scrollbar the user can't reach without closing it.
-  const [shiftX, setShiftX] = useState(0)
+  // Fixed-viewport coordinates for the popover. We render it in a portal on
+  // document.body so it can never overflow — and thus never spawn a horizontal
+  // scrollbar on — a narrow ancestor (e.g. the tuning wizard's scroll body).
+  // That overflow was the bug: a scrollbar would appear, and dragging it fired
+  // the click-away handler and closed the popover before it could be read.
+  // Null until measured so the first paint doesn't flash at an unclamped spot.
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
 
-  useLayoutEffect(() => {
-    if (!open) {
-      setShiftX(0)
-      return
-    }
+  const reposition = useCallback(() => {
+    const trigger = wrapRef.current
     const tip = tipRef.current
-    if (!tip) return
+    if (!trigger || !tip) return
+    const r = trigger.getBoundingClientRect()
     const margin = 8
     const vw = document.documentElement.clientWidth
-    const rect = tip.getBoundingClientRect()
-    let shift = 0
-    if (rect.right > vw - margin) shift = vw - margin - rect.right
-    if (rect.left + shift < margin) shift = margin - rect.left
-    setShiftX(shift)
-  }, [open])
+    const vh = document.documentElement.clientHeight
+    const tw = tip.offsetWidth
+    const th = tip.offsetHeight
+    // Left-align to the trigger, then clamp both edges into the viewport.
+    let left = r.left
+    if (left + tw > vw - margin) left = vw - margin - tw
+    if (left < margin) left = margin
+    // Prefer below the trigger; flip above when it would clip the bottom and
+    // there's more room up top.
+    let top = r.bottom + 6
+    if (top + th > vh - margin && r.top - th - 6 >= margin) top = r.top - th - 6
+    setPos({ top, left })
+  }, [])
+
+  // Measure + clamp before paint (useLayoutEffect) so the popover never appears
+  // off-screen for a frame.
+  useLayoutEffect(() => {
+    if (!open) {
+      setPos(null)
+      return
+    }
+    reposition()
+  }, [open, reposition])
 
   useEffect(() => {
     if (!open) return
     function onDocClick(e: MouseEvent) {
-      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false)
+      const t = e.target as Node
+      // Keep open while interacting with the trigger or the popover itself
+      // (the popover now lives outside wrapRef in a body portal).
+      if (wrapRef.current?.contains(t) || tipRef.current?.contains(t)) return
+      setOpen(false)
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') setOpen(false)
     }
+    // Keep the fixed popover glued to the trigger as the page or any nested
+    // container scrolls (capture phase catches scrolls on ancestor elements).
+    const onReflow = () => reposition()
     document.addEventListener('mousedown', onDocClick)
     document.addEventListener('keydown', onKey)
+    window.addEventListener('resize', onReflow)
+    window.addEventListener('scroll', onReflow, true)
     return () => {
       document.removeEventListener('mousedown', onDocClick)
       document.removeEventListener('keydown', onKey)
+      window.removeEventListener('resize', onReflow)
+      window.removeEventListener('scroll', onReflow, true)
     }
-  }, [open])
+  }, [open, reposition])
 
   const isDark = theme === 'dark'
   const triggerColor = isDark ? '#c4b5fd' : '#7c3aed'
@@ -136,15 +166,17 @@ export function TermDef({ term, children, theme = 'dark' }: TermDefProps) {
       >
         {children ?? term}
       </button>
-      {open && (
+      {open && createPortal(
         <span
           ref={tipRef}
           role="tooltip"
           style={{
-            position: 'absolute',
+            position: 'fixed',
             zIndex: 1000,
-            top: 'calc(100% + 6px)',
-            left: shiftX,
+            top: pos?.top ?? 0,
+            left: pos?.left ?? 0,
+            // Hidden until measured/clamped so it never flashes off-screen.
+            visibility: pos ? 'visible' : 'hidden',
             minWidth: 240,
             maxWidth: 320,
             padding: '10px 12px',
@@ -168,7 +200,8 @@ export function TermDef({ term, children, theme = 'dark' }: TermDefProps) {
               {def.example}
             </div>
           )}
-        </span>
+        </span>,
+        document.body,
       )}
     </span>
   )

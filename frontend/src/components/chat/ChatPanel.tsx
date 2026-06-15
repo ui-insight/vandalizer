@@ -149,7 +149,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     setActivity,
   } = useChat()
 
-  const { bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, activeKBUuid, activeKBTitle, activateKB, deactivateKB, setCurrentConversationUuid } = useWorkspace()
+  const { bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, activeKBUuid, activeKBTitle, activateKB, deactivateKB, activeProjectUuid, setCurrentConversationUuid } = useWorkspace()
   const [convertingToKB, setConvertingToKB] = useState(false)
   const { toast } = useToast()
   const shareLink = useShareLink()
@@ -389,15 +389,16 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
 
   const handleSend = (message: string, includeOnboardingContext?: boolean) => {
     // Use the locked ref so remounts / refetches can't flip this mid-conversation.
-    const firstSession = effectiveFirstSession && !hasDocContext && !activeKBUuid
+    const firstSession = effectiveFirstSession && !hasDocContext && !activeKBUuid && !activeProjectUuid
     // Detect "show me" to track demo trigger (backend does the real routing)
     if (firstSession && /^show\s*me/i.test(message.trim())) {
       demoTriggered.current = true
     }
-    send(message, selectedDocUuids, selectedModel || undefined, activeKBUuid || undefined, includeOnboardingContext, selectedFolderUuids, firstSession || undefined)
-    // End first-session mode on the user's first real message. One exchange is
-    // enough — staying in first-session state leaks demo behavior into normal chat.
-    if (firstSession && !firstSessionMarked.current) {
+    send(message, selectedDocUuids, selectedModel || undefined, activeKBUuid || undefined, includeOnboardingContext, selectedFolderUuids, firstSession || undefined, undefined, activeProjectUuid || undefined)
+    // Defer markFirstSessionComplete until the user has had enough exchanges
+    // to experience the value discovery (at least 3 user messages).
+    // messages.length counts both user + assistant; 4 = 2 full exchanges done.
+    if (firstSession && !firstSessionMarked.current && messages.length >= 4) {
       firstSessionMarked.current = true
       markFirstSessionComplete().catch(() => {})
     }

@@ -14,6 +14,7 @@ import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
 import { useAuth } from '../../hooks/useAuth'
 import { useShareLink } from '../../lib/shareLink'
+import { getProjectDocuments } from '../../api/projects'
 import {
   getWorkflow, addStep, deleteStep, addTask, deleteTask, updateTask,
   updateWorkflow, updateStep, downloadResults, testStep, getTestStepStatus,
@@ -206,7 +207,7 @@ export function WorkflowEditorPanel() {
   const { toast } = useToast()
   const { user } = useAuth()
   const shareLink = useShareLink()
-  const { openWorkflowId, openWorkflowShareToken, openWorkflow, closeWorkflow, consumeWorkflowSession, selectedDocUuids, bumpActivitySignal } = useWorkspace()
+  const { openWorkflowId, openWorkflowShareToken, openWorkflow, closeWorkflow, consumeWorkflowSession, selectedDocUuids, bumpActivitySignal, activeProjectUuid } = useWorkspace()
   const [workflow, setWorkflow] = useState<Workflow | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('design')
@@ -471,8 +472,10 @@ export function WorkflowEditorPanel() {
   const isTextInput = workflow?.input_config?.trigger_type === 'text_input'
   const isNoInput = workflow?.input_config?.trigger_type === 'no_input'
   // Whether the run is blocked for lack of required input. "No input"
-  // workflows never require input; text needs non-empty text; otherwise a doc.
-  const missingInput = isNoInput ? false : isTextInput ? !textInput.trim() : selectedDocUuids.length === 0
+  // workflows never require input; text needs non-empty text; otherwise a doc
+  // — unless a project is active, in which case the run falls back to all of
+  // the project's files.
+  const missingInput = isNoInput ? false : isTextInput ? !textInput.trim() : (selectedDocUuids.length === 0 && !activeProjectUuid)
 
   const handleRun = async () => {
     if (!openWorkflowId) return
@@ -493,8 +496,16 @@ export function WorkflowEditorPanel() {
         setActiveTab('design')
         await runner.start(openWorkflowId, allUuids, undefined, false)
       } else {
-        const uuids = selectedDocUuids.length > 0 ? selectedDocUuids : []
-        if (uuids.length === 0) return
+        // Default to the whole project when nothing is explicitly selected.
+        let uuids = selectedDocUuids
+        if (uuids.length === 0) {
+          if (!activeProjectUuid) return
+          uuids = (await getProjectDocuments(activeProjectUuid)).document_uuids
+          if (uuids.length === 0) {
+            toast('No files in this project to run on yet', 'info')
+            return
+          }
+        }
         setActiveTab('design')
         await runner.start(openWorkflowId, uuids, undefined, batchMode)
       }
@@ -945,7 +956,7 @@ export function WorkflowEditorPanel() {
         {!isTextInput && !isNoInput && selectedDocUuids.length === 0 && (
           <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
             <FileText style={{ width: 12, height: 12 }} />
-            Select a document to run this workflow
+            {activeProjectUuid ? 'Will run on all files in this project' : 'Select a document to run this workflow'}
           </div>
         )}
         {isNoInput && (
@@ -5641,6 +5652,18 @@ function ValidateTab({
   const [submitLibraryResult, setSubmitLibraryResult] = useState<'success' | 'error' | null>(null)
   const [showSubmitDialog, setShowSubmitDialog] = useState(false)
 
+  // Unified-flow layout: "Validate & improve" (autovalidate) leads the tab;
+  // test data and the per-check diagnostic run are collapsible support
+  // sections so first-time users see exactly one button.
+  const [setupOpen, setSetupOpen] = useState(false)
+  const [diagOpen, setDiagOpen] = useState(false)
+
+  // A stale plan needs user attention — pop the setup section open so the
+  // StalePlanBanner inside it isn't hidden behind the collapse.
+  useEffect(() => {
+    if (planStale) setSetupOpen(true)
+  }, [planStale])
+
   // Progress tracking for Run & Validate
   const [runElapsedValidate, setRunElapsedValidate] = useState(0)
   const runStartRef = useRef<number | null>(null)
@@ -6137,10 +6160,70 @@ function ValidateTab({
 
   return (
     <div style={{ padding: 24 }}>
-      <div style={{ fontSize: 14, fontWeight: 600, color: '#202124', marginBottom: 16 }}>
-        Output Quality Validation
+      <div style={{ fontSize: 14, fontWeight: 600, color: '#202124', marginBottom: 4 }}>
+        Validate & Improve
+      </div>
+      <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 16, lineHeight: 1.5 }}>
+        One click runs this workflow against your test data, scores the output, and tries
+        better settings. Expand the sections below to edit test data or dig into individual checks.
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+        {/* Validate & improve (autovalidate) — THE validation flow. Its baseline
+            trial scores the current config; tuning and one-click apply are part
+            of the same run. The wizard walks new users through missing test
+            data, so this works as the only button people ever need. */}
+        {workflowId && (
+          <WorkflowAutovalidatePanel
+            workflowId={workflowId}
+            testDataSummary={{
+              inputs: inputs.length,
+              expectedOutputs: expectedOutputs.length,
+              checks: planChecks.length,
+            }}
+            onOpenTestData={() => setSetupOpen(true)}
+          />
+        )}
+
+        {error && (
+          <div style={{
+            padding: 12, backgroundColor: '#fee2e2', border: '1px solid #fca5a5',
+            borderRadius: 8, fontSize: 13, color: '#dc2626',
+          }}>
+            {error}
+          </div>
+        )}
+
+        {/* ---- Test data & quality checks (collapsible setup) ---- */}
+        <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, backgroundColor: '#fff' }}>
+          <button
+            onClick={() => setSetupOpen(o => !o)}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+              padding: '12px 16px', background: 'none', border: 'none',
+              cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+            }}
+          >
+            {setupOpen
+              ? <ChevronDown style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0 }} />
+              : <ChevronRight style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0 }} />}
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>Test data & quality checks</span>
+            {planStale && (
+              <span style={{
+                fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4,
+                backgroundColor: '#fef3c7', color: '#92400e', whiteSpace: 'nowrap',
+              }}>
+                PLAN NEEDS REVIEW
+              </span>
+            )}
+            <span style={{ marginLeft: 'auto', fontSize: 11, color: '#9ca3af', whiteSpace: 'nowrap' }}>
+              {inputs.length} {inputs.length === 1 ? 'input' : 'inputs'}
+              {' · '}{expectedOutputs.length} expected {expectedOutputs.length === 1 ? 'output' : 'outputs'}
+              {' · '}{planChecks.length} {planChecks.length === 1 ? 'check' : 'checks'}
+            </span>
+          </button>
+          {setupOpen && (
+          <div style={{ padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* ---- Test Inputs Section ---- */}
         <div style={{
@@ -6656,22 +6739,33 @@ function ValidateTab({
           )}
         </div>
 
-        {/* Tune this workflow (autovalidate optimizer) — the primary scoring
-            surface, mirroring the extraction Validate tab. Apply writes the
-            certified result; the on-demand detailed validation below is a
-            diagnostic, not a competing score. */}
-        {workflowId && <WorkflowAutovalidatePanel workflowId={workflowId} />}
-
-        {/* ---- Detailed validation (on demand) ---- */}
-        <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16 }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: '#202124', marginBottom: 4 }}>
-            Detailed validation
           </div>
-          <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
-            Run the validation plan as-is and inspect the grade and per-check breakdown.
-            For the official score and tuning, use “Tune this workflow” above.
-          </div>
+          )}
         </div>
+
+        {/* ---- Detailed check results (diagnostic, collapsible) ----
+            Runs the validation plan as-is against the current config and shows
+            per-check pass/fail. The official score and tuning live in
+            "Validate & improve" above. */}
+        <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, backgroundColor: '#fff' }}>
+          <button
+            onClick={() => setDiagOpen(o => !o)}
+            style={{
+              width: '100%', display: 'flex', alignItems: 'center', gap: 8,
+              padding: '12px 16px', background: 'none', border: 'none',
+              cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+            }}
+          >
+            {diagOpen
+              ? <ChevronDown style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0 }} />
+              : <ChevronRight style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0 }} />}
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>Detailed check results</span>
+            <span style={{ marginLeft: 'auto', fontSize: 11, color: '#9ca3af', whiteSpace: 'nowrap' }}>
+              run checks one-by-one to debug a low score
+            </span>
+          </button>
+          {diagOpen && (
+          <div style={{ padding: '0 16px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* ---- Run Buttons ---- */}
         <div style={{ display: 'flex', gap: 8 }}>
@@ -6716,15 +6810,6 @@ function ValidateTab({
         {!hasChecks && !planLoading && !generating && (
           <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'center', marginTop: -8 }}>
             Generate or add checks to your validation plan first.
-          </div>
-        )}
-
-        {error && (
-          <div style={{
-            padding: 12, backgroundColor: '#fee2e2', border: '1px solid #fca5a5',
-            borderRadius: 8, fontSize: 13, color: '#dc2626',
-          }}>
-            {error}
           </div>
         )}
 
@@ -7129,6 +7214,10 @@ function ValidateTab({
             </div>
           </>
         )}
+
+          </div>
+          )}
+        </div>
       </div>
 
       {/* Document Picker Dialog */}

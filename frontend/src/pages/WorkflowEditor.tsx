@@ -20,6 +20,7 @@ export default function WorkflowEditor() {
           extraction: undefined,
           automation: undefined,
           kb: undefined,
+          project: undefined,
           workflow_share_token: undefined,
         },
         replace: true,

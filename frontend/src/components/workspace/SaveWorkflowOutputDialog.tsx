@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { X, Folder } from 'lucide-react'
 import { listAllFolders, type FolderSummary } from '../../api/folders'
 import { saveResultToFolder, type SaveOutputFormat } from '../../api/workflows'
+import { useWorkspace } from '../../contexts/WorkspaceContext'
 
 interface Props {
   sessionId: string
@@ -20,6 +21,7 @@ const FORMAT_OPTIONS: { value: SaveOutputFormat; label: string; ext: string }[] 
 ]
 
 export function SaveWorkflowOutputDialog({ sessionId, workflowName, outputPreview, onClose, onSaved }: Props) {
+  const { activeProjectRootFolder } = useWorkspace()
   const [folders, setFolders] = useState<FolderSummary[]>([])
   const [folderUuid, setFolderUuid] = useState('')
   const [format, setFormat] = useState<SaveOutputFormat>('pdf')
@@ -33,11 +35,15 @@ export function SaveWorkflowOutputDialog({ sessionId, workflowName, outputPrevie
       .then(list => {
         const sorted = [...list].sort((a, b) => a.path.localeCompare(b.path))
         setFolders(sorted)
-        setFolderUuid(sorted[0]?.uuid ?? '')
+        // In a project, default to its folder so results land back in the
+        // project (and get re-indexed for chat) — the enrich flywheel.
+        const projectMatch = activeProjectRootFolder
+          && sorted.some(f => f.uuid === activeProjectRootFolder)
+        setFolderUuid(projectMatch ? activeProjectRootFolder : (sorted[0]?.uuid ?? ''))
       })
       .catch(() => setFolders([]))
       .finally(() => setLoading(false))
-  }, [])
+  }, [activeProjectRootFolder])
 
   useEffect(() => {
     if (fileName) return

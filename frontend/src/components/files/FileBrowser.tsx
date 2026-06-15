@@ -55,17 +55,31 @@ interface FileBrowserProps {
   ) => void
   currentFolder?: string | null
   onFolderNavigate?: (folderId: string | null) => void
+  // When set (project scope), this folder is the browser's home/floor:
+  // breadcrumbs start here and navigation can't go above it.
+  rootFolder?: string | null
+  rootLabel?: string | null
+  // Override the team scope used to list/scope documents (project's team).
+  teamScopeUuid?: string
 }
 
-export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSelectionChange, onDocNamesChange, onFolderSelectionChange, onSelectionProcessingChange, currentFolder: controlledFolder, onFolderNavigate }: FileBrowserProps) {
+export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSelectionChange, onDocNamesChange, onFolderSelectionChange, onSelectionProcessingChange, currentFolder: controlledFolder, onFolderNavigate, rootFolder = null, rootLabel, teamScopeUuid }: FileBrowserProps) {
   const { currentTeam } = useTeams()
   const confirm = useConfirm()
 
   const [internalFolder, setInternalFolder] = useState<string | null>(null)
   const currentFolder = controlledFolder !== undefined ? controlledFolder : internalFolder
   const setCurrentFolder = onFolderNavigate ?? setInternalFolder
-  const { documents, folders, loading, refresh } = useDocuments(currentFolder, currentTeam?.uuid)
+  const { documents, folders, loading, refresh } = useDocuments(currentFolder, teamScopeUuid ?? currentTeam?.uuid)
   const { breadcrumbs } = useBreadcrumbs(currentFolder)
+
+  // When rooted at a project folder, trim the breadcrumb trail to start at that
+  // folder so the project root acts as "Home" and ancestors above it are hidden.
+  const displayBreadcrumbs = useMemo(() => {
+    if (!rootFolder) return breadcrumbs
+    const idx = breadcrumbs.findIndex(b => b.uuid === rootFolder)
+    return idx >= 0 ? breadcrumbs.slice(idx + 1) : breadcrumbs
+  }, [breadcrumbs, rootFolder])
   const { uploads, upload, lastUploadedUuid, clearLastUploaded } = useUpload(currentFolder, refresh)
 
   // Load watched folder UUIDs from automations
@@ -520,7 +534,12 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
       </div>
 
       {/* Breadcrumbs - matches Flask _breadcrumbs.html */}
-      <Breadcrumbs items={breadcrumbs} onNavigate={setCurrentFolder} />
+      <Breadcrumbs
+        items={displayBreadcrumbs}
+        onNavigate={setCurrentFolder}
+        floor={rootFolder}
+        homeLabel={rootFolder ? (rootLabel ?? 'Project') : 'Home'}
+      />
 
       {/* Bulk action toolbar */}
       {selectedUuids.size > 0 && (

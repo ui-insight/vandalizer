@@ -577,11 +577,19 @@ export type ApplyPreview = {
   items: ApplyPreviewItem[]
 }
 
+/** How the tuning run's evaluation set is assembled in the Test-set wizard step:
+ * reuse the KB's saved questions, generate a fresh set, or combine both. */
+export type TestSetBuildMode = 'existing' | 'generate' | 'combined'
+
 export type StartOptimizationOptions = {
   token_budget: number
   include_indexing_track?: boolean
   apply_on_finish?: boolean
   autogen_coverage?: OptimizationCoverage
+  test_set_build_mode?: TestSetBuildMode
+  /** The exact reviewed test-question UUIDs to grade against — authoritative
+   * when present so "generate only" / "combine" scope the run precisely. */
+  test_query_uuids?: string[]
 }
 
 export function startKBOptimization(uuid: string, opts: StartOptimizationOptions) {
