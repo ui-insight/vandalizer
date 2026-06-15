@@ -590,6 +590,23 @@ build_image() {
   local label="$2"
   local logfile="${SETUP_LOG}.${service}"
 
+  # Stamp the image with a real version on EVERY build path (full setup,
+  # redeploy, and upgrade all funnel through build_image). compose passes
+  # ${VERSION} as the backend build-arg -> /app/VERSION -> /api/config/version,
+  # shown in the account-menu footer. Computed once; the export persists in this
+  # shell for sibling builds (e.g. the direct `compose build celery`).
+  # Precedence: explicit VERSION env > .vandalizer_version (image deploys) >
+  # git describe > "dev" when none are available (tarball / no git).
+  if [[ -z "${VERSION:-}" ]]; then
+    if [[ -f "$CODE_VERSION_FILE" ]]; then
+      VERSION=$(tr -d '[:space:]' < "$CODE_VERSION_FILE")
+    else
+      VERSION=$(git describe --tags --always 2>/dev/null || echo dev)
+    fi
+    export VERSION
+    echo -e "  ${SYM_CHECK}  Build version: ${BOLD}${VERSION}${RESET}"
+  fi
+
   echo -e "  ${SYM_NEURAL}  ${BOLD}Building ${label}...${RESET}"
 
   # Run build in background, tee to logfile
@@ -634,21 +651,6 @@ build_image() {
 
 launch_services() {
   section "2" "Launching Services"
-
-  # Derive the build version baked into the backend image (compose passes it as
-  # the VERSION build-arg -> backend Dockerfile -> /app/VERSION -> the app's
-  # /api/config/version endpoint, shown in the account-menu footer).
-  # Precedence: explicit VERSION env > .vandalizer_version (image deploys) >
-  # git describe > "dev" when none of those are available (e.g. tarball, no git).
-  if [[ -z "${VERSION:-}" ]]; then
-    if [[ -f "$CODE_VERSION_FILE" ]]; then
-      VERSION=$(tr -d '[:space:]' < "$CODE_VERSION_FILE")
-    else
-      VERSION=$(git describe --tags --always 2>/dev/null || echo dev)
-    fi
-  fi
-  export VERSION
-  echo -e "  ${SYM_CHECK}  Build version: ${BOLD}${VERSION}${RESET}"
 
   # --- Build phase: show streaming progress ---
   echo -e "  ${DIM}     First build may take several minutes (downloading dependencies).${RESET}"
