@@ -211,6 +211,8 @@ export function WorkflowEditorPanel() {
   const [newStepName, setNewStepName] = useState('')
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleValue, setTitleValue] = useState('')
+  const [editingDesc, setEditingDesc] = useState(false)
+  const [descValue, setDescValue] = useState('')
   const [showDownloadPopup, setShowDownloadPopup] = useState(false)
   const [editingTask, setEditingTask] = useState<WorkflowTask | null>(null)
   const runner = useWorkflowRunner()
@@ -222,6 +224,7 @@ export function WorkflowEditorPanel() {
   const [nudgeDismissed, setNudgeDismissed] = useState(false)
   const runTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const titleInputRef = useRef<HTMLInputElement>(null)
+  const descInputRef = useRef<HTMLTextAreaElement>(null)
   const newStepInputRef = useRef<HTMLInputElement>(null)
   const importInputRef = useRef<HTMLInputElement>(null)
   const tabBarRef = useRef<HTMLDivElement>(null)
@@ -301,6 +304,13 @@ export function WorkflowEditorPanel() {
   }, [editingTitle])
 
   useEffect(() => {
+    if (editingDesc && descInputRef.current) {
+      descInputRef.current.focus()
+      descInputRef.current.select()
+    }
+  }, [editingDesc])
+
+  useEffect(() => {
     if (showNewStepModal && newStepInputRef.current) {
       newStepInputRef.current.focus()
     }
@@ -336,6 +346,28 @@ export function WorkflowEditorPanel() {
     }
     await updateWorkflow(openWorkflowId, { name: cleanName })
     setEditingTitle(false)
+    refresh()
+  }
+
+  const handleDescSave = async () => {
+    if (!openWorkflowId) {
+      setEditingDesc(false)
+      return
+    }
+    if (confirmCopyOnEdit()) {
+      setEditingDesc(false)
+      return
+    }
+    const cleanDesc = descValue.trim()
+    // No-op if unchanged, so a stray click-then-blur doesn't fire a needless PATCH.
+    if (cleanDesc === (workflow?.description ?? '').trim()) {
+      setEditingDesc(false)
+      return
+    }
+    // Send an empty string (not undefined) so a cleared description actually clears
+    // server-side — the backend only writes the field when it's not None.
+    await updateWorkflow(openWorkflowId, { description: cleanDesc })
+    setEditingDesc(false)
     refresh()
   }
 
@@ -617,9 +649,43 @@ export function WorkflowEditorPanel() {
             <X style={{ width: 20, height: 20 }} />
           </button>
         </div>
-        {workflow.description && (
-          <div style={{ fontSize: 13, color: '#5f6368', marginTop: 4 }}>{workflow.description}</div>
-        )}
+        {editingDesc ? (
+          <textarea
+            ref={descInputRef}
+            value={descValue}
+            rows={2}
+            placeholder="A one sentence description of the workflow's purpose."
+            onChange={e => setDescValue(e.target.value)}
+            onBlur={handleDescSave}
+            onKeyDown={e => {
+              // Enter saves; Shift+Enter inserts a newline. Escape cancels.
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleDescSave() }
+              if (e.key === 'Escape') setEditingDesc(false)
+            }}
+            style={{
+              fontSize: 13, color: '#202124', border: '1px solid #d1d5db', borderRadius: 4,
+              padding: '4px 8px', fontFamily: 'inherit', outline: 'none', resize: 'vertical',
+              width: '100%', marginTop: 6,
+            }}
+          />
+        ) : workflow.description ? (
+          <div
+            onClick={() => { setDescValue(workflow.description ?? ''); setEditingDesc(true) }}
+            title="Click to edit description"
+            style={{ display: 'flex', alignItems: 'flex-start', gap: 6, cursor: 'pointer', fontSize: 13, color: '#5f6368', marginTop: 4 }}
+          >
+            <span>{workflow.description}</span>
+            <Pencil style={{ width: 12, height: 12, color: '#9ca3af', flexShrink: 0, marginTop: 2 }} />
+          </div>
+        ) : canManage ? (
+          <div
+            onClick={() => { setDescValue(''); setEditingDesc(true) }}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontSize: 13, color: '#9ca3af', marginTop: 4 }}
+          >
+            <Pencil style={{ width: 12, height: 12 }} />
+            <span>Add a description</span>
+          </div>
+        ) : null}
       </div>
 
       {/* ===== TAB BAR ===== */}
