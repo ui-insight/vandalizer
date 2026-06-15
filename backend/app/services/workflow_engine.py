@@ -1423,6 +1423,7 @@ class WorkflowEngine:
         self.connections = []
         self.graph = graphlib.TopologicalSorter()
         self.usage = UsageAccumulator()
+        self._topological_order: list[Node] | None = None
 
     def add_node(self, node: Node) -> None:
         self.graph.add(node)
@@ -1431,7 +1432,16 @@ class WorkflowEngine:
         self.graph.add(from_node, to_node)
 
     def get_topological_order(self) -> list[Node]:
-        return list(reversed(tuple(self.graph.static_order())))
+        # graphlib's static_order() calls prepare() internally, and a
+        # TopologicalSorter can only be prepared once — a second call raises
+        # "cannot prepare() more than once". The DAG is fixed once the engine
+        # is built, so compute the order a single time and reuse it. Without
+        # this, pausing on an Approval Gate crashed the run: execute() walks
+        # the graph, then _pause_for_approval() re-calls this to locate the
+        # Approval step and tripped the double-prepare error.
+        if self._topological_order is None:
+            self._topological_order = list(reversed(tuple(self.graph.static_order())))
+        return self._topological_order
 
     def execute(self, workflow_result_updater=None, start_index=0, initial_output=None,
                 should_cancel=None):

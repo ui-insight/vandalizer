@@ -133,6 +133,23 @@ class TestWorkflowEngineTopology:
         order = engine.get_topological_order()
         assert order == [n1, n2, n3]
 
+    def test_repeated_calls_do_not_raise(self):
+        # Regression: graphlib's TopologicalSorter can only be prepared once,
+        # so a second static_order() used to raise "cannot prepare() more than
+        # once". execute() walks the graph and _pause_for_approval() walks it
+        # again to locate the Approval step, which crashed approval-gate runs.
+        # get_topological_order() must be callable repeatedly.
+        engine = WorkflowEngine()
+        n1 = DocumentNode({"doc_uuids": ["a"]})
+        n2 = AddDocumentNode({"doc_texts": ["text"]})
+        engine.add_node(n1)
+        engine.add_node(n2)
+        engine.connect(n1, n2)
+        first = engine.get_topological_order()
+        second = engine.get_topological_order()
+        assert first == [n1, n2]
+        assert second == first
+
 
 # ---------------------------------------------------------------------------
 # WorkflowEngine - Execute
