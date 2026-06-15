@@ -991,6 +991,23 @@ async def delete_test_query(uuid: str, query_uuid: str, user: User = Depends(get
 # ---------------------------------------------------------------------------
 
 
+def _iso_utc(dt):
+    """ISO-8601 string with an explicit UTC offset.
+
+    Datetimes read back from Mongo are naive (the Motor client isn't tz_aware),
+    so a bare ``.isoformat()`` emits no offset and browsers parse it as *local*
+    time. For users west of UTC that pushes ``started_at`` into the future, so
+    the live elapsed-time readout clamps to 0s for the whole run. Treat naive
+    values as UTC so the wire format is unambiguous.
+    """
+    if dt is None:
+        return None
+    import datetime as _dt
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=_dt.timezone.utc)
+    return dt.astimezone(_dt.timezone.utc).isoformat()
+
+
 def _serialize_optimization_run(run) -> dict:
     return {
         "uuid": run.uuid,
@@ -1031,12 +1048,12 @@ def _serialize_optimization_run(run) -> dict:
         "data_source_suggestions": run.data_source_suggestions,
         "options": run.options,
         "error_message": run.error_message,
-        "started_at": run.started_at.isoformat() if run.started_at else None,
-        "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+        "started_at": _iso_utc(run.started_at),
+        "completed_at": _iso_utc(run.completed_at),
         "cancel_requested": run.cancel_requested,
         "previous_override": getattr(run, "previous_override", None),
-        "applied_at": run.applied_at.isoformat() if getattr(run, "applied_at", None) else None,
-        "reverted_at": run.reverted_at.isoformat() if getattr(run, "reverted_at", None) else None,
+        "applied_at": _iso_utc(getattr(run, "applied_at", None)),
+        "reverted_at": _iso_utc(getattr(run, "reverted_at", None)),
         "tied_with_baseline": getattr(run, "tied_with_baseline", False),
         "apply_preview": getattr(run, "apply_preview", None),
     }
@@ -1050,7 +1067,13 @@ async def start_kb_optimization(uuid: str, request: Request, user: User = Depend
       - token_budget: int (required)
       - include_indexing_track: bool (v1 ignores this — cheap track only)
       - apply_on_finish: bool
-      - autogen_coverage: "quick" | "standard" | "exhaustive" (used only when KB has no test queries)
+      - autogen_coverage: "quick" | "standard" | "exhaustive" (generation tier)
+      - test_set_build_mode: "existing" | "generate" | "combined" — how the
+        Test-set wizard step built the eval set (audit/telemetry only).
+      - test_query_uuids: list[str] — the exact reviewed test questions to grade
+        against. When present this is authoritative (lets "generate only" exclude
+        pre-existing saved questions, and "combine" mix both). Falls back to
+        "use all saved, else auto-generate" when omitted.
     """
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
     kb = await svc.get_knowledge_base(
@@ -1073,6 +1096,17 @@ async def start_kb_optimization(uuid: str, request: Request, user: User = Depend
     if autogen_coverage not in ("quick", "standard", "exhaustive"):
         autogen_coverage = "standard"
 
+    # Test-set build mode chosen in the wizard. The selection is made
+    # authoritative by ``test_query_uuids`` (the exact reviewed set); the mode
+    # string is retained for auditing and re-run display.
+    test_set_build_mode = (body.get("test_set_build_mode") or "").strip()
+    if test_set_build_mode not in ("existing", "generate", "combined"):
+        test_set_build_mode = ""
+    raw_uuids = body.get("test_query_uuids")
+    test_query_uuids = (
+        [str(u) for u in raw_uuids if u] if isinstance(raw_uuids, list) else []
+    )
+
     # Reject if a non-terminal run already exists for this KB.
     from app.models.kb_optimization_run import KBOptimizationRun
     active = await KBOptimizationRun.find_one(
@@ -1094,6 +1128,8 @@ async def start_kb_optimization(uuid: str, request: Request, user: User = Depend
             "include_indexing_track": include_indexing_track,
             "apply_on_finish": apply_on_finish,
             "autogen_coverage": autogen_coverage,
+            "test_set_build_mode": test_set_build_mode,
+            "test_query_uuids": test_query_uuids,
         },
     )
     await run.insert()
@@ -1134,8 +1170,8 @@ def _summarise_optimization_run(run) -> dict:
         "uuid": run.uuid,
         "kb_uuid": run.kb_uuid,
         "status": run.status,
-        "started_at": run.started_at.isoformat() if run.started_at else None,
-        "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+        "started_at": _iso_utc(run.started_at),
+        "completed_at": _iso_utc(run.completed_at),
         "token_budget": run.token_budget,
         "tokens_used": run.tokens_used,
         "baseline_no_kb_score": run.baseline_no_kb_score,
