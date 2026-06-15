@@ -119,7 +119,7 @@ export default function SupportCenter() {
   }, [urlSearch.ticket, activeTicketUuid, view])
 
   if (!user?.is_support_agent) {
-    return <Navigate to="/" search={{ mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined, workflow_share_token: undefined }} />
+    return <Navigate to="/" search={{ mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined, project: undefined, workflow_share_token: undefined }} />
   }
 
   const openTicket = (uuid: string) => {

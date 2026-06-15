@@ -126,6 +126,7 @@ export function VerificationQueue() {
           extraction: undefined,
           automation: undefined,
           kb: undefined,
+          project: undefined,
           workflow_share_token: undefined,
         },
       })
@@ -139,6 +140,7 @@ export function VerificationQueue() {
           extraction: req.item_uuid,
           automation: undefined,
           kb: undefined,
+          project: undefined,
           workflow_share_token: undefined,
         },
       })

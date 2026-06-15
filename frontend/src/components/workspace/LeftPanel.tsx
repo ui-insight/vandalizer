@@ -8,7 +8,7 @@ import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { pollStatus, searchDocuments } from '../../api/documents'
 
 export function LeftPanel() {
-  const { setSelectedDocUuids, setSelectedDocNames, setSelectedFolderUuids, highlightTerms, setHighlightTerms, setProcessingDoc, setSelectedDocsProcessing, viewDocumentRequest, clearViewDocumentRequest } = useWorkspace()
+  const { setSelectedDocUuids, setSelectedDocNames, setSelectedFolderUuids, highlightTerms, setHighlightTerms, setProcessingDoc, setSelectedDocsProcessing, viewDocumentRequest, clearViewDocumentRequest, activeProjectRootFolder, activeProjectTitle, activeProjectTeamId } = useWorkspace()
   const [viewingDoc, setViewingDoc] = useState<{
     uuid: string
     title: string
@@ -25,6 +25,13 @@ export function LeftPanel() {
   const pollRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
   const viewingDocRef = useRef(viewingDoc)
   viewingDocRef.current = viewingDoc
+
+  // When a project is active, root the existing file browser at its folder
+  // (and reset there whenever the active project changes). This reuses the
+  // whole browser — upload, subfolders, drag-to-move, rename — scoped in.
+  useEffect(() => {
+    setCurrentFolder(activeProjectRootFolder ?? null)
+  }, [activeProjectRootFolder])
 
   // When a document is being viewed, ignore checkbox selection changes from FileBrowser
   // (the documents list refresh triggers onSelectionChange with empty selection, which
@@ -262,6 +269,9 @@ export function LeftPanel() {
             contentMatches={contentMatches}
             currentFolder={currentFolder}
             onFolderNavigate={setCurrentFolder}
+            rootFolder={activeProjectRootFolder}
+            rootLabel={activeProjectTitle}
+            teamScopeUuid={activeProjectTeamId ?? undefined}
             onDocClick={(doc) => {
               const next = {
                 uuid: doc.uuid,

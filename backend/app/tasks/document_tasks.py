@@ -4,15 +4,97 @@ Ported from Flask app/utilities/document_manager.py.
 Uses pymongo (sync) for DB access — same pattern as workflow_tasks.py.
 """
 
+import datetime
 import logging
 import os
 import re
+import uuid
 from pathlib import Path
 
 from app.celery_app import celery_app
 from app.tasks import TRANSIENT_EXCEPTIONS, get_sync_db
 
 logger = logging.getLogger(__name__)
+
+
+def _ingest_into_project_kb(db, dm, doc: dict, text: str) -> None:
+    """Best-effort: add a freshly-ingested document to its Project's implicit KB.
+
+    Walks the document's folder ancestry to find the owning project, then mirrors
+    the chunks into the project's KB collection (the same path KBs use) so
+    "chat with this project" sees the file. Sync — runs inside the Celery task.
+    """
+    folder_uuid = doc.get("folder")
+    if not folder_uuid or folder_uuid == "0":
+        return
+
+    # Collect the doc's folder plus every ancestor up to the root.
+    ancestors: list[str] = []
+    cursor = folder_uuid
+    seen: set[str] = set()
+    while cursor and cursor != "0" and cursor not in seen:
+        seen.add(cursor)
+        ancestors.append(cursor)
+        folder = db.smart_folder.find_one({"uuid": cursor}, {"parent_id": 1})
+        if not folder:
+            break
+        cursor = folder.get("parent_id")
+
+    project = db.project.find_one({"root_folder_uuid": {"$in": ancestors}})
+    if not project or not project.get("kb_uuid"):
+        return
+
+    kb_uuid = project["kb_uuid"]
+    doc_uuid = doc["uuid"]
+    # Dedupe — never add the same document to a project KB twice.
+    if db.knowledge_base_sources.find_one(
+        {"knowledge_base_uuid": kb_uuid, "document_uuid": doc_uuid}
+    ):
+        return
+
+    chunk_count = dm.add_to_kb(
+        kb_uuid=kb_uuid,
+        source_id=doc_uuid,
+        source_name=doc.get("title", ""),
+        raw_text=text,
+        text_markers=doc.get("text_markers") or [],
+    )
+
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    db.knowledge_base_sources.insert_one({
+        "uuid": uuid.uuid4().hex,
+        "knowledge_base_uuid": kb_uuid,
+        "source_type": "document",
+        "document_uuid": doc_uuid,
+        "url": None,
+        "url_title": None,
+        "custom_name": None,
+        "content": None,
+        "status": "ready",
+        "error_message": None,
+        "chunk_count": chunk_count,
+        "crawl_enabled": False,
+        "max_crawl_pages": 5,
+        "parent_source_uuid": None,
+        "crawled_urls": None,
+        "created_at": now,
+        "processed_at": now,
+    })
+    db.knowledge_bases.update_one(
+        {"uuid": kb_uuid},
+        {
+            "$inc": {
+                "total_sources": 1,
+                "sources_ready": 1,
+                "total_chunks": chunk_count,
+            },
+            "$set": {"status": "ready", "updated_at": now},
+        },
+    )
+    logger.info(
+        "Added document %s to project %s implicit KB (%d chunks)",
+        doc_uuid, project.get("uuid"), chunk_count,
+    )
 
 
 def _remove_images_from_markdown(markdown_text: str) -> str:
@@ -522,6 +604,16 @@ def perform_semantic_ingestion(self, raw_text: str, document_uuid: str, user_id:
             }
         },
     )
+
+    # If this document lives in a Project, mirror it into the project's implicit
+    # KB. Best-effort: a failure here must not fail document ingestion.
+    if chunk_count > 0:
+        try:
+            _ingest_into_project_kb(db, dm, doc, text)
+        except Exception:
+            logger.exception(
+                "Project KB ingestion failed for %s", document_uuid
+            )
 
     return document_uuid
 

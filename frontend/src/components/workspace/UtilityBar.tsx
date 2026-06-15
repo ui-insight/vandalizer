@@ -1,4 +1,4 @@
-import { MessageSquare, FolderOpen, Workflow, BookOpen } from 'lucide-react'
+import { MessageSquare, FolderOpen, Workflow, BookOpen, FolderKanban } from 'lucide-react'
 import { useWorkspace, type WorkspaceMode } from '../../contexts/WorkspaceContext'
 
 const MODES: { mode: WorkspaceMode; icon: typeof MessageSquare; label: string }[] = [
@@ -9,7 +9,10 @@ const MODES: { mode: WorkspaceMode; icon: typeof MessageSquare; label: string }[
 ]
 
 export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomation?: boolean }) {
-  const { workspaceMode, setWorkspaceMode, resetToHome } = useWorkspace()
+  const { workspaceMode, setWorkspaceMode, resetToHome, activeProjectRole } = useWorkspace()
+  const projectsActive = workspaceMode === 'projects'
+  // A shared-in viewer (e.g. a PI) gets chat only — no files/automations/knowledge.
+  const modes = activeProjectRole === 'viewer' ? MODES.filter(m => m.mode === 'chat') : MODES
 
   return (
     <div
@@ -25,7 +28,31 @@ export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomatio
         flexShrink: 0,
       }}
     >
-      {MODES.map(({ mode, icon: Icon, label }) => {
+      {/* Projects — opens a slideout drawer (project list), like the modes below. */}
+      <button
+        onClick={() => setWorkspaceMode('projects')}
+        title="Projects"
+        aria-label="Projects"
+        aria-current={projectsActive ? 'page' : undefined}
+        style={{
+          width: 40,
+          height: 40,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'transparent',
+          border: 'none',
+          borderLeft: projectsActive ? '3px solid var(--highlight-color, #eab308)' : '3px solid transparent',
+          borderRadius: 4,
+          cursor: 'pointer',
+          padding: 0,
+        }}
+      >
+        <FolderKanban size={20} style={{ color: projectsActive ? '#fff' : '#888' }} />
+      </button>
+      <div style={{ width: 24, height: 1, background: '#333', margin: '2px 0 4px' }} />
+
+      {modes.map(({ mode, icon: Icon, label }) => {
         const active = workspaceMode === mode
         const isAutomations = mode === 'automations'
         const showPulse = isAutomations && hasActiveAutomation && active

@@ -14,6 +14,7 @@ import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
 import { useAuth } from '../../hooks/useAuth'
 import { useShareLink } from '../../lib/shareLink'
+import { getProjectDocuments } from '../../api/projects'
 import {
   getWorkflow, addStep, deleteStep, addTask, deleteTask, updateTask,
   updateWorkflow, updateStep, downloadResults, testStep, getTestStepStatus,
@@ -206,7 +207,7 @@ export function WorkflowEditorPanel() {
   const { toast } = useToast()
   const { user } = useAuth()
   const shareLink = useShareLink()
-  const { openWorkflowId, openWorkflowShareToken, openWorkflow, closeWorkflow, consumeWorkflowSession, selectedDocUuids, bumpActivitySignal } = useWorkspace()
+  const { openWorkflowId, openWorkflowShareToken, openWorkflow, closeWorkflow, consumeWorkflowSession, selectedDocUuids, bumpActivitySignal, activeProjectUuid } = useWorkspace()
   const [workflow, setWorkflow] = useState<Workflow | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('design')
@@ -471,8 +472,10 @@ export function WorkflowEditorPanel() {
   const isTextInput = workflow?.input_config?.trigger_type === 'text_input'
   const isNoInput = workflow?.input_config?.trigger_type === 'no_input'
   // Whether the run is blocked for lack of required input. "No input"
-  // workflows never require input; text needs non-empty text; otherwise a doc.
-  const missingInput = isNoInput ? false : isTextInput ? !textInput.trim() : selectedDocUuids.length === 0
+  // workflows never require input; text needs non-empty text; otherwise a doc
+  // — unless a project is active, in which case the run falls back to all of
+  // the project's files.
+  const missingInput = isNoInput ? false : isTextInput ? !textInput.trim() : (selectedDocUuids.length === 0 && !activeProjectUuid)
 
   const handleRun = async () => {
     if (!openWorkflowId) return
@@ -493,8 +496,16 @@ export function WorkflowEditorPanel() {
         setActiveTab('design')
         await runner.start(openWorkflowId, allUuids, undefined, false)
       } else {
-        const uuids = selectedDocUuids.length > 0 ? selectedDocUuids : []
-        if (uuids.length === 0) return
+        // Default to the whole project when nothing is explicitly selected.
+        let uuids = selectedDocUuids
+        if (uuids.length === 0) {
+          if (!activeProjectUuid) return
+          uuids = (await getProjectDocuments(activeProjectUuid)).document_uuids
+          if (uuids.length === 0) {
+            toast('No files in this project to run on yet', 'info')
+            return
+          }
+        }
         setActiveTab('design')
         await runner.start(openWorkflowId, uuids, undefined, batchMode)
       }
@@ -945,7 +956,7 @@ export function WorkflowEditorPanel() {
         {!isTextInput && !isNoInput && selectedDocUuids.length === 0 && (
           <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
             <FileText style={{ width: 12, height: 12 }} />
-            Select a document to run this workflow
+            {activeProjectUuid ? 'Will run on all files in this project' : 'Select a document to run this workflow'}
           </div>
         )}
         {isNoInput && (

@@ -85,7 +85,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     setActivity,
   } = useChat()
 
-  const { bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, activeKBUuid, activeKBTitle, activateKB, deactivateKB, setCurrentConversationUuid } = useWorkspace()
+  const { bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, activeKBUuid, activeKBTitle, activateKB, deactivateKB, activeProjectUuid, setCurrentConversationUuid } = useWorkspace()
   const [convertingToKB, setConvertingToKB] = useState(false)
   const { toast } = useToast()
   const shareLink = useShareLink()
@@ -324,8 +324,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const handleSend = (message: string, includeOnboardingContext?: boolean) => {
     // In first-session mode, every message uses the first-session system prompt.
     // Use the locked ref so remounts / refetches can't flip this mid-conversation.
-    const firstSession = effectiveFirstSession && !hasDocContext && !activeKBUuid
-    send(message, selectedDocUuids, selectedModel || undefined, activeKBUuid || undefined, includeOnboardingContext, selectedFolderUuids, firstSession || undefined)
+    const firstSession = effectiveFirstSession && !hasDocContext && !activeKBUuid && !activeProjectUuid
+    send(message, selectedDocUuids, selectedModel || undefined, activeKBUuid || undefined, includeOnboardingContext, selectedFolderUuids, firstSession || undefined, activeProjectUuid || undefined)
     // Defer markFirstSessionComplete until the user has had enough exchanges
     // to experience the value discovery (at least 3 user messages).
     // messages.length counts both user + assistant; 4 = 2 full exchanges done.

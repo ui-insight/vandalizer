@@ -1,13 +1,15 @@
 import React, { Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ExtractionTutorial } from './ExtractionTutorial'
-import { X, Pencil, Loader2, Copy, Trash2, GripVertical, Plus, ChevronDown, ChevronRight, Play, TrendingUp, Sparkles, FileText, AlertTriangle, Eye, Shield, ShieldCheck, Download, Check, PenTool, Wrench, ClipboardCheck, SlidersHorizontal, Clock, Link2 } from 'lucide-react'
+import { X, Pencil, Loader2, Copy, Trash2, GripVertical, Plus, ChevronDown, ChevronRight, Play, TrendingUp, Sparkles, FileText, AlertTriangle, Eye, Shield, ShieldCheck, Download, Check, PenTool, Wrench, ClipboardCheck, SlidersHorizontal, Clock, Link2, FolderInput } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
 import { useAuth } from '../../hooks/useAuth'
 import { useShareLink } from '../../lib/shareLink'
 import { useConfirm } from '../shared/useConfirm'
 import { useSearchSetItems } from '../../hooks/useExtractions'
+import { getProjectDocuments } from '../../api/projects'
+import { uploadFile } from '../../api/files'
 import {
   getSearchSet,
   updateSearchSet,
@@ -74,7 +76,7 @@ interface ExtractionConfig {
 
 export function ExtractionEditorPanel() {
   const queryClient = useQueryClient()
-  const { openExtractionId, openExtraction, closeExtraction, selectedDocUuids, selectedDocNames, setHighlightTerms, bumpActivitySignal, consumeExtractionResults } = useWorkspace()
+  const { openExtractionId, openExtraction, closeExtraction, selectedDocUuids, selectedDocNames, setHighlightTerms, bumpActivitySignal, consumeExtractionResults, activeProjectUuid, activeProjectRootFolder } = useWorkspace()
   const { toast } = useToast()
   const { user } = useAuth()
   const shareLink = useShareLink()
@@ -192,7 +194,22 @@ export function ExtractionEditorPanel() {
 
   // --- Run ---
   const handleRun = async () => {
-    if (!openExtractionId || selectedDocUuids.length === 0) return
+    if (!openExtractionId) return
+    // Default to the whole project when nothing is explicitly selected, so you
+    // can run an extraction "on the project" without hand-picking files.
+    let docUuids = selectedDocUuids
+    if (docUuids.length === 0) {
+      if (!activeProjectUuid) return
+      try {
+        docUuids = (await getProjectDocuments(activeProjectUuid)).document_uuids
+      } catch {
+        docUuids = []
+      }
+      if (docUuids.length === 0) {
+        toast('No files in this project to run on yet', 'info')
+        return
+      }
+    }
     setRunning(true)
     // Bump activity signal now so the side rail starts polling immediately and
     // picks up the running record the backend creates — otherwise no entry
@@ -201,7 +218,7 @@ export function ExtractionEditorPanel() {
     try {
       const resp = await runExtractionSync({
         search_set_uuid: openExtractionId,
-        document_uuids: selectedDocUuids,
+        document_uuids: docUuids,
         combined_context: combinedContext,
       })
       // Build result sets — one per entity object returned
@@ -220,9 +237,9 @@ export function ExtractionEditorPanel() {
       const finalSets = sets.length > 0 ? sets : [{}]
       // Snapshot doc names at run time so exports stay correct if the user
       // changes selection afterward.
-      const runDocNames: string[] = combinedContext && selectedDocUuids.length > 1
-        ? [`Combined (${selectedDocUuids.length} docs)`]
-        : selectedDocUuids.map(uuid => selectedDocNames[uuid] ?? uuid)
+      const runDocNames: string[] = combinedContext && docUuids.length > 1
+        ? [`Combined (${docUuids.length} docs)`]
+        : docUuids.map(uuid => selectedDocNames[uuid] ?? uuid)
       setResultSets(finalSets)
       setResultDocNames(finalSets.map((_, i) => runDocNames[i] ?? `Result ${i + 1}`))
       setActiveResultIdx(0)
@@ -258,7 +275,7 @@ export function ExtractionEditorPanel() {
     toast('JSON downloaded', 'success')
   }
 
-  const handleExportCSV = () => {
+  const buildResultsCSV = (): string => {
     const escape = (v: string) => `"${v.replace(/"/g, '""')}"`
     const allSets = resultSets.length > 0 ? resultSets : [results]
     // Union of keys across all sets, preserving the first set's order.
@@ -275,8 +292,11 @@ export function ExtractionEditorPanel() {
       const docName = resultDocNames[i] ?? (allSets.length === 1 ? '' : `Result ${i + 1}`)
       return [escape(docName), ...keys.map(k => escape(String(set[k] ?? '')))].join(',')
     })
-    const csv = header + '\n' + rows.join('\n') + '\n'
-    const blob = new Blob([csv], { type: 'text/csv' })
+    return header + '\n' + rows.join('\n') + '\n'
+  }
+
+  const handleExportCSV = () => {
+    const blob = new Blob([buildResultsCSV()], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -284,6 +304,27 @@ export function ExtractionEditorPanel() {
     a.click()
     URL.revokeObjectURL(url)
     toast('CSV downloaded', 'success')
+  }
+
+  // Save results back into the project as a CSV file. It rides the normal
+  // upload pipeline → gets indexed → becomes answerable in project chat.
+  // This closes the extraction half of the enrich flywheel.
+  const handleSaveToProject = async () => {
+    if (!activeProjectRootFolder) return
+    try {
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve((reader.result as string).split(',')[1] ?? '')
+        reader.onerror = reject
+        reader.readAsDataURL(new Blob([buildResultsCSV()], { type: 'text/csv' }))
+      })
+      const fileName = `${searchSet?.title || 'extraction'}-results-${new Date().toISOString().slice(0, 10)}.csv`
+      await uploadFile({ contentAsBase64String: base64, fileName, extension: 'csv', folder: activeProjectRootFolder })
+      toast('Saved to project — indexing for chat…', 'success')
+      bumpActivitySignal()
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Failed to save to project', 'error')
+    }
   }
 
   // --- Tools ---
@@ -490,7 +531,11 @@ export function ExtractionEditorPanel() {
             </div>
           )}
           <div style={{ fontSize: 12, color: '#5f6368', marginTop: 2 }}>
-            {selectedDocUuids.length} document{selectedDocUuids.length !== 1 ? 's' : ''} selected
+            {selectedDocUuids.length > 0
+              ? `${selectedDocUuids.length} document${selectedDocUuids.length !== 1 ? 's' : ''} selected`
+              : activeProjectUuid
+                ? 'All project files'
+                : '0 documents selected'}
           </div>
         </div>
         <button
@@ -619,6 +664,7 @@ export function ExtractionEditorPanel() {
           onExportCSV={handleExportCSV}
           onExportJSON={handleExportJSON}
           onExportCopy={handleExportCopy}
+          onSaveToProject={activeProjectRootFolder ? handleSaveToProject : undefined}
           onRemoveItem={remove}
           onUpdateItem={update}
           onReorder={reorder}
@@ -822,10 +868,12 @@ export function ExtractionEditorPanel() {
           )}
           <button
             onClick={handleRun}
-            disabled={running || selectedDocUuids.length === 0}
+            disabled={running || (selectedDocUuids.length === 0 && !activeProjectUuid)}
             title={
               selectedDocUuids.length === 0
-                ? 'Select one or more documents to run an extraction'
+                ? (activeProjectUuid
+                    ? 'Run this extraction on all files in this project'
+                    : 'Select one or more documents to run an extraction')
                 : selectedDocUuids.length === 1
                   ? 'Run this extraction on the selected document'
                   : combinedContext
@@ -842,7 +890,7 @@ export function ExtractionEditorPanel() {
               fontFamily: 'inherit',
               borderRadius: 'var(--ui-radius, 8px)',
               border: 'none',
-              cursor: running || selectedDocUuids.length === 0 ? 'not-allowed' : 'pointer',
+              cursor: running || (selectedDocUuids.length === 0 && !activeProjectUuid) ? 'not-allowed' : 'pointer',
               whiteSpace: 'nowrap',
               flexShrink: 0,
             }}
@@ -912,6 +960,7 @@ function DesignTab({
   onExportCSV,
   onExportJSON,
   onExportCopy,
+  onSaveToProject,
   onRemoveItem,
   onUpdateItem,
   onReorder,
@@ -931,6 +980,7 @@ function DesignTab({
   onExportCSV: () => void
   onExportJSON: () => void
   onExportCopy: () => void
+  onSaveToProject?: () => void
   onRemoveItem: (id: string) => void
   onUpdateItem: (id: string, data: { searchphrase?: string; title?: string; is_optional?: boolean; enum_values?: string[] }) => void
   onReorder: (itemIds: string[]) => void
@@ -1040,6 +1090,7 @@ function DesignTab({
                 }}
               >
                 {[
+                  ...(onSaveToProject ? [{ label: 'Save to project', icon: <FolderInput style={{ width: 13, height: 13 }} />, action: onSaveToProject }] : []),
                   { label: 'Download CSV', icon: <Download style={{ width: 13, height: 13 }} />, action: onExportCSV },
                   { label: 'Download JSON', icon: <Download style={{ width: 13, height: 13 }} />, action: onExportJSON },
                   { label: 'Copy to Clipboard', icon: <Copy style={{ width: 13, height: 13 }} />, action: onExportCopy },

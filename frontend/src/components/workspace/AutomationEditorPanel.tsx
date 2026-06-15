@@ -499,6 +499,18 @@ function FolderWatchConfig({ automation, onSave }: { automation: Automation; onS
       .catch(() => {})
   }, [])
 
+  // In a project, default a new folder-watch to the project's folder so the
+  // automation is scoped to the project out of the box.
+  const { activeProjectRootFolder } = useWorkspace()
+  const defaultedRef = useRef(false)
+  useEffect(() => {
+    if (defaultedRef.current) return
+    if (!watchedFolder && activeProjectRootFolder) {
+      defaultedRef.current = true
+      onSave({ trigger_config: { ...config, folder_id: activeProjectRootFolder } })
+    }
+  }, [activeProjectRootFolder, watchedFolder]) // eslint-disable-line react-hooks/exhaustive-deps
+
   const FILE_TYPE_OPTIONS = ['pdf', 'docx', 'xlsx', 'html', 'txt', 'csv']
 
   const handleFileTypeToggle = (type: string) => {
