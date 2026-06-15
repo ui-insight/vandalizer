@@ -1,39 +1,28 @@
 import { useState } from 'react'
 import { Play, Loader2, ChevronDown, ChevronRight } from 'lucide-react'
 import {
-  runKBValidation,
   type KBValidationMode,
   type KBValidationResult,
   type KBValidationDetail,
 } from '../../api/knowledge'
 
 interface Props {
-  kbUuid: string
   kbReady: boolean
   canManage: boolean
   numQueries: number
   latestRun: KBValidationResult | null
-  onRun: (r: KBValidationResult) => void
+  // Run lifecycle is owned by the parent KBValidationPanel so an in-flight run
+  // survives switching away from and back to this tab.
+  running: boolean
+  error: string | null
+  onRun: (mode: KBValidationMode) => void
 }
 
-export function KBValidationRunTab({ kbUuid, kbReady, canManage, numQueries, latestRun, onRun }: Props) {
+export function KBValidationRunTab({ kbReady, canManage, numQueries, latestRun, running, error, onRun }: Props) {
   const [mode, setMode] = useState<KBValidationMode>('judge+baseline')
-  const [running, setRunning] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
-  const handleRun = async () => {
-    setRunning(true)
-    setError(null)
-    try {
-      const r = await runKBValidation(kbUuid, { mode })
-      onRun(r)
-    } catch (e) {
-      setError((e as Error).message)
-    } finally {
-      setRunning(false)
-    }
-  }
+  const handleRun = () => onRun(mode)
 
   const toggle = (key: string) => {
     setExpanded(prev => {
@@ -87,7 +76,17 @@ export function KBValidationRunTab({ kbUuid, kbReady, canManage, numQueries, lat
         <div style={{ fontSize: 12, color: '#ef4444', marginBottom: 10 }}>{error}</div>
       )}
 
-      {!latestRun ? (
+      {running && !latestRun ? (
+        <div style={{ fontSize: 12, color: '#888', padding: '20px 0', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+            <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+            Validation running…
+          </span>
+          <span style={{ fontSize: 11, color: '#666' }}>
+            Large evaluation sets can take a few minutes. You can switch tabs — results appear here and in <b>History</b> when finished.
+          </span>
+        </div>
+      ) : !latestRun ? (
         <div style={{ fontSize: 12, color: '#888', padding: '20px 0', textAlign: 'center' }}>
           No validation run yet. Click <b>Run Validation</b> to evaluate this KB.
         </div>
