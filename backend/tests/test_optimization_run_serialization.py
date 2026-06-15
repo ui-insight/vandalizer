@@ -21,6 +21,10 @@ from app.routers.workflows import (
     _serialize_workflow_optimization_run,
     _summarise_workflow_optimization_run,
 )
+from app.routers.extractions import (
+    _serialize_extraction_optimization_run,
+    _summarise_extraction_optimization_run,
+)
 
 
 # A naive datetime — exactly what Beanie/Motor hands back on read.
@@ -76,4 +80,22 @@ def test_workflow_serializer_started_at_carries_offset():
 
 def test_workflow_summary_started_at_carries_offset():
     out = _summarise_workflow_optimization_run(_wf_run_with(NAIVE))
+    assert out["started_at"].endswith("+00:00")
+
+
+def _extraction_run_with(started_at):
+    run = MagicMock()
+    run.started_at = started_at
+    run.completed_at = None
+    run.cancel_requested_at = None
+    return run
+
+
+def test_extraction_serializer_started_at_carries_offset():
+    out = _serialize_extraction_optimization_run(_extraction_run_with(NAIVE))
+    assert out["started_at"].endswith("+00:00")
+
+
+def test_extraction_summary_started_at_carries_offset():
+    out = _summarise_extraction_optimization_run(_extraction_run_with(NAIVE))
     assert out["started_at"].endswith("+00:00")

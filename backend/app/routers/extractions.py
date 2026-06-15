@@ -1462,6 +1462,23 @@ async def clear_tuning_result(uuid: str, user: User = Depends(get_current_user))
 # ---------------------------------------------------------------------------
 
 
+def _iso_utc(dt):
+    """ISO-8601 string with an explicit UTC offset.
+
+    Datetimes read back from Mongo are naive (the Motor client isn't tz_aware),
+    so a bare ``.isoformat()`` emits no offset and browsers parse it as *local*
+    time. For users west of UTC that pushes ``started_at`` into the future, so
+    the live elapsed-time readout clamps to 0s for the whole run. Treat naive
+    values as UTC so the wire format is unambiguous.
+    """
+    if dt is None:
+        return None
+    import datetime as _dt
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=_dt.timezone.utc)
+    return dt.astimezone(_dt.timezone.utc).isoformat()
+
+
 def _serialize_extraction_optimization_run(run) -> dict:
     return {
         "uuid": run.uuid,
@@ -1497,10 +1514,10 @@ def _serialize_extraction_optimization_run(run) -> dict:
         "apply_preview": getattr(run, "apply_preview", None),
         "options": run.options,
         "error_message": run.error_message,
-        "started_at": run.started_at.isoformat() if run.started_at else None,
-        "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+        "started_at": _iso_utc(run.started_at),
+        "completed_at": _iso_utc(run.completed_at),
         "cancel_requested": run.cancel_requested,
-        "cancel_requested_at": run.cancel_requested_at.isoformat() if getattr(run, "cancel_requested_at", None) else None,
+        "cancel_requested_at": _iso_utc(getattr(run, "cancel_requested_at", None)),
     }
 
 
@@ -1746,8 +1763,8 @@ def _summarise_extraction_optimization_run(run) -> dict:
         "uuid": run.uuid,
         "search_set_uuid": run.search_set_uuid,
         "status": run.status,
-        "started_at": run.started_at.isoformat() if run.started_at else None,
-        "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+        "started_at": _iso_utc(run.started_at),
+        "completed_at": _iso_utc(run.completed_at),
         "token_budget": run.token_budget,
         "tokens_used": run.tokens_used,
         "baseline_no_tool_score": run.baseline_no_tool_score,
