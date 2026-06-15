@@ -635,6 +635,21 @@ build_image() {
 launch_services() {
   section "2" "Launching Services"
 
+  # Derive the build version baked into the backend image (compose passes it as
+  # the VERSION build-arg -> backend Dockerfile -> /app/VERSION -> the app's
+  # /api/config/version endpoint, shown in the account-menu footer).
+  # Precedence: explicit VERSION env > .vandalizer_version (image deploys) >
+  # git describe > "dev" when none of those are available (e.g. tarball, no git).
+  if [[ -z "${VERSION:-}" ]]; then
+    if [[ -f "$CODE_VERSION_FILE" ]]; then
+      VERSION=$(tr -d '[:space:]' < "$CODE_VERSION_FILE")
+    else
+      VERSION=$(git describe --tags --always 2>/dev/null || echo dev)
+    fi
+  fi
+  export VERSION
+  echo -e "  ${SYM_CHECK}  Build version: ${BOLD}${VERSION}${RESET}"
+
   # --- Build phase: show streaming progress ---
   echo -e "  ${DIM}     First build may take several minutes (downloading dependencies).${RESET}"
   echo -e "  ${DIM}     Subsequent builds use Docker layer cache and are much faster.${RESET}"

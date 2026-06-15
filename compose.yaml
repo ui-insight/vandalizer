@@ -60,6 +60,10 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        # Baked into /app/VERSION so the app self-reports its build.
+        # setup.sh exports VERSION (git describe); defaults to "dev" otherwise.
+        VERSION: ${VERSION:-dev}
     depends_on:
       redis:
         condition: service_healthy
@@ -92,6 +96,10 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        # Baked into /app/VERSION so the app self-reports its build.
+        # setup.sh exports VERSION (git describe); defaults to "dev" otherwise.
+        VERSION: ${VERSION:-dev}
     depends_on:
       redis:
         condition: service_healthy
