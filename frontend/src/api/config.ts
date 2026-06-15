@@ -32,6 +32,18 @@ export function getThemeConfig() {
   return apiFetch<ThemeConfig>('/api/config/theme')
 }
 
+// Version / deployment
+
+export interface VersionInfo {
+  version: string
+  environment: string
+  deployment_label: string
+}
+
+export function getVersionInfo() {
+  return apiFetch<VersionInfo>('/api/config/version')
+}
+
 export function updateThemeConfig(data: {
   highlight_color?: string
   ui_radius?: string

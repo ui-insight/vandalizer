@@ -5,7 +5,8 @@ import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.dependencies import get_current_user
+from app.config import Settings
+from app.dependencies import get_current_user, get_settings
 from app.models.automation import Automation
 from app.models.certification import CertificationProgress
 from app.models.chat import ChatConversation
@@ -32,8 +33,27 @@ from app.services.config_service import (
     reconcile_user_model_config,
 )
 from app.services import workflow_service
+from app.services.version_service import get_current_version
 
 router = APIRouter()
+
+
+# ---------------------------------------------------------------------------
+# Version / deployment info
+# ---------------------------------------------------------------------------
+
+
+@router.get("/version")
+async def get_version(settings: Settings = Depends(get_settings)):
+    """Public  - the build and environment this instance is running, for the UI
+    version footer. Lets users tell deployments apart (different envs deploy at
+    different times). `deployment_label` falls back to `environment` when unset.
+    """
+    return {
+        "version": get_current_version(),
+        "environment": settings.environment,
+        "deployment_label": settings.deployment_label or settings.environment,
+    }
 
 
 @router.get("/models", response_model=list[ModelInfo])

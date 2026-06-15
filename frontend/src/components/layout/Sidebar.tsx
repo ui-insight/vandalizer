@@ -3,6 +3,7 @@ import { Link, useRouterState } from '@tanstack/react-router'
 import { cn } from '../../lib/cn'
 import { useAuth } from '../../hooks/useAuth'
 import { useTeams } from '../../hooks/useTeams'
+import { VersionFooter } from './VersionFooter'
 
 export function Sidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
@@ -49,6 +50,7 @@ export function Sidebar() {
           </Link>
         ))}
       </nav>
+      <VersionFooter />
     </aside>
   )
 }
