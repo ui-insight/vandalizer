@@ -6,6 +6,7 @@ import { LeftPanel } from './LeftPanel'
 import { RightPanel } from './RightPanel'
 import { UtilityBar } from './UtilityBar'
 import { ProjectContextBar } from './ProjectContextBar'
+import { ProjectManageModal } from './ProjectManageModal'
 import { ProjectsPanel } from './ProjectsPanel'
 import { AutomationsPanel } from './AutomationsPanel'
 import { KnowledgePanel } from './KnowledgePanel'
@@ -20,6 +21,7 @@ export function WorkspaceLayout() {
   const { toast } = useToast()
   const containerRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [manageOpen, setManageOpen] = useState(false)
 
   const handleAutomationStarted = useCallback((info: AutomationStarted) => {
     toast(`${info.name} started`, 'info')
@@ -58,7 +60,8 @@ export function WorkspaceLayout() {
   return (
     <div className="flex h-screen flex-col">
       <Header />
-      <ProjectContextBar />
+      <ProjectContextBar onOpenManage={() => setManageOpen(true)} />
+      <ProjectManageModal open={manageOpen} onClose={() => setManageOpen(false)} />
       <div className="flex flex-1 overflow-hidden">
         <UtilityBar hasActiveAutomation={automationActivity.hasActive} />
         <div

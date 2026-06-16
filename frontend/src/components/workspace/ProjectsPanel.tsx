@@ -8,9 +8,9 @@ import { ProjectsExplainer } from '../projects/ProjectsExplainer'
 
 /**
  * The Projects drawer — a slideout panel (like Automations/Knowledge) listing
- * the user's projects. Clicking one opens its project home (the detail page),
- * which is the single surface for working in, managing, sharing, or leaving a
- * project. This panel is just a launcher — it never hosts project tools itself.
+ * the user's projects and the only project list in the app. Clicking one scopes
+ * the whole workspace (files, chat, …) to that project; managing/sharing/leaving
+ * happens in the in-workspace Manage panel opened from the project context bar.
  */
 export function ProjectsPanel() {
   const navigate = useNavigate()
@@ -18,8 +18,22 @@ export function ProjectsPanel() {
   const [newName, setNewName] = useState('')
   const [creating, setCreating] = useState(false)
 
+  // Scope the workspace to the project. The `?project=` param is consumed by
+  // WorkspaceContext, which activates the project scope and lands in chat.
   const openProject = (uuid: string) =>
-    navigate({ to: '/projects/$uuid', params: { uuid } })
+    navigate({
+      to: '/',
+      search: {
+        mode: undefined,
+        tab: undefined,
+        workflow: undefined,
+        extraction: undefined,
+        automation: undefined,
+        kb: undefined,
+        project: uuid,
+        workflow_share_token: undefined,
+      },
+    })
 
   const handleCreate = async () => {
     if (!newName.trim()) return

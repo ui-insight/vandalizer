@@ -68,6 +68,10 @@ interface ChatStateContextValue {
   activeProjectRole: string | null // owner|editor|viewer — gates mutating UI
   activateProject: (uuid: string, title: string) => void
   deactivateProject: () => void
+  // Re-pull the active project's metadata (title/role/team) into the context
+  // bar after an in-workspace edit (rename, share, make-personal) — without
+  // resetting the chat the way activateProject does.
+  refreshActiveProject: () => void
   processingDoc: { title: string; status: string | null } | null
   setProcessingDoc: (doc: { title: string; status: string | null } | null) => void
   // Subset of selectedDocUuids that are still being processed by the upload
@@ -360,6 +364,20 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setActiveProjectRole(null)
   }, [])
 
+  const refreshActiveProject = useCallback(() => {
+    if (!activeProjectUuid) return
+    import('../api/projects').then(({ getProject }) => {
+      getProject(activeProjectUuid)
+        .then((project) => {
+          setActiveProjectTitle(project.title)
+          setActiveProjectRootFolder(project.root_folder_uuid)
+          setActiveProjectTeamId(project.team_id ?? null)
+          setActiveProjectRole(project.role)
+        })
+        .catch(() => {})
+    }).catch(() => {})
+  }, [activeProjectUuid])
+
   // Activate a knowledge base from URL param (e.g. /?kb=<uuid>)
   useEffect(() => {
     const kbParam = search.kb
@@ -496,7 +514,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     newChatSignal, triggerNewChat,
     pendingChatMessage, sendChatMessage, clearPendingChatMessage,
     activeKBUuid, activeKBTitle, activateKB, deactivateKB,
-    activeProjectUuid, activeProjectTitle, activeProjectRootFolder, activeProjectTeamId, activeProjectRole, activateProject, deactivateProject,
+    activeProjectUuid, activeProjectTitle, activeProjectRootFolder, activeProjectTeamId, activeProjectRole, activateProject, deactivateProject, refreshActiveProject,
     processingDoc, setProcessingDoc,
     selectedDocsProcessing, setSelectedDocsProcessing,
   }), [
@@ -504,7 +522,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     newChatSignal, triggerNewChat,
     pendingChatMessage, sendChatMessage, clearPendingChatMessage,
     activeKBUuid, activeKBTitle, activateKB, deactivateKB,
-    activeProjectUuid, activeProjectTitle, activeProjectRootFolder, activeProjectTeamId, activeProjectRole, activateProject, deactivateProject,
+    activeProjectUuid, activeProjectTitle, activeProjectRootFolder, activeProjectTeamId, activeProjectRole, activateProject, deactivateProject, refreshActiveProject,
     processingDoc,
     selectedDocsProcessing, setSelectedDocsProcessing,
   ])

@@ -1,17 +1,15 @@
 import { FolderKanban, Settings, X } from 'lucide-react'
-import { useNavigate } from '@tanstack/react-router'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 
 /**
  * A thin bar shown across all workspace modes while a project scope is active.
  * It's the one project-specific chrome in the workspace — everything else
  * (files, chat, automations, knowledge) is the normal workspace, just scoped.
+ * The gear opens the in-workspace Manage panel (rename/share/leave/delete).
  */
-export function ProjectContextBar() {
+export function ProjectContextBar({ onOpenManage }: { onOpenManage?: () => void }) {
   const { activeProjectUuid, activeProjectTitle, activeProjectRole, deactivateProject } = useWorkspace()
-  const navigate = useNavigate()
   if (!activeProjectUuid) return null
-  const canManage = activeProjectRole === 'owner' || activeProjectRole === 'editor'
 
   return (
     <div
@@ -33,13 +31,14 @@ export function ProjectContextBar() {
         <span style={{ color: '#9ca3af', fontSize: 12 }}>· viewing</span>
       )}
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
-        {canManage && (
+        {onOpenManage && (
           <button
-            onClick={() => navigate({ to: '/projects/$uuid', params: { uuid: activeProjectUuid } })}
-            title="Project settings"
-            style={{ display: 'flex', alignItems: 'center', background: 'transparent', border: 'none', cursor: 'pointer', color: '#6b7280' }}
+            onClick={onOpenManage}
+            title="Manage project"
+            style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'transparent', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: 12, fontWeight: 500 }}
           >
             <Settings size={14} />
+            Manage
           </button>
         )}
         <button

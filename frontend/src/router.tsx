@@ -13,8 +13,6 @@ import { Workspace } from './pages/Workspace'
 import { TeamSettings } from './pages/TeamSettings'
 
 const Landing = lazy(() => import('./pages/Landing'))
-const Projects = lazy(() => import('./pages/Projects'))
-const ProjectDetail = lazy(() => import('./pages/ProjectDetail'))
 const Workflows = lazy(() => import('./pages/Workflows'))
 const WorkflowEditor = lazy(() => import('./pages/WorkflowEditor'))
 const Admin = lazy(() => import('./pages/Admin'))
@@ -180,25 +178,6 @@ const teamsRoute = createRoute({
   ),
 })
 
-const projectsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/projects',
-  component: () => (
-    <ProtectedRoute>
-      <Projects />
-    </ProtectedRoute>
-  ),
-})
-
-const projectDetailRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/projects/$uuid',
-  component: () => (
-    <ProtectedRoute>
-      <ProjectDetail />
-    </ProtectedRoute>
-  ),
-})
 
 const workflowsRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -433,8 +412,6 @@ const routeTree = rootRoute.addChildren([
   joinProjectRoute,
   indexRoute,
   teamsRoute,
-  projectsRoute,
-  projectDetailRoute,
   workflowsRoute,
   workflowEditorRoute,
   chatRoute,
