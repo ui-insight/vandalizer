@@ -18,6 +18,40 @@ export interface ChatError {
 const THINK_BLOCK_RE = /<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>\n?/g
 const THINK_TRAILING_RE = /<think(?:ing)?>[\s\S]*$/
 
+/** Stable identity for a citation so repeated `sources` chunks don't duplicate chips. */
+function citationKey(c: Citation): string {
+  return (
+    c.chunk_id ||
+    `${c.document_id ?? ''}|${c.page ?? ''}|${c.sheet ?? ''}|${(c.content_preview ?? '').slice(0, 40)}`
+  )
+}
+
+/** Map raw fetch/stream failures to a message a first-time user can act on. */
+function toFriendlyError(e: unknown): string {
+  if (e instanceof Error) {
+    const m = e.message || ''
+    if (/failed to fetch|load failed|networkerror|network error|err_|connection|stalled/i.test(m)) {
+      return m && /stalled/i.test(m)
+        ? m
+        : 'Connection lost before the response finished. Check your network and try again.'
+    }
+    return m || 'Chat failed'
+  }
+  return 'Chat failed'
+}
+
+type SendArgs = [
+  message: string,
+  documentUuids?: string[],
+  model?: string,
+  knowledgeBaseUuid?: string,
+  includeOnboardingContext?: boolean,
+  folderUuids?: string[],
+  isFirstSession?: boolean,
+  runDemo?: boolean,
+  projectUuid?: string,
+]
+
 export function useChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [streamingContent, setStreamingContent] = useState('')
@@ -45,9 +79,11 @@ export function useChat() {
   const segmentsRef = useRef<StreamSegment[]>([])
   const abortRef = useRef<AbortController | null>(null)
   const citationsRef = useRef<Citation[]>([])
+  const lastSendArgsRef = useRef<SendArgs | null>(null)
 
   const send = useCallback(
     async (message: string, documentUuids: string[] = [], model?: string, knowledgeBaseUuid?: string, includeOnboardingContext?: boolean, folderUuids?: string[], isFirstSession?: boolean, runDemo?: boolean, projectUuid?: string) => {
+      lastSendArgsRef.current = [message, documentUuids, model, knowledgeBaseUuid, includeOnboardingContext, folderUuids, isFirstSession, runDemo, projectUuid]
       setError(null)
       setErrorDetails(null)
       setIsStreaming(true)
@@ -69,6 +105,45 @@ export function useChat() {
 
       // Add user message immediately
       setMessages((prev) => [...prev, { role: 'user', content: message }])
+
+      // Build and append an assistant message from whatever has accumulated so
+      // far. Shared by the normal-completion, user-stop, and network-failure
+      // paths so a partial response is never silently discarded.
+      const commitAssistantMessage = () => {
+        const finalContent = streamingRef.current.replace(THINK_BLOCK_RE, '').trim()
+        if (!finalContent && toolResultsRef.current.length === 0) return
+        const assistantMsg: ChatMessage = { role: 'assistant', content: finalContent }
+        if (thinkingRef.current) {
+          assistantMsg.thinking = thinkingRef.current
+          if (thinkingDurationRef.current != null) {
+            assistantMsg.thinking_duration = thinkingDurationRef.current
+          }
+        }
+        if (toolCallsRef.current.length > 0 || toolResultsRef.current.length > 0) {
+          assistantMsg.tool_calls = [
+            ...toolCallsRef.current,
+            ...toolResultsRef.current.map((r) => ({
+              tool_name: r.tool_name,
+              tool_call_id: r.tool_call_id,
+              args: {},
+            })),
+          ]
+          assistantMsg.tool_results = [...toolResultsRef.current]
+        }
+        if (segmentsRef.current.length > 0) {
+          assistantMsg.segments = segmentsRef.current
+            .map((seg) =>
+              seg.kind === 'text'
+                ? { ...seg, content: seg.content.replace(THINK_BLOCK_RE, '').replace(THINK_TRAILING_RE, '') }
+                : seg,
+            )
+            .filter((seg) => seg.kind !== 'text' || seg.content.trim().length > 0)
+        }
+        if (citationsRef.current.length) {
+          assistantMsg.citations = citationsRef.current
+        }
+        setMessages((prev) => [...prev, assistantMsg])
+      }
 
       const controller = new AbortController()
       abortRef.current = controller
@@ -140,7 +215,16 @@ export function useChat() {
               }
             } else if (chunk.kind === 'sources') {
               if (chunk.sources?.length) {
-                citationsRef.current = [...citationsRef.current, ...chunk.sources]
+                const seen = new Set(citationsRef.current.map(citationKey))
+                const merged = [...citationsRef.current]
+                for (const s of chunk.sources) {
+                  const k = citationKey(s)
+                  if (!seen.has(k)) {
+                    seen.add(k)
+                    merged.push(s)
+                  }
+                }
+                citationsRef.current = merged
               }
             } else if (chunk.kind === 'context_notice') {
               setContextNotices((prev) => [
@@ -175,41 +259,7 @@ export function useChat() {
         setActivityId(result.activityId)
 
         // Add assistant message from accumulated stream
-        const finalContent = streamingRef.current.replace(THINK_BLOCK_RE, '').trim()
-        if (finalContent || toolResultsRef.current.length > 0) {
-          const assistantMsg: ChatMessage = {
-            role: 'assistant',
-            content: finalContent,
-          }
-          if (thinkingRef.current) {
-            assistantMsg.thinking = thinkingRef.current
-            if (thinkingDurationRef.current != null) {
-              assistantMsg.thinking_duration = thinkingDurationRef.current
-            }
-          }
-          if (toolCallsRef.current.length > 0 || toolResultsRef.current.length > 0) {
-            assistantMsg.tool_calls = [...toolCallsRef.current, ...toolResultsRef.current.map((r) => ({
-              tool_name: r.tool_name,
-              tool_call_id: r.tool_call_id,
-              args: {},
-            }))]
-            assistantMsg.tool_results = [...toolResultsRef.current]
-          }
-          // Persist ordered segments so the message renders interleaved
-          if (segmentsRef.current.length > 0) {
-            // Clean think tags from text segments
-            assistantMsg.segments = segmentsRef.current.map((seg) => {
-              if (seg.kind === 'text') {
-                return { ...seg, content: seg.content.replace(THINK_BLOCK_RE, '').replace(THINK_TRAILING_RE, '') }
-              }
-              return seg
-            }).filter((seg) => seg.kind !== 'text' || seg.content.trim().length > 0)
-          }
-          if (citationsRef.current.length) {
-            assistantMsg.citations = citationsRef.current
-          }
-          setMessages((prev) => [...prev, assistantMsg])
-        }
+        commitAssistantMessage()
       } catch (e) {
         const wasAborted =
           (e instanceof DOMException && e.name === 'AbortError') ||
@@ -218,34 +268,15 @@ export function useChat() {
           // User hit Stop. Keep whatever partial content streamed — the backend
           // persisted it on its side; mirror that in the local message list so
           // the UI doesn't lose the response.
-          const finalContent = streamingRef.current.replace(THINK_BLOCK_RE, '').trim()
-          if (finalContent || toolResultsRef.current.length > 0) {
-            const assistantMsg: ChatMessage = {
-              role: 'assistant',
-              content: finalContent,
-            }
-            if (thinkingRef.current) {
-              assistantMsg.thinking = thinkingRef.current
-              if (thinkingDurationRef.current != null) {
-                assistantMsg.thinking_duration = thinkingDurationRef.current
-              }
-            }
-            if (segmentsRef.current.length > 0) {
-              assistantMsg.segments = segmentsRef.current
-                .map((seg) =>
-                  seg.kind === 'text'
-                    ? { ...seg, content: seg.content.replace(THINK_BLOCK_RE, '').replace(THINK_TRAILING_RE, '') }
-                    : seg,
-                )
-                .filter((seg) => seg.kind !== 'text' || seg.content.trim().length > 0)
-            }
-            if (citationsRef.current.length) {
-              assistantMsg.citations = citationsRef.current
-            }
-            setMessages((prev) => [...prev, assistantMsg])
-          }
+          commitAssistantMessage()
         } else {
-          setError(e instanceof Error ? e.message : 'Chat failed')
+          // Network drop or stalled stream. Preserve the partial response (same
+          // as the Stop path) so the user doesn't lose a half-written answer,
+          // then surface a recoverable, plain-language error.
+          commitAssistantMessage()
+          const friendly = toFriendlyError(e)
+          setError(friendly)
+          setErrorDetails({ message: friendly })
         }
       } finally {
         abortRef.current = null
@@ -302,6 +333,21 @@ export function useChat() {
     setErrorDetails(null)
   }, [])
 
+  /** Re-send the last message, dropping the failed exchange so it isn't duplicated. */
+  const retry = useCallback(() => {
+    const args = lastSendArgsRef.current
+    if (!args) return
+    setMessages((prev) => {
+      const next = [...prev]
+      // Drop a committed partial assistant reply, then the user message —
+      // send() re-appends the user message itself.
+      if (next.length && next[next.length - 1].role === 'assistant') next.pop()
+      if (next.length && next[next.length - 1].role === 'user') next.pop()
+      return next
+    })
+    send(...args)
+  }, [send])
+
   const setActivity = useCallback((newActivityId: string, newConversationUuid: string) => {
     setActivityId(newActivityId)
     setConversationUuid(newConversationUuid)
@@ -322,6 +368,7 @@ export function useChat() {
     segments,
     errorDetails,
     clearError,
+    retry,
     contextTokens,
     contextMode,
     contextCutoffIndex,

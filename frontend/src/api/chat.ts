@@ -47,23 +47,47 @@ export async function streamChat(
   const decoder = new TextDecoder()
   let buffer = ''
 
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
+  // Watchdog: if the server goes silent for this long mid-stream, stop waiting
+  // and surface a recoverable error instead of an indefinite "Thinking…" spinner.
+  const IDLE_TIMEOUT_MS = 90_000
 
-    buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split('\n')
-    buffer = lines.pop() || ''
-
-    for (const line of lines) {
-      if (!line.trim()) continue
+  try {
+    while (true) {
+      let timer: ReturnType<typeof setTimeout> | undefined
+      const idle = new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error('The response stalled. Check your connection and try again.')),
+          IDLE_TIMEOUT_MS,
+        )
+      })
+      let result: ReadableStreamReadResult<Uint8Array>
       try {
-        const chunk: StreamChunk = JSON.parse(line)
-        onChunk?.(chunk)
-      } catch {
-        // skip malformed lines
+        result = await Promise.race([reader.read(), idle])
+      } finally {
+        clearTimeout(timer)
+      }
+
+      const { done, value } = result
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+
+      for (const line of lines) {
+        if (!line.trim()) continue
+        try {
+          const chunk: StreamChunk = JSON.parse(line)
+          onChunk?.(chunk)
+        } catch {
+          // skip malformed lines
+        }
       }
     }
+  } catch (e) {
+    // Release the underlying connection before propagating (timeout or abort).
+    reader.cancel().catch(() => {})
+    throw e
   }
 
   // Process remaining buffer

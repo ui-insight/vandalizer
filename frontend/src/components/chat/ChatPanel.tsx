@@ -39,12 +39,12 @@ function StreamingLabel() {
     const interval = setInterval(() => {
       setFade(false)
       setTimeout(() => {
-        setIndex(i => (i + 1) % LOADING_WORDS.length)
+        setIndex(i => (i + 1) % words.length)
         setFade(true)
       }, 200)
     }, 2000)
     return () => clearInterval(interval)
-  }, [])
+  }, [words.length])
 
   return (
     <span style={{
@@ -136,6 +136,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     segments,
     errorDetails,
     clearError,
+    retry,
     contextTokens,
     contextMode,
     contextCutoffIndex,
@@ -170,8 +171,10 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const [selectedModel, setSelectedModel] = useState<string>('')
   const [modelsList, setModelsList] = useState<ModelInfo[]>([])
   const [showContextDialog, setShowContextDialog] = useState(false)
-  const contextDialogShownRef = useRef(false)
+  const [showContextNudge, setShowContextNudge] = useState(false)
+  const contextNudgeShownRef = useRef(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const stickToBottomRef = useRef(true)
   const lastLoadedConvo = useRef<string | null>(null)
   const prevStreamingRef = useRef(false)
   const [showScrollDown, setShowScrollDown] = useState(false)
@@ -204,15 +207,17 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     return match?.context_window ?? 128000
   })()
 
-  // Auto-trigger context limit dialog when usage exceeds 90%
+  // When usage crosses 90%, show a dismissible inline nudge rather than a
+  // blocking modal — far less jarring for a first-time user mid-conversation.
   useEffect(() => {
     if (contextTokens > 0 && contextWindow > 0) {
       const ratio = contextTokens / contextWindow
-      if (ratio >= 0.9 && !contextDialogShownRef.current) {
-        contextDialogShownRef.current = true
-        setShowContextDialog(true)
+      if (ratio >= 0.9 && !contextNudgeShownRef.current) {
+        contextNudgeShownRef.current = true
+        setShowContextNudge(true)
       } else if (ratio < 0.9) {
-        contextDialogShownRef.current = false
+        contextNudgeShownRef.current = false
+        setShowContextNudge(false)
       }
     }
   }, [contextTokens, contextWindow])
@@ -299,8 +304,19 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       clientHeight: el.clientHeight,
     }
     const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    // Stay "pinned" while near the bottom; if the user scrolls up, stop
+    // auto-following the stream so they can read back without being yanked down.
+    stickToBottomRef.current = distFromBottom < 80
     setShowScrollDown(distFromBottom > 80)
   }, [])
+
+  // Follow the assistant's streaming output while the user is pinned to the
+  // bottom — otherwise long answers scroll off-screen with no auto-scroll.
+  useEffect(() => {
+    if (!isStreaming || !stickToBottomRef.current) return
+    const el = scrollContainerRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [isStreaming, streamingContent, thinkingContent, segments])
 
   useEffect(() => {
     const el = scrollContainerRef.current
@@ -334,6 +350,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       if (lastMsg?.role === 'user') {
         prevScrollInfo.current = { scrollHeight: 0, scrollTop: 0, clientHeight: 0 }
         setShowScrollDown(false)
+        stickToBottomRef.current = true
         const el = scrollContainerRef.current
         if (el) el.scrollTop = el.scrollHeight
       }
@@ -343,6 +360,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
 
   const scrollToBottom = useCallback(() => {
     setShowScrollDown(false)
+    stickToBottomRef.current = true
     const el = scrollContainerRef.current
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
   }, [])
@@ -985,8 +1003,17 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
 
         {error && (
           <div className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 border border-red-200">
-            <div>{error}</div>
-            {errorDetails?.suggestedAction === 'convert_to_kb' && (errorDetails.oversizeDocuments?.length ?? 0) > 0 && (
+            <div className="flex items-start gap-2">
+              <div className="flex-1">{error}</div>
+              <button
+                onClick={clearError}
+                aria-label="Dismiss error"
+                className="flex shrink-0 items-center justify-center rounded p-0.5 text-red-400 hover:text-red-600"
+              >
+                <X size={14} />
+              </button>
+            </div>
+            {errorDetails?.suggestedAction === 'convert_to_kb' && (errorDetails.oversizeDocuments?.length ?? 0) > 0 ? (
               <div className="mt-2 flex items-center gap-2">
                 <button
                   onClick={handleConvertToKB}
@@ -1009,7 +1036,42 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                   Builds a searchable index so chat can read the document a chunk at a time.
                 </span>
               </div>
+            ) : (
+              <div className="mt-2">
+                <button
+                  onClick={retry}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-700"
+                >
+                  Retry
+                </button>
+              </div>
             )}
+          </div>
+        )}
+
+        {showContextNudge && (
+          <div className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 border border-amber-200">
+            <div className="flex items-start gap-2">
+              <div className="flex-1">
+                This conversation is getting long and is close to the model's memory limit.
+                You can trim or summarize older messages so replies stay sharp.
+              </div>
+              <button
+                onClick={() => setShowContextNudge(false)}
+                aria-label="Dismiss"
+                className="flex shrink-0 items-center justify-center rounded p-0.5 text-amber-500 hover:text-amber-700"
+              >
+                <X size={14} />
+              </button>
+            </div>
+            <div className="mt-2">
+              <button
+                onClick={() => { setShowContextNudge(false); setShowContextDialog(true) }}
+                className="inline-flex items-center gap-1.5 rounded-md bg-amber-500 px-2.5 py-1 text-xs font-medium text-white hover:bg-amber-600"
+              >
+                Manage memory
+              </button>
+            </div>
           </div>
         )}
 

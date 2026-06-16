@@ -76,13 +76,13 @@ export function ContextLimitDialog({
           <div>
             <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>
               {percent >= 100
-                ? 'Context Window Full'
+                ? 'Conversation memory is full'
                 : percent >= 90
-                  ? 'Context Window Nearly Full'
-                  : 'Manage Context Window'}
+                  ? 'Conversation memory is nearly full'
+                  : 'Manage conversation memory'}
             </h3>
             <p style={{ margin: '4px 0 0', fontSize: 13, color: '#6b7280' }}>
-              {percent}% of context used.{percent >= 90 ? ' Choose how to manage it.' : ''}
+              {percent}% of the model's memory is in use.{percent >= 90 ? ' Pick how to free some up.' : ''}
             </p>
           </div>
           <button
@@ -129,9 +129,9 @@ export function ContextLimitDialog({
           >
             <Scissors size={18} style={{ marginTop: 2, color: '#6b7280', flexShrink: 0 }} />
             <div>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>Truncate</div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>Trim older messages</div>
               <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                Drop older messages from context. They'll still be visible in the conversation.
+                Stop sending the oldest messages to the model. They stay visible here in the conversation.
               </div>
             </div>
           </button>
@@ -167,9 +167,9 @@ export function ContextLimitDialog({
               <Minimize2 size={18} style={{ marginTop: 2, color: '#6b7280', flexShrink: 0 }} />
             )}
             <div>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>Compact</div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>Summarize the conversation</div>
               <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                Summarize the conversation into a concise context. Old messages remain visible.
+                Replace earlier messages with a short summary to save room. Old messages remain visible.
               </div>
             </div>
           </button>
@@ -200,9 +200,9 @@ export function ContextLimitDialog({
           >
             <Trash2 size={18} style={{ marginTop: 2, color: '#6b7280', flexShrink: 0 }} />
             <div>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>Clear</div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>Start fresh</div>
               <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                Start fresh. Old messages remain visible but won't be sent to the model.
+                Keep chatting with a clean slate. Old messages stay visible but won't be sent to the model.
               </div>
             </div>
           </button>

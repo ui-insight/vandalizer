@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { Check, ChevronRight, ClipboardCopy, Download, ExternalLink, FileText, Loader2 } from 'lucide-react'
+import { AlertTriangle, Check, ChevronRight, ClipboardCopy, Download, ExternalLink, FileText, Loader2 } from 'lucide-react'
 import { QualityBadge } from './QualityBadge'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import type { WorkspaceMode } from '../../contexts/WorkspaceContext'
@@ -540,7 +540,7 @@ function ExtractionContent({ content }: { content: Record<string, unknown> }) {
 }
 
 /** Pick a short phrase from chunk content for PDF text-search highlighting. */
-function pickHighlightPhrase(content: string): string {
+export function pickHighlightPhrase(content: string): string {
   const cleaned = content.replace(/\s+/g, ' ').trim()
   if (cleaned.length <= 60) return cleaned
   const cut = cleaned.slice(0, 60)
@@ -802,15 +802,19 @@ export function ToolStatusLine({
             size={12}
             style={{ animation: 'spin 1s linear infinite', color: accent, flexShrink: 0 }}
           />
+        ) : isError ? (
+          <AlertTriangle size={13} style={{ color: '#dc2626', flexShrink: 0 }} />
         ) : (
           <span style={{
             width: 5, height: 5, borderRadius: '50%',
-            background: isError ? '#ef4444' : accent,
+            background: accent,
             flexShrink: 0, opacity: 0.5,
           }} />
         )}
 
-        {/* Label — active shows present tense + context hint, done shows result summary */}
+        {/* Label — active shows present tense + context hint, done shows result
+            summary. Errors get a distinct red treatment so a failed or denied
+            tool can't be mistaken for a successful one. */}
         {isActive ? (
           <>
             <span style={{ color: '#374151', fontWeight: 500 }}>
@@ -820,6 +824,20 @@ export function ToolStatusLine({
               <span style={{ color: '#6b7280', fontStyle: 'italic' }}>
                 {activeHint}
               </span>
+            )}
+          </>
+        ) : isError ? (
+          <>
+            <span style={{ color: '#dc2626', fontWeight: 500 }}>
+              {meta.label} failed
+            </span>
+            {summaryText && (
+              <>
+                <span style={{ color: '#fca5a5' }}>&middot;</span>
+                <span style={{ color: '#b91c1c', fontStyle: 'italic' }}>
+                  {summaryText}
+                </span>
+              </>
             )}
           </>
         ) : (

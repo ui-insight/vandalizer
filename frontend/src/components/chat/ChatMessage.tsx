@@ -6,8 +6,9 @@ import { submitChatFeedback } from '../../api/feedback'
 import { useBranding } from '../../contexts/BrandingContext'
 import { useCertificationPanel } from '../../contexts/CertificationPanelContext'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
-import { ToolCallDisplay, ToolStatusLine, toolResultToText } from './ToolCallDisplay'
-import type { ChatMessage as ChatMessageType, StreamSegment, ToolCallInfo, ToolResultInfo } from '../../types/chat'
+import { useToast } from '../../contexts/ToastContext'
+import { ToolCallDisplay, ToolStatusLine, toolResultToText, pickHighlightPhrase } from './ToolCallDisplay'
+import type { ChatMessage as ChatMessageType, Citation, StreamSegment, ToolCallInfo, ToolResultInfo } from '../../types/chat'
 
 // Matches [ACTION:type]Label[/ACTION] (correct) and also
 // [Label][ACTION:type] or [Label](ACTION:type) (common LLM mistakes)
@@ -33,12 +34,12 @@ function ThinkingLabel() {
     const interval = setInterval(() => {
       setFade(false)
       setTimeout(() => {
-        setIndex(i => (i + 1) % THINKING_WORDS.length)
+        setIndex(i => (i + 1) % words.length)
         setFade(true)
       }, 200)
     }, 2000)
     return () => clearInterval(interval)
-  }, [])
+  }, [words.length])
 
   return (
     <span style={{
@@ -104,7 +105,8 @@ export function ChatMessage({
   const [thinkingExpanded, setThinkingExpanded] = useState(false)
   const contentRef = useRef<HTMLDivElement>(null)
   const certPanel = useCertificationPanel()
-  const { setWorkspaceMode } = useWorkspace()
+  const { setWorkspaceMode, viewDocument, setHighlightTerms } = useWorkspace()
+  const { toast } = useToast()
 
   const thinkingText = streamingThinking || message.thinking || ''
   const duration = thinkingDuration ?? message.thinking_duration ?? null
@@ -130,6 +132,7 @@ export function ChatMessage({
   }, [certPanel, setWorkspaceMode])
 
   const handleFeedback = async (rating: 'up' | 'down') => {
+    const prev = feedback
     setFeedback(rating)
     try {
       await submitChatFeedback({
@@ -137,7 +140,12 @@ export function ChatMessage({
         message_index: messageIndex,
         rating,
       })
-    } catch { /* ignore */ }
+    } catch {
+      // Revert the optimistic highlight so the user knows it didn't save.
+      setFeedback(prev)
+      toast('Could not save your feedback. Please try again.', 'error')
+      return
+    }
     if (rating === 'down') setShowComment(true)
   }
 
@@ -152,7 +160,17 @@ export function ChatMessage({
       })
       setCommentSent(true)
       setShowComment(false)
-    } catch { /* ignore */ }
+    } catch {
+      toast('Could not send your comment. Please try again.', 'error')
+    }
+  }
+
+  // Open the cited document in the viewer and highlight the cited passage.
+  const handleCitationClick = (c: Citation) => {
+    if (!c.document_id) return
+    setWorkspaceMode('files')
+    viewDocument(c.document_id, c.document_title)
+    if (c.content_preview) setHighlightTerms([pickHighlightPhrase(c.content_preview)])
   }
 
   const handleCopy = () => {
@@ -357,18 +375,36 @@ export function ChatMessage({
                   border: '1px solid #e5e7eb', borderRadius: 999,
                 } as const
                 const key = `${c.chunk_id ?? c.document_id ?? i}`
-                return c.url ? (
-                  <a
-                    key={key}
-                    href={c.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    title={preview}
-                    style={{ ...chipStyle, cursor: 'pointer', textDecoration: 'none' }}
-                  >
-                    {label}
-                  </a>
-                ) : (
+                if (c.url) {
+                  return (
+                    <a
+                      key={key}
+                      href={c.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={preview}
+                      style={{ ...chipStyle, cursor: 'pointer', textDecoration: 'none' }}
+                    >
+                      {label}
+                    </a>
+                  )
+                }
+                // Document-backed citation: open the source in the viewer and
+                // highlight the cited passage so the user can verify it.
+                if (c.document_id) {
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => handleCitationClick(c)}
+                      title={preview ? `${preview}\n\nClick to open the source` : 'Click to open the source'}
+                      style={{ ...chipStyle, cursor: 'pointer', fontFamily: 'inherit' }}
+                    >
+                      {label}
+                    </button>
+                  )
+                }
+                return (
                   <span key={key} title={preview} style={{ ...chipStyle, cursor: 'help' }}>
                     {label}
                   </span>
