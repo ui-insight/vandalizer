@@ -80,6 +80,8 @@ def _mock_async_client(text: str, status: int = 200):
     resp.text = text
     resp.status_code = status
     resp.raise_for_status = MagicMock()
+    # safe_get checks is_redirect on every hop; a final (non-redirect) response.
+    resp.is_redirect = False
 
     client = MagicMock()
     client.get = AsyncMock(return_value=resp)
@@ -205,6 +207,7 @@ async def test_http_error_propagates():
     resp = MagicMock()
     resp.text = ""
     resp.status_code = 404
+    resp.is_redirect = False
     resp.raise_for_status = MagicMock(side_effect=httpx.HTTPStatusError(
         "404", request=MagicMock(), response=resp,
     ))

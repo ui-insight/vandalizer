@@ -1,8 +1,18 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import * as api from '../api/projects'
-import type { Project, ProjectOverview, ProjectState } from '../types/project'
+import type { Project, ProjectOverview, ProjectPin, ProjectState } from '../types/project'
 
 type ProjectUpdate = { title?: string; description?: string; state?: ProjectState }
+
+/** The pins (workflows/extractions/etc.) attached to a project. */
+export function useProjectPins(uuid: string | null | undefined) {
+  const { data: pins = [], isLoading: loading } = useQuery<ProjectPin[]>({
+    queryKey: ['project', uuid, 'pins'],
+    queryFn: () => api.listProjectPins(uuid as string),
+    enabled: !!uuid,
+  })
+  return { pins, loading }
+}
 
 export function useProjects() {
   const qc = useQueryClient()

@@ -184,6 +184,13 @@ class ChatConversation(Document):
     context_cutoff_index: int = 0
     compact_summary: Optional[str] = None
 
+    # Write-tool confirmation handshake. Each entry is
+    # {"fp": <fingerprint>, "turn": <message-count when armed>, "tool": <name>}.
+    # A write tool only executes when a matching entry was armed on an EARLIER
+    # turn, so the agent cannot self-confirm a mutation within a single turn —
+    # a real user message must intervene. See chat_tools._confirm_gate.
+    pending_confirmations: list[dict] = []
+
     class Settings:
         name = "chat_conversation"
         indexes = [

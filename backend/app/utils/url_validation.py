@@ -41,3 +41,34 @@ def validate_outbound_url(url: str) -> str:
             raise ValueError(f"URL resolves to blocked IP range: {ip}")
 
     return url
+
+
+async def safe_get(client, url: str, *, max_redirects: int = 5):
+    """GET *url*, re-validating every redirect hop against the SSRF policy.
+
+    ``httpx``'s built-in ``follow_redirects`` validates nothing, so a public
+    URL that we cleared with :func:`validate_outbound_url` can still ``302`` to
+    ``http://169.254.169.254/`` or another internal host. We validate the
+    initial URL and every ``Location`` before connecting, so the link-local /
+    private / reserved block applies to the *final* address actually fetched —
+    not just the first hop.
+
+    The caller must pass an ``httpx.AsyncClient`` created with
+    ``follow_redirects=False``. Raises ``ValueError`` (the same type
+    :func:`validate_outbound_url` raises) when a hop is blocked or the redirect
+    chain is too long, so existing ``except ValueError`` handlers catch it.
+    Returns the final non-redirect ``httpx.Response``.
+    """
+    current = validate_outbound_url(url)
+    for _ in range(max_redirects + 1):
+        resp = await client.get(current)
+        if resp.is_redirect:
+            location = resp.headers.get("location")
+            if not location:
+                return resp
+            # Resolve relative redirects against the URL we just requested,
+            # then re-run the full SSRF policy on the absolute target.
+            current = validate_outbound_url(str(resp.url.join(location)))
+            continue
+        return resp
+    raise ValueError("Too many redirects")

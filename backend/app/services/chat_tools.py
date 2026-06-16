@@ -8,6 +8,8 @@ Tools are exported as the ``TOOLS`` list for bulk registration.
 
 import asyncio
 import datetime
+import hashlib
+import json
 import logging
 import re
 from typing import Optional
@@ -123,6 +125,104 @@ def _build_owner_filter(deps: "AgenticChatDeps") -> dict:
     return {"$or": conditions}
 
 
+def _kb_access_ok(kb: "KnowledgeBase", user_id: str, team_id: Optional[str]) -> bool:
+    """Whether ``(user_id, team_id)`` may access *kb*.
+
+    ``shared_with_team`` is NOT a global grant — it only opens the KB to members
+    of ``kb.team_id``. Earlier guards treated a truthy ``shared_with_team`` as a
+    blanket bypass (``... and not kb.shared_with_team``), so any authenticated
+    user — including one on a different team or with no current team — could read
+    or write a team-shared KB by UUID (cross-tenant leak). This mirrors the
+    correct predicate already used in ``_get_optimizable_item``.
+
+    Verified (org-curated) KBs are intentionally NOT granted here: read paths
+    that allow them check ``kb.verified`` explicitly, and write paths must never
+    let a non-owner mutate a verified KB.
+    """
+    if kb.user_id == user_id:
+        return True
+    if kb.shared_with_team and team_id and kb.team_id == team_id:
+        return True
+    return False
+
+
+def _confirm_fingerprint(tool_name: str, key: dict) -> str:
+    """Stable fingerprint of a write action, used to match preview→confirm."""
+    raw = tool_name + "|" + json.dumps(key, sort_keys=True, default=str)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:32]
+
+
+async def _confirm_gate(
+    context: "RunContext[AgenticChatDeps]",
+    *,
+    tool_name: str,
+    key: dict,
+    confirmed: bool,
+    preview: dict,
+) -> Optional[dict]:
+    """Server-side enforcement of the write-tool preview→confirm handshake.
+
+    Returns ``None`` when the action is genuinely approved and the caller may
+    execute; otherwise returns the ``preview`` dict (with
+    ``needs_confirmation=True``) and the caller must return it unchanged.
+
+    A write tool may only execute when (a) the identical action was previewed
+    on an EARLIER user turn and (b) the model re-issues it with
+    ``confirmed=true``. The agent loops server-side within a single turn, so a
+    ``confirmed=true`` argument it produces on its own — e.g. because a
+    prompt-injected document or KB snippet told it to — never satisfies the
+    gate: there is no prior-turn arming, so it is downgraded to a preview that a
+    human must approve by sending another message. Fails closed: any error or
+    missing conversation yields a preview, never execution.
+
+    ``turn_marker`` is ``len(conversation.messages)`` at turn start, which
+    strictly increases each turn, so "armed on an earlier turn" is
+    ``entry.turn < turn_marker``.
+    """
+    deps = context.deps
+    conv = getattr(deps, "conversation", None)
+    marker = int(getattr(deps, "turn_marker", 0) or 0)
+    fp = _confirm_fingerprint(tool_name, key)
+
+    armed = list(getattr(conv, "pending_confirmations", None) or []) if conv else []
+    match = next(
+        (p for p in armed if isinstance(p, dict) and p.get("fp") == fp), None
+    )
+
+    # Execute only when a prior-turn preview armed this exact action.
+    if confirmed and match is not None and int(match.get("turn", marker)) < marker:
+        if conv is not None:
+            conv.pending_confirmations = [
+                p for p in armed
+                if not (isinstance(p, dict) and p.get("fp") == fp)
+            ]
+            try:
+                await conv.save()
+            except Exception:
+                logger.warning("Failed to clear pending confirmation for %s", tool_name)
+        return None
+
+    # Otherwise (re)arm the confirmation for a future turn and return the
+    # preview. confirmed=true with no prior-turn arming is downgraded here —
+    # this is the injection defense.
+    if conv is not None:
+        new_pending = [
+            p for p in armed
+            if not (isinstance(p, dict) and p.get("fp") == fp)
+        ]
+        new_pending.append({"fp": fp, "turn": marker, "tool": tool_name})
+        # Cap to bound growth on long conversations; keep the most recent.
+        conv.pending_confirmations = new_pending[-25:]
+        try:
+            await conv.save()
+        except Exception:
+            logger.warning("Failed to arm pending confirmation for %s", tool_name)
+
+    out = dict(preview)
+    out["needs_confirmation"] = True
+    return out
+
+
 async def search_documents(
     context: RunContext[AgenticChatDeps],
     query: str,
@@ -224,6 +324,32 @@ async def list_documents(
     }
 
 
+async def list_folders(
+    context: RunContext[AgenticChatDeps],
+) -> list[dict]:
+    """List every folder the user can access, flattened across the whole tree.
+
+    Unlike list_documents (which shows one level at a time), this returns all
+    accessible folders — personal and team — in a single call. Use it to resolve
+    a folder name to its UUID before calling save_to_folder, e.g. the user says
+    "save it to my Grants folder" and you need the destination folder_uuid.
+
+    Args:
+        context: The call context.
+    """
+    owner_filter = _build_owner_filter(context.deps)
+    folders = await SmartFolder.find(owner_filter).sort("title").limit(200).to_list()
+    return [
+        {
+            "uuid": f.uuid,
+            "title": f.title,
+            "parent_id": f.parent_id,
+            "team_id": f.team_id,
+        }
+        for f in folders
+    ]
+
+
 async def search_knowledge_base(
     context: RunContext[AgenticChatDeps],
     query: str,
@@ -247,12 +373,10 @@ async def search_knowledge_base(
 
     team_id = context.deps.team_id
     user_id = context.deps.user_id
-    if not kb.verified and not kb.shared_with_team:
-        if kb.user_id != user_id:
-            return [{"error": "You do not have access to this knowledge base."}]
-    if kb.shared_with_team and kb.team_id and team_id:
-        if kb.team_id != team_id:
-            return [{"error": "You do not have access to this knowledge base."}]
+    # Verified KBs are readable org-wide; otherwise require ownership or a
+    # team-shared KB whose team matches the caller (see _kb_access_ok).
+    if not (kb.verified or _kb_access_ok(kb, user_id, team_id)):
+        return [{"error": "You do not have access to this knowledge base."}]
 
     if kb.status and kb.status != "ready":
         return [{"error": f"Knowledge base \"{kb.title}\" is currently {kb.status}. Try again in a few minutes once indexing completes."}]
@@ -685,7 +809,7 @@ async def fetch_url(
         _extract_text_from_html,
         _extract_title_from_html,
     )
-    from app.utils.url_validation import validate_outbound_url
+    from app.utils.url_validation import safe_get, validate_outbound_url
 
     try:
         validate_outbound_url(url)
@@ -696,13 +820,20 @@ async def fetch_url(
         }
 
     try:
+        # follow_redirects=False + safe_get re-validates every hop, so a public
+        # page can't 302 us into an internal/metadata address (SSRF).
         async with httpx.AsyncClient(
             timeout=_FETCH_URL_TIMEOUT_S,
-            follow_redirects=True,
+            follow_redirects=False,
             headers={"User-Agent": "Vandalizer-Chat/1.0 (+research-admin agent)"},
         ) as client:
-            resp = await client.get(url)
+            resp = await safe_get(client, url)
             resp.raise_for_status()
+    except ValueError as e:
+        return {
+            "error": f"URL rejected: {e}",
+            "url": url,
+        }
     except httpx.HTTPStatusError as e:
         status = e.response.status_code
         return {
@@ -884,8 +1015,6 @@ async def run_extraction(
         extraction_set_uuid: UUID of the extraction template to run.
         document_uuids: List of document UUIDs to extract from (max 10).
     """
-    from app.services.extraction_engine import ExtractionEngine
-
     # Load the search set
     ss = await SearchSet.find_one(SearchSet.uuid == extraction_set_uuid)
     if not ss:
@@ -897,6 +1026,28 @@ async def run_extraction(
     if not ss.verified and ss.user_id != user_id:
         if not (team_id and ss.team_id == team_id):
             return {"error": "You do not have access to this extraction set."}
+
+    return await _execute_extraction(context, ss, document_uuids)
+
+
+async def _execute_extraction(
+    context: RunContext[AgenticChatDeps],
+    ss,
+    document_uuids: list[str],
+) -> dict:
+    """Run an already-authorized extraction set against documents.
+
+    Shared by ``run_extraction`` (after it authorizes the set) and
+    ``run_pin_on_project`` (where the project pin is the authorization
+    boundary). Each document is still authorized against the caller. Returns
+    the same response shape as ``run_extraction``, including the quality
+    sidecar. Caps at 10 documents and 50 entities.
+    """
+    from app.services.extraction_engine import ExtractionEngine
+
+    team_id = context.deps.team_id
+    user_id = context.deps.user_id
+    extraction_set_uuid = ss.uuid
 
     # Load extraction items (fields)
     items = await ss.get_extraction_items()
@@ -1060,12 +1211,19 @@ async def create_knowledge_base(
         description: Optional description.
         confirmed: Must be true to actually create. If false, returns a preview for user confirmation.
     """
-    if not confirmed:
-        return {
+    gate = await _confirm_gate(
+        context,
+        tool_name="create_knowledge_base",
+        key={"title": title, "description": description},
+        preview={
             "action": "create_knowledge_base",
             "preview": f"Create a new knowledge base titled \"{title}\"" + (f" — {description}" if description else ""),
             "needs_confirmation": True,
-        }
+        },
+        confirmed=confirmed,
+    )
+    if gate is not None:
+        return gate
 
     from app.services.knowledge_service import create_knowledge_base as kb_create
 
@@ -1104,18 +1262,24 @@ async def add_documents_to_kb(
     if not kb:
         return {"error": f"Knowledge base '{kb_uuid}' not found."}
 
-    # Authorization
+    # Authorization — owner or a team-shared KB matching the caller's team.
     user = context.deps.user
-    if kb.user_id != user.user_id and not kb.shared_with_team:
-        if not (context.deps.team_id and kb.team_id == context.deps.team_id):
-            return {"error": "You do not have access to this knowledge base."}
+    if not _kb_access_ok(kb, user.user_id, context.deps.team_id):
+        return {"error": "You do not have access to this knowledge base."}
 
-    if not confirmed:
-        return {
+    gate = await _confirm_gate(
+        context,
+        tool_name="add_documents_to_kb",
+        key={"kb_uuid": kb_uuid, "docs": sorted(document_uuids)},
+        preview={
             "action": "add_documents_to_kb",
             "preview": f"Add {len(document_uuids)} document(s) to knowledge base \"{kb.title}\"",
             "needs_confirmation": True,
-        }
+        },
+        confirmed=confirmed,
+    )
+    if gate is not None:
+        return gate
 
     from app.services.knowledge_service import add_documents as kb_add_docs
 
@@ -1152,19 +1316,25 @@ async def add_url_to_kb(
         return {"error": f"Knowledge base '{kb_uuid}' not found."}
 
     user = context.deps.user
-    if kb.user_id != user.user_id and not kb.shared_with_team:
-        if not (context.deps.team_id and kb.team_id == context.deps.team_id):
-            return {"error": "You do not have access to this knowledge base."}
+    if not _kb_access_ok(kb, user.user_id, context.deps.team_id):
+        return {"error": "You do not have access to this knowledge base."}
 
-    if not confirmed:
-        action = f"Add URL \"{url}\" to knowledge base \"{kb.title}\""
-        if crawl:
-            action += " (with link crawling, up to 5 pages)"
-        return {
+    action = f"Add URL \"{url}\" to knowledge base \"{kb.title}\""
+    if crawl:
+        action += " (with link crawling, up to 5 pages)"
+    gate = await _confirm_gate(
+        context,
+        tool_name="add_url_to_kb",
+        key={"kb_uuid": kb_uuid, "url": url, "crawl": crawl},
+        preview={
             "action": "add_url_to_kb",
             "preview": action,
             "needs_confirmation": True,
-        }
+        },
+        confirmed=confirmed,
+    )
+    if gate is not None:
+        return gate
 
     from app.services.knowledge_service import add_urls as kb_add_urls
 
@@ -1215,14 +1385,39 @@ async def run_workflow(
         if not (team_id and getattr(wf, "team_id", None) == team_id):
             return {"error": "You do not have access to this workflow."}
 
-    if not confirmed:
-        return {
+    gate = await _confirm_gate(
+        context,
+        tool_name="run_workflow",
+        key={"workflow_id": workflow_id, "docs": sorted(document_uuids)},
+        preview={
             "action": "run_workflow",
             "preview": f"Run workflow \"{wf.name}\" on {len(document_uuids)} document(s)",
             "needs_confirmation": True,
-        }
+        },
+        confirmed=confirmed,
+    )
+    if gate is not None:
+        return gate
 
+    return await _execute_workflow(context, wf, document_uuids)
+
+
+async def _execute_workflow(
+    context: RunContext[AgenticChatDeps],
+    wf,
+    document_uuids: list[str],
+) -> dict:
+    """Dispatch an already-authorized workflow against documents.
+
+    Shared by ``run_workflow`` (after auth + confirmation) and
+    ``run_pin_on_project``. Caps at 10 documents (the workflow_service limit).
+    Returns a session_id for polling via get_workflow_status.
+    """
     from app.services import workflow_service
+
+    workflow_id = str(wf.id)
+    team_id = context.deps.team_id
+    user_id = context.deps.user_id
 
     # Create a chat-tagged activity event so the completion hook can increment
     # chat_workflow_count only when the workflow actually finishes.
@@ -1511,6 +1706,7 @@ async def create_extraction_from_document(
     document_uuids: list[str],
     title: Optional[str] = None,
     domain: Optional[str] = None,
+    pin_to_active_project: bool = True,
     confirmed: bool = False,
 ) -> dict:
     """Create a new extraction set by analyzing one or more documents.
@@ -1537,6 +1733,8 @@ async def create_extraction_from_document(
         title: Optional name for the new extraction set.
         domain: Optional domain hint — one of 'nsf', 'nih', 'dod', 'doe'.
             Activates domain-specific extraction prompts.
+        pin_to_active_project: When a project is open and the user can manage
+            it, pin the new extraction to that project (default true).
         confirmed: Must be true to create. If false, returns a preview.
     """
     user_id = context.deps.user_id
@@ -1571,20 +1769,40 @@ async def create_extraction_from_document(
 
     default_title = title or f"Extraction from {docs[0].title or doc_uuids[0]}"
 
-    if not confirmed:
-        doc_names = ", ".join(f'"{d.title}"' for d in docs[:3])
-        if len(docs) > 3:
-            doc_names += f" + {len(docs) - 3} more"
-        return {
+    # If the user is inside a project they can manage, the new extraction is
+    # auto-pinned there so it shows up alongside the project's other tools.
+    from app.services import project_service
+
+    active_project = await _resolve_active_project(context) if pin_to_active_project else None
+    if active_project and not await project_service.can_manage_project(
+        active_project, context.deps.user
+    ):
+        active_project = None  # viewer — don't pin
+
+    doc_names = ", ".join(f'"{d.title}"' for d in docs[:3])
+    if len(docs) > 3:
+        doc_names += f" + {len(docs) - 3} more"
+    preview_text = (
+        f'Create a new extraction set "{default_title}" by analyzing {doc_names}. '
+        "The LLM will propose field names worth extracting."
+    )
+    if active_project:
+        preview_text += f' It will also be pinned to project "{active_project.title}".'
+    gate = await _confirm_gate(
+        context,
+        tool_name="create_extraction_from_document",
+        key={"docs": sorted(d.uuid for d in docs), "title": default_title},
+        preview={
             "action": "create_extraction_from_document",
-            "preview": (
-                f'Create a new extraction set "{default_title}" by analyzing {doc_names}. '
-                "The LLM will propose field names worth extracting."
-            ),
+            "preview": preview_text,
             "needs_confirmation": True,
             "document_count": len(docs),
             "default_title": default_title,
-        }
+        },
+        confirmed=confirmed,
+    )
+    if gate is not None:
+        return gate
 
     from app.services import search_set_service as svc
 
@@ -1624,18 +1842,33 @@ async def create_extraction_from_document(
     except Exception:
         pass
 
+    # Auto-pin to the active project (best-effort — never blocks creation).
+    pinned_to_project = None
+    if active_project:
+        try:
+            await project_service.add_pin(
+                active_project, "extraction", ss.uuid, context.deps.user
+            )
+            pinned_to_project = active_project.title
+        except Exception:
+            logger.exception("Auto-pin of new extraction to project failed")
+
     if not discovered_fields:
         return {
             "extraction_set_uuid": ss.uuid,
             "title": ss.title,
             "fields": [],
             "document_uuids": [d.uuid for d in docs],
+            "pinned_to_project": pinned_to_project,
             "message": (
                 "Created an empty extraction set — the LLM didn't find clear "
                 "fields in the document. You can add fields manually."
             ),
         }
 
+    pin_note = (
+        f' It\'s pinned to project "{pinned_to_project}".' if pinned_to_project else ""
+    )
     return {
         "extraction_set_uuid": ss.uuid,
         "title": ss.title,
@@ -1643,10 +1876,11 @@ async def create_extraction_from_document(
         "field_count": len(discovered_fields),
         "document_uuids": [d.uuid for d in docs],
         "document_titles": [d.title or d.uuid for d in docs],
+        "pinned_to_project": pinned_to_project,
         "message": (
-            f'Created "{ss.title}" with {len(discovered_fields)} proposed field(s). '
-            "You can now run extraction on other documents, or propose this same "
-            "document as the first test case to lock in ground truth."
+            f'Created "{ss.title}" with {len(discovered_fields)} proposed field(s).'
+            f"{pin_note} You can now run extraction on other documents, or propose "
+            "this same document as the first test case to lock in ground truth."
         ),
     }
 
@@ -1697,8 +1931,15 @@ async def run_validation(
             "error": "No test cases found for this extraction set. Use propose_test_case first to add ground truth.",
         }
 
-    if not confirmed:
-        return {
+    gate = await _confirm_gate(
+        context,
+        tool_name="run_validation",
+        key={
+            "extraction_set_uuid": extraction_set_uuid,
+            "num_runs": num_runs,
+            "test_case_uuids": sorted(test_case_uuids) if test_case_uuids else None,
+        },
+        preview={
             "action": "run_validation",
             "preview": (
                 f"Validate \"{ss.title}\" with {effective_count} test case(s), "
@@ -1707,7 +1948,11 @@ async def run_validation(
             "needs_confirmation": True,
             "num_test_cases": effective_count,
             "num_runs": num_runs,
-        }
+        },
+        confirmed=confirmed,
+    )
+    if gate is not None:
+        return gate
 
     try:
         result = await val_svc.run_validation(
@@ -1948,13 +2193,16 @@ async def start_optimization(
     if err:
         return err
 
-    if not confirmed:
-        duration = {
-            "knowledge_base": "10–20 minutes",
-            "search_set": "5–15 minutes",
-            "workflow": "15–30 minutes",
-        }[kind]
-        return {
+    duration = {
+        "knowledge_base": "10–20 minutes",
+        "search_set": "5–15 minutes",
+        "workflow": "15–30 minutes",
+    }[kind]
+    gate = await _confirm_gate(
+        context,
+        tool_name="start_optimization",
+        key={"item_kind": kind, "item_uuid": item_uuid, "token_budget": token_budget},
+        preview={
             "action": "start_optimization",
             "preview": (
                 f"Run autovalidate on \"{title}\" with a budget of "
@@ -1963,7 +2211,11 @@ async def start_optimization(
             ),
             "needs_confirmation": True,
             "token_budget": token_budget,
-        }
+        },
+        confirmed=confirmed,
+    )
+    if gate is not None:
+        return gate
 
     user_id = context.deps.user_id
     try:
@@ -2030,31 +2282,38 @@ async def apply_optimization(
     if run.status != "completed":
         return {"error": f"Cannot apply — run status is '{run.status}', expected 'completed'."}
 
-    if not confirmed:
-        optimized = getattr(run, "optimized_score", None)
-        baseline = getattr(run, "baseline_default_score", None)
-        delta = ""
-        if optimized is not None and baseline is not None:
-            delta = f" (score {baseline:.2f} → {optimized:.2f})"
-        preview = f"Apply the winning autovalidate config to \"{title}\"{delta}."
-        if getattr(run, "tied_with_baseline", False):
-            preview += (
-                " Note: the winner is statistically tied with the current config — "
-                "applying may not improve quality."
-            )
-        rollup = (getattr(run, "apply_preview", None) or {})
-        result: dict = {
-            "action": "apply_optimization",
-            "preview": preview,
-            "needs_confirmation": True,
+    optimized = getattr(run, "optimized_score", None)
+    baseline = getattr(run, "baseline_default_score", None)
+    delta = ""
+    if optimized is not None and baseline is not None:
+        delta = f" (score {baseline:.2f} → {optimized:.2f})"
+    preview_text = f"Apply the winning autovalidate config to \"{title}\"{delta}."
+    if getattr(run, "tied_with_baseline", False):
+        preview_text += (
+            " Note: the winner is statistically tied with the current config — "
+            "applying may not improve quality."
+        )
+    rollup = (getattr(run, "apply_preview", None) or {})
+    preview_result: dict = {
+        "action": "apply_optimization",
+        "preview": preview_text,
+        "needs_confirmation": True,
+    }
+    if rollup:
+        preview_result["expected_changes"] = {
+            k: rollup.get(k)
+            for k in ("total", "will_change", "improvements", "regressions", "significant_regressions", "net_delta")
+            if k in rollup
         }
-        if rollup:
-            result["expected_changes"] = {
-                k: rollup.get(k)
-                for k in ("total", "will_change", "improvements", "regressions", "significant_regressions", "net_delta")
-                if k in rollup
-            }
-        return result
+    gate = await _confirm_gate(
+        context,
+        tool_name="apply_optimization",
+        key={"item_kind": kind, "run_uuid": run_uuid},
+        preview=preview_result,
+        confirmed=confirmed,
+    )
+    if gate is not None:
+        return gate
 
     user_id = context.deps.user_id
     try:
@@ -2099,15 +2358,22 @@ async def regenerate_validation_plan(
     if err:
         return err
 
-    if not confirmed:
-        return {
+    gate = await _confirm_gate(
+        context,
+        tool_name="regenerate_validation_plan",
+        key={"workflow_id": workflow_id},
+        preview={
             "action": "regenerate_validation_plan",
             "preview": (
                 f"Regenerate the validation plan for \"{title}\" from its current "
                 "definition. The old checks are replaced."
             ),
             "needs_confirmation": True,
-        }
+        },
+        confirmed=confirmed,
+    )
+    if gate is not None:
+        return gate
 
     try:
         checks = await workflow_service.generate_validation_plan(workflow_id, user=context.deps.user)
@@ -2123,6 +2389,482 @@ async def regenerate_validation_plan(
 
 
 # ---------------------------------------------------------------------------
+# Phase 7 — Output artifacts (write generated content back to the workspace)
+# ---------------------------------------------------------------------------
+
+# Markdown and plain text are the only formats the agent authors directly — both
+# round-trip cleanly through raw_text, so the saved doc is immediately
+# chat-searchable, KB-ingestable, and usable as extraction/workflow input.
+_SAVE_EXTENSIONS = {"md", "txt"}
+MAX_SAVE_CHARS = 1_000_000
+
+
+async def save_to_folder(
+    context: RunContext[AgenticChatDeps],
+    title: str,
+    content: str,
+    folder_uuid: Optional[str] = None,
+    extension: str = "md",
+    confirmed: bool = False,
+) -> dict:
+    """Save generated text content as a document in the user's folder tree.
+
+    This is how chat output becomes a durable, reusable artifact instead of
+    living only in the transcript. The saved file is a real SmartDocument: it
+    appears in the Files tab, can be downloaded, and — once indexing finishes —
+    is searchable in chat, addable to a knowledge base, and usable as input to
+    extractions and workflows.
+
+    Use when the user says "save this", "save that to my folder", "write this up
+    as a document", "export the results", or after you've synthesized something
+    worth keeping (a summary, a memo, a comparison table, a drafted section).
+    For structured extraction or workflow results, render them as a Markdown
+    table in ``content`` before saving.
+
+    Call first with confirmed=false to preview the destination. Then call again
+    with confirmed=true after the user approves — this writes a file and mutates
+    workspace state.
+
+    Args:
+        context: The call context.
+        title: Human-readable document title (also seeds the filename).
+        content: The full text to save. Markdown is preferred; it renders in the
+            viewer and round-trips as searchable text.
+        folder_uuid: Destination folder UUID. Omit or pass null to save to the
+            user's root folder. Use list_folders to resolve a folder by name.
+        extension: File type — "md" (default) or "txt".
+        confirmed: Must be true to actually save. If false, returns a preview
+            for user confirmation.
+    """
+    import uuid as uuid_mod
+
+    from werkzeug.utils import secure_filename
+
+    user = context.deps.user
+    user_id = context.deps.user_id
+
+    ext = (extension or "md").lower().lstrip(".")
+    if ext not in _SAVE_EXTENSIONS:
+        return {"error": f"Unsupported extension '{ext}'. Use 'md' or 'txt'."}
+
+    clean_title = (title or "").strip()
+    if not clean_title:
+        return {"error": "A title is required."}
+    if not (content or "").strip():
+        return {"error": "Cannot save empty content."}
+    if len(content) > MAX_SAVE_CHARS:
+        return {
+            "error": f"Content is too large to save ({len(content):,} chars; limit {MAX_SAVE_CHARS:,})."
+        }
+
+    # Resolve + authorize the destination. Root ("0"/None) is the user's personal
+    # space and is always writable; team_id is inherited only from a real folder,
+    # so a personal save never lands under a team uuid (team_id dual-identity trap).
+    target_folder = "0"
+    team_id: Optional[str] = None
+    folder_name = "your root folder"
+    if folder_uuid and folder_uuid not in ("0", ""):
+        from app.services import access_control
+
+        folder = await access_control.get_authorized_folder(
+            folder_uuid, user, team_access=context.deps.team_access,
+        )
+        if not folder:
+            return {"error": "Folder not found or you don't have access to it."}
+        target_folder = folder.uuid
+        team_id = folder.team_id
+        folder_name = f'"{folder.title}"'
+
+    display_title = (
+        clean_title if clean_title.lower().endswith(f".{ext}") else f"{clean_title}.{ext}"
+    )
+
+    gate = await _confirm_gate(
+        context,
+        tool_name="save_to_folder",
+        key={"title": display_title, "folder": target_folder, "ext": ext},
+        preview={
+            "action": "save_to_folder",
+            "preview": f'Save "{display_title}" ({len(content):,} chars) to {folder_name}.',
+            "needs_confirmation": True,
+            "destination_folder": target_folder,
+        },
+        confirmed=confirmed,
+    )
+    if gate is not None:
+        return gate
+
+    # Guard against an empty filename from a title of only punctuation/spaces.
+    if not secure_filename(clean_title):
+        return {"error": "Title contains no usable characters for a filename."}
+
+    uid = uuid_mod.uuid4().hex.upper()
+    # On-disk name is uuid-based to avoid collisions; the friendly name lives in title.
+    relative_path = f"{user_id}/{uid}.{ext}"
+
+    from app.services.storage import get_storage
+
+    storage = get_storage()
+    try:
+        await storage.write(relative_path, content.encode("utf-8"))
+    except Exception as e:
+        logger.exception("save_to_folder: failed to write %s", relative_path)
+        return {"error": f"Failed to write the file: {e}"}
+
+    doc = SmartDocument(
+        title=display_title,
+        processing=False,
+        valid=True,
+        raw_text=content,
+        path=relative_path,
+        downloadpath=relative_path,
+        extension=ext,
+        uuid=uid,
+        user_id=user_id,
+        team_id=team_id,
+        folder=target_folder,
+        token_count=len(content) // 4,
+    )
+    await doc.insert()
+
+    # Index for retrieval so the saved doc is immediately chat-searchable and
+    # KB-ingestable. We already have the text, so skip the extraction round-trip.
+    # Best-effort — the document is usable as text even if indexing lags.
+    try:
+        from app.celery_app import celery_app
+
+        celery_app.send_task(
+            "tasks.document.semantic_ingestion",
+            kwargs={"raw_text": content, "document_uuid": uid, "user_id": user_id},
+            queue="documents",
+        )
+    except Exception:
+        logger.exception("save_to_folder: failed to dispatch ingestion for %s", uid)
+
+    return {
+        "document_uuid": uid,
+        "title": display_title,
+        "folder": target_folder,
+        "extension": ext,
+        "char_count": len(content),
+        "message": (
+            f'Saved "{display_title}" to {folder_name}. It\'s in your Files tab now and '
+            "will be searchable in chat once indexing finishes — you can also add it to a "
+            "knowledge base or run an extraction on it."
+        ),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Phase 8 — Project tools (active only when a project is open in chat)
+# ---------------------------------------------------------------------------
+
+
+async def _resolve_active_project(context: RunContext[AgenticChatDeps]):
+    """The authorized active project, or None when no project is open.
+
+    Resolves ``deps.active_project_uuid`` (set when the user chats inside a
+    project) through the same authorization as the project routes.
+    """
+    project_uuid = getattr(context.deps, "active_project_uuid", None)
+    if not project_uuid:
+        return None
+    from app.services import project_service
+
+    return await project_service.get_authorized_project(project_uuid, context.deps.user)
+
+
+async def list_project_documents(context: RunContext[AgenticChatDeps]) -> dict:
+    """List the documents inside the active project's folder subtree.
+
+    Use when the user refers to "this project's files" or "what's in the
+    project", or when you need the project's document set. Only works when a
+    project is open. Returns up to 50 documents with uuid + title.
+
+    Args:
+        context: The call context.
+    """
+    project = await _resolve_active_project(context)
+    if not project:
+        return {"error": "No project is open. Open a project to use this tool."}
+
+    from app.services import project_service
+
+    doc_uuids = await project_service.get_project_document_uuids(project)
+    docs: list[dict] = []
+    for doc_uuid in doc_uuids[:50]:
+        doc = await SmartDocument.find_one(SmartDocument.uuid == doc_uuid)
+        if doc:
+            docs.append({"uuid": doc.uuid, "title": doc.title or doc_uuid})
+
+    return {
+        "project": project.title,
+        "document_count": len(doc_uuids),
+        "documents": docs,
+        "note": (
+            f"Showing {len(docs)} of {len(doc_uuids)} documents."
+            if len(doc_uuids) > len(docs)
+            else None
+        ),
+    }
+
+
+async def run_pin_on_project(
+    context: RunContext[AgenticChatDeps],
+    pin_type: str,
+    target_id: str,
+    confirmed: bool = False,
+) -> dict:
+    """Run a project-pinned workflow or extraction on ALL the project's documents.
+
+    Resolves the project's document set automatically — you do not need to list
+    documents first. ``pin_type`` must be "workflow" or "extraction" and must
+    match a capability pinned to the project (see the Active project section).
+    Automation pins cannot be run from chat.
+
+    Call first with confirmed=false to preview, then confirmed=true after the
+    user approves.
+
+    Args:
+        context: The call context.
+        pin_type: "workflow" or "extraction".
+        target_id: The pinned item's target_id (from the Active project section).
+        confirmed: Must be true to actually run; false returns a preview.
+    """
+    project = await _resolve_active_project(context)
+    if not project:
+        return {"error": "No project is open. Open a project to use this tool."}
+
+    if pin_type not in ("workflow", "extraction"):
+        return {
+            "error": (
+                "Only 'workflow' and 'extraction' pins can be run from chat. "
+                f"'{pin_type}' is not runnable here."
+            )
+        }
+
+    from app.services import project_service
+
+    # Running is a manage action — keep it to owners/editors. Viewers can chat
+    # with the project but not trigger work on it.
+    if not await project_service.can_manage_project(project, context.deps.user):
+        return {"error": "You need edit access to this project to run its tools."}
+
+    # The pin must exist on this project — that's the authorization boundary for
+    # the referenced workflow/extraction (the user reaches it via the project).
+    pins = await project_service.list_pins(project)
+    match = next(
+        (p for p in pins if p["pin_type"] == pin_type and p["target_id"] == target_id),
+        None,
+    )
+    if not match:
+        return {"error": f"That {pin_type} is not pinned to this project."}
+
+    doc_uuids = await project_service.get_project_document_uuids(project)
+    if not doc_uuids:
+        return {"error": "This project has no documents to run on yet."}
+
+    gate = await _confirm_gate(
+        context,
+        tool_name="run_pin_on_project",
+        key={"project": project.uuid, "pin_type": pin_type, "target_id": target_id},
+        preview={
+            "action": "run_pin_on_project",
+            "preview": (
+                f'Run {pin_type} "{match["name"]}" on {len(doc_uuids)} '
+                f'document(s) in project "{project.title}"'
+            ),
+            "needs_confirmation": True,
+            "document_count": len(doc_uuids),
+        },
+        confirmed=confirmed,
+    )
+    if gate is not None:
+        return gate
+
+    if pin_type == "extraction":
+        ss = await SearchSet.find_one(SearchSet.uuid == target_id)
+        if not ss:
+            return {"error": "The pinned extraction no longer exists."}
+        result = await _execute_extraction(context, ss, doc_uuids)
+    else:  # workflow
+        wf = await Workflow.get(target_id)
+        if not wf:
+            return {"error": "The pinned workflow no longer exists."}
+        result = await _execute_workflow(context, wf, doc_uuids)
+        if len(doc_uuids) > 10 and "error" not in result:
+            result["note"] = (
+                "Ran on the first 10 of "
+                f"{len(doc_uuids)} project documents (workflow run limit)."
+            )
+
+    if isinstance(result, dict) and "error" not in result:
+        result["project"] = project.title
+    return result
+
+
+async def pin_to_project(
+    context: RunContext[AgenticChatDeps],
+    pin_type: str,
+    target_id: str,
+    confirmed: bool = False,
+) -> dict:
+    """Pin an existing workflow/extraction/automation/knowledge_base to the project.
+
+    A pin is a reference for quick access — it never moves or copies the
+    artifact. Call first with confirmed=false to preview.
+
+    Args:
+        context: The call context.
+        pin_type: One of "workflow", "extraction", "automation", "knowledge_base".
+        target_id: The artifact's id (workflow/automation ObjectId, or uuid).
+        confirmed: Must be true to actually pin; false returns a preview.
+    """
+    from app.models.project import PIN_TYPES
+    from app.services import project_service
+
+    project = await _resolve_active_project(context)
+    if not project:
+        return {"error": "No project is open. Open a project to use this tool."}
+    if pin_type not in PIN_TYPES:
+        return {"error": f"Invalid pin type. Must be one of: {', '.join(PIN_TYPES)}."}
+    if not await project_service.can_manage_project(project, context.deps.user):
+        return {"error": "You need edit access to this project to pin items."}
+
+    gate = await _confirm_gate(
+        context,
+        tool_name="pin_to_project",
+        key={"project": project.uuid, "pin_type": pin_type, "target_id": target_id},
+        preview={
+            "action": "pin_to_project",
+            "preview": f'Pin {pin_type} {target_id} to project "{project.title}"',
+            "needs_confirmation": True,
+        },
+        confirmed=confirmed,
+    )
+    if gate is not None:
+        return gate
+
+    try:
+        await project_service.add_pin(project, pin_type, target_id, context.deps.user)
+    except ValueError as e:
+        return {"error": str(e)}
+    return {
+        "ok": True,
+        "project": project.title,
+        "pin_type": pin_type,
+        "target_id": target_id,
+        "message": f'Pinned {pin_type} to "{project.title}".',
+    }
+
+
+async def unpin_from_project(
+    context: RunContext[AgenticChatDeps],
+    pin_type: str,
+    target_id: str,
+    confirmed: bool = False,
+) -> dict:
+    """Remove a pinned workflow/extraction/automation/knowledge_base from the project.
+
+    The artifact itself is untouched — only the project reference is removed.
+    Call first with confirmed=false to preview.
+
+    Args:
+        context: The call context.
+        pin_type: One of "workflow", "extraction", "automation", "knowledge_base".
+        target_id: The pinned item's target_id.
+        confirmed: Must be true to actually unpin; false returns a preview.
+    """
+    from app.services import project_service
+
+    project = await _resolve_active_project(context)
+    if not project:
+        return {"error": "No project is open. Open a project to use this tool."}
+    if not await project_service.can_manage_project(project, context.deps.user):
+        return {"error": "You need edit access to this project to unpin items."}
+
+    gate = await _confirm_gate(
+        context,
+        tool_name="unpin_from_project",
+        key={"project": project.uuid, "pin_type": pin_type, "target_id": target_id},
+        preview={
+            "action": "unpin_from_project",
+            "preview": f'Remove {pin_type} {target_id} from project "{project.title}"',
+            "needs_confirmation": True,
+        },
+        confirmed=confirmed,
+    )
+    if gate is not None:
+        return gate
+
+    try:
+        await project_service.remove_pin(project, pin_type, target_id, context.deps.user)
+    except ValueError as e:
+        return {"error": str(e)}
+    return {
+        "ok": True,
+        "project": project.title,
+        "message": f'Removed {pin_type} from "{project.title}".',
+    }
+
+
+async def set_project_status(
+    context: RunContext[AgenticChatDeps],
+    state: str,
+    confirmed: bool = False,
+) -> dict:
+    """Set the active project's lifecycle status.
+
+    Use when the user wants to move the project through its lifecycle (e.g.
+    "mark this submitted", "archive the project"). Call first with
+    confirmed=false to preview.
+
+    Args:
+        context: The call context.
+        state: One of draft, active, submitted, awarded, closeout, archived.
+        confirmed: Must be true to actually change; false returns a preview.
+    """
+    from app.models.project import PROJECT_STATES
+    from app.services import project_service
+
+    project = await _resolve_active_project(context)
+    if not project:
+        return {"error": "No project is open. Open a project to use this tool."}
+    if state not in PROJECT_STATES:
+        return {
+            "error": f"Invalid status. Must be one of: {', '.join(PROJECT_STATES)}."
+        }
+    # update_project is an ungated setter, so the manage check must live here.
+    if not await project_service.can_manage_project(project, context.deps.user):
+        return {"error": "You need edit access to change this project's status."}
+
+    gate = await _confirm_gate(
+        context,
+        tool_name="set_project_status",
+        key={"project": project.uuid, "state": state},
+        preview={
+            "action": "set_project_status",
+            "preview": (
+                f'Set project "{project.title}" status to {state} '
+                f"(currently {project.state})"
+            ),
+            "needs_confirmation": True,
+        },
+        confirmed=confirmed,
+    )
+    if gate is not None:
+        return gate
+
+    await project_service.update_project(project, state=state)
+    return {
+        "ok": True,
+        "project": project.title,
+        "state": state,
+        "message": f'Project "{project.title}" is now {state}.',
+    }
+
+
+# ---------------------------------------------------------------------------
 # Tool registry — imported by llm_service.create_agentic_chat_agent()
 # ---------------------------------------------------------------------------
 
@@ -2130,6 +2872,7 @@ TOOLS = [
     # Phase 1 — Read-only
     search_documents,
     list_documents,
+    list_folders,
     search_knowledge_base,
     list_knowledge_bases,
     list_extraction_sets,
@@ -2160,4 +2903,12 @@ TOOLS = [
     start_optimization,
     apply_optimization,
     regenerate_validation_plan,
+    # Phase 7 — Output artifacts
+    save_to_folder,
+    # Phase 8 — Project tools (active only when a project is open)
+    list_project_documents,
+    run_pin_on_project,
+    pin_to_project,
+    unpin_from_project,
+    set_project_status,
 ]

@@ -905,6 +905,12 @@ async def chat_stream(
             context_document_uuids=effective_doc_uuids,
             active_kb_uuid=kb_uuid,
             active_project_uuid=project_uuid,
+            conversation=conversation,
+            # Monotonic per-turn marker: the current user message is already
+            # persisted (router add_message) before chat_stream runs, so this
+            # strictly increases each turn. Write tools require a preview armed
+            # on an earlier turn (smaller marker) before they execute.
+            turn_marker=len(conversation.messages),
         )
         agent = create_agentic_chat_agent(
             model_name, system_config_doc=sys_config_doc,

@@ -25,7 +25,7 @@ import trafilatura
 from bs4 import BeautifulSoup
 
 from app.config import Settings
-from app.utils.url_validation import validate_outbound_url
+from app.utils.url_validation import safe_get, validate_outbound_url
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +106,25 @@ async def _render_with_browser(url: str, timeout_seconds: int) -> Optional[str]:
             try:
                 context = await browser.new_context(user_agent=_USER_AGENT)
                 page = await context.new_page()
+
+                # SSRF guard: the browser follows redirects on its own, so a
+                # public page could navigate to an internal/metadata host and
+                # hand us back its body. Re-validate every top-level document
+                # navigation and abort blocked ones. Subresources are left
+                # alone — their bodies never reach us, and per-request blocking
+                # DNS lookups would stall rendering.
+                async def _guard(route):
+                    req = route.request
+                    if req.resource_type == "document":
+                        try:
+                            await asyncio.to_thread(validate_outbound_url, req.url)
+                        except ValueError:
+                            await route.abort()
+                            return
+                    await route.continue_()
+
+                await page.route("**/*", _guard)
+
                 # ``networkidle`` waits for the page to go quiet, which is what
                 # SPAs need to fetch their content.  ``domcontentloaded`` is
                 # too early.
@@ -142,12 +161,14 @@ async def fetch_url(
     status_code: Optional[int] = None
     used_browser = False
 
+    # follow_redirects=False + safe_get re-validates every redirect hop so a
+    # public URL cannot bounce us to an internal/metadata address (SSRF).
     async with httpx.AsyncClient(
         timeout=settings.web_fetcher_timeout_seconds,
-        follow_redirects=True,
+        follow_redirects=False,
         headers={"User-Agent": _USER_AGENT},
     ) as client:
-        resp = await client.get(url)
+        resp = await safe_get(client, url)
         status_code = resp.status_code
         resp.raise_for_status()
         raw_html = resp.text[: settings.web_fetcher_max_chars]

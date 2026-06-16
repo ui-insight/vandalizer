@@ -1,10 +1,13 @@
 """Dependency dataclass for agentic chat tools."""
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from app.models.user import User
 from app.services.access_control import TeamAccessContext
+
+if TYPE_CHECKING:
+    from app.models.chat import ChatConversation
 
 
 @dataclass
@@ -25,6 +28,11 @@ class AgenticChatDeps:
     model_name: str
     context_document_uuids: list[str] = field(default_factory=list)
     active_kb_uuid: Optional[str] = None
+    # The project the user is chatting "inside", if any. Project tools
+    # (run_pin_on_project, list_project_documents, pin/unpin, set_status) resolve
+    # the project from here. Existing tools ignore it — they range the whole
+    # workspace regardless, by design.
+    active_project_uuid: Optional[str] = None
 
     # Sidecar for quality metadata — tools write here keyed by tool_call_id,
     # and the streaming layer pops entries when emitting tool_result events.
@@ -37,3 +45,12 @@ class AgenticChatDeps:
     # rationale as quality_annotations: citation plumbing (chunk ids, scores)
     # stays out of the LLM context.
     citation_annotations: dict[str, list[dict]] = field(default_factory=dict)
+
+    # The live conversation for this turn + a monotonic turn marker
+    # (len(messages) captured at turn start). Write tools read/write
+    # ``conversation.pending_confirmations`` and compare against ``turn_marker``
+    # to enforce the preview→confirm handshake across a real user turn, so a
+    # prompt-injected document or KB snippet cannot drive a mutation by passing
+    # confirmed=true within a single turn. See chat_tools._confirm_gate.
+    conversation: Optional["ChatConversation"] = None
+    turn_marker: int = 0

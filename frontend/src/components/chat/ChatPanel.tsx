@@ -9,6 +9,9 @@ import { WorkspaceBriefing } from './WorkspaceBriefing'
 import { OnboardingStepper } from './WelcomeExperience'
 import { ContextMeter } from './ContextMeter'
 import { ContextLimitDialog } from './ContextLimitDialog'
+import { MemoryPanel } from './MemoryPanel'
+import { ProjectChatBadge } from './ProjectChatBadge'
+import { ProjectSuggestedActions } from '../projects/ProjectSuggestedActions'
 import { useChat } from '../../hooks/useChat'
 import { useOnboarding } from '../../hooks/useOnboarding'
 import { useWorkspace, type PendingChatMessage } from '../../contexts/WorkspaceContext'
@@ -150,7 +153,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     setActivity,
   } = useChat()
 
-  const { bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, activeKBUuid, activeKBTitle, activateKB, deactivateKB, activeProjectUuid, setCurrentConversationUuid } = useWorkspace()
+  const { bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, activeKBUuid, activeKBTitle, activateKB, deactivateKB, activeProjectUuid, activeProjectTitle, activeProjectRole, deactivateProject, setCurrentConversationUuid } = useWorkspace()
   const [convertingToKB, setConvertingToKB] = useState(false)
   const { toast } = useToast()
   const shareLink = useShareLink()
@@ -380,6 +383,9 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           const el = scrollContainerRef.current
           if (el) el.scrollTop = el.scrollHeight
         }, 50)
+      }).catch(() => {
+        // loadHistory sets its own error state; swallow here so a failed
+        // history fetch doesn't surface as an unhandled promise rejection.
       })
     }
   }, [conversationToLoad, loadHistory])
@@ -833,8 +839,18 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
             )}
 
             <div style={{ marginTop: 16, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {/* Inside a project, surface project-specific actions (run pinned
+                  tools, summarize, gaps) instead of generic onboarding/demo. */}
+              {activeProjectUuid && (
+                <ProjectSuggestedActions
+                  projectUuid={activeProjectUuid}
+                  role={activeProjectRole}
+                  disabled={!!bannerProcessingDoc}
+                  onSend={(msg) => handleSend(msg)}
+                />
+              )}
               {/* Demo pill — hidden once user reaches practitioner stage or has deeply engaged */}
-              {!(onboardingStatus?.has_run_workflow || onboardingStatus?.is_certified || (onboardingStatus?.has_extraction_sets && onboardingStatus?.has_workflows) || (onboardingStatus?.maturity_stage && ['practitioner', 'builder', 'architect'].includes(onboardingStatus.maturity_stage))) && (
+              {!activeProjectUuid && !(onboardingStatus?.has_run_workflow || onboardingStatus?.is_certified || (onboardingStatus?.has_extraction_sets && onboardingStatus?.has_workflows) || (onboardingStatus?.maturity_stage && ['practitioner', 'builder', 'architect'].includes(onboardingStatus.maturity_stage))) && (
               <button
                 disabled={!!processingDoc}
                 onClick={handleRunDemo}
@@ -868,8 +884,9 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                 Show me what you can do
               </button>
               )}
-              {/* Contextual suggestion pills */}
-              {(activeKBUuid ? [
+              {/* Contextual suggestion pills (suppressed inside a project — the
+                  project actions above take their place) */}
+              {!activeProjectUuid && (activeKBUuid ? [
                 'Summarize the key points across all sources',
                 'What are the most important facts and figures?',
                 'List every topic covered',
@@ -1128,6 +1145,16 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
 
 
 
+      {/* Project active badge — entering a project clears the KB, so normally
+          only one of these shows; render project-first for deterministic order. */}
+      {activeProjectUuid && (
+        <ProjectChatBadge
+          projectUuid={activeProjectUuid}
+          fallbackTitle={activeProjectTitle}
+          onExit={deactivateProject}
+        />
+      )}
+
       {/* KB active badge */}
       {activeKBUuid && (
         <div
@@ -1190,6 +1217,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         onExport={handleExport}
         hasMessages={messages.length > 0}
         hasDocuments={fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0 || selectedFolderUuids.length > 0}
+        memoryControl={<MemoryPanel />}
         contextMeter={
           messages.length > 0 && contextTokens > 0 ? (
             <ContextMeter
