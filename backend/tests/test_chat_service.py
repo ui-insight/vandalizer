@@ -309,3 +309,59 @@ class TestClassifyStreamError:
         assert secret not in msg
         assert "10.0.0.5" not in msg
         assert "went wrong" in msg.lower()
+
+
+# ---------------------------------------------------------------------------
+# _hold_message_for_unreadable_docs — don't hallucinate about unread files
+# ---------------------------------------------------------------------------
+
+
+class TestHoldMessageForUnreadableDocs:
+    """The user attaches a doc that's still OCR-processing (or that failed
+    extraction) and asks a question. chat_stream must NOT run the agent — it
+    would confabulate about a file it never read — and instead return an honest
+    holding reply. This covers the decision + wording; chat_stream wires it to
+    a stream-and-return."""
+
+    def _hold(self, **over):
+        from app.services.chat_service import _hold_message_for_unreadable_docs
+
+        kwargs = dict(
+            document_uuids=["doc-1"],
+            doc_segments=[],
+            kb_sources=[],
+            attachment_segments=[],
+            skipped_no_text=[],
+            errored_docs=[],
+        )
+        kwargs.update(over)
+        return _hold_message_for_unreadable_docs(**kwargs)
+
+    def test_holds_when_doc_still_processing(self):
+        msg = self._hold(skipped_no_text=["19E777.pdf"])
+        assert msg is not None
+        assert "19E777.pdf" in msg
+        assert "still being processed" in msg
+
+    def test_holds_when_doc_extraction_failed(self):
+        msg = self._hold(errored_docs=["19E777.pdf"])
+        assert msg is not None
+        assert "extraction failed" in msg
+        assert "Retry extraction" in msg
+
+    def test_processing_takes_priority_and_pluralizes(self):
+        msg = self._hold(skipped_no_text=["a.pdf", "b.pdf"], errored_docs=["c.pdf"])
+        assert "they are" in msg and "them" in msg  # plural phrasing
+        assert "still being processed" in msg  # not-ready wins over failed
+
+    def test_no_hold_when_a_doc_is_readable(self):
+        # One doc produced text → run the agent normally.
+        assert self._hold(doc_segments=["## Document: x"], skipped_no_text=["y.pdf"]) is None
+
+    def test_no_hold_with_kb_or_attachment_grounding(self):
+        assert self._hold(kb_sources=[{"x": 1}], skipped_no_text=["y.pdf"]) is None
+        assert self._hold(attachment_segments=["web"], skipped_no_text=["y.pdf"]) is None
+
+    def test_no_hold_when_no_docs_attached(self):
+        # Plain chat with no document context — never holds.
+        assert self._hold(document_uuids=[], skipped_no_text=[]) is None

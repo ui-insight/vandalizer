@@ -24,7 +24,7 @@ import { convertDocumentsToKB } from '../../api/knowledge'
 import { getUserConfig, updateUserConfig, markFirstSessionComplete } from '../../api/config'
 import type { FileAttachment, UrlAttachment } from '../../types/chat'
 import type { ModelInfo } from '../../types/workflow'
-import { stageCopy } from '../../utils/processingStatus'
+import { stageCopy, isDocReady } from '../../utils/processingStatus'
 
 const LOADING_WORDS = [
   'Thinking', 'Vandalizing', 'Pondering', 'Analyzing',
@@ -178,6 +178,11 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const contextNudgeShownRef = useRef(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const stickToBottomRef = useRef(true)
+  // Docs dropped this session — shown as "processing…" until the docs poll
+  // confirms readiness, so a freshly dropped file's chip reflects state at once.
+  const [justDroppedUuids, setJustDroppedUuids] = useState<Set<string>>(new Set())
+  // A message sent while attached docs are still processing; auto-fires once ready.
+  const [heldMessage, setHeldMessage] = useState<{ message: string; includeOnboardingContext?: boolean } | null>(null)
   const lastLoadedConvo = useRef<string | null>(null)
   const prevStreamingRef = useRef(false)
   const [showScrollDown, setShowScrollDown] = useState(false)
@@ -411,7 +416,41 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     : null)
   const processingCount = processingDoc ? 1 : selectedDocsProcessing.length
 
+  // Per-document readiness: a selected doc is "processing" if FileBrowser
+  // reports it not-ready, or it was just dropped and hasn't been reported yet.
+  // Drives the live chip state and the send gate (Phase 4).
+  const processingByUuid: Record<string, boolean> = {}
+  for (const d of selectedDocsProcessing) {
+    processingByUuid[d.uuid] = !isDocReady({ task_status: d.status })
+  }
+  for (const uuid of justDroppedUuids) {
+    if (!(uuid in processingByUuid)) processingByUuid[uuid] = true
+  }
+  const anySelectedProcessing = selectedDocUuids.some(u => processingByUuid[u])
+
+  // Once a just-dropped doc is reported ready, stop forcing its chip to spin.
+  useEffect(() => {
+    if (justDroppedUuids.size === 0) return
+    const ready = new Set(
+      selectedDocsProcessing.filter(d => isDocReady({ task_status: d.status })).map(d => d.uuid),
+    )
+    if ([...justDroppedUuids].some(u => ready.has(u))) {
+      setJustDroppedUuids(prev => {
+        const next = new Set(prev)
+        for (const u of prev) if (ready.has(u)) next.delete(u)
+        return next
+      })
+    }
+  }, [selectedDocsProcessing, justDroppedUuids])
+
   const handleSend = (message: string, includeOnboardingContext?: boolean) => {
+    // Auto-hold: if the user attached document(s) that aren't readable yet,
+    // don't fire a question at a file the model can't see. Queue it and let the
+    // readiness effect below auto-send once text extraction finishes.
+    if (anySelectedProcessing) {
+      setHeldMessage({ message, includeOnboardingContext })
+      return
+    }
     // Use the locked ref so remounts / refetches can't flip this mid-conversation.
     const firstSession = effectiveFirstSession && !hasDocContext && !activeKBUuid && !activeProjectUuid
     // Detect "show me" to track demo trigger (backend does the real routing)
@@ -427,6 +466,21 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       markFirstSessionComplete().catch(() => {})
     }
   }
+
+  // Keep the latest handleSend in a ref so the auto-fire effect can call it
+  // without re-subscribing on every render (handleSend isn't memoized).
+  const handleSendRef = useRef(handleSend)
+  handleSendRef.current = handleSend
+
+  // Auto-fire a held message once all attached docs are readable. A doc that
+  // errored out counts as "ready" (isDocReady), so the turn fires and the
+  // backend explains the failure rather than the message hanging forever.
+  useEffect(() => {
+    if (!heldMessage || anySelectedProcessing || isStreaming) return
+    const { message, includeOnboardingContext } = heldMessage
+    setHeldMessage(null)
+    handleSendRef.current(message, includeOnboardingContext)
+  }, [heldMessage, anySelectedProcessing, isStreaming])
 
   const handleRunDemo = () => {
     demoTriggered.current = true
@@ -446,12 +500,31 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const queryClient = useQueryClient()
 
   const handleAttachFile = async (files: File[]) => {
+    // Dedup by filename against what's already attached so a second drop of the
+    // same file doesn't silently create a duplicate document (and OCR job).
+    const attachedNames = new Set(Object.values(selectedDocNames))
+    const seenThisBatch = new Set<string>()
+    const toUpload: File[] = []
+    const dupes: string[] = []
+    for (const file of files) {
+      if (attachedNames.has(file.name) || seenThisBatch.has(file.name)) {
+        dupes.push(file.name)
+      } else {
+        seenThisBatch.add(file.name)
+        toUpload.push(file)
+      }
+    }
+    if (dupes.length > 0) {
+      toast(`${dupes[0]}${dupes.length > 1 ? ` and ${dupes.length - 1} more` : ''} already attached`, 'info')
+    }
+    if (toUpload.length === 0) return
+
     setAttachLoading(true)
     try {
       // Upload to the file browser (single source of truth) and auto-select
       const newNames: Record<string, string> = {}
       const newUuids: string[] = []
-      for (const file of files) {
+      for (const file of toUpload) {
         const ext = file.name.split('.').pop() || ''
         const base64 = await fileToBase64(file)
         const result = await uploadFile({ contentAsBase64String: base64, fileName: file.name, extension: ext })
@@ -463,7 +536,16 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       if (newUuids.length > 0) {
         setSelectedDocUuids([...selectedDocUuids, ...newUuids])
         setSelectedDocNames({ ...selectedDocNames, ...newNames })
+        // Mark as just-dropped so the chip shows "processing…" immediately,
+        // before the documents poll has a chance to report status.
+        setJustDroppedUuids(prev => {
+          const next = new Set(prev)
+          newUuids.forEach(u => next.add(u))
+          return next
+        })
         queryClient.invalidateQueries({ queryKey: ['documents'] })
+        const label = newUuids.length === 1 ? newNames[newUuids[0]] : `${newUuids.length} files`
+        toast(`Added ${label} — processing…`, 'success')
       }
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Failed to upload file', 'error')
@@ -682,6 +764,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         urlAttachments={urlAttachments}
         selectedDocUuids={selectedDocUuids}
         selectedDocNames={selectedDocNames}
+        processingByUuid={processingByUuid}
         onRemoveFile={handleRemoveFile}
         onRemoveUrl={handleRemoveUrl}
         onDeselectDoc={(uuid) => {
@@ -1018,6 +1101,35 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           </div>
         )}
 
+        {/* Held message: queued while attached docs finish processing. Renders
+            as the user's bubble with a waiting note; auto-sends when ready. */}
+        {heldMessage && !isStreaming && (() => {
+          const names = selectedDocUuids
+            .filter(u => processingByUuid[u])
+            .map(u => selectedDocNames[u] || 'document')
+          const joined = names.slice(0, 2).join(', ') + (names.length > 2 ? `, +${names.length - 2}` : '')
+          return (
+            <div style={{
+              padding: 15, marginBottom: 10, color: 'white', backgroundColor: '#191919',
+              borderLeft: '7px solid var(--highlight-color, #f1b300)', borderRadius: 'var(--ui-radius, 12px)',
+              opacity: 0.85,
+            }}>
+              <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">{heldMessage.message}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, fontSize: 12, color: '#d1d5db' }}>
+                <Loader2 size={13} className="animate-spin" style={{ color: 'var(--highlight-color, #f1b300)' }} />
+                <span style={{ flex: 1 }}>Waiting for {joined || 'your file'} to finish processing…</span>
+                <button
+                  onClick={() => setHeldMessage(null)}
+                  className="rounded px-2 py-0.5 text-xs text-gray-300 hover:text-white"
+                  style={{ border: '1px solid #4b5563', background: 'transparent' }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )
+        })()}
+
         {error && (
           <div className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 border border-red-200">
             <div className="flex items-start gap-2">
@@ -1092,16 +1204,51 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           </div>
         )}
 
-        {contextNotices.length > 0 && (
-          <div className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 border border-amber-200">
-            <div className="font-medium mb-1">Context was compacted to fit the model:</div>
-            <ul className="list-disc pl-4 space-y-0.5">
-              {contextNotices.map((n, i) => (
-                <li key={i}>{n.detail}</li>
-              ))}
-            </ul>
-          </div>
-        )}
+        {/* Notices are keyed by `action` so a "document still processing"
+            warning never wears the "Context was compacted" label. */}
+        {(() => {
+          const notReady = contextNotices.filter(n => n.action === 'documents_not_ready')
+          const failed = contextNotices.filter(n => n.action === 'documents_extraction_failed')
+          const compacted = contextNotices.filter(
+            n => n.action !== 'documents_not_ready' && n.action !== 'documents_extraction_failed',
+          )
+          return (
+            <>
+              {notReady.length > 0 && (
+                <div className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 border border-amber-200">
+                  <div className="font-medium mb-1">Still processing</div>
+                  <ul className="list-disc pl-4 space-y-0.5">
+                    {notReady.map((n, i) => <li key={i}>{n.detail}</li>)}
+                  </ul>
+                  <div className="mt-2">
+                    <button
+                      onClick={retry}
+                      className="inline-flex items-center gap-1.5 rounded-md bg-amber-500 px-2.5 py-1 text-xs font-medium text-white hover:bg-amber-600"
+                    >
+                      Resend now
+                    </button>
+                  </div>
+                </div>
+              )}
+              {failed.length > 0 && (
+                <div className="mt-2 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700 border border-red-200">
+                  <div className="font-medium mb-1">Couldn't read these files</div>
+                  <ul className="list-disc pl-4 space-y-0.5">
+                    {failed.map((n, i) => <li key={i}>{n.detail}</li>)}
+                  </ul>
+                </div>
+              )}
+              {compacted.length > 0 && (
+                <div className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 border border-amber-200">
+                  <div className="font-medium mb-1">Context was compacted to fit the model:</div>
+                  <ul className="list-disc pl-4 space-y-0.5">
+                    {compacted.map((n, i) => <li key={i}>{n.detail}</li>)}
+                  </ul>
+                </div>
+              )}
+            </>
+          )
+        })()}
         </div>{/* end centering wrapper */}
 
       </div>

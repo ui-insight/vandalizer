@@ -492,6 +492,48 @@ async def _run_scripted_demo(
                 await ev.save()
 
 
+def _hold_message_for_unreadable_docs(
+    *,
+    document_uuids: list[str],
+    doc_segments: list,
+    kb_sources: list,
+    attachment_segments: list,
+    skipped_no_text: list[str],
+    errored_docs: list[str],
+) -> Optional[str]:
+    """Honest holding reply when attached docs aren't readable yet.
+
+    Returns a message to stream (and persist) instead of running the agent when
+    the user explicitly attached documents but none yielded readable text —
+    either extraction is still in flight (``skipped_no_text``) or it failed
+    (``errored_docs``) — and there's no other grounding (KB snippets, pasted
+    attachments). Returns ``None`` when the agent should run normally.
+    """
+    if not (
+        document_uuids
+        and not doc_segments
+        and not kb_sources
+        and not attachment_segments
+        and (skipped_no_text or errored_docs)
+    ):
+        return None
+    if skipped_no_text:
+        names = ", ".join(skipped_no_text[:3]) + ("…" if len(skipped_no_text) > 3 else "")
+        many = len(skipped_no_text) != 1
+        return (
+            f"I can't read {names} yet — {'they are' if many else 'it is'} still being "
+            f"processed (text extraction/OCR). I'll analyze {'them' if many else 'it'} as "
+            "soon as that finishes — ask again in a moment."
+        )
+    names = ", ".join(errored_docs[:3]) + ("…" if len(errored_docs) > 3 else "")
+    many = len(errored_docs) != 1
+    return (
+        f"I couldn't read {names} — text extraction failed, so there's nothing for me "
+        f"to work from. Open {'each document' if many else 'the document'} and use "
+        '"Retry extraction", then ask again.'
+    )
+
+
 async def chat_stream(
     message: str,
     document_uuids: list[str],
@@ -696,6 +738,27 @@ async def chat_stream(
                 logger.warning("KB query returned no results for kb_uuid=%s", kb_uuid)
         except Exception as e:
             logger.error("KB context retrieval failed for kb_uuid=%s: %s", kb_uuid, e)
+
+    # Hold instead of hallucinate. The user attached document(s) but none are
+    # readable — text extraction hasn't finished or it failed — and there's no
+    # other grounding (KB snippets, pasted attachments). Running the agent here
+    # is exactly how we got a confident answer about a file the model never
+    # read. Return an honest holding turn instead. The frontend also auto-holds
+    # the send, but the backend is the source of truth on `raw_text` and must
+    # never fabricate when context is empty. The documents_not_ready /
+    # documents_extraction_failed notices were already emitted above.
+    hold_text = _hold_message_for_unreadable_docs(
+        document_uuids=document_uuids,
+        doc_segments=doc_segments,
+        kb_sources=kb_sources,
+        attachment_segments=attachment_segments,
+        skipped_no_text=skipped_no_text,
+        errored_docs=errored_docs,
+    )
+    if hold_text is not None:
+        yield json.dumps({"kind": "text", "content": hold_text}) + "\n"
+        await _finalize(conversation, hold_text, [], None, activity_id, user_id)
+        return
 
     # Build workspace inventory for all non-demo, non-help paths.
     # run_demo returns early (scripted demo path); help path uses its own context.
