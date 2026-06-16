@@ -20,11 +20,13 @@ import { useBranding } from '../../contexts/BrandingContext'
 import { useShareLink } from '../../lib/shareLink'
 import { addLink, removeDocument, removeLink, truncateContext, compactContext, clearContext } from '../../api/chat'
 import { uploadFile } from '../../api/files'
+import { pollStatus } from '../../api/documents'
 import { convertDocumentsToKB } from '../../api/knowledge'
 import { getUserConfig, updateUserConfig, markFirstSessionComplete } from '../../api/config'
 import type { FileAttachment, UrlAttachment } from '../../types/chat'
 import type { ModelInfo } from '../../types/workflow'
 import { stageCopy, isDocReady } from '../../utils/processingStatus'
+import { partitionNewFiles } from './attachmentDedup'
 
 const LOADING_WORDS = [
   'Thinking', 'Vandalizing', 'Pondering', 'Analyzing',
@@ -428,20 +430,36 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   }
   const anySelectedProcessing = selectedDocUuids.some(u => processingByUuid[u])
 
-  // Once a just-dropped doc is reported ready, stop forcing its chip to spin.
+  // Poll just-dropped docs to authoritative readiness. FileBrowser only reports
+  // status for docs selected *in the browser*, so a chat-dropped doc may never
+  // appear in selectedDocsProcessing — poll_status is the source of truth here.
+  // Clears each uuid once text extraction completes (or fails), which both
+  // stops its chip spinning and releases any held message.
   useEffect(() => {
     if (justDroppedUuids.size === 0) return
-    const ready = new Set(
-      selectedDocsProcessing.filter(d => isDocReady({ task_status: d.status })).map(d => d.uuid),
-    )
-    if ([...justDroppedUuids].some(u => ready.has(u))) {
-      setJustDroppedUuids(prev => {
-        const next = new Set(prev)
-        for (const u of prev) if (ready.has(u)) next.delete(u)
-        return next
-      })
+    let cancelled = false
+    const tick = async () => {
+      const uuids = [...justDroppedUuids]
+      const results = await Promise.all(
+        uuids.map(u => pollStatus(u).then(r => ({ u, r })).catch(() => null)),
+      )
+      if (cancelled) return
+      const done = results
+        .filter((x): x is { u: string; r: Awaited<ReturnType<typeof pollStatus>> } => x !== null)
+        .filter(({ r }) => r.complete || !!r.raw_text || !!r.error_message)
+        .map(({ u }) => u)
+      if (done.length) {
+        setJustDroppedUuids(prev => {
+          const next = new Set(prev)
+          done.forEach(u => next.delete(u))
+          return next
+        })
+      }
     }
-  }, [selectedDocsProcessing, justDroppedUuids])
+    tick()
+    const id = setInterval(tick, 2500)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [justDroppedUuids])
 
   const handleSend = (message: string, includeOnboardingContext?: boolean) => {
     // Auto-hold: if the user attached document(s) that aren't readable yet,
@@ -502,18 +520,17 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const handleAttachFile = async (files: File[]) => {
     // Dedup by filename against what's already attached so a second drop of the
     // same file doesn't silently create a duplicate document (and OCR job).
-    const attachedNames = new Set(Object.values(selectedDocNames))
-    const seenThisBatch = new Set<string>()
-    const toUpload: File[] = []
-    const dupes: string[] = []
-    for (const file of files) {
-      if (attachedNames.has(file.name) || seenThisBatch.has(file.name)) {
-        dupes.push(file.name)
-      } else {
-        seenThisBatch.add(file.name)
-        toUpload.push(file)
-      }
-    }
+    const { toUpload: uploadNames, dupes } = partitionNewFiles(
+      files.map(f => f.name),
+      Object.values(selectedDocNames),
+    )
+    const uploadSet = new Set(uploadNames)
+    const seen = new Set<string>()
+    const toUpload = files.filter(f => {
+      if (!uploadSet.has(f.name) || seen.has(f.name)) return false
+      seen.add(f.name)
+      return true
+    })
     if (dupes.length > 0) {
       toast(`${dupes[0]}${dupes.length > 1 ? ` and ${dupes.length - 1} more` : ''} already attached`, 'info')
     }
