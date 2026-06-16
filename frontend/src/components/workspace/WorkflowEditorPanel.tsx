@@ -167,12 +167,14 @@ const TEST_MESSAGES = [
 
 // Task types where Test Step is meaningful and safe. Excludes:
 //   - Approval: backend test handler doesn't support it
-//   - APINode, BrowserAutomation, CodeNode: real side effects make "test" misleading
+//   - BrowserAutomation, CodeNode: real side effects make "test" misleading
 // KnowledgeBaseQuery is read-only (a vector lookup), so it is safe to test.
+// APINode is included because issuing the configured request is exactly what
+// users need to test/debug — the tooltip already warns of real network calls.
 const TEST_STEP_SUPPORTED_TYPES = new Set([
   'Extraction', 'Prompt', 'Formatter', 'Format', 'AddWebsite', 'AddDocument',
   'DescribeImage', 'CrawlerNode', 'ResearchNode', 'DocumentRenderer',
-  'FormFiller', 'DataExport', 'PackageBuilder', 'KnowledgeBaseQuery',
+  'FormFiller', 'DataExport', 'PackageBuilder', 'KnowledgeBaseQuery', 'APINode',
 ])
 
 const TEST_STEP_TOOLTIP = [
