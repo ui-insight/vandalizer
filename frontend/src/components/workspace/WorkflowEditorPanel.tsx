@@ -21,7 +21,7 @@ import {
   getWorkflowQualityHistory, getWorkflowImprovementSuggestions, getWorkflowQualityStatus,
   getValidationPlan, updateValidationPlan, generateValidationPlan,
   getValidationInputs, updateValidationInputs,
-  exportWorkflowUrl, importIntoWorkflow, getWorkflowHistory, duplicateWorkflow,
+  exportWorkflowUrl, importIntoWorkflow, getWorkflowHistory, getWorkflowStatus, duplicateWorkflow,
   improvePrompt,
 } from '../../api/workflows'
 import { RunHistoryTab } from './RunHistoryTab'
@@ -224,6 +224,10 @@ export function WorkflowEditorPanel() {
   const [qualityStatus, setQualityStatus] = useState<WorkflowQualityStatus | null>(null)
   const { scores: sparklineScores, refresh: refreshSparkline } = useQualitySparkline('workflow', openWorkflowId ?? undefined)
   const [nudgeDismissed, setNudgeDismissed] = useState(false)
+  // Per-step output from the most recent run, fetched lazily so a step's last
+  // output is viewable even on a fresh editor open (no run started this session).
+  const [lastRunStepsOutput, setLastRunStepsOutput] = useState<Record<string, unknown> | null>(null)
+  const [lastRunMeta, setLastRunMeta] = useState<{ finishedAt: string | null; status: string } | null>(null)
   const runTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const titleInputRef = useRef<HTMLInputElement>(null)
   const descInputRef = useRef<HTMLTextAreaElement>(null)
@@ -247,6 +251,15 @@ export function WorkflowEditorPanel() {
   const editingStep = editingStepId
     ? workflow?.steps.find(s => s.id === editingStepId) ?? null
     : null
+
+  // Per-step output to show in the step editor: prefer a run started this session
+  // (freshest); otherwise fall back to the lazily-fetched most-recent run.
+  const liveStepsOutput = (runner.status?.steps_output ?? null) as Record<string, unknown> | null
+  const hasLiveStepsOutput = !!liveStepsOutput && Object.keys(liveStepsOutput).length > 0
+  const effectiveStepsOutput = hasLiveStepsOutput ? liveStepsOutput : lastRunStepsOutput
+  const effectiveRunMeta = hasLiveStepsOutput
+    ? { finishedAt: null, status: runner.status?.status ?? 'running' }
+    : lastRunMeta
 
   // --- data fetching ---
 
@@ -281,6 +294,35 @@ export function WorkflowEditorPanel() {
     getWorkflowQualityStatus(openWorkflowId).then(setQualityStatus).catch(() => {})
     const key = `quality-nudge-dismissed-wf-${openWorkflowId}`
     setNudgeDismissed(!!localStorage.getItem(key))
+  }, [openWorkflowId])
+
+  // Fetch the most recent run's per-step output so the step editor can show what
+  // each step last produced without re-running. The live runner status (a run
+  // started this session) is preferred over this when present.
+  useEffect(() => {
+    if (!openWorkflowId) {
+      setLastRunStepsOutput(null)
+      setLastRunMeta(null)
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { runs } = await getWorkflowHistory(openWorkflowId, 1)
+        const latest = runs.find(r => r.session_id)
+        if (!latest?.session_id) {
+          if (!cancelled) { setLastRunStepsOutput(null); setLastRunMeta(null) }
+          return
+        }
+        const status = await getWorkflowStatus(latest.session_id)
+        if (cancelled) return
+        setLastRunStepsOutput((status.steps_output ?? null) as Record<string, unknown> | null)
+        setLastRunMeta({ finishedAt: latest.finished_at, status: latest.status })
+      } catch {
+        if (!cancelled) { setLastRunStepsOutput(null); setLastRunMeta(null) }
+      }
+    })()
+    return () => { cancelled = true }
   }, [openWorkflowId])
 
   // --- run elapsed timer ---
@@ -1025,6 +1067,8 @@ export function WorkflowEditorPanel() {
           onSelectTaskType={handleAddTask}
           onCloseTaskPicker={() => setShowTaskPicker(false)}
           canManage={canManage}
+          stepsOutput={effectiveStepsOutput}
+          lastRunMeta={effectiveRunMeta}
         />
       )}
 
@@ -1450,6 +1494,113 @@ function StepCard({ step, index, totalSteps, isImplicitOutput, isActive, onClick
 }
 
 // ---------------------------------------------------------------------------
+// Read-only "last run output" for a single step
+// ---------------------------------------------------------------------------
+
+// Mirror of backend sanitize_step_name (workflow_engine.py) — steps_output keys
+// are sanitized step names.
+function sanitizeStepName(name: string): string {
+  const s = name
+    .replace(/[.$]/g, '_')
+    .trim()
+    .replace(/^_+|_+$/g, '')
+    .replace(/\s+/g, '_')
+    .replace(/_+/g, '_')
+  return s || 'step'
+}
+
+function StepLastRunOutput({ step, stepsOutput, lastRunMeta }: {
+  step: WorkflowStep
+  stepsOutput?: Record<string, unknown> | null
+  lastRunMeta?: { finishedAt: string | null; status: string } | null
+}) {
+  const [expanded, setExpanded] = useState(true)
+
+  // Find this step's entry: match on the original step_name stored in the
+  // payload, falling back to the sanitized key used in steps_output.
+  let entry: Record<string, unknown> | null = null
+  if (stepsOutput) {
+    for (const val of Object.values(stepsOutput)) {
+      if (val && typeof val === 'object' && (val as Record<string, unknown>).step_name === step.name) {
+        entry = val as Record<string, unknown>
+        break
+      }
+    }
+    if (!entry) {
+      const byKey = stepsOutput[sanitizeStepName(step.name)]
+      if (byKey && typeof byKey === 'object') entry = byKey as Record<string, unknown>
+    }
+  }
+
+  // The combined/aggregated value across this step's parallel tasks
+  // (mirror backend _step_output_value: formatted_output || output).
+  const value = entry ? (entry.formatted_output ?? entry.output) : undefined
+  const warning = entry && typeof entry.warning === 'string' ? (entry.warning as string) : null
+  const hasValue = value !== undefined && value !== null && value !== ''
+  const taskCount = step.tasks.length
+
+  return (
+    <div style={{ marginTop: 24 }}>
+      <div
+        onClick={() => setExpanded(e => !e)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
+          fontSize: 12, fontWeight: 600, color: '#6b7280',
+          textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12,
+        }}
+      >
+        {expanded ? <ChevronDown style={{ width: 14, height: 14 }} /> : <ChevronRight style={{ width: 14, height: 14 }} />}
+        Last run output
+      </div>
+
+      {expanded && (
+        <div style={{
+          border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, backgroundColor: '#fafafa',
+        }}>
+          {/* Caption */}
+          <div style={{ fontSize: 12, color: '#6b7280', marginBottom: hasValue || warning ? 12 : 0 }}>
+            Combined output{taskCount > 0 ? ` · ${taskCount} task${taskCount !== 1 ? 's' : ''}` : ''}
+            {lastRunMeta?.finishedAt && <> · from last run {relativeTime(lastRunMeta.finishedAt)}</>}
+          </div>
+
+          {warning && (
+            <div style={{
+              fontSize: 12, color: '#92400e', backgroundColor: '#fffbeb',
+              border: '1px solid #fde68a', borderRadius: 6, padding: '8px 10px', marginBottom: 12,
+            }}>
+              {warning}
+            </div>
+          )}
+
+          {hasValue ? (
+            typeof value === 'string' ? (
+              <div
+                style={{ fontSize: 13, color: '#202124', lineHeight: 1.6, wordBreak: 'break-word' }}
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(value) as string) }}
+              />
+            ) : (
+              <pre style={{
+                margin: 0, fontSize: 12, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                color: '#202124', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                maxHeight: 320, overflowY: 'auto',
+              }}>
+                {JSON.stringify(value, null, 2)}
+              </pre>
+            )
+          ) : (
+            <div style={{ fontSize: 13, color: '#9ca3af' }}>
+              {stepsOutput
+                ? 'This step produced no output on the last run.'
+                : "This step hasn't produced output yet. Run the workflow to see its last output here."}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Edit step overlay (with inline step name editing)
 // ---------------------------------------------------------------------------
 
@@ -1458,7 +1609,7 @@ function EditStepOverlay({
   onStepNameSave, onToggleOutput,
   showTaskPicker, taskPickerCategory, setTaskPickerCategory,
   onSelectTaskType, onCloseTaskPicker,
-  canManage,
+  canManage, stepsOutput, lastRunMeta,
 }: {
   step: WorkflowStep
   onClose: () => void
@@ -1474,6 +1625,8 @@ function EditStepOverlay({
   onSelectTaskType: (type: TaskTypeDef) => void
   onCloseTaskPicker: () => void
   canManage: boolean
+  stepsOutput?: Record<string, unknown> | null
+  lastRunMeta?: { finishedAt: string | null; status: string } | null
 }) {
   const [editingName, setEditingName] = useState(false)
   const [nameValue, setNameValue] = useState(step.name)
@@ -1647,6 +1800,9 @@ function EditStepOverlay({
             </div>
           )}
         </div>
+
+        {/* Read-only output this step produced on the most recent run */}
+        <StepLastRunOutput step={step} stepsOutput={stepsOutput} lastRunMeta={lastRunMeta} />
       </div>
 
       {/* Bottom toolbar */}
