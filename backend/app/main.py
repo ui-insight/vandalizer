@@ -15,7 +15,7 @@ from app.database import init_db
 from app.exceptions import AppError
 from app.middleware.csrf import CSRFMiddleware
 from app.rate_limit import limiter
-from app.routers import activity, admin, audit, auth, automations, browser_automation, certification, chat, config, credentials, demo, documents, extractions, feedback, feedback_prompt, files, folders, graph_webhooks, knowledge, library, mgmt, notifications, office, organizations, reviews, spaces, support, teams, verification, workflows
+from app.routers import activity, admin, apps, audit, auth, automations, browser_automation, certification, chat, config, credentials, demo, documents, extractions, feedback, feedback_prompt, files, folders, graph_webhooks, knowledge, library, mgmt, notifications, office, organizations, reviews, spaces, support, teams, verification, workflows
 
 
 @lru_cache
@@ -242,6 +242,7 @@ app.include_router(mgmt.router, prefix="/api/mgmt/v1", tags=["mgmt"])
 if _boot_settings.enable_trial_system:
     app.include_router(feedback_prompt.router, prefix="/api/feedback/prompts", tags=["feedback-prompts"])
 
+app.include_router(apps.router, prefix="/api/apps", tags=["apps"])
 
 # ---------------------------------------------------------------------------
 # Prometheus metrics
