@@ -184,3 +184,128 @@ class TestBuildInterruptedBody:
 
         body = _build_interrupted_body(["   \n  "], "context over budget")
         assert body.startswith("_(no response")
+
+
+# ---------------------------------------------------------------------------
+# _build_project_context — the block that makes the agent project-aware
+# ---------------------------------------------------------------------------
+
+
+class TestBuildProjectContext:
+    @pytest.mark.asyncio
+    async def test_empty_when_project_unauthorized(self):
+        from unittest.mock import AsyncMock, patch
+
+        from app.services import chat_service, project_service
+
+        # The helper imports project_service lazily; patch on the module singleton.
+        with patch.object(project_service, "get_authorized_project",
+                          AsyncMock(return_value=None)):
+            out = await chat_service._build_project_context("missing", MagicMock())
+        assert out == ""
+
+    @pytest.mark.asyncio
+    async def test_includes_title_state_role_and_pin_target_ids(self):
+        from types import SimpleNamespace
+        from unittest.mock import AsyncMock, patch
+
+        from app.services import chat_service, project_service
+
+        project = SimpleNamespace(
+            uuid="p1", title="NIH R01", state="active", description="Grant",
+        )
+        overview = {
+            "role": "owner",
+            "capabilities": {
+                "files": {"count": 4, "folders": 1},
+                "knowledge": {"ready": True, "documents": 3},
+            },
+        }
+        pins = [
+            {"pin_type": "workflow", "target_id": "wf-1", "name": "Compliance check"},
+            {"pin_type": "extraction", "target_id": "ss-1", "name": "Budget fields"},
+        ]
+        with (
+            patch.object(project_service, "get_authorized_project",
+                        AsyncMock(return_value=project)),
+            patch.object(project_service, "get_project_overview",
+                        AsyncMock(return_value=overview)),
+            patch.object(project_service, "list_pins",
+                        AsyncMock(return_value=pins)),
+        ):
+            out = await chat_service._build_project_context("p1", MagicMock())
+
+        assert "NIH R01" in out
+        assert "state: active" in out
+        assert "their role: owner" in out
+        assert "wf-1" in out and "ss-1" in out  # target_ids the agent runs with
+        assert "WHOLE workspace" in out  # the do-not-narrow instruction
+
+
+# ---------------------------------------------------------------------------
+# _brand_org_text — white-label identity branding
+# ---------------------------------------------------------------------------
+
+
+class TestBrandOrgText:
+    def _brand(self, text, org):
+        from app.services.chat_service import _brand_org_text
+        return _brand_org_text(text, org)
+
+    def test_default_deploy_is_unchanged(self):
+        text = "You are Vandalizer, built for research administration at the University of Idaho."
+        # Empty org and the literal default both mean "use built-in defaults".
+        assert self._brand(text, "") == text
+        assert self._brand(text, "Vandalizer") == text
+
+    def test_custom_org_swaps_product_name(self):
+        out = self._brand("You are the Vandalizer assistant.", "Acme Research")
+        assert "Vandalizer" not in out
+        assert "Acme Research" in out
+
+    def test_custom_org_drops_home_institution(self):
+        # White-label deploys are not the University of Idaho — the geography
+        # must not leak once a custom org name is configured.
+        text = (
+            "You are Vandalizer, a document intelligence assistant built for "
+            "research administration at the University of Idaho."
+        )
+        out = self._brand(text, "Boise State University")
+        assert "University of Idaho" not in out
+        assert "built for research administration." in out
+
+    def test_custom_org_drops_institution_first_session_phrasing(self):
+        text = "You are the assistant, built at the University of Idaho for research administration."
+        out = self._brand(text, "Acme")
+        assert "University of Idaho" not in out
+        assert "built for research administration" in out
+
+
+# ---------------------------------------------------------------------------
+# _classify_stream_error — never leak raw exceptions to the user
+# ---------------------------------------------------------------------------
+
+
+class TestClassifyStreamError:
+    def _classify(self, exc):
+        from app.services.chat_service import _classify_stream_error
+        return _classify_stream_error(exc)
+
+    def test_context_length_is_a_warning(self):
+        severity, msg = self._classify(Exception("This exceeds model's maximum context length"))
+        assert severity == "warning"
+        assert "too large" in msg
+
+    def test_transient_gateway_is_a_warning(self):
+        severity, msg = self._classify(Exception("502 bad gateway"))
+        assert severity == "warning"
+        assert "try again" in msg.lower()
+
+    def test_unexpected_error_does_not_leak_raw_exception(self):
+        secret = "Traceback: psycopg2.OperationalError at 10.0.0.5:5432"
+        severity, msg = self._classify(Exception(secret))
+        assert severity == "error"
+        # The raw exception text must not reach the user-facing message.
+        assert secret not in msg
+        assert "10.0.0.5" not in msg
+        assert "went wrong" in msg.lower()

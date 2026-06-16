@@ -37,6 +37,7 @@ from app.services.llm_service import (
     AGENTIC_CHAT_SYSTEM_PROMPT,
     create_agentic_chat_agent,
     create_chat_agent,
+    DEFAULT_CHAT_SYSTEM_PROMPT,
     DOCUMENT_CHAT_SYSTEM_PROMPT,
     FIRST_SESSION_SYSTEM_PROMPT,
     HELP_CHAT_SYSTEM_PROMPT,
@@ -166,7 +167,13 @@ def _classify_stream_error(exc: BaseException) -> tuple[str, str]:
             "The model service was unreachable. Please try again in a moment."
         )
 
-    return "error", text
+    # Unexpected failure. Never surface the raw exception to the user — it leaks
+    # stack-trace-shaped text that breaks the assistant's voice. The caller logs
+    # the original exception for debugging.
+    return "error", (
+        "Something went wrong while generating that response. Please try again — "
+        "if it keeps happening, let your administrator know."
+    )
 
 
 def _extract_event_content(event) -> tuple[str | None, bool]:
@@ -189,10 +196,26 @@ def _extract_event_content(event) -> tuple[str | None, bool]:
 
 def _brand_org_text(text: str, org: str | None) -> str:
     """White-label chat-visible copy: swap the default product name for the
-    deployment's org name (same convention as email branding)."""
+    deployment's org name (same convention as email branding).
+
+    Also neutralizes the built-in "University of Idaho" home institution, which
+    is true for the default Vandalizer build but wrong (and off-brand) on a
+    white-labeled deployment. The identity/onboarding prompts are the only
+    places that phrasing appears, so collapsing the two fixed patterns keeps the
+    grammar clean without a brittle blanket strip.
+    """
     if not org or org == "Vandalizer":
         return text
-    return text.replace("Vandalizer", org)
+    text = text.replace("Vandalizer", org)
+    text = text.replace(
+        "research administration at the University of Idaho",
+        "research administration",
+    )
+    text = text.replace(
+        "built at the University of Idaho for research administration",
+        "built for research administration",
+    )
+    return text
 
 
 def _brand_org_json_chunk(chunk: str, org: str | None) -> str:
@@ -478,6 +501,7 @@ async def chat_stream(
     settings=None,
     model_override: Optional[str] = None,
     kb_uuid: Optional[str] = None,
+    project_uuid: Optional[str] = None,
     include_onboarding_context: bool = False,
     is_first_session: bool = False,
     run_demo: bool = False,
@@ -732,6 +756,21 @@ async def chat_stream(
             base = system_prompt if system_prompt is not None else AGENTIC_CHAT_SYSTEM_PROMPT
             system_prompt = base + "\n\n" + open_docs_block
 
+    # Tell the agent it's inside a project, and what that project contains
+    # (pinned workflows/extractions with their ids, file/KB counts). This is
+    # what makes the project tools usable — without it the agent doesn't know a
+    # project is active or which target_ids to run. Existing tools are
+    # unaffected; the block explicitly tells the agent not to narrow them.
+    if project_uuid and user:
+        try:
+            project_block = await _build_project_context(project_uuid, user)
+        except Exception as e:  # never let project context break a turn
+            logger.warning("Project context build failed: %s", e)
+            project_block = ""
+        if project_block:
+            base = system_prompt if system_prompt is not None else AGENTIC_CHAT_SYSTEM_PROMPT
+            system_prompt = base + "\n\n" + project_block
+
     # Resolve the model's context window and compact oversize components.
     model_config = await get_llm_model_by_name(model_name)
     compacted = plan_and_compact_context(
@@ -865,6 +904,7 @@ async def chat_stream(
             model_name=model_name,
             context_document_uuids=effective_doc_uuids,
             active_kb_uuid=kb_uuid,
+            active_project_uuid=project_uuid,
         )
         agent = create_agentic_chat_agent(
             model_name, system_config_doc=sys_config_doc,
@@ -907,12 +947,19 @@ async def chat_stream(
         }
         if deps is not None:
             iter_kwargs["deps"] = deps
-        if system_prompt is not None:
-            # White-label: the canned prompts identify as "Vandalizer"; branded
-            # deployments speak as the configured org instead.
-            iter_kwargs["instructions"] = _brand_org_text(
-                system_prompt, (sys_config_doc or {}).get("org_name") or ""
+        # White-label: the canned prompts identify as "Vandalizer"; branded
+        # deployments speak as the configured org instead. When system_prompt is
+        # None (empty-workspace chat), resolve the same default the agent would
+        # otherwise use baked-in, so branding still reaches the identity line
+        # instead of leaking "Vandalizer" on a white-labeled deployment.
+        effective_prompt = system_prompt
+        if effective_prompt is None:
+            effective_prompt = (
+                AGENTIC_CHAT_SYSTEM_PROMPT if deps is not None else DEFAULT_CHAT_SYSTEM_PROMPT
             )
+        iter_kwargs["instructions"] = _brand_org_text(
+            effective_prompt, (sys_config_doc or {}).get("org_name") or ""
+        )
 
         async with agent.iter(prompt, **iter_kwargs) as agent_run:
             async for node in agent_run:
@@ -1186,6 +1233,58 @@ def _build_open_documents_block(documents: list[SmartDocument]) -> str:
     ]
     for doc in documents:
         lines.append(f'- "{doc.title}" (uuid: {doc.uuid})')
+    return "\n".join(lines)
+
+
+async def _build_project_context(project_uuid: str, user: User) -> str:
+    """Tell the agent a project is active and what it contains.
+
+    Reuses ``get_project_overview`` + ``list_pins`` so the block matches the
+    project home exactly. Lists each pin's ``target_id`` so the agent can pass
+    them to ``run_pin_on_project``. Returns "" when the project is missing or
+    unauthorized so a stale uuid never breaks the turn.
+    """
+    from app.services import project_service
+
+    project = await project_service.get_authorized_project(project_uuid, user)
+    if not project:
+        return ""
+    overview = await project_service.get_project_overview(project, user)
+    pins = await project_service.list_pins(project)
+    caps = overview["capabilities"]
+
+    lines = [
+        "## Active project",
+        f'The user is working inside the project "{project.title}" '
+        f"(uuid: {project.uuid}, state: {project.state}, "
+        f"their role: {overview['role']}).",
+    ]
+    if project.description:
+        lines.append(f"Description: {project.description}")
+    kb_state = "ready" if caps["knowledge"]["ready"] else "not set up"
+    lines.append(
+        f"- {caps['files']['count']} file(s); project knowledge base {kb_state} "
+        f"({caps['knowledge']['documents']} indexed)."
+    )
+    if pins:
+        lines.append(
+            "Pinned capabilities (pass pin_type + target_id to run_pin_on_project):"
+        )
+        for p in pins:
+            lines.append(
+                f'- {p["pin_type"]}: "{p["name"]}" (target_id: {p["target_id"]})'
+            )
+    else:
+        lines.append("No capabilities are pinned to this project yet.")
+    lines.append(
+        "IMPORTANT: your other tools (search_documents, run_extraction, "
+        "run_workflow, search_knowledge_base, etc.) still range the user's "
+        "WHOLE workspace — do NOT silently narrow them to this project. Use the "
+        "project tools (run_pin_on_project, list_project_documents, "
+        "pin_to_project, unpin_from_project, set_project_status) only when the "
+        "user explicitly refers to \"this project\", its files, a pinned item, "
+        "or its status."
+    )
     return "\n".join(lines)
 
 

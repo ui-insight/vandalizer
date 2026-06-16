@@ -225,6 +225,7 @@ async def chat(
                 settings=settings,
                 model_override=body.model,
                 kb_uuid=resolved_kb_uuid,
+                project_uuid=body.project_uuid,
                 include_onboarding_context=body.include_onboarding_context,
                 is_first_session=body.is_first_session,
                 run_demo=body.run_demo,
@@ -327,7 +328,10 @@ async def add_link(
         await activity_service.activity_finish(
             activity.id, status=ActivityStatus.FAILED, error=str(e)
         )
-        raise HTTPException(status_code=400, detail=f"Failed to fetch URL: {e}")
+        raise HTTPException(
+            status_code=400,
+            detail="Couldn't fetch that link. Check the URL is correct and publicly reachable, then try again.",
+        )
 
     url_attachment = UrlAttachment(
         url=body.link, title=title, content=content, user_id=user_id
@@ -449,7 +453,7 @@ async def add_document(
             logger.error(f"Error processing file {file.filename}: {e}")
             file_attachment = FileAttachment(
                 filename=file.filename,
-                content=f"[Error processing file: {e}]",
+                content="[This file couldn't be read — it may be corrupted, password-protected, or an unsupported format.]",
                 file_type="",
                 user_id=user_id,
             )
