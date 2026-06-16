@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseServerTimeMs } from './OptimizationProgressCard'
+import { parseServerTimeMs, projectElapsedSeconds } from './OptimizationProgressCard'
 
 describe('parseServerTimeMs', () => {
   // Same wall-clock instant: 2026-06-15T18:00:00 UTC == 1781632800000 ms.
@@ -28,5 +28,33 @@ describe('parseServerTimeMs', () => {
     // Regression: a recent naive start must read as the past, so now - start >= 0.
     const recentNaive = new Date(Date.now() - 5000).toISOString().replace('Z', '')
     expect(Date.now() - parseServerTimeMs(recentNaive)).toBeGreaterThanOrEqual(0)
+  })
+})
+
+describe('projectElapsedSeconds', () => {
+  it('returns the server base when no client time has passed (skew cannot leak)', () => {
+    // The instant the base is received, anchoredAt == now, so the readout is
+    // exactly the server-reported elapsed — regardless of any client/server
+    // clock skew. This is the ~3m30s-jump regression: the timer must not add
+    // the skew the moment polling swaps in the server value.
+    expect(projectElapsedSeconds(12, 1_000_000, 1_000_000)).toBe(12)
+  })
+
+  it('adds only the client-clock delta since the base was anchored', () => {
+    const anchoredAt = 5_000_000
+    expect(projectElapsedSeconds(12, anchoredAt, anchoredAt + 7_000)).toBe(19)
+  })
+
+  it('depends only on the now−anchor delta, not absolute clock values', () => {
+    // Shifting both anchor and now by the same (arbitrary, skew-like) offset
+    // leaves the result unchanged.
+    const a = projectElapsedSeconds(30, 1_000_000, 1_004_000)
+    const b = projectElapsedSeconds(30, 1_000_000 + 210_000, 1_004_000 + 210_000)
+    expect(a).toBe(b)
+    expect(a).toBe(34)
+  })
+
+  it('never goes negative', () => {
+    expect(projectElapsedSeconds(0, 2_000_000, 1_000_000)).toBe(0)
   })
 })

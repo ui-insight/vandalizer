@@ -1692,6 +1692,27 @@ def _iso_utc(dt):
     return dt.astimezone(_dt.timezone.utc).isoformat()
 
 
+def _elapsed_seconds(started_at, completed_at):
+    """Server-authoritative elapsed seconds for the live run timer.
+
+    Computed on the server so the readout can't be corrupted by client/server
+    clock skew. The elapsed counter previously did ``Date.now() - started_at``
+    in the browser, mixing the client wall clock with the server-set start
+    timestamp; on a drifted backend (e.g. a Docker VM that fell behind the host
+    after sleep) that made the counter jump by the full skew the moment polling
+    replaced the optimistic client-side seed. The frontend now ticks forward
+    from this base using client-clock *deltas* only.
+    """
+    if started_at is None:
+        return None
+    import datetime as _dt
+    start = started_at if started_at.tzinfo else started_at.replace(tzinfo=_dt.timezone.utc)
+    end = completed_at or _dt.datetime.now(tz=_dt.timezone.utc)
+    if end.tzinfo is None:
+        end = end.replace(tzinfo=_dt.timezone.utc)
+    return max(0, int((end - start).total_seconds()))
+
+
 def _serialize_workflow_optimization_run(run) -> dict:
     return {
         "uuid": run.uuid,
@@ -1725,6 +1746,7 @@ def _serialize_workflow_optimization_run(run) -> dict:
         "error_message": run.error_message,
         "started_at": _iso_utc(run.started_at),
         "completed_at": _iso_utc(run.completed_at),
+        "elapsed_seconds": _elapsed_seconds(run.started_at, run.completed_at),
         "cancel_requested": run.cancel_requested,
     }
 

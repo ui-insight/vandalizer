@@ -122,6 +122,7 @@ export function AutovalidateTab({ kbUuid, kbReady, canManage, queriesCount, onSw
         options: opts as unknown as Record<string, unknown>,
         error_message: null,
         started_at: new Date().toISOString(), completed_at: null,
+        elapsed_seconds: 0,
         cancel_requested: false,
       }
       setRun(seed)

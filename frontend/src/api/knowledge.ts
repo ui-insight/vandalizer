@@ -69,6 +69,13 @@ export function addDocumentsToKB(uuid: string, documentUuids: string[]) {
   })
 }
 
+export function addFolderToKB(uuid: string, folderUuid: string, includeSubfolders = true) {
+  return apiFetch<{ ok: boolean; added: number }>(`/api/knowledge/${uuid}/add_folder`, {
+    method: 'POST',
+    body: JSON.stringify({ folder_uuid: folderUuid, include_subfolders: includeSubfolders }),
+  })
+}
+
 export function convertDocumentsToKB(documentUuids: string[], title?: string) {
   return apiFetch<KnowledgeBase>('/api/knowledge/convert_documents', {
     method: 'POST',
@@ -544,6 +551,10 @@ export type KBOptimizationRun = {
   error_context?: Record<string, unknown> | null
   started_at: string | null
   completed_at: string | null
+  // Server-computed elapsed seconds (started_at → completed_at|now). Drives the
+  // live timer skew-free; the client ticks forward from this base. Optional so
+  // older payloads fall back to the started_at delta.
+  elapsed_seconds?: number | null
   cancel_requested: boolean
   // Apply/revert lifecycle (Phase 1 loop closure).
   previous_override?: OptimizationTrial['config'] | null

@@ -13,6 +13,7 @@ import datetime
 from unittest.mock import MagicMock
 
 from app.routers.knowledge import (
+    _elapsed_seconds,
     _iso_utc,
     _serialize_optimization_run,
     _summarise_optimization_run,
@@ -99,3 +100,59 @@ def test_extraction_serializer_started_at_carries_offset():
 def test_extraction_summary_started_at_carries_offset():
     out = _summarise_extraction_optimization_run(_extraction_run_with(NAIVE))
     assert out["started_at"].endswith("+00:00")
+
+
+# --- Server-authoritative elapsed seconds ---------------------------------
+# The live timer used to do ``Date.now() - started_at`` in the browser, mixing
+# the client wall clock with the server's start timestamp. On a drifted backend
+# (e.g. a Docker VM behind the host) that surfaced the full skew as a sudden
+# jump (~3m30s) the instant polling replaced the optimistic client seed. The
+# fix moves the elapsed computation server-side; the client only ticks deltas.
+
+def test_elapsed_seconds_completed_run_is_exact_duration():
+    start = datetime.datetime(2026, 6, 15, 18, 0, 0, tzinfo=datetime.timezone.utc)
+    end = datetime.datetime(2026, 6, 15, 18, 3, 30, tzinfo=datetime.timezone.utc)
+    assert _elapsed_seconds(start, end) == 210
+
+
+def test_elapsed_seconds_treats_naive_start_as_utc():
+    # A naive start (Mongo read-back) must measure against UTC now, not local.
+    start = datetime.datetime(2026, 6, 15, 18, 0, 0)
+    end = datetime.datetime(2026, 6, 15, 18, 0, 30)
+    assert _elapsed_seconds(start, end) == 30
+
+
+def test_elapsed_seconds_clamps_negative_to_zero():
+    start = datetime.datetime(2026, 6, 15, 18, 0, 30, tzinfo=datetime.timezone.utc)
+    end = datetime.datetime(2026, 6, 15, 18, 0, 0, tzinfo=datetime.timezone.utc)
+    assert _elapsed_seconds(start, end) == 0
+
+
+def test_elapsed_seconds_none_start_is_none():
+    assert _elapsed_seconds(None, None) is None
+
+
+def test_elapsed_seconds_running_run_uses_now():
+    # No completed_at → measured against current UTC time, so non-negative.
+    start = datetime.datetime.now(tz=datetime.timezone.utc) - datetime.timedelta(seconds=5)
+    assert _elapsed_seconds(start, None) >= 0
+
+
+def test_serializers_emit_elapsed_seconds():
+    completed = datetime.datetime(2026, 6, 15, 18, 0, 0, tzinfo=datetime.timezone.utc)
+
+    kb = _kb_run_with(NAIVE)
+    kb.completed_at = completed
+    wf = _wf_run_with(NAIVE)
+    wf.completed_at = completed
+    ex = _extraction_run_with(NAIVE)
+    ex.completed_at = completed
+
+    for out in (
+        _serialize_optimization_run(kb),
+        _serialize_workflow_optimization_run(wf),
+        _serialize_extraction_optimization_run(ex),
+    ):
+        assert "elapsed_seconds" in out
+        assert isinstance(out["elapsed_seconds"], int)
+        assert out["elapsed_seconds"] >= 0

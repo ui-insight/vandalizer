@@ -15,6 +15,7 @@ from app.models.kb_optimization_run import KBOptimizationRun
 from app.services import organization_service
 from app.schemas.knowledge import (
     AddDocumentsRequest,
+    AddFolderRequest,
     AddUrlsRequest,
     AdoptKBRequest,
     ConvertDocumentsRequest,
@@ -529,6 +530,41 @@ async def add_documents(uuid: str, req: AddDocumentsRequest, user: User = Depend
     return {"ok": True, "added": added}
 
 
+@router.post("/{uuid}/add_folder")
+async def add_folder(uuid: str, req: AddFolderRequest, user: User = Depends(get_current_user)):
+    """Add every document in a folder (and, by default, its subfolders) to a KB."""
+    from app.services import document_service
+
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(
+        uuid,
+        user,
+        manage=True,
+        user_org_ancestry=user_org_ancestry,
+        allow_admin=True,
+    )
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+
+    doc_uuids = await document_service.collect_folder_document_uuids(
+        folder_uuid=req.folder_uuid,
+        user=user,
+        include_subfolders=req.include_subfolders,
+    )
+    if doc_uuids is None:
+        raise HTTPException(status_code=404, detail="Folder not found")
+    if not doc_uuids:
+        return {"ok": True, "added": 0}
+
+    kb.status = "building"
+    await kb.save()
+    try:
+        added = await svc.add_documents(kb, doc_uuids, user)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return {"ok": True, "added": added}
+
+
 @router.post("/{uuid}/add_urls")
 @limiter.limit("10/minute")
 async def add_urls(request: Request, uuid: str, req: AddUrlsRequest, user: User = Depends(get_current_user)):
@@ -1015,6 +1051,27 @@ def _iso_utc(dt):
     return dt.astimezone(_dt.timezone.utc).isoformat()
 
 
+def _elapsed_seconds(started_at, completed_at):
+    """Server-authoritative elapsed seconds for the live run timer.
+
+    Computed on the server so the readout can't be corrupted by client/server
+    clock skew. The elapsed counter previously did ``Date.now() - started_at``
+    in the browser, mixing the client wall clock with the server-set start
+    timestamp; on a drifted backend (e.g. a Docker VM that fell behind the host
+    after sleep) that made the counter jump by the full skew the moment polling
+    replaced the optimistic client-side seed. The frontend now ticks forward
+    from this base using client-clock *deltas* only.
+    """
+    if started_at is None:
+        return None
+    import datetime as _dt
+    start = started_at if started_at.tzinfo else started_at.replace(tzinfo=_dt.timezone.utc)
+    end = completed_at or _dt.datetime.now(tz=_dt.timezone.utc)
+    if end.tzinfo is None:
+        end = end.replace(tzinfo=_dt.timezone.utc)
+    return max(0, int((end - start).total_seconds()))
+
+
 def _serialize_optimization_run(run) -> dict:
     return {
         "uuid": run.uuid,
@@ -1057,6 +1114,7 @@ def _serialize_optimization_run(run) -> dict:
         "error_message": run.error_message,
         "started_at": _iso_utc(run.started_at),
         "completed_at": _iso_utc(run.completed_at),
+        "elapsed_seconds": _elapsed_seconds(run.started_at, run.completed_at),
         "cancel_requested": run.cancel_requested,
         "previous_override": getattr(run, "previous_override", None),
         "applied_at": _iso_utc(getattr(run, "applied_at", None)),
