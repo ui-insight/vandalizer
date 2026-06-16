@@ -18,13 +18,14 @@ interface Props {
   hasMessages?: boolean
   hasDocuments?: boolean
   contextMeter?: ReactNode
+  memoryControl?: ReactNode
 }
 
 export function ChatInput({
   onSend, onAttachFile, onAttachLink, disabled,
   isStreaming, onStop,
   selectedModel, onModelChange, onExport, hasMessages, hasDocuments,
-  contextMeter,
+  contextMeter, memoryControl,
 }: Props) {
   const branding = useBranding()
   const [message, setMessage] = useState('')
@@ -250,6 +251,9 @@ export function ChatInput({
 
           {/* Spacer */}
           <div className="flex-1" />
+
+          {/* Assistant memory */}
+          {memoryControl}
 
           {/* Export button */}
           {onExport && hasMessages && (

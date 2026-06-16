@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { AlertTriangle, Check, ChevronRight, ClipboardCopy, Download, ExternalLink, FileText, Loader2 } from 'lucide-react'
 import { QualityBadge } from './QualityBadge'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import type { WorkspaceMode } from '../../contexts/WorkspaceContext'
 import type { ToolCallInfo, ToolResultInfo, QualityMeta } from '../../types/chat'
+import { getWorkflowStatus } from '../../api/workflows'
+import type { WorkflowStatus } from '../../types/workflow'
 
 // ---------------------------------------------------------------------------
 // Tool metadata
@@ -15,6 +17,7 @@ type ToolCategory = 'read' | 'extract' | 'write' | 'workflow'
 const TOOL_META: Record<string, { label: string; category: ToolCategory }> = {
   search_documents:      { label: 'Searching documents',      category: 'read' },
   list_documents:        { label: 'Listing documents',        category: 'read' },
+  list_folders:          { label: 'Listing folders',          category: 'read' },
   search_knowledge_base: { label: 'Querying knowledge base',  category: 'read' },
   list_knowledge_bases:  { label: 'Listing knowledge bases',  category: 'read' },
   list_extraction_sets:  { label: 'Listing extraction templates',  category: 'read' },
@@ -22,6 +25,9 @@ const TOOL_META: Record<string, { label: string; category: ToolCategory }> = {
   get_quality_info:      { label: 'Checking quality',         category: 'read' },
   search_library:        { label: 'Searching library',        category: 'read' },
   get_document_text:     { label: 'Reading document',         category: 'read' },
+  get_app_help:          { label: 'Looking up help',          category: 'read' },
+  fetch_url:             { label: 'Reading web page',         category: 'read' },
+  web_search:            { label: 'Searching the web',        category: 'read' },
   run_extraction:        { label: 'Running extraction',       category: 'extract' },
   create_knowledge_base: { label: 'Creating knowledge base',  category: 'write' },
   add_documents_to_kb:   { label: 'Adding documents to KB',   category: 'write' },
@@ -32,6 +38,12 @@ const TOOL_META: Record<string, { label: string; category: ToolCategory }> = {
   propose_test_case:     { label: 'Preparing guided verification', category: 'extract' },
   run_validation:        { label: 'Running validation',         category: 'workflow' },
   create_extraction_from_document: { label: 'Building extraction from document', category: 'write' },
+  list_optimization_recommendations: { label: 'Checking optimization suggestions', category: 'workflow' },
+  get_optimization_run:  { label: 'Checking autovalidate run',  category: 'workflow' },
+  start_optimization:    { label: 'Starting autovalidate',      category: 'write' },
+  apply_optimization:    { label: 'Applying optimized config',  category: 'write' },
+  regenerate_validation_plan: { label: 'Regenerating validation plan', category: 'write' },
+  save_to_folder:        { label: 'Saving to folder',         category: 'write' },
 }
 
 const CATEGORY_ACCENT: Record<ToolCategory, string> = {
@@ -70,8 +82,16 @@ function getActiveHint(toolName: string, args: Record<string, unknown>): string 
       const docs = Array.isArray(args.document_uuids) ? args.document_uuids.length : 0
       return docs > 0 ? `from ${docs} document${docs !== 1 ? 's' : ''}` : ''
     }
+    case 'get_app_help': {
+      const t = args.topic
+      return typeof t === 'string' && t
+        ? `about "${t.length > 40 ? t.slice(0, 37) + '...' : t}"`
+        : ''
+    }
     case 'get_document_text':
       return ''
+    case 'save_to_folder':
+      return queryStr ? `"${queryStr}"` : ''
     default:
       return queryStr
   }
@@ -138,6 +158,12 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
       if (docs > 0) parts.push(`${docs} document${docs !== 1 ? 's' : ''}`)
       if (folders > 0) parts.push(`${folders} folder${folders !== 1 ? 's' : ''}`)
       return { text: parts.length > 0 ? parts.join(', ') : 'Empty folder', qualityHint }
+    }
+
+    case 'list_folders': {
+      if (!Array.isArray(content)) break
+      if (content.length === 0) return { text: 'No folders found', qualityHint: '' }
+      return { text: `Found ${content.length} folder${content.length !== 1 ? 's' : ''}`, qualityHint }
     }
 
     case 'search_knowledge_base': {
@@ -220,6 +246,56 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
       const done = (obj.steps_completed as number) || 0
       const total = (obj.steps_total as number) || 0
       return { text: `${done}/${total} steps`, qualityHint }
+    }
+
+    case 'get_app_help': {
+      if (obj.matched === false) return { text: 'No matching help topic', qualityHint: '' }
+      const topic = (obj.topic as Record<string, unknown> | undefined)?.title
+      return { text: topic ? `Help: ${String(topic)}` : 'Help topic found', qualityHint: '' }
+    }
+
+    case 'fetch_url': {
+      const title = obj.title ? `"${String(obj.title).slice(0, 50)}"` : 'page'
+      const chars = obj.total_chars ? `${Math.round((obj.total_chars as number) / 1000)}K chars` : ''
+      return { text: [`Read ${title}`, chars].filter(Boolean).join(' — '), qualityHint: '' }
+    }
+
+    case 'web_search': {
+      const results = Array.isArray(obj.results) ? obj.results.length : 0
+      if (results === 0) return { text: 'No web results', qualityHint: '' }
+      return { text: `Found ${results} web result${results !== 1 ? 's' : ''}`, qualityHint: '' }
+    }
+
+    case 'list_optimization_recommendations': {
+      const items = Array.isArray(obj.items) ? obj.items.length : 0
+      if (items === 0) return { text: 'No pending optimization suggestions', qualityHint: '' }
+      return { text: `${items} optimization suggestion${items !== 1 ? 's' : ''} pending`, qualityHint: '' }
+    }
+
+    case 'get_optimization_run': {
+      const status = obj.status as string | undefined
+      const score = obj.optimized_score ?? obj.score
+      if (status === 'completed' && typeof score === 'number') {
+        const base = typeof obj.baseline_score === 'number'
+          ? ` (was ${Math.round(obj.baseline_score as number)})`
+          : ''
+        return { text: `Completed — score ${Math.round(score)}/100${base}`, qualityHint: '' }
+      }
+      if (status) {
+        const phase = obj.phase ? ` · ${String(obj.phase)}` : ''
+        return { text: `${status}${phase}`, qualityHint: '' }
+      }
+      return { text: 'Optimization run', qualityHint: '' }
+    }
+
+    case 'start_optimization':
+    case 'apply_optimization':
+    case 'regenerate_validation_plan':
+      return { text: obj.message ? String(obj.message) : 'Done', qualityHint }
+
+    case 'save_to_folder': {
+      const t = obj.title ? `"${String(obj.title).slice(0, 40)}"` : 'document'
+      return { text: `Saved ${t}`, qualityHint }
     }
   }
 
@@ -673,6 +749,126 @@ function WorkflowOutput({ content }: { content: Record<string, unknown> }) {
   return null
 }
 
+const WORKFLOW_TERMINAL = new Set(['completed', 'failed', 'error', 'canceled'])
+const WORKFLOW_POLL_MS = 2500
+
+/**
+ * Live progress for a workflow kicked off via the chat `run_workflow` tool.
+ *
+ * The tool result only carries `{ session_id, status: 'running' }`, so without
+ * this the chat thread looks frozen for the whole run. We poll the same REST
+ * status endpoint the workspace uses — costs zero LLM tokens — and stop the
+ * moment the run reaches a terminal (or paused) state. On a history reload an
+ * already-finished run resolves in a single fetch and renders its output.
+ */
+function WorkflowProgress({ sessionId, initialStatus }: { sessionId: string; initialStatus?: string }) {
+  const [status, setStatus] = useState<WorkflowStatus | null>(null)
+  const [fetchFailed, setFetchFailed] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+
+    const tick = async () => {
+      try {
+        const s = await getWorkflowStatus(sessionId)
+        if (cancelled) return
+        setStatus(s)
+        setFetchFailed(false)
+        // Stop on terminal states; 'paused' needs an approval the chat surface
+        // can't grant, so we stop and surface it rather than busy-poll.
+        if (WORKFLOW_TERMINAL.has(s.status) || s.status === 'paused') return
+        timer = setTimeout(tick, WORKFLOW_POLL_MS)
+      } catch {
+        if (cancelled) return
+        setFetchFailed(true)
+      }
+    }
+
+    tick()
+    return () => {
+      cancelled = true
+      if (timer) clearTimeout(timer)
+    }
+  }, [sessionId])
+
+  const effective = status?.status || initialStatus || 'running'
+  const done = status?.num_steps_completed ?? 0
+  const total = status?.num_steps_total ?? 0
+  const stepName = status?.current_step_name
+  const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0
+
+  const wrap = (children: ReactNode) => (
+    <div style={{ marginTop: 6, marginLeft: 20 }}>{children}</div>
+  )
+
+  if (fetchFailed && !status) {
+    return wrap(
+      <div style={{ fontSize: 11, color: '#9ca3af' }}>
+        Couldn&rsquo;t reach the workflow for live progress — check the Activity rail.
+      </div>,
+    )
+  }
+
+  if (effective === 'completed') {
+    const normalized = { status: 'completed', output: unwrapWorkflowOutput(status?.final_output) }
+    return (
+      <>
+        {wrap(
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#16a34a', fontWeight: 500 }}>
+            <Check size={13} /> Workflow complete
+          </div>,
+        )}
+        <WorkflowOutput content={normalized} />
+      </>
+    )
+  }
+
+  if (effective === 'failed' || effective === 'error' || effective === 'canceled') {
+    const label = effective === 'canceled' ? 'Workflow canceled' : 'Workflow failed'
+    return wrap(
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#dc2626' }}>
+        <AlertTriangle size={13} />
+        {label}{status?.error ? ` — ${status.error}` : ''}
+      </div>,
+    )
+  }
+
+  if (effective === 'paused') {
+    return wrap(
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#b45309' }}>
+        <AlertTriangle size={13} /> Paused — awaiting approval in the workflow runner.
+      </div>,
+    )
+  }
+
+  // running / queued
+  return wrap(
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#6b7280' }}>
+        <Loader2 size={12} style={{ animation: 'spin 1s linear infinite', color: '#8b5cf6', flexShrink: 0 }} />
+        <span>
+          {total > 0 ? `${done}/${total} steps` : 'Running'}
+          {stepName ? ` · ${stepName}` : ''}
+        </span>
+      </div>
+      {total > 0 && (
+        <div style={{ marginTop: 5, height: 4, borderRadius: 4, background: '#ede9fe', overflow: 'hidden' }}>
+          <div style={{ width: `${pct}%`, height: '100%', background: '#8b5cf6', transition: 'width 0.4s ease' }} />
+        </div>
+      )}
+    </div>,
+  )
+}
+
+/** Workflow final_output may be wrapped as `{ output: ... }` — unwrap to match WorkflowOutput's contract. */
+function unwrapWorkflowOutput(final: unknown): unknown {
+  if (final && typeof final === 'object' && !Array.isArray(final) && 'output' in (final as Record<string, unknown>)) {
+    return (final as Record<string, unknown>).output
+  }
+  return final
+}
+
 interface VerificationLauncherActions {
   viewDocument: (uuid: string, title: string) => void
   setWorkspaceMode: (mode: WorkspaceMode) => void
@@ -882,6 +1078,9 @@ export function ToolStatusLine({
       )}
       {result && name === 'get_workflow_status' && obj?.status === 'completed' && obj?.output != null && (
         <WorkflowOutput content={obj} />
+      )}
+      {result && name === 'run_workflow' && typeof obj?.session_id === 'string' && (
+        <WorkflowProgress sessionId={obj.session_id as string} initialStatus={obj?.status as string | undefined} />
       )}
       {result && name === 'propose_test_case' && obj?.verification_session_id != null && (
         <VerificationLauncher content={obj} actions={verificationActions} />
