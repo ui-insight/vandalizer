@@ -20,7 +20,10 @@ export function ProjectsPanel() {
 
   // Scope the workspace to the project. The `?project=` param is consumed by
   // WorkspaceContext, which activates the project scope and lands in chat.
-  const openProject = (uuid: string) =>
+  // Switch the stored mode to chat *first* so the drawer doesn't linger via the
+  // localStorage fallback while the (async) project scope resolves.
+  const openProject = (uuid: string) => {
+    localStorage.setItem('workspace:mode', 'chat')
     navigate({
       to: '/',
       search: {
@@ -34,6 +37,7 @@ export function ProjectsPanel() {
         workflow_share_token: undefined,
       },
     })
+  }
 
   const handleCreate = async () => {
     if (!newName.trim()) return
