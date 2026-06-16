@@ -62,12 +62,17 @@ async def test_summarize_project_includes_role_and_capabilities():
             project_service, "get_project_role",
             AsyncMock(return_value="owner"),
         ),
+        patch.object(
+            project_service, "_is_project_member",
+            AsyncMock(return_value=False),
+        ),
     ):
         out = await project_service.summarize_project(_project(), user)
 
     assert out["uuid"] == "p1"
     assert out["role"] == "owner"
     assert out["capabilities"] == CAPS
+    assert out["can_leave"] is False
 
 
 @pytest.mark.asyncio
@@ -83,6 +88,10 @@ async def test_overview_and_summary_share_capability_counts():
         patch.object(
             project_service, "get_project_role",
             AsyncMock(return_value="editor"),
+        ),
+        patch.object(
+            project_service, "_is_project_member",
+            AsyncMock(return_value=False),
         ),
     ):
         overview = await project_service.get_project_overview(_project(), user)

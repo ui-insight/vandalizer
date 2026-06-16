@@ -163,6 +163,21 @@ async def make_personal(
     return project_service.serialize_project(project)
 
 
+@router.post("/{project_uuid}/leave")
+async def leave_project(
+    project_uuid: str,
+    user: User = Depends(get_current_user),
+):
+    project = await project_service.get_authorized_project(project_uuid, user)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    try:
+        await project_service.leave_project(project, user)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"ok": True}
+
+
 @router.delete("/{project_uuid}")
 async def delete_project(
     project_uuid: str,

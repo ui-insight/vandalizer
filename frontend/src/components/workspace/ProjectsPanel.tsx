@@ -8,8 +8,9 @@ import { ProjectsExplainer } from '../projects/ProjectsExplainer'
 
 /**
  * The Projects drawer — a slideout panel (like Automations/Knowledge) listing
- * the user's projects. Clicking one drops you into the scoped workspace; this
- * panel never hosts project tools, it just gets you into a project.
+ * the user's projects. Clicking one opens its project home (the detail page),
+ * which is the single surface for working in, managing, sharing, or leaving a
+ * project. This panel is just a launcher — it never hosts project tools itself.
  */
 export function ProjectsPanel() {
   const navigate = useNavigate()
@@ -17,20 +18,8 @@ export function ProjectsPanel() {
   const [newName, setNewName] = useState('')
   const [creating, setCreating] = useState(false)
 
-  const enter = (uuid: string) =>
-    navigate({
-      to: '/',
-      search: {
-        mode: 'files',
-        tab: undefined,
-        workflow: undefined,
-        extraction: undefined,
-        automation: undefined,
-        kb: undefined,
-        project: uuid,
-        workflow_share_token: undefined,
-      },
-    })
+  const openProject = (uuid: string) =>
+    navigate({ to: '/projects/$uuid', params: { uuid } })
 
   const handleCreate = async () => {
     if (!newName.trim()) return
@@ -38,7 +27,7 @@ export function ProjectsPanel() {
     try {
       const project = await create(newName.trim())
       setNewName('')
-      enter(project.uuid)
+      openProject(project.uuid)
     } finally {
       setCreating(false)
     }
@@ -80,7 +69,7 @@ export function ProjectsPanel() {
             projects.map(p => (
               <button
                 key={p.uuid}
-                onClick={() => enter(p.uuid)}
+                onClick={() => openProject(p.uuid)}
                 className="flex w-full flex-col items-start rounded-lg border border-gray-200 bg-white p-3 text-left hover:border-highlight transition-colors"
               >
                 <div className="flex w-full items-center justify-between gap-2">

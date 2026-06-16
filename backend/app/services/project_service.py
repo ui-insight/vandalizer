@@ -332,6 +332,35 @@ async def remove_project_member(
     ).delete()
 
 
+async def _is_project_member(project: Project, user: User) -> bool:
+    """True if the user has a personal (invite-granted) membership in the project."""
+    membership = await ProjectMembership.find_one(
+        ProjectMembership.project_uuid == project.uuid,
+        ProjectMembership.user_id == user.user_id,
+    )
+    return membership is not None
+
+
+async def leave_project(project: Project, user: User) -> None:
+    """Remove the requesting user's own invite-granted membership.
+
+    Owners can't leave (they delete the project instead), and access that comes
+    from team membership can't be dropped here — only a personal invite grant.
+    """
+    if project.owner_user_id == user.user_id:
+        raise ValueError("The owner can't leave a project — delete it instead")
+    membership = await ProjectMembership.find_one(
+        ProjectMembership.project_uuid == project.uuid,
+        ProjectMembership.user_id == user.user_id,
+    )
+    if not membership:
+        raise ValueError(
+            "Your access comes from your team, not a personal invite, so there's "
+            "nothing to leave here"
+        )
+    await membership.delete()
+
+
 async def share_project_with_team(project: Project, user: User) -> Project:
     """Convert a personal project to the user's current team.
 
@@ -547,6 +576,10 @@ async def get_project_overview(project: Project, user: User) -> dict:
     return {
         **serialize_project(project),
         "role": await get_project_role(project, user),
+        "can_leave": (
+            project.owner_user_id != user.user_id
+            and await _is_project_member(project, user)
+        ),
         "capabilities": await get_project_capabilities(project),
     }
 
@@ -560,6 +593,10 @@ async def summarize_project(project: Project, user: User) -> dict:
     return {
         **serialize_project(project),
         "role": await get_project_role(project, user),
+        "can_leave": (
+            project.owner_user_id != user.user_id
+            and await _is_project_member(project, user)
+        ),
         "capabilities": await get_project_capabilities(project),
     }
 

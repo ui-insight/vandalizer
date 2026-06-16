@@ -13,6 +13,7 @@ import {
   Link2,
   UserMinus,
   Pencil,
+  LogOut,
 } from 'lucide-react'
 import { useCallback, useEffect, useState, type ComponentType } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -28,6 +29,7 @@ import {
   deleteProject,
   shareProjectWithTeam,
   makeProjectPersonal,
+  leaveProject,
   createProjectInviteLink,
   listProjectMembers,
   removeProjectMember,
@@ -239,6 +241,29 @@ export default function ProjectDetail() {
     }
   }
 
+  const handleLeave = async () => {
+    const ok = await confirm({
+      title: 'Leave project?',
+      message: (
+        <>
+          Leave <strong>{project.title}</strong>? You'll lose access until
+          you're invited again. The project and its files are unaffected.
+        </>
+      ),
+      confirmLabel: 'Leave project',
+      destructive: true,
+    })
+    if (!ok) return
+    try {
+      await leaveProject(project.uuid)
+      qc.invalidateQueries({ queryKey: ['projects'] })
+      toast('You left the project', 'success')
+      navigate({ to: '/projects' })
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to leave', 'error')
+    }
+  }
+
   const handleDelete = async () => {
     const ok = await confirm({
       title: 'Delete project?',
@@ -384,6 +409,16 @@ export default function ProjectDetail() {
                 </option>
               ))}
             </select>
+            {project.can_leave && (
+              <button
+                onClick={handleLeave}
+                className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-red-500"
+                title="Leave this project"
+              >
+                <LogOut size={15} />
+                Leave
+              </button>
+            )}
             {isOwner && (
               <button
                 onClick={handleDelete}
