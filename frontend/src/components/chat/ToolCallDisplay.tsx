@@ -44,6 +44,7 @@ const TOOL_META: Record<string, { label: string; category: ToolCategory }> = {
   apply_optimization:    { label: 'Applying optimized config',  category: 'write' },
   regenerate_validation_plan: { label: 'Regenerating validation plan', category: 'write' },
   save_to_folder:        { label: 'Saving to folder',         category: 'write' },
+  create_project:        { label: 'Creating project',         category: 'write' },
 }
 
 const CATEGORY_ACCENT: Record<ToolCategory, string> = {
@@ -296,6 +297,11 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
     case 'save_to_folder': {
       const t = obj.title ? `"${String(obj.title).slice(0, 40)}"` : 'document'
       return { text: `Saved ${t}`, qualityHint }
+    }
+
+    case 'create_project': {
+      const t = obj.title ? `"${String(obj.title).slice(0, 40)}"` : 'project'
+      return { text: `Created project ${t}`, qualityHint }
     }
   }
 

@@ -2864,6 +2864,82 @@ async def set_project_status(
     }
 
 
+async def create_project(
+    context: RunContext[AgenticChatDeps],
+    title: str,
+    description: Optional[str] = None,
+    confirmed: bool = False,
+) -> dict:
+    """Create a project — a goal-scoped workspace for one unit of work (e.g. a grant).
+
+    A project is the right answer when the user wants to "drop files in as they
+    arrive and chat across the whole set." Every file added to the project is
+    automatically indexed into the project's implicit knowledge base, so
+    project-wide chat works with NO separate knowledge-base building. The project
+    also carries a lifecycle status and can have extraction/workflow capabilities
+    pinned to it.
+
+    Recommend this over create_knowledge_base whenever the user describes an
+    ongoing effort they'll feed documents into over time and want to question as
+    a whole (a grant, a proposal package, a compliance review). A bare knowledge
+    base is better only when they want a standalone reference corpus with no
+    folder, lifecycle, or pinned capabilities.
+
+    Call first with confirmed=false to preview. Then call again with confirmed=true
+    after the user approves — this creates a folder plus a knowledge base and
+    mutates workspace state.
+
+    Args:
+        context: The call context.
+        title: Name for the project (e.g. the grant or effort name).
+        description: Optional short description of the project's goal.
+        confirmed: Must be true to actually create. If false, returns a preview.
+    """
+    from app.services import project_service
+
+    clean_title = (title or "").strip()
+    if not clean_title:
+        return {"error": "A project title is required."}
+    clean_desc = (description or "").strip()
+
+    gate = await _confirm_gate(
+        context,
+        tool_name="create_project",
+        key={"title": clean_title, "description": clean_desc},
+        preview={
+            "action": "create_project",
+            "preview": (
+                f'Create a project "{clean_title}". Files you add to it are '
+                "auto-indexed, so you can chat across the whole project with no "
+                "knowledge-base setup."
+            ),
+            "needs_confirmation": True,
+        },
+        confirmed=confirmed,
+    )
+    if gate is not None:
+        return gate
+
+    project = await project_service.create_project(
+        title=clean_title,
+        description=clean_desc or None,
+        user=context.deps.user,
+    )
+    return {
+        "project_uuid": project.uuid,
+        "title": project.title,
+        "root_folder_uuid": project.root_folder_uuid,
+        "kb_uuid": project.kb_uuid,
+        "state": project.state,
+        "message": (
+            f'Created the project "{project.title}". Add files to it as they come in — '
+            "each one is automatically indexed into the project's knowledge base, so you "
+            "can chat across the entire project without building a separate KB. Open the "
+            "project to start adding documents."
+        ),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Tool registry — imported by llm_service.create_agentic_chat_agent()
 # ---------------------------------------------------------------------------
@@ -2905,7 +2981,8 @@ TOOLS = [
     regenerate_validation_plan,
     # Phase 7 — Output artifacts
     save_to_folder,
-    # Phase 8 — Project tools (active only when a project is open)
+    # Phase 8 — Projects. create_project works anytime; the rest need a project open.
+    create_project,
     list_project_documents,
     run_pin_on_project,
     pin_to_project,

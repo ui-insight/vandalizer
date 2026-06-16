@@ -1022,3 +1022,54 @@ class TestCreateExtractionAutoPin:
                 )
         mock_add.assert_not_awaited()
         assert result["pinned_to_project"] is None
+
+
+# ---------------------------------------------------------------------------
+# create_project
+# ---------------------------------------------------------------------------
+
+
+class TestCreateProject:
+    @pytest.mark.asyncio
+    async def test_preview_without_confirmation(self):
+        from app.services.chat_tools import create_project
+
+        ctx = _make_context()
+        result = await create_project(ctx, "NSF Grant 2026", "My submission", confirmed=False)
+
+        assert result["needs_confirmation"] is True
+        assert result["action"] == "create_project"
+        assert "NSF Grant 2026" in result["preview"]
+
+    @pytest.mark.asyncio
+    async def test_rejects_empty_title(self):
+        from app.services.chat_tools import create_project
+
+        ctx = _make_context()
+        result = await create_project(ctx, "   ", confirmed=True)
+        assert "title" in result["error"].lower()
+
+    @pytest.mark.asyncio
+    async def test_creates_project_when_confirmed(self):
+        from app.services.chat_tools import create_project
+
+        fake_project = MagicMock()
+        fake_project.uuid = "proj-1"
+        fake_project.title = "NSF Grant 2026"
+        fake_project.root_folder_uuid = "folder-1"
+        fake_project.kb_uuid = "kb-9"
+        fake_project.state = "active"
+
+        ctx = _make_context()
+        with patch(
+            "app.services.project_service.create_project",
+            new_callable=AsyncMock,
+            return_value=fake_project,
+        ) as mock_create:
+            result = await create_project(ctx, "NSF Grant 2026", "My submission", confirmed=True)
+
+        assert result["project_uuid"] == "proj-1"
+        assert result["kb_uuid"] == "kb-9"
+        # The success message must convey the auto-indexing / project-wide chat value
+        assert "automatically indexed" in result["message"].lower() or "auto" in result["message"].lower()
+        mock_create.assert_awaited_once()
