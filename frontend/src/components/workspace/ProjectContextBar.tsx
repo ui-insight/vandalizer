@@ -8,8 +8,12 @@ import { useWorkspace } from '../../contexts/WorkspaceContext'
  * The gear opens the in-workspace Manage panel (rename/share/leave/delete).
  */
 export function ProjectContextBar({ onOpenManage }: { onOpenManage?: () => void }) {
-  const { activeProjectUuid, activeProjectTitle, activeProjectRole, deactivateProject } = useWorkspace()
+  const { activeProjectUuid, activeProjectTitle, activeProjectRole, deactivateProject, railDocked } = useWorkspace()
   if (!activeProjectUuid) return null
+
+  // The Activity rail is fixed to the right edge; reserve its width so the
+  // Manage/Exit controls aren't rendered underneath (and unclickable).
+  const railWidth = railDocked ? 64 : 220
 
   return (
     <div
@@ -18,6 +22,7 @@ export function ProjectContextBar({ onOpenManage }: { onOpenManage?: () => void 
         alignItems: 'center',
         gap: 8,
         padding: '6px 16px',
+        marginRight: railWidth,
         fontSize: 13,
         background: 'color-mix(in srgb, var(--highlight-color, #eab308) 8%, white)',
         borderBottom: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 25%, white)',
@@ -34,11 +39,11 @@ export function ProjectContextBar({ onOpenManage }: { onOpenManage?: () => void 
         {onOpenManage && (
           <button
             onClick={onOpenManage}
-            title="Manage project"
-            style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'transparent', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: 12, fontWeight: 500 }}
+            title="View details, share, rename, leave, or delete this project"
+            style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--highlight-color, #eab308)', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', color: '#000', fontSize: 12, fontWeight: 600 }}
           >
             <Settings size={14} />
-            Manage
+            Manage project
           </button>
         )}
         <button
