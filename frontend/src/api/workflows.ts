@@ -110,7 +110,7 @@ export function improvePrompt(data: {
 
 // Execution
 
-export function runWorkflow(workflowId: string, data: { document_uuids: string[]; model?: string; batch_mode?: boolean }) {
+export function runWorkflow(workflowId: string, data: { document_uuids?: string[]; folder_uuids?: string[]; model?: string; batch_mode?: boolean }) {
   return apiFetch<{ session_id?: string; batch_id?: string; activity_id?: string }>(`/api/workflows/${workflowId}/run`, {
     method: 'POST',
     body: JSON.stringify(data),

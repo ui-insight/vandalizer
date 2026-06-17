@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState, useLayoutEffect } from 'react'
-import { Download, Edit2, Trash2, Copy, Users, FolderInput, FolderDown, MessageSquareText } from 'lucide-react'
+import { Download, Edit2, Trash2, Copy, Users, FolderInput, FolderDown, MessageSquareText, Play, Library } from 'lucide-react'
 
 interface ContextMenuProps {
   x: number
   y: number
   onClose: () => void
   onAskFolder?: () => void
+  onRunWorkflow?: () => void
+  onAddToKB?: () => void
   onRename?: () => void
   onMove?: () => void
   onDelete?: () => void
@@ -20,6 +22,8 @@ export function ContextMenu({
   y,
   onClose,
   onAskFolder,
+  onRunWorkflow,
+  onAddToKB,
   onRename,
   onMove,
   onDelete,
@@ -52,6 +56,8 @@ export function ContextMenu({
 
   const items = [
     onAskFolder && { label: 'Ask about folder', icon: MessageSquareText, action: onAskFolder },
+    onRunWorkflow && { label: 'Run workflow on folder', icon: Play, action: onRunWorkflow },
+    onAddToKB && { label: 'Add to knowledge base', icon: Library, action: onAddToKB },
     onRename && { label: 'Rename', icon: Edit2, action: onRename },
     onMove && { label: 'Move to…', icon: FolderInput, action: onMove },
     onExport && { label: 'Export contents', icon: FolderDown, action: onExport },

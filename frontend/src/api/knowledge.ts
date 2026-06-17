@@ -62,10 +62,10 @@ export function transferKnowledgeBaseToTeam(uuid: string) {
   })
 }
 
-export function addDocumentsToKB(uuid: string, documentUuids: string[]) {
+export function addDocumentsToKB(uuid: string, documentUuids: string[], folderUuids?: string[]) {
   return apiFetch<{ ok: boolean; added: number }>(`/api/knowledge/${uuid}/add_documents`, {
     method: 'POST',
-    body: JSON.stringify({ document_uuids: documentUuids }),
+    body: JSON.stringify({ document_uuids: documentUuids, folder_uuids: folderUuids ?? [] }),
   })
 }
 

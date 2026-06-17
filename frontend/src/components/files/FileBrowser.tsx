@@ -58,9 +58,12 @@ interface FileBrowserProps {
   onFolderNavigate?: (folderId: string | null) => void
   // Scope the chat to a folder and focus the composer ("Ask about folder").
   onAskAboutFolder?: (folder: Folder) => void
+  // Run a workflow against / add to a KB every document in a folder.
+  onRunWorkflowOnFolder?: (folder: Folder) => void
+  onAddFolderToKB?: (folder: Folder) => void
 }
 
-export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSelectionChange, onDocNamesChange, onFolderSelectionChange, onSelectionProcessingChange, currentFolder: controlledFolder, onFolderNavigate, onAskAboutFolder }: FileBrowserProps) {
+export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSelectionChange, onDocNamesChange, onFolderSelectionChange, onSelectionProcessingChange, currentFolder: controlledFolder, onFolderNavigate, onAskAboutFolder, onRunWorkflowOnFolder, onAddFolderToKB }: FileBrowserProps) {
   const { currentTeam } = useTeams()
   const confirm = useConfirm()
 
@@ -608,6 +611,16 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
           onAskFolder={
             contextMenu.type === 'folder' && onAskAboutFolder
               ? () => onAskAboutFolder(contextMenu.item as Folder)
+              : undefined
+          }
+          onRunWorkflow={
+            contextMenu.type === 'folder' && onRunWorkflowOnFolder
+              ? () => onRunWorkflowOnFolder(contextMenu.item as Folder)
+              : undefined
+          }
+          onAddToKB={
+            contextMenu.type === 'folder' && onAddFolderToKB
+              ? () => onAddFolderToKB(contextMenu.item as Folder)
               : undefined
           }
           onRename={() => {
