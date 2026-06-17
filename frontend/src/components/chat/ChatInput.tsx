@@ -16,12 +16,15 @@ interface Props {
   hasMessages?: boolean
   hasDocuments?: boolean
   contextMeter?: ReactNode
+  // Bumped by the workspace to pull focus into the composer (e.g. the file
+  // browser's "Ask about folder" action).
+  focusSignal?: number
 }
 
 export function ChatInput({
   onSend, onAttachFile, onAttachLink, disabled,
   selectedModel, onModelChange, onExport, hasMessages, hasDocuments,
-  contextMeter,
+  contextMeter, focusSignal,
 }: Props) {
   const branding = useBranding()
   const [message, setMessage] = useState('')
@@ -44,6 +47,12 @@ export function ChatInput({
     ta.style.height = 'auto'
     ta.style.height = `${ta.scrollHeight}px`
   }, [message])
+
+  // Pull focus into the composer when the workspace requests it. Guard on the
+  // initial 0 so the chat doesn't grab focus on first mount.
+  useEffect(() => {
+    if (focusSignal) textareaRef.current?.focus()
+  }, [focusSignal])
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {

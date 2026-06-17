@@ -56,9 +56,11 @@ interface FileBrowserProps {
   ) => void
   currentFolder?: string | null
   onFolderNavigate?: (folderId: string | null) => void
+  // Scope the chat to a folder and focus the composer ("Ask about folder").
+  onAskAboutFolder?: (folder: Folder) => void
 }
 
-export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSelectionChange, onDocNamesChange, onFolderSelectionChange, onSelectionProcessingChange, currentFolder: controlledFolder, onFolderNavigate }: FileBrowserProps) {
+export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSelectionChange, onDocNamesChange, onFolderSelectionChange, onSelectionProcessingChange, currentFolder: controlledFolder, onFolderNavigate, onAskAboutFolder }: FileBrowserProps) {
   const { currentTeam } = useTeams()
   const confirm = useConfirm()
 
@@ -603,6 +605,11 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
           x={contextMenu.x}
           y={contextMenu.y}
           onClose={() => setContextMenu(null)}
+          onAskFolder={
+            contextMenu.type === 'folder' && onAskAboutFolder
+              ? () => onAskAboutFolder(contextMenu.item as Folder)
+              : undefined
+          }
           onRename={() => {
             const item = contextMenu.item
             setRenameTarget({

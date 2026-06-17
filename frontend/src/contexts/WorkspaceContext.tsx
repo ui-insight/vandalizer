@@ -50,6 +50,11 @@ interface ChatStateContextValue {
   setCurrentConversationUuid: (uuid: string | null) => void
   newChatSignal: number
   triggerNewChat: () => void
+  // Bumped to ask the ChatPanel to reveal itself and focus the composer
+  // (e.g. the file browser's "Ask about folder" action) without starting a
+  // new conversation.
+  focusChatSignal: number
+  focusChat: () => void
   pendingChatMessage: PendingChatMessage | null
   sendChatMessage: (
     message: string,
@@ -182,6 +187,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [loadConversationId, setLoadConversationId] = useState<string | null>(null)
   const [currentConversationUuid, setCurrentConversationUuid] = useState<string | null>(null)
   const [newChatSignal, setNewChatSignal] = useState(0)
+  const [focusChatSignal, setFocusChatSignal] = useState(0)
   const [pendingChatMessage, setPendingChatMessage] = useState<PendingChatMessage | null>(null)
   const [highlightTerms, setHighlightTerms] = useState<string[]>([])
   const [activitySignal, setActivitySignal] = useState(0)
@@ -290,6 +296,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const triggerNewChat = useCallback(() => {
     setNewChatSignal(prev => prev + 1)
     updateSearch((prev) => ({ ...prev, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined }))
+  }, [updateSearch])
+
+  const focusChat = useCallback(() => {
+    // Clear any right-panel overlay so the chat is visible, but keep the
+    // current conversation intact (unlike triggerNewChat).
+    updateSearch((prev) => ({ ...prev, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined }))
+    setFocusChatSignal(prev => prev + 1)
   }, [updateSearch])
 
   const sendChatMessage = useCallback((
@@ -408,6 +421,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     loadConversationId, setLoadConversationId,
     currentConversationUuid, setCurrentConversationUuid,
     newChatSignal, triggerNewChat,
+    focusChatSignal, focusChat,
     pendingChatMessage, sendChatMessage, clearPendingChatMessage,
     activeKBUuid, activeKBTitle, activateKB, deactivateKB,
     processingDoc, setProcessingDoc,
@@ -415,6 +429,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }), [
     loadConversationId, currentConversationUuid,
     newChatSignal, triggerNewChat,
+    focusChatSignal, focusChat,
     pendingChatMessage, sendChatMessage, clearPendingChatMessage,
     activeKBUuid, activeKBTitle, activateKB, deactivateKB,
     processingDoc,

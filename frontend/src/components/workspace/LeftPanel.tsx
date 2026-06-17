@@ -8,7 +8,7 @@ import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { pollStatus, searchDocuments } from '../../api/documents'
 
 export function LeftPanel() {
-  const { setSelectedDocUuids, setSelectedDocNames, setSelectedFolderUuids, highlightTerms, setHighlightTerms, setProcessingDoc, setSelectedDocsProcessing, viewDocumentRequest, clearViewDocumentRequest } = useWorkspace()
+  const { setSelectedDocUuids, setSelectedDocNames, setSelectedFolderUuids, highlightTerms, setHighlightTerms, setProcessingDoc, setSelectedDocsProcessing, viewDocumentRequest, clearViewDocumentRequest, focusChat } = useWorkspace()
   const [viewingDoc, setViewingDoc] = useState<{
     uuid: string
     title: string
@@ -40,6 +40,16 @@ export function LeftPanel() {
   const handleFolderSelectionChange = useCallback((uuids: string[]) => {
     if (!viewingDocRef.current) setSelectedFolderUuids(uuids)
   }, [setSelectedFolderUuids])
+
+  // "Ask about folder": scope the chat to just this folder, drop any
+  // doc-level selection, and pull focus into the composer so the user can
+  // immediately type a question. Backend chat already resolves folder_uuids.
+  const handleAskAboutFolder = useCallback((folder: { uuid: string }) => {
+    setSelectedDocUuids([])
+    setSelectedDocNames({})
+    setSelectedFolderUuids([folder.uuid])
+    focusChat()
+  }, [setSelectedDocUuids, setSelectedDocNames, setSelectedFolderUuids, focusChat])
 
   const handleSelectionProcessingChange = useCallback(
     (docs: Array<{ uuid: string; title: string; status: string | null }>) => {
@@ -283,6 +293,7 @@ export function LeftPanel() {
             onDocNamesChange={handleDocNamesChange}
             onFolderSelectionChange={handleFolderSelectionChange}
             onSelectionProcessingChange={handleSelectionProcessingChange}
+            onAskAboutFolder={handleAskAboutFolder}
           />
         </div>
       )}

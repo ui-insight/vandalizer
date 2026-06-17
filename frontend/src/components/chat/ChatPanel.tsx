@@ -85,7 +85,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     setActivity,
   } = useChat()
 
-  const { bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, activeKBUuid, activeKBTitle, activateKB, deactivateKB, setCurrentConversationUuid } = useWorkspace()
+  const { bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, activeKBUuid, activeKBTitle, activateKB, deactivateKB, setCurrentConversationUuid, focusChatSignal } = useWorkspace()
   const [convertingToKB, setConvertingToKB] = useState(false)
   const { toast } = useToast()
   const shareLink = useShareLink()
@@ -961,6 +961,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         onExport={handleExport}
         hasMessages={messages.length > 0}
         hasDocuments={fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0 || selectedFolderUuids.length > 0}
+        focusSignal={focusChatSignal}
         contextMeter={
           messages.length > 0 && contextTokens > 0 ? (
             <ContextMeter
