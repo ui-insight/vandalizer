@@ -64,7 +64,11 @@ async def classify_document(
         system_prompt=CLASSIFICATION_SYSTEM_PROMPT,
         system_config_doc=system_config_doc,
     )
-    result = agent.run_sync(prompt)
+    # Must use the async API: classify_document runs inside an already-running
+    # event loop (the Celery classify task drives it with run_until_complete).
+    # agent.run_sync() would start a second loop → "This event loop is already
+    # running" and classification fails on every document.
+    result = await agent.run(prompt)
     output = result.output
 
     import json
