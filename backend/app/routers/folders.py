@@ -1,6 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException
+import io
+import zipfile
 
-from app.dependencies import get_current_user
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
+
+from app.config import Settings
+from app.dependencies import get_current_user, get_settings
 from app.models.folder import SmartFolder
 from app.models.user import User
 from app.schemas.documents import (
@@ -8,7 +13,7 @@ from app.schemas.documents import (
     MoveFolderRequest,
     RenameFolderRequest,
 )
-from app.services import folder_service
+from app.services import file_service, folder_service
 
 router = APIRouter()
 
@@ -54,6 +59,39 @@ async def rename(
     if not ok:
         raise HTTPException(status_code=404, detail="Folder not found")
     return {"ok": True}
+
+
+@router.get("/{folder_uuid}/export")
+async def export(
+    folder_uuid: str,
+    user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+):
+    """Stream a zip of every document in the folder subtree, preserving structure."""
+    manifest = await folder_service.collect_export_entries(folder_uuid, user)
+    if manifest is None:
+        raise HTTPException(status_code=404, detail="Folder not found")
+    root_title, entries = manifest
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for prefix, doc_uuid in entries:
+            result = await file_service.download_document(doc_uuid, settings, user=user)
+            if not result:
+                continue
+            name = result.title
+            ext = (result.extension or "").lower()
+            if ext and not name.lower().endswith(f".{ext}"):
+                name = f"{name}.{ext}"
+            zf.writestr(f"{prefix}{name}", result.data)
+
+    buf.seek(0)
+    filename = folder_service._safe_component(root_title)
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}.zip"'},
+    )
 
 
 @router.patch("/{folder_uuid}/move")

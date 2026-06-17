@@ -1,9 +1,16 @@
+import re
 import uuid
 
 from app.models.document import SmartDocument
 from app.models.folder import SmartFolder
 from app.models.user import User
 from app.services import access_control
+
+
+def _safe_component(name: str) -> str:
+    """Make a folder/file title safe to use as a single zip path segment."""
+    cleaned = re.sub(r'[/\\:*?"<>|]', "_", name or "").strip()
+    return cleaned or "untitled"
 
 
 async def create_folder(
@@ -153,6 +160,53 @@ async def convert_to_team_folder(folder_uuid: str, user: User) -> SmartFolder:
     # Refresh and return
     folder = await SmartFolder.find_one(SmartFolder.uuid == folder_uuid)
     return folder
+
+
+async def collect_export_entries(
+    folder_uuid: str, user: User
+) -> tuple[str, list[tuple[str, str]]] | None:
+    """Plan a zip export of a folder subtree.
+
+    Returns ``(root_title, [(path_prefix, doc_uuid), ...])`` where each prefix
+    is the document's folder path relative to the export root (e.g.
+    ``"Subfolder/"`` or ``""`` for the root). Per-document authorization is
+    still enforced at download time, so candidates here are filtered to the
+    requested (already authorized) subtree only. Returns ``None`` if the root
+    folder is missing or not viewable.
+    """
+    root = await access_control.get_authorized_folder(folder_uuid, user)
+    if not root:
+        return None
+
+    folders_by_uuid: dict[str, SmartFolder] = {root.uuid: root}
+    frontier = [root.uuid]
+    while frontier:
+        children = await SmartFolder.find({"parent_id": {"$in": frontier}}).to_list()
+        frontier = []
+        for child in children:
+            folders_by_uuid[child.uuid] = child
+            frontier.append(child.uuid)
+
+    def path_prefix(folder: SmartFolder) -> str:
+        parts: list[str] = []
+        current = folder
+        while current.uuid != root.uuid:
+            parts.append(_safe_component(current.title))
+            parent = folders_by_uuid.get(current.parent_id)
+            if parent is None:
+                break
+            current = parent
+        return "/".join(reversed(parts)) + "/" if parts else ""
+
+    docs = await SmartDocument.find(
+        {"folder": {"$in": list(folders_by_uuid)}}
+    ).to_list()
+    entries = [
+        (path_prefix(folders_by_uuid[d.folder]), d.uuid)
+        for d in docs
+        if d.folder in folders_by_uuid
+    ]
+    return root.title, entries
 
 
 async def get_breadcrumbs(folder_uuid: str, user: User) -> list[dict] | None:

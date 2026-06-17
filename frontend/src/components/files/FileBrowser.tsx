@@ -14,7 +14,7 @@ import { CreateFolderDialog } from './CreateFolderDialog'
 import { MoveFolderDialog } from './MoveFolderDialog'
 import { useConfirm } from '../shared/useConfirm'
 import { deleteFile, renameFile, downloadFile, downloadFilesAsZip, moveFile } from '../../api/files'
-import { createFolder, renameFolder, deleteFolder, convertFolderToTeam, moveFolder } from '../../api/folders'
+import { createFolder, renameFolder, deleteFolder, convertFolderToTeam, moveFolder, exportFolder } from '../../api/folders'
 import { listAutomations } from '../../api/automations'
 import type { Document, Folder } from '../../types/document'
 import { isDocReady } from '../../utils/processingStatus'
@@ -614,6 +614,18 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
           onMove={
             contextMenu.type === 'folder' && !(contextMenu.item as Folder).is_shared_team_root
               ? () => setMoveTarget(contextMenu.item as Folder)
+              : undefined
+          }
+          onExport={
+            contextMenu.type === 'folder'
+              ? async () => {
+                  const folder = contextMenu.item as Folder
+                  try {
+                    await exportFolder(folder.uuid, folder.title)
+                  } catch (err: unknown) {
+                    alert(err instanceof Error ? err.message : 'Failed to export folder')
+                  }
+                }
               : undefined
           }
           onDelete={() => handleDelete(contextMenu.type, contextMenu.item.uuid)}
