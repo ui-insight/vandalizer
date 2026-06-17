@@ -8,7 +8,7 @@ from contextvars import ContextVar
 from typing import Callable, Optional
 
 import httpx
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from pydantic_ai import Agent
 
 from app.models.kb_test_query import KBTestQuery
@@ -771,7 +771,6 @@ async def judge_test_queries(
         tasks: list[tuple[object, asyncio.Task]] = [
             (tq, asyncio.create_task(judge_one(tq))) for tq in judgeable
         ]
-        task_to_tq = {t: tq for tq, t in tasks}
         pending = {t for _, t in tasks}
         try:
             for fut in asyncio.as_completed([t for _, t in tasks]):

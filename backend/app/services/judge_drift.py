@@ -22,9 +22,8 @@ import datetime
 import json
 import os
 import statistics
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Iterable
 
 
 # Trailing window for the median we regress against. 30 runs is large enough
