@@ -19,6 +19,13 @@ export function deleteFolder(folderUuid: string) {
   return apiFetch<{ ok: boolean }>(`/api/folders/${folderUuid}`, { method: 'DELETE' })
 }
 
+export function moveFolder(folderUuid: string, parentId: string) {
+  return apiFetch<Folder>(`/api/folders/${folderUuid}/move`, {
+    method: 'PATCH',
+    body: JSON.stringify({ parent_id: parentId }),
+  })
+}
+
 export function convertFolderToTeam(folderUuid: string) {
   return apiFetch<Folder>(`/api/folders/${folderUuid}/convert-to-team`, { method: 'PATCH' })
 }

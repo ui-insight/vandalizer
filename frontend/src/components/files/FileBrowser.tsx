@@ -11,9 +11,10 @@ import { UploadProgress } from './UploadProgress'
 import { ContextMenu } from './ContextMenu'
 import { RenameDialog } from './RenameDialog'
 import { CreateFolderDialog } from './CreateFolderDialog'
+import { MoveFolderDialog } from './MoveFolderDialog'
 import { useConfirm } from '../shared/useConfirm'
 import { deleteFile, renameFile, downloadFile, downloadFilesAsZip, moveFile } from '../../api/files'
-import { createFolder, renameFolder, deleteFolder, convertFolderToTeam } from '../../api/folders'
+import { createFolder, renameFolder, deleteFolder, convertFolderToTeam, moveFolder } from '../../api/folders'
 import { listAutomations } from '../../api/automations'
 import type { Document, Folder } from '../../types/document'
 import { isDocReady } from '../../utils/processingStatus'
@@ -323,6 +324,7 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
   } | null>(null)
   const [showCreateFolder, setShowCreateFolder] = useState(false)
   const [createTeamFolder, setCreateTeamFolder] = useState(false)
+  const [moveTarget, setMoveTarget] = useState<Folder | null>(null)
 
   // Panel-wide drag & drop
   const dragCounter = useRef(0)
@@ -393,6 +395,20 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
       refresh()
     },
     [currentFolder, createTeamFolder, refresh],
+  )
+
+  const handleMoveFolder = useCallback(
+    async (parentId: string) => {
+      if (!moveTarget) return
+      try {
+        await moveFolder(moveTarget.uuid, parentId)
+      } catch (err: unknown) {
+        alert(err instanceof Error ? err.message : 'Failed to move folder')
+      }
+      setMoveTarget(null)
+      refresh()
+    },
+    [moveTarget, refresh],
   )
 
   const handleDelete = useCallback(
@@ -595,6 +611,11 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
               name: item.title,
             })
           }}
+          onMove={
+            contextMenu.type === 'folder' && !(contextMenu.item as Folder).is_shared_team_root
+              ? () => setMoveTarget(contextMenu.item as Folder)
+              : undefined
+          }
           onDelete={() => handleDelete(contextMenu.type, contextMenu.item.uuid)}
           onDownload={
             contextMenu.type === 'doc'
@@ -634,6 +655,14 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
           onSubmit={handleCreateFolder}
           onClose={() => { setShowCreateFolder(false); setCreateTeamFolder(false) }}
           title={createTeamFolder ? 'New Team Folder' : 'New Folder'}
+        />
+      )}
+
+      {moveTarget && (
+        <MoveFolderDialog
+          folder={moveTarget}
+          onSubmit={handleMoveFolder}
+          onClose={() => setMoveTarget(null)}
         />
       )}
     </div>

@@ -3,7 +3,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.dependencies import get_current_user
 from app.models.folder import SmartFolder
 from app.models.user import User
-from app.schemas.documents import CreateFolderRequest, RenameFolderRequest
+from app.schemas.documents import (
+    CreateFolderRequest,
+    MoveFolderRequest,
+    RenameFolderRequest,
+)
 from app.services import folder_service
 
 router = APIRouter()
@@ -50,6 +54,26 @@ async def rename(
     if not ok:
         raise HTTPException(status_code=404, detail="Folder not found")
     return {"ok": True}
+
+
+@router.patch("/{folder_uuid}/move")
+async def move(
+    folder_uuid: str,
+    body: MoveFolderRequest,
+    user: User = Depends(get_current_user),
+):
+    try:
+        folder = await folder_service.move_folder(folder_uuid, body.parent_id, user)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {
+        "id": str(folder.id),
+        "uuid": folder.uuid,
+        "title": folder.title,
+        "parent_id": folder.parent_id,
+        "is_shared_team_root": folder.is_shared_team_root,
+        "team_id": folder.team_id,
+    }
 
 
 @router.delete("/{folder_uuid}")

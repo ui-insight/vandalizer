@@ -50,6 +50,49 @@ async def rename_folder(folder_uuid: str, new_title: str, user: User) -> bool:
     return True
 
 
+async def move_folder(folder_uuid: str, new_parent_id: str, user: User) -> SmartFolder:
+    """Reparent a folder under ``new_parent_id`` ("0" == top level).
+
+    Guards against the three ways a move can corrupt the tree:
+      * moving a folder into itself or one of its own descendants (cycle),
+      * moving the immovable shared team root,
+      * crossing the personal/team ownership boundary (use convert-to-team
+        for that), which would otherwise silently re-own a whole subtree.
+    """
+    folder = await access_control.get_authorized_folder(folder_uuid, user, manage=True)
+    if not folder:
+        raise ValueError("Folder not found.")
+    if folder.is_shared_team_root:
+        raise ValueError("Shared team folders cannot be moved.")
+
+    dest_team_id: str | None = None
+    if new_parent_id != "0":
+        parent = await access_control.get_authorized_folder(new_parent_id, user, manage=True)
+        if not parent:
+            raise ValueError("Destination folder not found.")
+        dest_team_id = parent.team_id
+
+        # Reject moving into self or any descendant.
+        descendants = {folder_uuid}
+        frontier = [folder_uuid]
+        while frontier:
+            children = await SmartFolder.find({"parent_id": {"$in": frontier}}).to_list()
+            frontier = [child.uuid for child in children]
+            descendants.update(frontier)
+        if new_parent_id in descendants:
+            raise ValueError("Cannot move a folder into itself or one of its subfolders.")
+
+    if folder.team_id != dest_team_id:
+        raise ValueError(
+            "Cannot move a folder across personal and team ownership. "
+            "Use 'Convert to team folder' instead."
+        )
+
+    folder.parent_id = new_parent_id
+    await folder.save()
+    return folder
+
+
 async def delete_folder(folder_uuid: str, user: User) -> bool:
     folder = await access_control.get_authorized_folder(folder_uuid, user, manage=True)
     if not folder:

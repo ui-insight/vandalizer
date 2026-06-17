@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, useLayoutEffect } from 'react'
-import { Download, Edit2, Trash2, Copy, Users } from 'lucide-react'
+import { Download, Edit2, Trash2, Copy, Users, FolderInput } from 'lucide-react'
 
 interface ContextMenuProps {
   x: number
   y: number
   onClose: () => void
   onRename?: () => void
+  onMove?: () => void
   onDelete?: () => void
   onDownload?: () => void
   onCopyUuid?: () => void
@@ -17,6 +18,7 @@ export function ContextMenu({
   y,
   onClose,
   onRename,
+  onMove,
   onDelete,
   onDownload,
   onCopyUuid,
@@ -46,6 +48,7 @@ export function ContextMenu({
 
   const items = [
     onRename && { label: 'Rename', icon: Edit2, action: onRename },
+    onMove && { label: 'Move to…', icon: FolderInput, action: onMove },
     onDownload && { label: 'Download', icon: Download, action: onDownload },
     onCopyUuid && { label: 'Copy UUID', icon: Copy, action: onCopyUuid },
     onConvertToTeam && { label: 'Convert to team folder', icon: Users, action: onConvertToTeam },

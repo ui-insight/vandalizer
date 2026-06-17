@@ -128,6 +128,63 @@ class TestRenameFolder:
         assert resp.status_code == 404
 
 
+class TestMoveFolder:
+    @pytest.mark.asyncio
+    async def test_move_folder(self, client):
+        """PATCH /api/folders/{uuid}/move reparents a folder."""
+        user = _make_user()
+        cookies, headers = _auth()
+
+        mock_folder = MagicMock()
+        mock_folder.id = "folder-id"
+        mock_folder.uuid = "folder-uuid"
+        mock_folder.title = "Moved Folder"
+        mock_folder.parent_id = "dest-uuid"
+        mock_folder.is_shared_team_root = False
+        mock_folder.team_id = None
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.folders.folder_service") as mock_svc:
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.move_folder = AsyncMock(return_value=mock_folder)
+
+            resp = await client.patch(
+                "/api/folders/folder-uuid/move",
+                json={"parent_id": "dest-uuid"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["parent_id"] == "dest-uuid"
+        mock_svc.move_folder.assert_called_once_with("folder-uuid", "dest-uuid", user)
+
+    @pytest.mark.asyncio
+    async def test_move_folder_into_descendant_rejected(self, client):
+        """A cycle-inducing move surfaces the service ValueError as a 400."""
+        user = _make_user()
+        cookies, headers = _auth()
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.folders.folder_service") as mock_svc:
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.move_folder = AsyncMock(
+                side_effect=ValueError("Cannot move a folder into itself or one of its subfolders.")
+            )
+
+            resp = await client.patch(
+                "/api/folders/folder-uuid/move",
+                json={"parent_id": "child-uuid"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 400
+        assert "subfolder" in resp.json()["detail"]
+
+
 class TestDeleteFolder:
     @pytest.mark.asyncio
     async def test_delete_folder(self, client):

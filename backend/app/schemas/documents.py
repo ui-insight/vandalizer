@@ -59,6 +59,10 @@ class RenameFolderRequest(BaseModel):
     newName: EntityName
 
 
+class MoveFolderRequest(BaseModel):
+    parent_id: str
+
+
 class RenameDocumentRequest(BaseModel):
     uuid: str
     newName: EntityName
