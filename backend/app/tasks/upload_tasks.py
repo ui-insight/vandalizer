@@ -32,22 +32,27 @@ def dispatch_upload_tasks(
         immutable=True,
     )
 
-    workflow = extraction | update
-    result = workflow.apply_async(link_error=cleanup)
-
-    # Dispatch semantic ingestion after extraction completes.
-    # This uses send_task so it works whether tasks are local or in Flask workers.
+    # Semantic ingestion MUST run only after extraction has written raw_text.
+    # Previously it was dispatched fire-and-forget with countdown=10, racing the
+    # extraction task: it routinely read an empty document, produced zero chunks,
+    # and "succeeded" — leaving the doc permanently unindexed (0 chunks isn't an
+    # error, so it never retries). Chain it onto extraction→update so ordering is
+    # guaranteed; the task reads raw_text from the DB, now populated by extraction.
     if user_id:
-        celery.send_task(
+        ingestion = celery.signature(
             "tasks.document.semantic_ingestion",
             kwargs={
-                "raw_text": "",  # task will read from DB if empty
+                "raw_text": "",  # task reads raw_text from DB
                 "document_uuid": document_uuid,
                 "user_id": user_id,
             },
             queue="documents",
-            countdown=10,  # slight delay to let extraction finish
+            immutable=True,
         )
+        workflow = extraction | update | ingestion
+    else:
+        workflow = extraction | update
+    result = workflow.apply_async(link_error=cleanup)
 
     # Run classification independently in the background
     celery.send_task(
