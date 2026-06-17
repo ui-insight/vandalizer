@@ -209,6 +209,53 @@ async def collect_export_entries(
     return root.title, entries
 
 
+async def expand_folders_to_document_uuids(
+    folder_uuids: list[str], user: User
+) -> list[str]:
+    """Resolve a set of folders to the UUIDs of all viewable documents within
+    them, recursing through subfolders.
+
+    Each root folder must be viewable by the user (raises ValueError otherwise);
+    documents are additionally filtered by per-document view access. Returns a
+    de-duplicated, order-preserving list. Used by "Run workflow on folder" and
+    "Add folder to knowledge base".
+    """
+    team_access = await access_control.get_team_access_context(user)
+
+    folder_uuid_set: list[str] = []
+    seen_folders: set[str] = set()
+    for root_uuid in folder_uuids:
+        root = await access_control.get_authorized_folder(
+            root_uuid, user, team_access=team_access, allow_admin=True
+        )
+        if not root:
+            raise ValueError(f"Folder not found: {root_uuid}")
+        # Walk the subtree rooted here; descendants share the root's ownership.
+        frontier = [root.uuid]
+        while frontier:
+            for fid in frontier:
+                if fid not in seen_folders:
+                    seen_folders.add(fid)
+                    folder_uuid_set.append(fid)
+            children = await SmartFolder.find(
+                {"parent_id": {"$in": frontier}}
+            ).to_list()
+            frontier = [c.uuid for c in children if c.uuid not in seen_folders]
+
+    docs = await SmartDocument.find(
+        {"folder": {"$in": folder_uuid_set}}
+    ).to_list()
+    result: list[str] = []
+    seen_docs: set[str] = set()
+    for doc in docs:
+        if doc.uuid in seen_docs:
+            continue
+        if access_control.can_view_document(doc, user, team_access, allow_admin=True):
+            result.append(doc.uuid)
+            seen_docs.add(doc.uuid)
+    return result
+
+
 async def get_breadcrumbs(folder_uuid: str, user: User) -> list[dict] | None:
     current = await access_control.get_authorized_folder(folder_uuid, user)
     if not current:

@@ -390,12 +390,27 @@ async def add_documents(uuid: str, req: AddDocumentsRequest, user: User = Depend
     )
     if not kb:
         raise HTTPException(status_code=404, detail="Knowledge base not found")
-    if not req.document_uuids:
+    document_uuids = list(req.document_uuids)
+    if req.folder_uuids:
+        from app.services import folder_service
+
+        try:
+            folder_docs = await folder_service.expand_folders_to_document_uuids(
+                req.folder_uuids, user
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        seen = set(document_uuids)
+        for doc_uuid in folder_docs:
+            if doc_uuid not in seen:
+                document_uuids.append(doc_uuid)
+                seen.add(doc_uuid)
+    if not document_uuids:
         raise HTTPException(status_code=400, detail="No documents provided")
     kb.status = "building"
     await kb.save()
     try:
-        added = await svc.add_documents(kb, req.document_uuids, user)
+        added = await svc.add_documents(kb, document_uuids, user)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     return {"ok": True, "added": added}

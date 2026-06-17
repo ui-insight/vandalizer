@@ -1106,6 +1106,20 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
     document_uuids = await _authorize_documents(req.document_uuids, user)
+    if req.folder_uuids:
+        from app.services import folder_service
+
+        try:
+            folder_docs = await folder_service.expand_folders_to_document_uuids(
+                req.folder_uuids, user
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        seen = set(document_uuids)
+        for doc_uuid in folder_docs:
+            if doc_uuid not in seen:
+                document_uuids.append(doc_uuid)
+                seen.add(doc_uuid)
     initial_title = wf.name if wf else "Workflow Run"
     # steps count excludes the trigger step
     num_steps = max(0, len(wf.steps) - 1) if wf and wf.steps else 0

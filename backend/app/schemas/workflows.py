@@ -72,7 +72,8 @@ class UpdateTaskRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 class RunWorkflowRequest(BaseModel):
-    document_uuids: list[str]
+    document_uuids: list[str] = []
+    folder_uuids: list[str] = []
     model: Optional[str] = None
     batch_mode: bool = False
 
