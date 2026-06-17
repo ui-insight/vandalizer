@@ -575,6 +575,10 @@ export interface ExtractionOptimizationRun {
   error_message: string | null
   started_at: string | null
   completed_at: string | null
+  // Server-computed elapsed seconds (started_at → completed_at|now). Drives the
+  // live timer skew-free; the client ticks forward from this base. Optional so
+  // older payloads fall back to the started_at delta.
+  elapsed_seconds?: number | null
   cancel_requested: boolean
 }
 
@@ -808,6 +812,36 @@ export async function downloadValidationZip(uuid: string): Promise<void> {
   const disposition = res.headers.get('Content-Disposition') ?? ''
   const match = disposition.match(/filename="([^"]+)"/)
   const filename = match ? match[1] : `validation-${uuid}.zip`
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
+/**
+ * Download the raw results of a validation run: a zip with the extracted value
+ * for every replicate of every document (validation-results.json) plus the same
+ * data as a tidy CSV (extracted-values.csv), for ingestion into an external
+ * evaluation data repository. Defaults to the most recent run; pass runUuid to
+ * export a specific one. Companion to downloadValidationZip (the setup export).
+ */
+export async function downloadValidationResults(uuid: string, runUuid?: string): Promise<void> {
+  const qs = runUuid ? `?run_uuid=${encodeURIComponent(runUuid)}` : ''
+  const res = await rawFetch(`/api/extractions/search-sets/${uuid}/download-results${qs}`, {
+    method: 'GET',
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ detail: 'Download failed' }))
+    throw new ApiError(res.status, body.detail || 'Download failed')
+  }
+  const blob = await res.blob()
+  const disposition = res.headers.get('Content-Disposition') ?? ''
+  const match = disposition.match(/filename="([^"]+)"/)
+  const filename = match ? match[1] : `validation-results-${uuid}.zip`
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url

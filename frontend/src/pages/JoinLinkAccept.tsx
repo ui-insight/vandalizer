@@ -85,6 +85,7 @@ export default function JoinLinkAccept() {
               extraction: undefined,
               automation: undefined,
               kb: undefined,
+              project: undefined,
               workflow_share_token: undefined,
             },
           })
@@ -117,6 +118,7 @@ export default function JoinLinkAccept() {
                 extraction: undefined,
                 automation: undefined,
                 kb: undefined,
+                project: undefined,
                 workflow_share_token: undefined,
               },
             })

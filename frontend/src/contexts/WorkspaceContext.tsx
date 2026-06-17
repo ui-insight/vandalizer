@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useNavigate, useSearch } from '@tanstack/react-router'
 
 type RightTab = 'assistant' | 'library'
-export type WorkspaceMode = 'chat' | 'files' | 'automations' | 'knowledge'
+export type WorkspaceMode = 'chat' | 'files' | 'automations' | 'knowledge' | 'projects'
 
 // ---------------------------------------------------------------------------
 // 1. Navigation Context — URL-synced panels, mode, tab
@@ -65,6 +65,18 @@ interface ChatStateContextValue {
   activeKBTitle: string | null
   activateKB: (uuid: string, title: string) => void
   deactivateKB: () => void
+  // Project scope — the whole workspace (files, chat, …) re-scoped to one project.
+  activeProjectUuid: string | null
+  activeProjectTitle: string | null
+  activeProjectRootFolder: string | null
+  activeProjectTeamId: string | null
+  activeProjectRole: string | null // owner|editor|viewer — gates mutating UI
+  activateProject: (uuid: string, title: string) => void
+  deactivateProject: () => void
+  // Re-pull the active project's metadata (title/role/team) into the context
+  // bar after an in-workspace edit (rename, share, make-personal) — without
+  // resetting the chat the way activateProject does.
+  refreshActiveProject: () => void
   processingDoc: { title: string; status: string | null } | null
   setProcessingDoc: (doc: { title: string; status: string | null } | null) => void
   // Subset of selectedDocUuids that are still being processed by the upload
@@ -145,6 +157,7 @@ type WorkspaceSearchState = {
   extraction: string | undefined
   automation: string | undefined
   kb: string | undefined
+  project: string | undefined
 }
 
 function emptyWorkspaceSearch(): WorkspaceSearchState {
@@ -156,6 +169,7 @@ function emptyWorkspaceSearch(): WorkspaceSearchState {
     extraction: undefined,
     automation: undefined,
     kb: undefined,
+    project: undefined,
   }
 }
 
@@ -170,7 +184,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   // ── URL-derived state ───────────────────────────────────────────────────
   const workspaceMode: WorkspaceMode =
     search.mode ??
-    getStoredString('workspace:mode', 'chat', ['chat', 'files', 'automations', 'knowledge'])
+    getStoredString('workspace:mode', 'chat', ['chat', 'files', 'automations', 'knowledge', 'projects'])
 
   const openWorkflowId: string | null = search.workflow ?? null
   const openWorkflowShareToken: string | null = search.workflow_share_token ?? null
@@ -210,6 +224,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   )
   const [activeKBUuid, setActiveKBUuid] = useState<string | null>(null)
   const [activeKBTitle, setActiveKBTitle] = useState<string | null>(null)
+  const [activeProjectUuid, setActiveProjectUuid] = useState<string | null>(null)
+  const [activeProjectTitle, setActiveProjectTitle] = useState<string | null>(null)
+  const [activeProjectRootFolder, setActiveProjectRootFolder] = useState<string | null>(null)
+  const [activeProjectTeamId, setActiveProjectTeamId] = useState<string | null>(null)
+  const [activeProjectRole, setActiveProjectRole] = useState<string | null>(null)
   const [viewDocumentRequest, setViewDocumentRequest] = useState<{ uuid: string; title: string } | null>(null)
   const pendingExtractionResultsRef = useRef<Record<string, string> | null>(null)
   const pendingWorkflowSessionRef = useRef<string | null>(null)
@@ -289,6 +308,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setHighlightTerms([])
     setActiveKBUuid(null)
     setActiveKBTitle(null)
+    setActiveProjectUuid(null)
+    setActiveProjectTitle(null)
+    setActiveProjectRootFolder(null)
+    setActiveProjectTeamId(null)
+    setActiveProjectRole(null)
   }, [updateSearch])
 
   // ── Chat callbacks ──────────────────────────────────────────────────────
@@ -334,6 +358,39 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setActiveKBTitle(null)
   }, [])
 
+  const activateProject = useCallback((uuid: string, title: string) => {
+    setActiveProjectUuid(uuid)
+    setActiveProjectTitle(title)
+    // Entering a project starts a fresh, project-scoped chat.
+    setActiveKBUuid(null)
+    setActiveKBTitle(null)
+    setNewChatSignal(prev => prev + 1)
+    localStorage.setItem('workspace:mode', 'chat')
+    updateSearch((prev) => ({ ...prev, mode: undefined, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined }))
+  }, [updateSearch])
+
+  const deactivateProject = useCallback(() => {
+    setActiveProjectUuid(null)
+    setActiveProjectTitle(null)
+    setActiveProjectRootFolder(null)
+    setActiveProjectTeamId(null)
+    setActiveProjectRole(null)
+  }, [])
+
+  const refreshActiveProject = useCallback(() => {
+    if (!activeProjectUuid) return
+    import('../api/projects').then(({ getProject }) => {
+      getProject(activeProjectUuid)
+        .then((project) => {
+          setActiveProjectTitle(project.title)
+          setActiveProjectRootFolder(project.root_folder_uuid)
+          setActiveProjectTeamId(project.team_id ?? null)
+          setActiveProjectRole(project.role)
+        })
+        .catch(() => {})
+    }).catch(() => {})
+  }, [activeProjectUuid])
+
   // Activate a knowledge base from URL param (e.g. /?kb=<uuid>)
   useEffect(() => {
     const kbParam = search.kb
@@ -366,6 +423,53 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       })
     })
   }, [search.kb, navigate])
+
+  // Activate a project scope from URL param (e.g. /?project=<uuid>)
+  useEffect(() => {
+    const projectParam = search.project
+    if (!projectParam) return
+    import('../api/projects').then(({ getProject }) => {
+      getProject(projectParam)
+        .then((project) => {
+          setActiveProjectUuid(projectParam)
+          setActiveProjectTitle(project.title)
+          setActiveProjectRootFolder(project.root_folder_uuid)
+          setActiveProjectTeamId(project.team_id ?? null)
+          setActiveProjectRole(project.role)
+          setActiveKBUuid(null)
+          setActiveKBTitle(null)
+          setNewChatSignal(prev => prev + 1)
+          // Land in whatever mode was requested (e.g. ?project=X&mode=files),
+          // defaulting to chat. Viewers (shared-in PIs) are chat-only.
+          const requestedMode = project.role === 'viewer' ? 'chat' : (search.mode ?? 'chat')
+          localStorage.setItem('workspace:mode', requestedMode)
+          navigate({
+            // Preserve any editor param so a pinned tool (e.g. ?project=X&workflow=Y)
+            // opens inside the scoped project rather than being wiped.
+            search: () => ({
+              ...emptyWorkspaceSearch(),
+              mode: requestedMode === 'chat' ? undefined : requestedMode,
+              workflow: project.role === 'viewer' ? undefined : search.workflow,
+              extraction: project.role === 'viewer' ? undefined : search.extraction,
+              automation: project.role === 'viewer' ? undefined : search.automation,
+              project: undefined,
+            }),
+            replace: true,
+          })
+        })
+        .catch(() => {
+          navigate({
+            search: (prev) => ({ ...emptyWorkspaceSearch(), ...prev, project: undefined }),
+            replace: true,
+          })
+        })
+    }).catch(() => {
+      navigate({
+        search: (prev) => ({ ...emptyWorkspaceSearch(), ...prev, project: undefined }),
+        replace: true,
+      })
+    })
+  }, [search.project, search.mode, navigate])
 
   // ── UI callbacks ────────────────────────────────────────────────────────
 
@@ -424,6 +528,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     focusChatSignal, focusChat,
     pendingChatMessage, sendChatMessage, clearPendingChatMessage,
     activeKBUuid, activeKBTitle, activateKB, deactivateKB,
+    activeProjectUuid, activeProjectTitle, activeProjectRootFolder, activeProjectTeamId, activeProjectRole, activateProject, deactivateProject, refreshActiveProject,
     processingDoc, setProcessingDoc,
     selectedDocsProcessing, setSelectedDocsProcessing,
   }), [
@@ -432,6 +537,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     focusChatSignal, focusChat,
     pendingChatMessage, sendChatMessage, clearPendingChatMessage,
     activeKBUuid, activeKBTitle, activateKB, deactivateKB,
+    activeProjectUuid, activeProjectTitle, activeProjectRootFolder, activeProjectTeamId, activeProjectRole, activateProject, deactivateProject, refreshActiveProject,
     processingDoc,
     selectedDocsProcessing, setSelectedDocsProcessing,
   ])

@@ -160,6 +160,7 @@ export function ExtractionAutovalidatePanel({ searchSetUuid, canManage, onApplie
       error_message: null,
       started_at: new Date().toISOString(),
       completed_at: null,
+      elapsed_seconds: 0,
       cancel_requested: false,
     }
     setRun(seed)

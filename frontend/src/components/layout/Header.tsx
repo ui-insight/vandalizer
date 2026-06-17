@@ -29,6 +29,7 @@ export function Header() {
         extraction: undefined,
         automation: undefined,
         kb: undefined,
+        project: undefined,
         workflow_share_token: undefined,
       },
     })

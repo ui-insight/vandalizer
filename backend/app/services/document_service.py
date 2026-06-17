@@ -111,6 +111,64 @@ async def list_contents(
         ],
     }
 
+async def collect_folder_document_uuids(
+    *,
+    folder_uuid: str,
+    user: User,
+    include_subfolders: bool = True,
+) -> list[str] | None:
+    """Return the uuids of every (non-deleted) SmartDocument inside a folder.
+
+    Walks subfolders when ``include_subfolders`` is set. Returns ``None`` if the
+    folder is missing or the user can't access it. The returned uuids are still
+    re-authorized individually by the caller (e.g. ``add_documents``).
+    """
+    team_access = await access_control.get_team_access_context(user)
+    root = await access_control.get_authorized_folder(
+        folder_uuid, user, team_access=team_access
+    )
+    if not root:
+        return None
+
+    # Resolve the set of folder uuids to scan (root + descendants).
+    folder_uuids = [root.uuid]
+    if include_subfolders:
+        if root.team_id:
+            all_folders = await SmartFolder.find(
+                SmartFolder.team_id == root.team_id
+            ).to_list()
+        else:
+            all_folders = await SmartFolder.find(
+                SmartFolder.user_id == user.user_id
+            ).to_list()
+        children_by_parent: dict[str, list[str]] = {}
+        for f in all_folders:
+            children_by_parent.setdefault(f.parent_id, []).append(f.uuid)
+        queue = [root.uuid]
+        seen = {root.uuid}
+        while queue:
+            current = queue.pop()
+            for child in children_by_parent.get(current, []):
+                if child not in seen:
+                    seen.add(child)
+                    folder_uuids.append(child)
+                    queue.append(child)
+
+    scope = (
+        {"team_id": root.team_id}
+        if root.team_id
+        else {"user_id": user.user_id}
+    )
+    documents = await SmartDocument.find(
+        {
+            "folder": {"$in": folder_uuids},
+            "soft_deleted": {"$ne": True},
+            **scope,
+        }
+    ).to_list()
+    return [d.uuid for d in documents]
+
+
 async def poll_status(doc_uuid: str, user: User) -> dict | None:
     doc = await access_control.get_authorized_document(doc_uuid, user)
     if not doc:

@@ -256,6 +256,41 @@ async def expand_folders_to_document_uuids(
     return result
 
 
+async def convert_to_personal_folder(
+    folder_uuid: str, user: User, *, owner_user_id: str | None = None
+) -> SmartFolder:
+    """Convert a team folder (and all its descendants) back to personal ownership.
+
+    Inverse of ``convert_to_team_folder``. ``owner_user_id`` is who the folder
+    and its documents revert to (defaults to the acting user) — the project flow
+    passes the project owner so an admin acting on their behalf doesn't claim it.
+    """
+    folder = await access_control.get_authorized_folder(folder_uuid, user, manage=True)
+    if not folder:
+        raise ValueError("Folder not found.")
+    if not folder.team_id:
+        raise ValueError("Folder is already personal.")
+    target_user_id = owner_user_id or user.user_id
+
+    # Collect this folder and all descendants
+    folder_uuids = [folder_uuid]
+    frontier = [folder_uuid]
+    while frontier:
+        children = await SmartFolder.find({"parent_id": {"$in": frontier}}).to_list()
+        frontier = [child.uuid for child in children]
+        folder_uuids.extend(frontier)
+
+    await SmartFolder.find({"uuid": {"$in": folder_uuids}}).update(
+        {"$set": {"team_id": None, "user_id": target_user_id}}
+    )
+    await SmartDocument.find({"folder": {"$in": folder_uuids}}).update(
+        {"$set": {"team_id": None, "user_id": target_user_id}}
+    )
+
+    folder = await SmartFolder.find_one(SmartFolder.uuid == folder_uuid)
+    return folder
+
+
 async def get_breadcrumbs(folder_uuid: str, user: User) -> list[dict] | None:
     current = await access_control.get_authorized_folder(folder_uuid, user)
     if not current:

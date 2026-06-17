@@ -567,17 +567,17 @@ export function ExploreTab() {
     if (item.kind === 'workflow') {
       navigate({
         to: '/',
-        search: { mode: undefined, tab: undefined, workflow: item.source_uuid, extraction: undefined, automation: undefined, kb: undefined, workflow_share_token: undefined },
+        search: { mode: undefined, tab: undefined, workflow: item.source_uuid, extraction: undefined, automation: undefined, kb: undefined, project: undefined, workflow_share_token: undefined },
       })
     } else if (item.kind === 'search_set') {
       navigate({
         to: '/',
-        search: { mode: undefined, tab: undefined, workflow: undefined, extraction: item.source_uuid, automation: undefined, kb: undefined, workflow_share_token: undefined },
+        search: { mode: undefined, tab: undefined, workflow: undefined, extraction: item.source_uuid, automation: undefined, kb: undefined, project: undefined, workflow_share_token: undefined },
       })
     } else if (item.kind === 'knowledge_base') {
       navigate({
         to: '/',
-        search: { mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: item.source_uuid, workflow_share_token: undefined },
+        search: { mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: item.source_uuid, project: undefined, workflow_share_token: undefined },
       })
     }
   }

@@ -5,6 +5,9 @@ import { PanelResizer } from './PanelResizer'
 import { LeftPanel } from './LeftPanel'
 import { RightPanel } from './RightPanel'
 import { UtilityBar } from './UtilityBar'
+import { ProjectContextBar } from './ProjectContextBar'
+import { ProjectManageModal } from './ProjectManageModal'
+import { ProjectsPanel } from './ProjectsPanel'
 import { AutomationsPanel } from './AutomationsPanel'
 import { KnowledgePanel } from './KnowledgePanel'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
@@ -14,10 +17,11 @@ import type { AutomationStarted } from '../../hooks/useAutomationActivity'
 import type { CompletedAutomation } from '../../api/automations'
 
 export function WorkspaceLayout() {
-  const { railDocked, panelSplit, workspaceMode, viewDocument, setWorkspaceMode } = useWorkspace()
+  const { railDocked, panelSplit, workspaceMode, viewDocument, setWorkspaceMode, activeProjectUuid } = useWorkspace()
   const { toast } = useToast()
   const containerRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [manageOpen, setManageOpen] = useState(false)
 
   const handleAutomationStarted = useCallback((info: AutomationStarted) => {
     toast(`${info.name} started`, 'info')
@@ -47,7 +51,10 @@ export function WorkspaceLayout() {
 
   const railWidth = railDocked ? 64 : 220
 
-  const isChat = workspaceMode === 'chat'
+  // Once a project is scoped, the workspace shows that project (chat/files/…) —
+  // the Projects drawer (the picker) must not linger underneath it.
+  const isProjects = workspaceMode === 'projects' && !activeProjectUuid
+  const isChat = workspaceMode === 'chat' || (workspaceMode === 'projects' && !!activeProjectUuid)
   const isAutomations = workspaceMode === 'automations'
   const isKnowledge = workspaceMode === 'knowledge'
 
@@ -55,6 +62,8 @@ export function WorkspaceLayout() {
   return (
     <div className="flex h-screen flex-col">
       <Header />
+      <ProjectContextBar onOpenManage={() => setManageOpen(true)} />
+      <ProjectManageModal open={manageOpen} onClose={() => setManageOpen(false)} />
       <div className="flex flex-1 overflow-hidden">
         <UtilityBar hasActiveAutomation={automationActivity.hasActive} />
         <div
@@ -74,7 +83,7 @@ export function WorkspaceLayout() {
               transition: isDragging ? 'none' : 'width 0.3s ease',
             }}
           >
-            {isAutomations ? <AutomationsPanel activeIds={automationActivity.activeIds} /> : isKnowledge ? <KnowledgePanel /> : <LeftPanel />}
+            {isProjects ? <ProjectsPanel /> : isAutomations ? <AutomationsPanel activeIds={automationActivity.activeIds} /> : isKnowledge ? <KnowledgePanel /> : <LeftPanel />}
           </div>
 
           {/* Resizer — hidden in chat mode */}

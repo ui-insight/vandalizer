@@ -220,6 +220,28 @@ export function KnowledgePanel() {
     }
   }
 
+  const handleAddFolder = async (folderUuid: string, includeSubfolders: boolean) => {
+    if (!selectedKB) return
+    setAddingDocs(true)
+    setShowDocPicker(false)
+    try {
+      const result = await api.addFolderToKB(selectedKB.uuid, folderUuid, includeSubfolders)
+      const n = result?.added ?? 0
+      if (n === 0) {
+        toast('No new documents found in that folder', 'info')
+      } else {
+        toast(`Added ${n} document${n === 1 ? '' : 's'} from folder`, 'success')
+      }
+      loadDetail(selectedKB.uuid)
+      refresh()
+    } catch (err) {
+      console.error('Failed to add folder:', err)
+      toast(err instanceof Error ? err.message : 'Failed to add folder', 'error')
+    } finally {
+      setAddingDocs(false)
+    }
+  }
+
   const handleAddUrls = (urls: string[], crawlEnabled = false, maxCrawlPages = 5, allowedDomains = '') => {
     if (!selectedKB) return
     setAddingUrls(true)
@@ -1204,6 +1226,7 @@ export function KnowledgePanel() {
         {showDocPicker && (
           <DocumentPickerModal
             onSubmit={handleAddDocuments}
+            onSubmitFolder={handleAddFolder}
             onClose={() => setShowDocPicker(false)}
             existingSourceUuids={selectedKB.sources
               .filter(s => s.source_type === 'document' && s.document_uuid)

@@ -444,3 +444,111 @@ async def test_run_optimization_fails_when_no_test_inputs():
 
     assert result.status == "failed"
     assert "test inputs" in (result.error_message or "").lower()
+
+
+# ---------------------------------------------------------------------------
+# Cancellation — the cancel endpoint flips ``cancel_requested`` on a separate
+# DB copy, so the worker must read the flag from the DB (not its stale,
+# long-lived in-memory ``run_doc``) and must not clobber it on save.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_is_cancelled_reads_db_not_stale_in_memory_copy():
+    """A cancel requested after the worker loaded run_doc is still detected."""
+    run_doc = _make_run_doc()
+    run_doc.cancel_requested = False  # worker's stale view
+
+    db_copy = _make_run_doc()
+    db_copy.cancel_requested = True  # endpoint flipped it in the DB
+
+    with patch.object(
+        workflow_optimizer.WorkflowOptimizationRun, "find_one",
+        AsyncMock(return_value=db_copy),
+    ):
+        assert await workflow_optimizer._is_cancelled(run_doc) is True
+
+    # The fresh flag is synced forward so subsequent saves preserve it.
+    assert run_doc.cancel_requested is True
+
+
+@pytest.mark.asyncio
+async def test_save_preserves_concurrently_requested_cancel():
+    """A full-document save must not revert a cancel set by the endpoint."""
+    run_doc = _make_run_doc()
+    run_doc.cancel_requested = False
+
+    db_copy = _make_run_doc()
+    db_copy.cancel_requested = True
+
+    with patch.object(
+        workflow_optimizer.WorkflowOptimizationRun, "find_one",
+        AsyncMock(return_value=db_copy),
+    ):
+        await workflow_optimizer._save(run_doc)
+
+    assert run_doc.cancel_requested is True  # not clobbered back to False
+    run_doc.save.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_run_single_trial_stops_at_input_boundary_when_cancelled():
+    """An in-flight trial aborts at the next input instead of running them all."""
+    run_doc = _make_run_doc()
+    run_doc.cancel_requested = True  # already cancelled
+
+    wf = MagicMock()
+    wf.id = "wf-1"
+    test_inputs = [{"id": "a", "doc_uuids": ["d1"]}, {"id": "b", "doc_uuids": ["d2"]}]
+
+    execute = AsyncMock(return_value=(None, [], 0, 0))
+    with patch.object(
+        workflow_optimizer, "_execute_and_score", execute,
+    ):
+        result = await workflow_optimizer._run_single_trial(
+            wf=wf,
+            wf_data={"validation_plan": []},
+            user_id="u1",
+            step_overrides={},
+            test_inputs=test_inputs,
+            baseline_score=None,
+            label="trial-1",
+            run_doc=run_doc,
+        )
+
+    assert result["status"] == "cancelled"
+    assert result["num_inputs_run"] == 0
+    execute.assert_not_called()  # bailed before running any input
+
+
+@pytest.mark.asyncio
+async def test_run_single_trial_runs_all_inputs_when_not_cancelled():
+    """The cancel check is a no-op when no cancel is pending."""
+    run_doc = _make_run_doc()
+    run_doc.cancel_requested = False
+
+    wf = MagicMock()
+    wf.id = "wf-1"
+    test_inputs = [{"id": "a", "doc_uuids": ["d1"]}, {"id": "b", "doc_uuids": ["d2"]}]
+
+    execute = AsyncMock(return_value=(None, [], 0, 0))
+    with patch.object(
+        workflow_optimizer.WorkflowOptimizationRun, "find_one",
+        AsyncMock(return_value=run_doc),  # DB agrees: not cancelled
+    ), patch.object(
+        workflow_optimizer, "_execute_and_score", execute,
+    ):
+        result = await workflow_optimizer._run_single_trial(
+            wf=wf,
+            wf_data={"validation_plan": []},
+            user_id="u1",
+            step_overrides={},
+            test_inputs=test_inputs,
+            baseline_score=None,
+            label="trial-1",
+            run_doc=run_doc,
+        )
+
+    assert result["status"] == "completed"
+    assert result["num_inputs_run"] == 2
+    assert execute.await_count == 2

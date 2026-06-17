@@ -685,6 +685,66 @@ class TestKnowledgeDocSources:
         assert resp.status_code == 404
 
     @pytest.mark.asyncio
+    async def test_get_source_detail_document_returns_extracted_text(self, client):
+        """Document sources don't cache content, so the inspector endpoint must
+        fall back to the SmartDocument's full extracted raw_text (the text that
+        was chunked into the KB) — not return empty / a single chunk."""
+        from datetime import datetime, timezone
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+
+        source = MagicMock()
+        source.uuid = "src-1"
+        source.source_type = "document"
+        source.document_uuid = "doc-1"
+        source.url = None
+        source.url_title = None
+        source.custom_name = None
+        source.source_reference = None
+        source.status = "ready"
+        source.error_message = None
+        source.chunk_count = 5
+        source.created_at = datetime(2025, 1, 1, tzinfo=timezone.utc)
+        source.content = None  # document sources never cache content on the source
+        source.crawl_enabled = False
+        source.max_crawl_pages = 5
+        source.parent_source_uuid = None
+        source.crawled_urls = None
+        source.processed_at = None
+
+        doc = MagicMock()
+        doc.uuid = "doc-1"
+        doc.title = "My Doc"
+        doc.raw_text = "FULL EXTRACTED TEXT " * 50  # spans many chunks
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.models.knowledge.KnowledgeBaseSource") as MockKBSource,
+            patch("app.models.document.SmartDocument") as MockDoc,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+            MockKBSource.find_one = AsyncMock(return_value=source)
+            MockKBSource.find = MagicMock(return_value=MagicMock(to_list=AsyncMock(return_value=[])))
+            MockDoc.find_one = AsyncMock(return_value=doc)
+
+            resp = await client.get(
+                "/api/knowledge/kb-uuid-1/source/src-1",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["content"] == doc.raw_text
+        assert body["document_title"] == "My Doc"
+
+    @pytest.mark.asyncio
     async def test_remove_source_success(self, client):
         user = _make_user()
         cookies, headers = _auth()

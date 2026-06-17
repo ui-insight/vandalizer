@@ -15,6 +15,7 @@ from app.models.kb_optimization_run import KBOptimizationRun
 from app.services import organization_service
 from app.schemas.knowledge import (
     AddDocumentsRequest,
+    AddFolderRequest,
     AddUrlsRequest,
     AdoptKBRequest,
     ConvertDocumentsRequest,
@@ -544,6 +545,41 @@ async def add_documents(uuid: str, req: AddDocumentsRequest, user: User = Depend
     return {"ok": True, "added": added}
 
 
+@router.post("/{uuid}/add_folder")
+async def add_folder(uuid: str, req: AddFolderRequest, user: User = Depends(get_current_user)):
+    """Add every document in a folder (and, by default, its subfolders) to a KB."""
+    from app.services import document_service
+
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(
+        uuid,
+        user,
+        manage=True,
+        user_org_ancestry=user_org_ancestry,
+        allow_admin=True,
+    )
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+
+    doc_uuids = await document_service.collect_folder_document_uuids(
+        folder_uuid=req.folder_uuid,
+        user=user,
+        include_subfolders=req.include_subfolders,
+    )
+    if doc_uuids is None:
+        raise HTTPException(status_code=404, detail="Folder not found")
+    if not doc_uuids:
+        return {"ok": True, "added": 0}
+
+    kb.status = "building"
+    await kb.save()
+    try:
+        added = await svc.add_documents(kb, doc_uuids, user)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return {"ok": True, "added": added}
+
+
 @router.post("/{uuid}/add_urls")
 @limiter.limit("10/minute")
 async def add_urls(request: Request, uuid: str, req: AddUrlsRequest, user: User = Depends(get_current_user)):
@@ -598,10 +634,17 @@ async def get_source_detail(uuid: str, source_uuid: str, user: User = Depends(ge
         raise HTTPException(status_code=404, detail="Source not found")
 
     document_title: str | None = None
+    # The inspector shows the full ingested text. URL sources cache it on
+    # ``source.content``; document sources don't, so fall back to the
+    # SmartDocument's extracted ``raw_text`` (the same text that was chunked
+    # into the KB) — mirroring what export_knowledge_base does.
+    content = source.content
     if source.source_type == "document" and source.document_uuid:
         doc = await SmartDocument.find_one(SmartDocument.uuid == source.document_uuid)
         if doc:
             document_title = doc.title
+            if not content:
+                content = doc.raw_text or None
 
     # Crawled children (only meaningful when this source is itself a crawl parent)
     children = await KnowledgeBaseSource.find(
@@ -611,7 +654,7 @@ async def get_source_detail(uuid: str, source_uuid: str, user: User = Depends(ge
 
     return KBSourceDetailResponse(
         **_source_response(source, document_title=document_title).model_dump(),
-        content=source.content,
+        content=content,
         crawl_enabled=bool(source.crawl_enabled),
         max_crawl_pages=int(source.max_crawl_pages or 5),
         parent_source_uuid=source.parent_source_uuid,
@@ -1006,6 +1049,44 @@ async def delete_test_query(uuid: str, query_uuid: str, user: User = Depends(get
 # ---------------------------------------------------------------------------
 
 
+def _iso_utc(dt):
+    """ISO-8601 string with an explicit UTC offset.
+
+    Datetimes read back from Mongo are naive (the Motor client isn't tz_aware),
+    so a bare ``.isoformat()`` emits no offset and browsers parse it as *local*
+    time. For users west of UTC that pushes ``started_at`` into the future, so
+    the live elapsed-time readout clamps to 0s for the whole run. Treat naive
+    values as UTC so the wire format is unambiguous.
+    """
+    if dt is None:
+        return None
+    import datetime as _dt
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=_dt.timezone.utc)
+    return dt.astimezone(_dt.timezone.utc).isoformat()
+
+
+def _elapsed_seconds(started_at, completed_at):
+    """Server-authoritative elapsed seconds for the live run timer.
+
+    Computed on the server so the readout can't be corrupted by client/server
+    clock skew. The elapsed counter previously did ``Date.now() - started_at``
+    in the browser, mixing the client wall clock with the server-set start
+    timestamp; on a drifted backend (e.g. a Docker VM that fell behind the host
+    after sleep) that made the counter jump by the full skew the moment polling
+    replaced the optimistic client-side seed. The frontend now ticks forward
+    from this base using client-clock *deltas* only.
+    """
+    if started_at is None:
+        return None
+    import datetime as _dt
+    start = started_at if started_at.tzinfo else started_at.replace(tzinfo=_dt.timezone.utc)
+    end = completed_at or _dt.datetime.now(tz=_dt.timezone.utc)
+    if end.tzinfo is None:
+        end = end.replace(tzinfo=_dt.timezone.utc)
+    return max(0, int((end - start).total_seconds()))
+
+
 def _serialize_optimization_run(run) -> dict:
     return {
         "uuid": run.uuid,
@@ -1046,12 +1127,13 @@ def _serialize_optimization_run(run) -> dict:
         "data_source_suggestions": run.data_source_suggestions,
         "options": run.options,
         "error_message": run.error_message,
-        "started_at": run.started_at.isoformat() if run.started_at else None,
-        "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+        "started_at": _iso_utc(run.started_at),
+        "completed_at": _iso_utc(run.completed_at),
+        "elapsed_seconds": _elapsed_seconds(run.started_at, run.completed_at),
         "cancel_requested": run.cancel_requested,
         "previous_override": getattr(run, "previous_override", None),
-        "applied_at": run.applied_at.isoformat() if getattr(run, "applied_at", None) else None,
-        "reverted_at": run.reverted_at.isoformat() if getattr(run, "reverted_at", None) else None,
+        "applied_at": _iso_utc(getattr(run, "applied_at", None)),
+        "reverted_at": _iso_utc(getattr(run, "reverted_at", None)),
         "tied_with_baseline": getattr(run, "tied_with_baseline", False),
         "apply_preview": getattr(run, "apply_preview", None),
     }
@@ -1065,7 +1147,13 @@ async def start_kb_optimization(uuid: str, request: Request, user: User = Depend
       - token_budget: int (required)
       - include_indexing_track: bool (v1 ignores this — cheap track only)
       - apply_on_finish: bool
-      - autogen_coverage: "quick" | "standard" | "exhaustive" (used only when KB has no test queries)
+      - autogen_coverage: "quick" | "standard" | "exhaustive" (generation tier)
+      - test_set_build_mode: "existing" | "generate" | "combined" — how the
+        Test-set wizard step built the eval set (audit/telemetry only).
+      - test_query_uuids: list[str] — the exact reviewed test questions to grade
+        against. When present this is authoritative (lets "generate only" exclude
+        pre-existing saved questions, and "combine" mix both). Falls back to
+        "use all saved, else auto-generate" when omitted.
     """
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
     kb = await svc.get_knowledge_base(
@@ -1088,6 +1176,17 @@ async def start_kb_optimization(uuid: str, request: Request, user: User = Depend
     if autogen_coverage not in ("quick", "standard", "exhaustive"):
         autogen_coverage = "standard"
 
+    # Test-set build mode chosen in the wizard. The selection is made
+    # authoritative by ``test_query_uuids`` (the exact reviewed set); the mode
+    # string is retained for auditing and re-run display.
+    test_set_build_mode = (body.get("test_set_build_mode") or "").strip()
+    if test_set_build_mode not in ("existing", "generate", "combined"):
+        test_set_build_mode = ""
+    raw_uuids = body.get("test_query_uuids")
+    test_query_uuids = (
+        [str(u) for u in raw_uuids if u] if isinstance(raw_uuids, list) else []
+    )
+
     # Reject if a non-terminal run already exists for this KB.
     from app.models.kb_optimization_run import KBOptimizationRun
     active = await KBOptimizationRun.find_one(
@@ -1109,6 +1208,8 @@ async def start_kb_optimization(uuid: str, request: Request, user: User = Depend
             "include_indexing_track": include_indexing_track,
             "apply_on_finish": apply_on_finish,
             "autogen_coverage": autogen_coverage,
+            "test_set_build_mode": test_set_build_mode,
+            "test_query_uuids": test_query_uuids,
         },
     )
     await run.insert()
@@ -1149,8 +1250,8 @@ def _summarise_optimization_run(run) -> dict:
         "uuid": run.uuid,
         "kb_uuid": run.kb_uuid,
         "status": run.status,
-        "started_at": run.started_at.isoformat() if run.started_at else None,
-        "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+        "started_at": _iso_utc(run.started_at),
+        "completed_at": _iso_utc(run.completed_at),
         "token_budget": run.token_budget,
         "tokens_used": run.tokens_used,
         "baseline_no_kb_score": run.baseline_no_kb_score,

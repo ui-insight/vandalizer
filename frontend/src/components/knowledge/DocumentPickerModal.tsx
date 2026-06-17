@@ -8,6 +8,7 @@ interface DocumentPickerModalProps {
   onSubmit: (docUuids: string[]) => void
   onClose: () => void
   existingSourceUuids?: string[]
+  onSubmitFolder?: (folderUuid: string, includeSubfolders: boolean) => void
 }
 
 type UploadStatus = 'uploading' | 'done' | 'error'
@@ -47,13 +48,14 @@ function fileToBase64(file: File): Promise<string> {
   })
 }
 
-export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [] }: DocumentPickerModalProps) {
+export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [], onSubmitFolder }: DocumentPickerModalProps) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [folders, setFolders] = useState<FolderSummary[]>([])
   const [folderFilter, setFolderFilter] = useState<string>('')  // '' = all folders
+  const [includeSubfolders, setIncludeSubfolders] = useState(true)
   const [uploads, setUploads] = useState<UploadItem[]>([])
   const [dragActive, setDragActive] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -340,6 +342,37 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
             </select>
           </div>
         </div>
+
+        {/* Add entire folder */}
+        {onSubmitFolder && folderFilter && folderFilter !== '__root__' && (
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+            padding: '8px 12px', backgroundColor: '#252525',
+            border: '1px solid #333', borderRadius: 8,
+          }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#bbb', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={includeSubfolders}
+                onChange={e => setIncludeSubfolders(e.target.checked)}
+                style={{ accentColor: 'var(--highlight-color, #eab308)', cursor: 'pointer' }}
+              />
+              Include subfolders
+            </label>
+            <button
+              onClick={() => onSubmitFolder(folderFilter, includeSubfolders)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                color: '#000', backgroundColor: 'var(--highlight-color, #eab308)',
+                border: 'none', borderRadius: 6, cursor: 'pointer', whiteSpace: 'nowrap',
+              }}
+            >
+              <FolderIcon size={13} />
+              Add entire folder
+            </button>
+          </div>
+        )}
 
         {/* Upload progress */}
         {uploads.length > 0 && (

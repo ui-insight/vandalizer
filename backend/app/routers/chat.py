@@ -83,6 +83,10 @@ async def chat(
         authorized_document_uuids.append(doc.uuid)
     document_uuids = authorized_document_uuids
 
+    # The KB scope passed to retrieval. A project scope overrides it with the
+    # project's implicit KB (authorized by project access, not KB sharing).
+    resolved_kb_uuid = body.knowledge_base_uuid
+
     if body.knowledge_base_uuid:
         user_org_ancestry = await organization_service.get_user_org_ancestry(user)
         kb = await access_control.get_authorized_knowledge_base(
@@ -94,6 +98,15 @@ async def chat(
         )
         if not kb:
             raise HTTPException(status_code=404, detail="Knowledge base not found")
+
+    if body.project_uuid:
+        from app.services import project_service
+
+        project = await project_service.get_authorized_project(body.project_uuid, user)
+        if not project:
+            raise HTTPException(status_code=404, detail="Project not found")
+        if project.kb_uuid:
+            resolved_kb_uuid = project.kb_uuid
 
     # Resolve folder selections: find all documents inside selected folders
     if body.folder_uuids:
@@ -197,7 +210,7 @@ async def chat(
                 activity_id=str(activity.id) if activity else None,
                 settings=settings,
                 model_override=body.model,
-                kb_uuid=body.knowledge_base_uuid,
+                kb_uuid=resolved_kb_uuid,
                 include_onboarding_context=body.include_onboarding_context,
                 is_first_session=body.is_first_session,
             ):

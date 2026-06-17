@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Loader2, X, Sparkles, Target, Clock } from 'lucide-react'
 import { ProgressRow } from './ProgressRow'
 import { scoreColor } from './TrialsTable'
@@ -16,8 +16,11 @@ export interface ProgressRunShape<TConfig> {
   best_config_so_far: TConfig | null
   trials: Array<{ trial_id: string; config: TConfig; score: number; status: string }>
   cancel_requested: boolean
-  /** Server-set start timestamp (ISO). Drives the live elapsed-time readout. */
+  /** Server-set start timestamp (ISO). Fallback anchor for the elapsed readout. */
   started_at?: string | null
+  /** Server-computed elapsed seconds (started_at → completed_at|now). Preferred
+   *  anchor for the live timer — see `useElapsedSeconds`. */
+  elapsed_seconds?: number | null
 }
 
 interface OptimizationProgressCardProps<TConfig> {
@@ -60,11 +63,11 @@ export function OptimizationProgressCard<TConfig>({
     ? (run.tokens_used / run.token_budget) * 100
     : 0
 
-  // Live elapsed time, anchored to the server-set started_at so it stays
-  // accurate across UI reloads and polling lag (unlike a client-side
-  // Date.now() captured when the panel happened to mount). Ticks once a
-  // second while the run is active.
-  const elapsedSeconds = useElapsedSeconds(run.started_at, run.status)
+  // Live elapsed time, anchored to the server-computed elapsed so it stays
+  // accurate across UI reloads and polling lag, and — unlike the old
+  // Date.now() − started_at math — immune to client/server clock skew. Ticks
+  // once a second while the run is active.
+  const elapsedSeconds = useElapsedSeconds(run.elapsed_seconds, run.started_at, run.status)
 
   return (
     <div style={{
@@ -247,25 +250,85 @@ function formatElapsed(seconds: number) {
 }
 
 /**
- * Seconds elapsed since `startedAt`, re-rendering once a second while the run
- * is queued/running. Returns null when there's no start timestamp yet or the
- * run is no longer active, so callers can omit the readout entirely.
+ * Epoch ms for a server timestamp, treating timezone-less ISO strings as UTC.
+ *
+ * Datetimes read back from Mongo can serialize without an offset (the Motor
+ * client isn't tz_aware). Left as-is, the browser parses such a string as
+ * *local* time, which for users west of UTC puts the start in the future and
+ * pins elapsed at 0s. Forcing UTC when no offset is present keeps the readout
+ * correct even if a backend serializer slips — the failure mode that kept the
+ * workflow tuning elapsed-time readout broken across earlier fixes.
  */
-function useElapsedSeconds(startedAt: string | null | undefined, status: string): number | null {
+export function parseServerTimeMs(ts: string): number {
+  const hasTz = /[zZ]$|[+-]\d{2}:?\d{2}$/.test(ts)
+  return new Date(hasTz ? ts : ts + 'Z').getTime()
+}
+
+/**
+ * Project a server-reported elapsed base forward by however long the client
+ * has held it. `baseSeconds` was the elapsed at `anchoredAtMs` (a client
+ * Date.now()); we add only the *client-clock delta* since then.
+ *
+ * Crucially this never compares the client clock to a server-derived absolute
+ * timestamp, so client/server clock skew can't leak in: when nowMs equals
+ * anchoredAtMs the result is exactly `baseSeconds`, whatever the skew. The old
+ * `Date.now() − started_at` math instead surfaced the full skew as a sudden
+ * jump (e.g. to ~3m30s on a drifted Docker-VM backend) the instant polling
+ * replaced the optimistic client-side seed.
+ */
+export function projectElapsedSeconds(baseSeconds: number, anchoredAtMs: number, nowMs: number): number {
+  return Math.max(0, baseSeconds) + Math.max(0, Math.round((nowMs - anchoredAtMs) / 1000))
+}
+
+/**
+ * Seconds elapsed for an active run, re-rendering once a second. Prefers the
+ * server-computed `elapsedSecondsBase` (skew-immune; see
+ * `projectElapsedSeconds`) and falls back to the parsed `startedAt` delta for
+ * payloads that predate the field. Returns null when there's no usable anchor
+ * or the run is no longer active, so callers can omit the readout entirely.
+ */
+function useElapsedSeconds(
+  elapsedSecondsBase: number | null | undefined,
+  startedAt: string | null | undefined,
+  status: string,
+): number | null {
   const active = status === 'queued' || status === 'running'
-  const startMs = startedAt ? new Date(startedAt).getTime() : NaN
-  const [elapsed, setElapsed] = useState<number>(() =>
-    active && Number.isFinite(startMs) ? Math.max(0, Math.round((Date.now() - startMs) / 1000)) : 0,
-  )
+  const serverBase =
+    typeof elapsedSecondsBase === 'number' && Number.isFinite(elapsedSecondsBase)
+      ? elapsedSecondsBase
+      : null
+  const startMs = startedAt ? parseServerTimeMs(startedAt) : NaN
+  const hasAnchor = serverBase !== null || Number.isFinite(startMs)
+
+  // Pin the server base to the client instant we received it, so the ticker
+  // only ever adds client-clock deltas. Re-anchors whenever the polled base
+  // changes. Mutating a ref during render is safe here — it's an idempotent
+  // cache keyed on the current `serverBase`.
+  const anchor = useRef<{ base: number; at: number } | null>(null)
+  if (serverBase === null) {
+    anchor.current = null
+  } else if (!anchor.current || anchor.current.base !== serverBase) {
+    anchor.current = { base: serverBase, at: Date.now() }
+  }
+
+  const compute = () => {
+    if (anchor.current) return projectElapsedSeconds(anchor.current.base, anchor.current.at, Date.now())
+    if (Number.isFinite(startMs)) return Math.max(0, Math.round((Date.now() - startMs) / 1000))
+    return 0
+  }
+
+  const [elapsed, setElapsed] = useState<number>(() => (active && hasAnchor ? compute() : 0))
 
   useEffect(() => {
-    if (!active || !Number.isFinite(startMs)) return
-    const tick = () => setElapsed(Math.max(0, Math.round((Date.now() - startMs) / 1000)))
+    if (!active || !hasAnchor) return
+    const tick = () => setElapsed(compute())
     tick()
     const id = setInterval(tick, 1000)
     return () => clearInterval(id)
-  }, [active, startMs])
+    // `serverBase` re-anchors the ref above; `startMs` is the fallback anchor.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, hasAnchor, serverBase, startMs])
 
-  if (!active || !Number.isFinite(startMs)) return null
+  if (!active || !hasAnchor) return null
   return elapsed
 }

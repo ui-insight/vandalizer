@@ -12,6 +12,9 @@ class ChatRequest(BaseModel):
     folder_uuids: list[str] = []
     model: Optional[str] = None
     knowledge_base_uuid: Optional[str] = None
+    # Scope chat to a project's implicit KB. Access is governed by project
+    # membership; resolves to the project's hidden kb_uuid server-side.
+    project_uuid: Optional[str] = None
     include_onboarding_context: bool = False
     is_first_session: bool = False
 

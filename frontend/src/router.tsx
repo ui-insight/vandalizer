@@ -26,6 +26,7 @@ const DemoFeedback = lazy(() => import('./pages/DemoFeedback'))
 const DemoTrialEnd = lazy(() => import('./pages/DemoTrialEnd'))
 const InviteAccept = lazy(() => import('./pages/InviteAccept'))
 const JoinLinkAccept = lazy(() => import('./pages/JoinLinkAccept'))
+const JoinProjectAccept = lazy(() => import('./pages/JoinProjectAccept'))
 const Organizations = lazy(() => import('./pages/Organizations'))
 const Credentials = lazy(() => import('./pages/Credentials'))
 const Reviews = lazy(() => import('./pages/Reviews'))
@@ -49,6 +50,7 @@ function CertificationRedirect() {
         extraction: undefined,
         automation: undefined,
         kb: undefined,
+        project: undefined,
         workflow_share_token: undefined,
       },
     })
@@ -127,13 +129,22 @@ const joinRoute = createRoute({
   component: JoinLinkAccept,
 })
 
+const joinProjectRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/join-project',
+  validateSearch: (search: Record<string, unknown>) => ({
+    token: (search.token as string) || undefined,
+  }),
+  component: JoinProjectAccept,
+})
+
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
   validateSearch: (search: Record<string, unknown>) => ({
     // Workspace mode (chat is the default, omitted from URL when active)
-    mode: (['chat', 'files', 'automations', 'knowledge'].includes(search.mode as string)
-      ? (search.mode as 'chat' | 'files' | 'automations' | 'knowledge')
+    mode: (['chat', 'files', 'automations', 'knowledge', 'projects'].includes(search.mode as string)
+      ? (search.mode as 'chat' | 'files' | 'automations' | 'knowledge' | 'projects')
       : undefined),
     // Active right panel tab (assistant is the default, omitted when active)
     tab: (['assistant', 'library'].includes(search.tab as string)
@@ -144,6 +155,8 @@ const indexRoute = createRoute({
     extraction: ((search.extraction as string) || (search.openExtraction as string) || undefined),
     automation: (search.automation as string) || undefined,
     kb: (search.kb as string) || undefined,
+    // Project scope — present when arriving from "Chat with this project".
+    project: (search.project as string) || undefined,
     // Share-link tokens — present when arriving from a "Copy share link" URL
     // and used to gate view-only access for users without team membership.
     workflow_share_token: (search.workflow_share_token as string) || undefined,
@@ -164,6 +177,7 @@ const teamsRoute = createRoute({
     </ProtectedRoute>
   ),
 })
+
 
 const workflowsRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -189,13 +203,13 @@ const workflowEditorRoute = createRoute({
 const chatRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/chat',
-  component: () => <Navigate to="/" search={{ mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined, workflow_share_token: undefined }} />,
+  component: () => <Navigate to="/" search={{ mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined, project: undefined, workflow_share_token: undefined }} />,
 })
 
 const libraryRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/library',
-  component: () => <Navigate to="/" search={{ mode: undefined, tab: 'library', workflow: undefined, extraction: undefined, automation: undefined, kb: undefined, workflow_share_token: undefined }} />,
+  component: () => <Navigate to="/" search={{ mode: undefined, tab: 'library', workflow: undefined, extraction: undefined, automation: undefined, kb: undefined, project: undefined, workflow_share_token: undefined }} />,
 })
 
 const adminRoute = createRoute({
@@ -373,13 +387,13 @@ const approvalsRoute = createRoute({
 const officeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/office',
-  component: () => <Navigate to="/" search={{ mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined, workflow_share_token: undefined }} />,
+  component: () => <Navigate to="/" search={{ mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined, project: undefined, workflow_share_token: undefined }} />,
 })
 
 const browserAutomationRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/browser-automation',
-  component: () => <Navigate to="/" search={{ mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined, workflow_share_token: undefined }} />,
+  component: () => <Navigate to="/" search={{ mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined, project: undefined, workflow_share_token: undefined }} />,
 })
 
 const demoStatusRoute = createRoute({
@@ -395,6 +409,7 @@ const routeTree = rootRoute.addChildren([
   resetPasswordRoute,
   inviteRoute,
   joinRoute,
+  joinProjectRoute,
   indexRoute,
   teamsRoute,
   workflowsRoute,

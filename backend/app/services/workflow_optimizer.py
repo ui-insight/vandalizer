@@ -157,7 +157,7 @@ async def run_optimization(
         run_doc.train_input_ids = [str(ti.get("id", "") or "") for ti in train_inputs]
         run_doc.holdout_input_ids = [str(ti.get("id", "") or "") for ti in holdout_inputs]
         run_doc.overfitting_warning = not holdout_inputs
-        await run_doc.save()
+        await _save(run_doc)
 
         sys_config = await SystemConfig.get_config()
         available_models = list(sys_config.available_models) if sys_config else []
@@ -166,7 +166,7 @@ async def run_optimization(
         judge_model = baseline_model if include_judge else None
         if judge_model:
             run_doc.judge_model = judge_model
-            await run_doc.save()
+            await _save(run_doc)
 
         # --- Phase 1: baselines ---
         await _update(run_doc, phase="baselines",
@@ -195,7 +195,7 @@ async def run_optimization(
             run_doc.baseline_no_workflow_score = round(
                 sum(no_wf_scores) / len(no_wf_scores), 4,
             )
-            await run_doc.save()
+            await _save(run_doc)
 
         # Default baseline: run the workflow with its currently-applied config
         # (override-or-authored) against each test input.
@@ -208,9 +208,10 @@ async def run_optimization(
             test_inputs=train_inputs,
             baseline_score=None,  # no early-stop on the default baseline itself
             label="baseline-default",
+            run_doc=run_doc,
         )
         run_doc.baseline_default_score = default_trial.get("score")
-        await run_doc.save()
+        await _save(run_doc)
 
         # Workflow judge variance: replay the default trial's per-check
         # verdicts. Measured here (before the sweep) so the convergence test
@@ -219,9 +220,9 @@ async def run_optimization(
             variance = _compute_workflow_variance(default_trial["variance_samples"])
             if variance is not None:
                 run_doc.judge_variance = variance
-                await run_doc.save()
+                await _save(run_doc)
 
-        if _is_cancelled(run_doc):
+        if await _is_cancelled(run_doc):
             return await _finalize_cancelled(run_doc)
 
         # --- Phase 2: trial sweep ---
@@ -254,7 +255,7 @@ async def run_optimization(
             candidates = enforcer.sample_trials(candidates)
 
         run_doc.total_trials_planned = len(candidates)
-        await run_doc.save()
+        await _save(run_doc)
 
         trial_results: list[dict] = []
         baseline_score = run_doc.baseline_default_score
@@ -267,7 +268,7 @@ async def run_optimization(
 
         async def _bounded_trial(candidate: dict) -> dict:
             async with semaphore:
-                if _is_cancelled(run_doc):
+                if await _is_cancelled(run_doc):
                     return {"label": candidate["label"], "status": "cancelled"}
                 trial_idx["i"] += 1
                 await _update(
@@ -283,6 +284,7 @@ async def run_optimization(
                     test_inputs=train_inputs,
                     baseline_score=baseline_score,
                     label=candidate["label"],
+                    run_doc=run_doc,
                 )
 
         # asyncio.as_completed lets us update best-so-far the moment each
@@ -315,7 +317,7 @@ async def run_optimization(
 
             run_doc.trials = trial_results
             run_doc.tokens_used = sum(int(t.get("tokens_used", 0) or 0) for t in trial_results)
-            await run_doc.save()
+            await _save(run_doc)
 
             if (
                 len(trial_results) >= CONVERGENCE_MIN_TRIALS
@@ -349,7 +351,13 @@ async def run_optimization(
             stopped_reason = "all_trials_complete"
 
         run_doc.stopped_reason = stopped_reason
-        await run_doc.save()
+        await _save(run_doc)
+
+        # A cancel requested mid-sweep short-circuits the remaining trials
+        # (each pending `_bounded_trial` returns early); finalize as cancelled
+        # instead of selecting a "winner" from a partial, interrupted sweep.
+        if await _is_cancelled(run_doc):
+            return await _finalize_cancelled(run_doc)
 
         # --- Phase 3: winner selection + holdout ---
         await _update(run_doc, phase="finalizing",
@@ -411,6 +419,7 @@ async def run_optimization(
                             test_inputs=holdout_inputs,
                             baseline_score=None,
                             label="holdout-winner",
+                            run_doc=run_doc,
                         )
                         if holdout_winner.get("score") is not None:
                             run_doc.optimized_score = holdout_winner.get("score")
@@ -426,6 +435,7 @@ async def run_optimization(
                             test_inputs=holdout_inputs,
                             baseline_score=None,
                             label="holdout-default",
+                            run_doc=run_doc,
                         )
                         if holdout_default.get("score") is not None:
                             run_doc.holdout_default_score = holdout_default.get("score")
@@ -449,6 +459,11 @@ async def run_optimization(
                     default_breakdown=list(default_trial.get("step_breakdown") or []),
                     judge_variance=run_doc.judge_variance,
                 )
+
+        # A cancel arriving during finalize (e.g. mid-holdout re-score) must
+        # not silently apply the winner's config — honor it before _apply_best.
+        if await _is_cancelled(run_doc):
+            return await _finalize_cancelled(run_doc)
 
         # Apply-on-finish only when the winner cleared the significance band.
         if (
@@ -848,8 +863,13 @@ async def _run_single_trial(
     test_inputs: list[dict],
     baseline_score: float | None,
     label: str,
+    run_doc: WorkflowOptimizationRun | None = None,
 ) -> dict:
     """Run one trial across all test inputs and return aggregated metrics.
+
+    When ``run_doc`` is supplied the trial checks for a requested cancel at each
+    test-input boundary, so an in-flight trial stops promptly instead of
+    grinding through every input after the user clicks Cancel.
 
     Returns a dict shaped for ``_to_trial_summary``:
         {
@@ -879,6 +899,9 @@ async def _run_single_trial(
     early_stop_at = max(1, int(len(test_inputs) * EARLY_STOP_FRACTION))
 
     for idx, ti in enumerate(test_inputs):
+        if run_doc is not None and await _is_cancelled(run_doc):
+            status = "cancelled"
+            break
         try:
             final_output, judge_checks, t_in, t_out = await _execute_and_score(
                 wf=wf,
@@ -1462,14 +1485,48 @@ async def _apply_best(wf: Workflow, run_doc: WorkflowOptimizationRun) -> None:
     await wf.save()
 
 
-async def _update(run_doc: WorkflowOptimizationRun, **fields: Any) -> None:
-    for k, v in fields.items():
-        setattr(run_doc, k, v)
+async def _fetch_cancel_flag(run_uuid: str) -> bool:
+    """Read the persisted ``cancel_requested`` flag straight from the DB.
+
+    The cancel endpoint flips the flag on a freshly-loaded copy of the run.
+    The worker holds a long-lived in-memory ``run_doc`` that is never
+    refreshed, so the only reliable source of truth is the database.
+    """
+    fresh = await WorkflowOptimizationRun.find_one({"uuid": run_uuid})
+    return bool(fresh and fresh.cancel_requested)
+
+
+async def _save(run_doc: WorkflowOptimizationRun) -> None:
+    """Persist ``run_doc`` without clobbering a concurrently-requested cancel.
+
+    Beanie's ``.save()`` does a full-document replace, so writing the worker's
+    stale in-memory copy would revert the cancel endpoint's ``cancel_requested``
+    write. Pull the persisted flag forward first so saves preserve it (and so the
+    next ``_is_cancelled`` check sees it).
+    """
+    if not run_doc.cancel_requested and await _fetch_cancel_flag(run_doc.uuid):
+        run_doc.cancel_requested = True
     await run_doc.save()
 
 
-def _is_cancelled(run_doc: WorkflowOptimizationRun) -> bool:
-    return bool(run_doc.cancel_requested)
+async def _update(run_doc: WorkflowOptimizationRun, **fields: Any) -> None:
+    for k, v in fields.items():
+        setattr(run_doc, k, v)
+    await _save(run_doc)
+
+
+async def _is_cancelled(run_doc: WorkflowOptimizationRun) -> bool:
+    """True when a cancel has been requested for this run.
+
+    Reads the flag from the database rather than trusting the worker's
+    long-lived in-memory ``run_doc``, which is never refreshed during a run.
+    """
+    if run_doc.cancel_requested:
+        return True
+    if await _fetch_cancel_flag(run_doc.uuid):
+        run_doc.cancel_requested = True
+        return True
+    return False
 
 
 async def _finalize_cancelled(run_doc: WorkflowOptimizationRun) -> WorkflowOptimizationRun:

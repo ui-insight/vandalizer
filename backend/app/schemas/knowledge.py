@@ -25,6 +25,11 @@ class AddDocumentsRequest(BaseModel):
     folder_uuids: list[str] = []
 
 
+class AddFolderRequest(BaseModel):
+    folder_uuid: str
+    include_subfolders: bool = True
+
+
 class ConvertDocumentsRequest(BaseModel):
     """Wrap one or more SmartDocuments in a new KB so they can be retrieved
     instead of inlined. Used by the chat / workflow "Convert to Knowledge

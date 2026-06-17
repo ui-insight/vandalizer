@@ -561,17 +561,10 @@ class KBOptimizer:
             trials_since_best_changed = 0
             stopped_reason: str | None = None
             for i, cfg_dict in enumerate(trial_configs, start=1):
-                # Cancellation check (re-fetch so a UI cancel propagates).
-                fresh = await KBOptimizationRun.find_one(KBOptimizationRun.uuid == run_uuid)
-                if fresh and fresh.cancel_requested:
-                    await self._update(
-                        run_doc, status="cancelled", phase="cancelled",
-                        progress_message="Cancelled by user.",
-                        stopped_reason="cancelled",
-                        completed_at=_now(),
-                    )
-                    await self._notify_terminal(run_doc, kb)
-                    return run_doc
+                # Cancellation check — reads the flag from the DB so a UI
+                # cancel propagates even though our in-memory run_doc is stale.
+                if await _is_cancelled(run_doc):
+                    return await self._finalize_cancelled(run_doc, kb)
 
                 # Budget check.
                 if run_doc.tokens_used >= token_budget:
@@ -666,6 +659,12 @@ class KBOptimizer:
                 # for-else: hit when the loop exhausted without ``break``.
                 stopped_reason = "all_trials_complete"
 
+            # A cancel that landed during the final trial (after the loop's
+            # top-of-iteration check) must stop here, before we select a
+            # winner and re-score on the holdout slice.
+            if await _is_cancelled(run_doc):
+                return await self._finalize_cancelled(run_doc, kb)
+
             # ----- Variance-aware winner selection (T2.2) -----
             # The greedy ``best_trial`` from the loop is the highest raw
             # score, but with judge noise σ that "best" may be inside a
@@ -756,6 +755,12 @@ class KBOptimizer:
             else:
                 optimized_score = optimized_score_train
 
+            # A cancel arriving during holdout re-scoring must not silently
+            # finish the run — honor it before the remaining finalize work
+            # (suggestions, cross-judge re-score, and applying the winner).
+            if await _is_cancelled(run_doc):
+                return await self._finalize_cancelled(run_doc, kb)
+
             await self._update(run_doc, phase="finalizing",
                                progress_message="Generating data source suggestions…")
             suggestions = self._analyse_suggestions(
@@ -829,6 +834,11 @@ class KBOptimizer:
             # changing settings the judge can't tell apart adds churn without
             # measurable benefit. UI surfaces ``tied_with_baseline`` as a
             # "no measurable improvement" banner.
+            # Final cancel gate: a cancel during the cross-judge pass must still
+            # prevent mutating the KB's live config.
+            if await _is_cancelled(run_doc):
+                return await self._finalize_cancelled(run_doc, kb)
+
             if apply_on_finish and best_config and not tied_with_baseline:
                 await self._apply_to_kb(kb_uuid, best_config, run_uuid, run_doc=run_doc)
                 await self._update(
@@ -877,8 +887,30 @@ class KBOptimizer:
     async def _ensure_test_queries(
         self, kb_uuid: str, user_id: str, run_doc: KBOptimizationRun,
     ) -> list[KBTestQuery]:
-        """Load existing queries with expected_answer; if none, auto-generate
-        Standard coverage (UI's default flow already covers manual selection)."""
+        """Build the eval set for this run.
+
+        When the wizard passed an explicit reviewed set
+        (``options.test_query_uuids``) we grade against exactly those. That's
+        what makes the Test-set step's existing / generate / combine choice
+        authoritative — e.g. "generate only" must exclude pre-existing saved
+        questions even though they still live in the KB, and "combine" must mix
+        both. Falls back to "use all saved, else auto-generate Standard" for
+        callers that don't curate a set up front (passive re-runs, older clients).
+        """
+        opts = run_doc.options or {}
+        selected_uuids = opts.get("test_query_uuids") or []
+        if selected_uuids:
+            chosen = await KBTestQuery.find(
+                KBTestQuery.knowledge_base_uuid == kb_uuid,
+                {"uuid": {"$in": list(selected_uuids)}},
+            ).to_list()
+            with_answers = [q for q in chosen if getattr(q, "expected_answer", None)]
+            if with_answers:
+                return with_answers
+            # The curated set yielded nothing usable (all deleted, or none have
+            # an expected answer). Fall through to the legacy path rather than
+            # failing the run outright.
+
         existing = await KBTestQuery.find(
             KBTestQuery.knowledge_base_uuid == kb_uuid,
         ).to_list()
@@ -891,7 +923,7 @@ class KBOptimizer:
             progress_message="No test queries yet — generating one for evaluation…",
         )
         from app.services.kb_question_generator import KBQuestionGenerator
-        coverage = (run_doc.options or {}).get("autogen_coverage") or DEFAULT_AUTOGEN_COVERAGE
+        coverage = opts.get("autogen_coverage") or DEFAULT_AUTOGEN_COVERAGE
         created = await KBQuestionGenerator().generate(
             kb_uuid, user_id, coverage=coverage, persist=True,
         )
@@ -1799,16 +1831,78 @@ class KBOptimizer:
             bits.append(f"t={temp}")
         return " · ".join(bits)
 
+    async def _finalize_cancelled(
+        self, run_doc: KBOptimizationRun, kb,
+    ) -> KBOptimizationRun:
+        """Transition a run to the cancelled terminal state and notify.
+
+        Shared by every cancel checkpoint so a cancel that lands after the
+        trial sweep (e.g. mid holdout re-scoring) still stops the run instead
+        of completing and applying the winner's config.
+        """
+        await self._update(
+            run_doc, status="cancelled", phase="cancelled",
+            progress_message="Cancelled by user.",
+            stopped_reason="cancelled",
+            completed_at=_now(),
+        )
+        await self._notify_terminal(run_doc, kb)
+        return run_doc
+
     @staticmethod
     async def _update(run_doc: KBOptimizationRun, **fields) -> None:
-        """Mutate-and-save helper. Keeps the run doc in sync with progress."""
+        """Mutate-and-save helper. Keeps the run doc in sync with progress.
+
+        Saves route through ``_save`` so a concurrently-requested cancel is
+        pulled forward rather than reverted by this full-document write.
+        """
         for k, v in fields.items():
             setattr(run_doc, k, v)
         try:
-            await run_doc.save()
+            await _save(run_doc)
         except Exception as e:  # pragma: no cover — defensive
             logger.warning("Could not persist KBOptimizationRun update: %s", e)
 
 
 def _now() -> datetime.datetime:
     return datetime.datetime.now(tz=datetime.timezone.utc)
+
+
+async def _fetch_cancel_flag(run_uuid: str) -> bool:
+    """Read the persisted ``cancel_requested`` flag straight from the DB.
+
+    The cancel endpoint flips the flag on a freshly-loaded copy of the run.
+    The worker holds a long-lived in-memory ``run_doc`` that is never
+    refreshed during a run, so the database is the only reliable source of
+    truth for whether a cancel has been requested.
+    """
+    fresh = await KBOptimizationRun.find_one({"uuid": run_uuid})
+    return bool(fresh and fresh.cancel_requested)
+
+
+async def _save(run_doc: KBOptimizationRun) -> None:
+    """Persist ``run_doc`` without clobbering a concurrently-requested cancel.
+
+    Beanie's ``.save()`` does a full-document replace, so writing the worker's
+    stale in-memory copy would revert the cancel endpoint's ``cancel_requested``
+    write — which is exactly why Cancel never stopped a running KB tune. Pull
+    the persisted flag forward first so saves preserve it (and so the next
+    ``_is_cancelled`` check sees it).
+    """
+    if not run_doc.cancel_requested and await _fetch_cancel_flag(run_doc.uuid):
+        run_doc.cancel_requested = True
+    await run_doc.save()
+
+
+async def _is_cancelled(run_doc: KBOptimizationRun) -> bool:
+    """True when a cancel has been requested for this run.
+
+    Reads the flag from the database rather than trusting the worker's
+    long-lived in-memory ``run_doc``, which is never refreshed during a run.
+    """
+    if run_doc.cancel_requested:
+        return True
+    if await _fetch_cancel_flag(run_doc.uuid):
+        run_doc.cancel_requested = True
+        return True
+    return False

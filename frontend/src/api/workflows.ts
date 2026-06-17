@@ -692,6 +692,10 @@ export type WorkflowOptimizationRun = {
   error_message: string | null
   started_at: string | null
   completed_at: string | null
+  // Server-computed elapsed seconds (started_at → completed_at|now). Drives the
+  // live timer skew-free; the client ticks forward from this base. Optional so
+  // older payloads fall back to the started_at delta.
+  elapsed_seconds?: number | null
   cancel_requested: boolean
 }
 

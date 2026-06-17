@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, type DragEvent } from 'react'
-import { Loader2, BookOpen, X, ArrowDown, ChevronRight, Shield, CheckCircle2, Upload, Link2, Sparkles } from 'lucide-react'
+import { Loader2, BookOpen, X, ArrowDown, ChevronRight, Shield, CheckCircle2, Upload, Link2, Sparkles, FolderKanban } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
@@ -7,6 +7,7 @@ import { AttachmentList } from './AttachmentList'
 import { ContextMeter } from './ContextMeter'
 import { ContextLimitDialog } from './ContextLimitDialog'
 import { useChat } from '../../hooks/useChat'
+import { useProject } from '../../hooks/useProjects'
 import { useOnboarding } from '../../hooks/useOnboarding'
 import { useWorkspace, type PendingChatMessage } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
@@ -85,7 +86,15 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     setActivity,
   } = useChat()
 
-  const { bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, activeKBUuid, activeKBTitle, activateKB, deactivateKB, setCurrentConversationUuid, focusChatSignal } = useWorkspace()
+  const { bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, activeKBUuid, activeKBTitle, activateKB, deactivateKB, activeProjectUuid, activeProjectTitle, setCurrentConversationUuid, focusChatSignal } = useWorkspace()
+
+  // When scoped to a project, surface its file/index status so the empty state
+  // reflects the project (not a generic assistant) and sets honest expectations.
+  const { project: scopedProject } = useProject(activeProjectUuid ?? '')
+  const projectFileCount = scopedProject?.capabilities?.files.count ?? 0
+  const projectIndexed = scopedProject?.capabilities?.knowledge.documents ?? 0
+  const projectEmpty = !!activeProjectUuid && projectFileCount === 0
+  const projectIndexing = !!activeProjectUuid && projectFileCount > 0 && projectIndexed < projectFileCount
   const [convertingToKB, setConvertingToKB] = useState(false)
   const { toast } = useToast()
   const shareLink = useShareLink()
@@ -324,8 +333,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const handleSend = (message: string, includeOnboardingContext?: boolean) => {
     // In first-session mode, every message uses the first-session system prompt.
     // Use the locked ref so remounts / refetches can't flip this mid-conversation.
-    const firstSession = effectiveFirstSession && !hasDocContext && !activeKBUuid
-    send(message, selectedDocUuids, selectedModel || undefined, activeKBUuid || undefined, includeOnboardingContext, selectedFolderUuids, firstSession || undefined)
+    const firstSession = effectiveFirstSession && !hasDocContext && !activeKBUuid && !activeProjectUuid
+    send(message, selectedDocUuids, selectedModel || undefined, activeKBUuid || undefined, includeOnboardingContext, selectedFolderUuids, firstSession || undefined, activeProjectUuid || undefined)
     // Defer markFirstSessionComplete until the user has had enough exchanges
     // to experience the value discovery (at least 3 user messages).
     // messages.length counts both user + assistant; 4 = 2 full exchanges done.
@@ -665,6 +674,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                 <div style={{ animation: 'float 3s ease-in-out infinite' }} className="shrink-0">
                   {bannerProcessingDoc ? (
                     <Loader2 className="h-7 w-7 opacity-90 animate-spin" />
+                  ) : activeProjectUuid ? (
+                    <FolderKanban className="h-7 w-7 opacity-90" />
                   ) : activeKBUuid ? (
                     <BookOpen className="h-7 w-7 opacity-90" />
                   ) : brandIcon ? (
@@ -679,22 +690,30 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                       ? processingCount > 1
                         ? `Preparing ${processingCount} documents…`
                         : stageCopy(bannerProcessingDoc.status).title
-                      : activeKBUuid
-                        ? `Knowledge Base: ${activeKBTitle}`
-                        : hasDocContext
-                          ? 'Documents ready for analysis'
-                          : 'What would you like to work on?'}
+                      : activeProjectUuid
+                        ? `Chat with ${activeProjectTitle ?? 'this project'}`
+                        : activeKBUuid
+                          ? `Knowledge Base: ${activeKBTitle}`
+                          : hasDocContext
+                            ? 'Documents ready for analysis'
+                            : 'What would you like to work on?'}
                   </div>
                   <div style={{ fontSize: 13, opacity: 0.8, marginTop: 2, fontWeight: 400 }}>
                     {bannerProcessingDoc
                       ? processingCount > 1
                         ? "We'll be ready as soon as each document finishes processing."
                         : stageCopy(bannerProcessingDoc.status).message
-                      : activeKBUuid
-                        ? 'Ask questions grounded in your indexed documents and sources.'
-                        : hasDocContext
-                          ? 'Summarize, extract data, compare, or ask anything about your selected documents.'
-                          : 'Select documents to analyze, activate a knowledge base, or ask me anything.'}
+                      : activeProjectUuid
+                        ? projectEmpty
+                          ? 'No files in this project yet — add files in the Files tab and I’ll answer from them. You can still ask me anything.'
+                          : projectIndexing
+                            ? 'Indexing this project’s files — you can chat now; answers get better as indexing finishes.'
+                            : `Ask questions across every file in this project (${projectFileCount} ${projectFileCount === 1 ? 'file' : 'files'}).`
+                        : activeKBUuid
+                          ? 'Ask questions grounded in your indexed documents and sources.'
+                          : hasDocContext
+                            ? 'Summarize, extract data, compare, or ask anything about your selected documents.'
+                            : 'Select documents to analyze, activate a knowledge base, or ask me anything.'}
                   </div>
                 </div>
               </div>
@@ -713,7 +732,14 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
             </div>
 
             <div style={{ marginTop: 16, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {(activeKBUuid ? [
+              {(activeProjectUuid ? (projectEmpty ? [
+                'What can you help me do with this project?',
+                'How should I organize the files for this grant?',
+              ] : [
+                'Summarize everything in this project',
+                'What are the key dates and deadlines?',
+                'List the documents and what each covers',
+              ]) : activeKBUuid ? [
                 'Summarize the key points across all sources',
                 'What are the most important facts and figures?',
                 'List every topic covered',
@@ -725,7 +751,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                 <button
                   key={suggestion}
                   disabled={!!bannerProcessingDoc}
-                  onClick={() => handleSend(suggestion, !activeKBUuid && !hasDocContext)}
+                  onClick={() => handleSend(suggestion, !activeKBUuid && !hasDocContext && !activeProjectUuid)}
                   style={{
                     padding: '8px 14px',
                     fontSize: 13,

@@ -69,6 +69,13 @@ export function addDocumentsToKB(uuid: string, documentUuids: string[], folderUu
   })
 }
 
+export function addFolderToKB(uuid: string, folderUuid: string, includeSubfolders = true) {
+  return apiFetch<{ ok: boolean; added: number }>(`/api/knowledge/${uuid}/add_folder`, {
+    method: 'POST',
+    body: JSON.stringify({ folder_uuid: folderUuid, include_subfolders: includeSubfolders }),
+  })
+}
+
 export function convertDocumentsToKB(documentUuids: string[], title?: string) {
   return apiFetch<KnowledgeBase>('/api/knowledge/convert_documents', {
     method: 'POST',
@@ -544,6 +551,10 @@ export type KBOptimizationRun = {
   error_context?: Record<string, unknown> | null
   started_at: string | null
   completed_at: string | null
+  // Server-computed elapsed seconds (started_at → completed_at|now). Drives the
+  // live timer skew-free; the client ticks forward from this base. Optional so
+  // older payloads fall back to the started_at delta.
+  elapsed_seconds?: number | null
   cancel_requested: boolean
   // Apply/revert lifecycle (Phase 1 loop closure).
   previous_override?: OptimizationTrial['config'] | null
@@ -576,11 +587,19 @@ export type ApplyPreview = {
   items: ApplyPreviewItem[]
 }
 
+/** How the tuning run's evaluation set is assembled in the Test-set wizard step:
+ * reuse the KB's saved questions, generate a fresh set, or combine both. */
+export type TestSetBuildMode = 'existing' | 'generate' | 'combined'
+
 export type StartOptimizationOptions = {
   token_budget: number
   include_indexing_track?: boolean
   apply_on_finish?: boolean
   autogen_coverage?: OptimizationCoverage
+  test_set_build_mode?: TestSetBuildMode
+  /** The exact reviewed test-question UUIDs to grade against — authoritative
+   * when present so "generate only" / "combine" scope the run precisely. */
+  test_query_uuids?: string[]
 }
 
 export function startKBOptimization(uuid: string, opts: StartOptimizationOptions) {

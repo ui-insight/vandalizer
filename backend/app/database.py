@@ -46,6 +46,7 @@ from app.models.email_log import EmailLog
 from app.models.api_key import ApiKey
 from app.models.credential import Credential
 from app.models.llm_usage import LlmUsageRecord
+from app.models.project import Project, ProjectMembership, ProjectPin, ProjectJoinLink
 
 ALL_MODELS = [
     User,
@@ -112,6 +113,10 @@ ALL_MODELS = [
     ApiKey,
     Credential,
     LlmUsageRecord,
+    Project,
+    ProjectMembership,
+    ProjectPin,
+    ProjectJoinLink,
 ]
 
 

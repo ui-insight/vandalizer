@@ -1689,6 +1689,44 @@ async def run_workflow_integrated(
 # ---------------------------------------------------------------------------
 
 
+def _iso_utc(dt):
+    """ISO-8601 string with an explicit UTC offset.
+
+    Datetimes read back from Mongo are naive (the Motor client isn't tz_aware),
+    so a bare ``.isoformat()`` emits no offset and browsers parse it as *local*
+    time. For users west of UTC that pushes ``started_at`` into the future, so
+    the live elapsed-time readout clamps to 0s for the whole run. Treat naive
+    values as UTC so the wire format is unambiguous.
+    """
+    if dt is None:
+        return None
+    import datetime as _dt
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=_dt.timezone.utc)
+    return dt.astimezone(_dt.timezone.utc).isoformat()
+
+
+def _elapsed_seconds(started_at, completed_at):
+    """Server-authoritative elapsed seconds for the live run timer.
+
+    Computed on the server so the readout can't be corrupted by client/server
+    clock skew. The elapsed counter previously did ``Date.now() - started_at``
+    in the browser, mixing the client wall clock with the server-set start
+    timestamp; on a drifted backend (e.g. a Docker VM that fell behind the host
+    after sleep) that made the counter jump by the full skew the moment polling
+    replaced the optimistic client-side seed. The frontend now ticks forward
+    from this base using client-clock *deltas* only.
+    """
+    if started_at is None:
+        return None
+    import datetime as _dt
+    start = started_at if started_at.tzinfo else started_at.replace(tzinfo=_dt.timezone.utc)
+    end = completed_at or _dt.datetime.now(tz=_dt.timezone.utc)
+    if end.tzinfo is None:
+        end = end.replace(tzinfo=_dt.timezone.utc)
+    return max(0, int((end - start).total_seconds()))
+
+
 def _serialize_workflow_optimization_run(run) -> dict:
     return {
         "uuid": run.uuid,
@@ -1720,8 +1758,9 @@ def _serialize_workflow_optimization_run(run) -> dict:
         "apply_preview": getattr(run, "apply_preview", None),
         "options": run.options,
         "error_message": run.error_message,
-        "started_at": run.started_at.isoformat() if run.started_at else None,
-        "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+        "started_at": _iso_utc(run.started_at),
+        "completed_at": _iso_utc(run.completed_at),
+        "elapsed_seconds": _elapsed_seconds(run.started_at, run.completed_at),
         "cancel_requested": run.cancel_requested,
     }
 
@@ -1731,8 +1770,8 @@ def _summarise_workflow_optimization_run(run) -> dict:
         "uuid": run.uuid,
         "workflow_id": run.workflow_id,
         "status": run.status,
-        "started_at": run.started_at.isoformat() if run.started_at else None,
-        "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+        "started_at": _iso_utc(run.started_at),
+        "completed_at": _iso_utc(run.completed_at),
         "token_budget": run.token_budget,
         "tokens_used": run.tokens_used,
         "baseline_no_workflow_score": run.baseline_no_workflow_score,

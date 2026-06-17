@@ -862,3 +862,38 @@ export function getApiKeyDocs() {
 
 /** URL for the downloadable Claude Code skill file (admin-gated, cookie auth). */
 export const API_KEY_SKILL_DOWNLOAD_URL = '/api/admin/api-keys/skill'
+
+// ──────────────────────────────────────────
+// Knowledge Base inventory (org-wide, admin/staff read; rename is admin-only)
+// ──────────────────────────────────────────
+
+export interface AdminKBSummary {
+  uuid: string
+  title: string
+  status: string
+  verified: boolean
+  tags: string[]
+  total_sources: number
+  total_chunks: number
+  owner_id: string
+  owner_email: string | null
+  team_id: string | null
+  team_name: string | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+export interface AdminKBListResponse {
+  total: number
+  knowledge_bases: AdminKBSummary[]
+}
+
+/** Org-wide KB inventory for reviewing names/versions. Backend gates on
+ * admin-or-staff; renaming a KB you don't own additionally requires full admin. */
+export function getAdminKnowledgeBases(params?: { search?: string; limit?: number }) {
+  const qs = new URLSearchParams()
+  if (params?.search) qs.set('search', params.search)
+  if (params?.limit) qs.set('limit', String(params.limit))
+  const q = qs.toString()
+  return apiFetch<AdminKBListResponse>(`/api/admin/knowledge-bases${q ? `?${q}` : ''}`)
+}

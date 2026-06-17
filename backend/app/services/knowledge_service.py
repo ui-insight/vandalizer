@@ -70,6 +70,8 @@ def build_kb_list_query(
                 {"description": {"$regex": pattern, "$options": "i"}},
             ]},
         ]}
+    # Implicit (project-owned) KBs never surface in the normal KB lists.
+    query = {"$and": [query, {"implicit": {"$ne": True}}]}
     return query
 
 
@@ -153,13 +155,14 @@ async def admin_list_all_knowledge_bases(
 
 async def create_knowledge_base(
     title: str, user_id: str, team_id: str | None = None,
-    description: str | None = None,
+    description: str | None = None, implicit: bool = False,
 ) -> KnowledgeBase:
     kb = KnowledgeBase(
         title=title[:300],
         description=(description or "")[:5000] or None,
         user_id=user_id,
         team_id=team_id,
+        implicit=implicit,
     )
     await kb.insert()
     return kb
