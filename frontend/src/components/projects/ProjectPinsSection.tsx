@@ -22,7 +22,7 @@ const key = (p: { pin_type: string; target_id: string }) => `${p.pin_type}:${p.t
  * you use for this grant, for quick access. Clicking one opens it inside the
  * scoped project so it runs against the project's documents.
  */
-export function ProjectPinsSection({ projectUuid, onChange }: { projectUuid: string; onChange?: () => void }) {
+export function ProjectPinsSection({ projectUuid, onChange, onOpen }: { projectUuid: string; onChange?: () => void; onOpen?: () => void }) {
   const navigate = useNavigate()
   const { workflows } = useWorkflows()
   const { searchSets } = useSearchSets()
@@ -65,6 +65,9 @@ export function ProjectPinsSection({ projectUuid, onChange }: { projectUuid: str
     else if (p.pin_type === 'extraction') navigate({ to: '/', search: { ...base, mode: 'files', extraction: p.target_id } })
     else if (p.pin_type === 'automation') navigate({ to: '/', search: { ...base, mode: 'automations', automation: p.target_id } })
     else if (p.pin_type === 'knowledge_base') navigate({ to: '/', search: { ...base, kb: p.target_id } })
+    // Close the Manage modal so the tool we just navigated to is actually
+    // visible — otherwise the overlay stays up and the click looks like a no-op.
+    onOpen?.()
   }
 
   return (

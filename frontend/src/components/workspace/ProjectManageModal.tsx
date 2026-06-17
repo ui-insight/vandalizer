@@ -299,7 +299,7 @@ export function ProjectManageModal({ open, onClose }: { open: boolean; onClose: 
 
           {/* Pinned tools */}
           {canManage && (
-            <ProjectPinsSection projectUuid={uuid} onChange={() => qc.invalidateQueries({ queryKey: ['project', uuid] })} />
+            <ProjectPinsSection projectUuid={uuid} onChange={() => qc.invalidateQueries({ queryKey: ['project', uuid] })} onOpen={onClose} />
           )}
 
           {/* Share — invite links + members */}
