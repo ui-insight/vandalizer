@@ -22,7 +22,7 @@ celery.conf.task_routes = {
     "tasks.workflow_next.*": {"queue": "workflows"},
     "tasks.upload.*": {"queue": "uploads"},
     "tasks.extraction.*": {"queue": "workflows"},
-    "tasks.evaluation.*": {"queue": "workflows"},
+    "tasks.kb.*": {"queue": "workflows"},
     "tasks.passive.*": {"queue": "passive"},
     "tasks.activity.*": {"queue": "default"},
     "tasks.demo.*": {"queue": "default"},
@@ -112,6 +112,19 @@ celery.conf.beat_schedule = {
     "engagement-inactivity-nudges": {
         "task": "tasks.engagement.process_inactivity_nudges",
         "schedule": crontab(hour=10, minute=30),  # daily at 10:30am
+    },
+    # KB Autovalidate orphan-run reaper
+    "kb-optimization-janitor": {
+        "task": "tasks.passive.kb_optimization_janitor",
+        "schedule": crontab(minute=0),  # hourly
+    },
+    # Monthly re-judge of KBs with an applied optimization config — catches
+    # quiet regressions after Apply (KB content drifts, retrieval pipeline
+    # shifts). Emits a QualityAlert when the current blended score has fallen
+    # >10pts vs the originally applied run's optimized_score.
+    "kb-revalidate-applied-monthly": {
+        "task": "tasks.passive.kb_revalidate_applied",
+        "schedule": crontab(day_of_month=1, hour=2, minute=0),  # 1st of month, 2am UTC
     },
 }
 

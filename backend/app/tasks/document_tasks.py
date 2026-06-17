@@ -317,9 +317,10 @@ def _run_automation_extraction(db, automation: dict, search_set_uuid: str, doc: 
         models = sys_config.get("available_models", [])
         model = models[0]["name"] if models else "gpt-4o-mini"
 
-        # Load search set config
+        # Load search set config (honors optimizer override if set)
+        from app.services.search_set_service import effective_extraction_config
         ss_doc = db.search_set.find_one({"uuid": search_set_uuid})
-        extraction_config = (ss_doc or {}).get("extraction_config") or {}
+        extraction_config = effective_extraction_config(ss_doc)
 
         # Load field metadata
         field_metadata = {}

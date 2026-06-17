@@ -337,3 +337,48 @@ class TestSearchSetItemCRUD:
             result = await get_extraction_keys("ss-uuid")
 
         assert result == ["PI Name", "Award Amount"]
+
+
+class TestEffectiveExtractionConfig:
+    """Optimizer apply-back: override wins over authored config when set."""
+
+    def test_returns_empty_dict_when_ss_is_none(self):
+        from app.services.search_set_service import effective_extraction_config
+        assert effective_extraction_config(None) == {}
+
+    def test_returns_extraction_config_when_no_override(self):
+        from app.services.search_set_service import effective_extraction_config
+        ss = _make_search_set(extraction_config={"model": "claude-haiku"})
+        ss.extraction_config_override = None
+        assert effective_extraction_config(ss) == {"model": "claude-haiku"}
+
+    def test_override_wins_when_set(self):
+        from app.services.search_set_service import effective_extraction_config
+        ss = _make_search_set(extraction_config={"model": "claude-haiku"})
+        ss.extraction_config_override = {"model": "claude-sonnet", "strategy": "two-pass"}
+        assert effective_extraction_config(ss) == {"model": "claude-sonnet", "strategy": "two-pass"}
+
+    def test_empty_override_falls_back_to_config(self):
+        # An empty dict shouldn't masquerade as an applied override
+        from app.services.search_set_service import effective_extraction_config
+        ss = _make_search_set(extraction_config={"model": "claude-haiku"})
+        ss.extraction_config_override = {}
+        assert effective_extraction_config(ss) == {"model": "claude-haiku"}
+
+    def test_accepts_pymongo_dict(self):
+        # Celery tasks read raw dicts via db.search_set.find_one
+        from app.services.search_set_service import effective_extraction_config
+        ss_dict = {
+            "extraction_config": {"model": "claude-haiku"},
+            "extraction_config_override": {"model": "claude-sonnet"},
+        }
+        assert effective_extraction_config(ss_dict) == {"model": "claude-sonnet"}
+
+    def test_dict_without_override_returns_extraction_config(self):
+        from app.services.search_set_service import effective_extraction_config
+        ss_dict = {"extraction_config": {"model": "claude-haiku"}}
+        assert effective_extraction_config(ss_dict) == {"model": "claude-haiku"}
+
+    def test_dict_with_empty_extraction_config(self):
+        from app.services.search_set_service import effective_extraction_config
+        assert effective_extraction_config({}) == {}

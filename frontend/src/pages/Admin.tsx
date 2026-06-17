@@ -2078,12 +2078,21 @@ function QualityTab() {
                     <div style={{ fontSize: 13, fontWeight: 600, color: '#111827' }}>{alert.item_name}</div>
                     <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
                       {alert.message}
-                      {alert.alert_type === 'regression' && alert.previous_score != null && alert.current_score != null && (
+                      {(alert.alert_type === 'regression' || alert.alert_type === 'baseline_drift') && alert.previous_score != null && alert.current_score != null && (
                         <span style={{
                           marginLeft: 8, fontFamily: 'ui-monospace, monospace', fontWeight: 600,
                           color: '#dc2626',
                         }}>
                           {alert.previous_score} &rarr; {alert.current_score}
+                        </span>
+                      )}
+                      {alert.alert_type === 'baseline_drift' && (
+                        <span style={{
+                          marginLeft: 8, padding: '1px 6px', borderRadius: 4,
+                          backgroundColor: '#fef3c7', color: '#78350f',
+                          fontSize: 10, fontWeight: 700, textTransform: 'uppercase',
+                        }}>
+                          Drift
                         </span>
                       )}
                     </div>

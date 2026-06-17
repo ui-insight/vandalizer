@@ -127,6 +127,10 @@ export interface ModelInfo {
   multimodal: boolean;
   supports_pdf: boolean;
   context_window: number;
+  // USD per 1M tokens (optional). Populated for paid external models so the
+  // KB Autovalidate budget modal can show dollar estimates next to tokens.
+  cost_per_1m_input?: number | null;
+  cost_per_1m_output?: number | null;
 }
 
 export interface UserConfig {

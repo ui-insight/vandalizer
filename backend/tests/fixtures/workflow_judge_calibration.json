@@ -1,0 +1,430 @@
+{
+  "_meta": {
+    "purpose": "Human-labeled (check, workflow_output, gold_verdict) triples to calibrate the workflow judge. Stratified across the six check_types (presence, format, constraints, completeness, correctness, hallucination). Gold verdict is one of PASS/FAIL/WARN; gold_confidence_band optional. Authored alongside the per-check_type rubric in workflow_validator.py — keep in sync when rubric anchors change.",
+    "labelling_rules": [
+      "PASS: check is clearly satisfied by visible content.",
+      "WARN: partially met or a minor issue that does not invalidate the output.",
+      "FAIL: clearly not met.",
+      "NEEDS_INVESTIGATION is reserved for genuinely ambiguous outputs; we don't include those in calibration so the κ statistic is well-defined."
+    ],
+    "version": 1
+  },
+  "cases": [
+    {
+      "id": "presence_field_filled",
+      "check_type": "presence",
+      "description": "Verify 'Invoice Number' is present and non-empty",
+      "target_field": "Invoice Number",
+      "workflow_output": "- **Invoice Number**: INV-2026-00451\n- **Date**: 2026-04-01",
+      "gold_verdict": "PASS"
+    },
+    {
+      "id": "presence_field_missing",
+      "check_type": "presence",
+      "description": "Verify 'Vendor' is present and non-empty",
+      "target_field": "Vendor",
+      "workflow_output": "- **Invoice Number**: INV-2026-00451\n- **Date**: 2026-04-01",
+      "gold_verdict": "FAIL"
+    },
+    {
+      "id": "presence_field_empty_string",
+      "check_type": "presence",
+      "description": "Verify 'Total' is present and non-empty",
+      "target_field": "Total",
+      "workflow_output": "- **Total**: \n- **Date**: 2026-04-01",
+      "gold_verdict": "FAIL"
+    },
+    {
+      "id": "presence_placeholder_tbd",
+      "check_type": "presence",
+      "description": "Verify 'Approver' is present and non-empty",
+      "target_field": "Approver",
+      "workflow_output": "- **Approver**: TBD\n- **Date**: 2026-04-01",
+      "gold_verdict": "WARN"
+    },
+    {
+      "id": "presence_placeholder_question_marks",
+      "check_type": "presence",
+      "description": "Verify 'PI' is present and non-empty",
+      "target_field": "PI",
+      "workflow_output": "- **PI**: ???\n- **Department**: Chemistry",
+      "gold_verdict": "WARN"
+    },
+    {
+      "id": "presence_value_is_zero",
+      "check_type": "presence",
+      "description": "Verify 'Indirect Cost Rate' is present and non-empty",
+      "target_field": "Indirect Cost Rate",
+      "workflow_output": "- **Indirect Cost Rate**: 0\n- **PI**: Dr. Smith",
+      "gold_verdict": "PASS"
+    },
+    {
+      "id": "presence_only_whitespace",
+      "check_type": "presence",
+      "description": "Verify 'Title' is present and non-empty",
+      "target_field": "Title",
+      "workflow_output": "- **Title**:    \n- **PI**: Dr. Smith",
+      "gold_verdict": "FAIL"
+    },
+    {
+      "id": "format_currency_clean",
+      "check_type": "format",
+      "description": "Verify 'Total' is a currency value",
+      "target_field": "Total",
+      "workflow_output": "- **Total**: $1,200.00",
+      "gold_verdict": "PASS"
+    },
+    {
+      "id": "format_currency_words",
+      "check_type": "format",
+      "description": "Verify 'Total' is a currency value",
+      "target_field": "Total",
+      "workflow_output": "- **Total**: 1200 dollars",
+      "gold_verdict": "WARN"
+    },
+    {
+      "id": "format_currency_unparseable",
+      "check_type": "format",
+      "description": "Verify 'Total' is a currency value",
+      "target_field": "Total",
+      "workflow_output": "- **Total**: twelve hundred",
+      "gold_verdict": "FAIL"
+    },
+    {
+      "id": "format_date_iso",
+      "check_type": "format",
+      "description": "Verify 'Start Date' is a date",
+      "target_field": "Start Date",
+      "workflow_output": "- **Start Date**: 2026-09-01",
+      "gold_verdict": "PASS"
+    },
+    {
+      "id": "format_date_us_long",
+      "check_type": "format",
+      "description": "Verify 'Start Date' is a date",
+      "target_field": "Start Date",
+      "workflow_output": "- **Start Date**: September 1, 2026",
+      "gold_verdict": "PASS"
+    },
+    {
+      "id": "format_date_garbage",
+      "check_type": "format",
+      "description": "Verify 'Start Date' is a date",
+      "target_field": "Start Date",
+      "workflow_output": "- **Start Date**: next fall sometime",
+      "gold_verdict": "FAIL"
+    },
+    {
+      "id": "format_email_valid",
+      "check_type": "format",
+      "description": "Verify 'Contact' is an email address",
+      "target_field": "Contact",
+      "workflow_output": "- **Contact**: jbrunsfeld@uidaho.edu",
+      "gold_verdict": "PASS"
+    },
+    {
+      "id": "format_email_invalid",
+      "check_type": "format",
+      "description": "Verify 'Contact' is an email address",
+      "target_field": "Contact",
+      "workflow_output": "- **Contact**: ask the front desk",
+      "gold_verdict": "FAIL"
+    },
+    {
+      "id": "constraints_length_under",
+      "check_type": "constraints",
+      "description": "Verify 'Abstract' is at most 200 characters",
+      "target_field": "Abstract",
+      "workflow_output": "- **Abstract**: This study examines uplift effects on grant turnaround time.",
+      "gold_verdict": "PASS"
+    },
+    {
+      "id": "constraints_length_over",
+      "check_type": "constraints",
+      "description": "Verify 'Abstract' is at most 80 characters",
+      "target_field": "Abstract",
+      "workflow_output": "- **Abstract**: This study examines uplift effects on grant turnaround time across three research administration offices over the 2024-2026 funding cycles, with controls for budget size and PI seniority.",
+      "gold_verdict": "FAIL"
+    },
+    {
+      "id": "constraints_length_boundary",
+      "check_type": "constraints",
+      "description": "Verify 'Tagline' is at most 30 characters",
+      "target_field": "Tagline",
+      "workflow_output": "- **Tagline**: AI for research administration",
+      "gold_verdict": "WARN"
+    },
+    {
+      "id": "constraints_numeric_range_ok",
+      "check_type": "constraints",
+      "description": "Verify 'Indirect Cost Rate' is between 0 and 1",
+      "target_field": "Indirect Cost Rate",
+      "workflow_output": "- **Indirect Cost Rate**: 0.485",
+      "gold_verdict": "PASS"
+    },
+    {
+      "id": "constraints_numeric_range_violated",
+      "check_type": "constraints",
+      "description": "Verify 'Indirect Cost Rate' is between 0 and 1",
+      "target_field": "Indirect Cost Rate",
+      "workflow_output": "- **Indirect Cost Rate**: 48.5",
+      "gold_verdict": "FAIL"
+    },
+    {
+      "id": "completeness_all_present",
+      "check_type": "completeness",
+      "description": "Verify all required sections (Summary, Risks, Recommendation) are present",
+      "target_field": null,
+      "workflow_output": "## Summary\nGrant proposal is well-aligned with NSF program goals.\n## Risks\nBudget slightly above program cap.\n## Recommendation\nResubmit with budget revision.",
+      "gold_verdict": "PASS"
+    },
+    {
+      "id": "completeness_one_minor_missing",
+      "check_type": "completeness",
+      "description": "Verify all required sections (Summary, Risks, Recommendation, Appendix) are present",
+      "target_field": null,
+      "workflow_output": "## Summary\nGrant proposal is well-aligned with NSF program goals.\n## Risks\nBudget slightly above program cap.\n## Recommendation\nResubmit with budget revision.",
+      "gold_verdict": "WARN"
+    },
+    {
+      "id": "completeness_critical_missing",
+      "check_type": "completeness",
+      "description": "Verify all required sections (Summary, Risks, Recommendation) are present",
+      "target_field": null,
+      "workflow_output": "## Summary\nGrant proposal is well-aligned with NSF program goals.",
+      "gold_verdict": "FAIL"
+    },
+    {
+      "id": "completeness_restated_requirement",
+      "check_type": "completeness",
+      "description": "Verify all required sections (Summary, Risks, Recommendation) are present",
+      "target_field": null,
+      "workflow_output": "The output should include a Summary, Risks, and Recommendation. I have considered each of these.",
+      "gold_verdict": "FAIL"
+    },
+    {
+      "id": "completeness_reordered",
+      "check_type": "completeness",
+      "description": "Verify all required sections (Summary, Risks, Recommendation) are present",
+      "target_field": null,
+      "workflow_output": "## Recommendation\nResubmit with revisions.\n## Summary\nProposal aligned.\n## Risks\nBudget high.",
+      "gold_verdict": "PASS"
+    },
+    {
+      "id": "correctness_consistent",
+      "check_type": "correctness",
+      "description": "Verify the recommendation is consistent with the stated risks",
+      "target_field": null,
+      "workflow_output": "## Risks\nBudget exceeds cap by 12%.\n## Recommendation\nReduce budget to within cap before resubmitting.",
+      "gold_verdict": "PASS"
+    },
+    {
+      "id": "correctness_contradiction",
+      "check_type": "correctness",
+      "description": "Verify the recommendation is consistent with the stated risks",
+      "target_field": null,
+      "workflow_output": "## Risks\nBudget exceeds cap by 12%.\n## Recommendation\nApprove as submitted, no budget changes needed.",
+      "gold_verdict": "FAIL"
+    },
+    {
+      "id": "correctness_minor_inconsistency",
+      "check_type": "correctness",
+      "description": "Verify the recommendation is consistent with the stated risks",
+      "target_field": null,
+      "workflow_output": "## Risks\nBudget exceeds cap by 1%.\n## Recommendation\nReduce budget moderately before resubmitting.",
+      "gold_verdict": "WARN"
+    },
+    {
+      "id": "correctness_concise_correct",
+      "check_type": "correctness",
+      "description": "Verify the summary captures the key finding",
+      "target_field": null,
+      "workflow_output": "## Summary\nProposal viable; budget needs trimming.",
+      "gold_verdict": "PASS"
+    },
+    {
+      "id": "correctness_verbose_wrong",
+      "check_type": "correctness",
+      "description": "Verify the summary captures the key finding that the proposal exceeds the budget cap",
+      "target_field": null,
+      "workflow_output": "## Summary\nAfter careful consideration of all aspects of this proposal, including its scientific merit, alignment with funder priorities, the qualifications of the PI, the breadth of the team, and the strength of the supporting documentation, we conclude that the proposal is well within all administrative requirements and presents no concerns whatsoever to the review committee.",
+      "gold_verdict": "FAIL"
+    },
+    {
+      "id": "correctness_unsupported_claim",
+      "check_type": "correctness",
+      "description": "Verify the recommendation is supported by the visible content",
+      "target_field": null,
+      "workflow_output": "## Visible Context\nThe proposal lists three PIs.\n## Recommendation\nReject because the proposal has only one PI.",
+      "gold_verdict": "FAIL"
+    },
+    {
+      "id": "hallucination_grounded",
+      "check_type": "hallucination",
+      "description": "Verify the answer does not contain fabricated claims",
+      "target_field": null,
+      "workflow_output": "## Context\nThe abstract mentions a $250,000 budget.\n## Answer\nThe proposed budget is $250,000.",
+      "gold_verdict": "PASS"
+    },
+    {
+      "id": "hallucination_fabricated_number",
+      "check_type": "hallucination",
+      "description": "Verify the answer does not contain fabricated claims",
+      "target_field": null,
+      "workflow_output": "## Context\nThe abstract describes the methodology in general terms.\n## Answer\nThe proposed budget is $487,250.",
+      "gold_verdict": "FAIL"
+    },
+    {
+      "id": "hallucination_fabricated_citation",
+      "check_type": "hallucination",
+      "description": "Verify the answer does not contain fabricated claims",
+      "target_field": null,
+      "workflow_output": "## Context\nThe author cites several recent papers on graph neural networks.\n## Answer\nThe approach builds on Smith et al. (2025), 'Hyperbolic GNNs for Sparse Citation Graphs', published in Nature Machine Intelligence.",
+      "gold_verdict": "FAIL"
+    },
+    {
+      "id": "hallucination_hedged_borderline",
+      "check_type": "hallucination",
+      "description": "Verify the answer does not contain fabricated claims",
+      "target_field": null,
+      "workflow_output": "## Context\nThe abstract emphasises clinical applications.\n## Answer\nThe author likely intends this for translational research, though that is not stated explicitly.",
+      "gold_verdict": "WARN"
+    },
+    {
+      "id": "hallucination_confident_phrasing_still_fabricated",
+      "check_type": "hallucination",
+      "description": "Verify the answer does not contain fabricated claims",
+      "target_field": null,
+      "workflow_output": "## Context\nThe document does not mention an IRB.\n## Answer\nThis study was clearly approved by IRB protocol #2024-1158.",
+      "gold_verdict": "FAIL"
+    },
+    {
+      "id": "hallucination_name_fabricated",
+      "check_type": "hallucination",
+      "description": "Verify the answer does not contain fabricated claims",
+      "target_field": null,
+      "workflow_output": "## Context\nThe abstract does not name any collaborators.\n## Answer\nThe PI collaborates with Dr. Elena Vasquez at MIT.",
+      "gold_verdict": "FAIL"
+    },
+    {
+      "id": "hallucination_date_grounded",
+      "check_type": "hallucination",
+      "description": "Verify the answer does not contain fabricated claims",
+      "target_field": null,
+      "workflow_output": "## Context\nThe project runs from 2026-09-01 to 2029-08-31.\n## Answer\nThe project spans three years starting September 2026.",
+      "gold_verdict": "PASS"
+    },
+    {
+      "id": "completeness_verbose_padding",
+      "check_type": "completeness",
+      "description": "Verify the output includes a budget breakdown and a timeline",
+      "target_field": null,
+      "workflow_output": "We considered the budget breakdown and the timeline very carefully. We thought deeply about how each component contributes to the overall project. The team has extensive experience. The project is ambitious. We believe it will succeed.",
+      "gold_verdict": "FAIL"
+    },
+    {
+      "id": "correctness_internally_inconsistent_dates",
+      "check_type": "correctness",
+      "description": "Verify dates referenced in the output are internally consistent",
+      "target_field": null,
+      "workflow_output": "## Summary\nThe project runs from 2026-09-01 to 2028-08-31, a three-year span.",
+      "gold_verdict": "WARN"
+    },
+    {
+      "id": "format_percentage_clean",
+      "check_type": "format",
+      "description": "Verify 'F&A Rate' is a percentage",
+      "target_field": "F&A Rate",
+      "workflow_output": "- **F&A Rate**: 48.5%",
+      "gold_verdict": "PASS"
+    },
+    {
+      "id": "format_percentage_words",
+      "check_type": "format",
+      "description": "Verify 'F&A Rate' is a percentage",
+      "target_field": "F&A Rate",
+      "workflow_output": "- **F&A Rate**: about half",
+      "gold_verdict": "FAIL"
+    },
+    {
+      "id": "presence_long_value_present",
+      "check_type": "presence",
+      "description": "Verify 'Abstract' is present and non-empty",
+      "target_field": "Abstract",
+      "workflow_output": "- **Abstract**: We propose a method for evaluating LLM-as-judge systems against human-labeled calibration sets across three workflow surfaces.",
+      "gold_verdict": "PASS"
+    },
+    {
+      "id": "hallucination_paraphrase_grounded",
+      "check_type": "hallucination",
+      "description": "Verify the answer does not contain fabricated claims",
+      "target_field": null,
+      "workflow_output": "## Context\nThe document discusses uplift across three sites.\n## Answer\nThe study compared outcomes at three locations.",
+      "gold_verdict": "PASS"
+    },
+    {
+      "id": "constraints_word_count_satisfied",
+      "check_type": "constraints",
+      "description": "Verify 'Summary' is at least 5 words",
+      "target_field": "Summary",
+      "workflow_output": "- **Summary**: Grant proposal is well aligned with NSF program goals.",
+      "gold_verdict": "PASS"
+    },
+    {
+      "id": "constraints_word_count_too_short",
+      "check_type": "constraints",
+      "description": "Verify 'Summary' is at least 5 words",
+      "target_field": "Summary",
+      "workflow_output": "- **Summary**: Looks good.",
+      "gold_verdict": "FAIL"
+    },
+    {
+      "id": "correctness_units_mismatch",
+      "check_type": "correctness",
+      "description": "Verify numeric quantities use consistent units",
+      "target_field": null,
+      "workflow_output": "## Budget\nPersonnel: $120,000\nEquipment: 45,000 (in thousands)\nTotal: $165,000",
+      "gold_verdict": "FAIL"
+    },
+    {
+      "id": "completeness_field_subset",
+      "check_type": "completeness",
+      "description": "Verify all extraction fields (Name, Title, Email, Phone) are present",
+      "target_field": null,
+      "workflow_output": "- **Name**: Jane Doe\n- **Title**: Director\n- **Email**: jdoe@example.edu",
+      "gold_verdict": "WARN"
+    },
+    {
+      "id": "presence_field_in_paragraph",
+      "check_type": "presence",
+      "description": "Verify 'PI' is present and non-empty",
+      "target_field": "PI",
+      "workflow_output": "The principal investigator (PI) is Dr. Jane Smith, who leads the Computational Biology lab.",
+      "gold_verdict": "PASS"
+    },
+    {
+      "id": "hallucination_no_context_unanswerable",
+      "check_type": "hallucination",
+      "description": "Verify the answer does not contain fabricated claims when context is absent",
+      "target_field": null,
+      "workflow_output": "## Context\n(none provided)\n## Answer\nThe project was funded by the NIH for $1.2M and started in March 2025.",
+      "gold_verdict": "FAIL"
+    },
+    {
+      "id": "format_uuid_valid",
+      "check_type": "format",
+      "description": "Verify 'Run ID' is a UUID",
+      "target_field": "Run ID",
+      "workflow_output": "- **Run ID**: 7f3c9a18-2b4d-4e5f-9a01-cd1234567890",
+      "gold_verdict": "PASS"
+    },
+    {
+      "id": "format_uuid_invalid",
+      "check_type": "format",
+      "description": "Verify 'Run ID' is a UUID",
+      "target_field": "Run ID",
+      "workflow_output": "- **Run ID**: run-001",
+      "gold_verdict": "FAIL"
+    }
+  ]
+}

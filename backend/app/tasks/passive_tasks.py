@@ -856,8 +856,9 @@ def process_extraction_outputs(
 
         sys_config = db.system_config.find_one() or {}
 
+        from app.services.search_set_service import effective_extraction_config
         ss_doc = db.search_set.find_one({"uuid": search_set_uuid})
-        extraction_config = (ss_doc or {}).get("extraction_config") or {}
+        extraction_config = effective_extraction_config(ss_doc)
         domain = (ss_doc or {}).get("domain")
 
         ss_items = list(db.search_set_item.find({

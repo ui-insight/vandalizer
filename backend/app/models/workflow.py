@@ -59,10 +59,27 @@ class Workflow(Document):
     version: int = 1
     parent_version_id: Optional[str] = None
     validation_plan: list[dict] = []
+    # SHA256 of the workflow definition (steps/tasks/output_config) at the time
+    # the plan was last generated or saved. Mismatch with the current
+    # definition means the plan may reference steps or fields that no longer
+    # exist — surfaced as a stale-plan warning in the Validate tab.
+    validation_plan_definition_hash: Optional[str] = None
+    validation_plan_updated_at: Optional[datetime.datetime] = None
     validation_inputs: list[dict] = []
     # Random opaque token that grants view-only access to anyone holding it.
     # Minted lazily the first time the owner copies a share link.
     share_token: Optional[str] = None
+    # Optimizer-applied per-step overrides. The workflow engine consults this
+    # at build time to swap per-step ``model`` and prompt variant without
+    # rewriting the underlying WorkflowStep/WorkflowStepTask documents — so
+    # a one-click revert restores the authored config.
+    # Shape:
+    #   {
+    #     "step_overrides": {step_name: {"model": str, "prompt_variant": str | None}},
+    #     "from_run_uuid": str,
+    #   }
+    config_override: Optional[dict] = None
+    config_override_set_at: Optional[datetime.datetime] = None
 
     class Settings:
         name = "workflow"

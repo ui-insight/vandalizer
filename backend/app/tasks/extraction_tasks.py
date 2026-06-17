@@ -299,3 +299,81 @@ def ingest_extraction_recommendation_task(
         "Extraction recommendation prepared for %s (text length %d) — storage not yet implemented",
         searchset_uuid, len(ingestion_text),
     )
+
+
+# ---------------------------------------------------------------------------
+# Extraction optimization (parallel to KB Autovalidate)
+# ---------------------------------------------------------------------------
+
+
+def _run_async(coro):
+    """Run an async coroutine from sync Celery task context."""
+    import asyncio
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
+
+
+@celery_app.task(
+    bind=True,
+    name="tasks.extraction.optimize",
+    autoretry_for=(),  # no retries — partial optimization isn't safely resumable
+    soft_time_limit=5400,  # 90 min — matches KB optimizer's tier ceiling
+    time_limit=5460,
+)
+def optimize_extraction_task(
+    self,
+    search_set_uuid: str,
+    user_id: str,
+    run_uuid: str,
+    budget_tokens: int = 0,
+    apply_on_finish: bool = False,
+    max_candidates: int = 8,
+    include_judge: bool = False,
+    test_case_uuids: list[str] | None = None,
+):
+    """Drive an ExtractionOptimizationRun. The pre-allocated run doc is passed
+    in so the API route can return its UUID immediately.
+    """
+    return _run_async(_optimize_extraction_async(
+        search_set_uuid, user_id, run_uuid, budget_tokens, apply_on_finish,
+        max_candidates, include_judge, test_case_uuids,
+    ))
+
+
+async def _optimize_extraction_async(
+    search_set_uuid: str,
+    user_id: str,
+    run_uuid: str,
+    budget_tokens: int,
+    apply_on_finish: bool,
+    max_candidates: int,
+    include_judge: bool,
+    test_case_uuids: list[str] | None = None,
+):
+    from app.config import Settings
+    from app.database import init_db
+    await init_db(Settings())
+
+    from app.services.extraction_optimizer import run_optimization
+    run_doc = await run_optimization(
+        search_set_uuid=search_set_uuid,
+        user_id=user_id,
+        run_uuid=run_uuid,
+        budget_tokens=budget_tokens,
+        apply_on_finish=apply_on_finish,
+        max_candidates=max_candidates,
+        include_judge=include_judge,
+        test_case_uuids=test_case_uuids,
+    )
+    return {
+        "run_uuid": run_uuid,
+        "search_set_uuid": search_set_uuid,
+        "status": run_doc.status,
+        "optimized_score": run_doc.optimized_score,
+        "baseline_no_tool_score": run_doc.baseline_no_tool_score,
+        "baseline_default_score": run_doc.baseline_default_score,
+        "best_config": run_doc.best_config,
+    }

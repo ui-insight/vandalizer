@@ -1,17 +1,19 @@
 import { useState } from 'react'
-import { ShieldCheck, BookOpen, FolderOpen, Users } from 'lucide-react'
+import { ShieldCheck, BookOpen, FolderOpen, Users, Pin } from 'lucide-react'
 import { PageLayout } from '../components/layout/PageLayout'
 import { VerificationQueue } from '../components/library/VerificationQueue'
 import { VerifiedCatalog } from '../components/library/VerifiedCatalog'
 import { CollectionsManager } from '../components/library/CollectionsManager'
 import { ExaminerManager } from '../components/library/ExaminerManager'
+import { CatalogCoverageTab } from '../components/library/CatalogCoverageTab'
 import { useAuth } from '../hooks/useAuth'
 
-type Tab = 'queue' | 'catalog' | 'collections' | 'examiners'
+type Tab = 'queue' | 'catalog' | 'coverage' | 'collections' | 'examiners'
 
 const TABS: { key: Tab; label: string; icon: typeof ShieldCheck; adminOnly?: boolean }[] = [
   { key: 'queue', label: 'Queue', icon: ShieldCheck },
   { key: 'catalog', label: 'Catalog', icon: BookOpen },
+  { key: 'coverage', label: 'Coverage', icon: Pin },
   { key: 'collections', label: 'Collections', icon: FolderOpen },
   { key: 'examiners', label: 'Examiners', icon: Users, adminOnly: true },
 ]
@@ -80,6 +82,7 @@ export default function Verification() {
         <div style={{ flex: 1, padding: '20px 32px', minWidth: 0 }}>
           {activeTab === 'queue' && <VerificationQueue />}
           {activeTab === 'catalog' && <VerifiedCatalog />}
+          {activeTab === 'coverage' && <CatalogCoverageTab />}
           {activeTab === 'collections' && <CollectionsManager />}
           {activeTab === 'examiners' && isAdmin && <ExaminerManager />}
         </div>

@@ -45,6 +45,11 @@ class SearchSet(Document):
     domain: Optional[str] = None  # nsf | nih | dod | doe — for domain-specific prompts
     cross_field_rules: list[dict] = []  # cross-field validation rules
     tuning_result: Optional[dict] = None  # persisted "Find Best Settings" result
+    # Optimizer apply-back: when set, takes precedence over `extraction_config`
+    # at extraction time. Resolved via `effective_extraction_config()`. Cleared
+    # by the revert endpoint.
+    extraction_config_override: Optional[dict] = None
+    extraction_config_override_set_at: Optional[datetime.datetime] = None
 
     class Settings:
         name = "search_set"
@@ -67,3 +72,12 @@ class SearchSet(Document):
         return await SearchSetItem.find(
             SearchSetItem.searchset == self.uuid
         ).count()
+
+    def normalized_cross_field_rules(self) -> list[dict]:
+        """Return cross-field rules with ids/counters stamped in.
+
+        Lazy import — avoids a circular at module load between
+        `app.models.search_set` and `app.services.cross_field_rules`.
+        """
+        from app.services.cross_field_rules import normalize_rules
+        return normalize_rules(self.cross_field_rules)

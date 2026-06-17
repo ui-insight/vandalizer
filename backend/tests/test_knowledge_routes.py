@@ -274,6 +274,7 @@ def _mock_source(**overrides):
     s.url = overrides.get("url", None)
     s.url_title = overrides.get("url_title", None)
     s.custom_name = overrides.get("custom_name", None)
+    s.source_reference = overrides.get("source_reference", None)
     s.status = overrides.get("status", "ready")
     s.error_message = overrides.get("error_message", None)
     s.chunk_count = overrides.get("chunk_count", 50)
@@ -324,11 +325,15 @@ class TestKnowledgeListEndpoints:
             patch("app.dependencies.User") as MockUser,
             patch("app.routers.knowledge.svc") as mock_svc,
             patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.routers.knowledge.ValidationRun") as MockRun,
+            patch("app.routers.knowledge.KBOptimizationRun") as MockOpt,
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
             mock_svc.list_knowledge_bases = AsyncMock(return_value=([kb], 1))
             mock_svc.list_references = AsyncMock(return_value=[])
+            MockRun.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
+            MockOpt.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
 
             resp = await client.get(
                 "/api/knowledge/list/v2?scope=mine",
@@ -415,10 +420,12 @@ class TestKnowledgeCRUD:
             patch("app.dependencies.User") as MockUser,
             patch("app.routers.knowledge.svc") as mock_svc,
             patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.routers.knowledge.ValidationRun") as MockRun,
+            patch("app.routers.knowledge.KBOptimizationRun") as MockOpt,
             # SmartDocument.find requires Beanie initialization which the
             # ASGI test client skips; stub the title lookup helper directly.
             patch(
-                "app.routers.knowledge._lookup_document_titles",
+                "app.routers.knowledge._resolve_document_titles",
                 new_callable=AsyncMock,
                 return_value={"doc-1": "Some Document.pdf"},
             ),
@@ -427,6 +434,8 @@ class TestKnowledgeCRUD:
             mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
             mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
             mock_svc.get_kb_sources = AsyncMock(return_value=[src])
+            MockRun.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
+            MockOpt.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
 
             resp = await client.get("/api/knowledge/kb-uuid-1", cookies=cookies, headers=headers)
 
@@ -738,7 +747,7 @@ class TestKnowledgeDocSources:
             patch("app.dependencies.User") as MockUser,
             patch("app.routers.knowledge.svc") as mock_svc,
             patch("app.routers.knowledge.organization_service") as mock_org,
-            patch("app.routers.knowledge._lookup_document_titles", new_callable=AsyncMock) as mock_titles,
+            patch("app.routers.knowledge._resolve_document_titles", new_callable=AsyncMock) as mock_titles,
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
@@ -1280,3 +1289,265 @@ class TestKBListQueryBuilder:
         base, search = q["$and"]
         assert base == {"user_id": "user1", "team_owned": {"$ne": True}}
         assert search["$or"][0]["title"]["$regex"] == "needle"
+
+
+class TestBaselineProbe:
+    """Cover the cheap no-KB probe used by the tuning wizard."""
+
+    @pytest.mark.asyncio
+    async def test_returns_404_when_kb_missing(self, client):
+        user = _make_user("viewer")
+        cookies, headers = _auth("viewer")
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "viewer", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.routers.knowledge.organization_service.get_user_org_ancestry",
+                new_callable=AsyncMock,
+            ) as mock_org_ancestry,
+            patch("app.routers.knowledge.svc.get_knowledge_base", new_callable=AsyncMock) as mock_get_kb,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org_ancestry.return_value = []
+            mock_get_kb.return_value = None
+            resp = await client.post(
+                "/api/knowledge/kb-1/baseline-probe", json={}, cookies=cookies, headers=headers,
+            )
+        assert resp.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_rejects_invalid_sample_size(self, client):
+        user = _make_user("manager")
+        cookies, headers = _auth("manager")
+        kb = MagicMock(uuid="kb-1")
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "manager", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.routers.knowledge.organization_service.get_user_org_ancestry",
+                new_callable=AsyncMock,
+            ) as mock_org_ancestry,
+            patch("app.routers.knowledge.svc.get_knowledge_base", new_callable=AsyncMock) as mock_get_kb,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org_ancestry.return_value = []
+            mock_get_kb.return_value = kb
+            resp = await client.post(
+                "/api/knowledge/kb-1/baseline-probe",
+                json={"sample_size": 999},
+                cookies=cookies,
+                headers=headers,
+            )
+        assert resp.status_code == 422
+
+    @pytest.mark.asyncio
+    async def test_returns_score_for_judgeable_queries(self, client):
+        user = _make_user("manager")
+        cookies, headers = _auth("manager")
+        kb = MagicMock(uuid="kb-1")
+
+        # Two test queries: one judgeable, one without expected_answer.
+        judgeable = MagicMock(uuid="q1", query="What is X?", expected_answer="X is foo.")
+        unjudgeable = MagicMock(uuid="q2", query="What about Y?", expected_answer=None)
+
+        # Beanie's chained `find().to_list()` — mock the find result to return
+        # an awaitable list when ``to_list`` is called.
+        find_result = MagicMock()
+        find_result.to_list = AsyncMock(return_value=[judgeable, unjudgeable])
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "manager", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.routers.knowledge.organization_service.get_user_org_ancestry",
+                new_callable=AsyncMock,
+            ) as mock_org_ancestry,
+            patch("app.routers.knowledge.svc.get_knowledge_base", new_callable=AsyncMock) as mock_get_kb,
+            patch("app.models.kb_test_query.KBTestQuery.find", return_value=find_result),
+            patch(
+                "app.services.workflow_validator._resolve_model_name",
+                return_value="gpt-4o-mini",
+            ),
+            patch(
+                "app.services.kb_validation_service.judge_baselines_only",
+                new_callable=AsyncMock,
+            ) as mock_judge,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org_ancestry.return_value = []
+            mock_get_kb.return_value = kb
+            mock_judge.return_value = {
+                "avg_baseline_score": 0.72,
+                "num_baselines_judged": 1,
+                "tokens_used": 1500,
+                "details": [],
+            }
+
+            resp = await client.post(
+                "/api/knowledge/kb-1/baseline-probe",
+                json={"sample_size": 5},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["no_kb_score"] == 0.72
+        assert body["num_queries_judged"] == 1
+        assert body["sample_query_ids"] == ["q1"]
+        assert body["tokens_used"] == 1500
+        assert "duration_ms" in body
+
+    @pytest.mark.asyncio
+    async def test_returns_null_score_when_no_judgeable_queries(self, client):
+        user = _make_user("manager")
+        cookies, headers = _auth("manager")
+        kb = MagicMock(uuid="kb-1")
+        find_result = MagicMock()
+        find_result.to_list = AsyncMock(return_value=[])  # no queries at all
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "manager", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.routers.knowledge.organization_service.get_user_org_ancestry",
+                new_callable=AsyncMock,
+            ) as mock_org_ancestry,
+            patch("app.routers.knowledge.svc.get_knowledge_base", new_callable=AsyncMock) as mock_get_kb,
+            patch("app.models.kb_test_query.KBTestQuery.find", return_value=find_result),
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org_ancestry.return_value = []
+            mock_get_kb.return_value = kb
+            resp = await client.post(
+                "/api/knowledge/kb-1/baseline-probe", json={}, cookies=cookies, headers=headers,
+            )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["no_kb_score"] is None
+        assert body["num_queries_judged"] == 0
+        assert body["sample_query_ids"] == []
+
+
+def _make_source(uuid="s1", source_type="document"):
+    s = MagicMock()
+    s.uuid = uuid
+    s.source_type = source_type
+    s.document_uuid = "doc1" if source_type == "document" else None
+    s.url = None if source_type == "document" else "https://www.uidaho.edu/apm/45"
+    s.url_title = None
+    s.custom_name = "My label"
+    s.source_reference = "APM Ch.45"
+    s.status = "ready"
+    s.error_message = None
+    s.chunk_count = 3
+    s.created_at = datetime.datetime(2026, 6, 9, tzinfo=datetime.timezone.utc)
+    return s
+
+
+class TestUpdateSourceFields:
+    @pytest.mark.asyncio
+    async def test_source_reference_only_does_not_clear_custom_name(self, client):
+        """A PATCH carrying only source_reference must route to
+        set_source_reference and NOT call update_source_name (which would
+        otherwise clear the custom_name)."""
+        user = _make_user("manager")
+        cookies, headers = _auth("manager")
+        kb = MagicMock()
+        kb.uuid = "kb-1"
+        updated = _make_source()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "manager", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.routers.knowledge.organization_service.get_user_org_ancestry",
+                new_callable=AsyncMock,
+            ) as mock_org_ancestry,
+            patch("app.routers.knowledge.svc.get_knowledge_base", new_callable=AsyncMock) as mock_get_kb,
+            patch("app.routers.knowledge.svc.set_source_reference", new_callable=AsyncMock) as mock_set_ref,
+            patch("app.routers.knowledge.svc.update_source_name", new_callable=AsyncMock) as mock_rename,
+            patch("app.routers.knowledge._resolve_document_titles", new_callable=AsyncMock) as mock_titles,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org_ancestry.return_value = []
+            mock_get_kb.return_value = kb
+            mock_set_ref.return_value = updated
+            mock_titles.return_value = {}
+
+            resp = await client.patch(
+                "/api/knowledge/kb-1/source/s1",
+                json={"source_reference": "APM Ch.45"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        mock_set_ref.assert_awaited_once()
+        mock_rename.assert_not_awaited()  # custom_name left untouched
+        assert resp.json()["source_reference"] == "APM Ch.45"
+
+
+class TestAdminKBInventory:
+    @pytest.mark.asyncio
+    async def test_non_admin_forbidden(self, client):
+        user = _make_user("plebe")
+        user.is_admin = False
+        user.is_staff = False  # MagicMock attrs are truthy by default — pin it
+        cookies, headers = _auth("plebe")
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "plebe", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.services.knowledge_service.admin_list_all_knowledge_bases",
+                new_callable=AsyncMock,
+            ) as mock_list,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            resp = await client.get("/api/admin/knowledge-bases", cookies=cookies, headers=headers)
+
+        assert resp.status_code == 403
+        mock_list.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_admin_lists_kbs(self, client):
+        user = _make_user("boss")
+        user.is_admin = True
+        cookies, headers = _auth("boss")
+        kb = MagicMock()
+        kb.uuid = "kb-1"
+        kb.title = "APM Chapter 45"
+        kb.status = "ready"
+        kb.verified = True
+        kb.tags = ["v2026-06"]
+        kb.total_sources = 2
+        kb.total_chunks = 40
+        kb.user_id = "boss"
+        kb.team_id = None
+        kb.created_at = datetime.datetime(2026, 6, 1, tzinfo=datetime.timezone.utc)
+        kb.updated_at = datetime.datetime(2026, 6, 9, tzinfo=datetime.timezone.utc)
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "boss", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.services.knowledge_service.admin_list_all_knowledge_bases",
+                new_callable=AsyncMock,
+            ) as mock_list,
+            patch("app.routers.admin.User.find") as mock_user_find,
+            patch("app.routers.admin.Team.find") as mock_team_find,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_list.return_value = [kb]
+            mock_user_find.return_value.to_list = AsyncMock(return_value=[])
+            mock_team_find.return_value.to_list = AsyncMock(return_value=[])
+
+            resp = await client.get("/api/admin/knowledge-bases", cookies=cookies, headers=headers)
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["total"] == 1
+        assert body["knowledge_bases"][0]["title"] == "APM Chapter 45"
+        assert body["knowledge_bases"][0]["tags"] == ["v2026-06"]

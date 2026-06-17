@@ -78,6 +78,7 @@ class SubmitRequest(BaseModel):
     dependencies: Optional[list[str]] = None
     intended_use_tags: Optional[list[str]] = None
     test_files: Optional[list[dict]] = None
+    skip_validation: bool = False  # Phase B: opt-in unvalidated submission
 
 
 class UpdateStatusRequest(BaseModel):
@@ -85,6 +86,16 @@ class UpdateStatusRequest(BaseModel):
     reviewer_notes: Optional[str] = None
     organization_ids: Optional[list[str]] = None
     collection_ids: Optional[list[str]] = None
+
+
+class ExaminerAdditionsRequest(BaseModel):
+    additions: dict  # See verification_service.set_examiner_additions for shape
+
+
+class PinRetroactiveBaselineRequest(BaseModel):
+    baseline: dict
+    source_run_uuid: Optional[str] = None
+    score: Optional[float] = None
 
 
 class MetadataUpdateRequest(BaseModel):
@@ -146,6 +157,7 @@ async def submit_for_verification(
             dependencies=req.dependencies,
             intended_use_tags=req.intended_use_tags,
             test_files=req.test_files,
+            skip_validation=req.skip_validation,
         )
         return result
     except ValueError as e:
@@ -632,7 +644,8 @@ async def try_verified_item(
     model = await get_user_model_name(user.user_id)
     sys_config = await SystemConfig.get_config()
     sys_config_doc = sys_config.model_dump() if sys_config else {}
-    extraction_config = ss.extraction_config if ss.extraction_config else None
+    from app.services.search_set_service import effective_extraction_config
+    extraction_config = effective_extraction_config(ss) or None
 
     engine = ExtractionEngine(system_config_doc=sys_config_doc)
     result = await asyncio.to_thread(
@@ -656,6 +669,44 @@ async def try_verified_item(
         "fields": keys,
         "extraction_result": flat,
     }
+
+
+# ---------------------------------------------------------------------------
+# Phase D — Catalog coverage (admin view of pinned baselines)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/catalog/coverage")
+async def list_catalog_coverage(
+    kind: Optional[str] = Query(None),
+    coverage: Optional[str] = Query(None, description="none | snapshot_only | pinned_baseline | drift_checked"),
+    limit: int = Query(200, ge=1, le=500),
+    user: User = Depends(get_current_user),
+):
+    _require_examiner_access(user)
+    return await svc.list_catalog_coverage(kind_filter=kind, coverage_filter=coverage, limit=limit)
+
+
+@router.post("/catalog/{item_kind}/{item_id}/pin-baseline")
+async def pin_retroactive_baseline(
+    item_kind: str,
+    item_id: str,
+    req: PinRetroactiveBaselineRequest,
+    user: User = Depends(get_current_user),
+):
+    _require_examiner_access(user)
+    try:
+        result = await svc.pin_retroactive_baseline(
+            item_kind=item_kind,
+            item_id=item_id,
+            baseline=req.baseline,
+            user_id=user.user_id,
+            source_run_uuid=req.source_run_uuid,
+            score=req.score,
+        )
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 # ---------------------------------------------------------------------------
@@ -695,3 +746,45 @@ async def update_status(
     if not result:
         raise HTTPException(status_code=404, detail="Request not found")
     return result
+
+
+# ---------------------------------------------------------------------------
+# Phase C — examiner authoring + claim lock
+# ---------------------------------------------------------------------------
+
+
+@router.post("/{request_uuid}/claim")
+async def claim_request(
+    request_uuid: str,
+    user: User = Depends(get_current_user),
+):
+    _require_examiner_access(user)
+    try:
+        return await svc.claim_request(request_uuid, user.user_id)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
+@router.post("/{request_uuid}/release")
+async def release_claim(
+    request_uuid: str,
+    user: User = Depends(get_current_user),
+):
+    _require_examiner_access(user)
+    try:
+        return await svc.release_claim(request_uuid, user.user_id)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+
+
+@router.put("/{request_uuid}/examiner-additions")
+async def set_examiner_additions(
+    request_uuid: str,
+    req: ExaminerAdditionsRequest,
+    user: User = Depends(get_current_user),
+):
+    _require_examiner_access(user)
+    try:
+        return await svc.set_examiner_additions(request_uuid, user.user_id, req.additions)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))

@@ -132,6 +132,14 @@ class ValidationCheckDefinition(BaseModel):
     name: str
     description: str = ""
     category: Optional[str] = None
+    # Name of the workflow step this check is primarily about. Drives the
+    # per-step quality breakdown in the validate response. Auto-generated
+    # plans now always populate this; older plans may omit it.
+    target_step: Optional[str] = None
+    # "auto" (LLM-generated) or "manual" (user-authored). Regenerating the
+    # plan replaces auto checks but preserves manual ones. Older checks omit
+    # this and are treated as auto.
+    source: Optional[str] = None
 
 
 class UpdateValidationPlanRequest(BaseModel):
@@ -140,6 +148,12 @@ class UpdateValidationPlanRequest(BaseModel):
 
 class ValidationPlanResponse(BaseModel):
     checks: list[ValidationCheckDefinition]
+    # Stale-plan detection: true when the workflow definition changed since
+    # the plan was generated/saved, or when checks target steps that no
+    # longer exist. PUT/generate responses always return fresh (False).
+    plan_stale: bool = False
+    stale_reasons: list[str] = []  # "definition_changed" | "orphaned_checks"
+    orphaned_check_ids: list[str] = []
 
 
 # ---------------------------------------------------------------------------
@@ -178,6 +192,14 @@ class ValidationCheckResult(BaseModel):
     run_details: Optional[list[str]] = None  # Detail from each run
 
 
+class StaticDiagnostic(BaseModel):
+    code: str  # e.g. "dangling_search_set", "empty_step_output"
+    level: str  # "error" | "warning" | "info"
+    message: str
+    target_step: Optional[str] = None
+    details: dict = {}
+
+
 class ValidateWorkflowResponse(BaseModel):
     grade: str  # A-F
     summary: str
@@ -191,3 +213,15 @@ class ValidateWorkflowResponse(BaseModel):
     consistency: Optional[float] = None  # 0-1, evaluator agreement (diagnostic)
     num_runs: int = 1
     num_checks: int = 0
+    # Phase 2A diagnostics (previously stripped by response_model filtering).
+    output_comparison: Optional[dict] = None
+    baseline_no_workflow_score: Optional[float] = None
+    lift_vs_no_workflow: Optional[float] = None
+    baseline_no_workflow_detail: Optional[dict] = None
+    step_breakdown: list[dict] = []
+    judge_variance: Optional[float] = None
+    # Static + runtime deterministic diagnostics (new).
+    static_diagnostics: list[StaticDiagnostic] = []
+    # True when this run was graded against a plan that no longer matches the
+    # workflow definition — the grade card renders a regenerate caveat.
+    plan_stale: bool = False

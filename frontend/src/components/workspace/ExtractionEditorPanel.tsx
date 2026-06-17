@@ -26,17 +26,16 @@ import {
   exportExtractionPdf,
   generateExampleTemplate,
   exportSearchSetUrl,
-  downloadValidationZip,
   importSearchSet,
-  getTuningResult,
-  clearTuningResult,
   getExtractionHistory,
 } from '../../api/extractions'
 import { RunHistoryTab } from './RunHistoryTab'
-import type { ValidationV2Result, QualityHistoryRun, ValidationSource, TuningResult, TuningStreamEvent } from '../../api/extractions'
-import { findBestSettingsStream } from '../../api/extractions'
+import type { ValidationV2Result, QualityHistoryRun, ValidationSource } from '../../api/extractions'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
 import { VerificationSubmitModal } from '../library/VerificationSubmitModal'
+import { ExtractionAutovalidatePanel } from '../extractions/ExtractionAutovalidatePanel'
+import { CrossFieldRulesSection } from '../extractions/CrossFieldRulesSection'
+import { CrossFieldViolationsPanel } from '../extractions/CrossFieldViolationsPanel'
 import { getModels } from '../../api/config'
 import { MAX_NAME_LENGTH, normalizeName } from '../../utils/nameValidation'
 import type { SearchSet, ModelInfo } from '../../types/workflow'
@@ -2437,7 +2436,6 @@ function ValidateTab({
   extractionConfig,
   onUpdateItem,
   onValidationComplete,
-  onSaveConfig,
   portability,
 }: {
   searchSetUuid: string
@@ -2449,8 +2447,8 @@ function ValidateTab({
   onSaveConfig?: (config: ExtractionConfig) => Promise<void>
   portability?: { test_case_count: number; text_count: number; document_count: number; missing_snapshot_count: number } | null
 }) {
-  const { toast } = useToast()
   const { selectedDocUuids, viewDocument } = useWorkspace()
+  const { toast } = useToast()
   const [sources, setSources] = useState<SourceLocal[]>([])
   const [loadingSources, setLoadingSources] = useState(true)
   const [numRuns, setNumRuns] = useState(3)
@@ -2466,16 +2464,11 @@ function ValidateTab({
   const [suggestions, setSuggestions] = useState<string | null>(null)
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
   const [sourcesCollapsed, setSourcesCollapsed] = useState(false)
-  const [tuning, setTuning] = useState(false)
-  const [tuningResults, setTuningResults] = useState<TuningResult[] | null>(null)
-  const [tuningRecommendation, setTuningRecommendation] = useState<string | null>(null)
-  const [tuningProgress, setTuningProgress] = useState<{ index: number; total: number; label: string } | null>(null)
   const [fillingSourceId, setFillingSourceId] = useState<string | null>(null)
   const [fillError, setFillError] = useState<string | null>(null)
   const fillAbortRef = useRef<AbortController | null>(null)
   const [showSubmitDialog, setShowSubmitDialog] = useState(false)
   const [submitLibraryResult, setSubmitLibraryResult] = useState<'success' | 'error' | null>(null)
-  const [downloadingZip, setDownloadingZip] = useState(false)
   const progress = useValidationProgress(validating, sources.length, numRuns, items.length, extractionConfig)
 
   // Debounce timers keyed by source id
@@ -2503,23 +2496,13 @@ function ValidateTab({
       .finally(() => setLoadingSources(false))
   }, [searchSetUuid])
 
-  useEffect(() => {
-    getExtractionQualityHistory(searchSetUuid)
+  const reloadQualityHistory = useCallback(() => {
+    return getExtractionQualityHistory(searchSetUuid)
       .then(r => setQualityHistory(r.runs))
       .catch(() => {})
   }, [searchSetUuid])
 
-  // Load persisted tuning results
-  useEffect(() => {
-    getTuningResult(searchSetUuid)
-      .then(r => {
-        if (r.tuning_result) {
-          setTuningResults(r.tuning_result.results)
-          setTuningRecommendation(r.tuning_result.recommendation)
-        }
-      })
-      .catch(() => {})
-  }, [searchSetUuid])
+  useEffect(() => { void reloadQualityHistory() }, [reloadQualityHistory])
 
   // Cleanup debounce timers on unmount
   useEffect(() => {
@@ -2722,7 +2705,25 @@ function ValidateTab({
 
   return (
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* 1. Source Management */}
+      <div>
+        <div style={{ fontSize: 14, fontWeight: 600, color: '#202124', marginBottom: 4 }}>
+          Validate & Improve
+        </div>
+        <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
+          One click scores this extraction against your test cases and tries better settings.
+          The sections below hold the test data and per-field diagnostics.
+        </div>
+      </div>
+
+      {/* Validate & improve (autovalidate) — THE validation flow and the single
+          scoring surface. Apply writes the certified ValidationRun / quality tile. */}
+      <ExtractionAutovalidatePanel
+        searchSetUuid={searchSetUuid}
+        canManage={true}
+        onApplied={() => { onValidationComplete?.(); void reloadQualityHistory() }}
+      />
+
+      {/* Test cases — the shared input to tuning + detailed validation. */}
       <div>
         <div
           style={{
@@ -2738,7 +2739,7 @@ function ValidateTab({
               : <ChevronDown style={{ width: 14, height: 14, color: '#9ca3af' }} />
           )}
           <span style={{ fontSize: 14, fontWeight: 600, color: '#202124' }}>
-            Validation Sources
+            Test cases
           </span>
           {sources.length > 0 && sourcesCollapsed && (
             <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 400 }}>
@@ -3065,8 +3066,24 @@ function ValidateTab({
         )}
       </div>
 
-      {/* 2. Run Controls */}
+      {/* Cross-field rules — feed into the optimizer's fitness function */}
+      <CrossFieldRulesSection
+        searchSetUuid={searchSetUuid}
+        canManage={true}
+        fieldNames={items.map(i => i.searchphrase)}
+      />
+
+      {/* 2. Detailed validation (on demand) — optional per-source/per-field
+          deep-dive. The headline score lives in the tune panel above; this is
+          a diagnostic breakdown, not a competing score. */}
       <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: '#202124', marginBottom: 4 }}>
+          Detailed validation
+        </div>
+        <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
+          Run the test cases as-is and inspect expected vs. extracted values per source and field.
+          For the official score, use “Validate & improve” at the top.
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <label style={{ fontSize: 13, color: '#5f6368' }}>Replicates:</label>
           <input
@@ -3095,200 +3112,10 @@ function ValidateTab({
             {validating ? (
               <><Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} /> Validating...</>
             ) : (
-              <><Play style={{ width: 14, height: 14 }} /> Run Validation</>
-            )}
-          </button>
-          <button
-            onClick={async () => {
-              setTuning(true)
-              setTuningResults(null)
-              setTuningRecommendation(null)
-              setTuningProgress(null)
-              try {
-                await findBestSettingsStream(searchSetUuid, numRuns, 8, (event: TuningStreamEvent) => {
-                  if (event.kind === 'testing') {
-                    setTuningProgress({ index: event.index, total: event.total, label: event.label })
-                  } else if (event.kind === 'result') {
-                    setTuningResults(prev => [...(prev || []), event.result])
-                  } else if (event.kind === 'done') {
-                    setTuningResults(event.results)
-                    setTuningRecommendation(event.recommendation)
-                    setTuningProgress(null)
-                  } else if (event.kind === 'error') {
-                    setTuningRecommendation(event.detail)
-                    setTuningProgress(null)
-                  }
-                })
-              } catch (e: unknown) {
-                const msg = e instanceof Error ? e.message : 'Failed to find best settings'
-                setTuningRecommendation(msg)
-              } finally {
-                setTuning(false)
-                setTuningProgress(null)
-              }
-            }}
-            disabled={tuning || validating || sources.length === 0}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '8px 16px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
-              borderRadius: 8, border: '1px solid #d1d5db', backgroundColor: '#fff',
-              color: '#374151',
-              cursor: tuning || validating || sources.length === 0 ? 'not-allowed' : 'pointer',
-              opacity: tuning || validating || sources.length === 0 ? 0.5 : 1,
-            }}
-          >
-            {tuning ? (
-              <><Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} /> {tuningProgress ? `Testing ${tuningProgress.index + 1}/${tuningProgress.total}` : 'Preparing...'}</>
-            ) : (
-              <><Sparkles style={{ width: 14, height: 14 }} /> Find Best Settings</>
-            )}
-          </button>
-          <button
-            onClick={async () => {
-              setDownloadingZip(true)
-              try {
-                await downloadValidationZip(searchSetUuid)
-                toast('Validation setup downloaded', 'success')
-              } catch (e: unknown) {
-                toast(e instanceof Error ? e.message : 'Download failed', 'error')
-              } finally {
-                setDownloadingZip(false)
-              }
-            }}
-            disabled={downloadingZip || sources.length === 0}
-            title="Download a zip with this validation's test cases, expected values, and source documents"
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '8px 16px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
-              borderRadius: 8, border: '1px solid #d1d5db', backgroundColor: '#fff',
-              color: '#374151',
-              cursor: downloadingZip || sources.length === 0 ? 'not-allowed' : 'pointer',
-              opacity: downloadingZip || sources.length === 0 ? 0.5 : 1,
-            }}
-          >
-            {downloadingZip ? (
-              <><Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} /> Packaging...</>
-            ) : (
-              <><Download style={{ width: 14, height: 14 }} /> Download Setup</>
+              <><Play style={{ width: 14, height: 14 }} /> Run detailed validation</>
             )}
           </button>
         </div>
-
-        {/* Tuning results — live streaming */}
-        {(tuningResults || tuningRecommendation || tuningProgress) && (
-          <div style={{
-            marginTop: 12, padding: 16, borderRadius: 8,
-            border: '1px solid #c4b5fd', backgroundColor: '#f5f3ff',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-              <Sparkles style={{ width: 14, height: 14, color: '#7c3aed' }} />
-              <span style={{ fontSize: 13, fontWeight: 600, color: '#5b21b6' }}>Settings Comparison</span>
-              {!tuning && (
-                <button
-                  onClick={() => {
-                    setTuningResults(null); setTuningRecommendation(null); setTuningProgress(null)
-                    clearTuningResult(searchSetUuid).catch(() => {})
-                  }}
-                  style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', padding: 2 }}
-                >
-                  <X style={{ width: 12, height: 12 }} />
-                </button>
-              )}
-            </div>
-
-            {/* Progress bar while tuning */}
-            {tuningProgress && (
-              <div style={{ marginBottom: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                  <Loader2 style={{ width: 14, height: 14, color: '#7c3aed', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
-                  <span style={{ fontSize: 12, color: '#5b21b6', fontWeight: 500 }}>
-                    Testing: {tuningProgress.label}
-                  </span>
-                  <span style={{ fontSize: 11, color: '#8b5cf6', marginLeft: 'auto' }}>
-                    {tuningProgress.index + 1} of {tuningProgress.total}
-                  </span>
-                </div>
-                <div style={{ height: 4, borderRadius: 2, backgroundColor: '#ddd6fe', overflow: 'hidden' }}>
-                  <div style={{
-                    height: '100%', borderRadius: 2, backgroundColor: '#7c3aed',
-                    width: `${((tuningProgress.index + 0.5) / tuningProgress.total) * 100}%`,
-                    transition: 'width 0.3s ease',
-                  }} />
-                </div>
-              </div>
-            )}
-
-            {tuningResults && tuningResults.length > 0 && (
-              <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse', marginBottom: 10 }}>
-                <thead>
-                  <tr style={{ borderBottom: '2px solid #ddd6fe' }}>
-                    <th style={{ textAlign: 'left', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Config</th>
-                    <th style={{ textAlign: 'left', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Model</th>
-                    <th style={{ textAlign: 'right', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Score</th>
-                    <th style={{ textAlign: 'right', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Acc</th>
-                    <th style={{ textAlign: 'right', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Cons</th>
-                    <th style={{ textAlign: 'right', padding: '4px 6px', color: '#6b7280', fontWeight: 500 }}>Time</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tuningResults.map((r, i) => {
-                    const scoreColor = r.score >= 90 ? '#059669' : r.score >= 70 ? '#d97706' : '#dc2626'
-                    const isBest = !tuning && i === 0
-                    return (
-                      <tr key={r.label} style={{
-                        borderBottom: '1px solid #ede9fe',
-                        backgroundColor: isBest ? '#ede9fe' : 'transparent',
-                      }}>
-                        <td style={{ padding: '4px 6px', fontWeight: isBest ? 700 : 400 }}>
-                          {r.label}{isBest && ' *'}
-                        </td>
-                        <td style={{ padding: '4px 6px', color: '#6b7280', fontSize: 10 }}>{r.model}</td>
-                        <td style={{ padding: '4px 6px', textAlign: 'right', fontWeight: 600, color: scoreColor }}>
-                          {r.error ? '-' : Math.round(r.score)}
-                        </td>
-                        <td style={{ padding: '4px 6px', textAlign: 'right' }}>
-                          {r.error ? '-' : `${Math.round(r.accuracy * 100)}%`}
-                        </td>
-                        <td style={{ padding: '4px 6px', textAlign: 'right' }}>
-                          {r.error ? '-' : `${Math.round(r.consistency * 100)}%`}
-                        </td>
-                        <td style={{ padding: '4px 6px', textAlign: 'right', color: '#6b7280' }}>
-                          {r.error ? '-' : `${r.elapsed_seconds.toFixed(1)}s`}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            )}
-            {tuningRecommendation && (
-              <div style={{ fontSize: 12, color: '#5b21b6', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
-                {tuningRecommendation}
-              </div>
-            )}
-            {!tuning && tuningResults && tuningResults.length > 0 && !tuningResults[0].error && (
-              <button
-                onClick={async () => {
-                  const best = tuningResults[0]
-                  if (!best?.config_override) return
-                  await onSaveConfig?.(best.config_override as ExtractionConfig)
-                  setTuningResults(null)
-                  setTuningRecommendation(null)
-                  clearTuningResult(searchSetUuid).catch(() => {})
-                  toast(`Switched to ${best.label}`, 'success')
-                }}
-                style={{
-                  marginTop: 10, display: 'inline-flex', alignItems: 'center', gap: 6,
-                  padding: '7px 16px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                  borderRadius: 8, border: 'none', backgroundColor: '#7c3aed', color: '#fff',
-                  cursor: 'pointer',
-                }}
-              >
-                <Sparkles style={{ width: 13, height: 13 }} /> Apply Best Settings
-              </button>
-            )}
-          </div>
-        )}
 
         {/* Progress display */}
         {validating && (
@@ -3481,7 +3308,7 @@ function ValidateTab({
       {results && (
         <div style={{ borderTop: '1px solid #e5e7eb', paddingTop: 16, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: '#202124' }}>Results</div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#202124' }}>Detailed breakdown</div>
             <button
               onClick={() => downloadValidationCSV(results)}
               style={{
@@ -3494,6 +3321,11 @@ function ValidateTab({
               <Download style={{ width: 13, height: 13 }} /> Download CSV
             </button>
           </div>
+
+          {/* The official, certified score lives in the auto-tune panel above
+              (and the quality tile). This block is a per-source/per-field
+              diagnostic only — no headline score here, so there's never a
+              second number that can disagree with the certified one. */}
 
           {/* Executive Summary Card */}
           <div style={{
@@ -3538,6 +3370,14 @@ function ValidateTab({
               </div>
             </div>
           </div>
+
+          {/* Cross-Field rule outcomes — shows fails inline with "False alarm" mark-up */}
+          <CrossFieldViolationsPanel
+            searchSetUuid={searchSetUuid}
+            canManage={true}
+            summary={results.cross_field_summary}
+            results={results.cross_field_results}
+          />
 
           {/* LLM Improvement Suggestions */}
           {(suggestions || loadingSuggestions || (

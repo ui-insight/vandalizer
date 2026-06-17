@@ -31,6 +31,15 @@ class ValidationRun(Document):
     extraction_config: dict = {}  # Extraction config used for this run
     config_hash: Optional[str] = None
     user_id: str
+    # Provenance tag — distinguishes a user-triggered validation run from an
+    # auto-recorded apply event (Phase 4 of loop closure). Values:
+    # ``"validation"`` (default), ``"optimizer_apply"``. Optimizer-apply rows
+    # are rendered differently on the quality timeline so users can tell
+    # "we measured this" from "the optimizer believed this".
+    source: Optional[str] = None
+    # When source="optimizer_apply", the originating optimization-run uuid.
+    # Lets the timeline deep-link an apply row back to its winning trial.
+    source_run_uuid: Optional[str] = None
     created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
 
     class Settings:

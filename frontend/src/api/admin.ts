@@ -580,7 +580,7 @@ export function runRegressionSuite(model?: string) {
 
 export interface QualityAlert {
   uuid: string
-  alert_type: 'regression' | 'stale' | 'config_changed'
+  alert_type: 'regression' | 'stale' | 'config_changed' | 'baseline_drift'
   item_kind: string
   item_id: string
   item_name: string

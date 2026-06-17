@@ -51,6 +51,7 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
   const [expectedOutputs, setExpectedOutputs] = useState('')
   const [dependencies, setDependencies] = useState('')
   const [intendedUseTags, setIntendedUseTags] = useState('')
+  const [skipValidation, setSkipValidation] = useState(false)
 
   const stepIndex = STEPS.findIndex(s => s.key === step)
   const canGoBack = stepIndex > 0
@@ -85,6 +86,7 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
         expected_outputs: expectedOutputs ? splitLines(expectedOutputs) : undefined,
         dependencies: dependencies ? splitLines(dependencies) : undefined,
         intended_use_tags: intendedUseTags ? splitLines(intendedUseTags) : undefined,
+        skip_validation: skipValidation,
       })
       onSubmitted()
       onClose()
@@ -343,6 +345,25 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
                   </div>
                 )}
               </dl>
+
+              {/* Submit-without-validation opt-in (Phase B) */}
+              <label className="flex items-start gap-2 cursor-pointer rounded-md bg-amber-50 border border-amber-200 px-3.5 py-2.5">
+                <input
+                  type="checkbox"
+                  checked={skipValidation}
+                  onChange={(e) => setSkipValidation(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>
+                  <span className="block text-xs font-semibold text-amber-900">
+                    Submit without validation — request reviewer help
+                  </span>
+                  <span className="block text-[11px] leading-snug text-amber-800 mt-0.5">
+                    Reviewer will establish a validation baseline before approval. May take longer to review and could be returned for rework. Most submissions should be validated by the submitter first.
+                  </span>
+                </span>
+              </label>
+
               {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{error}</p>}
             </div>
           )}
@@ -375,7 +396,7 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
                 className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 disabled:opacity-50"
               >
                 <Upload className="h-4 w-4" />
-                {submitting ? 'Submitting...' : 'Submit for Verification'}
+                {submitting ? 'Submitting...' : skipValidation ? 'Submit (reviewer will validate)' : 'Submit for Verification'}
               </button>
             ) : (
               <button
