@@ -15,6 +15,7 @@ import random
 from typing import Any
 
 from pydantic_ai import Agent
+from pydantic_ai.exceptions import ModelAPIError
 
 from app.models.kb_test_query import KBTestQuery
 from app.models.knowledge import KnowledgeBase, KnowledgeBaseSource
@@ -168,7 +169,14 @@ class KBQuestionGenerator:
     # gets this via ``autoretry_for=TRANSIENT_EXCEPTIONS``; the synchronous
     # route call (used by the UI) has no such safety net, so mirror it here so a
     # single provider/network blip doesn't surface as a 502.
-    _TRANSIENT = (ConnectionError, TimeoutError, OSError)
+    #
+    # ModelAPIError is pydantic-ai's wrapper for connection/transport failures
+    # (e.g. openai.APIConnectionError -> "Connection error."). On oauthdev the
+    # API container intermittently can't open an outbound socket to the model
+    # endpoint, so this is exactly the blip a retry should absorb. HTTP *status*
+    # errors surface as ModelHTTPError instead and are deliberately not retried
+    # (a 4xx won't get better on a retry).
+    _TRANSIENT = (ConnectionError, TimeoutError, OSError, ModelAPIError)
     _MAX_LLM_ATTEMPTS = 3
 
     async def _run_agent_with_retries(self, agent: Agent, prompt: str) -> Any:
