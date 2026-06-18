@@ -34,6 +34,9 @@ export interface SearchSet {
   last_validated_at?: string | null;
   validation_run_count?: number;
   validation_portability?: ValidationPortability | null;
+  // Whether the current user may manage (edit/validate) this set. Returned by
+  // the backend SearchSetResponse; absent on older payloads, so treat as true.
+  can_manage?: boolean;
 }
 
 export interface WorkflowTask {

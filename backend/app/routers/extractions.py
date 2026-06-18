@@ -80,8 +80,14 @@ async def _attach_quality(ss) -> dict:
     return {"quality_score": None, "quality_tier": None, "last_validated_at": None, "validation_run_count": 0}
 
 
-async def _ss_response(ss) -> SearchSetResponse:
-    """Build a SearchSetResponse with quality data attached."""
+async def _ss_response(ss, *, can_manage: bool = True) -> SearchSetResponse:
+    """Build a SearchSetResponse with quality data attached.
+
+    ``can_manage`` defaults True because most callers reach here only after a
+    manage authorization has already passed (create/update/clone/import). The
+    read paths (single GET, list) pass a real value so the UI can gate the
+    "Validate & improve" controls for view-only users.
+    """
     count = await ss.item_count()
     quality = await _attach_quality(ss)
     portability = await val_svc.portability_summary(ss.uuid)
@@ -91,6 +97,7 @@ async def _ss_response(ss) -> SearchSetResponse:
         team_id=ss.team_id, is_global=ss.is_global, verified=ss.verified, item_count=count,
         extraction_config=ss.extraction_config,
         fillable_pdf_url=ss.fillable_pdf_url,
+        can_manage=can_manage,
         validation_portability=portability,
         **quality,
     )
@@ -158,13 +165,26 @@ async def list_search_sets(
     user: User = Depends(get_current_user),
 ):
     sets = await svc.list_search_sets(user=user, skip=skip, limit=limit, scope=scope, search=search)
-    return [await _ss_response(ss) for ss in sets]
+    team_access = await access_control.get_team_access_context(user)
+    return [
+        await _ss_response(
+            ss,
+            can_manage=access_control.can_manage_search_set(
+                ss, user, allow_admin=True, team_access=team_access,
+            ),
+        )
+        for ss in sets
+    ]
 
 
 @router.get("/search-sets/{uuid}", response_model=SearchSetResponse)
 async def get_search_set(uuid: str, user: User = Depends(get_current_user)):
     ss = await _get_search_set_or_404(uuid, user)
-    return await _ss_response(ss)
+    team_access = await access_control.get_team_access_context(user)
+    can_manage = access_control.can_manage_search_set(
+        ss, user, allow_admin=True, team_access=team_access,
+    )
+    return await _ss_response(ss, can_manage=can_manage)
 
 
 @router.patch("/search-sets/{uuid}", response_model=SearchSetResponse)
@@ -1920,6 +1940,17 @@ async def start_extraction_optimization(
             status_code=409,
             detail=f"Optimization already in progress (run {active.uuid})",
         )
+
+    # Cross-resource cost governance: per-user concurrency cap + audit trail.
+    from app.services import optimization_governance
+    await optimization_governance.enforce_and_record_start(
+        user,
+        resource_type="extraction",
+        resource_id=ss.uuid,
+        resource_name=getattr(ss, "title", None),
+        team_id=getattr(ss, "team_id", None),
+        token_budget=int(req.token_budget),
+    )
 
     # Drop blanks/dupes; None means "use every test case" downstream.
     selected_case_uuids = list(dict.fromkeys(u for u in (req.test_case_uuids or []) if u)) or None

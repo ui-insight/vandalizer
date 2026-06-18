@@ -1307,17 +1307,27 @@ class TestKnowledgeSharedDeleteFlow:
 class TestKBListQueryBuilder:
     """Verify the mongo query shape for the scope filters that drive My KBs vs Team."""
 
+    # Every query is wrapped in an outer ``$and`` that also excludes implicit
+    # (project-owned) KBs, which never surface in the normal lists. The helpers
+    # below peel that wrapper off so each test can assert its scope clause.
+    IMPLICIT_EXCLUSION = {"implicit": {"$ne": True}}
+
+    def _unwrap_implicit(self, q: dict) -> dict:
+        """Return the scope clause from inside the outer implicit-exclusion $and."""
+        assert self.IMPLICIT_EXCLUSION in q["$and"]
+        return next(c for c in q["$and"] if c != self.IMPLICIT_EXCLUSION)
+
     def test_mine_scope_excludes_team_owned(self):
         from app.services.knowledge_service import build_kb_list_query
 
         q = build_kb_list_query("user1", "team-1", "mine", None)
-        assert q == {"user_id": "user1", "team_owned": {"$ne": True}}
+        assert self._unwrap_implicit(q) == {"user_id": "user1", "team_owned": {"$ne": True}}
 
     def test_team_scope_filters_by_shared_and_team_id(self):
         from app.services.knowledge_service import build_kb_list_query
 
         q = build_kb_list_query("user1", "team-1", "team", None)
-        assert q == {"shared_with_team": True, "team_id": "team-1"}
+        assert self._unwrap_implicit(q) == {"shared_with_team": True, "team_id": "team-1"}
 
     def test_team_scope_without_team_id_returns_none(self):
         from app.services.knowledge_service import build_kb_list_query
@@ -1328,7 +1338,7 @@ class TestKBListQueryBuilder:
         from app.services.knowledge_service import build_kb_list_query
 
         q = build_kb_list_query("user1", "team-1", None, None)
-        or_clauses = q["$or"]
+        or_clauses = self._unwrap_implicit(q)["$or"]
         mine_clause = next(
             (c for c in or_clauses if c.get("user_id") == "user1"),
             None,
@@ -1345,8 +1355,9 @@ class TestKBListQueryBuilder:
         from app.services.knowledge_service import build_kb_list_query
 
         q = build_kb_list_query("user1", None, "mine", "needle")
-        assert "$and" in q
-        base, search = q["$and"]
+        inner = self._unwrap_implicit(q)
+        assert "$and" in inner
+        base, search = inner["$and"]
         assert base == {"user_id": "user1", "team_owned": {"$ne": True}}
         assert search["$or"][0]["title"]["$regex"] == "needle"
 

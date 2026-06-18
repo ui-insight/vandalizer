@@ -139,6 +139,16 @@ export function KnowledgePanel() {
     setError(null)
     try {
       const kb = await create(title, description || undefined)
+      // Created from inside a project: auto-pin so it shows in the project's
+      // Knowledge tab (pins are the only project↔KB link). A fresh KB is never
+      // a reference, so its own uuid is the canonical pin target.
+      if (canPin) {
+        try {
+          await projectPins.pin('knowledge_base', kb.uuid)
+        } catch (err) {
+          console.error('Failed to pin new KB to project:', err)
+        }
+      }
       setShowCreateModal(false)
       loadDetail(kb.uuid)
     } catch (err) {

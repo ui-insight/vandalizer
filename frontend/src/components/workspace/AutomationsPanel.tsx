@@ -351,8 +351,18 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
       {showWizard && (
         <AutomationCreationWizard
           onClose={() => setShowWizard(false)}
-          onCreate={id => {
+          onCreate={async id => {
             setShowWizard(false)
+            // Created from inside a project: auto-pin so it shows in the
+            // project's Automations tab (pins are the only project↔automation
+            // link). Pin before refresh so the scoped list includes it.
+            if (canPin) {
+              try {
+                await projectPins.pin('automation', id)
+              } catch (err) {
+                console.error('Failed to pin new automation to project:', err)
+              }
+            }
             refresh()
             openAutomation(id)
           }}

@@ -155,6 +155,7 @@ class TestExtractionsRoutes:
             patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
             patch("app.dependencies.User") as MockUser,
             patch("app.routers.extractions.svc") as mock_svc,
+            patch("app.routers.extractions.access_control") as mock_ac,
             patch("app.routers.extractions._attach_quality", new_callable=AsyncMock, return_value={
                 "quality_score": None, "quality_tier": None,
                 "last_validated_at": None, "validation_run_count": 0,
@@ -163,6 +164,8 @@ class TestExtractionsRoutes:
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_svc.list_search_sets = AsyncMock(return_value=[ss])
+            mock_ac.get_team_access_context = AsyncMock(return_value=MagicMock())
+            mock_ac.can_manage_search_set = MagicMock(return_value=True)
 
             resp = await client.get(
                 "/api/extractions/search-sets",
@@ -193,6 +196,8 @@ class TestExtractionsRoutes:
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_ac.get_authorized_search_set = AsyncMock(return_value=ss)
+            mock_ac.get_team_access_context = AsyncMock(return_value=MagicMock())
+            mock_ac.can_manage_search_set = MagicMock(return_value=True)
 
             resp = await client.get(
                 "/api/extractions/search-sets/ss-uuid-1",
@@ -611,6 +616,7 @@ class TestExtractionsRoutes:
             patch("app.routers.extractions.access_control") as mock_ac,
             patch("app.models.extraction_optimization_run.ExtractionOptimizationRun") as MockRun,
             patch("app.services.extraction_optimizer.reap_stale_runs", new=AsyncMock()),
+            patch("app.services.optimization_governance.enforce_and_record_start", new=AsyncMock()),
             patch("app.tasks.extraction_tasks.optimize_extraction_task") as mock_task,
         ):
             MockUser.find_one = AsyncMock(return_value=user)

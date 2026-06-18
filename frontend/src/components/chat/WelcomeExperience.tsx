@@ -82,17 +82,17 @@ export function ValueWelcome({ onSwitchToFiles, onSendMessage }: ValueWelcomePro
         <ValueCard
           icon={<Sparkles size={20} />}
           title="Prove your knowledge base earns its keep"
-          description="Run autovalidate on any KB to get a quality score and a one-click recipe to improve it. Typically $1–$5 in tokens and 10–20 minutes — and nothing changes until you click Apply."
+          description="Run Validate & improve on any KB to get a quality score and a one-click recipe to improve it. Typically $1–$5 in tokens and 10–20 minutes — and nothing changes until you click Apply."
         />
         <ValueCard
           icon={<Target size={20} />}
           title="Know your extractions are right before you trust them"
-          description="Run autovalidate on any extraction to score it against test cases and get a one-click recipe to improve accuracy. Typically $1–$5 and 5–15 minutes — and nothing changes until you click Apply."
+          description="Run Validate & improve on any extraction to score it against test cases and get a one-click recipe to improve accuracy. Typically $1–$5 and 5–15 minutes — and nothing changes until you click Apply."
         />
         <ValueCard
           icon={<Zap size={20} />}
           title="Stop guessing which workflow config is best"
-          description="Run autovalidate on any workflow to find the per-step model and prompt combination that scores highest on your test inputs. Typically $5–$15 and 15–30 minutes — and nothing changes until you click Apply."
+          description="Run Validate & improve on any workflow to find the per-step model and prompt combination that scores highest on your test inputs. Typically $5–$15 and 15–30 minutes — and nothing changes until you click Apply."
         />
       </div>
 

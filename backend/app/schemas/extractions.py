@@ -70,6 +70,10 @@ class SearchSetResponse(BaseModel):
     item_count: int = 0
     extraction_config: dict = {}
     fillable_pdf_url: Optional[str] = None
+    # Whether the requesting user can manage (edit / optimize) this set. Gates
+    # the "Validate & improve" controls in the UI. Defaults True for the many
+    # response paths that only run after a manage check has already passed.
+    can_manage: bool = True
     quality_score: Optional[float] = None
     quality_tier: Optional[str] = None
     last_validated_at: Optional[str] = None

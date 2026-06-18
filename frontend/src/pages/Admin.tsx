@@ -4816,6 +4816,7 @@ function DemoTab() {
   const [stats, setStats] = useState<DemoAdminStats | null>(null)
   const [apps, setApps] = useState<DemoApp[]>([])
   const [statusFilter, setStatusFilter] = useState<string>('')
+  const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [expandedUuid, setExpandedUuid] = useState<string | null>(null)
 
@@ -4836,6 +4837,18 @@ function DemoTab() {
   }, [statusFilter])
 
   useEffect(() => { loadData() }, [loadData])
+
+  // Client-side text search over the (status-filtered) applications.
+  const filteredApps = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return apps
+    return apps.filter(app =>
+      app.name.toLowerCase().includes(q)
+      || (app.title ?? '').toLowerCase().includes(q)
+      || app.email.toLowerCase().includes(q)
+      || app.organization.toLowerCase().includes(q),
+    )
+  }, [apps, search])
 
   const [actionLoading, setActionLoading] = useState<string | null>(null)
 
@@ -5224,7 +5237,7 @@ function DemoTab() {
       )}
 
       {/* Filter */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'center' }}>
         {['', 'pending', 'active', 'expired', 'completed'].map((s) => (
           <button
             key={s}
@@ -5239,6 +5252,9 @@ function DemoTab() {
             {s || 'All'}
           </button>
         ))}
+        <div style={{ marginLeft: 'auto' }}>
+          <SearchInput value={search} onChange={setSearch} placeholder="Search name, email, organization..." />
+        </div>
       </div>
 
       {/* Applications table */}
@@ -5261,7 +5277,14 @@ function DemoTab() {
               </tr>
             </thead>
             <tbody>
-              {apps.map((app) => {
+              {filteredApps.length === 0 && (
+                <tr>
+                  <td colSpan={9} style={{ padding: 40, textAlign: 'center', color: '#9ca3af' }}>
+                    {search.trim() ? 'No applications match your search.' : 'No applications found.'}
+                  </td>
+                </tr>
+              )}
+              {filteredApps.map((app) => {
                 const sc = statusColors[app.status] || { bg: '#f3f4f6', text: '#374151' }
                 const isExpanded = expandedUuid === app.uuid
                 return (

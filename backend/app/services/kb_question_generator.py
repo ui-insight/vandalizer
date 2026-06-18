@@ -129,7 +129,7 @@ class KBQuestionGenerator:
 
         model = get_agent_model(model_name, system_config_doc=sys_config_doc)
         agent = Agent(model, system_prompt=KB_QUESTION_GENERATION_SYSTEM_PROMPT)
-        run = await agent.run(prompt)
+        run = await self._run_agent_with_retries(agent, prompt)
 
         try:
             parsed = _extract_json(run.output or "")
@@ -163,6 +163,29 @@ class KBQuestionGenerator:
         return created
 
     # ----- internals -----
+
+    # Transient errors worth retrying on the inline LLM call. The Celery path
+    # gets this via ``autoretry_for=TRANSIENT_EXCEPTIONS``; the synchronous
+    # route call (used by the UI) has no such safety net, so mirror it here so a
+    # single provider/network blip doesn't surface as a 502.
+    _TRANSIENT = (ConnectionError, TimeoutError, OSError)
+    _MAX_LLM_ATTEMPTS = 3
+
+    async def _run_agent_with_retries(self, agent: Agent, prompt: str) -> Any:
+        last_exc: Exception | None = None
+        for attempt in range(1, self._MAX_LLM_ATTEMPTS + 1):
+            try:
+                return await agent.run(prompt)
+            except self._TRANSIENT as e:
+                last_exc = e
+                logger.warning(
+                    "Question-generation LLM call failed (attempt %d/%d): %s",
+                    attempt, self._MAX_LLM_ATTEMPTS, e,
+                )
+                if attempt < self._MAX_LLM_ATTEMPTS:
+                    await asyncio.sleep(2 * attempt)
+        assert last_exc is not None
+        raise last_exc
 
     @staticmethod
     def _sample_chunks(

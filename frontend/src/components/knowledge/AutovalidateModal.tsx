@@ -213,7 +213,7 @@ export function AutovalidateModal({ kbUuid, onConfirm, onClose, onSwitchToQuerie
     const parts: string[] = []
     if (cost_label) parts.push(cost_label)
     if (time) parts.push(`~${time}`)
-    return parts.length > 0 ? `Start tuning — ${parts.join(', ')}` : 'Start tuning'
+    return parts.length > 0 ? `Validate & improve — ${parts.join(', ')}` : 'Validate & improve'
   }
 
   return (

@@ -160,7 +160,11 @@ def _user_collection_name(user_id: str) -> str:
     collection (that would cross-contaminate users' documents).
     """
     safe = re.sub(r"[^a-zA-Z0-9_-]", "_", user_id or "").strip("_-")[:40] or "anon"
-    digest = hashlib.sha1((user_id or "").encode("utf-8")).hexdigest()[:10]
+    # Non-cryptographic: just a short stable suffix to keep distinct user_ids
+    # that sanitize to the same token in separate collections.
+    digest = hashlib.sha1(
+        (user_id or "").encode("utf-8"), usedforsecurity=False
+    ).hexdigest()[:10]
     return f"user_{safe}_{digest}"
 
 
