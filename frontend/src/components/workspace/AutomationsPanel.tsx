@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FolderKanban, FolderSearch, Globe, Loader2, Mail, Pin, PinOff, Plus, Search, X } from 'lucide-react'
+import { FolderKanban, FolderSearch, Globe, HelpCircle, Loader2, Mail, Pin, PinOff, Plus, Search, X } from 'lucide-react'
 import { AutomationsExplainer } from './AutomationsExplainer'
 import { AutomationCreationWizard } from './AutomationCreationWizard'
 import { useAutomations } from '../../hooks/useAutomations'
@@ -28,6 +28,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
   const [filter, setFilter] = useState<FilterMode>('all')
   const [search, setSearch] = useState('')
   const [showWizard, setShowWizard] = useState(false)
+  const [showExplainer, setShowExplainer] = useState(false)
   const [m365Enabled, setM365Enabled] = useState(false)
   // When inside a project, default to showing only the automations pinned to it.
   // The "Show all" toggle escapes the scope; reset to scoped when the project changes.
@@ -121,7 +122,10 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
           position: 'relative',
         }}
       >
-        <span style={{ fontSize: 18, fontWeight: 600, color: '#fff' }}>Automations</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 18, fontWeight: 600, color: '#fff' }}>Automations</span>
+          <ExplainerPill label="What are automations?" onClick={() => setShowExplainer(true)} />
+        </div>
         <button
           onClick={() => setShowWizard(true)}
           style={{
@@ -354,7 +358,31 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
           }}
         />
       )}
+
+      {showExplainer && <AutomationsExplainer onClose={() => setShowExplainer(false)} />}
     </div>
+  )
+}
+
+// Small header chip that opens the feature explainer. Styled for the dark
+// panel header so it reads as a secondary affordance next to the title.
+export function ExplainerPill({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 5,
+        padding: '4px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+        color: '#999', backgroundColor: 'transparent',
+        border: '1px solid #3a3a3a', borderRadius: 999, cursor: 'pointer',
+        transition: 'all 0.15s', whiteSpace: 'nowrap',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.color = '#ddd'; e.currentTarget.style.borderColor = '#555' }}
+      onMouseLeave={e => { e.currentTarget.style.color = '#999'; e.currentTarget.style.borderColor = '#3a3a3a' }}
+    >
+      <HelpCircle size={12} />
+      {label}
+    </button>
   )
 }
 

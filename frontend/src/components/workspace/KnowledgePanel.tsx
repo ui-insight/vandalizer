@@ -19,6 +19,7 @@ import { KBExploreTab } from '../knowledge/KBExploreTab'
 import { CreateKBModal } from '../knowledge/CreateKBModal'
 import { KBTrustBanner } from '../knowledge/KBTrustBanner'
 import { KnowledgeExplainer } from './KnowledgeExplainer'
+import { ExplainerPill } from './AutomationsPanel'
 import { ShareWithTeamDialog } from '../library/ShareWithTeamDialog'
 import { useToast } from '../../contexts/ToastContext'
 import { useConfirm } from '../shared/useConfirm'
@@ -1394,7 +1395,10 @@ export function KnowledgePanel() {
           position: 'relative',
         }}
       >
-        <span style={{ fontSize: 18, fontWeight: 600, color: '#fff' }}>Knowledge Bases</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 18, fontWeight: 600, color: '#fff' }}>Knowledge Bases</span>
+          <ExplainerPill label="What are knowledge bases?" onClick={() => setShowExplainer(true)} />
+        </div>
         {activeTab === 'mine' && (
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <input
@@ -1601,6 +1605,7 @@ export function KnowledgePanel() {
         onCreate={handleCreate}
       />
     )}
+    {showExplainer && <KnowledgeExplainer onClose={() => setShowExplainer(false)} />}
     {shareDialogJSX}
     {verifyModalJSX}
     <SharedKBDeleteDialog
