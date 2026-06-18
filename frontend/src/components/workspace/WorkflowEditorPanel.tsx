@@ -6541,6 +6541,7 @@ function ValidateTab({
         {workflowId && (
           <WorkflowAutovalidatePanel
             workflowId={workflowId}
+            canManage={canManage}
             testDataSummary={{
               inputs: inputs.length,
               expectedOutputs: expectedOutputs.length,

@@ -4,7 +4,7 @@
  *
  * Three states, mirroring KB Autovalidate:
  *
- *   A (idle)      Hero card; "Start tuning" button opens the 4-step wizard.
+ *   A (idle)      Hero card; "Validate & improve" button opens the 4-step wizard.
  *                 Past runs are surfaced underneath so users can revisit them
  *                 even before a new run is kicked off.
  *   B (running)   Live progress via shared OptimizationProgressCard + cancel.
@@ -287,7 +287,7 @@ export function ExtractionAutovalidatePanel({ searchSetUuid, canManage, onApplie
   if (run.status === 'failed') {
     return (
       <FailedBanner
-        message={run.error_message || 'Tuning failed.'}
+        message={run.error_message || 'Optimization failed.'}
         onRunAgain={handleRunAgain}
       />
     )

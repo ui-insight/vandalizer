@@ -974,7 +974,23 @@ async def generate_test_queries(
             kb.uuid, user.user_id, coverage=coverage, persist=True,
         )
     except ValueError as e:
+        # Expected, actionable conditions (empty KB, no model configured,
+        # unparseable generator output) — surface the message to the user.
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        # Unexpected failure — most often a transient LLM/provider error on the
+        # inline generation call. Log with context so it's diagnosable, and
+        # return a clean 502 instead of an opaque 500 with no detail.
+        logger.exception(
+            "Test-query generation failed for KB %s (user=%s, coverage=%s): %s",
+            kb.uuid, user.user_id, coverage, e,
+        )
+        raise HTTPException(
+            status_code=502,
+            detail="Question generation failed (the language model call did not "
+            "complete). Please try again; if it persists, generate in the "
+            "background instead.",
+        )
     return {
         "created": len(created),
         "test_queries": [_serialize_test_query(q) for q in created],
@@ -1140,6 +1156,7 @@ def _serialize_optimization_run(run) -> dict:
 
 
 @router.post("/{uuid}/optimize")
+@limiter.limit("5/minute")
 async def start_kb_optimization(uuid: str, request: Request, user: User = Depends(get_current_user)):
     """Kick off a KB Autovalidate optimization run.
 
@@ -1198,6 +1215,17 @@ async def start_kb_optimization(uuid: str, request: Request, user: User = Depend
             status_code=409,
             detail=f"Optimization already in progress for this KB (run {active.uuid})",
         )
+
+    # Cross-resource cost governance: per-user concurrency cap + audit trail.
+    from app.services import optimization_governance
+    await optimization_governance.enforce_and_record_start(
+        user,
+        resource_type="knowledge_base",
+        resource_id=kb.uuid,
+        resource_name=getattr(kb, "title", None),
+        team_id=getattr(kb, "team_id", None),
+        token_budget=token_budget,
+    )
 
     run = KBOptimizationRun(
         kb_uuid=kb.uuid,

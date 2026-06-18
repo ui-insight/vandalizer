@@ -2784,7 +2784,7 @@ function ValidateTab({
           scoring surface. Apply writes the certified ValidationRun / quality tile. */}
       <ExtractionAutovalidatePanel
         searchSetUuid={searchSetUuid}
-        canManage={true}
+        canManage={searchSet?.can_manage !== false}
         onApplied={() => { onValidationComplete?.(); void reloadQualityHistory() }}
       />
 
@@ -3134,7 +3134,7 @@ function ValidateTab({
       {/* Cross-field rules — feed into the optimizer's fitness function */}
       <CrossFieldRulesSection
         searchSetUuid={searchSetUuid}
-        canManage={true}
+        canManage={searchSet?.can_manage !== false}
         fieldNames={items.map(i => i.searchphrase)}
       />
 
@@ -3458,7 +3458,7 @@ function ValidateTab({
           {/* Cross-Field rule outcomes — shows fails inline with "False alarm" mark-up */}
           <CrossFieldViolationsPanel
             searchSetUuid={searchSetUuid}
-            canManage={true}
+            canManage={searchSet?.can_manage !== false}
             summary={results.cross_field_summary}
             results={results.cross_field_results}
           />

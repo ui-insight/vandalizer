@@ -189,7 +189,7 @@ export function ExtractionAutovalidateWizard({ searchSetUuid, onClose, onStarted
       onStarted(run_uuid)
       onClose()
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Failed to start tuning', 'error')
+      toast(e instanceof Error ? e.message : 'Couldn’t start Validate & improve', 'error')
     }
   }
 
@@ -282,7 +282,7 @@ export function ExtractionAutovalidateWizard({ searchSetUuid, onClose, onStarted
     const parts: string[] = []
     if (cost_label) parts.push(cost_label)
     if (time) parts.push(`~${time}`)
-    return parts.length > 0 ? `Start tuning — ${parts.join(', ')}` : 'Start tuning'
+    return parts.length > 0 ? `Validate & improve — ${parts.join(', ')}` : 'Validate & improve'
   }
 
   return (

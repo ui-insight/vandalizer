@@ -21,7 +21,7 @@ export interface DomainLabels {
   liftLabel: string
 }
 
-const COMMON_TILE = { noBaseline: 'No baseline', yourSettings: 'Your settings', tuned: 'Tuned' }
+const COMMON_TILE = { noBaseline: 'No baseline', yourSettings: 'Your settings', tuned: 'Optimized' }
 
 export const DOMAIN_LABELS: Record<AutovalidateDomain, DomainLabels> = {
   kb: {

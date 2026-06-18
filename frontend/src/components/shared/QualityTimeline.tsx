@@ -80,7 +80,7 @@ export function QualityTimeline({
           </h3>
         </div>
         <p style={{ margin: '0 0 14px 0', fontSize: 13, color: '#bbb', lineHeight: 1.55 }}>
-          Each autovalidate or validation run records a quality score here so you can
+          Each Validate &amp; improve run records a quality score here so you can
           watch {itemKindPluralLabel} improve over time. Nothing is mutated until
           you choose to apply a winning configuration.
         </p>
@@ -97,7 +97,7 @@ export function QualityTimeline({
             }}
           >
             <Sparkles size={12} />
-            Run autovalidate
+            Validate &amp; improve
           </button>
         )}
       </div>

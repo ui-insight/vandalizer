@@ -22,7 +22,7 @@ interface AutovalidateWizardProps<TOptions> {
   title?: string
   /** Label on the final step's primary button. Default "Start optimization".
    * Pass a function to compute the label from current options (e.g. to bake
-   * the selected tier's cost into the button: "Start tuning — $2.40, ~15 min"). */
+   * the selected tier's cost into the button: "Validate & improve — $2.40, ~15 min"). */
   confirmLabel?: string | ((options: TOptions) => string)
 }
 
@@ -40,7 +40,7 @@ export function AutovalidateWizard<TOptions>({
   initialOptions,
   onConfirm,
   onClose,
-  title = 'Autovalidate',
+  title = 'Validate & improve',
   confirmLabel = 'Start optimization',
 }: AutovalidateWizardProps<TOptions>) {
   const [stepIndex, setStepIndex] = useState(0)

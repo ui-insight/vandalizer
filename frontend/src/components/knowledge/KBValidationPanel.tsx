@@ -43,7 +43,7 @@ type KBHistoryItem = {
 }
 
 const TAB_LABELS: { id: Tab; label: string; icon?: typeof Sparkles }[] = [
-  { id: 'autovalidate', label: 'Tune', icon: Sparkles },
+  { id: 'autovalidate', label: 'Validate', icon: Sparkles },
   { id: 'queries', label: 'Test Queries' },
   { id: 'run', label: 'Run now' },
   { id: 'history', label: 'History' },
@@ -263,7 +263,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage }: Props) {
           fontSize: 11, color: '#888', marginBottom: 6, lineHeight: 1.5,
         }}
       >
-        <b style={{ color: '#bbb' }}>Tune</b> to improve. <b style={{ color: '#bbb' }}>Run now</b> to spot-check.{' '}
+        <b style={{ color: '#bbb' }}>Validate</b> to score &amp; improve. <b style={{ color: '#bbb' }}>Run now</b> to spot-check.{' '}
         <b style={{ color: '#bbb' }}>Test Queries</b> are the rubric.
       </div>
 

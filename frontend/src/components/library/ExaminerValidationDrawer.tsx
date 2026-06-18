@@ -395,7 +395,7 @@ export function ExaminerValidationDrawer({ request, currentUserId, onClose, onSa
           <div style={{ fontSize: 11, color: '#6b7280', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6, padding: '8px 10px', display: 'flex', alignItems: 'flex-start', gap: 6 }}>
             <ExternalLink size={12} style={{ marginTop: 2, flexShrink: 0 }} />
             <span>
-              To run validation against your additions before approving, open the item directly (external-link icon on the queue row) and use its Autovalidate tab. Saved additions will be merged into the pinned baseline at approval time.
+              To run validation against your additions before approving, open the item directly (external-link icon on the queue row) and use its Validate tab. Saved additions will be merged into the pinned baseline at approval time.
             </span>
           </div>
 

@@ -1786,6 +1786,7 @@ def _summarise_workflow_optimization_run(run) -> dict:
 
 
 @router.post("/{workflow_id}/optimize")
+@limiter.limit("5/minute")
 async def start_workflow_optimization(
     workflow_id: str, request: Request, user: User = Depends(get_current_user),
 ):
@@ -1834,6 +1835,17 @@ async def start_workflow_optimization(
             status_code=409,
             detail=f"Optimization already in progress for this workflow (run {active.uuid})",
         )
+
+    # Cross-resource cost governance: per-user concurrency cap + audit trail.
+    from app.services import optimization_governance
+    await optimization_governance.enforce_and_record_start(
+        user,
+        resource_type="workflow",
+        resource_id=workflow_id,
+        resource_name=getattr(wf, "name", None),
+        team_id=getattr(wf, "team_id", None),
+        token_budget=token_budget,
+    )
 
     run = WorkflowOptimizationRun(
         workflow_id=workflow_id,
