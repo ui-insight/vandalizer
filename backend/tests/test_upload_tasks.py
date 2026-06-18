@@ -16,19 +16,26 @@ def mock_celery():
         extraction_sig = MagicMock()
         update_sig = MagicMock()
         cleanup_sig = MagicMock()
+        ingestion_sig = MagicMock()
         chain_result = MagicMock()
         chain_result.apply_async.return_value = MagicMock(id="task-id-123")
 
+        # Both extraction|update and the further |ingestion (when a user_id is
+        # present) collapse to the same chain_result so apply_async assertions
+        # hold for both the two- and three-step chains.
         extraction_sig.__or__ = MagicMock(return_value=chain_result)
+        chain_result.__or__ = MagicMock(return_value=chain_result)
         mock.signature.side_effect = lambda name, **kw: {
             "tasks.document.extraction": extraction_sig,
             "tasks.document.update": update_sig,
             "tasks.document.cleanup": cleanup_sig,
+            "tasks.document.semantic_ingestion": ingestion_sig,
         }[name]
 
         mock._chain_result = chain_result
         mock._extraction_sig = extraction_sig
         mock._cleanup_sig = cleanup_sig
+        mock._ingestion_sig = ingestion_sig
         yield mock
 
 
@@ -72,7 +79,11 @@ class TestDispatchUploadTasks:
 
         dispatch_upload_tasks("doc-uuid", "pdf", "/uploads/test.pdf", user_id="user1")
 
-        mock_celery.send_task.assert_any_call(
+        # Ingestion is now chained onto extraction→update (created via
+        # signature, not fired off with send_task+countdown) so it only runs
+        # after extraction has written raw_text — see the race-fix note in
+        # dispatch_upload_tasks.
+        mock_celery.signature.assert_any_call(
             "tasks.document.semantic_ingestion",
             kwargs={
                 "raw_text": "",
@@ -80,7 +91,7 @@ class TestDispatchUploadTasks:
                 "user_id": "user1",
             },
             queue="documents",
-            countdown=10,
+            immutable=True,
         )
 
     def test_skips_semantic_ingestion_without_user_id(self, mock_celery):
