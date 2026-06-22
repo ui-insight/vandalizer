@@ -58,14 +58,28 @@ async def _validate_kb_async(kb_uuid: str, user_id: str, mode: str, skip_judge: 
 @celery.task(
     bind=True,
     name="tasks.kb.generate_test_queries",
-    autoretry_for=TRANSIENT_EXCEPTIONS,
     retry_backoff=True,
     max_retries=2,
     default_retry_delay=10,
 )
 def generate_test_queries_task(self, kb_uuid: str, user_id: str, coverage: str = "standard"):
-    """Auto-generate KBTestQuery records via LLM in the background."""
-    return _run_async(_generate_test_queries_async(kb_uuid, user_id, coverage))
+    """Auto-generate KBTestQuery records via LLM in the background.
+
+    Retries transient connection blips on a fresh attempt with backoff — this
+    includes pydantic-ai's ``ModelAPIError`` ("Connection error.", the oauthdev
+    outbound-socket blip), which the generator's tight in-process retries can
+    miss when the blip outlasts their ~6s window. ``ModelHTTPError`` (an HTTP
+    *status* error, and a ModelAPIError subclass) is deliberately not retried —
+    a 4xx won't improve on retry — so it's caught and re-raised first.
+    """
+    from pydantic_ai.exceptions import ModelAPIError, ModelHTTPError
+    retry_on = (ModelAPIError, *TRANSIENT_EXCEPTIONS)
+    try:
+        return _run_async(_generate_test_queries_async(kb_uuid, user_id, coverage))
+    except ModelHTTPError:
+        raise
+    except retry_on as exc:
+        raise self.retry(exc=exc)
 
 
 async def _generate_test_queries_async(kb_uuid: str, user_id: str, coverage: str):

@@ -1045,12 +1045,24 @@ async def test_query_generation_status(
             "created": len(ordered),
             "test_queries": [_serialize_test_query(q) for q in ordered],
         }
+    # The task failed. Celery often can't reconstruct the original exception
+    # type across the result backend, so ``result.result`` is a generic whose
+    # str is an opaque class repr — never surface that raw. Log it for
+    # diagnosis and return a clean, actionable message instead.
     err = result.result
-    if isinstance(err, BaseException):
-        error_text = f"{type(err).__name__}: {err}"
+    raw = f"{type(err).__name__}: {err}" if isinstance(err, BaseException) else str(err)
+    logger.warning(
+        "Test-query generation task %s failed for KB %s: %s", task_id, kb.uuid, raw,
+    )
+    lowered = raw.lower()
+    if any(s in lowered for s in ("connection error", "modelapierror", "timed out", "timeout")):
+        message = (
+            "The language model was briefly unreachable, so question generation "
+            "didn't finish. Please try again in a moment."
+        )
     else:
-        error_text = str(err) if err else "Question generation failed"
-    return {"status": "failed", "error": error_text}
+        message = "Question generation failed. Please try again."
+    return {"status": "failed", "error": message}
 
 
 @router.patch("/{uuid}/test-queries/{query_uuid}")
