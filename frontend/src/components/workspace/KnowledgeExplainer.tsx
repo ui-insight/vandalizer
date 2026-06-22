@@ -40,7 +40,10 @@ export function KnowledgeExplainer({ onClose }: { onClose?: () => void }) {
       <div
         className="kb-explainer-root"
         style={{
-          position: 'absolute', inset: 0, zIndex: 50,
+          // As a modal (onClose set) it must sit above the panel header/search
+          // chrome (zIndex 300), or that header bleeds through over the top.
+          // As an inline empty-state it stays in flow below the header.
+          position: 'absolute', inset: 0, zIndex: onClose ? 400 : 50,
           background: 'radial-gradient(ellipse at top, #1f2740 0%, #131628 55%, #0c1020 100%)',
           overflowY: 'auto',
         }}
