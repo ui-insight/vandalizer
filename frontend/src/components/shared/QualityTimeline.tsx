@@ -1,5 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Loader2, Sparkles } from 'lucide-react'
+
+// While a run is in flight, re-pull history on this cadence so a freshly
+// persisted ValidationRun appears without a manual reload.
+const POLL_INTERVAL_MS = 4000
 
 /**
  * Generic quality-over-time component used by KB, Extraction, and Workflow
@@ -42,21 +46,41 @@ interface Props {
   /** When provided, used to count sample-size in the row label
    *  (queries / cases / checks). Defaults to "items". */
   sampleNoun?: string
+  /** Bump to force an immediate refetch — e.g. a validation run just finished
+   *  and its row should appear without a page reload. */
+  refreshKey?: number
+  /** When true, a run is in flight: poll history on an interval so the new run
+   *  lands here even while the user sits on this tab. */
+  polling?: boolean
 }
 
 export function QualityTimeline({
   fetchHistory, itemKindLabel, itemKindPluralLabel, onSwitchToAutovalidate, sampleNoun = 'items',
+  refreshKey, polling = false,
 }: Props) {
   const [items, setItems] = useState<QualityHistoryItem[]>([])
   const [loading, setLoading] = useState(true)
+  // Only the first fetch drives the spinner; background refreshes (poll ticks,
+  // refreshKey bumps) swap rows in place rather than flashing the loader.
+  const firstLoadRef = useRef(true)
 
   useEffect(() => {
-    setLoading(true)
-    fetchHistory()
-      .then(out => setItems((out.history || []).slice(0, 30)))
-      .catch(e => console.error('QualityTimeline fetchHistory failed', e))
-      .finally(() => setLoading(false))
-  }, [fetchHistory])
+    let cancelled = false
+    const load = () => {
+      fetchHistory()
+        .then(out => { if (!cancelled) setItems((out.history || []).slice(0, 30)) })
+        .catch(e => console.error('QualityTimeline fetchHistory failed', e))
+        .finally(() => {
+          if (!cancelled && firstLoadRef.current) {
+            firstLoadRef.current = false
+            setLoading(false)
+          }
+        })
+    }
+    load()
+    const timer = polling ? setInterval(load, POLL_INTERVAL_MS) : undefined
+    return () => { cancelled = true; if (timer) clearInterval(timer) }
+  }, [fetchHistory, refreshKey, polling])
 
   if (loading) {
     return (

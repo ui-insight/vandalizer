@@ -73,6 +73,10 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage }: Props) {
   // showing the idle "Run Validation" button as if nothing were happening.
   const [running, setRunning] = useState(false)
   const [runError, setRunError] = useState<string | null>(null)
+  // Bumped whenever a run finishes so the History tab refetches even if it's
+  // already mounted (it otherwise only loads on mount, so a freshly persisted
+  // run wouldn't appear until a full page reload).
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0)
   // Guards against committing poll results after the panel unmounts (KB closed
   // mid-run). The polling loop awaits across many seconds, so it can resolve
   // long after React has torn the component down.
@@ -159,6 +163,8 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage }: Props) {
       if (!mountedRef.current) return
       if (result) {
         setLatestRun(result)
+        // Surface the new run in History without waiting for a reload.
+        setHistoryRefreshKey(k => k + 1)
       } else {
         setRunError(
           'Validation is still running — large evaluation sets can take several ' +
@@ -176,6 +182,15 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage }: Props) {
     setLoading(true)
     Promise.all([refreshQueries(), refreshHistory()]).finally(() => setLoading(false))
   }, [refreshQueries, refreshHistory])
+
+  // Re-pull the test-query list on every entry to the Test Queries tab. The
+  // Validate-tab wizard generates and persists queries server-side, so the
+  // snapshot held here goes stale; refetching on entry keeps the tab honest
+  // without a page reload. Runs in the background — it doesn't clear the
+  // existing rows, so there's no spinner flash.
+  useEffect(() => {
+    if (tab === 'queries') void refreshQueries()
+  }, [tab, refreshQueries])
 
   const latestScore = latestQuality?.score ?? null
   const scoreColor =
@@ -332,7 +347,12 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage }: Props) {
           onRun={runValidation}
         />
       ) : (
-        <KBQualityHistoryTab kbUuid={kbUuid} onSwitchToAutovalidate={() => setTab('autovalidate')} />
+        <KBQualityHistoryTab
+          kbUuid={kbUuid}
+          onSwitchToAutovalidate={() => setTab('autovalidate')}
+          refreshKey={historyRefreshKey}
+          polling={running}
+        />
       )}
     </div>
   )
