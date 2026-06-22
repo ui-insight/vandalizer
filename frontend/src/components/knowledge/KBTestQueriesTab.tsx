@@ -4,7 +4,7 @@ import {
   createKBTestQuery,
   updateKBTestQuery,
   deleteKBTestQuery,
-  generateKBTestQueries,
+  generateKBTestQueriesAndWait,
   type KBTestQuery,
 } from '../../api/knowledge'
 import { GenerateTestQueriesModal } from './GenerateTestQueriesModal'
@@ -115,10 +115,9 @@ export function KBTestQueriesTab({ kbUuid, kbReady, canManage, queries, onChange
     setGenerating(true)
     setShowGen(false)
     try {
-      const out = await generateKBTestQueries(kbUuid, { coverage })
-      if ('created' in out) {
-        // sync result
-      }
+      // Runs on a background worker and polls for completion — the inline LLM
+      // call could exceed the proxy's gateway timeout and 502 on larger KBs.
+      await generateKBTestQueriesAndWait(kbUuid, { coverage })
       await onChange()
     } catch (e) {
       alert(`Generation failed: ${(e as Error).message}`)

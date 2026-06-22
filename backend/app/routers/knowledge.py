@@ -1002,6 +1002,57 @@ async def generate_test_queries(
     }
 
 
+@router.get("/{uuid}/test-queries/generate/status")
+async def test_query_generation_status(
+    uuid: str,
+    task_id: str,
+    user: User = Depends(get_current_user),
+):
+    """Poll an async test-query generation task (dispatched with async=true).
+
+    Returns ``{status}`` while the task is pending/running, ``{status:
+    "completed", created, test_queries}`` once the worker has persisted the
+    queries (serialized in generation order), or ``{status: "failed", error}``
+    if the task raised. Lets the frontend run generation off the request path —
+    the inline LLM call could exceed the proxy's gateway timeout and surface as
+    a 502 on larger KBs / slower models.
+    """
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(
+        uuid, user, manage=True, user_org_ancestry=user_org_ancestry, allow_admin=True,
+    )
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+
+    from celery.result import AsyncResult
+    from app.celery_app import celery
+
+    result = AsyncResult(task_id, app=celery)
+    if not result.ready():
+        return {"status": result.state}
+    if result.successful():
+        payload = result.result if isinstance(result.result, dict) else {}
+        uuids = payload.get("uuids", [])
+        from app.models.kb_test_query import KBTestQuery
+        rows = await KBTestQuery.find(
+            {"uuid": {"$in": uuids}, "knowledge_base_uuid": kb.uuid},
+        ).to_list()
+        # Preserve the generation order the task reported.
+        by_uuid = {q.uuid: q for q in rows}
+        ordered = [by_uuid[u] for u in uuids if u in by_uuid]
+        return {
+            "status": "completed",
+            "created": len(ordered),
+            "test_queries": [_serialize_test_query(q) for q in ordered],
+        }
+    err = result.result
+    if isinstance(err, BaseException):
+        error_text = f"{type(err).__name__}: {err}"
+    else:
+        error_text = str(err) if err else "Question generation failed"
+    return {"status": "failed", "error": error_text}
+
+
 @router.patch("/{uuid}/test-queries/{query_uuid}")
 async def update_test_query(
     uuid: str, query_uuid: str, request: Request, user: User = Depends(get_current_user),
