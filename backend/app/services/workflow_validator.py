@@ -23,10 +23,7 @@ sites continue to work without edits.
 from __future__ import annotations
 
 import json
-import logging
 import re
-
-logger = logging.getLogger(__name__)
 
 __all__ = ["_extract_json", "_resolve_model_name"]
 
@@ -42,36 +39,17 @@ def _resolve_model_name(user_id: str | None = None) -> str:
 
     Synchronous (pymongo). Returns "" when no model can be resolved — callers
     should treat that as "no LLM configured" and skip or raise as appropriate.
-
-    A user's stored selection is validated against ``available_models`` (by
-    name or tag) and the canonical name is returned. If the selection is stale
-    — the model was removed/renamed in System Config since the user last picked
-    it — we fall back to the system default instead of returning the dead name.
-    Returning a name absent from ``available_models`` would leave
-    ``get_agent_model`` with no endpoint/api_key for it, so it routes to the
-    provider's public default host (e.g. api.openai.com), which sealed
-    deployments can't reach — surfacing as a per-user "Connection error." This
-    mirrors the async ``resolve_model_name`` reconciliation, which only runs
-    when the user opens Settings.
     """
     db = _get_db()
-    sys_cfg = db.system_config.find_one() or {}
-    available = [m for m in sys_cfg.get("available_models", []) if isinstance(m, dict)]
-
     if user_id:
         user_config = db.user_model_config.find_one({"user_id": user_id})
-        chosen = user_config.get("name") if user_config else None
-        if chosen:
-            for m in available:
-                if m.get("name") == chosen or m.get("tag") == chosen:
-                    return m.get("name", chosen)
-            logger.warning(
-                "User %s has a stale model selection %r not in available_models; "
-                "falling back to system default for the LLM call.",
-                user_id, chosen,
-            )
-
-    return available[0].get("name", "") if available else ""
+        if user_config and user_config.get("name"):
+            return user_config["name"]
+    sys_cfg = db.system_config.find_one() or {}
+    models = sys_cfg.get("available_models", [])
+    if models and isinstance(models[0], dict):
+        return models[0].get("name", "")
+    return ""
 
 
 def _extract_json(text: str) -> dict | list:

@@ -67,32 +67,12 @@ def _make_db(user_config=None, sys_config=None):
 
 class TestResolveModelName:
     @patch("app.services.workflow_validator._get_db")
-    def test_user_config_wins_when_model_is_available(self, mock_db):
+    def test_user_config_wins(self, mock_db):
         mock_db.return_value = _make_db(
             user_config={"user_id": "u1", "name": "user-model"},
-            sys_config={"available_models": [{"name": "user-model"}, {"name": "sys-model"}]},
-        )
-        assert _resolve_model_name("u1") == "user-model"
-
-    @patch("app.services.workflow_validator._get_db")
-    def test_stale_user_selection_falls_back_to_default(self, mock_db):
-        # The user's stored model was removed/renamed in System Config, so it's
-        # no longer in available_models. Returning it would route the LLM call
-        # to an unreachable default endpoint; fall back to the system default.
-        mock_db.return_value = _make_db(
-            user_config={"user_id": "u1", "name": "deleted-model"},
             sys_config={"available_models": [{"name": "sys-model"}]},
         )
-        assert _resolve_model_name("u1") == "sys-model"
-
-    @patch("app.services.workflow_validator._get_db")
-    def test_user_selection_matched_by_tag_returns_canonical_name(self, mock_db):
-        # Stored value may be a display tag; resolve it to the canonical name.
-        mock_db.return_value = _make_db(
-            user_config={"user_id": "u1", "name": "Friendly Label"},
-            sys_config={"available_models": [{"name": "real-model", "tag": "Friendly Label"}]},
-        )
-        assert _resolve_model_name("u1") == "real-model"
+        assert _resolve_model_name("u1") == "user-model"
 
     @patch("app.services.workflow_validator._get_db")
     def test_falls_back_to_system_default(self, mock_db):

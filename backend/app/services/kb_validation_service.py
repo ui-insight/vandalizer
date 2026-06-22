@@ -1242,9 +1242,12 @@ async def run_kb_validation(
     judge_variance: float | None = None
     if test_queries and not skip_judge and any(getattr(q, "expected_answer", None) for q in test_queries):
         try:
-            # Resolve the model lazily and off the event loop (sync pymongo helper).
-            from app.services.workflow_validator import _resolve_model_name as _resolve_sync
-            judge_model_used = await asyncio.to_thread(_resolve_sync, user_id)
+            # Resolve the judge model. get_user_model_name validates the user's
+            # stored selection against available_models and falls back to the
+            # system default when stale — a stale pick has no resolvable
+            # endpoint and routes to an unreachable public default host.
+            from app.services.config_service import get_user_model_name
+            judge_model_used = await get_user_model_name(user_id)
             if judge_model_used:
                 judge_payload = await judge_test_queries(
                     kb_uuid, test_queries, judge_model_used, mode=mode,

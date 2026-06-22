@@ -21,7 +21,8 @@ from app.models.kb_test_query import KBTestQuery
 from app.models.knowledge import KnowledgeBase, KnowledgeBaseSource
 from app.services.document_manager import DocumentManager
 from app.services.llm_service import get_agent_model
-from app.services.workflow_validator import _extract_json, _resolve_model_name
+from app.services.config_service import get_user_model_name
+from app.services.workflow_validator import _extract_json
 
 logger = logging.getLogger(__name__)
 
@@ -112,8 +113,13 @@ class KBQuestionGenerator:
 
         prompt = self._build_user_prompt(target_count, sampled)
 
-        # Resolve model + run generator agent (async).
-        model_name = await asyncio.to_thread(_resolve_model_name, user_id)
+        # Resolve model + run generator agent (async). get_user_model_name
+        # validates the user's stored selection against available_models and
+        # falls back to the system default when it's stale — a raw read would
+        # return a removed/renamed model whose endpoint can't be resolved,
+        # routing the call to an unreachable public default host (the per-user
+        # "Connection error." that broke generation while chat worked).
+        model_name = await get_user_model_name(user_id)
         if not model_name:
             raise ValueError("No LLM model configured for question generation")
 
