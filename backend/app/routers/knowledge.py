@@ -595,15 +595,20 @@ async def add_urls(request: Request, uuid: str, req: AddUrlsRequest, user: User 
         raise HTTPException(status_code=404, detail="Knowledge base not found")
     if not req.urls:
         raise HTTPException(status_code=400, detail="No URLs provided")
+    # Ingestion (fetch + optional crawl + embed) can run for minutes and would
+    # blow past the proxy read timeout if awaited inline — dispatch it to a
+    # worker and let the frontend poll source status. See tasks.kb.add_urls.
+    from app.tasks.kb_validation_tasks import add_urls_task
+
     kb.status = "building"
     await kb.save()
-    added = await svc.add_urls(
-        kb, req.urls,
+    add_urls_task.delay(
+        kb.uuid, req.urls,
         crawl_enabled=req.crawl_enabled,
         max_crawl_pages=req.max_crawl_pages,
         allowed_domains=req.allowed_domains,
     )
-    return {"ok": True, "added": added}
+    return {"ok": True, "added": len(req.urls)}
 
 
 @router.get("/{uuid}/source/{source_uuid}", response_model=KBSourceDetailResponse)

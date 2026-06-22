@@ -82,6 +82,71 @@ async def _generate_test_queries_async(kb_uuid: str, user_id: str, coverage: str
 
 
 # ---------------------------------------------------------------------------
+# KB URL ingestion task.
+#
+# Fetching a URL (httpx + Playwright browser fallback) and, when crawl is
+# enabled, walking up to 50 child pages serially can take many minutes — far
+# longer than nginx's proxy_read_timeout. Running it inline in the request
+# handler is what produced the 502 on POST /knowledge/{uuid}/add_urls. The
+# frontend already drives this as a background flow (it sets status="building"
+# and polls source status), so we dispatch here and return immediately.
+# ---------------------------------------------------------------------------
+
+
+@celery.task(
+    bind=True,
+    name="tasks.kb.add_urls",
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
+    max_retries=2,
+    default_retry_delay=10,
+    soft_time_limit=1800,  # 30 min — accommodates a full 50-page crawl
+    time_limit=1860,
+)
+def add_urls_task(
+    self,
+    kb_uuid: str,
+    urls: list[str],
+    crawl_enabled: bool = False,
+    max_crawl_pages: int = 5,
+    allowed_domains: str = "",
+):
+    """Fetch, crawl, chunk and embed URLs into a KB in the background."""
+    return _run_async(_add_urls_async(
+        kb_uuid, urls, crawl_enabled, max_crawl_pages, allowed_domains,
+    ))
+
+
+async def _add_urls_async(
+    kb_uuid: str,
+    urls: list[str],
+    crawl_enabled: bool,
+    max_crawl_pages: int,
+    allowed_domains: str,
+):
+    from app.config import Settings
+    from app.database import init_db
+
+    await init_db(Settings())
+
+    from app.models.knowledge import KnowledgeBase
+    from app.services import knowledge_service as svc
+
+    kb = await KnowledgeBase.find_one(KnowledgeBase.uuid == kb_uuid)
+    if not kb:
+        logger.warning("KB %s not found for add_urls; skipping.", kb_uuid)
+        return {"kb_uuid": kb_uuid, "added": 0}
+
+    added = await svc.add_urls(
+        kb, urls,
+        crawl_enabled=crawl_enabled,
+        max_crawl_pages=max_crawl_pages,
+        allowed_domains=allowed_domains,
+    )
+    return {"kb_uuid": kb_uuid, "added": added}
+
+
+# ---------------------------------------------------------------------------
 # KB Autovalidate optimizer task — long-running, no auto-retry.
 #
 # Idempotency mid-trial is not safe: a retry would re-run trials that already

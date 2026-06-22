@@ -685,6 +685,71 @@ class TestKnowledgeDocSources:
         assert resp.status_code == 404
 
     @pytest.mark.asyncio
+    async def test_add_urls_dispatches_background_task(self, client):
+        """URL ingestion must be dispatched to a worker (not awaited inline) so
+        slow fetches/crawls can't blow past the proxy timeout and 502."""
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.tasks.kb_validation_tasks.add_urls_task.delay") as mock_delay,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/add_urls",
+                json={"urls": ["https://example.com", "https://example.org"],
+                      "crawl_enabled": True, "max_crawl_pages": 5},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        # Returns immediately with the count of URLs queued.
+        assert resp.json() == {"ok": True, "added": 2}
+        # Work was handed off to the worker, not run inline.
+        mock_svc.add_urls.assert_not_called()
+        mock_delay.assert_called_once()
+        args, kwargs = mock_delay.call_args
+        assert args[0] == kb.uuid
+        assert args[1] == ["https://example.com", "https://example.org"]
+        assert kwargs["crawl_enabled"] is True
+        assert kwargs["max_crawl_pages"] == 5
+
+    @pytest.mark.asyncio
+    async def test_add_urls_empty_list_rejected(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/add_urls",
+                json={"urls": []},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 400
+        assert resp.json()["detail"] == "No URLs provided"
+
+    @pytest.mark.asyncio
     async def test_get_source_detail_document_returns_extracted_text(self, client):
         """Document sources don't cache content, so the inspector endpoint must
         fall back to the SmartDocument's full extracted raw_text (the text that
