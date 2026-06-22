@@ -85,6 +85,26 @@ def _get_loop_http_client() -> httpx.AsyncClient:
     return client
 
 
+async def aclose_loop_http_client() -> None:
+    """Close and drop the pooled httpx client bound to the running loop.
+
+    The per-loop cache relies on the loop being garbage-collected to release a
+    client's sockets/FDs. That's fine for the web server's long-lived loop and
+    for workflow worker-thread loops (which exit), but Celery tasks build a
+    *fresh* loop per run and ``loop.close()`` does NOT close the httpx client —
+    so every background LLM task would leak a client and its sockets until GC,
+    re-creating the recurring ``[Errno 24] Too many open files`` exhaustion.
+    Call this just before tearing such a loop down to release them eagerly.
+    """
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        return
+    client = _loop_http_clients.pop(loop, None)
+    if client is not None and not client.is_closed:
+        await client.aclose()
+
+
 # ---------------------------------------------------------------------------
 # RAG deps dataclass
 # ---------------------------------------------------------------------------

@@ -1,9 +1,9 @@
 """Celery tasks for document classification."""
 
-import asyncio
 import logging
 
 from app.celery_app import celery
+from app.tasks import run_task_async
 
 logger = logging.getLogger(__name__)
 
@@ -11,11 +11,7 @@ logger = logging.getLogger(__name__)
 @celery.task(name="tasks.document.classify", bind=True, autoretry_for=(Exception,), max_retries=2, default_retry_delay=30)
 def classify_document_task(self, document_uuid: str):
     """Auto-classify a document after text extraction."""
-    loop = asyncio.new_event_loop()
-    try:
-        loop.run_until_complete(_classify(document_uuid))
-    finally:
-        loop.close()
+    run_task_async(_classify(document_uuid))
 
 
 async def _classify(document_uuid: str):
