@@ -54,6 +54,12 @@ export function QualityBadge({ quality }: { quality: QualityMeta }) {
     <span style={{ position: 'relative', display: 'inline-flex' }}>
       <button
         ref={badgeRef}
+        aria-expanded={showTooltip}
+        aria-label={
+          quality.score != null
+            ? `Quality ${config.label}, score ${Math.round(quality.score)} of 100. Show details.`
+            : `Quality ${config.label}. Show details.`
+        }
         onClick={(e) => { e.stopPropagation(); setShowTooltip(!showTooltip) }}
         style={{
           display: 'inline-flex',
@@ -93,6 +99,7 @@ export function QualityBadge({ quality }: { quality: QualityMeta }) {
             right: 0,
             marginBottom: 6,
             width: 240,
+            maxWidth: 'calc(100vw - 24px)',
             background: '#fff',
             border: '1px solid #e5e7eb',
             borderRadius: 8,
@@ -151,7 +158,7 @@ export function QualityBadge({ quality }: { quality: QualityMeta }) {
           {quality.plan_stale && (
             <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid #f3f4f6', display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 11, color: '#d97706' }}>
               <AlertTriangle size={12} style={{ flexShrink: 0, marginTop: 1 }} />
-              <span>Validation plan is out of date with the workflow — regenerate it before trusting this score.</span>
+              <span>Validation plan is out of date with the workflow. Regenerate it before trusting this score.</span>
             </div>
           )}
 
@@ -164,7 +171,7 @@ export function QualityBadge({ quality }: { quality: QualityMeta }) {
                 {quality.optimization.optimized_score != null && quality.optimization.baseline_score != null
                   ? ` (${Math.round(quality.optimization.optimized_score)} vs ${Math.round(quality.optimization.baseline_score)} current)`
                   : ''}
-                {' '}— review and apply when ready.
+                {' '}(review and apply when ready).
               </span>
             </div>
           )}

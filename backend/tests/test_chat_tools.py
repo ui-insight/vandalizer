@@ -1073,3 +1073,465 @@ class TestCreateProject:
         # The success message must convey the auto-indexing / project-wide chat value
         assert "automatically indexed" in result["message"].lower() or "auto" in result["message"].lower()
         mock_create.assert_awaited_once()
+
+
+# ---------------------------------------------------------------------------
+# check_compliance
+# ---------------------------------------------------------------------------
+
+
+class TestCheckCompliance:
+    @pytest.mark.asyncio
+    async def test_not_found(self):
+        from app.services.chat_tools import check_compliance
+
+        ctx = _make_context()
+        with patch("app.services.chat_tools.SearchSet") as MockSS:
+            MockSS.find_one = AsyncMock(return_value=None)
+            result = await check_compliance(ctx, "nope", ["doc-1"])
+
+        assert "error" in result
+
+    @pytest.mark.asyncio
+    async def test_unauthorized(self):
+        from app.services.chat_tools import check_compliance
+
+        ss = MagicMock()
+        ss.verified = False
+        ss.user_id = "other-user"
+        ss.team_id = "other-team"
+
+        ctx = _make_context(team_id="team1", user_id="user1")
+        with patch("app.services.chat_tools.SearchSet") as MockSS:
+            MockSS.find_one = AsyncMock(return_value=ss)
+            result = await check_compliance(ctx, "ss-1", ["doc-1"])
+
+        assert "error" in result
+        assert "access" in result["error"].lower()
+
+    @pytest.mark.asyncio
+    async def test_no_rules_defined(self):
+        from app.services.chat_tools import check_compliance
+
+        ss = MagicMock()
+        ss.verified = True
+        ss.user_id = "user1"
+        ss.team_id = "team1"
+        ss.title = "Budget Set"
+        ss.normalized_cross_field_rules = MagicMock(return_value=[])
+
+        ctx = _make_context()
+        with patch("app.services.chat_tools.SearchSet") as MockSS:
+            MockSS.find_one = AsyncMock(return_value=ss)
+            result = await check_compliance(ctx, "ss-1", ["doc-1"])
+
+        assert result["rules_checked"] == 0
+        assert "no active compliance rules" in result["message"].lower()
+
+    @pytest.mark.asyncio
+    async def test_reports_violations(self):
+        from app.services.chat_tools import check_compliance
+
+        ss = MagicMock()
+        ss.verified = True
+        ss.user_id = "user1"
+        ss.team_id = "team1"
+        ss.title = "Budget Set"
+        ss.normalized_cross_field_rules = MagicMock(
+            return_value=[{"id": "r1", "type": "date_order", "enabled": True}]
+        )
+
+        fake_validator = MagicMock()
+        fake_validator.validate = MagicMock(
+            return_value=[
+                {
+                    "rule": {"type": "date_order"},
+                    "rule_id": "r1",
+                    "status": "fail",
+                    "passed": False,
+                    "message": "start_date is after end_date",
+                }
+            ]
+        )
+
+        ctx = _make_context()
+        with patch("app.services.chat_tools.SearchSet") as MockSS, \
+             patch(
+                 "app.services.chat_tools._execute_extraction",
+                 new_callable=AsyncMock,
+                 return_value={
+                     "entities": [{"start_date": "2026-05-01", "end_date": "2026-01-01"}],
+                     "documents": ["Award.pdf"],
+                 },
+             ), \
+             patch("app.services.cross_field_validation.CrossFieldValidator", return_value=fake_validator):
+            MockSS.find_one = AsyncMock(return_value=ss)
+            result = await check_compliance(ctx, "ss-1", ["doc-1"])
+
+        assert result["rules_checked"] == 1
+        assert result["documents_checked"] == 1
+        assert result["all_compliant"] is False
+        assert result["total_violations"] == 1
+        assert result["results"][0]["compliant"] is False
+        assert result["results"][0]["violations"][0]["rule_type"] == "date_order"
+
+    @pytest.mark.asyncio
+    async def test_extraction_error_propagates(self):
+        from app.services.chat_tools import check_compliance
+
+        ss = MagicMock()
+        ss.verified = True
+        ss.user_id = "user1"
+        ss.team_id = "team1"
+        ss.title = "Budget Set"
+        ss.normalized_cross_field_rules = MagicMock(
+            return_value=[{"id": "r1", "type": "date_order", "enabled": True}]
+        )
+
+        ctx = _make_context()
+        with patch("app.services.chat_tools.SearchSet") as MockSS, \
+             patch(
+                 "app.services.chat_tools._execute_extraction",
+                 new_callable=AsyncMock,
+                 return_value={"error": "No accessible documents with text content found."},
+             ):
+            MockSS.find_one = AsyncMock(return_value=ss)
+            result = await check_compliance(ctx, "ss-1", ["doc-1"])
+
+        assert "error" in result
+
+
+# ---------------------------------------------------------------------------
+# approve_workflow_step / reject_workflow_step
+# ---------------------------------------------------------------------------
+
+
+def _make_approval(status="pending"):
+    from app.models.approval import STATUS_PENDING
+
+    approval = MagicMock()
+    approval.uuid = "appr-1"
+    approval.status = status or STATUS_PENDING
+    approval.step_name = "Manager sign-off"
+    approval.workflow_name = "Award Setup"
+    approval.assigned_to_user_ids = ["user1"]
+    approval.workflow_id = "wf-1"
+    approval.workflow_result_id = "wr-1"
+    approval.save = AsyncMock()
+    return approval
+
+
+class TestApproveWorkflowStep:
+    @pytest.mark.asyncio
+    async def test_not_found(self):
+        from app.services.chat_tools import approve_workflow_step
+
+        ctx = _make_context()
+        with patch("app.models.approval.ApprovalRequest") as MockAR:
+            MockAR.find_one = AsyncMock(return_value=None)
+            result = await approve_workflow_step(ctx, "appr-1", confirmed=True)
+
+        assert "error" in result
+        assert "not found" in result["error"].lower()
+
+    @pytest.mark.asyncio
+    async def test_rejects_non_pending(self):
+        from app.services.chat_tools import approve_workflow_step
+
+        ctx = _make_context()
+        approval = _make_approval(status="approved")
+        with patch("app.models.approval.ApprovalRequest") as MockAR:
+            MockAR.find_one = AsyncMock(return_value=approval)
+            result = await approve_workflow_step(ctx, "appr-1", confirmed=True)
+
+        assert "error" in result
+        assert "status" in result["error"].lower()
+
+    @pytest.mark.asyncio
+    async def test_unauthorized(self):
+        from app.services.chat_tools import approve_workflow_step
+
+        ctx = _make_context()
+        approval = _make_approval()
+        with patch("app.models.approval.ApprovalRequest") as MockAR, \
+             patch("app.services.chat_tools._can_decide_approval", new_callable=AsyncMock, return_value=False):
+            MockAR.find_one = AsyncMock(return_value=approval)
+            result = await approve_workflow_step(ctx, "appr-1", confirmed=True)
+
+        assert "error" in result
+        assert "authorized" in result["error"].lower()
+
+    @pytest.mark.asyncio
+    async def test_preview_without_confirmation(self):
+        from app.services.chat_tools import approve_workflow_step
+
+        ctx = _make_context()
+        approval = _make_approval()
+        with patch("app.models.approval.ApprovalRequest") as MockAR, \
+             patch("app.services.chat_tools._can_decide_approval", new_callable=AsyncMock, return_value=True):
+            MockAR.find_one = AsyncMock(return_value=approval)
+            result = await approve_workflow_step(ctx, "appr-1", confirmed=False)
+
+        assert result["needs_confirmation"] is True
+        assert "Manager sign-off" in result["preview"]
+
+    @pytest.mark.asyncio
+    async def test_approves_when_confirmed(self):
+        from app.services.chat_tools import approve_workflow_step
+
+        ctx = _make_context()
+        approval = _make_approval()
+        fake_celery = MagicMock()
+        with patch("app.models.approval.ApprovalRequest") as MockAR, \
+             patch("app.services.chat_tools._can_decide_approval", new_callable=AsyncMock, return_value=True), \
+             patch("app.celery_app.celery", fake_celery):
+            MockAR.find_one = AsyncMock(return_value=approval)
+            result = await approve_workflow_step(ctx, "appr-1", confirmed=True)
+
+        assert result["status"] == "approved"
+        approval.save.assert_awaited_once()
+        fake_celery.send_task.assert_called_once()
+
+
+class TestRejectWorkflowStep:
+    @pytest.mark.asyncio
+    async def test_rejects_when_confirmed(self):
+        from app.services.chat_tools import reject_workflow_step
+
+        ctx = _make_context()
+        approval = _make_approval()
+        fake_result = MagicMock()
+        fake_result.save = AsyncMock()
+        with patch("app.models.approval.ApprovalRequest") as MockAR, \
+             patch("app.services.chat_tools._can_decide_approval", new_callable=AsyncMock, return_value=True), \
+             patch("app.models.workflow.WorkflowResult") as MockWR:
+            MockAR.find_one = AsyncMock(return_value=approval)
+            MockWR.get = AsyncMock(return_value=fake_result)
+            result = await reject_workflow_step(ctx, "appr-1", comments="missing budget", confirmed=True)
+
+        assert result["status"] == "rejected"
+        approval.save.assert_awaited_once()
+        assert fake_result.status == "failed"
+
+    @pytest.mark.asyncio
+    async def test_preview_without_confirmation(self):
+        from app.services.chat_tools import reject_workflow_step
+
+        ctx = _make_context()
+        approval = _make_approval()
+        with patch("app.models.approval.ApprovalRequest") as MockAR, \
+             patch("app.services.chat_tools._can_decide_approval", new_callable=AsyncMock, return_value=True):
+            MockAR.find_one = AsyncMock(return_value=approval)
+            result = await reject_workflow_step(ctx, "appr-1", confirmed=False)
+
+        assert result["needs_confirmation"] is True
+
+
+# ---------------------------------------------------------------------------
+# create_automation
+# ---------------------------------------------------------------------------
+
+
+class TestCreateAutomation:
+    @pytest.mark.asyncio
+    async def test_invalid_trigger_type(self):
+        from app.services.chat_tools import create_automation
+
+        ctx = _make_context()
+        result = await create_automation(ctx, "Nightly", "workflow", "wf-1", trigger_type="webhook")
+        assert "error" in result
+        assert "trigger_type" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_folder_watch_requires_folder(self):
+        from app.services.chat_tools import create_automation
+
+        ctx = _make_context()
+        result = await create_automation(ctx, "Watcher", "workflow", "wf-1", trigger_type="folder_watch")
+        assert "error" in result
+        assert "folder_uuid" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_schedule_requires_cron(self):
+        from app.services.chat_tools import create_automation
+
+        ctx = _make_context()
+        result = await create_automation(ctx, "Nightly", "workflow", "wf-1", trigger_type="schedule")
+        assert "error" in result
+        assert "cron" in result["error"].lower()
+
+    @pytest.mark.asyncio
+    async def test_invalid_action_type(self):
+        from app.services.chat_tools import create_automation
+
+        ctx = _make_context()
+        with patch("app.services.access_control.get_authorized_folder", new_callable=AsyncMock) as mock_folder:
+            mock_folder.return_value = MagicMock(uuid="f-1", title="Intake")
+            result = await create_automation(
+                ctx, "Watcher", "task", "x-1", trigger_type="folder_watch", folder_uuid="f-1",
+            )
+        assert "error" in result
+        assert "action_type" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_preview_without_confirmation(self):
+        from app.services.chat_tools import create_automation
+
+        ctx = _make_context()
+        with patch("app.services.access_control.get_authorized_folder", new_callable=AsyncMock) as mock_folder, \
+             patch("app.services.access_control.get_authorized_workflow", new_callable=AsyncMock) as mock_wf:
+            mock_folder.return_value = MagicMock(uuid="f-1", title="Intake")
+            mock_wf.return_value = MagicMock(name="Award Setup")
+            result = await create_automation(
+                ctx, "Watcher", "workflow", "wf-1",
+                trigger_type="folder_watch", folder_uuid="f-1", confirmed=False,
+            )
+        assert result["needs_confirmation"] is True
+        assert "Watcher" in result["preview"]
+
+    @pytest.mark.asyncio
+    async def test_creates_when_confirmed(self):
+        from app.services.chat_tools import create_automation
+
+        fake_auto = MagicMock()
+        fake_auto.id = "auto-1"
+        fake_auto.name = "Watcher"
+        fake_auto.enabled = False
+
+        ctx = _make_context()
+        with patch("app.services.access_control.get_authorized_folder", new_callable=AsyncMock) as mock_folder, \
+             patch("app.services.access_control.get_authorized_workflow", new_callable=AsyncMock) as mock_wf, \
+             patch("app.services.automation_service.create_automation", new_callable=AsyncMock, return_value=fake_auto) as mock_create:
+            mock_folder.return_value = MagicMock(uuid="f-1", title="Intake")
+            mock_wf.return_value = MagicMock(name="Award Setup")
+            result = await create_automation(
+                ctx, "Watcher", "workflow", "wf-1",
+                trigger_type="folder_watch", folder_uuid="f-1", confirmed=True,
+            )
+
+        assert result["id"] == "auto-1"
+        assert result["enabled"] is False
+        assert "disabled" in result["message"].lower()
+        mock_create.assert_awaited_once()
+
+
+# ---------------------------------------------------------------------------
+# create_workflow
+# ---------------------------------------------------------------------------
+
+
+class TestCreateWorkflow:
+    @pytest.mark.asyncio
+    async def test_requires_name(self):
+        from app.services.chat_tools import create_workflow
+
+        ctx = _make_context()
+        result = await create_workflow(ctx, "  ", [{"name": "S", "type": "summarize"}])
+        assert "error" in result
+
+    @pytest.mark.asyncio
+    async def test_requires_steps(self):
+        from app.services.chat_tools import create_workflow
+
+        ctx = _make_context()
+        result = await create_workflow(ctx, "Flow", [])
+        assert "error" in result
+
+    @pytest.mark.asyncio
+    async def test_unknown_step_type(self):
+        from app.services.chat_tools import create_workflow
+
+        ctx = _make_context()
+        result = await create_workflow(ctx, "Flow", [{"name": "S", "type": "teleport"}])
+        assert "error" in result
+        assert "unknown type" in result["error"].lower()
+
+    @pytest.mark.asyncio
+    async def test_extraction_step_needs_fields(self):
+        from app.services.chat_tools import create_workflow
+
+        ctx = _make_context()
+        result = await create_workflow(ctx, "Flow", [{"name": "Pull", "type": "extraction"}])
+        assert "error" in result
+        assert "extraction" in result["error"].lower()
+
+    @pytest.mark.asyncio
+    async def test_preview_without_confirmation(self):
+        from app.services.chat_tools import create_workflow
+
+        ctx = _make_context()
+        steps = [
+            {"name": "Extract budget", "type": "extraction", "extractions": ["amount", "period"]},
+            {"name": "Summarize", "type": "summarize"},
+        ]
+        result = await create_workflow(ctx, "Budget Flow", steps, confirmed=False)
+        assert result["needs_confirmation"] is True
+        assert "Budget Flow" in result["preview"]
+        assert "Extract budget" in result["preview"]
+
+    @pytest.mark.asyncio
+    async def test_creates_when_confirmed(self):
+        from app.services.chat_tools import create_workflow
+
+        fake_wf = MagicMock()
+        fake_wf.id = "wf-9"
+        fake_wf.name = "Budget Flow"
+
+        ctx = _make_context()
+        steps = [
+            {"name": "Extract budget", "type": "extraction", "extractions": ["amount"]},
+            {"name": "Summarize", "type": "summarize"},
+        ]
+        with patch("app.services.workflow_service.create_workflow", new_callable=AsyncMock, return_value=fake_wf), \
+             patch("app.services.workflow_service.add_step", new_callable=AsyncMock, return_value={"id": "s1"}) as mock_step, \
+             patch("app.services.workflow_service.add_task", new_callable=AsyncMock, return_value={"id": "t1"}) as mock_task:
+            result = await create_workflow(ctx, "Budget Flow", steps, confirmed=True)
+
+        assert result["workflow_id"] == "wf-9"
+        assert result["steps_created"] == 2
+        assert result["verified"] is False
+        # Two steps created, two tasks configured
+        assert mock_step.await_count == 2
+        assert mock_task.await_count == 2
+        # First content step is wired to read the workflow's input documents
+        first_task_data = mock_task.await_args_list[0].kwargs["data"]
+        assert first_task_data["input_sources"] == ["workflow_documents"]
+        # Later step reads the previous step's output
+        second_task_data = mock_task.await_args_list[1].kwargs["data"]
+        assert second_task_data["input_sources"] == ["step_input"]
+
+    @pytest.mark.asyncio
+    async def test_marks_last_step_output_by_default(self):
+        from app.services.chat_tools import create_workflow
+
+        fake_wf = MagicMock()
+        fake_wf.id = "wf-9"
+        fake_wf.name = "Flow"
+
+        ctx = _make_context()
+        steps = [{"name": "Summarize", "type": "summarize"}]
+        with patch("app.services.workflow_service.create_workflow", new_callable=AsyncMock, return_value=fake_wf), \
+             patch("app.services.workflow_service.add_step", new_callable=AsyncMock, return_value={"id": "s1"}) as mock_step, \
+             patch("app.services.workflow_service.add_task", new_callable=AsyncMock, return_value={"id": "t1"}):
+            await create_workflow(ctx, "Flow", steps, confirmed=True)
+
+        assert mock_step.await_args_list[0].kwargs["is_output"] is True
+
+    @pytest.mark.asyncio
+    async def test_rolls_back_on_failure(self):
+        from app.services.chat_tools import create_workflow
+
+        fake_wf = MagicMock()
+        fake_wf.id = "wf-9"
+        fake_wf.name = "Flow"
+
+        ctx = _make_context()
+        steps = [{"name": "Summarize", "type": "summarize"}]
+        with patch("app.services.workflow_service.create_workflow", new_callable=AsyncMock, return_value=fake_wf), \
+             patch("app.services.workflow_service.add_step", new_callable=AsyncMock, return_value={"id": "s1"}), \
+             patch("app.services.workflow_service.add_task", new_callable=AsyncMock, return_value=None), \
+             patch("app.services.workflow_service.delete_workflow", new_callable=AsyncMock) as mock_del:
+            result = await create_workflow(ctx, "Flow", steps, confirmed=True)
+
+        assert "error" in result
+        mock_del.assert_awaited_once()

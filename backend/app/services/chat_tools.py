@@ -1190,6 +1190,112 @@ async def _execute_extraction(
     return response
 
 
+async def check_compliance(
+    context: RunContext[AgenticChatDeps],
+    extraction_set_uuid: str,
+    document_uuids: list[str],
+) -> dict:
+    """Check documents against an extraction set's cross-field compliance rules.
+
+    Use this for "does this proposal/contract follow our rules?" questions. It
+    runs the extraction template against each document to pull the field values,
+    then evaluates the set's cross-field rules — sum checks (parts add up to a
+    total), required-when conditions, date ordering (start before end), numeric
+    ranges, and cross-references — and reports every rule that passes or fails,
+    with a plain-language reason for each violation.
+
+    Read-only: nothing is saved. Maximum 10 documents per call. If the
+    extraction set has no rules defined, say so and offer to set them up in the
+    extraction's Cross-field Rules section (chat can't author rules yet).
+
+    Args:
+        context: The call context.
+        extraction_set_uuid: UUID of the extraction template whose rules to apply.
+        document_uuids: Document UUIDs to check (max 10).
+    """
+    ss = await SearchSet.find_one(SearchSet.uuid == extraction_set_uuid)
+    if not ss:
+        return {"error": f"Extraction set '{extraction_set_uuid}' not found."}
+
+    # Authorization mirrors run_extraction.
+    team_id = context.deps.team_id
+    user_id = context.deps.user_id
+    if not ss.verified and ss.user_id != user_id:
+        if not (team_id and ss.team_id == team_id):
+            return {"error": "You do not have access to this extraction set."}
+
+    rules = ss.normalized_cross_field_rules()
+    active_rules = [
+        r for r in rules
+        if not (r.get("enabled") is False or r.get("auto_disabled"))
+    ]
+    if not active_rules:
+        return {
+            "extraction_set": ss.title,
+            "rules_checked": 0,
+            "message": (
+                f"\"{ss.title}\" has no active compliance rules defined, so there "
+                "is nothing to check against. Compliance rules (sum checks, "
+                "required-when conditions, date order, ranges) live in the "
+                "extraction set's Cross-field Rules section in the UI. Set them up "
+                "there, then I can check documents against them."
+            ),
+        }
+
+    # Run the extraction to get field values, then validate each document.
+    extraction = await _execute_extraction(context, ss, document_uuids)
+    if "error" in extraction:
+        return extraction
+
+    from app.services.cross_field_validation import (
+        CrossFieldValidator,
+        summarize_results,
+    )
+
+    validator = CrossFieldValidator()
+    entities = extraction.get("entities") or []
+    doc_names = extraction.get("documents") or []
+
+    per_document: list[dict] = []
+    total_fail = 0
+    for idx, entity in enumerate(entities):
+        data = entity if isinstance(entity, dict) else {}
+        results = validator.validate(data, active_rules)
+        summary = summarize_results(results)
+        total_fail += summary.get("fail", 0)
+        violations = [
+            {
+                "rule_type": (r.get("rule") or {}).get("type"),
+                "message": r.get("message"),
+            }
+            for r in results
+            if r.get("status") == "fail"
+        ]
+        per_document.append({
+            "document": doc_names[idx] if idx < len(doc_names) else f"document {idx + 1}",
+            "compliant": summary.get("fail", 0) == 0,
+            "checks_passed": summary.get("pass", 0),
+            "checks_failed": summary.get("fail", 0),
+            "checks_unparseable": summary.get("unparseable", 0),
+            "violations": violations,
+        })
+
+    response: dict = {
+        "extraction_set": ss.title,
+        "rules_checked": len(active_rules),
+        "documents_checked": len(per_document),
+        "all_compliant": total_fail == 0,
+        "total_violations": total_fail,
+        "results": per_document,
+    }
+    # Carry the extraction's quality sidecar through (streaming layer strips it
+    # before the LLM sees it and renders a badge) so compliance answers also
+    # surface how trustworthy the underlying extraction is.
+    if extraction.get("quality"):
+        response["quality"] = extraction["quality"]
+    return response
+
+
 # ---------------------------------------------------------------------------
 # Phase 3 — Knowledge base write tools
 # ---------------------------------------------------------------------------
@@ -1526,6 +1632,209 @@ async def get_workflow_status(
         result["preview"] = status["current_step_preview"]
 
     return result
+
+
+async def _can_decide_approval(approval, user) -> bool:
+    """Whether *user* may approve/reject *approval*.
+
+    Mirrors ``routers/reviews.py::_can_decide_approval``: an assigned reviewer,
+    or anyone with manage access to the workflow.
+    """
+    if user.user_id in (approval.assigned_to_user_ids or []):
+        return True
+    from app.services import access_control
+
+    workflow = await access_control.get_authorized_workflow(
+        str(approval.workflow_id), user, manage=True,
+    )
+    return workflow is not None
+
+
+async def approve_workflow_step(
+    context: RunContext[AgenticChatDeps],
+    approval_request_id: str,
+    comments: str = "",
+    confirmed: bool = False,
+) -> dict:
+    """Approve a workflow that is paused awaiting human review, resuming it.
+
+    A workflow pauses at an approval gate; get_workflow_status returns an
+    ``approval_request_id`` for it. Pass that id here. Call first with
+    confirmed=false to preview, then confirmed=true after the user approves.
+    Only an assigned reviewer or a workflow manager can approve.
+
+    Args:
+        context: The call context.
+        approval_request_id: The approval request UUID from get_workflow_status.
+        comments: Optional reviewer note recorded with the decision.
+        confirmed: Must be true to actually approve. If false, returns a preview.
+    """
+    from app.models.approval import (
+        ApprovalRequest,
+        STATUS_APPROVED,
+        STATUS_PENDING,
+    )
+
+    approval = await ApprovalRequest.find_one(
+        ApprovalRequest.uuid == approval_request_id
+    )
+    if not approval:
+        return {"error": f"Approval request '{approval_request_id}' not found."}
+    if approval.status != STATUS_PENDING:
+        return {
+            "error": (
+                f"This review can't be approved — its status is "
+                f"'{approval.status}', not pending."
+            )
+        }
+    if not await _can_decide_approval(approval, context.deps.user):
+        return {
+            "error": (
+                "You're not authorized to approve this step. Only an assigned "
+                "reviewer or a workflow manager can."
+            )
+        }
+
+    gate = await _confirm_gate(
+        context,
+        tool_name="approve_workflow_step",
+        key={"approval": approval_request_id},
+        preview={
+            "action": "approve_workflow_step",
+            "preview": (
+                f"Approve the paused step \"{approval.step_name}\" of workflow "
+                f"\"{approval.workflow_name or 'workflow'}\" and resume it"
+            ),
+            "needs_confirmation": True,
+        },
+        confirmed=confirmed,
+    )
+    if gate is not None:
+        return gate
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    approval.status = STATUS_APPROVED
+    approval.reviewer_user_id = context.deps.user_id
+    approval.reviewer_comments = comments or ""
+    approval.decision_at = now
+    await approval.save()
+
+    try:
+        from app.celery_app import celery
+
+        celery.send_task(
+            "tasks.workflow.resume_after_approval",
+            kwargs={"approval_uuid": approval_request_id},
+            queue="workflows",
+        )
+    except Exception as e:
+        logger.error("Failed to dispatch workflow resume after approval: %s", e)
+        return {
+            "error": (
+                "The step was marked approved but the workflow couldn't be "
+                "resumed automatically. Try again from the Reviews screen."
+            )
+        }
+
+    return {
+        "status": "approved",
+        "step": approval.step_name,
+        "message": "Approved. The workflow is resuming from where it paused.",
+    }
+
+
+async def reject_workflow_step(
+    context: RunContext[AgenticChatDeps],
+    approval_request_id: str,
+    comments: str = "",
+    confirmed: bool = False,
+) -> dict:
+    """Reject a workflow that is paused awaiting human review, failing it.
+
+    Get the ``approval_request_id`` from get_workflow_status. Call first with
+    confirmed=false to preview, then confirmed=true after the user approves.
+    Only an assigned reviewer or a workflow manager can reject. Rejecting marks
+    the workflow run as failed — it does not resume.
+
+    Args:
+        context: The call context.
+        approval_request_id: The approval request UUID from get_workflow_status.
+        comments: Optional reason recorded with the rejection.
+        confirmed: Must be true to actually reject. If false, returns a preview.
+    """
+    from app.models.approval import (
+        ApprovalRequest,
+        STATUS_PENDING,
+        STATUS_REJECTED,
+    )
+
+    approval = await ApprovalRequest.find_one(
+        ApprovalRequest.uuid == approval_request_id
+    )
+    if not approval:
+        return {"error": f"Approval request '{approval_request_id}' not found."}
+    if approval.status != STATUS_PENDING:
+        return {
+            "error": (
+                f"This review can't be rejected — its status is "
+                f"'{approval.status}', not pending."
+            )
+        }
+    if not await _can_decide_approval(approval, context.deps.user):
+        return {
+            "error": (
+                "You're not authorized to reject this step. Only an assigned "
+                "reviewer or a workflow manager can."
+            )
+        }
+
+    gate = await _confirm_gate(
+        context,
+        tool_name="reject_workflow_step",
+        key={"approval": approval_request_id},
+        preview={
+            "action": "reject_workflow_step",
+            "preview": (
+                f"Reject the paused step \"{approval.step_name}\" of workflow "
+                f"\"{approval.workflow_name or 'workflow'}\" — this fails the run"
+            ),
+            "needs_confirmation": True,
+        },
+        confirmed=confirmed,
+    )
+    if gate is not None:
+        return gate
+
+    now = datetime.datetime.now(datetime.timezone.utc)
+    approval.status = STATUS_REJECTED
+    approval.reviewer_user_id = context.deps.user_id
+    approval.reviewer_comments = comments or ""
+    approval.decision_at = now
+    await approval.save()
+
+    # Mark the workflow run failed, mirroring routers/reviews.py::reject_review.
+    try:
+        from app.models.workflow import WorkflowResult
+
+        result = await WorkflowResult.get(approval.workflow_result_id)
+        if result:
+            result.status = "failed"
+            result.current_step_detail = (
+                f"Rejected by reviewer: {comments}" if comments
+                else "Rejected by reviewer"
+            )
+            await result.save()
+    except Exception:
+        logger.exception(
+            "Failed to mark workflow result failed after rejection of %s",
+            approval_request_id,
+        )
+
+    return {
+        "status": "rejected",
+        "step": approval.step_name,
+        "message": "Rejected. The workflow run is marked failed and will not resume.",
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -2941,6 +3250,396 @@ async def create_project(
 
 
 # ---------------------------------------------------------------------------
+# Phase 9 — Automations
+# ---------------------------------------------------------------------------
+
+
+async def create_automation(
+    context: RunContext[AgenticChatDeps],
+    name: str,
+    action_type: str,
+    action_id: str,
+    trigger_type: str = "folder_watch",
+    folder_uuid: str = "",
+    cron_expression: str = "",
+    description: str = "",
+    confirmed: bool = False,
+) -> dict:
+    """Create an automation that runs a workflow or extraction automatically.
+
+    Two trigger types are supported from chat:
+      - "folder_watch": fires whenever a document is added to a folder (needs folder_uuid)
+      - "schedule": fires on a cron schedule (needs cron_expression, e.g. "0 9 * * 1")
+
+    The action is an EXISTING workflow or extraction (action_type + action_id);
+    chat can't author those, so find or create them first (list_workflows /
+    list_extraction_sets). Call with confirmed=false to preview, then
+    confirmed=true after the user approves. The automation is created DISABLED —
+    tell the user to enable it on the Automations screen once it looks right.
+
+    Args:
+        context: The call context.
+        name: A name for the automation.
+        action_type: "workflow" or "extraction" — what runs when the trigger fires.
+        action_id: ID of the workflow (object id) or extraction (uuid) to run.
+        trigger_type: "folder_watch" (default) or "schedule".
+        folder_uuid: Required for folder_watch — the folder to watch.
+        cron_expression: Required for schedule — a cron expression like "0 9 * * 1".
+        description: Optional description.
+        confirmed: Must be true to actually create. If false, returns a preview.
+    """
+    from app.services import access_control
+
+    user = context.deps.user
+
+    # Validate the trigger and build its config.
+    if trigger_type not in ("folder_watch", "schedule"):
+        return {
+            "error": "trigger_type must be 'folder_watch' or 'schedule'.",
+        }
+    trigger_config: dict = {}
+    trigger_desc = ""
+    if trigger_type == "folder_watch":
+        if not folder_uuid:
+            return {"error": "folder_watch needs a folder_uuid to watch."}
+        folder = await access_control.get_authorized_folder(
+            folder_uuid, user, team_access=context.deps.team_access,
+        )
+        if not folder:
+            return {"error": "Folder not found or you don't have access to it."}
+        trigger_config = {"folder_id": folder.uuid}
+        trigger_desc = f'when a document is added to "{folder.title}"'
+    else:  # schedule
+        if not (cron_expression or "").strip():
+            return {
+                "error": "schedule needs a cron_expression (e.g. '0 9 * * 1').",
+            }
+        trigger_config = {"cron_expression": cron_expression.strip()}
+        trigger_desc = f"on schedule ({cron_expression.strip()})"
+
+    # Validate the action target and resolve a friendly name.
+    if action_type not in ("workflow", "extraction"):
+        return {"error": "action_type must be 'workflow' or 'extraction'."}
+    if action_type == "workflow":
+        wf = await access_control.get_authorized_workflow(
+            action_id, user, team_access=context.deps.team_access,
+        )
+        if not wf:
+            return {"error": "Workflow not found or you don't have access to it."}
+        action_name = wf.name or action_id
+    else:
+        ss = await access_control.get_authorized_search_set(action_id, user)
+        if not ss:
+            return {"error": "Extraction not found or you don't have access to it."}
+        action_name = ss.title or action_id
+
+    gate = await _confirm_gate(
+        context,
+        tool_name="create_automation",
+        key={
+            "name": name,
+            "trigger_type": trigger_type,
+            "trigger_config": trigger_config,
+            "action_type": action_type,
+            "action_id": action_id,
+        },
+        preview={
+            "action": "create_automation",
+            "preview": (
+                f'Create automation "{name}": run {action_type} "{action_name}" '
+                f"{trigger_desc}. (Created disabled — you enable it after review.)"
+            ),
+            "needs_confirmation": True,
+        },
+        confirmed=confirmed,
+    )
+    if gate is not None:
+        return gate
+
+    from app.services import automation_service
+
+    team_id = str(user.current_team) if user.current_team else None
+    auto = await automation_service.create_automation(
+        name=name,
+        user_id=context.deps.user_id,
+        description=description or None,
+        trigger_type=trigger_type,
+        trigger_config=trigger_config,
+        action_type=action_type,
+        action_id=action_id,
+        team_id=team_id,
+        shared_with_team=False,
+    )
+    return {
+        "id": str(auto.id),
+        "name": auto.name,
+        "enabled": auto.enabled,
+        "message": (
+            f'Automation "{auto.name}" created (disabled). It will run the '
+            f'{action_type} "{action_name}" {trigger_desc}. Enable it on the '
+            "Automations screen when you're ready."
+        ),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Phase 10 — Workflow authoring
+# ---------------------------------------------------------------------------
+
+
+# Friendly step "type" (what the user/agent describes) → backend task name +
+# whether the step consumes the workflow's input documents. Keeping this map
+# small and RA-oriented means the agent doesn't need to know internal node names
+# like "ResearchNode" or "KnowledgeBaseQuery".
+_WORKFLOW_STEP_TYPES = {
+    "extraction": ("Extraction", True),
+    "extract": ("Extraction", True),
+    "prompt": ("Prompt", True),
+    "summarize": ("Prompt", True),
+    "custom": ("Prompt", True),
+    "format": ("Formatter", True),
+    "research": ("ResearchNode", True),
+    "knowledge_base_query": ("KnowledgeBaseQuery", False),
+    "kb_query": ("KnowledgeBaseQuery", False),
+    "website": ("AddWebsite", False),
+    "approval": ("Approval", False),
+}
+
+
+async def _build_workflow_step_data(
+    context: "RunContext[AgenticChatDeps]",
+    step: dict,
+    step_type: str,
+    model: str | None,
+) -> tuple[Optional[dict], Optional[str]]:
+    """Translate one friendly step spec into a (task_data, error) pair.
+
+    Returns ``(data, None)`` on success or ``(None, error_message)`` on a
+    validation problem (unknown type, missing/inaccessible reference, etc.).
+    """
+    instruction = (
+        step.get("prompt")
+        or step.get("question")
+        or step.get("instructions")
+        or step.get("format_template")
+        or ""
+    ).strip()
+
+    if step_type in ("extraction", "extract"):
+        set_uuid = step.get("extraction_set_uuid") or step.get("search_set_uuid")
+        if set_uuid:
+            from app.services import access_control
+
+            ss = await access_control.get_authorized_search_set(set_uuid, context.deps.user)
+            if not ss:
+                return None, f"extraction set '{set_uuid}' not found or not accessible"
+            return {"search_set_uuid": set_uuid}, None
+        fields = step.get("extractions") or step.get("fields")
+        if not fields or not isinstance(fields, list):
+            return None, "an extraction step needs 'extraction_set_uuid' or a non-empty 'extractions' list"
+        return {"extractions": [str(f) for f in fields]}, None
+
+    if step_type in ("prompt", "summarize", "custom"):
+        prompt = instruction
+        if not prompt and step_type == "summarize":
+            prompt = "Summarize the input clearly and concisely."
+        if not prompt:
+            return None, "a prompt step needs a 'prompt' describing what to do"
+        return {"prompt": prompt, "model": model}, None
+
+    if step_type == "format":
+        if not instruction:
+            return None, "a format step needs a 'format_template' (or 'prompt') describing the output shape"
+        return {"format_template": instruction, "model": model}, None
+
+    if step_type == "research":
+        if not instruction:
+            return None, "a research step needs a 'question' to investigate"
+        return {"question": instruction, "model": model}, None
+
+    if step_type in ("knowledge_base_query", "kb_query"):
+        kb_uuid = step.get("kb_uuid")
+        query = step.get("query") or instruction
+        if not kb_uuid:
+            return None, "a knowledge_base_query step needs a 'kb_uuid'"
+        if not query:
+            return None, "a knowledge_base_query step needs a 'query'"
+        kb = await KnowledgeBase.find_one(KnowledgeBase.uuid == kb_uuid)
+        if not kb or not (kb.verified or _kb_access_ok(kb, context.deps.user_id, context.deps.team_id)):
+            return None, f"knowledge base '{kb_uuid}' not found or not accessible"
+        mode = step.get("mode") if step.get("mode") in ("passages", "answer") else "answer"
+        return {"kb_uuid": kb_uuid, "query": query, "mode": mode, "model": model}, None
+
+    if step_type == "website":
+        url = step.get("url") or instruction
+        if not url:
+            return None, "a website step needs a 'url'"
+        return {"url": url}, None
+
+    if step_type == "approval":
+        return {
+            "review_instructions": instruction or "Review the output before the workflow continues.",
+            "assignee_role": "workflow_owner",
+        }, None
+
+    return None, f"unknown step type '{step_type}'"
+
+
+async def create_workflow(
+    context: RunContext[AgenticChatDeps],
+    name: str,
+    steps: list[dict],
+    description: str = "",
+    confirmed: bool = False,
+) -> dict:
+    """Build a multi-step workflow from a plain-language description of the steps.
+
+    Use this when the user wants to *create* a reusable workflow by talking it
+    through ("build me a workflow that extracts the budget, checks it against
+    policy, then drafts a summary"). Steps run in order — each step's output
+    feeds the next. The workflow is created UNVERIFIED and ready to run; tell the
+    user they can fine-tune it in the visual workflow editor and validate it
+    before relying on it.
+
+    Each entry in ``steps`` is a dict with:
+      - "name": short label for the step (e.g. "Extract budget fields")
+      - "type": one of:
+          "extraction"  — pull structured fields. Needs "extractions" (a list of
+                          field names) OR "extraction_set_uuid" (an existing set).
+          "prompt"      — run an instruction over the input. Needs "prompt".
+          "summarize"   — summarize the input. "prompt" optional.
+          "format"      — reshape the input into a template. Needs "format_template".
+          "research"    — investigate a question (multi-pass). Needs "question".
+          "knowledge_base_query" — query a KB. Needs "kb_uuid" and "query".
+          "website"     — fetch a page. Needs "url".
+          "approval"    — pause for human review. "instructions" optional.
+      - "is_output": optional bool — mark this step's result as a deliverable.
+
+    Steps are wired linearly: the first content step reads the documents the
+    workflow is run on; later steps read the previous step's output. Call first
+    with confirmed=false to preview the plan, then confirmed=true after the user
+    approves.
+
+    Args:
+        context: The call context.
+        name: Name for the new workflow.
+        steps: Ordered list of step specs (see above). At least one required.
+        description: Optional description of what the workflow does.
+        confirmed: Must be true to actually create. If false, returns a preview.
+    """
+    if not name or not name.strip():
+        return {"error": "A workflow name is required."}
+    if not steps or not isinstance(steps, list):
+        return {"error": "A workflow needs at least one step."}
+    if len(steps) > 25:
+        return {"error": "That's a lot of steps — keep workflows to 25 or fewer. Split big jobs into multiple workflows."}
+
+    model = context.deps.model_name or None
+
+    # Validate every step up front so the preview reflects a buildable plan and
+    # we never half-create a workflow because step 4 was malformed.
+    plan: list[dict] = []
+    for idx, step in enumerate(steps):
+        if not isinstance(step, dict):
+            return {"error": f"Step {idx + 1} is malformed (expected an object)."}
+        raw_type = str(step.get("type") or "").strip().lower()
+        if raw_type not in _WORKFLOW_STEP_TYPES:
+            return {
+                "error": (
+                    f"Step {idx + 1} has an unknown type '{step.get('type')}'. "
+                    f"Valid types: {', '.join(sorted(set(_WORKFLOW_STEP_TYPES)))}."
+                )
+            }
+        task_name, doc_consuming = _WORKFLOW_STEP_TYPES[raw_type]
+        data, err = await _build_workflow_step_data(context, step, raw_type, model)
+        if err:
+            return {"error": f"Step {idx + 1} ({step.get('name') or raw_type}): {err}."}
+        step_label = str(step.get("name") or f"Step {idx + 1}").strip()
+        plan.append({
+            "label": step_label,
+            "type": raw_type,
+            "task_name": task_name,
+            "data": data,
+            "doc_consuming": doc_consuming,
+            "is_output": bool(step.get("is_output")),
+        })
+
+    preview_lines = "; ".join(f"{i + 1}. {p['label']} ({p['type']})" for i, p in enumerate(plan))
+    gate = await _confirm_gate(
+        context,
+        tool_name="create_workflow",
+        key={"name": name, "steps": [{"t": p["type"], "n": p["label"]} for p in plan]},
+        preview={
+            "action": "create_workflow",
+            "preview": f"Create workflow \"{name}\" with {len(plan)} step(s): {preview_lines}",
+            "needs_confirmation": True,
+        },
+        confirmed=confirmed,
+    )
+    if gate is not None:
+        return gate
+
+    from app.services import workflow_service
+
+    user = context.deps.user
+    team_id = context.deps.team_id
+
+    # If the author didn't mark any deliverable, mark the last step as output so
+    # the run produces a downloadable result.
+    if not any(p["is_output"] for p in plan):
+        plan[-1]["is_output"] = True
+
+    wf = await workflow_service.create_workflow(
+        name.strip(), context.deps.user_id, description.strip() or None, team_id=team_id,
+    )
+    workflow_id = str(wf.id)
+
+    try:
+        first_doc_step_wired = False
+        for p in plan:
+            data = dict(p["data"])
+            # Linear wiring: the first document-consuming step reads the run's
+            # documents; every later step reads the previous step's output.
+            if p["doc_consuming"]:
+                if not first_doc_step_wired:
+                    data["input_sources"] = ["workflow_documents"]
+                    first_doc_step_wired = True
+                else:
+                    data["input_sources"] = ["step_input"]
+
+            step_res = await workflow_service.add_step(
+                workflow_id, p["label"], user=user, data={}, is_output=p["is_output"],
+            )
+            if not step_res or not step_res.get("id"):
+                raise RuntimeError(f"failed to create step '{p['label']}'")
+            task_res = await workflow_service.add_task(
+                step_res["id"], p["task_name"], user=user, data=data,
+            )
+            if not task_res:
+                raise RuntimeError(f"failed to configure step '{p['label']}'")
+    except Exception as e:
+        logger.error("create_workflow failed mid-build for %s: %s", workflow_id, e)
+        # Roll back the half-built workflow so the user isn't left with a broken shell.
+        try:
+            await workflow_service.delete_workflow(workflow_id, user)
+        except Exception:
+            logger.exception("Failed to clean up partial workflow %s", workflow_id)
+        return {"error": "Something went wrong building the workflow. Nothing was saved — try again."}
+
+    return {
+        "workflow_id": workflow_id,
+        "name": wf.name,
+        "steps_created": len(plan),
+        "verified": False,
+        "message": (
+            f"Created workflow \"{wf.name}\" with {len(plan)} steps. It's ready to run on "
+            "documents, and you can fine-tune the steps or validate it in the workflow "
+            "editor. Want to run it now or open it to review?"
+        ),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Tool registry — imported by llm_service.create_agentic_chat_agent()
 # ---------------------------------------------------------------------------
 
@@ -2961,6 +3660,7 @@ TOOLS = [
     web_search,
     get_document_text,
     run_extraction,
+    check_compliance,
     # Phase 3 — KB write
     create_knowledge_base,
     add_documents_to_kb,
@@ -2968,6 +3668,8 @@ TOOLS = [
     # Phase 4 — Workflow orchestration
     run_workflow,
     get_workflow_status,
+    approve_workflow_step,
+    reject_workflow_step,
     # Phase 5 — Validation & guided verification
     list_test_cases,
     propose_test_case,
@@ -2988,4 +3690,8 @@ TOOLS = [
     pin_to_project,
     unpin_from_project,
     set_project_status,
+    # Phase 9 — Automations
+    create_automation,
+    # Phase 10 — Workflow authoring
+    create_workflow,
 ]

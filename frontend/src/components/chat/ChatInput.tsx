@@ -169,8 +169,8 @@ export function ChatInput({
           />
         </div>
 
-        {/* Controls toolbar */}
-        <div className="flex items-center gap-2.5 pt-1 px-1">
+        {/* Controls toolbar — min-w-0 lets children shrink instead of overflowing on narrow screens */}
+        <div className="flex min-w-0 items-center gap-2.5 pt-1 px-1">
           {/* + Add button */}
           <div ref={addMenuRef} className="relative">
             <button
@@ -230,11 +230,11 @@ export function ChatInput({
                 onClick={() => setShowModelMenu(!showModelMenu)}
                 aria-expanded={showModelMenu}
                 aria-haspopup="true"
-                className="flex items-center gap-1 rounded-[30px] border border-gray-300 px-2.5 py-1 text-xs font-medium text-[#555] hover:bg-gray-100 transition-all"
+                className="flex min-w-0 items-center gap-1 rounded-[30px] border border-gray-300 px-2.5 py-1 text-xs font-medium text-[#555] hover:bg-gray-100 transition-all"
               >
-                <Cpu className="h-3 w-3" />
-                {displayModel || 'Model'}
-                <ChevronDown className="h-3 w-3" />
+                <Cpu className="h-3 w-3 shrink-0" />
+                <span className="truncate max-w-[28vw] sm:max-w-[160px]">{displayModel || 'Model'}</span>
+                <ChevronDown className="h-3 w-3 shrink-0" />
               </button>
 
               {showModelMenu && (
@@ -242,7 +242,7 @@ export function ChatInput({
                   role="dialog"
                   aria-label="Select model effort level"
                   className="absolute left-0 z-[1000] rounded-[var(--ui-radius)] border bg-white"
-                  style={{ bottom: 'calc(100% + 8px)', width: 310, borderColor: 'rgba(0,0,0,0.14)', boxShadow: '0 10px 28px rgba(0,0,0,0.16)' }}
+                  style={{ bottom: 'calc(100% + 8px)', width: 310, maxWidth: 'calc(100vw - 30px)', borderColor: 'rgba(0,0,0,0.14)', boxShadow: '0 10px 28px rgba(0,0,0,0.16)' }}
                   onKeyDown={(e) => { if (e.key === 'Escape') setShowModelMenu(false) }}
                 >
                   <ModelEffortPicker
@@ -303,7 +303,7 @@ export function ChatInput({
               onClick={onStop}
               aria-label="Stop response"
               title="Stop"
-              className="flex items-center justify-center rounded-[var(--ui-radius)] bg-highlight p-1.5 text-highlight-text transition-opacity"
+              className="flex shrink-0 items-center justify-center rounded-[var(--ui-radius)] bg-highlight p-1.5 text-highlight-text transition-opacity"
             >
               <Square className="h-4 w-4 fill-current" />
             </button>
@@ -312,7 +312,7 @@ export function ChatInput({
               onClick={handleSend}
               disabled={!message.trim() || disabled}
               aria-label="Send message"
-              className="flex items-center justify-center rounded-[var(--ui-radius)] bg-highlight p-1.5 text-highlight-text transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex shrink-0 items-center justify-center rounded-[var(--ui-radius)] bg-highlight p-1.5 text-highlight-text transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Send className="h-4 w-4" />
             </button>

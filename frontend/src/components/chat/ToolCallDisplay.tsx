@@ -29,11 +29,14 @@ const TOOL_META: Record<string, { label: string; category: ToolCategory }> = {
   fetch_url:             { label: 'Reading web page',         category: 'read' },
   web_search:            { label: 'Searching the web',        category: 'read' },
   run_extraction:        { label: 'Running extraction',       category: 'extract' },
+  check_compliance:      { label: 'Checking compliance rules', category: 'workflow' },
   create_knowledge_base: { label: 'Creating knowledge base',  category: 'write' },
   add_documents_to_kb:   { label: 'Adding documents to KB',   category: 'write' },
   add_url_to_kb:         { label: 'Adding URL to KB',         category: 'write' },
   run_workflow:          { label: 'Running workflow',          category: 'workflow' },
   get_workflow_status:   { label: 'Checking workflow status',  category: 'workflow' },
+  approve_workflow_step: { label: 'Approving workflow review', category: 'workflow' },
+  reject_workflow_step:  { label: 'Rejecting workflow review', category: 'workflow' },
   list_test_cases:       { label: 'Listing test cases',         category: 'read' },
   propose_test_case:     { label: 'Preparing guided verification', category: 'extract' },
   run_validation:        { label: 'Running validation',         category: 'workflow' },
@@ -45,6 +48,13 @@ const TOOL_META: Record<string, { label: string; category: ToolCategory }> = {
   regenerate_validation_plan: { label: 'Regenerating validation plan', category: 'write' },
   save_to_folder:        { label: 'Saving to folder',         category: 'write' },
   create_project:        { label: 'Creating project',         category: 'write' },
+  list_project_documents:{ label: 'Listing project files',    category: 'read' },
+  run_pin_on_project:    { label: 'Running pinned item',      category: 'workflow' },
+  pin_to_project:        { label: 'Pinning to project',       category: 'write' },
+  unpin_from_project:    { label: 'Removing project pin',     category: 'write' },
+  set_project_status:    { label: 'Updating project status',  category: 'write' },
+  create_automation:     { label: 'Creating automation',      category: 'write' },
+  create_workflow:       { label: 'Building workflow',         category: 'write' },
 }
 
 const CATEGORY_ACCENT: Record<ToolCategory, string> = {
@@ -75,7 +85,8 @@ function getActiveHint(toolName: string, args: Record<string, unknown>): string 
       return queryStr ? `for "${queryStr}"` : ''
     case 'search_knowledge_base':
       return queryStr ? `about "${queryStr}"` : ''
-    case 'run_extraction': {
+    case 'run_extraction':
+    case 'check_compliance': {
       const docs = Array.isArray(args.document_uuids) ? args.document_uuids.length : 0
       return docs > 0 ? `on ${docs} document${docs !== 1 ? 's' : ''}` : ''
     }
@@ -130,7 +141,7 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
       if (content.length === 1) {
         return { text: `Found ${name}${verified}`, qualityHint }
       }
-      return { text: `Found ${content.length} items — ${name}${verified}`, qualityHint }
+      return { text: `Found ${content.length} items: ${name}${verified}`, qualityHint }
     }
 
     case 'search_documents': {
@@ -139,7 +150,7 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
       const first = content[0] as Record<string, unknown>
       const title = first.title ? `"${String(first.title).slice(0, 40)}"` : ''
       if (content.length === 1) return { text: `Found ${title}`, qualityHint }
-      return { text: `Found ${content.length} documents — ${title}`, qualityHint }
+      return { text: `Found ${content.length} documents: ${title}`, qualityHint }
     }
 
     case 'list_extraction_sets':
@@ -176,7 +187,7 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
     case 'get_document_text': {
       const title = obj.title ? `"${String(obj.title).slice(0, 40)}"` : ''
       const chars = obj.total_chars ? `${((obj.total_chars as number) / 1000).toFixed(0)}K chars` : ''
-      return { text: [title, chars].filter(Boolean).join(' — '), qualityHint }
+      return { text: [title, chars].filter(Boolean).join(' - '), qualityHint }
     }
 
     case 'run_extraction': {
@@ -187,7 +198,7 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
       const entityHint = `${count} entit${count !== 1 ? 'ies' : 'y'}`
       const parts = [entityHint, fieldHint].filter(Boolean).join(', ')
       return {
-        text: setName ? `${setName} — ${parts}` : parts,
+        text: setName ? `${setName}: ${parts}` : parts,
         qualityHint,
       }
     }
@@ -196,7 +207,7 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
       const count = Array.isArray(obj.fields) ? (obj.fields as unknown[]).length : 0
       const title = obj.document_title ? `"${String(obj.document_title).slice(0, 40)}"` : ''
       return {
-        text: `${title} — ${count} field${count !== 1 ? 's' : ''} ready to verify`,
+        text: `${title}: ${count} field${count !== 1 ? 's' : ''} ready to verify`,
         qualityHint: '',
       }
     }
@@ -215,14 +226,14 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
     case 'list_test_cases': {
       const count = (obj.count as number) || 0
       const setName = obj.extraction_set ? `"${obj.extraction_set}"` : ''
-      return { text: `${setName} — ${count} test case${count !== 1 ? 's' : ''}`, qualityHint: '' }
+      return { text: `${setName}: ${count} test case${count !== 1 ? 's' : ''}`, qualityHint: '' }
     }
 
     case 'create_extraction_from_document': {
       const fields = Array.isArray(obj.fields) ? (obj.fields as unknown[]).length : 0
       const title = obj.title ? `"${String(obj.title).slice(0, 40)}"` : ''
       if (fields > 0) {
-        return { text: `${title} — ${fields} field${fields !== 1 ? 's' : ''} discovered`, qualityHint: '' }
+        return { text: `${title}: ${fields} field${fields !== 1 ? 's' : ''} discovered`, qualityHint: '' }
       }
       return { text: obj.message ? String(obj.message) : 'Created', qualityHint: '' }
     }
@@ -242,7 +253,7 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
     case 'get_workflow_status': {
       const status = obj.status as string
       if (status === 'completed') return { text: 'Completed', qualityHint }
-      if (status === 'paused') return { text: 'Paused — awaiting approval', qualityHint: '' }
+      if (status === 'paused') return { text: 'Paused, awaiting approval', qualityHint: '' }
       if (status === 'failed') return { text: 'Failed', qualityHint: '' }
       const done = (obj.steps_completed as number) || 0
       const total = (obj.steps_total as number) || 0
@@ -258,7 +269,7 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
     case 'fetch_url': {
       const title = obj.title ? `"${String(obj.title).slice(0, 50)}"` : 'page'
       const chars = obj.total_chars ? `${Math.round((obj.total_chars as number) / 1000)}K chars` : ''
-      return { text: [`Read ${title}`, chars].filter(Boolean).join(' — '), qualityHint: '' }
+      return { text: [`Read ${title}`, chars].filter(Boolean).join(' - '), qualityHint: '' }
     }
 
     case 'web_search': {
@@ -280,7 +291,7 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
         const base = typeof obj.baseline_score === 'number'
           ? ` (was ${Math.round(obj.baseline_score as number)})`
           : ''
-        return { text: `Completed — score ${Math.round(score)}/100${base}`, qualityHint: '' }
+        return { text: `Completed, score ${Math.round(score)}/100${base}`, qualityHint: '' }
       }
       if (status) {
         const phase = obj.phase ? ` · ${String(obj.phase)}` : ''
@@ -302,6 +313,32 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
     case 'create_project': {
       const t = obj.title ? `"${String(obj.title).slice(0, 40)}"` : 'project'
       return { text: `Created project ${t}`, qualityHint }
+    }
+
+    case 'check_compliance': {
+      if (obj.rules_checked === 0) return { text: 'No compliance rules defined', qualityHint: '' }
+      const violations = (obj.total_violations as number) || 0
+      const docs = (obj.documents_checked as number) || 0
+      if (obj.all_compliant) {
+        return { text: `All ${docs} document${docs !== 1 ? 's' : ''} compliant`, qualityHint }
+      }
+      return {
+        text: `${violations} violation${violations !== 1 ? 's' : ''} across ${docs} document${docs !== 1 ? 's' : ''}`,
+        qualityHint,
+      }
+    }
+
+    case 'approve_workflow_step':
+    case 'reject_workflow_step':
+      return { text: obj.message ? String(obj.message) : 'Done', qualityHint: '' }
+
+    case 'create_automation':
+      return { text: obj.message ? String(obj.message) : 'Automation created', qualityHint: '' }
+
+    case 'create_workflow': {
+      const n = (obj.steps_created as number) || 0
+      const t = obj.name ? `"${String(obj.name).slice(0, 40)}"` : 'workflow'
+      return { text: `Built ${t}: ${n} step${n !== 1 ? 's' : ''}`, qualityHint: '' }
     }
   }
 
@@ -599,7 +636,7 @@ function ExtractionContent({ content }: { content: Record<string, unknown> }) {
               color: '#3b82f6', fontSize: 10,
             }}
           >
-            {[hiddenRows > 0 && `+${hiddenRows} rows`, hiddenCols > 0 && `+${hiddenCols} cols`].filter(Boolean).join(', ')} — show all
+            {[hiddenRows > 0 && `+${hiddenRows} rows`, hiddenCols > 0 && `+${hiddenCols} cols`].filter(Boolean).join(', ')} - show all
           </button>
         )}
         {showAll && (entities.length > 12 || fields.length > 6) && (
@@ -811,7 +848,7 @@ function WorkflowProgress({ sessionId, initialStatus }: { sessionId: string; ini
   if (fetchFailed && !status) {
     return wrap(
       <div style={{ fontSize: 11, color: '#9ca3af' }}>
-        Couldn&rsquo;t reach the workflow for live progress — check the Activity rail.
+        Couldn&rsquo;t reach the workflow for live progress. Check the Activity rail.
       </div>,
     )
   }
@@ -835,7 +872,7 @@ function WorkflowProgress({ sessionId, initialStatus }: { sessionId: string; ini
     return wrap(
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#dc2626' }}>
         <AlertTriangle size={13} />
-        {label}{status?.error ? ` — ${status.error}` : ''}
+        {label}{status?.error ? `: ${status.error}` : ''}
       </div>,
     )
   }
@@ -843,7 +880,7 @@ function WorkflowProgress({ sessionId, initialStatus }: { sessionId: string; ini
   if (effective === 'paused') {
     return wrap(
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#b45309' }}>
-        <AlertTriangle size={13} /> Paused — awaiting approval in the workflow runner.
+        <AlertTriangle size={13} /> Paused, awaiting approval in the workflow runner.
       </div>,
     )
   }

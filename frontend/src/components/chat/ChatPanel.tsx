@@ -7,6 +7,7 @@ import { AttachmentList } from './AttachmentList'
 import { toolResultToText } from './ToolCallDisplay'
 import { WorkspaceBriefing } from './WorkspaceBriefing'
 import { OnboardingStepper } from './WelcomeExperience'
+import { ConceptStrip } from './ConceptTip'
 import { ContextMeter } from './ContextMeter'
 import { ContextLimitDialog } from './ContextLimitDialog'
 import { MemoryPanel } from './MemoryPanel'
@@ -53,13 +54,22 @@ function StreamingLabel() {
   }, [words.length])
 
   return (
-    <span style={{
-      opacity: fade ? 1 : 0,
-      transition: 'opacity 0.2s ease',
-      fontSize: 13,
-      color: '#9ca3af',
-    }}>
-      {words[index % words.length]}&hellip;
+    // role=status announces "working" to assistive tech ONCE when streaming
+    // begins; the rotating word itself is decorative (aria-hidden) so screen
+    // readers aren't spammed with "Thinking… Pondering… Analyzing…" every 2s.
+    <span role="status" aria-live="polite">
+      <span
+        aria-hidden="true"
+        style={{
+          opacity: fade ? 1 : 0,
+          transition: 'opacity 0.2s ease',
+          fontSize: 13,
+          color: '#9ca3af',
+        }}
+      >
+        {words[index % words.length]}&hellip;
+      </span>
+      <span className="sr-only">The assistant is working…</span>
     </span>
   )
 }
@@ -69,7 +79,7 @@ const VALUE_TAGLINES: Array<{
   title: string
   detail: string
 }> = [
-  { icon: Shield, title: 'Your documents stay private', detail: 'Files never leave your institution — you choose the model.' },
+  { icon: Shield, title: 'Your documents stay private', detail: 'Files never leave your institution; you choose the model.' },
   { icon: CheckCircle2, title: 'Workflows you can trust', detail: 'Every extraction template has documented accuracy metrics.' },
   { icon: Upload, title: 'Built for research administration', detail: 'Purpose-built for grants, compliance, and institutional docs.' },
 ]
@@ -249,7 +259,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         role: 'assistant',
         content:
           `Hi! I'm your ${branding.orgName} assistant.\n\n` +
-          "I specialize in document intelligence for research administration — " +
+          "I specialize in document intelligence for research administration: " +
           "extraction with **measured accuracy**, not guesses.\n\n" +
           "Want a quick demo? Say **\"show me\"** and I'll run one live against a sample grant proposal.\n\n" +
           "Or just ask me about your own documents.",
@@ -303,7 +313,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       setSelectedDocNames(remainingNames)
       activateKB(kb.uuid, kb.title)
       clearError()
-      toast('Converted to Knowledge Base — ask your question again.', 'success')
+      toast('Converted to Knowledge Base. Ask your question again.', 'success')
     } catch (e) {
       toast(
         e instanceof Error ? e.message : 'Could not convert the documents to a Knowledge Base.',
@@ -571,7 +581,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         })
         queryClient.invalidateQueries({ queryKey: ['documents'] })
         const label = newUuids.length === 1 ? newNames[newUuids[0]] : `${newUuids.length} files`
-        toast(`Added ${label} — processing…`, 'success')
+        toast(`Added ${label}, processing…`, 'success')
       }
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Failed to upload file', 'error')
@@ -846,7 +856,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                       Welcome to {branding.orgName}
                     </div>
                     <div style={{ fontSize: 13, opacity: 0.8, marginTop: 2, fontWeight: 400 }}>
-                      AI-powered document intelligence — watch it in action below
+                      AI-powered document intelligence. Watch it in action below.
                     </div>
                   </div>
                 </div>
@@ -913,9 +923,9 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                         : stageCopy(bannerProcessingDoc.status).message
                       : activeProjectUuid
                         ? projectEmpty
-                          ? 'No files in this project yet — add files in the Files tab and I’ll answer from them. You can still ask me anything.'
+                          ? 'No files in this project yet. Add files in the Files tab and I’ll answer from them. You can still ask me anything.'
                           : projectIndexing
-                            ? 'Indexing this project’s files — you can chat now; answers get better as indexing finishes.'
+                            ? 'Indexing this project’s files. You can chat now; answers get better as indexing finishes.'
                             : `Ask questions across every file in this project (${projectFileCount} ${projectFileCount === 1 ? 'file' : 'files'}).`
                         : activeKBUuid
                           ? 'Ask questions grounded in your indexed documents and sources.'
@@ -1055,6 +1065,15 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                 </button>
               ))}
             </div>
+
+            {/* Concept glossary — teach the core nouns on the generic "ask me
+                anything" surface, where a user new to the platform's vocabulary
+                lands. Suppressed once they're working in a doc/KB/project. */}
+            {!activeProjectUuid && !activeKBUuid && !hasDocContext && (
+              <div style={{ marginTop: 16 }}>
+                <ConceptStrip />
+              </div>
+            )}
 
             {/* Getting-started stepper for returning users who haven't finished basics */}
             {onboardingStatus && (
@@ -1272,6 +1291,12 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                   <ul className="list-disc pl-4 space-y-0.5">
                     {failed.map((n, i) => <li key={i}>{n.detail}</li>)}
                   </ul>
+                  <div className="mt-2 text-red-600/80">
+                    This usually means the file is scanned/image-only, password-protected,
+                    or in an unsupported format. Try re-saving it as a text-based PDF or
+                    DOCX and re-uploading from the Files tab — or paste the relevant text
+                    here directly.
+                  </div>
                 </div>
               )}
               {compacted.length > 0 && (
