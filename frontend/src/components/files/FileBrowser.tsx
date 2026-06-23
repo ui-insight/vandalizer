@@ -11,9 +11,10 @@ import { UploadProgress } from './UploadProgress'
 import { ContextMenu } from './ContextMenu'
 import { RenameDialog } from './RenameDialog'
 import { CreateFolderDialog } from './CreateFolderDialog'
+import { MoveFolderDialog } from './MoveFolderDialog'
 import { useConfirm } from '../shared/useConfirm'
 import { deleteFile, renameFile, downloadFile, downloadFilesAsZip, moveFile } from '../../api/files'
-import { createFolder, renameFolder, deleteFolder, convertFolderToTeam } from '../../api/folders'
+import { createFolder, renameFolder, deleteFolder, convertFolderToTeam, moveFolder, exportFolder } from '../../api/folders'
 import { listAutomations } from '../../api/automations'
 import type { Document, Folder } from '../../types/document'
 import { isDocReady } from '../../utils/processingStatus'
@@ -55,6 +56,11 @@ interface FileBrowserProps {
   ) => void
   currentFolder?: string | null
   onFolderNavigate?: (folderId: string | null) => void
+  // Scope the chat to a folder and focus the composer ("Ask about folder").
+  onAskAboutFolder?: (folder: Folder) => void
+  // Run a workflow against / add to a KB every document in a folder.
+  onRunWorkflowOnFolder?: (folder: Folder) => void
+  onAddFolderToKB?: (folder: Folder) => void
   // When set (project scope), this folder is the browser's home/floor:
   // breadcrumbs start here and navigation can't go above it.
   rootFolder?: string | null
@@ -63,7 +69,7 @@ interface FileBrowserProps {
   teamScopeUuid?: string
 }
 
-export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSelectionChange, onDocNamesChange, onFolderSelectionChange, onSelectionProcessingChange, currentFolder: controlledFolder, onFolderNavigate, rootFolder = null, rootLabel, teamScopeUuid }: FileBrowserProps) {
+export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSelectionChange, onDocNamesChange, onFolderSelectionChange, onSelectionProcessingChange, currentFolder: controlledFolder, onFolderNavigate, onAskAboutFolder, onRunWorkflowOnFolder, onAddFolderToKB, rootFolder = null, rootLabel, teamScopeUuid }: FileBrowserProps) {
   const { currentTeam } = useTeams()
   const confirm = useConfirm()
 
@@ -337,6 +343,7 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
   } | null>(null)
   const [showCreateFolder, setShowCreateFolder] = useState(false)
   const [createTeamFolder, setCreateTeamFolder] = useState(false)
+  const [moveTarget, setMoveTarget] = useState<Folder | null>(null)
 
   // Panel-wide drag & drop
   const dragCounter = useRef(0)
@@ -407,6 +414,20 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
       refresh()
     },
     [currentFolder, createTeamFolder, refresh],
+  )
+
+  const handleMoveFolder = useCallback(
+    async (parentId: string) => {
+      if (!moveTarget) return
+      try {
+        await moveFolder(moveTarget.uuid, parentId)
+      } catch (err: unknown) {
+        alert(err instanceof Error ? err.message : 'Failed to move folder')
+      }
+      setMoveTarget(null)
+      refresh()
+    },
+    [moveTarget, refresh],
   )
 
   const handleDelete = useCallback(
@@ -606,6 +627,21 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
           x={contextMenu.x}
           y={contextMenu.y}
           onClose={() => setContextMenu(null)}
+          onAskFolder={
+            contextMenu.type === 'folder' && onAskAboutFolder
+              ? () => onAskAboutFolder(contextMenu.item as Folder)
+              : undefined
+          }
+          onRunWorkflow={
+            contextMenu.type === 'folder' && onRunWorkflowOnFolder
+              ? () => onRunWorkflowOnFolder(contextMenu.item as Folder)
+              : undefined
+          }
+          onAddToKB={
+            contextMenu.type === 'folder' && onAddFolderToKB
+              ? () => onAddFolderToKB(contextMenu.item as Folder)
+              : undefined
+          }
           onRename={() => {
             const item = contextMenu.item
             setRenameTarget({
@@ -614,6 +650,23 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
               name: item.title,
             })
           }}
+          onMove={
+            contextMenu.type === 'folder' && !(contextMenu.item as Folder).is_shared_team_root
+              ? () => setMoveTarget(contextMenu.item as Folder)
+              : undefined
+          }
+          onExport={
+            contextMenu.type === 'folder'
+              ? async () => {
+                  const folder = contextMenu.item as Folder
+                  try {
+                    await exportFolder(folder.uuid, folder.title)
+                  } catch (err: unknown) {
+                    alert(err instanceof Error ? err.message : 'Failed to export folder')
+                  }
+                }
+              : undefined
+          }
           onDelete={() => handleDelete(contextMenu.type, contextMenu.item.uuid)}
           onDownload={
             contextMenu.type === 'doc'
@@ -653,6 +706,14 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
           onSubmit={handleCreateFolder}
           onClose={() => { setShowCreateFolder(false); setCreateTeamFolder(false) }}
           title={createTeamFolder ? 'New Team Folder' : 'New Folder'}
+        />
+      )}
+
+      {moveTarget && (
+        <MoveFolderDialog
+          folder={moveTarget}
+          onSubmit={handleMoveFolder}
+          onClose={() => setMoveTarget(null)}
         />
       )}
     </div>

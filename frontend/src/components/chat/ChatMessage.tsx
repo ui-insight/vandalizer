@@ -103,6 +103,7 @@ export function ChatMessage({
   const [comment, setComment] = useState('')
   const [commentSent, setCommentSent] = useState(false)
   const [thinkingExpanded, setThinkingExpanded] = useState(false)
+  const [openCitation, setOpenCitation] = useState<number | null>(null)
   const contentRef = useRef<HTMLDivElement>(null)
   const certPanel = useCertificationPanel()
   const { setWorkspaceMode, viewDocument, setHighlightTerms } = useWorkspace()
@@ -357,61 +358,102 @@ export function ChatMessage({
             </>
           )}
 
-          {message.citations && message.citations.length > 0 && (
-            <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              <span style={{ fontSize: 11, color: '#6b7280', alignSelf: 'center', marginRight: 2 }}>
-                Sources:
-              </span>
-              {message.citations.map((c, i) => {
-                const locator = typeof c.page === 'number' ? `p. ${c.page}` : (c.sheet || null)
-                const label = locator ? `${c.document_title} · ${locator}` : c.document_title
-                const preview = [c.content_preview, c.source_reference ? `Source: ${c.source_reference}` : null]
-                  .filter(Boolean)
-                  .join('\n\n')
-                const chipStyle = {
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                  padding: '2px 8px', fontSize: 11, fontWeight: 500,
-                  backgroundColor: '#f3f4f6', color: '#374151',
-                  border: '1px solid #e5e7eb', borderRadius: 999,
-                } as const
-                const key = `${c.chunk_id ?? c.document_id ?? i}`
-                if (c.url) {
-                  return (
-                    <a
-                      key={key}
-                      href={c.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      title={preview}
-                      style={{ ...chipStyle, cursor: 'pointer', textDecoration: 'none' }}
-                    >
-                      {label}
-                    </a>
-                  )
-                }
-                // Document-backed citation: open the source in the viewer and
-                // highlight the cited passage so the user can verify it.
-                if (c.document_id) {
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => handleCitationClick(c)}
-                      title={preview ? `${preview}\n\nClick to open the source` : 'Click to open the source'}
-                      style={{ ...chipStyle, cursor: 'pointer', fontFamily: 'inherit' }}
-                    >
-                      {label}
-                    </button>
-                  )
-                }
-                return (
-                  <span key={key} title={preview} style={{ ...chipStyle, cursor: 'help' }}>
-                    {label}
+          {message.citations && message.citations.length > 0 && (() => {
+            const open = openCitation !== null ? message.citations[openCitation] : null
+            const openPreview = open?.content_preview?.trim() || ''
+            return (
+              <div style={{ marginTop: 8 }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  <span style={{ fontSize: 11, color: '#6b7280', alignSelf: 'center', marginRight: 2 }}>
+                    Sources:
                   </span>
-                )
-              })}
-            </div>
-          )}
+                  {message.citations.map((c, i) => {
+                    const locator = typeof c.page === 'number' ? `p. ${c.page}` : (c.sheet || null)
+                    const label = locator ? `${c.document_title} · ${locator}` : c.document_title
+                    const preview = c.content_preview || ''
+                    const key = `${c.chunk_id ?? c.document_id ?? i}`
+                    const chipBase = {
+                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                      padding: '2px 8px', fontSize: 11, fontWeight: 500,
+                      borderRadius: 999, transition: 'all 0.15s',
+                    } as const
+                    // URL-backed KB source: link straight out to the origin.
+                    if (c.url) {
+                      return (
+                        <a
+                          key={key}
+                          href={c.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          title={preview ? `${preview}\n\nOpens ${c.url}` : c.url}
+                          style={{
+                            ...chipBase,
+                            backgroundColor: '#f3f4f6', color: '#374151',
+                            border: '1px solid #e5e7eb',
+                            cursor: 'pointer', textDecoration: 'none',
+                          }}
+                        >
+                          {label}
+                        </a>
+                      )
+                    }
+                    const isOpen = openCitation === i
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        title={preview}
+                        aria-expanded={isOpen}
+                        onClick={() => setOpenCitation(isOpen ? null : i)}
+                        style={{
+                          ...chipBase,
+                          backgroundColor: isOpen ? '#e0e7ff' : '#f3f4f6',
+                          color: isOpen ? '#3730a3' : '#374151',
+                          border: `1px solid ${isOpen ? '#c7d2fe' : '#e5e7eb'}`,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {label}
+                      </button>
+                    )
+                  })}
+                </div>
+                {open && (
+                  <div style={{
+                    marginTop: 6, padding: '8px 10px', fontSize: 12, lineHeight: 1.5,
+                    color: '#374151', backgroundColor: '#f9fafb',
+                    border: '1px solid #e5e7eb', borderRadius: 8,
+                    whiteSpace: 'pre-wrap' as const,
+                  }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', marginBottom: 4 }}>
+                      {open.document_title}
+                      {typeof open.page === 'number' ? ` · p. ${open.page}` : (open.sheet ? ` · ${open.sheet}` : '')}
+                    </div>
+                    {openPreview || 'No preview available for this source.'}
+                    {open.source_reference && (
+                      <div style={{ fontSize: 11, color: '#6b7280', marginTop: 6 }}>
+                        Source: {open.source_reference}
+                      </div>
+                    )}
+                    {open.document_id && (
+                      <button
+                        type="button"
+                        onClick={() => handleCitationClick(open)}
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                          marginTop: 8, padding: '4px 10px', fontSize: 11, fontWeight: 600,
+                          fontFamily: 'inherit', backgroundColor: '#fff', color: '#374151',
+                          border: '1px solid #d1d5db', borderRadius: 6, cursor: 'pointer',
+                        }}
+                      >
+                        Open the source
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
 
           {/* Feedback bar - hidden during streaming */}
           {!isStreamingProp && message.content && <div style={{

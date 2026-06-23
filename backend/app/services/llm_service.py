@@ -87,6 +87,26 @@ def _get_loop_http_client() -> httpx.AsyncClient:
     return client
 
 
+async def aclose_loop_http_client() -> None:
+    """Close and drop the pooled httpx client bound to the running loop.
+
+    The per-loop cache relies on the loop being garbage-collected to release a
+    client's sockets/FDs. That's fine for the web server's long-lived loop and
+    for workflow worker-thread loops (which exit), but Celery tasks build a
+    *fresh* loop per run and ``loop.close()`` does NOT close the httpx client —
+    so every background LLM task would leak a client and its sockets until GC,
+    re-creating the recurring ``[Errno 24] Too many open files`` exhaustion.
+    Call this just before tearing such a loop down to release them eagerly.
+    """
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        return
+    client = _loop_http_clients.pop(loop, None)
+    if client is not None and not client.is_closed:
+        await client.aclose()
+
+
 # ---------------------------------------------------------------------------
 # RAG deps dataclass
 # ---------------------------------------------------------------------------
@@ -956,6 +976,28 @@ KB_CHAT_SYSTEM_PROMPT = VANDALIZER_IDENTITY_PREAMBLE + (
     "- Keep answers under 150 words unless the user asks for detail.\n"
 )
 
+PROJECT_KB_EMPTY_SYSTEM_PROMPT = VANDALIZER_IDENTITY_PREAMBLE + (
+    "You are the assistant for a **Project** — a workspace that bundles the user's "
+    "uploaded documents with a chat. For this question, the project's knowledge base "
+    "returned **no relevant content**: either the project's documents don't cover it, "
+    "or files added to the project haven't finished indexing yet.\n\n"
+    "## How to answer\n"
+    "- **Never invent, summarize, quote, or describe the contents of any document in "
+    "this project.** You have not been shown any project document text for this "
+    "question, so you cannot speak to what a specific file says.\n"
+    "- If the user is asking about a specific document or the project's contents, tell "
+    "them plainly that you couldn't find it in this project's documents. Suggest they "
+    "confirm the file was added to the project (uploading is most reliable — a file just "
+    "moved in may still be indexing), wait a moment and retry, rephrase the question, or "
+    "open the file directly.\n"
+    "- **You can still answer general questions** from your own knowledge — go ahead and "
+    "help, but make clear that answer is general knowledge and is NOT based on this "
+    "project's documents.\n\n"
+    "## Format\n"
+    "- Be concise. Short Markdown bullets — no walls of text.\n"
+    "- Do NOT restate the question.\n"
+)
+
 HELP_CHAT_SYSTEM_PROMPT = VANDALIZER_IDENTITY_PREAMBLE + (
     "You are the built-in assistant for **Vandalizer**, an open-source AI-powered "
     "document intelligence platform.\n\n"
@@ -1314,6 +1356,20 @@ RAG_SYSTEM_PROMPT = VANDALIZER_IDENTITY_PREAMBLE + (
     "4. Maintain the original meaning and nuance from source documents\n"
     "5. Identify and reconcile any contradictions between different sources\n"
     "6. Distinguish between factual statements from the context and your own reasoning\n\n"
+    "Retrieval reality — read carefully:\n"
+    "- The retrieved chunks are partial excerpts selected only because they were "
+    "lexically or semantically similar to the question. Being retrieved does NOT "
+    "mean a chunk actually answers the question — chunks can be off-topic, stale, "
+    "or contradictory. Read each one before relying on it, and ignore ones that "
+    "don't bear on the question rather than force-fitting them.\n"
+    "- If the retrieved context does not contain the answer, say so explicitly — "
+    "e.g. \"The knowledge base does not cover this.\" Do NOT paper over the gap "
+    "with a confident-sounding guess, and do NOT fall back on general/training "
+    "knowledge to fabricate an answer the sources don't support.\n"
+    "- If you do supplement with general knowledge (a definition or background "
+    "the chunks don't provide), mark that portion with the prefix "
+    "`_Beyond the retrieved sources:_` so the reader can see where grounded "
+    "information ends and general reasoning begins.\n\n"
     "Response guidelines:\n"
     "- Begin with a direct answer to the question when possible\n"
     "- Structure complex answers with clear headings or numbered points\n"

@@ -276,6 +276,22 @@ async def move_document(file_uuid: str, folder_id: str, *, user: User) -> bool:
     if doc.team_id != target_team_id:
         raise ValueError("Cannot move files between personal and team folders.")
 
+    old_folder = doc.folder
     doc.folder = folder_id
     await doc.save()
+
+    # Re-sync the document's Project knowledge-base membership: moving a file into a
+    # project's folder tree must index it into that project's implicit KB (so "chat
+    # with this project" can see it instead of answering from the model's own
+    # knowledge), and moving it out must drop it. Best-effort, async via Celery.
+    if old_folder != folder_id:
+        try:
+            from app.tasks.document_tasks import sync_project_kb_on_move
+
+            sync_project_kb_on_move.delay(doc.uuid, old_folder)
+        except Exception:
+            logger.warning(
+                "Failed to dispatch project KB sync for moved document %s", doc.uuid
+            )
+
     return True

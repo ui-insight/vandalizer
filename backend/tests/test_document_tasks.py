@@ -520,3 +520,111 @@ class TestPerformSemanticIngestion:
         final_update = db.smart_document.update_one.call_args_list[-1][0][1]["$set"]
         assert final_update["chromadb_ready"] is False
         assert "embedding service down" in final_update["ingest_error"]
+
+
+# ---------------------------------------------------------------------------
+# Project KB membership sync (move into / out of a Project's folder tree)
+# ---------------------------------------------------------------------------
+
+
+class TestFindProjectForFolder:
+    def test_returns_none_for_root_or_empty(self):
+        from app.tasks.document_tasks import _find_project_for_folder
+
+        db = MagicMock()
+        assert _find_project_for_folder(db, None) is None
+        assert _find_project_for_folder(db, "0") is None
+        db.project.find_one.assert_not_called()
+
+    def test_walks_ancestry_to_project_root(self):
+        from app.tasks.document_tasks import _find_project_for_folder
+
+        db = MagicMock()
+        # child -> parent -> root("0")
+        db.smart_folder.find_one.side_effect = [
+            {"parent_id": "parent"},
+            {"parent_id": "0"},
+        ]
+        db.project.find_one.return_value = {"uuid": "p1", "kb_uuid": "kb1"}
+
+        project = _find_project_for_folder(db, "child")
+
+        assert project["uuid"] == "p1"
+        # The $in query should include every folder in the ancestry chain.
+        ancestors = db.project.find_one.call_args[0][0]["root_folder_uuid"]["$in"]
+        assert ancestors == ["child", "parent"]
+
+
+class TestSyncProjectKbOnMove:
+    @patch("app.tasks.document_tasks.get_sync_db")
+    def test_returns_empty_when_doc_missing(self, mock_get_db):
+        from app.tasks.document_tasks import sync_project_kb_on_move
+
+        db = MagicMock()
+        mock_get_db.return_value = db
+        db.smart_document.find_one.return_value = None
+
+        assert sync_project_kb_on_move("missing", "f1") == ""
+
+    @patch("app.tasks.document_tasks.get_sync_db")
+    @patch("app.config.Settings")
+    @patch("app.services.document_manager.DocumentManager")
+    def test_moving_into_project_ingests_into_kb(self, MockDM, MockSettings, mock_get_db):
+        from app.tasks.document_tasks import sync_project_kb_on_move
+
+        db = MagicMock()
+        mock_get_db.return_value = db
+        db.smart_document.find_one.return_value = {
+            "uuid": "doc-1",
+            "folder": "proj-root",
+            "title": "Composer-Performer Agreement",
+            "raw_text": "Performance Date & Time: 4.29.26",
+            "text_markers": [],
+        }
+        # proj-root is itself the project root.
+        db.smart_folder.find_one.return_value = {"parent_id": "0"}
+        db.project.find_one.return_value = {"uuid": "p1", "kb_uuid": "kb1"}
+        db.knowledge_base_sources.find_one.return_value = None  # not a dupe
+
+        dm = MagicMock()
+        dm.add_to_kb.return_value = 4
+        MockDM.return_value = dm
+        MockSettings.return_value = MagicMock()
+
+        result = sync_project_kb_on_move("doc-1", None)
+
+        assert result == "doc-1"
+        dm.add_to_kb.assert_called_once()
+        db.knowledge_base_sources.insert_one.assert_called_once()
+
+    @patch("app.tasks.document_tasks.get_sync_db")
+    @patch("app.config.Settings")
+    @patch("app.services.document_manager.DocumentManager")
+    def test_moving_out_of_project_removes_from_kb(self, MockDM, MockSettings, mock_get_db):
+        from app.tasks.document_tasks import sync_project_kb_on_move
+
+        db = MagicMock()
+        mock_get_db.return_value = db
+        # Doc now lives at the root (no project).
+        db.smart_document.find_one.return_value = {"uuid": "doc-1", "folder": "0"}
+        # Old folder resolves to a project.
+        db.smart_folder.find_one.return_value = {"parent_id": "0"}
+        db.project.find_one.return_value = {"uuid": "p1", "kb_uuid": "kb1"}
+        db.knowledge_base_sources.find_one.return_value = {
+            "_id": ObjectId(),
+            "chunk_count": 3,
+        }
+
+        dm = MagicMock()
+        MockDM.return_value = dm
+        MockSettings.return_value = MagicMock()
+
+        result = sync_project_kb_on_move("doc-1", "old-proj-root")
+
+        assert result == "doc-1"
+        dm.delete_kb_source.assert_called_once_with("kb1", "doc-1")
+        db.knowledge_base_sources.delete_one.assert_called_once()
+        # KB counters decremented by the removed source's chunk count.
+        inc = db.knowledge_bases.update_one.call_args[0][1]["$inc"]
+        assert inc["total_chunks"] == -3
+        assert inc["total_sources"] == -1

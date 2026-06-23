@@ -9,8 +9,10 @@ const MODES: { mode: WorkspaceMode; icon: typeof MessageSquare; label: string }[
 ]
 
 export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomation?: boolean }) {
-  const { workspaceMode, setWorkspaceMode, resetToHome, activeProjectRole } = useWorkspace()
-  const projectsActive = workspaceMode === 'projects'
+  const { workspaceMode, setWorkspaceMode, resetToHome, activeProjectRole, activeProjectUuid, deactivateProject } = useWorkspace()
+  // The Projects icon shows the picker, which is exclusive with being scoped
+  // into a project — so it's "active" only when a project is NOT scoped.
+  const projectsActive = workspaceMode === 'projects' && !activeProjectUuid
   // A shared-in viewer (e.g. a PI) gets chat only — no files/automations/knowledge.
   const modes = activeProjectRole === 'viewer' ? MODES.filter(m => m.mode === 'chat') : MODES
 
@@ -28,9 +30,10 @@ export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomatio
         flexShrink: 0,
       }}
     >
-      {/* Projects — opens a slideout drawer (project list), like the modes below. */}
+      {/* Projects — drops any active project scope and shows the project picker
+          (the drawer). Being scoped into a project is exclusive with the list. */}
       <button
-        onClick={() => setWorkspaceMode('projects')}
+        onClick={() => { deactivateProject(); setWorkspaceMode('projects') }}
         title="Projects"
         aria-label="Projects"
         aria-current={projectsActive ? 'page' : undefined}

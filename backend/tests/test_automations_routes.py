@@ -48,6 +48,42 @@ async def client():
             yield ac
 
 
+class TestResolveActionNamesBulk:
+    @pytest.mark.asyncio
+    async def test_batches_workflow_lookups_into_one_query(self):
+        """Five workflow-backed automations should resolve in a single find()."""
+        from app.routers.automations import _resolve_action_names_bulk
+
+        oids = [
+            "656f1f77bcf86cd799439011",
+            "656f1f77bcf86cd799439012",
+            "656f1f77bcf86cd799439013",
+            "656f1f77bcf86cd799439014",
+            "656f1f77bcf86cd799439015",
+        ]
+        autos = [_make_automation(action_type="workflow", action_id=o) for o in oids]
+
+        workflows = []
+        for i, o in enumerate(oids):
+            wf = MagicMock()
+            wf.id = o
+            wf.name = f"Workflow {i}"
+            workflows.append(wf)
+
+        find_result = MagicMock()
+        find_result.to_list = AsyncMock(return_value=workflows)
+
+        with patch("app.models.workflow.Workflow.find", return_value=find_result) as mock_find, \
+             patch("app.models.search_set.SearchSet.find") as mock_ss_find:
+            names = await _resolve_action_names_bulk(autos)
+
+        # One query for all five workflows; no extraction query since none linked.
+        mock_find.assert_called_once()
+        mock_ss_find.assert_not_called()
+        assert names[oids[0]] == "Workflow 0"
+        assert names[oids[4]] == "Workflow 4"
+
+
 class TestAutomationTriggerAuth:
     @pytest.mark.asyncio
     async def test_trigger_rejects_foreign_existing_document_uuid(self, client):

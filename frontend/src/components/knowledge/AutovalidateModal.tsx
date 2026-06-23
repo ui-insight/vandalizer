@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Pencil, Trash2 } from 'lucide-react'
 import {
   formatBudgetEstimate,
-  generateKBTestQueries,
+  generateKBTestQueriesAndWait,
   getKBBaselineProbe,
   listKBTestQueries,
   updateKBTestQuery,
@@ -213,7 +213,7 @@ export function AutovalidateModal({ kbUuid, onConfirm, onClose, onSwitchToQuerie
     const parts: string[] = []
     if (cost_label) parts.push(cost_label)
     if (time) parts.push(`~${time}`)
-    return parts.length > 0 ? `Start tuning — ${parts.join(', ')}` : 'Start tuning'
+    return parts.length > 0 ? `Validate & improve — ${parts.join(', ')}` : 'Validate & improve'
   }
 
   return (
@@ -529,15 +529,11 @@ function PreviewStep({
 
         let generatedQs: KBTestQuery[] = []
         if (buildMode === 'generate' || buildMode === 'combined') {
-          const generated = await generateKBTestQueries(kbUuid, { coverage, async: false })
+          // Runs on a background worker and polls for completion, so the wizard
+          // doesn't 502 when the inline LLM call would outlast the gateway.
+          const generated = await generateKBTestQueriesAndWait(kbUuid, { coverage })
           if (cancelled) return
-          if ('test_queries' in generated) {
-            generatedQs = generated.test_queries
-          } else {
-            setError('Generation was queued instead of returning inline — try again.')
-            setLoading(false)
-            return
-          }
+          generatedQs = generated.test_queries
         }
 
         // De-dupe in case generation echoed back an already-saved question.

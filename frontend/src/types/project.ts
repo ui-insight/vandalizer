@@ -31,6 +31,9 @@ export interface Project {
   // overview fetch. Omitted on create/update responses.
   capabilities?: ProjectCapabilities
   role?: ProjectRole
+  // True when the viewer joined via an invite (not owner, not team access) and
+  // can therefore leave the project. Present on list/overview responses.
+  can_leave?: boolean
 }
 
 export interface ProjectCapabilities {

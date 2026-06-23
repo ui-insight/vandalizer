@@ -487,8 +487,11 @@ class KBOptimizer:
             )
 
             # ----- Resolve model -----
-            from app.services.workflow_validator import _resolve_model_name as _resolve_sync
-            user_default_model = await asyncio.to_thread(_resolve_sync, user_id)
+            # get_user_model_name validates the stored selection against
+            # available_models and falls back to the system default when stale,
+            # so the judge never targets a removed model's unreachable endpoint.
+            from app.services.config_service import get_user_model_name
+            user_default_model = await get_user_model_name(user_id)
             if not user_default_model:
                 raise KBOptimizerError(
                     "judge_unavailable",

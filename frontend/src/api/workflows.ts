@@ -110,7 +110,7 @@ export function improvePrompt(data: {
 
 // Execution
 
-export function runWorkflow(workflowId: string, data: { document_uuids: string[]; model?: string; batch_mode?: boolean }) {
+export function runWorkflow(workflowId: string, data: { document_uuids?: string[]; folder_uuids?: string[]; model?: string; batch_mode?: boolean }) {
   return apiFetch<{ session_id?: string; batch_id?: string; activity_id?: string }>(`/api/workflows/${workflowId}/run`, {
     method: 'POST',
     body: JSON.stringify(data),
@@ -692,6 +692,10 @@ export type WorkflowOptimizationRun = {
   error_message: string | null
   started_at: string | null
   completed_at: string | null
+  // Server-computed elapsed seconds (started_at → completed_at|now). Drives the
+  // live timer skew-free; the client ticks forward from this base. Optional so
+  // older payloads fall back to the started_at delta.
+  elapsed_seconds?: number | null
   cancel_requested: boolean
 }
 

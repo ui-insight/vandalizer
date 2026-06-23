@@ -128,6 +128,127 @@ class TestRenameFolder:
         assert resp.status_code == 404
 
 
+class TestMoveFolder:
+    @pytest.mark.asyncio
+    async def test_move_folder(self, client):
+        """PATCH /api/folders/{uuid}/move reparents a folder."""
+        user = _make_user()
+        cookies, headers = _auth()
+
+        mock_folder = MagicMock()
+        mock_folder.id = "folder-id"
+        mock_folder.uuid = "folder-uuid"
+        mock_folder.title = "Moved Folder"
+        mock_folder.parent_id = "dest-uuid"
+        mock_folder.is_shared_team_root = False
+        mock_folder.team_id = None
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.folders.folder_service") as mock_svc:
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.move_folder = AsyncMock(return_value=mock_folder)
+
+            resp = await client.patch(
+                "/api/folders/folder-uuid/move",
+                json={"parent_id": "dest-uuid"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["parent_id"] == "dest-uuid"
+        mock_svc.move_folder.assert_called_once_with("folder-uuid", "dest-uuid", user)
+
+    @pytest.mark.asyncio
+    async def test_move_folder_into_descendant_rejected(self, client):
+        """A cycle-inducing move surfaces the service ValueError as a 400."""
+        user = _make_user()
+        cookies, headers = _auth()
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.folders.folder_service") as mock_svc:
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.move_folder = AsyncMock(
+                side_effect=ValueError("Cannot move a folder into itself or one of its subfolders.")
+            )
+
+            resp = await client.patch(
+                "/api/folders/folder-uuid/move",
+                json={"parent_id": "child-uuid"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 400
+        assert "subfolder" in resp.json()["detail"]
+
+
+class TestExportFolder:
+    @pytest.mark.asyncio
+    async def test_export_folder(self, client):
+        """GET /api/folders/{uuid}/export streams a structured zip."""
+        import io
+        import zipfile
+
+        user = _make_user()
+        cookies, headers = _auth()
+
+        def _result(title, extension, data):
+            r = MagicMock()
+            r.title, r.extension, r.data = title, extension, data
+            return r
+
+        downloads = {
+            "doc1": _result("root.txt", "txt", b"root"),
+            "doc2": _result("nested", "pdf", b"nested"),  # extension appended
+        }
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.folders.folder_service") as mock_folder_svc, \
+             patch("app.routers.folders.file_service") as mock_file_svc:
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_folder_svc.collect_export_entries = AsyncMock(
+                return_value=("My Folder", [("", "doc1"), ("Sub/", "doc2")])
+            )
+            mock_folder_svc._safe_component = lambda s: s.replace(" ", "_")
+            mock_file_svc.download_document = AsyncMock(side_effect=lambda uuid, *a, **k: downloads[uuid])
+
+            resp = await client.get(
+                "/api/folders/folder-uuid/export",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.headers["content-type"] == "application/zip"
+        assert "My_Folder.zip" in resp.headers["content-disposition"]
+        names = zipfile.ZipFile(io.BytesIO(resp.content)).namelist()
+        assert names == ["root.txt", "Sub/nested.pdf"]
+
+    @pytest.mark.asyncio
+    async def test_export_nonexistent_folder(self, client):
+        """GET export for a missing/unauthorized folder returns 404."""
+        user = _make_user()
+        cookies, headers = _auth()
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.folders.folder_service") as mock_folder_svc:
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_folder_svc.collect_export_entries = AsyncMock(return_value=None)
+
+            resp = await client.get(
+                "/api/folders/nonexistent/export",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 404
+
+
 class TestDeleteFolder:
     @pytest.mark.asyncio
     async def test_delete_folder(self, client):

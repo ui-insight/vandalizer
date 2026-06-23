@@ -24,6 +24,40 @@ def _wants_selected_document(task_data: dict) -> bool:
     return task_data.get("input_source") == "select_document"
 
 
+def _resolve_saved_prompt_formatter(db, task_name: str, task_data: dict) -> None:
+    """Resolve a linked saved Prompt/Formatter into the inline body in-place.
+
+    Prompt and Formatter steps may link a standalone Library prompt/formatter
+    (a SearchSet with set_type 'prompt'/'formatter'). The body lives in the
+    set's first item (`searchphrase`, materialized on edit) or, for sets never
+    edited since creation, in `extraction_config.content`. Resolving here — the
+    same task-data prep layer that resolves extraction sets — keeps the saved
+    item the single source of truth so edits propagate to every linked workflow.
+
+    Mirrors the extraction resolver's silent fallback: if the set is missing the
+    inline value is left as-is (PromptNode/FormatNode handle empties).
+    """
+    if task_name == "Prompt":
+        link_field, body_field = "saved_prompt_uuid", "prompt"
+    elif task_name in ("Formatter", "Format"):
+        link_field, body_field = "saved_formatter_uuid", "format_template"
+    else:
+        return
+
+    uuid = task_data.get(link_field)
+    if not uuid:
+        return
+    ss = db.search_set.find_one({"uuid": uuid})
+    if not ss:
+        return
+    item = db.search_set_item.find_one({"searchset": uuid})
+    body = item.get("searchphrase") if item else None
+    if not body:
+        body = (ss.get("extraction_config") or {}).get("content")
+    if body:
+        task_data[body_field] = body
+
+
 def _notify_approval_reviewers_sync(
     db, assigned_user_ids: list[str], workflow_name: str,
     step_name: str, instructions: str, approval_uuid: str,
@@ -283,6 +317,9 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
                         # but older workflows may have both persisted. Drop stale manual
                         # fields so the saved set is unambiguously the source of truth.
                         task_data.pop("extractions", None)
+
+                # Resolve a linked saved Prompt/Formatter into its inline body.
+                _resolve_saved_prompt_formatter(db, task_doc.get("name"), task_data)
 
                 # Pre-load doc texts for extraction and prompt nodes
                 doc_uuids = list(trigger_step_data.get("doc_uuids", []))
@@ -710,6 +747,9 @@ def execute_task_step_test(self, task_name, task_data, doc_uuids):
         if sel_doc and sel_doc.get("raw_text"):
             task_data["selected_doc_text"] = sel_doc["raw_text"]
 
+    # Resolve a linked saved Prompt/Formatter so Test Step uses the live body.
+    _resolve_saved_prompt_formatter(db, task_name, task_data)
+
     engine = WorkflowEngine()
     nodes = []
 
@@ -822,6 +862,7 @@ def resume_workflow_after_approval(self, approval_uuid):
                         }))
                         task_data["keys"] = [item["searchphrase"] for item in items]
                         task_data.pop("extractions", None)
+                _resolve_saved_prompt_formatter(db, task_doc.get("name"), task_data)
                 if doc_uuids:
                     doc_texts = []
                     for uuid in doc_uuids:

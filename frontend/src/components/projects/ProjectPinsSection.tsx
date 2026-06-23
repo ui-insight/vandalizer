@@ -3,6 +3,8 @@ import { useNavigate } from '@tanstack/react-router'
 import { Plus, Workflow, FileSearch, Zap, BookOpen, X } from 'lucide-react'
 import { useWorkflows } from '../../hooks/useWorkflows'
 import { useSearchSets } from '../../hooks/useExtractions'
+import { useAutomations } from '../../hooks/useAutomations'
+import { useKnowledgeBases } from '../../hooks/useKnowledgeBases'
 import { listProjectPins, addProjectPin, removeProjectPin } from '../../api/projects'
 import type { ProjectPin } from '../../types/project'
 
@@ -20,10 +22,12 @@ const key = (p: { pin_type: string; target_id: string }) => `${p.pin_type}:${p.t
  * you use for this grant, for quick access. Clicking one opens it inside the
  * scoped project so it runs against the project's documents.
  */
-export function ProjectPinsSection({ projectUuid, onChange }: { projectUuid: string; onChange?: () => void }) {
+export function ProjectPinsSection({ projectUuid, onChange, onOpen }: { projectUuid: string; onChange?: () => void; onOpen?: () => void }) {
   const navigate = useNavigate()
   const { workflows } = useWorkflows()
   const { searchSets } = useSearchSets()
+  const { automations } = useAutomations()
+  const { knowledgeBases } = useKnowledgeBases()
   const [pins, setPins] = useState<ProjectPin[]>([])
   const [adding, setAdding] = useState(false)
 
@@ -52,14 +56,18 @@ export function ProjectPinsSection({ projectUuid, onChange }: { projectUuid: str
 
   const open = (p: ProjectPin) => {
     const base = {
-      mode: 'files' as 'files' | 'automations',
+      mode: undefined as 'files' | 'automations' | undefined,
       tab: undefined, workflow: undefined as string | undefined,
       extraction: undefined as string | undefined, automation: undefined as string | undefined,
-      kb: undefined, project: projectUuid, workflow_share_token: undefined,
+      kb: undefined as string | undefined, project: projectUuid, workflow_share_token: undefined,
     }
-    if (p.pin_type === 'workflow') navigate({ to: '/', search: { ...base, workflow: p.target_id } })
-    else if (p.pin_type === 'extraction') navigate({ to: '/', search: { ...base, extraction: p.target_id } })
+    if (p.pin_type === 'workflow') navigate({ to: '/', search: { ...base, mode: 'files', workflow: p.target_id } })
+    else if (p.pin_type === 'extraction') navigate({ to: '/', search: { ...base, mode: 'files', extraction: p.target_id } })
     else if (p.pin_type === 'automation') navigate({ to: '/', search: { ...base, mode: 'automations', automation: p.target_id } })
+    else if (p.pin_type === 'knowledge_base') navigate({ to: '/', search: { ...base, kb: p.target_id } })
+    // Close the Manage modal so the tool we just navigated to is actually
+    // visible — otherwise the overlay stays up and the click looks like a no-op.
+    onOpen?.()
   }
 
   return (
@@ -75,12 +83,14 @@ export function ProjectPinsSection({ projectUuid, onChange }: { projectUuid: str
         <div className="mb-3 rounded-lg border border-gray-200 bg-white p-3">
           <PickerList title="Workflows" items={workflows.map(w => ({ id: w.id, name: w.name }))} pinType="workflow" pinnedSet={pinnedSet} onPin={pin} />
           <PickerList title="Extractions" items={searchSets.map(s => ({ id: s.uuid, name: s.title }))} pinType="extraction" pinnedSet={pinnedSet} onPin={pin} />
+          <PickerList title="Automations" items={automations.map(a => ({ id: a.id, name: a.name }))} pinType="automation" pinnedSet={pinnedSet} onPin={pin} />
+          <PickerList title="Knowledge bases" items={knowledgeBases.map(k => ({ id: k.uuid, name: k.title }))} pinType="knowledge_base" pinnedSet={pinnedSet} onPin={pin} />
         </div>
       )}
 
       {pins.length === 0 ? (
         <div className="rounded-lg border border-dashed border-gray-200 p-4 text-center text-sm text-gray-400">
-          No pinned tools. Pin the workflows and extractions you use for this project.
+          No pinned tools. Pin the workflows, extractions, automations, and knowledge bases you use for this project.
         </div>
       ) : (
         <div className="grid gap-2 sm:grid-cols-2">

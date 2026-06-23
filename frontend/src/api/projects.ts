@@ -46,6 +46,14 @@ export function shareProjectWithTeam(uuid: string) {
   return apiFetch<Project>(`/api/projects/${uuid}/share-with-team`, { method: 'POST' })
 }
 
+export function makeProjectPersonal(uuid: string) {
+  return apiFetch<Project>(`/api/projects/${uuid}/make-personal`, { method: 'POST' })
+}
+
+export function leaveProject(uuid: string) {
+  return apiFetch<{ ok: boolean }>(`/api/projects/${uuid}/leave`, { method: 'POST' })
+}
+
 // --- Pins ---
 
 export function listProjectPins(uuid: string) {

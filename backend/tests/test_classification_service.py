@@ -59,7 +59,9 @@ class TestClassifyDocument:
         mock_result.output = llm_response
 
         mock_agent = MagicMock()
-        mock_agent.run_sync = MagicMock(return_value=mock_result)
+        # classify_document runs inside an event loop, so it must use the async
+        # agent.run() API, not run_sync() (which would nest event loops).
+        mock_agent.run = AsyncMock(return_value=mock_result)
 
         mock_config = MagicMock()
         mock_config.get_extraction_config = MagicMock(return_value={"model": "gpt-4o-mini"})

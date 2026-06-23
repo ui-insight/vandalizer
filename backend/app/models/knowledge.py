@@ -91,13 +91,13 @@ class KnowledgeBase(Document):
     sources_failed: int = 0
     total_chunks: int = 0
     collection_name: Optional[str] = None
+    resource_config: dict = Field(default_factory=dict)  # provenance markers (e.g. {"seed_id": ...})
     # Optimized RAG settings discovered by KB Autovalidate. When present, the
     # headless RAG path consults this dict to pick k / model / prompt variant
     # / etc. Keys correspond to ``RAGConfig`` fields. None = use defaults.
     rag_config_override: Optional[dict] = None
     rag_config_override_set_at: Optional[datetime.datetime] = None
     rag_config_override_run_uuid: Optional[str] = None  # which optimization run produced it
-    resource_config: dict = Field(default_factory=dict)  # provenance markers (e.g. {"seed_id": ...})
     created_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
     updated_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc))
 

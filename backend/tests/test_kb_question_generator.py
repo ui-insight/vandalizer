@@ -225,7 +225,7 @@ async def test_generate_end_to_end_persist_false():
          patch.object(kb_question_generator, "KnowledgeBaseSource") as KBS, \
          patch.object(kb_question_generator, "KBTestQuery", side_effect=make_tq), \
          patch.object(KBQuestionGenerator, "_sample_chunks", return_value=sampled), \
-         patch.object(kb_question_generator, "_resolve_model_name", return_value="test-model"), \
+         patch.object(kb_question_generator, "get_user_model_name", new=AsyncMock(return_value="test-model")), \
          patch.object(kb_question_generator, "get_agent_model", return_value=MagicMock()), \
          patch("app.services.kb_question_generator.Agent", return_value=fake_agent):
         KB.find_one = AsyncMock(return_value=fake_kb)
@@ -276,7 +276,7 @@ async def test_generate_caps_results_to_target_count():
          patch.object(kb_question_generator, "KnowledgeBaseSource") as KBS, \
          patch.object(kb_question_generator, "KBTestQuery", side_effect=make_tq), \
          patch.object(KBQuestionGenerator, "_sample_chunks", return_value=sampled), \
-         patch.object(kb_question_generator, "_resolve_model_name", return_value="test-model"), \
+         patch.object(kb_question_generator, "get_user_model_name", new=AsyncMock(return_value="test-model")), \
          patch.object(kb_question_generator, "get_agent_model", return_value=MagicMock()), \
          patch("app.services.kb_question_generator.Agent", return_value=fake_agent):
         KB.find_one = AsyncMock(return_value=fake_kb)
@@ -300,7 +300,7 @@ async def test_generate_raises_when_no_model_configured():
     with patch.object(kb_question_generator, "KnowledgeBase") as KB, \
          patch.object(kb_question_generator, "KnowledgeBaseSource") as KBS, \
          patch.object(KBQuestionGenerator, "_sample_chunks", return_value=sampled), \
-         patch.object(kb_question_generator, "_resolve_model_name", return_value=""):
+         patch.object(kb_question_generator, "get_user_model_name", new=AsyncMock(return_value="")):
         KB.find_one = AsyncMock(return_value=fake_kb)
         find_call = MagicMock()
         find_call.to_list = AsyncMock(return_value=sources)

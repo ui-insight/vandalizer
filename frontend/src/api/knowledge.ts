@@ -62,10 +62,17 @@ export function transferKnowledgeBaseToTeam(uuid: string) {
   })
 }
 
-export function addDocumentsToKB(uuid: string, documentUuids: string[]) {
+export function addDocumentsToKB(uuid: string, documentUuids: string[], folderUuids?: string[]) {
   return apiFetch<{ ok: boolean; added: number }>(`/api/knowledge/${uuid}/add_documents`, {
     method: 'POST',
-    body: JSON.stringify({ document_uuids: documentUuids }),
+    body: JSON.stringify({ document_uuids: documentUuids, folder_uuids: folderUuids ?? [] }),
+  })
+}
+
+export function addFolderToKB(uuid: string, folderUuid: string, includeSubfolders = true) {
+  return apiFetch<{ ok: boolean; added: number }>(`/api/knowledge/${uuid}/add_folder`, {
+    method: 'POST',
+    body: JSON.stringify({ folder_uuid: folderUuid, include_subfolders: includeSubfolders }),
   })
 }
 
@@ -382,6 +389,56 @@ export function generateKBTestQueries(
   })
 }
 
+export function getKBTestQueryGenerationStatus(uuid: string, taskId: string) {
+  return apiFetch<{
+    status: string
+    created?: number
+    test_queries?: KBTestQuery[]
+    error?: string
+  }>(
+    `/api/knowledge/${uuid}/test-queries/generate/status?task_id=${encodeURIComponent(taskId)}`,
+  )
+}
+
+/**
+ * Generate test queries on a background worker and wait for the result.
+ *
+ * The inline generation path runs the LLM call inside the HTTP request, which
+ * can exceed the proxy's gateway timeout on larger KBs or slower models and
+ * surfaces as a 502 for the user. Dispatching to a Celery worker and polling
+ * the task status keeps the request short and avoids the gateway timeout.
+ */
+export async function generateKBTestQueriesAndWait(
+  uuid: string,
+  options: {
+    coverage?: 'quick' | 'standard' | 'exhaustive'
+    intervalMs?: number
+    timeoutMs?: number
+  } = {},
+): Promise<{ created: number; test_queries: KBTestQuery[] }> {
+  const { coverage, intervalMs = 3000, timeoutMs = 5 * 60 * 1000 } = options
+  const res = await generateKBTestQueries(uuid, { coverage, async: true })
+  // Small KBs may still run inline — use the returned set directly.
+  if ('test_queries' in res) {
+    return { created: res.created, test_queries: res.test_queries }
+  }
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    await new Promise(resolve => setTimeout(resolve, intervalMs))
+    const status = await getKBTestQueryGenerationStatus(uuid, res.task_id)
+    if (status.status === 'completed') {
+      return { created: status.created ?? 0, test_queries: status.test_queries ?? [] }
+    }
+    if (status.status === 'failed') {
+      throw new Error(status.error || 'Question generation failed.')
+    }
+  }
+  throw new Error(
+    'Generation is taking longer than expected — it will keep running in the ' +
+    'background. Check the Test Queries tab again shortly.',
+  )
+}
+
 // ---------------------------------------------------------------------------
 // KB Autovalidate (optimizer)
 // ---------------------------------------------------------------------------
@@ -545,6 +602,10 @@ export type KBOptimizationRun = {
   error_context?: Record<string, unknown> | null
   started_at: string | null
   completed_at: string | null
+  // Server-computed elapsed seconds (started_at → completed_at|now). Drives the
+  // live timer skew-free; the client ticks forward from this base. Optional so
+  // older payloads fall back to the started_at delta.
+  elapsed_seconds?: number | null
   cancel_requested: boolean
   // Apply/revert lifecycle (Phase 1 loop closure).
   previous_override?: OptimizationTrial['config'] | null

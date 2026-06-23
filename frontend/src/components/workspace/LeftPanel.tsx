@@ -5,9 +5,15 @@ import type { ContentMatch } from '../files/FileBrowser'
 import { DocumentViewer } from '../files/DocumentViewer'
 import { RawTextModal } from '../files/RawTextModal'
 import { VerificationNavBar } from '../files/VerificationNavBar'
+import { ItemPickerModal } from './ItemPickerModal'
+import { KBPickerModal } from '../files/KBPickerModal'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
+import { useToast } from '../../contexts/ToastContext'
 import { pollStatus, searchDocuments } from '../../api/documents'
 import { getVerificationSession } from '../../api/verificationSessions'
+import { runWorkflow } from '../../api/workflows'
+import { addDocumentsToKB } from '../../api/knowledge'
+import type { Folder } from '../../types/document'
 
 export function LeftPanel() {
   const {
@@ -15,8 +21,13 @@ export function LeftPanel() {
     highlightTerms, setHighlightTerms,
     setProcessingDoc, setSelectedDocsProcessing, viewDocumentRequest, clearViewDocumentRequest,
     verificationSession, setVerificationSession, setVerificationCompletion,
+    focusChat, openWorkflow,
     activeProjectRootFolder, activeProjectTitle, activeProjectTeamId,
   } = useWorkspace()
+  const { toast } = useToast()
+  // Folder targeted by the workflow / KB picker modals (null = closed).
+  const [workflowPickerFolder, setWorkflowPickerFolder] = useState<Folder | null>(null)
+  const [kbPickerFolder, setKbPickerFolder] = useState<Folder | null>(null)
   const [viewingDoc, setViewingDoc] = useState<{
     uuid: string
     title: string
@@ -55,6 +66,44 @@ export function LeftPanel() {
   const handleFolderSelectionChange = useCallback((uuids: string[]) => {
     if (!viewingDocRef.current) setSelectedFolderUuids(uuids)
   }, [setSelectedFolderUuids])
+
+  // "Ask about folder": scope the chat to just this folder, drop any
+  // doc-level selection, and pull focus into the composer so the user can
+  // immediately type a question. Backend chat already resolves folder_uuids.
+  const handleAskAboutFolder = useCallback((folder: { uuid: string }) => {
+    setSelectedDocUuids([])
+    setSelectedDocNames({})
+    setSelectedFolderUuids([folder.uuid])
+    focusChat()
+  }, [setSelectedDocUuids, setSelectedDocNames, setSelectedFolderUuids, focusChat])
+
+  // Pick a workflow, then run it over every document in the folder (batch:
+  // one run per document). Backend expands folder_uuids -> docs.
+  const handleWorkflowPicked = useCallback(async (workflowId: string) => {
+    const folder = workflowPickerFolder
+    setWorkflowPickerFolder(null)
+    if (!folder) return
+    try {
+      const { session_id } = await runWorkflow(workflowId, { folder_uuids: [folder.uuid], batch_mode: true })
+      openWorkflow(workflowId, session_id)
+      toast(`Started workflow on “${folder.title}”`, 'success')
+    } catch (err: unknown) {
+      toast(err instanceof Error ? err.message : 'Failed to run workflow', 'error')
+    }
+  }, [workflowPickerFolder, openWorkflow, toast])
+
+  // Pick (or create) a KB, then add the folder's documents to it.
+  const handleKBPicked = useCallback(async (kbUuid: string, kbTitle: string) => {
+    const folder = kbPickerFolder
+    setKbPickerFolder(null)
+    if (!folder) return
+    try {
+      const { added } = await addDocumentsToKB(kbUuid, [], [folder.uuid])
+      toast(`Added ${added} document${added === 1 ? '' : 's'} to “${kbTitle}”`, 'success')
+    } catch (err: unknown) {
+      toast(err instanceof Error ? err.message : 'Failed to add to knowledge base', 'error')
+    }
+  }, [kbPickerFolder, toast])
 
   const handleSelectionProcessingChange = useCallback(
     (docs: Array<{ uuid: string; title: string; status: string | null }>) => {
@@ -367,12 +416,31 @@ export function LeftPanel() {
             onDocNamesChange={handleDocNamesChange}
             onFolderSelectionChange={handleFolderSelectionChange}
             onSelectionProcessingChange={handleSelectionProcessingChange}
+            onAskAboutFolder={handleAskAboutFolder}
+            onRunWorkflowOnFolder={setWorkflowPickerFolder}
+            onAddFolderToKB={setKbPickerFolder}
           />
         </div>
       )}
 
       {showRawText && viewingDoc && (
         <RawTextModal docUuid={viewingDoc.uuid} onClose={() => setShowRawText(false)} />
+      )}
+
+      {workflowPickerFolder && (
+        <ItemPickerModal
+          kind="workflow"
+          onSelect={(id) => handleWorkflowPicked(id)}
+          onClose={() => setWorkflowPickerFolder(null)}
+        />
+      )}
+
+      {kbPickerFolder && (
+        <KBPickerModal
+          folderTitle={kbPickerFolder.title}
+          onSelect={handleKBPicked}
+          onClose={() => setKbPickerFolder(null)}
+        />
       )}
     </div>
   )

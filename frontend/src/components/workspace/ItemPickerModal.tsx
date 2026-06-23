@@ -14,8 +14,13 @@ interface PickerItem {
   qualityTier?: string | null
 }
 
+// 'extraction', 'prompt', and 'formatter' are all backed by SearchSet records
+// (distinguished by set_type); 'workflow' is a Workflow. The picker maps these
+// semantic kinds to the backend library kind and filters by set_type.
+type PickerKind = 'workflow' | 'extraction' | 'prompt' | 'formatter'
+
 interface Props {
-  kind: 'workflow' | 'extraction'
+  kind: PickerKind
   onSelect: (id: string, name: string) => void
   onClose: () => void
   currentId?: string
@@ -93,13 +98,23 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
           const lib = libraries.find(l => l.scope === targetScope)
           if (lib) {
             const filterKind = kind === 'workflow' ? 'workflow' : 'search_set'
-            const libItems = await listItems(lib.id, {
+            let libItems = await listItems(lib.id, {
               kind: filterKind,
               search: debouncedSearch || undefined,
             })
+            // All three SearchSet-backed kinds share the 'search_set' library
+            // kind, so narrow by set_type. Legacy sets with no set_type are
+            // treated as extractions.
+            if (kind !== 'workflow') {
+              libItems = libItems.filter(item =>
+                kind === 'extraction'
+                  ? (item.set_type === 'extraction' || item.set_type == null)
+                  : item.set_type === kind,
+              )
+            }
             result = libItems.map(item => ({
               // item_id is the Workflow _id; item_uuid is the SearchSet uuid
-              id: kind === 'extraction' ? (item.item_uuid || item.item_id) : item.item_id,
+              id: kind === 'workflow' ? item.item_id : (item.item_uuid || item.item_id),
               name: item.name,
               description: item.description,
               owner: scope as 'mine' | 'team',
@@ -124,12 +139,23 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
     return () => { cancelled = true }
   }, [scope, debouncedSearch, kind, libraries])
 
-  const kindLabel = kind === 'workflow' ? 'Workflow' : 'Extraction'
+  const kindLabel = kind === 'workflow' ? 'Workflow'
+    : kind === 'prompt' ? 'Prompt'
+    : kind === 'formatter' ? 'Formatter'
+    : 'Extraction'
+  const kindPlural = kind === 'workflow' ? 'workflows'
+    : kind === 'prompt' ? 'prompts'
+    : kind === 'formatter' ? 'formatters'
+    : 'extractions'
 
+  // The verified catalog has no set_type, so it can't distinguish prompts /
+  // formatters from extractions — only offer Explore for the kinds it serves.
   const SCOPE_TABS: { value: ScopeTab; label: string; icon: typeof Workflow }[] = [
     { value: 'mine', label: 'Mine', icon: FileText },
     { value: 'team', label: 'Team', icon: Users },
-    { value: 'explore', label: 'Explore', icon: Compass },
+    ...(kind === 'prompt' || kind === 'formatter'
+      ? []
+      : [{ value: 'explore' as const, label: 'Explore', icon: Compass }]),
   ]
 
   const tierColors: Record<string, { bg: string; text: string }> = {
@@ -192,7 +218,7 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
               ref={searchRef}
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder={`Search ${kind === 'workflow' ? 'workflows' : 'extractions'}...`}
+              placeholder={`Search ${kindPlural}...`}
               style={{
                 border: 'none', outline: 'none', flex: 1,
                 backgroundColor: 'transparent', fontSize: 14,
@@ -260,12 +286,12 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
               textAlign: 'center', padding: '40px 20px', color: '#9ca3af', fontSize: 13,
             }}>
               {debouncedSearch
-                ? `No ${kind === 'workflow' ? 'workflows' : 'extractions'} matching "${debouncedSearch}"`
+                ? `No ${kindPlural} matching "${debouncedSearch}"`
                 : scope === 'mine'
-                  ? `You haven't created any ${kind === 'workflow' ? 'workflows' : 'extractions'} yet.`
+                  ? `You haven't created any ${kindPlural} yet.`
                   : scope === 'team'
-                    ? `No team ${kind === 'workflow' ? 'workflows' : 'extractions'} found.`
-                    : `No verified ${kind === 'workflow' ? 'workflows' : 'extractions'} available.`
+                    ? `No team ${kindPlural} found.`
+                    : `No verified ${kindPlural} available.`
               }
             </div>
           ) : (

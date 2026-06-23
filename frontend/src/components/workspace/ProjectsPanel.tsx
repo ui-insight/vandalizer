@@ -8,8 +8,9 @@ import { ProjectsExplainer } from '../projects/ProjectsExplainer'
 
 /**
  * The Projects drawer — a slideout panel (like Automations/Knowledge) listing
- * the user's projects. Clicking one drops you into the scoped workspace; this
- * panel never hosts project tools, it just gets you into a project.
+ * the user's projects and the only project list in the app. Clicking one scopes
+ * the whole workspace (files, chat, …) to that project; managing/sharing/leaving
+ * happens in the in-workspace Manage panel opened from the project context bar.
  */
 export function ProjectsPanel() {
   const navigate = useNavigate()
@@ -17,11 +18,16 @@ export function ProjectsPanel() {
   const [newName, setNewName] = useState('')
   const [creating, setCreating] = useState(false)
 
-  const enter = (uuid: string) =>
+  // Scope the workspace to the project. The `?project=` param is consumed by
+  // WorkspaceContext, which activates the project scope and lands in chat.
+  // Switch the stored mode to chat *first* so the drawer doesn't linger via the
+  // localStorage fallback while the (async) project scope resolves.
+  const openProject = (uuid: string) => {
+    localStorage.setItem('workspace:mode', 'chat')
     navigate({
       to: '/',
       search: {
-        mode: 'files',
+        mode: undefined,
         tab: undefined,
         workflow: undefined,
         extraction: undefined,
@@ -31,6 +37,7 @@ export function ProjectsPanel() {
         workflow_share_token: undefined,
       },
     })
+  }
 
   const handleCreate = async () => {
     if (!newName.trim()) return
@@ -38,7 +45,7 @@ export function ProjectsPanel() {
     try {
       const project = await create(newName.trim())
       setNewName('')
-      enter(project.uuid)
+      openProject(project.uuid)
     } finally {
       setCreating(false)
     }
@@ -80,7 +87,7 @@ export function ProjectsPanel() {
             projects.map(p => (
               <button
                 key={p.uuid}
-                onClick={() => enter(p.uuid)}
+                onClick={() => openProject(p.uuid)}
                 className="flex w-full flex-col items-start rounded-lg border border-gray-200 bg-white p-3 text-left hover:border-highlight transition-colors"
               >
                 <div className="flex w-full items-center justify-between gap-2">

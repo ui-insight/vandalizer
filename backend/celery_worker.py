@@ -10,6 +10,8 @@ Usage:
 """
 
 from app.celery_app import celery_app  # noqa: F401
+from app.config import Settings
+from app.observability import init_sentry
 
 # Import all task modules so their @celery_app.task decorators register.
 
@@ -29,3 +31,11 @@ from app.tasks import classification_tasks  # noqa: F401  — tasks.document.cla
 from app.tasks import demo_tasks  # noqa: F401  — tasks.demo.*
 from app.tasks import approval_tasks  # noqa: F401  — tasks.approvals.*
 from app.tasks import catalog_tasks  # noqa: F401  — tasks.catalog.upgrade
+from app.tasks import engagement_tasks  # noqa: F401  — tasks.engagement.*
+from app.tasks import retention_tasks  # noqa: F401  — tasks.retention.*
+
+# Initialize Sentry in the worker process. Celery workers never import
+# app.main, so without this call task crashes are never reported. Task imports
+# above only register tasks (no execution), so init order relative to them is
+# irrelevant for runtime crash capture.
+init_sentry(Settings(), with_celery=True)

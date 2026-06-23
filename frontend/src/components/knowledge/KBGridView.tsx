@@ -1,7 +1,7 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import {
   ArrowUpDown, Loader2, BookOpen, ShieldCheck, Sparkles, Tag,
-  MessageSquare, Pencil, Trash2, Bookmark, BookmarkCheck,
+  MessageSquare, Pencil, Trash2, Bookmark, BookmarkCheck, Pin, PinOff,
 } from 'lucide-react'
 import { useScopedKnowledgeBases } from '../../hooks/useKnowledgeBases'
 import type { KBScope, KnowledgeBase } from '../../types/knowledge'
@@ -62,14 +62,19 @@ interface KBGridCardProps {
   onDelete?: (uuid: string) => void
   onAdopt?: (uuid: string) => void
   onRemoveRef?: (refUuid: string) => void
+  pinned?: boolean
+  onTogglePin?: (canonicalUuid: string) => void
 }
 
 function KBGridCard({
-  kb, allOrgs, onSelect, onChat, onEdit, onDelete, onAdopt, onRemoveRef,
+  kb, allOrgs, onSelect, onChat, onEdit, onDelete, onAdopt, onRemoveRef, pinned, onTogglePin,
 }: KBGridCardProps) {
   const badge = STATUS_BADGE[kb.status] || STATUS_BADGE.empty
   const isReady = kb.status === 'ready'
   const isReference = kb.is_reference
+  // The id a project pins is the canonical KB uuid — for a reference card that's
+  // the original it points at, matching what onChat uses.
+  const canonicalUuid = isReference ? (kb.source_kb_uuid || kb.uuid) : kb.uuid
 
   return (
     <button
@@ -99,6 +104,19 @@ function KBGridCard({
         }}>
           {kb.title}
         </span>
+        {onTogglePin && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onTogglePin(canonicalUuid) }}
+            title={pinned ? 'Unpin from this project' : 'Pin to this project'}
+            style={{
+              flexShrink: 0, display: 'flex', alignItems: 'center', padding: 2,
+              background: 'transparent', border: 'none', cursor: 'pointer',
+              color: pinned ? 'var(--highlight-color, #eab308)' : '#666',
+            }}
+          >
+            {pinned ? <Pin size={13} fill="currentColor" /> : <PinOff size={13} />}
+          </button>
+        )}
       </div>
 
       {/* AI Trust signal — the headline number for "is this KB worth using?". */}
@@ -302,6 +320,12 @@ interface KBGridViewProps {
   onRemoveRef?: (refUuid: string) => void
   emptyMessage?: string
   emptyComponent?: ReactNode
+  // Project scoping: when set, only KBs whose canonical uuid is in the set are
+  // shown. `onTogglePin` renders a pin toggle on each card (and is what flips
+  // membership of that set). Both are driven by the active project's pins.
+  filterUuids?: Set<string>
+  pinnedUuids?: Set<string>
+  onTogglePin?: (canonicalUuid: string) => void
 }
 
 export function KBGridView({
@@ -309,6 +333,7 @@ export function KBGridView({
   onSelect, onChat, onEdit, onDelete, onAdopt, onRemoveRef,
   emptyMessage = 'No knowledge bases found.',
   emptyComponent,
+  filterUuids, pinnedUuids, onTogglePin,
 }: KBGridViewProps) {
   const { knowledgeBases, loading } = useScopedKnowledgeBases({
     scope,
@@ -316,7 +341,14 @@ export function KBGridView({
   })
   const [sort, setSort] = useState<SortOption>('newest')
 
-  const sorted = useMemo(() => sortKBs(knowledgeBases, sort), [knowledgeBases, sort])
+  const canonical = (kb: KnowledgeBase) => (kb.is_reference ? (kb.source_kb_uuid || kb.uuid) : kb.uuid)
+
+  const scopedKBs = useMemo(
+    () => (filterUuids ? knowledgeBases.filter(kb => filterUuids.has(canonical(kb))) : knowledgeBases),
+    [knowledgeBases, filterUuids],
+  )
+
+  const sorted = useMemo(() => sortKBs(scopedKBs, sort), [scopedKBs, sort])
 
   if (loading) {
     return (
@@ -330,7 +362,7 @@ export function KBGridView({
     )
   }
 
-  if (knowledgeBases.length === 0) {
+  if (sorted.length === 0) {
     if (emptyComponent) return <>{emptyComponent}</>
     return (
       <div style={{ textAlign: 'center', padding: '60px 16px' }}>
@@ -376,6 +408,8 @@ export function KBGridView({
             onDelete={onDelete}
             onAdopt={onAdopt}
             onRemoveRef={onRemoveRef}
+            pinned={pinnedUuids?.has(kb.is_reference ? (kb.source_kb_uuid || kb.uuid) : kb.uuid)}
+            onTogglePin={onTogglePin}
           />
         ))}
       </div>

@@ -741,6 +741,7 @@ export function ExtractionEditorPanel() {
             onValidationComplete={refresh}
             onSaveConfig={saveConfig}
             portability={searchSet?.validation_portability ?? null}
+            canManage={searchSet?.can_manage !== false}
           />
         </div>
       )}
@@ -2489,6 +2490,7 @@ function ValidateTab({
   onUpdateItem,
   onValidationComplete,
   portability,
+  canManage = true,
 }: {
   searchSetUuid: string
   itemTitle?: string
@@ -2498,6 +2500,7 @@ function ValidateTab({
   onValidationComplete?: () => void
   onSaveConfig?: (config: ExtractionConfig) => Promise<void>
   portability?: { test_case_count: number; text_count: number; document_count: number; missing_snapshot_count: number } | null
+  canManage?: boolean
 }) {
   const { selectedDocUuids, viewDocument } = useWorkspace()
   const { toast } = useToast()
@@ -2784,7 +2787,7 @@ function ValidateTab({
           scoring surface. Apply writes the certified ValidationRun / quality tile. */}
       <ExtractionAutovalidatePanel
         searchSetUuid={searchSetUuid}
-        canManage={true}
+        canManage={canManage}
         onApplied={() => { onValidationComplete?.(); void reloadQualityHistory() }}
       />
 
@@ -3134,7 +3137,7 @@ function ValidateTab({
       {/* Cross-field rules — feed into the optimizer's fitness function */}
       <CrossFieldRulesSection
         searchSetUuid={searchSetUuid}
-        canManage={true}
+        canManage={canManage}
         fieldNames={items.map(i => i.searchphrase)}
       />
 
@@ -3458,7 +3461,7 @@ function ValidateTab({
           {/* Cross-Field rule outcomes — shows fails inline with "False alarm" mark-up */}
           <CrossFieldViolationsPanel
             searchSetUuid={searchSetUuid}
-            canManage={true}
+            canManage={canManage}
             summary={results.cross_field_summary}
             results={results.cross_field_results}
           />

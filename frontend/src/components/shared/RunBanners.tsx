@@ -71,11 +71,11 @@ const REMEDIATIONS: Record<string, { what: string; how: string }> = {
   },
   kb_empty: {
     what: "This KB doesn't have any indexed content yet.",
-    how: 'Add at least one document or URL to the KB, wait for it to finish processing, then re-run tuning.',
+    how: 'Add at least one document or URL to the KB, wait for it to finish processing, then run Validate & improve again.',
   },
   test_set_too_small: {
     what: "There aren't enough test questions to tune against.",
-    how: 'Open the Autovalidate wizard and add at least 5 questions with expected answers — auto-generation will fill in defaults if you skip this step.',
+    how: 'Open the Validate & improve wizard and add at least 5 questions with expected answers — auto-generation will fill in defaults if you skip this step.',
   },
   judge_unavailable: {
     what: 'No LLM judge model is configured for your account.',

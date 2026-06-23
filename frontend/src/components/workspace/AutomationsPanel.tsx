@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FolderSearch, Globe, Loader2, Mail, Plus, Search, X } from 'lucide-react'
+import { FolderKanban, FolderSearch, Globe, HelpCircle, Loader2, Mail, Pin, PinOff, Plus, Search, X } from 'lucide-react'
 import { AutomationsExplainer } from './AutomationsExplainer'
 import { AutomationCreationWizard } from './AutomationCreationWizard'
 import { useAutomations } from '../../hooks/useAutomations'
 import { useWorkflows } from '../../hooks/useWorkflows'
 import { useSearchSets } from '../../hooks/useExtractions'
+import { useProjectPins } from '../../hooks/useProjectPins'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { getFeatureFlags } from '../../api/config'
 import type { Automation, TriggerType } from '../../types/automation'
@@ -18,15 +19,23 @@ const TRIGGER_BADGES: Record<TriggerType, { label: string; color: string; bg: st
 type FilterMode = 'all' | 'folder_watch' | 'api' | 'm365_intake'
 
 export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?: Set<string> }) {
-  const { openAutomation, openAutomationId } = useWorkspace()
+  const { openAutomation, openAutomationId, activeProjectUuid, activeProjectTitle, activeProjectRole } = useWorkspace()
   const { automations, loading, refresh } = useAutomations()
   const { workflows } = useWorkflows()
   const { searchSets } = useSearchSets()
+  const projectPins = useProjectPins(activeProjectUuid)
 
   const [filter, setFilter] = useState<FilterMode>('all')
   const [search, setSearch] = useState('')
   const [showWizard, setShowWizard] = useState(false)
+  const [showExplainer, setShowExplainer] = useState(false)
   const [m365Enabled, setM365Enabled] = useState(false)
+  // When inside a project, default to showing only the automations pinned to it.
+  // The "Show all" toggle escapes the scope; reset to scoped when the project changes.
+  const [projectScoped, setProjectScoped] = useState(true)
+  useEffect(() => { setProjectScoped(true) }, [activeProjectUuid])
+
+  const canPin = !!activeProjectUuid && activeProjectRole !== 'viewer'
 
   useEffect(() => {
     getFeatureFlags().then(f => setM365Enabled(f.m365_enabled)).catch(() => {})
@@ -40,8 +49,18 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
     return () => window.removeEventListener('automations-updated', handler)
   }, [openAutomationId])
 
+  // The base list reflects the project scope: when scoped, only automations
+  // pinned to the active project. Everything below (counts, type filter, search)
+  // narrows this base, so the type-filter counts stay honest within the scope.
+  const isProjectScoped = !!activeProjectUuid && projectScoped
+  const base = useMemo(() => {
+    if (!isProjectScoped) return automations
+    const pinned = projectPins.idsByType('automation')
+    return automations.filter(a => pinned.has(a.id))
+  }, [automations, isProjectScoped, projectPins])
+
   const filtered = useMemo(() => {
-    let list = automations
+    let list = base
     if (filter !== 'all') list = list.filter(a => a.trigger_type === filter)
     if (search.trim()) {
       const q = search.toLowerCase()
@@ -51,14 +70,22 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
       )
     }
     return list
-  }, [automations, filter, search])
+  }, [base, filter, search])
 
   const counts = useMemo(() => ({
-    all: automations.length,
-    folder_watch: automations.filter(a => a.trigger_type === 'folder_watch').length,
-    api: automations.filter(a => a.trigger_type === 'api').length,
-    m365_intake: automations.filter(a => a.trigger_type === 'm365_intake').length,
-  }), [automations])
+    all: base.length,
+    folder_watch: base.filter(a => a.trigger_type === 'folder_watch').length,
+    api: base.filter(a => a.trigger_type === 'api').length,
+    m365_intake: base.filter(a => a.trigger_type === 'm365_intake').length,
+  }), [base])
+
+  const togglePin = async (e: React.MouseEvent, autoId: string) => {
+    e.stopPropagation()
+    try {
+      if (projectPins.isPinned('automation', autoId)) await projectPins.unpin('automation', autoId)
+      else await projectPins.pin('automation', autoId)
+    } catch { /* ignore — surfaced by absence of the pin toggling */ }
+  }
 
   const getActionName = (auto: Automation): string => {
     if (auto.action_type === 'workflow' && auto.action_id) {
@@ -95,7 +122,10 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
           position: 'relative',
         }}
       >
-        <span style={{ fontSize: 18, fontWeight: 600, color: '#fff' }}>Automations</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 18, fontWeight: 600, color: '#fff' }}>Automations</span>
+          <ExplainerPill label="What are automations?" onClick={() => setShowExplainer(true)} />
+        </div>
         <button
           onClick={() => setShowWizard(true)}
           style={{
@@ -118,8 +148,38 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
         </button>
       </div>
 
+      {/* Project scope bar — only inside a project. Lets you flip between the
+          automations pinned to this project and the whole workspace. */}
+      {activeProjectUuid && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '7px 12px',
+          backgroundColor: '#202020',
+          borderBottom: '1px solid #2f2f2f',
+          flexShrink: 0,
+        }}>
+          <FolderKanban size={13} style={{ color: 'var(--highlight-color, #eab308)', flexShrink: 0 }} />
+          <span style={{ fontSize: 12, color: '#aaa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {projectScoped
+              ? <>Pinned to <strong style={{ color: '#ddd' }}>{activeProjectTitle}</strong></>
+              : <>All automations</>}
+          </span>
+          <button
+            onClick={() => setProjectScoped(s => !s)}
+            style={{
+              marginLeft: 'auto', flexShrink: 0,
+              padding: '3px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+              color: '#ccc', backgroundColor: 'transparent',
+              border: '1px solid #3a3a3a', borderRadius: 12, cursor: 'pointer',
+            }}
+          >
+            {projectScoped ? 'Show all' : 'Show project only'}
+          </button>
+        </div>
+      )}
+
       {/* Filter bar */}
-      {automations.length > 0 && (
+      {base.length > 0 && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 6,
           padding: '8px 12px',
@@ -167,6 +227,22 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
           <div style={{ textAlign: 'center', padding: 40, color: '#888' }}>
             <Loader2 style={{ width: 20, height: 20, margin: '0 auto', animation: 'spin 1s linear infinite' }} />
           </div>
+        ) : base.length === 0 && isProjectScoped && automations.length > 0 ? (
+          <div style={{ textAlign: 'center', padding: 40, color: '#888', fontSize: 13 }}>
+            <FolderKanban size={28} style={{ color: '#444', margin: '0 auto 12px' }} />
+            <div style={{ color: '#bbb', fontWeight: 600, marginBottom: 4 }}>No automations pinned to this project</div>
+            <div style={{ marginBottom: 14 }}>Pin an automation to it from the list, or browse them all.</div>
+            <button
+              onClick={() => setProjectScoped(false)}
+              style={{
+                padding: '5px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                color: 'var(--highlight-text-color, #000)', backgroundColor: 'var(--highlight-color, #eab308)',
+                border: 'none', borderRadius: 6, cursor: 'pointer',
+              }}
+            >
+              Show all automations
+            </button>
+          </div>
         ) : automations.length === 0 ? (
           <AutomationsExplainer />
         ) : filtered.length === 0 ? (
@@ -212,6 +288,22 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
                     <span style={{ fontSize: 14, fontWeight: 600, color: '#e5e5e5', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {auto.name}
                     </span>
+                    {canPin && (() => {
+                      const pinned = projectPins.isPinned('automation', auto.id)
+                      return (
+                        <button
+                          onClick={(e) => togglePin(e, auto.id)}
+                          title={pinned ? 'Unpin from this project' : 'Pin to this project'}
+                          style={{
+                            flexShrink: 0, display: 'flex', alignItems: 'center',
+                            padding: 3, background: 'transparent', border: 'none', cursor: 'pointer',
+                            color: pinned ? 'var(--highlight-color, #eab308)' : '#666',
+                          }}
+                        >
+                          {pinned ? <Pin size={13} fill="currentColor" /> : <PinOff size={13} />}
+                        </button>
+                      )
+                    })()}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                     <span
@@ -259,14 +351,48 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
       {showWizard && (
         <AutomationCreationWizard
           onClose={() => setShowWizard(false)}
-          onCreate={id => {
+          onCreate={async id => {
             setShowWizard(false)
+            // Created from inside a project: auto-pin so it shows in the
+            // project's Automations tab (pins are the only project↔automation
+            // link). Pin before refresh so the scoped list includes it.
+            if (canPin) {
+              try {
+                await projectPins.pin('automation', id)
+              } catch (err) {
+                console.error('Failed to pin new automation to project:', err)
+              }
+            }
             refresh()
             openAutomation(id)
           }}
         />
       )}
+
+      {showExplainer && <AutomationsExplainer onClose={() => setShowExplainer(false)} />}
     </div>
+  )
+}
+
+// Small header chip that opens the feature explainer. Styled for the dark
+// panel header so it reads as a secondary affordance next to the title.
+export function ExplainerPill({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 5,
+        padding: '4px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+        color: '#999', backgroundColor: 'transparent',
+        border: '1px solid #3a3a3a', borderRadius: 999, cursor: 'pointer',
+        transition: 'all 0.15s', whiteSpace: 'nowrap',
+      }}
+      onMouseEnter={e => { e.currentTarget.style.color = '#ddd'; e.currentTarget.style.borderColor = '#555' }}
+      onMouseLeave={e => { e.currentTarget.style.color = '#999'; e.currentTarget.style.borderColor = '#3a3a3a' }}
+    >
+      <HelpCircle size={12} />
+      {label}
+    </button>
   )
 }
 

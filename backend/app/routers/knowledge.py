@@ -15,6 +15,7 @@ from app.models.kb_optimization_run import KBOptimizationRun
 from app.services import organization_service
 from app.schemas.knowledge import (
     AddDocumentsRequest,
+    AddFolderRequest,
     AddUrlsRequest,
     AdoptKBRequest,
     ConvertDocumentsRequest,
@@ -518,12 +519,62 @@ async def add_documents(uuid: str, req: AddDocumentsRequest, user: User = Depend
     )
     if not kb:
         raise HTTPException(status_code=404, detail="Knowledge base not found")
-    if not req.document_uuids:
+    document_uuids = list(req.document_uuids)
+    if req.folder_uuids:
+        from app.services import folder_service
+
+        try:
+            folder_docs = await folder_service.expand_folders_to_document_uuids(
+                req.folder_uuids, user
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        seen = set(document_uuids)
+        for doc_uuid in folder_docs:
+            if doc_uuid not in seen:
+                document_uuids.append(doc_uuid)
+                seen.add(doc_uuid)
+    if not document_uuids:
         raise HTTPException(status_code=400, detail="No documents provided")
     kb.status = "building"
     await kb.save()
     try:
-        added = await svc.add_documents(kb, req.document_uuids, user)
+        added = await svc.add_documents(kb, document_uuids, user)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return {"ok": True, "added": added}
+
+
+@router.post("/{uuid}/add_folder")
+async def add_folder(uuid: str, req: AddFolderRequest, user: User = Depends(get_current_user)):
+    """Add every document in a folder (and, by default, its subfolders) to a KB."""
+    from app.services import document_service
+
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(
+        uuid,
+        user,
+        manage=True,
+        user_org_ancestry=user_org_ancestry,
+        allow_admin=True,
+    )
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+
+    doc_uuids = await document_service.collect_folder_document_uuids(
+        folder_uuid=req.folder_uuid,
+        user=user,
+        include_subfolders=req.include_subfolders,
+    )
+    if doc_uuids is None:
+        raise HTTPException(status_code=404, detail="Folder not found")
+    if not doc_uuids:
+        return {"ok": True, "added": 0}
+
+    kb.status = "building"
+    await kb.save()
+    try:
+        added = await svc.add_documents(kb, doc_uuids, user)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     return {"ok": True, "added": added}
@@ -544,15 +595,20 @@ async def add_urls(request: Request, uuid: str, req: AddUrlsRequest, user: User 
         raise HTTPException(status_code=404, detail="Knowledge base not found")
     if not req.urls:
         raise HTTPException(status_code=400, detail="No URLs provided")
+    # Ingestion (fetch + optional crawl + embed) can run for minutes and would
+    # blow past the proxy read timeout if awaited inline — dispatch it to a
+    # worker and let the frontend poll source status. See tasks.kb.add_urls.
+    from app.tasks.kb_validation_tasks import add_urls_task
+
     kb.status = "building"
     await kb.save()
-    added = await svc.add_urls(
-        kb, req.urls,
+    add_urls_task.delay(
+        kb.uuid, req.urls,
         crawl_enabled=req.crawl_enabled,
         max_crawl_pages=req.max_crawl_pages,
         allowed_domains=req.allowed_domains,
     )
-    return {"ok": True, "added": added}
+    return {"ok": True, "added": len(req.urls)}
 
 
 @router.get("/{uuid}/source/{source_uuid}", response_model=KBSourceDetailResponse)
@@ -923,11 +979,90 @@ async def generate_test_queries(
             kb.uuid, user.user_id, coverage=coverage, persist=True,
         )
     except ValueError as e:
+        # Expected, actionable conditions (empty KB, no model configured,
+        # unparseable generator output) — surface the message to the user.
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        # Unexpected failure — most often a transient LLM/provider error on the
+        # inline generation call. Log with context so it's diagnosable, and
+        # return a clean 502 instead of an opaque 500 with no detail.
+        logger.exception(
+            "Test-query generation failed for KB %s (user=%s, coverage=%s): %s",
+            kb.uuid, user.user_id, coverage, e,
+        )
+        raise HTTPException(
+            status_code=502,
+            detail="Question generation failed (the language model call did not "
+            "complete). Please try again; if it persists, generate in the "
+            "background instead.",
+        )
     return {
         "created": len(created),
         "test_queries": [_serialize_test_query(q) for q in created],
     }
+
+
+@router.get("/{uuid}/test-queries/generate/status")
+async def test_query_generation_status(
+    uuid: str,
+    task_id: str,
+    user: User = Depends(get_current_user),
+):
+    """Poll an async test-query generation task (dispatched with async=true).
+
+    Returns ``{status}`` while the task is pending/running, ``{status:
+    "completed", created, test_queries}`` once the worker has persisted the
+    queries (serialized in generation order), or ``{status: "failed", error}``
+    if the task raised. Lets the frontend run generation off the request path —
+    the inline LLM call could exceed the proxy's gateway timeout and surface as
+    a 502 on larger KBs / slower models.
+    """
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await svc.get_knowledge_base(
+        uuid, user, manage=True, user_org_ancestry=user_org_ancestry, allow_admin=True,
+    )
+    if not kb:
+        raise HTTPException(status_code=404, detail="Knowledge base not found")
+
+    from celery.result import AsyncResult
+    from app.celery_app import celery
+
+    result = AsyncResult(task_id, app=celery)
+    if not result.ready():
+        return {"status": result.state}
+    if result.successful():
+        payload = result.result if isinstance(result.result, dict) else {}
+        uuids = payload.get("uuids", [])
+        from app.models.kb_test_query import KBTestQuery
+        rows = await KBTestQuery.find(
+            {"uuid": {"$in": uuids}, "knowledge_base_uuid": kb.uuid},
+        ).to_list()
+        # Preserve the generation order the task reported.
+        by_uuid = {q.uuid: q for q in rows}
+        ordered = [by_uuid[u] for u in uuids if u in by_uuid]
+        return {
+            "status": "completed",
+            "created": len(ordered),
+            "test_queries": [_serialize_test_query(q) for q in ordered],
+        }
+    # The task failed. Celery often can't reconstruct the original exception
+    # type across the result backend, so ``result.result`` is a generic whose
+    # str is an opaque class repr — never surface that raw. Log it for
+    # diagnosis and return a clean, actionable message instead.
+    err = result.result
+    raw = f"{type(err).__name__}: {err}" if isinstance(err, BaseException) else str(err)
+    logger.warning(
+        "Test-query generation task %s failed for KB %s: %s", task_id, kb.uuid, raw,
+    )
+    lowered = raw.lower()
+    if any(s in lowered for s in ("connection error", "modelapierror", "timed out", "timeout")):
+        message = (
+            "The language model was briefly unreachable, so question generation "
+            "didn't finish. Please try again in a moment."
+        )
+    else:
+        message = "Question generation failed. Please try again."
+    return {"status": "failed", "error": message}
 
 
 @router.patch("/{uuid}/test-queries/{query_uuid}")
@@ -1015,6 +1150,27 @@ def _iso_utc(dt):
     return dt.astimezone(_dt.timezone.utc).isoformat()
 
 
+def _elapsed_seconds(started_at, completed_at):
+    """Server-authoritative elapsed seconds for the live run timer.
+
+    Computed on the server so the readout can't be corrupted by client/server
+    clock skew. The elapsed counter previously did ``Date.now() - started_at``
+    in the browser, mixing the client wall clock with the server-set start
+    timestamp; on a drifted backend (e.g. a Docker VM that fell behind the host
+    after sleep) that made the counter jump by the full skew the moment polling
+    replaced the optimistic client-side seed. The frontend now ticks forward
+    from this base using client-clock *deltas* only.
+    """
+    if started_at is None:
+        return None
+    import datetime as _dt
+    start = started_at if started_at.tzinfo else started_at.replace(tzinfo=_dt.timezone.utc)
+    end = completed_at or _dt.datetime.now(tz=_dt.timezone.utc)
+    if end.tzinfo is None:
+        end = end.replace(tzinfo=_dt.timezone.utc)
+    return max(0, int((end - start).total_seconds()))
+
+
 def _serialize_optimization_run(run) -> dict:
     return {
         "uuid": run.uuid,
@@ -1057,6 +1213,7 @@ def _serialize_optimization_run(run) -> dict:
         "error_message": run.error_message,
         "started_at": _iso_utc(run.started_at),
         "completed_at": _iso_utc(run.completed_at),
+        "elapsed_seconds": _elapsed_seconds(run.started_at, run.completed_at),
         "cancel_requested": run.cancel_requested,
         "previous_override": getattr(run, "previous_override", None),
         "applied_at": _iso_utc(getattr(run, "applied_at", None)),
@@ -1067,6 +1224,7 @@ def _serialize_optimization_run(run) -> dict:
 
 
 @router.post("/{uuid}/optimize")
+@limiter.limit("5/minute")
 async def start_kb_optimization(uuid: str, request: Request, user: User = Depends(get_current_user)):
     """Kick off a KB Autovalidate optimization run.
 
@@ -1104,6 +1262,17 @@ async def start_kb_optimization(uuid: str, request: Request, user: User = Depend
     raw_uuids = body.get("test_query_uuids")
     test_query_uuids = (
         [str(u) for u in raw_uuids if u] if isinstance(raw_uuids, list) else []
+    )
+
+    # Cross-resource cost governance: per-user concurrency cap + audit trail.
+    from app.services import optimization_governance
+    await optimization_governance.enforce_and_record_start(
+        user,
+        resource_type="knowledge_base",
+        resource_id=kb.uuid,
+        resource_name=getattr(kb, "title", None),
+        team_id=getattr(kb, "team_id", None),
+        token_budget=token_budget,
     )
 
     from app.services.optimization_actions import OptimizationActionError, start_kb_optimization as _start

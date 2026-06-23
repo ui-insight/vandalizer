@@ -1,22 +1,18 @@
 """Celery periodic tasks for the demo waitlist system."""
 
-import asyncio
 import logging
 
 from app.celery_app import celery_app
-from app.tasks import TRANSIENT_EXCEPTIONS
+from app.tasks import TRANSIENT_EXCEPTIONS, run_task_async
 from app.config import Settings
 
 logger = logging.getLogger(__name__)
 
 
 def _run_async(coro):
-    """Run an async coroutine from sync Celery task context."""
-    loop = asyncio.new_event_loop()
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
+    """Run an async coroutine from sync Celery task context, releasing the
+    loop's pooled LLM HTTP client on teardown (see ``run_task_async``)."""
+    return run_task_async(coro)
 
 
 async def _init_and_process_waitlist():

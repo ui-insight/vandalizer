@@ -18,6 +18,9 @@ The project was developed at the University of Idaho under the NSF GRANTED progr
 - **Structured Extraction** - Pull dates, budgets, requirements, and more from PDFs into clean structured data
 - **Workflow Engine** - Chain extraction tasks into repeatable pipelines with dependency resolution
 - **RAG Chat** - Ask questions against your document collection with citation-backed answers
+- **Projects** - Gather the files, knowledge base, pinned tools, and chat for one grant or effort in a single scoped workspace, sharable to a team or via invite link
+- **Validate & Improve** - Score and automatically tune your extractions, workflows, and knowledge bases against a test set, with certified results
+- **Automations** - Run a workflow on every new upload, on a schedule, via API, or from Microsoft 365 intake
 - **Team Collaboration** - Multi-tenant workspaces with role-based access and shared libraries
 - **Custom Branding** - White-label the deployment with your institution's name, logo, icon, brand color, and branded email — set in the admin UI, applied at runtime with no redeploy
 - **Self-Hosted** - Run on your own infrastructure with full control over your data. A single server with 16 GB of RAM is sufficient; see the [Deployment Guide](DEPLOY.md) for details on local LLM/OCR hosting options for fully air-gapped installations.

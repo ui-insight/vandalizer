@@ -114,6 +114,7 @@ class TestStartOptimization:
             patch("app.routers.knowledge.organization_service.get_user_org_ancestry", new_callable=AsyncMock),
             patch("app.routers.knowledge.svc.get_knowledge_base", new_callable=AsyncMock, return_value=kb),
             patch("app.models.kb_optimization_run.KBOptimizationRun") as MockRun,
+            patch("app.services.optimization_governance.enforce_and_record_start", new=AsyncMock()),
             patch("app.tasks.kb_validation_tasks.optimize_kb_task", fake_task),
         ):
             MockUser.find_one = AsyncMock(return_value=user)

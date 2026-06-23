@@ -17,18 +17,12 @@ from app.tasks import TRANSIENT_EXCEPTIONS, get_sync_db
 logger = logging.getLogger(__name__)
 
 
-def _ingest_into_project_kb(db, dm, doc: dict, text: str) -> None:
-    """Best-effort: add a freshly-ingested document to its Project's implicit KB.
-
-    Walks the document's folder ancestry to find the owning project, then mirrors
-    the chunks into the project's KB collection (the same path KBs use) so
-    "chat with this project" sees the file. Sync — runs inside the Celery task.
-    """
-    folder_uuid = doc.get("folder")
+def _find_project_for_folder(db, folder_uuid: str | None) -> dict | None:
+    """Walk a folder's ancestry and return the Project that owns its root, if any."""
     if not folder_uuid or folder_uuid == "0":
-        return
+        return None
 
-    # Collect the doc's folder plus every ancestor up to the root.
+    # Collect the folder plus every ancestor up to the root.
     ancestors: list[str] = []
     cursor = folder_uuid
     seen: set[str] = set()
@@ -40,7 +34,17 @@ def _ingest_into_project_kb(db, dm, doc: dict, text: str) -> None:
             break
         cursor = folder.get("parent_id")
 
-    project = db.project.find_one({"root_folder_uuid": {"$in": ancestors}})
+    return db.project.find_one({"root_folder_uuid": {"$in": ancestors}})
+
+
+def _ingest_into_project_kb(db, dm, doc: dict, text: str) -> None:
+    """Best-effort: add a freshly-ingested document to its Project's implicit KB.
+
+    Walks the document's folder ancestry to find the owning project, then mirrors
+    the chunks into the project's KB collection (the same path KBs use) so
+    "chat with this project" sees the file. Sync — runs inside the Celery task.
+    """
+    project = _find_project_for_folder(db, doc.get("folder"))
     if not project or not project.get("kb_uuid"):
         return
 
@@ -95,6 +99,155 @@ def _ingest_into_project_kb(db, dm, doc: dict, text: str) -> None:
         "Added document %s to project %s implicit KB (%d chunks)",
         doc_uuid, project.get("uuid"), chunk_count,
     )
+
+
+def _remove_from_project_kb(db, dm, doc: dict, project: dict) -> None:
+    """Best-effort: drop a document's chunks from a Project's implicit KB.
+
+    Used when a document is moved out of (or to a different) project so the old
+    project's chat stops surfacing it. Sync — runs inside the Celery task.
+    """
+    kb_uuid = project.get("kb_uuid")
+    if not kb_uuid:
+        return
+    doc_uuid = doc["uuid"]
+    src = db.knowledge_base_sources.find_one(
+        {"knowledge_base_uuid": kb_uuid, "document_uuid": doc_uuid}
+    )
+    if not src:
+        return
+
+    dm.delete_kb_source(kb_uuid, doc_uuid)
+    db.knowledge_base_sources.delete_one({"_id": src["_id"]})
+
+    chunk_count = src.get("chunk_count") or 0
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    db.knowledge_bases.update_one(
+        {"uuid": kb_uuid},
+        {
+            "$inc": {
+                "total_sources": -1,
+                "sources_ready": -1,
+                "total_chunks": -chunk_count,
+            },
+            "$set": {"updated_at": now},
+        },
+    )
+    logger.info(
+        "Removed document %s from project %s implicit KB",
+        doc_uuid, project.get("uuid"),
+    )
+
+
+@celery_app.task(bind=True, name="tasks.document.sync_project_kb")
+def sync_project_kb_on_move(self, document_uuid: str, old_folder_uuid: str | None) -> str:
+    """Re-sync a document's project-KB membership after it is moved between folders.
+
+    Moving a file into a project's folder tree must add it to that project's
+    implicit KB (otherwise "chat with this project" can't see it and answers from
+    the model's own knowledge); moving it out must remove it. Best-effort — never
+    raises into the move flow.
+    """
+    db = get_sync_db()
+    doc = db.smart_document.find_one({"uuid": document_uuid})
+    if not doc:
+        return ""
+
+    from app.config import Settings
+    from app.services.document_manager import DocumentManager
+
+    settings = Settings()
+    dm = DocumentManager(persist_directory=settings.chromadb_persist_dir)
+
+    new_project = _find_project_for_folder(db, doc.get("folder"))
+    old_project = _find_project_for_folder(db, old_folder_uuid)
+
+    # Remove from the old project's KB if the project changed.
+    if old_project and (
+        not new_project or old_project.get("uuid") != new_project.get("uuid")
+    ):
+        try:
+            _remove_from_project_kb(db, dm, doc, old_project)
+        except Exception:
+            logger.exception(
+                "Failed to remove %s from old project KB on move", document_uuid
+            )
+
+    # Add to the new project's KB. _ingest_into_project_kb dedupes, so a no-op
+    # move (same project) is harmless. Requires extracted text — a doc still being
+    # processed will be mirrored by perform_semantic_ingestion when it finishes.
+    if new_project:
+        text = doc.get("raw_text", "") or ""
+        if text:
+            try:
+                _ingest_into_project_kb(db, dm, doc, text)
+            except Exception:
+                logger.exception(
+                    "Failed to add %s to new project KB on move", document_uuid
+                )
+
+    return document_uuid
+
+
+@celery_app.task(bind=True, name="tasks.document.sync_project_kb_folder")
+def sync_project_kb_on_folder_move(self, folder_uuid: str, old_parent_id: str | None) -> int:
+    """Re-sync project-KB membership for every document under a moved folder.
+
+    Moving a folder subtree into/out of a project changes the owning project for
+    all of its descendant documents at once. Mirror each one into the new
+    project's implicit KB and drop it from the old one. Best-effort.
+    """
+    db = get_sync_db()
+
+    new_project = _find_project_for_folder(db, folder_uuid)
+    old_project = _find_project_for_folder(db, old_parent_id)
+    new_uuid = new_project.get("uuid") if new_project else None
+    old_uuid = old_project.get("uuid") if old_project else None
+    if new_uuid == old_uuid:
+        return 0  # subtree stayed within the same project (or no project either side)
+
+    # Collect the moved folder plus every descendant folder.
+    folder_uuids = [folder_uuid]
+    frontier = [folder_uuid]
+    while frontier:
+        children = list(
+            db.smart_folder.find({"parent_id": {"$in": frontier}}, {"uuid": 1})
+        )
+        frontier = [c["uuid"] for c in children]
+        folder_uuids.extend(frontier)
+
+    from app.config import Settings
+    from app.services.document_manager import DocumentManager
+
+    settings = Settings()
+    dm = DocumentManager(persist_directory=settings.chromadb_persist_dir)
+
+    synced = 0
+    for doc in db.smart_document.find({"folder": {"$in": folder_uuids}}):
+        if old_project:
+            try:
+                _remove_from_project_kb(db, dm, doc, old_project)
+            except Exception:
+                logger.exception(
+                    "Failed to remove %s from old project KB on folder move",
+                    doc.get("uuid"),
+                )
+        if new_project:
+            text = doc.get("raw_text", "") or ""
+            if text:
+                try:
+                    _ingest_into_project_kb(db, dm, doc, text)
+                    synced += 1
+                except Exception:
+                    logger.exception(
+                        "Failed to add %s to new project KB on folder move",
+                        doc.get("uuid"),
+                    )
+    logger.info(
+        "Folder move %s re-synced %d document(s) into project %s",
+        folder_uuid, synced, new_uuid,
+    )
+    return synced
 
 
 def _remove_images_from_markdown(markdown_text: str) -> str:

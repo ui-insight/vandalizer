@@ -6,6 +6,7 @@ import { LeftPanel } from './LeftPanel'
 import { RightPanel } from './RightPanel'
 import { UtilityBar } from './UtilityBar'
 import { ProjectContextBar } from './ProjectContextBar'
+import { ProjectManageModal } from './ProjectManageModal'
 import { ProjectsPanel } from './ProjectsPanel'
 import { AutomationsPanel } from './AutomationsPanel'
 import { KnowledgePanel } from './KnowledgePanel'
@@ -16,10 +17,11 @@ import type { AutomationStarted } from '../../hooks/useAutomationActivity'
 import type { CompletedAutomation } from '../../api/automations'
 
 export function WorkspaceLayout() {
-  const { railDocked, panelSplit, workspaceMode, viewDocument, setWorkspaceMode } = useWorkspace()
+  const { railDocked, panelSplit, workspaceMode, viewDocument, setWorkspaceMode, activeProjectUuid } = useWorkspace()
   const { toast } = useToast()
   const containerRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
+  const [manageOpen, setManageOpen] = useState(false)
 
   const handleAutomationStarted = useCallback((info: AutomationStarted) => {
     toast(`${info.name} started`, 'info')
@@ -49,16 +51,19 @@ export function WorkspaceLayout() {
 
   const railWidth = railDocked ? 64 : 220
 
-  const isChat = workspaceMode === 'chat'
+  // Once a project is scoped, the workspace shows that project (chat/files/…) —
+  // the Projects drawer (the picker) must not linger underneath it.
+  const isProjects = workspaceMode === 'projects' && !activeProjectUuid
+  const isChat = workspaceMode === 'chat' || (workspaceMode === 'projects' && !!activeProjectUuid)
   const isAutomations = workspaceMode === 'automations'
   const isKnowledge = workspaceMode === 'knowledge'
-  const isProjects = workspaceMode === 'projects'
 
   // Layout: [UtilityBar 48px] [Content per mode] [ActivityRail(right)]
   return (
     <div className="flex h-screen flex-col">
       <Header />
-      <ProjectContextBar />
+      <ProjectContextBar onOpenManage={() => setManageOpen(true)} />
+      <ProjectManageModal open={manageOpen} onClose={() => setManageOpen(false)} />
       <div className="flex flex-1 overflow-hidden">
         <UtilityBar hasActiveAutomation={automationActivity.hasActive} />
         <div

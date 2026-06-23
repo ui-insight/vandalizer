@@ -1106,6 +1106,20 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
     document_uuids = await _authorize_documents(req.document_uuids, user)
+    if req.folder_uuids:
+        from app.services import folder_service
+
+        try:
+            folder_docs = await folder_service.expand_folders_to_document_uuids(
+                req.folder_uuids, user
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=404, detail=str(e))
+        seen = set(document_uuids)
+        for doc_uuid in folder_docs:
+            if doc_uuid not in seen:
+                document_uuids.append(doc_uuid)
+                seen.add(doc_uuid)
     initial_title = wf.name if wf else "Workflow Run"
     # steps count excludes the trigger step
     num_steps = max(0, len(wf.steps) - 1) if wf and wf.steps else 0
@@ -1692,6 +1706,27 @@ def _iso_utc(dt):
     return dt.astimezone(_dt.timezone.utc).isoformat()
 
 
+def _elapsed_seconds(started_at, completed_at):
+    """Server-authoritative elapsed seconds for the live run timer.
+
+    Computed on the server so the readout can't be corrupted by client/server
+    clock skew. The elapsed counter previously did ``Date.now() - started_at``
+    in the browser, mixing the client wall clock with the server-set start
+    timestamp; on a drifted backend (e.g. a Docker VM that fell behind the host
+    after sleep) that made the counter jump by the full skew the moment polling
+    replaced the optimistic client-side seed. The frontend now ticks forward
+    from this base using client-clock *deltas* only.
+    """
+    if started_at is None:
+        return None
+    import datetime as _dt
+    start = started_at if started_at.tzinfo else started_at.replace(tzinfo=_dt.timezone.utc)
+    end = completed_at or _dt.datetime.now(tz=_dt.timezone.utc)
+    if end.tzinfo is None:
+        end = end.replace(tzinfo=_dt.timezone.utc)
+    return max(0, int((end - start).total_seconds()))
+
+
 def _serialize_workflow_optimization_run(run) -> dict:
     return {
         "uuid": run.uuid,
@@ -1725,6 +1760,7 @@ def _serialize_workflow_optimization_run(run) -> dict:
         "error_message": run.error_message,
         "started_at": _iso_utc(run.started_at),
         "completed_at": _iso_utc(run.completed_at),
+        "elapsed_seconds": _elapsed_seconds(run.started_at, run.completed_at),
         "cancel_requested": run.cancel_requested,
     }
 
@@ -1750,6 +1786,7 @@ def _summarise_workflow_optimization_run(run) -> dict:
 
 
 @router.post("/{workflow_id}/optimize")
+@limiter.limit("5/minute")
 async def start_workflow_optimization(
     workflow_id: str, request: Request, user: User = Depends(get_current_user),
 ):
@@ -1780,6 +1817,17 @@ async def start_workflow_optimization(
         max_candidates = int(body.get("max_candidates", 10))
     except (TypeError, ValueError):
         raise HTTPException(status_code=400, detail="max_candidates must be an integer")
+
+    # Cross-resource cost governance: per-user concurrency cap + audit trail.
+    from app.services import optimization_governance
+    await optimization_governance.enforce_and_record_start(
+        user,
+        resource_type="workflow",
+        resource_id=workflow_id,
+        resource_name=getattr(wf, "name", None),
+        team_id=getattr(wf, "team_id", None),
+        token_budget=token_budget,
+    )
 
     from app.services.optimization_actions import (
         OptimizationActionError,

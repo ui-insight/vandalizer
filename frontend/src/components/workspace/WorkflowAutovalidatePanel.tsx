@@ -47,10 +47,15 @@ import { WhenToRunDisclosure } from '../shared/WhenToRunDisclosure'
 
 export function WorkflowAutovalidatePanel({
   workflowId,
+  canManage = true,
   testDataSummary,
   onOpenTestData,
 }: {
   workflowId: string
+  /** Whether the current user can manage this workflow. Gates the
+   * "Validate & improve" button so view-only users don't hit a backend 403.
+   * Defaults to true so existing call sites keep working. */
+  canManage?: boolean
   /** Counts shown under the description so users can see what the run will
    * score against without expanding the setup section. */
   testDataSummary?: { inputs: number; expectedOutputs: number; checks: number }
@@ -247,13 +252,16 @@ export function WorkflowAutovalidatePanel({
           <button
             type="button"
             onClick={() => setShowWizard(true)}
+            disabled={!canManage}
+            title={canManage ? '' : 'You cannot manage this workflow'}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
               padding: '8px 14px', borderRadius: 6,
-              background: 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)',
-              color: '#fff',
-              border: '1px solid #7c3aed',
-              fontSize: 13, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer',
+              background: canManage ? 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)' : '#222',
+              color: canManage ? '#fff' : '#555',
+              border: '1px solid ' + (canManage ? '#7c3aed' : '#333'),
+              fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+              cursor: canManage ? 'pointer' : 'not-allowed',
             }}
           >
             <Sparkles size={14} />
@@ -292,7 +300,7 @@ export function WorkflowAutovalidatePanel({
 
       {isIdle && run && run.status === 'failed' && (
         <div style={{ marginTop: 12, color: '#fca5a5', fontSize: 13 }}>
-          Tuning failed: {run.error_message || 'unknown error'}
+          Optimization failed: {run.error_message || 'unknown error'}
         </div>
       )}
 
@@ -410,7 +418,7 @@ function CompletedView({
         defaultBaselineId="default"
         optimizedBaselineId="optimized"
         secondaryBaselineId="no-workflow"
-        title="Tuning complete"
+        title="Optimization complete"
       />
 
       {run.step_breakdown.length > 0 && (
@@ -607,6 +615,7 @@ function runForProgress(
     })),
     cancel_requested: run.cancel_requested,
     started_at: run.started_at,
+    elapsed_seconds: run.elapsed_seconds,
   }
 }
 

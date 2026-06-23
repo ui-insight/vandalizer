@@ -24,7 +24,7 @@ import {
   getValidationInputs, updateValidationInputs,
   proposeTestCases, synthesizeTestCase, acceptTestCases,
   getExpectedOutputs, deleteExpectedOutput,
-  exportWorkflowUrl, importIntoWorkflow, getWorkflowHistory, duplicateWorkflow,
+  exportWorkflowUrl, importIntoWorkflow, getWorkflowHistory, getWorkflowStatus, duplicateWorkflow,
   improvePrompt,
 } from '../../api/workflows'
 import { RunHistoryTab } from './RunHistoryTab'
@@ -42,7 +42,7 @@ import { uploadFile } from '../../api/files'
 import { listKnowledgeBases } from '../../api/knowledge'
 import { listAllFolders } from '../../api/folders'
 import type { KnowledgeBase } from '../../types/knowledge'
-import { listItems as listSearchSetItems, suggestFields } from '../../api/extractions'
+import { listItems as listSearchSetItems, suggestFields, getSearchSet } from '../../api/extractions'
 import { useWorkflowRunner } from '../../hooks/useWorkflowRunner'
 import { ApiError } from '../../api/client'
 import { MAX_NAME_LENGTH, normalizeName } from '../../utils/nameValidation'
@@ -174,12 +174,14 @@ const TEST_MESSAGES = [
 
 // Task types where Test Step is meaningful and safe. Excludes:
 //   - Approval: backend test handler doesn't support it
-//   - APINode, BrowserAutomation, CodeNode: real side effects make "test" misleading
+//   - BrowserAutomation, CodeNode: real side effects make "test" misleading
 // KnowledgeBaseQuery is read-only (a vector lookup), so it is safe to test.
+// APINode is included because issuing the configured request is exactly what
+// users need to test/debug — the tooltip already warns of real network calls.
 const TEST_STEP_SUPPORTED_TYPES = new Set([
   'Extraction', 'Prompt', 'Formatter', 'Format', 'AddWebsite', 'AddDocument',
   'DescribeImage', 'CrawlerNode', 'ResearchNode', 'DocumentRenderer',
-  'FormFiller', 'DataExport', 'PackageBuilder', 'KnowledgeBaseQuery',
+  'FormFiller', 'DataExport', 'PackageBuilder', 'KnowledgeBaseQuery', 'APINode',
 ])
 
 const TEST_STEP_TOOLTIP = [
@@ -229,6 +231,10 @@ export function WorkflowEditorPanel() {
   const [qualityStatus, setQualityStatus] = useState<WorkflowQualityStatus | null>(null)
   const { scores: sparklineScores, refresh: refreshSparkline } = useQualitySparkline('workflow', openWorkflowId ?? undefined)
   const [nudgeDismissed, setNudgeDismissed] = useState(false)
+  // Per-step output from the most recent run, fetched lazily so a step's last
+  // output is viewable even on a fresh editor open (no run started this session).
+  const [lastRunStepsOutput, setLastRunStepsOutput] = useState<Record<string, unknown> | null>(null)
+  const [lastRunMeta, setLastRunMeta] = useState<{ finishedAt: string | null; status: string } | null>(null)
   const runTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const titleInputRef = useRef<HTMLInputElement>(null)
   const descInputRef = useRef<HTMLTextAreaElement>(null)
@@ -252,6 +258,15 @@ export function WorkflowEditorPanel() {
   const editingStep = editingStepId
     ? workflow?.steps.find(s => s.id === editingStepId) ?? null
     : null
+
+  // Per-step output to show in the step editor: prefer a run started this session
+  // (freshest); otherwise fall back to the lazily-fetched most-recent run.
+  const liveStepsOutput = (runner.status?.steps_output ?? null) as Record<string, unknown> | null
+  const hasLiveStepsOutput = !!liveStepsOutput && Object.keys(liveStepsOutput).length > 0
+  const effectiveStepsOutput = hasLiveStepsOutput ? liveStepsOutput : lastRunStepsOutput
+  const effectiveRunMeta = hasLiveStepsOutput
+    ? { finishedAt: null, status: runner.status?.status ?? 'running' }
+    : lastRunMeta
 
   // --- data fetching ---
 
@@ -286,6 +301,35 @@ export function WorkflowEditorPanel() {
     getWorkflowQualityStatus(openWorkflowId).then(setQualityStatus).catch(() => {})
     const key = `quality-nudge-dismissed-wf-${openWorkflowId}`
     setNudgeDismissed(!!localStorage.getItem(key))
+  }, [openWorkflowId])
+
+  // Fetch the most recent run's per-step output so the step editor can show what
+  // each step last produced without re-running. The live runner status (a run
+  // started this session) is preferred over this when present.
+  useEffect(() => {
+    if (!openWorkflowId) {
+      setLastRunStepsOutput(null)
+      setLastRunMeta(null)
+      return
+    }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { runs } = await getWorkflowHistory(openWorkflowId, 1)
+        const latest = runs.find(r => r.session_id)
+        if (!latest?.session_id) {
+          if (!cancelled) { setLastRunStepsOutput(null); setLastRunMeta(null) }
+          return
+        }
+        const status = await getWorkflowStatus(latest.session_id)
+        if (cancelled) return
+        setLastRunStepsOutput((status.steps_output ?? null) as Record<string, unknown> | null)
+        setLastRunMeta({ finishedAt: latest.finished_at, status: latest.status })
+      } catch {
+        if (!cancelled) { setLastRunStepsOutput(null); setLastRunMeta(null) }
+      }
+    })()
+    return () => { cancelled = true }
   }, [openWorkflowId])
 
   // --- run elapsed timer ---
@@ -1041,6 +1085,8 @@ export function WorkflowEditorPanel() {
           onSelectTaskType={handleAddTask}
           onCloseTaskPicker={() => setShowTaskPicker(false)}
           canManage={canManage}
+          stepsOutput={effectiveStepsOutput}
+          lastRunMeta={effectiveRunMeta}
         />
       )}
 
@@ -1466,6 +1512,113 @@ function StepCard({ step, index, totalSteps, isImplicitOutput, isActive, onClick
 }
 
 // ---------------------------------------------------------------------------
+// Read-only "last run output" for a single step
+// ---------------------------------------------------------------------------
+
+// Mirror of backend sanitize_step_name (workflow_engine.py) — steps_output keys
+// are sanitized step names.
+function sanitizeStepName(name: string): string {
+  const s = name
+    .replace(/[.$]/g, '_')
+    .trim()
+    .replace(/^_+|_+$/g, '')
+    .replace(/\s+/g, '_')
+    .replace(/_+/g, '_')
+  return s || 'step'
+}
+
+function StepLastRunOutput({ step, stepsOutput, lastRunMeta }: {
+  step: WorkflowStep
+  stepsOutput?: Record<string, unknown> | null
+  lastRunMeta?: { finishedAt: string | null; status: string } | null
+}) {
+  const [expanded, setExpanded] = useState(true)
+
+  // Find this step's entry: match on the original step_name stored in the
+  // payload, falling back to the sanitized key used in steps_output.
+  let entry: Record<string, unknown> | null = null
+  if (stepsOutput) {
+    for (const val of Object.values(stepsOutput)) {
+      if (val && typeof val === 'object' && (val as Record<string, unknown>).step_name === step.name) {
+        entry = val as Record<string, unknown>
+        break
+      }
+    }
+    if (!entry) {
+      const byKey = stepsOutput[sanitizeStepName(step.name)]
+      if (byKey && typeof byKey === 'object') entry = byKey as Record<string, unknown>
+    }
+  }
+
+  // The combined/aggregated value across this step's parallel tasks
+  // (mirror backend _step_output_value: formatted_output || output).
+  const value = entry ? (entry.formatted_output ?? entry.output) : undefined
+  const warning = entry && typeof entry.warning === 'string' ? (entry.warning as string) : null
+  const hasValue = value !== undefined && value !== null && value !== ''
+  const taskCount = step.tasks.length
+
+  return (
+    <div style={{ marginTop: 24 }}>
+      <div
+        onClick={() => setExpanded(e => !e)}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer',
+          fontSize: 12, fontWeight: 600, color: '#6b7280',
+          textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 12,
+        }}
+      >
+        {expanded ? <ChevronDown style={{ width: 14, height: 14 }} /> : <ChevronRight style={{ width: 14, height: 14 }} />}
+        Last run output
+      </div>
+
+      {expanded && (
+        <div style={{
+          border: '1px solid #e5e7eb', borderRadius: 8, padding: 16, backgroundColor: '#fafafa',
+        }}>
+          {/* Caption */}
+          <div style={{ fontSize: 12, color: '#6b7280', marginBottom: hasValue || warning ? 12 : 0 }}>
+            Combined output{taskCount > 0 ? ` · ${taskCount} task${taskCount !== 1 ? 's' : ''}` : ''}
+            {lastRunMeta?.finishedAt && <> · from last run {relativeTime(lastRunMeta.finishedAt)}</>}
+          </div>
+
+          {warning && (
+            <div style={{
+              fontSize: 12, color: '#92400e', backgroundColor: '#fffbeb',
+              border: '1px solid #fde68a', borderRadius: 6, padding: '8px 10px', marginBottom: 12,
+            }}>
+              {warning}
+            </div>
+          )}
+
+          {hasValue ? (
+            typeof value === 'string' ? (
+              <div
+                style={{ fontSize: 13, color: '#202124', lineHeight: 1.6, wordBreak: 'break-word' }}
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(value) as string) }}
+              />
+            ) : (
+              <pre style={{
+                margin: 0, fontSize: 12, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                color: '#202124', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                maxHeight: 320, overflowY: 'auto',
+              }}>
+                {JSON.stringify(value, null, 2)}
+              </pre>
+            )
+          ) : (
+            <div style={{ fontSize: 13, color: '#9ca3af' }}>
+              {stepsOutput
+                ? 'This step produced no output on the last run.'
+                : "This step hasn't produced output yet. Run the workflow to see its last output here."}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Edit step overlay (with inline step name editing)
 // ---------------------------------------------------------------------------
 
@@ -1474,7 +1627,7 @@ function EditStepOverlay({
   onStepNameSave, onToggleOutput,
   showTaskPicker, taskPickerCategory, setTaskPickerCategory,
   onSelectTaskType, onCloseTaskPicker,
-  canManage,
+  canManage, stepsOutput, lastRunMeta,
 }: {
   step: WorkflowStep
   onClose: () => void
@@ -1490,6 +1643,8 @@ function EditStepOverlay({
   onSelectTaskType: (type: TaskTypeDef) => void
   onCloseTaskPicker: () => void
   canManage: boolean
+  stepsOutput?: Record<string, unknown> | null
+  lastRunMeta?: { finishedAt: string | null; status: string } | null
 }) {
   const [editingName, setEditingName] = useState(false)
   const [nameValue, setNameValue] = useState(step.name)
@@ -1663,6 +1818,9 @@ function EditStepOverlay({
             </div>
           )}
         </div>
+
+        {/* Read-only output this step produced on the most recent run */}
+        <StepLastRunOutput step={step} stepsOutput={stepsOutput} lastRunMeta={lastRunMeta} />
       </div>
 
       {/* Bottom toolbar */}
@@ -2212,6 +2370,47 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
     return () => { cancelled = true }
   }, [task.name, linkedSearchSetUuid])
 
+  // Saved Prompt / Formatter pickers. Prompt and Formatter steps can link a
+  // standalone Library prompt/formatter (a SearchSet with set_type
+  // 'prompt'/'formatter'); the body is resolved at runtime so edits to the
+  // saved item propagate to every workflow that links it.
+  const [showPromptPicker, setShowPromptPicker] = useState(false)
+  const [showFormatterPicker, setShowFormatterPicker] = useState(false)
+  const savedPromptUuid = (taskData.saved_prompt_uuid as string | undefined) || null
+  const savedFormatterUuid = (taskData.saved_formatter_uuid as string | undefined) || null
+  const linkedSavedUuid = task.name === 'Prompt' ? savedPromptUuid
+    : (task.name === 'Formatter' || task.name === 'Format') ? savedFormatterUuid
+    : null
+  const [linkedSavedBody, setLinkedSavedBody] = useState('')
+  const [linkedSavedLoading, setLinkedSavedLoading] = useState(false)
+  useEffect(() => {
+    if (!linkedSavedUuid) { setLinkedSavedBody(''); return }
+    let cancelled = false
+    setLinkedSavedLoading(true)
+    // Body source mirrors the runtime resolver: the first SearchSetItem's
+    // searchphrase if one exists (materialized on edit), otherwise
+    // extraction_config.content (set at creation).
+    ;(async () => {
+      try {
+        const items = await listSearchSetItems(linkedSavedUuid)
+        if (cancelled) return
+        if (items.length > 0 && items[0].searchphrase) {
+          setLinkedSavedBody(items[0].searchphrase)
+          return
+        }
+        const ss = await getSearchSet(linkedSavedUuid)
+        if (cancelled) return
+        const content = (ss.extraction_config as Record<string, unknown> | undefined)?.content
+        setLinkedSavedBody(typeof content === 'string' ? content : '')
+      } catch {
+        if (!cancelled) setLinkedSavedBody('')
+      } finally {
+        if (!cancelled) setLinkedSavedLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [linkedSavedUuid])
+
   // Model override for LLM tasks
   const LLM_TASKS = ['Extraction', 'Prompt', 'Formatter', 'DescribeImage', 'ResearchNode', 'FormFiller', 'Browser']
   const [models, setModels] = useState<ModelInfo[]>([])
@@ -2406,6 +2605,42 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
     setTaskData(prev => {
       const next = { ...prev }
       delete (next as Record<string, unknown>).search_set_uuid
+      return next
+    })
+  }
+
+  const handleSelectSavedPrompt = (id: string, name: string) => {
+    // Linking clears the inline prompt — the saved body is the source of truth
+    // and is resolved at runtime. Keep state matching what the UI shows.
+    setTaskData(prev => {
+      const next = { ...prev, saved_prompt_uuid: id, name: name || prev.name }
+      delete (next as Record<string, unknown>).prompt
+      return next
+    })
+    setShowPromptPicker(false)
+  }
+
+  const handleUnlinkSavedPrompt = () => {
+    setTaskData(prev => {
+      const next = { ...prev }
+      delete (next as Record<string, unknown>).saved_prompt_uuid
+      return next
+    })
+  }
+
+  const handleSelectSavedFormatter = (id: string, name: string) => {
+    setTaskData(prev => {
+      const next = { ...prev, saved_formatter_uuid: id, name: name || prev.name }
+      delete (next as Record<string, unknown>).format_template
+      return next
+    })
+    setShowFormatterPicker(false)
+  }
+
+  const handleUnlinkSavedFormatter = () => {
+    setTaskData(prev => {
+      const next = { ...prev }
+      delete (next as Record<string, unknown>).saved_formatter_uuid
       return next
     })
   }
@@ -2692,6 +2927,69 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                     }}
                   />
                 </div>
+                {/* Saved prompt picker */}
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                    Use Saved Prompt
+                  </label>
+                  <button
+                    onClick={() => setShowPromptPicker(true)}
+                    style={{
+                      width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
+                      border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#fff',
+                      color: savedPromptUuid ? '#374151' : '#9ca3af',
+                      cursor: 'pointer', textAlign: 'left', display: 'flex',
+                      alignItems: 'center', justifyContent: 'space-between',
+                    }}
+                  >
+                    <span>{savedPromptUuid && getTextValue('name') ? getTextValue('name') : 'Browse prompts...'}</span>
+                    <ChevronDown style={{ width: 14, height: 14, color: '#9ca3af', flexShrink: 0 }} />
+                  </button>
+                  {showPromptPicker && (
+                    <ItemPickerModal
+                      kind="prompt"
+                      currentId={savedPromptUuid || undefined}
+                      onSelect={handleSelectSavedPrompt}
+                      onClose={() => setShowPromptPicker(false)}
+                      inline
+                    />
+                  )}
+                </div>
+                {savedPromptUuid ? (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6, gap: 8 }}>
+                    <label style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
+                      Prompt
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 11, color: '#6b7280' }}>
+                        From saved prompt — edit in the Library
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleUnlinkSavedPrompt}
+                        title="Unlink this saved prompt and enter one manually"
+                        style={{
+                          fontSize: 11, padding: '2px 8px', border: '1px solid #d1d5db',
+                          borderRadius: 4, backgroundColor: '#fff', color: '#374151',
+                          cursor: 'pointer', fontFamily: 'inherit',
+                        }}
+                      >
+                        Unlink
+                      </button>
+                    </div>
+                  </div>
+                  <div style={{
+                    padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 6,
+                    backgroundColor: '#f9fafb', fontSize: 13, color: '#374151',
+                    whiteSpace: 'pre-wrap', lineHeight: 1.5, minHeight: 38,
+                  }}>
+                    {linkedSavedLoading
+                      ? <span style={{ color: '#9ca3af' }}>Loading prompt…</span>
+                      : linkedSavedBody || <span style={{ color: '#9ca3af' }}>This saved prompt has no content yet.</span>}
+                  </div>
+                </div>
+                ) : (
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                     <label style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
@@ -2806,28 +3104,95 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                     </div>
                   )}
                 </div>
+                )}
               </div>
             )}
 
             {(task.name === 'Formatter' || task.name === 'Format') && (
-              <div>
-                <label style={{
-                  display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8,
-                }}>
-                  Format Template
-                </label>
-                <textarea
-                  value={getTextValue('format_template') || getTextValue('prompt')}
-                  onChange={e => setTextValue('format_template', e.target.value)}
-                  placeholder="Enter your format template..."
-                  rows={10}
-                  style={{
-                    width: '100%', padding: '10px 12px', fontSize: 14,
-                    fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
-                    outline: 'none', resize: 'vertical', boxSizing: 'border-box',
-                    lineHeight: 1.5,
-                  }}
-                />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {/* Saved formatter picker */}
+                <div>
+                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 6 }}>
+                    Use Saved Formatter
+                  </label>
+                  <button
+                    onClick={() => setShowFormatterPicker(true)}
+                    style={{
+                      width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
+                      border: '1px solid #d1d5db', borderRadius: 6, backgroundColor: '#fff',
+                      color: savedFormatterUuid ? '#374151' : '#9ca3af',
+                      cursor: 'pointer', textAlign: 'left', display: 'flex',
+                      alignItems: 'center', justifyContent: 'space-between',
+                    }}
+                  >
+                    <span>{savedFormatterUuid && getTextValue('name') ? getTextValue('name') : 'Browse formatters...'}</span>
+                    <ChevronDown style={{ width: 14, height: 14, color: '#9ca3af', flexShrink: 0 }} />
+                  </button>
+                  {showFormatterPicker && (
+                    <ItemPickerModal
+                      kind="formatter"
+                      currentId={savedFormatterUuid || undefined}
+                      onSelect={handleSelectSavedFormatter}
+                      onClose={() => setShowFormatterPicker(false)}
+                      inline
+                    />
+                  )}
+                </div>
+                {savedFormatterUuid ? (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 6, gap: 8 }}>
+                    <label style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
+                      Format Template
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 11, color: '#6b7280' }}>
+                        From saved formatter — edit in the Library
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleUnlinkSavedFormatter}
+                        title="Unlink this saved formatter and enter one manually"
+                        style={{
+                          fontSize: 11, padding: '2px 8px', border: '1px solid #d1d5db',
+                          borderRadius: 4, backgroundColor: '#fff', color: '#374151',
+                          cursor: 'pointer', fontFamily: 'inherit',
+                        }}
+                      >
+                        Unlink
+                      </button>
+                    </div>
+                  </div>
+                  <div style={{
+                    padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 6,
+                    backgroundColor: '#f9fafb', fontSize: 13, color: '#374151',
+                    whiteSpace: 'pre-wrap', lineHeight: 1.5, minHeight: 38,
+                  }}>
+                    {linkedSavedLoading
+                      ? <span style={{ color: '#9ca3af' }}>Loading formatter…</span>
+                      : linkedSavedBody || <span style={{ color: '#9ca3af' }}>This saved formatter has no content yet.</span>}
+                  </div>
+                </div>
+                ) : (
+                <div>
+                  <label style={{
+                    display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8,
+                  }}>
+                    Format Template
+                  </label>
+                  <textarea
+                    value={getTextValue('format_template') || getTextValue('prompt')}
+                    onChange={e => setTextValue('format_template', e.target.value)}
+                    placeholder="Enter your format template..."
+                    rows={10}
+                    style={{
+                      width: '100%', padding: '10px 12px', fontSize: 14,
+                      fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
+                      outline: 'none', resize: 'vertical', boxSizing: 'border-box',
+                      lineHeight: 1.5,
+                    }}
+                  />
+                </div>
+                )}
               </div>
             )}
 
@@ -6176,6 +6541,7 @@ function ValidateTab({
         {workflowId && (
           <WorkflowAutovalidatePanel
             workflowId={workflowId}
+            canManage={canManage}
             testDataSummary={{
               inputs: inputs.length,
               expectedOutputs: expectedOutputs.length,

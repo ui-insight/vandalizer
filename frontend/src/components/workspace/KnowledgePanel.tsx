@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload, Sparkles, HelpCircle, Pencil } from 'lucide-react'
+import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload, Sparkles, HelpCircle, Pencil, Pin, PinOff, FolderKanban } from 'lucide-react'
 import { useKnowledgeBases, useScopedKnowledgeBases } from '../../hooks/useKnowledgeBases'
+import { useProjectPins } from '../../hooks/useProjectPins'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useAuth } from '../../hooks/useAuth'
 import * as api from '../../api/knowledge'
@@ -18,6 +19,7 @@ import { KBExploreTab } from '../knowledge/KBExploreTab'
 import { CreateKBModal } from '../knowledge/CreateKBModal'
 import { KBTrustBanner } from '../knowledge/KBTrustBanner'
 import { KnowledgeExplainer } from './KnowledgeExplainer'
+import { ExplainerPill } from './AutomationsPanel'
 import { ShareWithTeamDialog } from '../library/ShareWithTeamDialog'
 import { useToast } from '../../contexts/ToastContext'
 import { useConfirm } from '../shared/useConfirm'
@@ -45,10 +47,31 @@ const SOURCE_STATUS: Record<string, { icon: typeof CheckCircle2; color: string }
 }
 
 export function KnowledgePanel() {
-  const { activateKB } = useWorkspace()
+  const { activateKB, activeProjectUuid, activeProjectTitle, activeProjectRole } = useWorkspace()
   const { user } = useAuth()
   const { toast } = useToast()
   const { create, remove, transferToTeam, refresh } = useKnowledgeBases()
+  const projectPins = useProjectPins(activeProjectUuid)
+  // Inside a project, default to showing only the KBs pinned to it; "Show all"
+  // escapes the scope. Reset to scoped when the project changes.
+  const [projectScoped, setProjectScoped] = useState(true)
+  useEffect(() => { setProjectScoped(true) }, [activeProjectUuid])
+  const canPin = !!activeProjectUuid && activeProjectRole !== 'viewer'
+  const isProjectScoped = !!activeProjectUuid && projectScoped
+
+  const handleTogglePin = async (canonicalUuid: string) => {
+    try {
+      if (projectPins.isPinned('knowledge_base', canonicalUuid)) {
+        await projectPins.unpin('knowledge_base', canonicalUuid)
+        toast('Unpinned from project', 'success')
+      } else {
+        await projectPins.pin('knowledge_base', canonicalUuid)
+        toast('Pinned to project', 'success')
+      }
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to update pin', 'error')
+    }
+  }
   const [sharedDeleteTarget, setSharedDeleteTarget] = useState<KnowledgeBase | null>(null)
   const confirm = useConfirm()
   const [activeTab, setActiveTab] = useState<TabKey>('mine')
@@ -116,6 +139,16 @@ export function KnowledgePanel() {
     setError(null)
     try {
       const kb = await create(title, description || undefined)
+      // Created from inside a project: auto-pin so it shows in the project's
+      // Knowledge tab (pins are the only project↔KB link). A fresh KB is never
+      // a reference, so its own uuid is the canonical pin target.
+      if (canPin) {
+        try {
+          await projectPins.pin('knowledge_base', kb.uuid)
+        } catch (err) {
+          console.error('Failed to pin new KB to project:', err)
+        }
+      }
       setShowCreateModal(false)
       loadDetail(kb.uuid)
     } catch (err) {
@@ -215,6 +248,28 @@ export function KnowledgePanel() {
     } catch (err) {
       console.error('Failed to add documents:', err)
       toast(err instanceof Error ? err.message : 'Failed to add documents', 'error')
+    } finally {
+      setAddingDocs(false)
+    }
+  }
+
+  const handleAddFolder = async (folderUuid: string, includeSubfolders: boolean) => {
+    if (!selectedKB) return
+    setAddingDocs(true)
+    setShowDocPicker(false)
+    try {
+      const result = await api.addFolderToKB(selectedKB.uuid, folderUuid, includeSubfolders)
+      const n = result?.added ?? 0
+      if (n === 0) {
+        toast('No new documents found in that folder', 'info')
+      } else {
+        toast(`Added ${n} document${n === 1 ? '' : 's'} from folder`, 'success')
+      }
+      loadDetail(selectedKB.uuid)
+      refresh()
+    } catch (err) {
+      console.error('Failed to add folder:', err)
+      toast(err instanceof Error ? err.message : 'Failed to add folder', 'error')
     } finally {
       setAddingDocs(false)
     }
@@ -869,6 +924,26 @@ export function KnowledgePanel() {
                 <MessageSquare size={13} />
                 Chat with this KB
               </button>
+              {canPin && (() => {
+                const pinned = projectPins.isPinned('knowledge_base', selectedKB.uuid)
+                return (
+                  <button
+                    onClick={() => handleTogglePin(selectedKB.uuid)}
+                    title={pinned ? `Unpin from ${activeProjectTitle || 'this project'}` : `Pin to ${activeProjectTitle || 'this project'}`}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 6,
+                      padding: '6px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                      color: pinned ? 'var(--highlight-text-color, #000)' : '#e5e5e5',
+                      backgroundColor: pinned ? 'var(--highlight-color, #eab308)' : '#2a2a2a',
+                      border: pinned ? 'none' : '1px solid #3a3a3a',
+                      borderRadius: 6, cursor: 'pointer',
+                    }}
+                  >
+                    {pinned ? <Pin size={13} fill="currentColor" /> : <PinOff size={13} />}
+                    {pinned ? 'Pinned to Project' : 'Pin to Project'}
+                  </button>
+                )
+              })()}
               <button
                 onClick={() => handleToggleShare(selectedKB)}
                 style={{
@@ -1204,6 +1279,7 @@ export function KnowledgePanel() {
         {showDocPicker && (
           <DocumentPickerModal
             onSubmit={handleAddDocuments}
+            onSubmitFolder={handleAddFolder}
             onClose={() => setShowDocPicker(false)}
             existingSourceUuids={selectedKB.sources
               .filter(s => s.source_type === 'document' && s.document_uuid)
@@ -1329,7 +1405,10 @@ export function KnowledgePanel() {
           position: 'relative',
         }}
       >
-        <span style={{ fontSize: 18, fontWeight: 600, color: '#fff' }}>Knowledge Bases</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 18, fontWeight: 600, color: '#fff' }}>Knowledge Bases</span>
+          <ExplainerPill label="What are knowledge bases?" onClick={() => setShowExplainer(true)} />
+        </div>
         {activeTab === 'mine' && (
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <input
@@ -1421,6 +1500,36 @@ export function KnowledgePanel() {
         ))}
       </div>
 
+      {/* Project scope bar — flip between KBs pinned to this project and all of
+          them. Only meaningful on the My/Team grids (Explore is the catalog). */}
+      {activeProjectUuid && activeTab !== 'explore' && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '7px 12px',
+          backgroundColor: '#202020',
+          borderBottom: '1px solid #2f2f2f',
+          flexShrink: 0,
+        }}>
+          <FolderKanban size={13} style={{ color: 'var(--highlight-color, #eab308)', flexShrink: 0 }} />
+          <span style={{ fontSize: 12, color: '#aaa', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {projectScoped
+              ? <>Pinned to <strong style={{ color: '#ddd' }}>{activeProjectTitle}</strong></>
+              : <>All knowledge bases</>}
+          </span>
+          <button
+            onClick={() => setProjectScoped(s => !s)}
+            style={{
+              marginLeft: 'auto', flexShrink: 0,
+              padding: '3px 10px', fontSize: 11, fontWeight: 600, fontFamily: 'inherit',
+              color: '#ccc', backgroundColor: 'transparent',
+              border: '1px solid #3a3a3a', borderRadius: 12, cursor: 'pointer',
+            }}
+          >
+            {projectScoped ? 'Show all' : 'Show project only'}
+          </button>
+        </div>
+      )}
+
       {/* Search (hidden on Explore — KBExploreTab has its own) */}
       {activeTab !== 'explore' && (
         <KBSearchBar value={search} onChange={setSearch} placeholder="Search..." />
@@ -1484,11 +1593,16 @@ export function KnowledgePanel() {
                   }
                 }
               : undefined}
-            emptyComponent={activeTab === 'mine' && !search ? <KnowledgeExplainer /> : undefined}
+            filterUuids={isProjectScoped ? projectPins.idsByType('knowledge_base') : undefined}
+            pinnedUuids={canPin ? projectPins.idsByType('knowledge_base') : undefined}
+            onTogglePin={canPin ? handleTogglePin : undefined}
+            emptyComponent={!isProjectScoped && activeTab === 'mine' && !search ? <KnowledgeExplainer /> : undefined}
             emptyMessage={
-              activeTab === 'team'
-                ? 'No knowledge bases shared with your team yet.'
-                : 'No knowledge bases found.'
+              isProjectScoped
+                ? `No knowledge bases pinned to ${activeProjectTitle || 'this project'}. Pin one here or in Explore, or switch to "Show all".`
+                : activeTab === 'team'
+                  ? 'No knowledge bases shared with your team yet.'
+                  : 'No knowledge bases found.'
             }
           />
         </div>
@@ -1501,6 +1615,7 @@ export function KnowledgePanel() {
         onCreate={handleCreate}
       />
     )}
+    {showExplainer && <KnowledgeExplainer onClose={() => setShowExplainer(false)} />}
     {shareDialogJSX}
     {verifyModalJSX}
     <SharedKBDeleteDialog

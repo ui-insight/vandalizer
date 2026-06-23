@@ -1,6 +1,8 @@
 """Document Manager  - ChromaDB-backed document ingestion and semantic search for RAG."""
 
+import hashlib
 import logging
+import re
 import threading
 from datetime import datetime
 from pathlib import Path
@@ -147,6 +149,25 @@ def _location_for_offset(offset: int, markers: list[dict]) -> dict:
     return location
 
 
+def _user_collection_name(user_id: str) -> str:
+    """Build a ChromaDB-legal collection name for a user's document corpus.
+
+    Chroma requires collection names of 3-63 chars, starting/ending alphanumeric,
+    containing only ``[a-zA-Z0-9._-]``. ``user_id`` is frequently an email
+    address (``@`` and ``.`` are illegal, and ``.`` risks the IPv4/`..` rules), so
+    sanitize the readable part and always append a hash of the raw id to guarantee
+    uniqueness — two ids that sanitize to the same token must not share a
+    collection (that would cross-contaminate users' documents).
+    """
+    safe = re.sub(r"[^a-zA-Z0-9_-]", "_", user_id or "").strip("_-")[:40] or "anon"
+    # Non-cryptographic: just a short stable suffix to keep distinct user_ids
+    # that sanitize to the same token in separate collections.
+    digest = hashlib.sha1(
+        (user_id or "").encode("utf-8"), usedforsecurity=False
+    ).hexdigest()[:10]
+    return f"user_{safe}_{digest}"
+
+
 class DocumentManager:
     """Synchronous document manager  - safe to call from asyncio.to_thread()."""
 
@@ -168,9 +189,8 @@ class DocumentManager:
         self.embedding_function = embedding_function or get_default_embedding_function()
 
     def get_user_collection(self, user_id: str) -> chromadb.Collection:
-        collection_name = f"user_{user_id}_docs"
         return self.client.get_or_create_collection(
-            name=collection_name,
+            name=_user_collection_name(user_id),
             embedding_function=self.embedding_function,
         )
 

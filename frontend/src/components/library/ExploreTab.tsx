@@ -6,6 +6,7 @@ import {
   Search, ShieldCheck, BookOpen, Workflow, FileSearch,
   FolderOpen, Star, X, Plus, ArrowUpDown,
   Bookmark, ArrowLeft, Loader2, Tag, Sparkles, ExternalLink, Link2, Users,
+  Pin, PinOff,
 } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
 import { QualityBadge } from './QualityBadge'
@@ -19,8 +20,18 @@ import { adoptKnowledgeBase } from '../../api/knowledge'
 import { listTeams } from '../../api/teams'
 import type { VerifiedCatalogItem, VerifiedCollection, Library, LibraryItemKind } from '../../types/library'
 import { useAuth } from '../../hooks/useAuth'
+import { useProjectPins } from '../../hooks/useProjectPins'
+import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
 import { useShareLink } from '../../lib/shareLink'
+
+// Catalog kinds → project pin types. Extractions are `search_set` in the
+// catalog but `extraction` as a pin; KBs and workflows map straight through.
+const KIND_TO_PIN_TYPE: Record<string, string> = {
+  workflow: 'workflow',
+  search_set: 'extraction',
+  knowledge_base: 'knowledge_base',
+}
 
 marked.setOptions({ breaks: true, gfm: true })
 
@@ -106,6 +117,9 @@ export function ItemDetailModal({
   onTryIt,
   currentTeamId,
   currentTeamName,
+  projectTitle,
+  isPinnedToProject,
+  onTogglePinToProject,
 }: {
   item: VerifiedCatalogItem
   onClose: () => void
@@ -114,6 +128,10 @@ export function ItemDetailModal({
   onTryIt?: (item: VerifiedCatalogItem) => void
   currentTeamId?: string | null
   currentTeamName?: string | null
+  // Present only when a project is active and the viewer can pin to it.
+  projectTitle?: string | null
+  isPinnedToProject?: boolean
+  onTogglePinToProject?: (item: VerifiedCatalogItem) => void
 }) {
   const tierStyle = TIER_STYLES[(item.quality_tier || '') as keyof typeof TIER_STYLES]
   const kindConf = KIND_CONFIG[item.kind as keyof typeof KIND_CONFIG]
@@ -235,6 +253,22 @@ export function ItemDetailModal({
               >
                 <ExternalLink className="h-4 w-4" />
                 Open
+              </button>
+            )}
+            {onTogglePinToProject && item.source_uuid && KIND_TO_PIN_TYPE[item.kind] && (
+              <button
+                onClick={() => onTogglePinToProject(item)}
+                title={isPinnedToProject
+                  ? `Unpin from ${projectTitle || 'this project'}`
+                  : `Pin to ${projectTitle || 'this project'}`}
+                className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  isPinnedToProject
+                    ? 'text-amber-800 bg-amber-100 hover:bg-amber-200'
+                    : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
+                }`}
+              >
+                {isPinnedToProject ? <Pin className="h-4 w-4" /> : <PinOff className="h-4 w-4" />}
+                {isPinnedToProject ? 'Pinned to Project' : 'Pin to Project'}
               </button>
             )}
             {shareKind && item.source_uuid && (
@@ -411,6 +445,30 @@ function CollectionLink({
 export function ExploreTab() {
   const { user } = useAuth()
   const { toast } = useToast()
+  const { activeProjectUuid, activeProjectTitle, activeProjectRole } = useWorkspace()
+  const projectPins = useProjectPins(activeProjectUuid)
+  const canPinToProject = !!activeProjectUuid && activeProjectRole !== 'viewer'
+
+  const isItemPinned = (item: VerifiedCatalogItem) => {
+    const pinType = KIND_TO_PIN_TYPE[item.kind]
+    return !!(pinType && item.source_uuid && projectPins.isPinned(pinType, item.source_uuid))
+  }
+
+  const handleTogglePinToProject = async (item: VerifiedCatalogItem) => {
+    const pinType = KIND_TO_PIN_TYPE[item.kind]
+    if (!pinType || !item.source_uuid) return
+    try {
+      if (projectPins.isPinned(pinType, item.source_uuid)) {
+        await projectPins.unpin(pinType, item.source_uuid)
+        toast('Unpinned from project', 'success')
+      } else {
+        await projectPins.pin(pinType, item.source_uuid)
+        toast(`Pinned to ${activeProjectTitle || 'project'}`, 'success')
+      }
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to update pin', 'error')
+    }
+  }
 
   // Data
   const [items, setItems] = useState<VerifiedCatalogItem[]>([])
@@ -894,6 +952,9 @@ export function ExploreTab() {
           onTryIt={handleTryIt}
           currentTeamId={user?.current_team ?? null}
           currentTeamName={currentTeamName}
+          projectTitle={activeProjectTitle}
+          isPinnedToProject={isItemPinned(detailItem)}
+          onTogglePinToProject={canPinToProject ? handleTogglePinToProject : undefined}
         />
       )}
 

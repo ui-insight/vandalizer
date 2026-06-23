@@ -685,6 +685,71 @@ class TestKnowledgeDocSources:
         assert resp.status_code == 404
 
     @pytest.mark.asyncio
+    async def test_add_urls_dispatches_background_task(self, client):
+        """URL ingestion must be dispatched to a worker (not awaited inline) so
+        slow fetches/crawls can't blow past the proxy timeout and 502."""
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.tasks.kb_validation_tasks.add_urls_task.delay") as mock_delay,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/add_urls",
+                json={"urls": ["https://example.com", "https://example.org"],
+                      "crawl_enabled": True, "max_crawl_pages": 5},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        # Returns immediately with the count of URLs queued.
+        assert resp.json() == {"ok": True, "added": 2}
+        # Work was handed off to the worker, not run inline.
+        mock_svc.add_urls.assert_not_called()
+        mock_delay.assert_called_once()
+        args, kwargs = mock_delay.call_args
+        assert args[0] == kb.uuid
+        assert args[1] == ["https://example.com", "https://example.org"]
+        assert kwargs["crawl_enabled"] is True
+        assert kwargs["max_crawl_pages"] == 5
+
+    @pytest.mark.asyncio
+    async def test_add_urls_empty_list_rejected(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/add_urls",
+                json={"urls": []},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 400
+        assert resp.json()["detail"] == "No URLs provided"
+
+    @pytest.mark.asyncio
     async def test_get_source_detail_document_returns_extracted_text(self, client):
         """Document sources don't cache content, so the inspector endpoint must
         fall back to the SmartDocument's full extracted raw_text (the text that
@@ -1307,17 +1372,27 @@ class TestKnowledgeSharedDeleteFlow:
 class TestKBListQueryBuilder:
     """Verify the mongo query shape for the scope filters that drive My KBs vs Team."""
 
+    # Every query is wrapped in an outer ``$and`` that also excludes implicit
+    # (project-owned) KBs, which never surface in the normal lists. The helpers
+    # below peel that wrapper off so each test can assert its scope clause.
+    IMPLICIT_EXCLUSION = {"implicit": {"$ne": True}}
+
+    def _unwrap_implicit(self, q: dict) -> dict:
+        """Return the scope clause from inside the outer implicit-exclusion $and."""
+        assert self.IMPLICIT_EXCLUSION in q["$and"]
+        return next(c for c in q["$and"] if c != self.IMPLICIT_EXCLUSION)
+
     def test_mine_scope_excludes_team_owned(self):
         from app.services.knowledge_service import build_kb_list_query
 
         q = build_kb_list_query("user1", "team-1", "mine", None)
-        assert q == {"user_id": "user1", "team_owned": {"$ne": True}}
+        assert self._unwrap_implicit(q) == {"user_id": "user1", "team_owned": {"$ne": True}}
 
     def test_team_scope_filters_by_shared_and_team_id(self):
         from app.services.knowledge_service import build_kb_list_query
 
         q = build_kb_list_query("user1", "team-1", "team", None)
-        assert q == {"shared_with_team": True, "team_id": "team-1"}
+        assert self._unwrap_implicit(q) == {"shared_with_team": True, "team_id": "team-1"}
 
     def test_team_scope_without_team_id_returns_none(self):
         from app.services.knowledge_service import build_kb_list_query
@@ -1328,7 +1403,7 @@ class TestKBListQueryBuilder:
         from app.services.knowledge_service import build_kb_list_query
 
         q = build_kb_list_query("user1", "team-1", None, None)
-        or_clauses = q["$or"]
+        or_clauses = self._unwrap_implicit(q)["$or"]
         mine_clause = next(
             (c for c in or_clauses if c.get("user_id") == "user1"),
             None,
@@ -1345,8 +1420,9 @@ class TestKBListQueryBuilder:
         from app.services.knowledge_service import build_kb_list_query
 
         q = build_kb_list_query("user1", None, "mine", "needle")
-        assert "$and" in q
-        base, search = q["$and"]
+        inner = self._unwrap_implicit(q)
+        assert "$and" in inner
+        base, search = inner["$and"]
         assert base == {"user_id": "user1", "team_owned": {"$ne": True}}
         assert search["$or"][0]["title"]["$regex"] == "needle"
 

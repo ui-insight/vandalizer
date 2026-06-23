@@ -14,6 +14,7 @@ from app.config import Settings
 from app.database import init_db
 from app.exceptions import AppError
 from app.middleware.csrf import CSRFMiddleware
+from app.observability import init_sentry
 from app.rate_limit import limiter
 from app.routers import activity, admin, audit, auth, automations, browser_automation, certification, chat, config, contact, credentials, demo, documents, extractions, feedback, feedback_prompt, files, folders, graph_webhooks, knowledge, library, mgmt, notifications, office, optimizer_inbox, organizations, projects, reviews, spaces, support, teams, verification, verification_sessions, workflows
 
@@ -46,25 +47,9 @@ def _configure_logging(settings: Settings) -> None:
     root.handlers = [handler]
 
 
-# ---------------------------------------------------------------------------
-# Sentry
-# ---------------------------------------------------------------------------
-def _init_sentry(settings: Settings) -> None:
-    if not settings.sentry_dsn:
-        return
-    import sentry_sdk
-
-    sentry_sdk.init(
-        dsn=settings.sentry_dsn,
-        environment=settings.environment,
-        traces_sample_rate=0.1 if settings.is_production else 1.0,
-        send_default_pii=False,
-    )
-
-
 _boot_settings = get_settings()
 _configure_logging(_boot_settings)
-_init_sentry(_boot_settings)
+init_sentry(_boot_settings)
 
 logger = logging.getLogger(__name__)
 

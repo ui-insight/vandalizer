@@ -31,14 +31,6 @@ async def _project_folder_uuids(root_folder_uuid: str) -> list[str]:
     return uuids
 
 
-async def _resolve_team_uuid(user: User) -> str | None:
-    """The current team's UUID (folders/documents key on UUID, not ObjectId)."""
-    if not user.current_team:
-        return None
-    team = await Team.get(user.current_team)
-    return team.uuid if team else None
-
-
 async def can_view_project(project: Project, user: User) -> bool:
     if project.owner_user_id == user.user_id or user.is_admin:
         return True
@@ -67,19 +59,21 @@ async def create_project(
 ) -> Project:
     """Create a project, allocating its root folder and implicit-KB name.
 
-    When the user is on a team, the project (and its root folder) is team
-    scoped so it's shared with the team; otherwise it's personal.
+    Projects are **personal by default** — owned only by the creator, even when
+    they're on a team. Sharing is an explicit choice: ``share_project_with_team``
+    converts the project (and its folder subtree + KB) to the team, and invite
+    links grant per-person access. This keeps "my projects are mine until I
+    share them" true, rather than silently exposing every project to teammates.
     """
     from app.services import knowledge_service
 
-    team_uuid = await _resolve_team_uuid(user)
     project_uuid = uuid_lib.uuid4().hex
 
     root_folder = SmartFolder(
         title=title,
         parent_id="0",
-        user_id=user.user_id if not team_uuid else None,
-        team_id=team_uuid,
+        user_id=user.user_id,
+        team_id=None,
         created_by=user.user_id,
         uuid=uuid_lib.uuid4().hex,
     )
@@ -90,7 +84,7 @@ async def create_project(
     kb = await knowledge_service.create_knowledge_base(
         title=title,
         user_id=user.user_id,
-        team_id=team_uuid,
+        team_id=None,
         description=f"Implicit knowledge base for project “{title}”.",
         implicit=True,
     )
@@ -100,7 +94,7 @@ async def create_project(
         title=title,
         description=description,
         owner_user_id=user.user_id,
-        team_id=team_uuid,
+        team_id=None,
         state="active",
         root_folder_uuid=root_folder.uuid,
         kb_uuid=kb.uuid,
@@ -113,8 +107,12 @@ async def list_projects(user: User) -> list[Project]:
     """Projects the user owns, can reach via team, or is a member of."""
     access = await access_control.get_team_access_context(user)
     or_clauses: list[dict] = [{"owner_user_id": user.user_id}]
-    if access.team_uuids:
-        or_clauses.append({"team_id": {"$in": list(access.team_uuids)}})
+    # Match can_view_project: a team project keys on the team UUID, but accept
+    # ObjectId-string team_ids too so list/view never disagree (the team
+    # _id-vs-uuid trap that has silently hidden content before).
+    team_ids = list(access.team_uuids) + list(access.team_object_ids)
+    if team_ids:
+        or_clauses.append({"team_id": {"$in": team_ids}})
     projects = await Project.find({"$or": or_clauses}).to_list()
 
     memberships = await ProjectMembership.find(
@@ -334,6 +332,35 @@ async def remove_project_member(
     ).delete()
 
 
+async def _is_project_member(project: Project, user: User) -> bool:
+    """True if the user has a personal (invite-granted) membership in the project."""
+    membership = await ProjectMembership.find_one(
+        ProjectMembership.project_uuid == project.uuid,
+        ProjectMembership.user_id == user.user_id,
+    )
+    return membership is not None
+
+
+async def leave_project(project: Project, user: User) -> None:
+    """Remove the requesting user's own invite-granted membership.
+
+    Owners can't leave (they delete the project instead), and access that comes
+    from team membership can't be dropped here — only a personal invite grant.
+    """
+    if project.owner_user_id == user.user_id:
+        raise ValueError("The owner can't leave a project — delete it instead")
+    membership = await ProjectMembership.find_one(
+        ProjectMembership.project_uuid == project.uuid,
+        ProjectMembership.user_id == user.user_id,
+    )
+    if not membership:
+        raise ValueError(
+            "Your access comes from your team, not a personal invite, so there's "
+            "nothing to leave here"
+        )
+    await membership.delete()
+
+
 async def share_project_with_team(project: Project, user: User) -> Project:
     """Convert a personal project to the user's current team.
 
@@ -367,6 +394,40 @@ async def share_project_with_team(project: Project, user: User) -> Project:
         if kb:
             kb.team_id = team.uuid
             kb.shared_with_team = True
+            await kb.save()
+
+    return project
+
+
+async def make_project_personal(project: Project, user: User) -> Project:
+    """Revert a team-shared project back to personal ownership (owner-only).
+
+    Inverse of ``share_project_with_team``: returns the folder subtree and its
+    documents to the owner and un-shares the implicit KB. Per-person invite
+    memberships are kept — only the team-wide exposure is removed.
+    """
+    if project.owner_user_id != user.user_id and not user.is_admin:
+        raise ValueError("Only the project owner can make it personal")
+    if not project.team_id:
+        raise ValueError("Project is already personal")
+
+    from app.services import folder_service
+
+    await folder_service.convert_to_personal_folder(
+        project.root_folder_uuid, user, owner_user_id=project.owner_user_id
+    )
+
+    project.team_id = None
+    project.updated_at = datetime.datetime.now()
+    await project.save()
+
+    if project.kb_uuid:
+        from app.models.knowledge import KnowledgeBase
+
+        kb = await KnowledgeBase.find_one(KnowledgeBase.uuid == project.kb_uuid)
+        if kb:
+            kb.team_id = None
+            kb.shared_with_team = False
             await kb.save()
 
     return project
@@ -515,6 +576,10 @@ async def get_project_overview(project: Project, user: User) -> dict:
     return {
         **serialize_project(project),
         "role": await get_project_role(project, user),
+        "can_leave": (
+            project.owner_user_id != user.user_id
+            and await _is_project_member(project, user)
+        ),
         "capabilities": await get_project_capabilities(project),
     }
 
@@ -528,6 +593,10 @@ async def summarize_project(project: Project, user: User) -> dict:
     return {
         **serialize_project(project),
         "role": await get_project_role(project, user),
+        "can_leave": (
+            project.owner_user_id != user.user_id
+            and await _is_project_member(project, user)
+        ),
         "capabilities": await get_project_capabilities(project),
     }
 

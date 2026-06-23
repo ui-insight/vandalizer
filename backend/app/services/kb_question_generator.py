@@ -15,12 +15,14 @@ import random
 from typing import Any
 
 from pydantic_ai import Agent
+from pydantic_ai.exceptions import ModelAPIError
 
 from app.models.kb_test_query import KBTestQuery
 from app.models.knowledge import KnowledgeBase, KnowledgeBaseSource
 from app.services.document_manager import DocumentManager
 from app.services.llm_service import get_agent_model
-from app.services.workflow_validator import _extract_json, _resolve_model_name
+from app.services.config_service import get_user_model_name
+from app.services.workflow_validator import _extract_json
 
 logger = logging.getLogger(__name__)
 
@@ -111,8 +113,13 @@ class KBQuestionGenerator:
 
         prompt = self._build_user_prompt(target_count, sampled)
 
-        # Resolve model + run generator agent (async).
-        model_name = await asyncio.to_thread(_resolve_model_name, user_id)
+        # Resolve model + run generator agent (async). get_user_model_name
+        # validates the user's stored selection against available_models and
+        # falls back to the system default when it's stale — a raw read would
+        # return a removed/renamed model whose endpoint can't be resolved,
+        # routing the call to an unreachable public default host (the per-user
+        # "Connection error." that broke generation while chat worked).
+        model_name = await get_user_model_name(user_id)
         if not model_name:
             raise ValueError("No LLM model configured for question generation")
 
@@ -129,7 +136,7 @@ class KBQuestionGenerator:
 
         model = get_agent_model(model_name, system_config_doc=sys_config_doc)
         agent = Agent(model, system_prompt=KB_QUESTION_GENERATION_SYSTEM_PROMPT)
-        run = await agent.run(prompt)
+        run = await self._run_agent_with_retries(agent, prompt)
 
         try:
             parsed = _extract_json(run.output or "")
@@ -163,6 +170,36 @@ class KBQuestionGenerator:
         return created
 
     # ----- internals -----
+
+    # Transient errors worth retrying on the inline LLM call. The Celery path
+    # gets this via ``autoretry_for=TRANSIENT_EXCEPTIONS``; the synchronous
+    # route call (used by the UI) has no such safety net, so mirror it here so a
+    # single provider/network blip doesn't surface as a 502.
+    #
+    # ModelAPIError is pydantic-ai's wrapper for connection/transport failures
+    # (e.g. openai.APIConnectionError -> "Connection error."). On oauthdev the
+    # API container intermittently can't open an outbound socket to the model
+    # endpoint, so this is exactly the blip a retry should absorb. HTTP *status*
+    # errors surface as ModelHTTPError instead and are deliberately not retried
+    # (a 4xx won't get better on a retry).
+    _TRANSIENT = (ConnectionError, TimeoutError, OSError, ModelAPIError)
+    _MAX_LLM_ATTEMPTS = 3
+
+    async def _run_agent_with_retries(self, agent: Agent, prompt: str) -> Any:
+        last_exc: Exception | None = None
+        for attempt in range(1, self._MAX_LLM_ATTEMPTS + 1):
+            try:
+                return await agent.run(prompt)
+            except self._TRANSIENT as e:
+                last_exc = e
+                logger.warning(
+                    "Question-generation LLM call failed (attempt %d/%d): %s",
+                    attempt, self._MAX_LLM_ATTEMPTS, e,
+                )
+                if attempt < self._MAX_LLM_ATTEMPTS:
+                    await asyncio.sleep(2 * attempt)
+        assert last_exc is not None
+        raise last_exc
 
     @staticmethod
     def _sample_chunks(

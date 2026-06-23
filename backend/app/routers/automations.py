@@ -89,8 +89,73 @@ async def _resolve_action_name(action_type: str | None, action_id: str | None) -
     return None
 
 
-async def _to_response(auto, *, can_manage: bool = True) -> AutomationResponse:
-    action_name = await _resolve_action_name(auto.action_type, auto.action_id)
+async def _resolve_action_names_bulk(automations: list) -> dict[str, str]:
+    """Resolve linked workflow/extraction names for many automations in bulk.
+
+    Returns a map keyed by ``action_id`` so callers avoid the N+1 of looking
+    up each automation's action target one query at a time.
+    """
+    from app.models.search_set import SearchSet
+    from app.models.workflow import Workflow as WfModel
+
+    workflow_oids: list[PydanticObjectId] = []
+    search_set_ids: list[str] = []
+    for auto in automations:
+        if not auto.action_id:
+            continue
+        if auto.action_type in ("workflow", "task"):
+            try:
+                workflow_oids.append(PydanticObjectId(auto.action_id))
+            except Exception:
+                pass
+        elif auto.action_type == "extraction":
+            search_set_ids.append(auto.action_id)
+
+    names: dict[str, str] = {}
+    # Name resolution only decorates the response; a lookup failure must degrade
+    # to "unnamed" rather than 500 the whole list (the prior per-row resolver
+    # swallowed errors the same way).
+    if workflow_oids:
+        try:
+            workflows = await WfModel.find({"_id": {"$in": workflow_oids}}).to_list()
+            for wf in workflows:
+                names[str(wf.id)] = wf.name
+        except Exception:
+            logger.warning("Bulk workflow name resolution failed", exc_info=True)
+    if search_set_ids:
+        # action_id is normally the SearchSet uuid; fall back to _id matches.
+        oid_candidates: list[PydanticObjectId] = []
+        for sid in search_set_ids:
+            try:
+                oid_candidates.append(PydanticObjectId(sid))
+            except Exception:
+                pass
+        try:
+            search_sets = await SearchSet.find(
+                {"$or": [
+                    {"uuid": {"$in": search_set_ids}},
+                    {"_id": {"$in": oid_candidates}},
+                ]}
+            ).to_list()
+            for ss in search_sets:
+                names[ss.uuid] = ss.title
+                names[str(ss.id)] = ss.title
+        except Exception:
+            logger.warning("Bulk search-set name resolution failed", exc_info=True)
+    return names
+
+
+_UNRESOLVED = object()
+
+
+async def _to_response(
+    auto, *, can_manage: bool = True, action_name=_UNRESOLVED
+) -> AutomationResponse:
+    # When action_name is left unresolved, look it up individually. Callers that
+    # have already batch-resolved names (e.g. list_automations) pass the value
+    # in — including None for a deleted target — to avoid a per-row N+1.
+    if action_name is _UNRESOLVED:
+        action_name = await _resolve_action_name(auto.action_type, auto.action_id)
     return AutomationResponse(
         id=str(auto.id),
         name=auto.name,
@@ -163,11 +228,13 @@ async def list_automations(user: User = Depends(get_current_user)):
         user_id=user.user_id, team_id=team_id,
     )
     team_access = await access_control.get_team_access_context(user)
+    action_names = await _resolve_action_names_bulk(automations)
     return [
         await _to_response(
             a,
             can_manage=access_control.can_manage_automation(a, user, team_access),
-        )
+            action_name=action_names.get(a.action_id) if a.action_id else None,
+        )  # action_name is always supplied here, so no per-row fallback fires
         for a in automations
     ]
 

@@ -68,7 +68,7 @@ export function AutovalidateTab({ kbUuid, kbReady, canManage, queriesCount, onSw
   // (or a page reload). We restore from the server here: first any in-flight
   // run, and failing that the most recent completed/failed/cancelled run — so
   // a finished tuning result keeps showing instead of dropping back to the
-  // "Start tuning" idle hero.
+  // "Validate & improve" idle hero.
   useEffect(() => {
     let cancelled = false
     setLoading(true)
@@ -122,6 +122,7 @@ export function AutovalidateTab({ kbUuid, kbReady, canManage, queriesCount, onSw
         options: opts as unknown as Record<string, unknown>,
         error_message: null,
         started_at: new Date().toISOString(), completed_at: null,
+        elapsed_seconds: 0,
         cancel_requested: false,
       }
       setRun(seed)
@@ -415,7 +416,7 @@ function IdleHero({
         }}
       >
         <Sparkles size={14} />
-        Start tuning
+        Validate &amp; improve
       </button>
     </div>
   )

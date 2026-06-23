@@ -5,22 +5,19 @@ bundled seed files, records progress on the SystemConfig singleton so the admin
 UI can poll it, and notifies admins on completion or failure.
 """
 
-import asyncio
 import datetime
 import logging
 
 from app.celery_app import celery
+from app.tasks import run_task_async
 
 logger = logging.getLogger(__name__)
 
 
 def _run_async(coro):
-    """Run an async coroutine from sync Celery task context."""
-    loop = asyncio.new_event_loop()
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
+    """Run an async coroutine from sync Celery task context, releasing the
+    loop's pooled LLM HTTP client on teardown (see ``run_task_async``)."""
+    return run_task_async(coro)
 
 
 def _now_iso() -> str:

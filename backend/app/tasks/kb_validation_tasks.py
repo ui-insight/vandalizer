@@ -7,22 +7,18 @@ for short runs; these tasks are used when the request body sets ``async=true``.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 
 from app.celery_app import celery
-from app.tasks import TRANSIENT_EXCEPTIONS
+from app.tasks import TRANSIENT_EXCEPTIONS, run_task_async
 
 logger = logging.getLogger(__name__)
 
 
 def _run_async(coro):
-    """Run an async coroutine from sync Celery task context."""
-    loop = asyncio.new_event_loop()
-    try:
-        return loop.run_until_complete(coro)
-    finally:
-        loop.close()
+    """Run an async coroutine from sync Celery task context, releasing the
+    loop's pooled LLM HTTP client on teardown (see ``run_task_async``)."""
+    return run_task_async(coro)
 
 
 @celery.task(
@@ -58,14 +54,28 @@ async def _validate_kb_async(kb_uuid: str, user_id: str, mode: str, skip_judge: 
 @celery.task(
     bind=True,
     name="tasks.kb.generate_test_queries",
-    autoretry_for=TRANSIENT_EXCEPTIONS,
     retry_backoff=True,
     max_retries=2,
     default_retry_delay=10,
 )
 def generate_test_queries_task(self, kb_uuid: str, user_id: str, coverage: str = "standard"):
-    """Auto-generate KBTestQuery records via LLM in the background."""
-    return _run_async(_generate_test_queries_async(kb_uuid, user_id, coverage))
+    """Auto-generate KBTestQuery records via LLM in the background.
+
+    Retries transient connection blips on a fresh attempt with backoff — this
+    includes pydantic-ai's ``ModelAPIError`` ("Connection error.", the oauthdev
+    outbound-socket blip), which the generator's tight in-process retries can
+    miss when the blip outlasts their ~6s window. ``ModelHTTPError`` (an HTTP
+    *status* error, and a ModelAPIError subclass) is deliberately not retried —
+    a 4xx won't improve on retry — so it's caught and re-raised first.
+    """
+    from pydantic_ai.exceptions import ModelAPIError, ModelHTTPError
+    retry_on = (ModelAPIError, *TRANSIENT_EXCEPTIONS)
+    try:
+        return _run_async(_generate_test_queries_async(kb_uuid, user_id, coverage))
+    except ModelHTTPError:
+        raise
+    except retry_on as exc:
+        raise self.retry(exc=exc)
 
 
 async def _generate_test_queries_async(kb_uuid: str, user_id: str, coverage: str):
@@ -79,6 +89,71 @@ async def _generate_test_queries_async(kb_uuid: str, user_id: str, coverage: str
         kb_uuid, user_id, coverage=coverage, persist=True,
     )
     return {"created": len(created), "uuids": [q.uuid for q in created]}
+
+
+# ---------------------------------------------------------------------------
+# KB URL ingestion task.
+#
+# Fetching a URL (httpx + Playwright browser fallback) and, when crawl is
+# enabled, walking up to 50 child pages serially can take many minutes — far
+# longer than nginx's proxy_read_timeout. Running it inline in the request
+# handler is what produced the 502 on POST /knowledge/{uuid}/add_urls. The
+# frontend already drives this as a background flow (it sets status="building"
+# and polls source status), so we dispatch here and return immediately.
+# ---------------------------------------------------------------------------
+
+
+@celery.task(
+    bind=True,
+    name="tasks.kb.add_urls",
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
+    max_retries=2,
+    default_retry_delay=10,
+    soft_time_limit=1800,  # 30 min — accommodates a full 50-page crawl
+    time_limit=1860,
+)
+def add_urls_task(
+    self,
+    kb_uuid: str,
+    urls: list[str],
+    crawl_enabled: bool = False,
+    max_crawl_pages: int = 5,
+    allowed_domains: str = "",
+):
+    """Fetch, crawl, chunk and embed URLs into a KB in the background."""
+    return _run_async(_add_urls_async(
+        kb_uuid, urls, crawl_enabled, max_crawl_pages, allowed_domains,
+    ))
+
+
+async def _add_urls_async(
+    kb_uuid: str,
+    urls: list[str],
+    crawl_enabled: bool,
+    max_crawl_pages: int,
+    allowed_domains: str,
+):
+    from app.config import Settings
+    from app.database import init_db
+
+    await init_db(Settings())
+
+    from app.models.knowledge import KnowledgeBase
+    from app.services import knowledge_service as svc
+
+    kb = await KnowledgeBase.find_one(KnowledgeBase.uuid == kb_uuid)
+    if not kb:
+        logger.warning("KB %s not found for add_urls; skipping.", kb_uuid)
+        return {"kb_uuid": kb_uuid, "added": 0}
+
+    added = await svc.add_urls(
+        kb, urls,
+        crawl_enabled=crawl_enabled,
+        max_crawl_pages=max_crawl_pages,
+        allowed_domains=allowed_domains,
+    )
+    return {"kb_uuid": kb_uuid, "added": added}
 
 
 # ---------------------------------------------------------------------------

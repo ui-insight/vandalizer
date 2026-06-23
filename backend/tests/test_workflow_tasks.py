@@ -541,3 +541,76 @@ class TestResumeWorkflowAfterApproval:
         error_calls = [c for c in db.workflow_result.update_one.call_args_list
                       if c[0][1].get("$set", {}).get("status") == "error"]
         assert len(error_calls) >= 1
+
+
+# ---------------------------------------------------------------------------
+# _resolve_saved_prompt_formatter — saved Prompt/Formatter link resolution
+# ---------------------------------------------------------------------------
+
+class TestResolveSavedPromptFormatter:
+    def _db(self, search_set=None, item=None):
+        db = MagicMock()
+        db.search_set.find_one.return_value = search_set
+        db.search_set_item.find_one.return_value = item
+        return db
+
+    def test_prompt_body_from_item_searchphrase(self):
+        from app.tasks.workflow_tasks import _resolve_saved_prompt_formatter
+
+        db = self._db(
+            search_set={"uuid": "p1", "extraction_config": {"content": "stale"}},
+            item={"searchphrase": "Summarize the grant."},
+        )
+        data = {"saved_prompt_uuid": "p1"}
+        _resolve_saved_prompt_formatter(db, "Prompt", data)
+        # The materialized item wins over the create-time config snapshot.
+        assert data["prompt"] == "Summarize the grant."
+
+    def test_prompt_body_falls_back_to_config_content(self):
+        from app.tasks.workflow_tasks import _resolve_saved_prompt_formatter
+
+        db = self._db(
+            search_set={"uuid": "p1", "extraction_config": {"content": "Summarize."}},
+            item=None,
+        )
+        data = {"saved_prompt_uuid": "p1"}
+        _resolve_saved_prompt_formatter(db, "Prompt", data)
+        assert data["prompt"] == "Summarize."
+
+    def test_formatter_sets_format_template(self):
+        from app.tasks.workflow_tasks import _resolve_saved_prompt_formatter
+
+        db = self._db(
+            search_set={"uuid": "f1", "extraction_config": {}},
+            item={"searchphrase": "Render as a table."},
+        )
+        data = {"saved_formatter_uuid": "f1"}
+        _resolve_saved_prompt_formatter(db, "Formatter", data)
+        assert data["format_template"] == "Render as a table."
+
+    def test_missing_set_leaves_data_untouched(self):
+        from app.tasks.workflow_tasks import _resolve_saved_prompt_formatter
+
+        db = self._db(search_set=None)
+        data = {"saved_prompt_uuid": "gone", "prompt": "inline"}
+        _resolve_saved_prompt_formatter(db, "Prompt", data)
+        # Silent fallback: a deleted set must not wipe the existing inline body.
+        assert data["prompt"] == "inline"
+
+    def test_no_link_is_noop(self):
+        from app.tasks.workflow_tasks import _resolve_saved_prompt_formatter
+
+        db = self._db()
+        data = {"prompt": "inline"}
+        _resolve_saved_prompt_formatter(db, "Prompt", data)
+        assert data == {"prompt": "inline"}
+        db.search_set.find_one.assert_not_called()
+
+    def test_other_task_type_is_noop(self):
+        from app.tasks.workflow_tasks import _resolve_saved_prompt_formatter
+
+        db = self._db(search_set={"uuid": "x"}, item={"searchphrase": "x"})
+        data = {"saved_prompt_uuid": "p1"}
+        _resolve_saved_prompt_formatter(db, "Extraction", data)
+        assert "prompt" not in data
+        db.search_set.find_one.assert_not_called()

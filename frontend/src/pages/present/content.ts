@@ -9,6 +9,9 @@
  *   Workflow DAG engine .......... Workflow editor, batch runs           (/workflows/$id)
  *   RAG chat with citations ...... Workspace chat mode                   (/?mode=chat)
  *   Knowledge bases .............. Workspace knowledge mode              (/?mode=knowledge)
+ *   Projects (scoped workspace) .. Workspace Projects drawer             (/?project=…)
+ *   Validate & improve ........... KB / extraction / workflow optimizer panels
+ *   Folder actions ............... File browser folder context menu (move, export, ask, run, add to KB)
  *   Automations (triggers) ....... Workspace automations mode + /automation
  *   Teams / RBAC ................. /teams, TeamMembership roles
  *   Reviews / sign-off ........... /reviews
@@ -369,6 +372,7 @@ const team: Track = {
     'Upload and organize documents into folders',
     'Build an extraction workflow once, run it across a whole batch',
     'Chat with your documents — answers cited back to the source',
+    'Gather everything for one grant into a Project: files, knowledge base, tools, and chat',
     'Automate processing so new files are handled on arrival',
     'Learn it through the built-in certification course',
   ],
@@ -422,8 +426,19 @@ const team: Track = {
       ].join('\n'),
     },
     {
+      id: 'projects',
+      title: '5 · Projects — tie it all together',
+      body: [
+        '- Gather one grant or effort into a single **Project**',
+        '- Its **files, knowledge base, chat, and pinned tools** live in one place',
+        '- Chat answers **only from that project’s documents**',
+        '- Keep it personal, share it with your team, or invite a collaborator by link',
+      ].join('\n'),
+      note: 'A project’s knowledge base builds itself from the files you add — no extra setup.',
+    },
+    {
       id: 'automate',
-      title: '5 · Automations',
+      title: '6 · Automations',
       body: [
         '- **Watch a folder** and run a workflow on every new upload',
         '- Run on a **schedule**, or trigger via **API**',
@@ -432,7 +447,7 @@ const team: Track = {
     },
     {
       id: 'collaborate',
-      title: '6 · Work as a team',
+      title: '7 · Work as a team',
       body: [
         '- Shared workflows, documents, and knowledge bases',
         '- Roles: owner, admin, member',
@@ -441,7 +456,7 @@ const team: Track = {
     },
     {
       id: 'certify',
-      title: '7 · Get certified',
+      title: '8 · Get certified',
       body: 'The built-in **Vandal Workflow Architect** course walks you from your first upload to building validated workflows — hands-on, inside the product.\n\nSign in and start: **/**',
       note: 'Offer to run a live build of one real workflow with the team.',
     },
@@ -466,6 +481,11 @@ const team: Track = {
       id: 'knowledge',
       heading: 'Knowledge bases',
       body: 'Collect documents, URLs, and notes into a reusable knowledge base that becomes searchable context for chat. Keep it personal or share it with your team; administrators can curate verified knowledge bases for everyone.',
+    },
+    {
+      id: 'projects',
+      heading: 'Projects',
+      body: 'When a piece of work — a grant, a contract, a compliance effort — spans many documents and tools, gather it into a **Project**. A project has its own folder of files, an automatic knowledge base built from those files, a chat that answers only from the project’s documents, and a place to pin the workflows and automations you use for it. Keep a project personal, share it with your team, or send a collaborator a viewer or editor invite link. Everything for that effort stays in one scoped workspace instead of scattered across the library.',
     },
     {
       id: 'automate',

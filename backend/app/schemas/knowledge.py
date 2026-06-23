@@ -21,7 +21,13 @@ class UpdateKBRequest(BaseModel):
 
 
 class AddDocumentsRequest(BaseModel):
-    document_uuids: list[str]
+    document_uuids: list[str] = []
+    folder_uuids: list[str] = []
+
+
+class AddFolderRequest(BaseModel):
+    folder_uuid: str
+    include_subfolders: bool = True
 
 
 class ConvertDocumentsRequest(BaseModel):

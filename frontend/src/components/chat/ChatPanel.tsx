@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, type DragEvent } from 'react'
-import { Loader2, BookOpen, X, ArrowDown, ChevronRight, Shield, CheckCircle2, Upload, Zap, Link2, Sparkles } from 'lucide-react'
+import { Loader2, BookOpen, X, ArrowDown, ChevronRight, Shield, CheckCircle2, Upload, Zap, Link2, Sparkles, FolderKanban } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
@@ -13,6 +13,7 @@ import { MemoryPanel } from './MemoryPanel'
 import { ProjectChatBadge } from './ProjectChatBadge'
 import { ProjectSuggestedActions } from '../projects/ProjectSuggestedActions'
 import { useChat } from '../../hooks/useChat'
+import { useProject } from '../../hooks/useProjects'
 import { useOnboarding } from '../../hooks/useOnboarding'
 import { useWorkspace, type PendingChatMessage } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
@@ -155,7 +156,15 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     setActivity,
   } = useChat()
 
-  const { bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, activeKBUuid, activeKBTitle, activateKB, deactivateKB, activeProjectUuid, activeProjectTitle, activeProjectRole, deactivateProject, setCurrentConversationUuid } = useWorkspace()
+  const { bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, activeKBUuid, activeKBTitle, activateKB, deactivateKB, activeProjectUuid, activeProjectTitle, activeProjectRole, deactivateProject, setCurrentConversationUuid, focusChatSignal } = useWorkspace()
+
+  // When scoped to a project, surface its file/index status so the empty state
+  // reflects the project (not a generic assistant) and sets honest expectations.
+  const { project: scopedProject } = useProject(activeProjectUuid ?? '')
+  const projectFileCount = scopedProject?.capabilities?.files.count ?? 0
+  const projectIndexed = scopedProject?.capabilities?.knowledge.documents ?? 0
+  const projectEmpty = !!activeProjectUuid && projectFileCount === 0
+  const projectIndexing = !!activeProjectUuid && projectFileCount > 0 && projectIndexed < projectFileCount
   const [convertingToKB, setConvertingToKB] = useState(false)
   const { toast } = useToast()
   const shareLink = useShareLink()
@@ -871,6 +880,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                 <div style={{ animation: 'float 3s ease-in-out infinite' }} className="shrink-0">
                   {bannerProcessingDoc ? (
                     <Loader2 className="h-7 w-7 opacity-90 animate-spin" />
+                  ) : activeProjectUuid ? (
+                    <FolderKanban className="h-7 w-7 opacity-90" />
                   ) : activeKBUuid ? (
                     <BookOpen className="h-7 w-7 opacity-90" />
                   ) : brandIcon ? (
@@ -885,26 +896,34 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                       ? processingCount > 1
                         ? `Preparing ${processingCount} documents…`
                         : stageCopy(bannerProcessingDoc.status).title
-                      : activeKBUuid
-                        ? `Knowledge Base: ${activeKBTitle}`
-                        : hasDocContext
-                          ? 'Documents ready for analysis'
-                          : onboardingStatus?.maturity_stage && onboardingStatus.maturity_stage !== 'newcomer'
-                            ? 'Welcome back'
-                            : 'What would you like to work on?'}
+                      : activeProjectUuid
+                        ? `Chat with ${activeProjectTitle ?? 'this project'}`
+                        : activeKBUuid
+                          ? `Knowledge Base: ${activeKBTitle}`
+                          : hasDocContext
+                            ? 'Documents ready for analysis'
+                            : onboardingStatus?.maturity_stage && onboardingStatus.maturity_stage !== 'newcomer'
+                              ? 'Welcome back'
+                              : 'What would you like to work on?'}
                   </div>
                   <div style={{ fontSize: 13, opacity: 0.8, marginTop: 2, fontWeight: 400 }}>
                     {bannerProcessingDoc
                       ? processingCount > 1
                         ? "We'll be ready as soon as each document finishes processing."
                         : stageCopy(bannerProcessingDoc.status).message
-                      : activeKBUuid
-                        ? 'Ask questions grounded in your indexed documents and sources.'
-                        : hasDocContext
-                          ? 'Summarize, extract data, compare, or ask anything about your selected documents.'
-                          : (onboardingStatus?.recent_activity?.length ?? 0) > 0
-                            ? 'Here\'s what\'s been happening in your workspace.'
-                            : 'Select documents to analyze, activate a knowledge base, or ask me anything.'}
+                      : activeProjectUuid
+                        ? projectEmpty
+                          ? 'No files in this project yet — add files in the Files tab and I’ll answer from them. You can still ask me anything.'
+                          : projectIndexing
+                            ? 'Indexing this project’s files — you can chat now; answers get better as indexing finishes.'
+                            : `Ask questions across every file in this project (${projectFileCount} ${projectFileCount === 1 ? 'file' : 'files'}).`
+                        : activeKBUuid
+                          ? 'Ask questions grounded in your indexed documents and sources.'
+                          : hasDocContext
+                            ? 'Summarize, extract data, compare, or ask anything about your selected documents.'
+                            : (onboardingStatus?.recent_activity?.length ?? 0) > 0
+                              ? 'Here\'s what\'s been happening in your workspace.'
+                              : 'Select documents to analyze, activate a knowledge base, or ask me anything.'}
                   </div>
                 </div>
               </div>
@@ -1382,6 +1401,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         hasMessages={messages.length > 0}
         hasDocuments={fileAttachments.length > 0 || urlAttachments.length > 0 || selectedDocUuids.length > 0 || selectedFolderUuids.length > 0}
         memoryControl={<MemoryPanel />}
+        focusSignal={focusChatSignal}
         contextMeter={
           messages.length > 0 && contextTokens > 0 ? (
             <ContextMeter
