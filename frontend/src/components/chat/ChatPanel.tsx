@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
 import { AttachmentList } from './AttachmentList'
+import { FileProcessingCell, type ProcessingCellDoc } from './FileProcessingCell'
 import { toolResultToText } from './ToolCallDisplay'
 import { WorkspaceBriefing } from './WorkspaceBriefing'
 import { OnboardingStepper } from './WelcomeExperience'
@@ -202,6 +203,14 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   // Docs dropped this session — shown as "processing…" until the docs poll
   // confirms readiness, so a freshly dropped file's chip reflects state at once.
   const [justDroppedUuids, setJustDroppedUuids] = useState<Set<string>>(new Set())
+  // Latest poll'd task_status per dropped uuid, so the in-chat processing cell
+  // can show the live stage ("Reading text…", "Indexing…") and progress.
+  const [dropStatusByUuid, setDropStatusByUuid] = useState<Record<string, string | null>>({})
+  // Dropped uuids that just finished, kept briefly so the cell shows a clear
+  // "Ready" / "Couldn't process" confirmation before fading out.
+  const [recentlyReady, setRecentlyReady] = useState<Record<string, 'ready' | 'error'>>({})
+  const readyTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  useEffect(() => () => { Object.values(readyTimers.current).forEach(clearTimeout) }, [])
   // A message sent while attached docs are still processing; auto-fires once ready.
   const [heldMessage, setHeldMessage] = useState<{ message: string; includeOnboardingContext?: boolean } | null>(null)
   const lastLoadedConvo = useRef<string | null>(null)
@@ -449,6 +458,27 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   }
   const anySelectedProcessing = selectedDocUuids.some(u => processingByUuid[u])
 
+  // Build the in-chat processing cell: every attached doc still working, plus
+  // any that just finished (kept briefly via recentlyReady) so the user gets a
+  // visible "Ready" beat. Best-known stage comes from the poll, falling back to
+  // FileBrowser's report. Skips docs the user has since removed.
+  const statusFor = (u: string): string | null => {
+    if (u in dropStatusByUuid) return dropStatusByUuid[u]
+    const d = selectedDocsProcessing.find(x => x.uuid === u)
+    return d ? d.status : null
+  }
+  const processingCellDocs: ProcessingCellDoc[] = []
+  for (const u of selectedDocUuids) {
+    if (processingByUuid[u]) {
+      processingCellDocs.push({ uuid: u, name: selectedDocNames[u] || 'Document', status: statusFor(u), phase: 'processing' })
+    }
+  }
+  for (const [u, phase] of Object.entries(recentlyReady)) {
+    if (!processingByUuid[u] && selectedDocUuids.includes(u) && !processingCellDocs.some(d => d.uuid === u)) {
+      processingCellDocs.push({ uuid: u, name: selectedDocNames[u] || 'Document', status: statusFor(u), phase })
+    }
+  }
+
   // Poll just-dropped docs to authoritative readiness. FileBrowser only reports
   // status for docs selected *in the browser*, so a chat-dropped doc may never
   // appear in selectedDocsProcessing — poll_status is the source of truth here.
@@ -463,14 +493,35 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         uuids.map(u => pollStatus(u).then(r => ({ u, r })).catch(() => null)),
       )
       if (cancelled) return
-      const done = results
-        .filter((x): x is { u: string; r: Awaited<ReturnType<typeof pollStatus>> } => x !== null)
-        .filter(({ r }) => r.complete || !!r.raw_text || !!r.error_message)
-        .map(({ u }) => u)
+      const ok = results.filter(
+        (x): x is { u: string; r: Awaited<ReturnType<typeof pollStatus>> } => x !== null,
+      )
+      // Capture the live stage so the in-chat cell can name what's happening.
+      setDropStatusByUuid(prev => {
+        const next = { ...prev }
+        for (const { u, r } of ok) next[u] = r.status
+        return next
+      })
+      const done = ok.filter(({ r }) => r.complete || !!r.raw_text || !!r.error_message)
       if (done.length) {
+        // Flag each finished doc as ready/errored for a brief grace window, then
+        // clear it so the cell can collapse once the user has seen the result.
+        setRecentlyReady(prev => {
+          const next = { ...prev }
+          for (const { u, r } of done) next[u] = r.error_message ? 'error' : 'ready'
+          return next
+        })
+        for (const { u } of done) {
+          if (readyTimers.current[u]) clearTimeout(readyTimers.current[u])
+          readyTimers.current[u] = setTimeout(() => {
+            setRecentlyReady(prev => { const n = { ...prev }; delete n[u]; return n })
+            setDropStatusByUuid(prev => { const n = { ...prev }; delete n[u]; return n })
+            delete readyTimers.current[u]
+          }, 4000)
+        }
         setJustDroppedUuids(prev => {
           const next = new Set(prev)
-          done.forEach(u => next.delete(u))
+          done.forEach(({ u }) => next.delete(u))
           return next
         })
       }
@@ -863,6 +914,50 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                 <ValueTaglineRotator />
               </div>
             </div>
+
+            {/* Primary CTA for brand-new users: one click straight to the live
+                demo, so a non-technical user never has to guess the "show me"
+                phrase. Disappears once the conversation actually starts. */}
+            {!messages.some(m => m.role === 'user') && (
+              <>
+                <div style={{ marginTop: 16, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
+                  <button
+                    disabled={!!processingDoc}
+                    onClick={handleRunDemo}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '10px 18px',
+                      fontSize: 14,
+                      fontWeight: 600,
+                      fontFamily: 'inherit',
+                      border: 'none',
+                      borderRadius: 22,
+                      backgroundColor: 'var(--highlight-color, #eab308)',
+                      color: '#1f2937',
+                      cursor: processingDoc ? 'default' : 'pointer',
+                      boxShadow: '0 2px 8px color-mix(in srgb, var(--highlight-color, #eab308) 35%, transparent)',
+                      transition: 'all 0.15s',
+                      opacity: processingDoc ? 0.5 : 1,
+                    }}
+                    onMouseEnter={e => { if (!processingDoc) e.currentTarget.style.filter = 'brightness(0.95)' }}
+                    onMouseLeave={e => { e.currentTarget.style.filter = 'none' }}
+                  >
+                    <Zap size={15} />
+                    Show me a live demo
+                  </button>
+                  <span style={{ fontSize: 12, color: '#9ca3af' }}>
+                    …or just ask a question below.
+                  </span>
+                </div>
+
+                {/* Plain-language glossary so first-timers aren't lost in jargon */}
+                <div style={{ marginTop: 18 }}>
+                  <ConceptStrip />
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -951,8 +1046,16 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
               )}
             </div>
 
-            {/* Workspace briefing for returning users with data, guidance, or post-demo state */}
-            {((onboardingStatus?.recent_activity?.length ?? 0) > 0 || onboardingStatus?.daily_guidance || onboardingStatus?.has_only_onboarding_docs) && (
+            {/* Workspace briefing for returning users with data, guidance, alerts,
+                pending work, or post-demo state. Surfacing it for any non-newcomer
+                (or anyone with docs waiting / alerts open) gives the 2nd-visit user
+                a personalized reason to re-engage instead of a generic banner. */}
+            {((onboardingStatus?.recent_activity?.length ?? 0) > 0
+              || (onboardingStatus?.active_alerts?.length ?? 0) > 0
+              || onboardingStatus?.daily_guidance
+              || onboardingStatus?.has_only_onboarding_docs
+              || (onboardingStatus?.unprocessed_doc_count ?? 0) > 0
+              || (!!onboardingStatus?.maturity_stage && onboardingStatus.maturity_stage !== 'newcomer')) && (
               <div style={{ marginTop: 12 }}>
                 <WorkspaceBriefing
                   recentActivity={onboardingStatus!.recent_activity}
@@ -1066,10 +1169,12 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
               ))}
             </div>
 
-            {/* Concept glossary — teach the core nouns on the generic "ask me
-                anything" surface, where a user new to the platform's vocabulary
-                lands. Suppressed once they're working in a doc/KB/project. */}
-            {!activeProjectUuid && !activeKBUuid && !hasDocContext && (
+            {/* Concept glossary — teach the core nouns to users still new to the
+                platform's vocabulary. Gated on maturity (newcomer/explorer) rather
+                than absence of context, so the definitions stay reachable even when
+                docs or a KB are selected — that's exactly when the jargon shows up.
+                Hidden inside projects (noisier) and for practitioners+ (who know it). */}
+            {!activeProjectUuid && ['newcomer', 'explorer'].includes(onboardingStatus?.maturity_stage ?? 'newcomer') && (
               <div style={{ marginTop: 16 }}>
                 <ConceptStrip />
               </div>
@@ -1120,6 +1225,13 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
               </div>
             )
           })}
+
+        {/* Live file-processing cell: in-stream visibility for dropped/attached
+            files during a conversation (the empty-state banner covers the
+            no-messages case). Flips to a "Ready" beat before fading out. */}
+        {(messages.length > 0 || isStreaming) && (
+          <FileProcessingCell docs={processingCellDocs} />
+        )}
 
         {/* Streaming: thinking-only phase (no text or tools yet) */}
         {isStreaming && thinkingContent && !streamingContent && segments.length === 0 && (

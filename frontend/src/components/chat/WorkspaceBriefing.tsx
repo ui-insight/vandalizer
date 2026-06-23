@@ -212,8 +212,15 @@ export function WorkspaceBriefing({
   hasOnlyOnboardingDocs,
   onSendMessage,
 }: WorkspaceBriefingProps) {
-  // Architect-level users with no alerts and no guidance: auto-hide
-  if (maturityStage === 'architect' && activeAlerts.length === 0 && !dailyGuidance) return null
+  // Architect-level users don't need the beginner nudge — but they DO still
+  // benefit from one-tap resume of recent work, alerts, and daily guidance.
+  // Only fully hide when there's genuinely nothing actionable to surface.
+  if (
+    maturityStage === 'architect' &&
+    activeAlerts.length === 0 &&
+    !dailyGuidance &&
+    recentActivity.length === 0
+  ) return null
 
   // Nothing to show at all
   if (recentActivity.length === 0 && activeAlerts.length === 0 && maturityStage === 'newcomer' && !dailyGuidance) return null
