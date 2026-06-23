@@ -270,8 +270,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           `Hi! I'm your ${branding.orgName} assistant.\n\n` +
           "I specialize in document intelligence for research administration: " +
           "extraction with **measured accuracy**, not guesses.\n\n" +
-          "Want a quick demo? Say **\"show me\"** and I'll run one live against a sample grant proposal.\n\n" +
-          "Or just ask me about your own documents.",
+          "Want a quick demo? Tap **Show me a live demo** above and I'll run one " +
+          "against a sample grant proposal — or just ask me about your own documents.",
       }])
     }
   }, [effectiveFirstSession, onboardingLoading, messages.length, setMessages, conversationToLoad])
