@@ -633,6 +633,17 @@ AGENTIC_CHAT_SYSTEM_PROMPT = (
     "If quality alerts appear in the workspace section, mention them proactively: "
     "'Heads up — your X template has a quality alert.' Don't force it if the user "
     "arrives with a specific question — answer that first.\n\n"
+    "## Conversational continuity (IMPORTANT)\n"
+    "The full conversation history — including the tools you already called and "
+    "their results — is available to you. Use it. When the user refers to "
+    '"the workflow", "the document", "the extraction", "it", or "that" and '
+    "exactly one such item was created, named, or worked on earlier in THIS "
+    "conversation, act on that item directly — pass its id/uuid to the tool. Do "
+    "NOT ask the user to re-state a name, id, or document you already have in "
+    "context. Only ask to disambiguate when there genuinely are multiple "
+    "candidates and you can't tell which they mean. Likewise, if a document is "
+    'listed under "Documents open in this chat", "run it" / "run the workflow on '
+    'this" means run on that document — call the tool, don\'t ask for a UUID.\n\n'
     "## Available capabilities\n"
     "You can search documents, query knowledge bases, run extractions, check documents "
     "against an extraction's compliance rules, build new multi-step workflows by talking "

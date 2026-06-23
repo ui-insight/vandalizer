@@ -33,6 +33,30 @@ logger = logging.getLogger(__name__)
 MAX_RESULTS = 20
 
 
+def _resolve_doc_uuids(
+    context: RunContext[AgenticChatDeps],
+    document_uuids: list[str] | None,
+) -> list[str]:
+    """Resolve the document UUIDs a tool should act on.
+
+    When the model passes none — e.g. the user said "run it on this" about a
+    PDF that's already open in the chat — fall back to the documents currently
+    selected in the conversation (``deps.context_document_uuids``) instead of
+    forcing the model to re-type a UUID it can see. Returns a de-duplicated
+    list preserving order.
+    """
+    uuids = list(document_uuids or [])
+    if not uuids:
+        uuids = list(getattr(context.deps, "context_document_uuids", None) or [])
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for u in uuids:
+        if u and u not in seen:
+            seen.add(u)
+            deduped.append(u)
+    return deduped
+
+
 def _score_to_tier(score: float | None) -> str | None:
     """Map a numeric quality score to a tier label."""
     if score is None:
@@ -1015,6 +1039,11 @@ async def run_extraction(
         extraction_set_uuid: UUID of the extraction template to run.
         document_uuids: List of document UUIDs to extract from (max 10).
     """
+    # Default to the documents open in the chat when the model omits them.
+    document_uuids = _resolve_doc_uuids(context, document_uuids)
+    if not document_uuids:
+        return {"error": "Give me at least one document to extract from."}
+
     # Load the search set
     ss = await SearchSet.find_one(SearchSet.uuid == extraction_set_uuid)
     if not ss:
@@ -1213,6 +1242,11 @@ async def check_compliance(
         extraction_set_uuid: UUID of the extraction template whose rules to apply.
         document_uuids: Document UUIDs to check (max 10).
     """
+    # Default to the documents open in the chat when the model omits them.
+    document_uuids = _resolve_doc_uuids(context, document_uuids)
+    if not document_uuids:
+        return {"error": "Give me at least one document to check."}
+
     ss = await SearchSet.find_one(SearchSet.uuid == extraction_set_uuid)
     if not ss:
         return {"error": f"Extraction set '{extraction_set_uuid}' not found."}
@@ -1487,7 +1521,10 @@ async def run_workflow(
             input; any documents pinned to the workflow are included too.
         confirmed: Must be true to actually run. If false, returns a preview.
     """
-    document_uuids = list(document_uuids or [])
+    # Fall back to the documents already open in the chat when the model omits
+    # them ("run the workflow on it"). Text-input workflows pass text instead,
+    # so only default when no text was given.
+    document_uuids = _resolve_doc_uuids(context, document_uuids) if not (text_input or "").strip() else list(document_uuids or [])
     text = (text_input or "").strip()
 
     # Look up workflow and verify access

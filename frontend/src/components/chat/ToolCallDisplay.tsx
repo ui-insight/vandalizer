@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { AlertTriangle, Check, ChevronRight, ClipboardCopy, Download, ExternalLink, FileText, Loader2 } from 'lucide-react'
 import { QualityBadge } from './QualityBadge'
+import { renderMarkdown } from './markdown'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import type { WorkspaceMode } from '../../contexts/WorkspaceContext'
 import type { ToolCallInfo, ToolResultInfo, QualityMeta } from '../../types/chat'
@@ -746,19 +747,23 @@ function WorkflowOutput({ content }: { content: Record<string, unknown> }) {
 
   const copyText = typeof output === 'string' ? output : JSON.stringify(output, null, 2)
 
-  // If output is a string, show it as a block
+  // If output is a string, render it as markdown — workflows commonly emit a
+  // formatted report (headings, bold, bullets). Showing the raw source (or
+  // truncating it) was the old behavior and looked broken.
   if (typeof output === 'string') {
     if (output.trim().length === 0) return null
     return (
       <div style={{ marginTop: 4, marginLeft: 20 }}>
-        <div style={{
-          fontSize: 12, lineHeight: 1.6,
-          color: '#374151', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-          maxHeight: 200, overflow: 'auto', padding: '8px 12px',
-          background: '#fafafa', borderRadius: 6, border: '1px solid #f3f4f6',
-        }}>
-          {output.length > 1000 ? output.slice(0, 997) + '...' : output}
-        </div>
+        <div
+          className="chat-markdown select-text"
+          style={{
+            fontSize: 13, lineHeight: 1.6,
+            color: '#374151', wordBreak: 'break-word',
+            maxHeight: 480, overflow: 'auto', padding: '8px 12px',
+            background: '#fafafa', borderRadius: 6, border: '1px solid #f3f4f6',
+          }}
+          dangerouslySetInnerHTML={{ __html: renderMarkdown(output) }}
+        />
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 2 }}>
           <CopyButton text={copyText} label="Copy workflow output" />
         </div>
