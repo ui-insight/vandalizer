@@ -1617,3 +1617,31 @@ class TestCreateWorkflow:
 
         assert "error" in result
         assert "input_mode" in result["error"]
+
+    @pytest.mark.asyncio
+    async def test_adds_to_personal_library(self):
+        from app.services.chat_tools import create_workflow
+
+        fake_wf = MagicMock()
+        fake_wf.id = "wf-lib"
+        fake_wf.name = "Flow"
+
+        fake_lib = MagicMock()
+        fake_lib.id = "lib-1"
+
+        ctx = _make_context()
+        steps = [{"name": "Summarize", "type": "summarize"}]
+        with patch("app.services.workflow_service.create_workflow", new_callable=AsyncMock, return_value=fake_wf), \
+             patch("app.services.workflow_service.add_step", new_callable=AsyncMock, return_value={"id": "s1"}), \
+             patch("app.services.workflow_service.add_task", new_callable=AsyncMock, return_value={"id": "t1"}), \
+             patch("app.services.library_service.get_or_create_personal_library", new_callable=AsyncMock, return_value=fake_lib), \
+             patch("app.services.library_service.add_item", new_callable=AsyncMock) as mock_add:
+            result = await create_workflow(ctx, "Flow", steps, confirmed=True)
+
+        assert result["workflow_id"] == "wf-lib"
+        # Workflow registered in the personal library as a 'workflow' item.
+        mock_add.assert_awaited_once()
+        args = mock_add.await_args.args
+        assert args[0] == "lib-1"      # personal library id
+        assert args[2] == "wf-lib"     # workflow id
+        assert args[3] == "workflow"   # kind

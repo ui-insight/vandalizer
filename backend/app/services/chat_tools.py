@@ -3718,6 +3718,18 @@ async def create_workflow(
         except Exception:
             logger.exception("Failed to persist input_config for workflow %s", workflow_id)
 
+    # Register the workflow in the user's personal library so it shows up in the
+    # Library tab — mirrors what the modal "New workflow" flow does, and what
+    # create_extraction_from_document already does for search sets. Without this
+    # a chat-built workflow exists but never appears in the Library.
+    try:
+        from app.services.library_service import add_item, get_or_create_personal_library
+
+        lib = await get_or_create_personal_library(context.deps.user_id)
+        await add_item(str(lib.id), user, workflow_id, "workflow")
+    except Exception:
+        logger.exception("Failed to add workflow %s to personal library", workflow_id)
+
     mode_note = {
         "text_input": " It takes typed text input each run — tell me what to type and I'll run it.",
         "no_input": " It runs with no input.",
