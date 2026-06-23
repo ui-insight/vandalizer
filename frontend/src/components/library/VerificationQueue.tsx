@@ -419,7 +419,7 @@ export function VerificationQueue() {
                               ) : (
                                 <div className="text-[10px] text-amber-700 inline-flex items-center gap-1">
                                   <Pin className="h-3 w-3" />
-                                  No baseline to pin — approving leaves catalog entry without a drift contract.
+                                  No baseline to pin. Approving leaves catalog entry without a drift contract.
                                 </div>
                               )}
                               <div className="flex gap-1">

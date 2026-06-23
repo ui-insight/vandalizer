@@ -367,7 +367,7 @@ function IdleHero({
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
         <Sparkles size={18} style={{ color: '#a78bfa' }} />
-        <h3 style={{ margin: 0, fontSize: 15, color: '#fff' }}>Get a quality score for this KB — and a one-click recipe to improve it</h3>
+        <h3 style={{ margin: 0, fontSize: 15, color: '#fff' }}>Get a quality score for this KB, and a one-click recipe to improve it</h3>
       </div>
       <FeedbackImpactCallout impact={impact} />
       <p style={{ margin: '0 0 12px 0', fontSize: 13, color: '#bbb', lineHeight: 1.5 }}>
@@ -392,7 +392,7 @@ function IdleHero({
           }}>
             <li>We'll write test questions from your documents</li>
             <li>You'll review them before anything else runs</li>
-            <li>We try many setups and recommend the best — you decide whether to apply</li>
+            <li>We try many setups and recommend the best; you decide whether to apply</li>
           </ol>
         </div>
       )}

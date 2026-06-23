@@ -28,21 +28,21 @@ export const DOMAIN_LABELS: Record<AutovalidateDomain, DomainLabels> = {
     baselineTile: COMMON_TILE,
     scoreFloorLabel: 'Score to beat (no baseline)',
     scoreFloorDescription:
-      'How well the model answers without your knowledge base — the tuned KB needs to clear this bar to be worth keeping.',
+      'How well the model answers without your knowledge base. The tuned KB needs to clear this bar to be worth keeping.',
     liftLabel: 'better than no baseline',
   },
   extraction: {
     baselineTile: COMMON_TILE,
     scoreFloorLabel: 'Score to beat (no baseline)',
     scoreFloorDescription:
-      'How well extraction performs with no custom settings — the tuned result needs to clear this bar to be worth keeping.',
+      'How well extraction performs with no custom settings. The tuned result needs to clear this bar to be worth keeping.',
     liftLabel: 'better than no baseline',
   },
   workflow: {
     baselineTile: COMMON_TILE,
     scoreFloorLabel: 'Score to beat (no baseline)',
     scoreFloorDescription:
-      'How well a single-shot LLM call performs without the workflow — the tuned workflow needs to clear this bar to be worth keeping.',
+      'How well a single-shot LLM call performs without the workflow. The tuned workflow needs to clear this bar to be worth keeping.',
     liftLabel: 'better than no baseline',
   },
 }

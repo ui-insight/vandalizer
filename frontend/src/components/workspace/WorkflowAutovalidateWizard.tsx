@@ -237,7 +237,7 @@ export function WorkflowAutovalidateWizard({ workflowId, onClose, onStarted }: P
     const parts: string[] = []
     if (cost_label) parts.push(cost_label)
     if (time) parts.push(`~${time}`)
-    return parts.length > 0 ? `Validate & improve — ${parts.join(', ')}` : 'Validate & improve'
+    return parts.length > 0 ? `Validate & improve: ${parts.join(', ')}` : 'Validate & improve'
   }
 
   return (
@@ -264,10 +264,10 @@ function ConceptStep() {
       <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: '#fff' }}>What happens when you run this?</h4>
       <p style={{ margin: '0 0 10px 0' }}>
         First we run your workflow as-is and score it against your{' '}
-        <TermDef term="test-set">expected outputs</TermDef> — that's your validation score.
-        Then we try other ways of running it — each per-step combination of model and
-        prompt-style is a <TermDef term="candidate">candidate</TermDef> — and keep whichever
-        scores best. Another AI — the <TermDef term="judge">judge</TermDef> — grades each
+        <TermDef term="test-set">expected outputs</TermDef>. That's your validation score.
+        Then we try other ways of running it (each per-step combination of model and
+        prompt-style is a <TermDef term="candidate">candidate</TermDef>) and keep whichever
+        scores best. Another AI, the <TermDef term="judge">judge</TermDef>, grades each
         result so wording differences don't unfairly penalize a good answer.
       </p>
       <h4 style={{ margin: '0 0 6px 0', fontSize: 13, color: '#fff' }}>What it changes</h4>
@@ -279,7 +279,7 @@ function ConceptStep() {
       <ul style={{ margin: '0 0 10px 0', paddingLeft: 18, color: '#bbb' }}>
         <li>The workflow's structure (steps, order)</li>
         <li>Your expected outputs</li>
-        <li>Your live config — until you click Apply</li>
+        <li>Your live config, until you click Apply</li>
       </ul>
       <h4 style={{ margin: '0 0 6px 0', fontSize: 13, color: '#fff' }}>Caveats</h4>
       <ul style={{ margin: 0, paddingLeft: 18, color: '#bbb' }}>

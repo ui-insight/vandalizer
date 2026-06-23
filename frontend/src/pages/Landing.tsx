@@ -267,7 +267,7 @@ function DemoRequestForm() {
         <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-green-500/10 text-green-400 mb-4">
           <Check className="w-6 h-6" />
         </div>
-        <h3 className="text-2xl font-bold text-white mb-2">Thanks — we&apos;ll be in touch soon.</h3>
+        <h3 className="text-2xl font-bold text-white mb-2">Thanks, we&apos;ll be in touch soon.</h3>
         <p className="text-gray-400">
           Someone from the Vandalizer team will reach out within one business day to schedule your walkthrough.
         </p>
@@ -591,7 +591,7 @@ export default function Landing() {
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-highlight/10 border border-highlight/20 mb-10 hover:bg-highlight/20 transition-colors cursor-default">
             <Sparkles className="w-4 h-4 text-highlight" />
             <span className="text-sm font-bold text-highlight tracking-wide uppercase">
-              Vandalizer 5.0 — Fully Agentic
+              Vandalizer 5.0 - Fully Agentic
             </span>
           </div>
 
@@ -610,7 +610,7 @@ export default function Landing() {
             <span className="text-highlight">Every answer is validated.</span>
           </p>
           <p className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto leading-relaxed mb-8">
-            Run extractions, build knowledge bases, and orchestrate workflows — all from one conversation. Backed by verified test cases and quality scores you can trust.
+            Run extractions, build knowledge bases, and orchestrate workflows, all from one conversation. Backed by verified test cases and quality scores you can trust.
           </p>
 
           {/* Demo CTA */}
@@ -644,7 +644,7 @@ export default function Landing() {
                   <div className="w-3 h-3 rounded-full bg-yellow-500/20 border border-yellow-500/50" />
                   <div className="w-3 h-3 rounded-full bg-green-500/20 border border-green-500/50" />
                 </div>
-                <div className="ml-4 text-xs text-gray-500 font-mono">Vandalizer — Chat</div>
+                <div className="ml-4 text-xs text-gray-500 font-mono">Vandalizer - Chat</div>
               </div>
 
               {/* Chat body */}
@@ -665,14 +665,14 @@ export default function Landing() {
                     <div className="flex items-center gap-2 text-xs text-gray-400">
                       <Check className="w-3 h-3 text-green-500" />
                       <span className="font-mono text-gray-400">search_documents</span>
-                      <span className="text-gray-500">— found 1 match: NIH_R01_Proposal.pdf</span>
+                      <span className="text-gray-500">- found 1 match: NIH_R01_Proposal.pdf</span>
                     </div>
 
                     {/* Tool call — run_extraction */}
                     <div className="flex items-center gap-2 text-xs text-gray-400">
                       <Check className="w-3 h-3 text-green-500" />
                       <span className="font-mono text-orange-400">run_extraction</span>
-                      <span className="text-gray-500">— 3 fields extracted</span>
+                      <span className="text-gray-500">- 3 fields extracted</span>
                       {/* Quality badge */}
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-500/10 border border-green-500/30 text-green-400 text-[10px] font-bold uppercase tracking-wide">
                         <BadgeCheck className="w-3 h-3" />
@@ -707,7 +707,7 @@ export default function Landing() {
                     </div>
 
                     <p className="text-gray-300 pt-1">
-                      Extraction complete — validated against 12 test cases with 94% accuracy. Want me to check compliance against your NIH checklist workflow?
+                      Extraction complete: validated against 12 test cases with 94% accuracy. Want me to check compliance against your NIH checklist workflow?
                     </p>
                   </div>
                 </div>
@@ -738,7 +738,7 @@ export default function Landing() {
                 not just chat that&apos;s <span className="text-gray-500 line-through">convenient</span>.
               </h2>
               <p className="text-xl text-gray-400 leading-relaxed mb-8">
-                Generic AI chat works for one-off questions. Research administration doesn&apos;t tolerate &ldquo;usually right.&rdquo; Vandalizer pairs conversational ease with verified test cases, quality scores, and source-linked answers — so every reply shows you <em>how</em> it knows.
+                Generic AI chat works for one-off questions. Research administration doesn&apos;t tolerate &ldquo;usually right.&rdquo; Vandalizer pairs conversational ease with verified test cases, quality scores, and source-linked answers, so every reply shows you <em>how</em> it knows.
               </p>
               <div className="space-y-6">
                 <div className="flex gap-4">
@@ -748,7 +748,7 @@ export default function Landing() {
                   <div>
                     <h4 className="text-xl font-bold text-white mb-2">Quality scores on every result</h4>
                     <p className="text-lg text-gray-400">
-                      Accuracy, consistency, and test-case counts surface inline — not buried in a dashboard.
+                      Accuracy, consistency, and test-case counts surface inline, not buried in a dashboard.
                     </p>
                   </div>
                 </div>
@@ -845,11 +845,11 @@ export default function Landing() {
                 <span className="text-blue-400">invoked by conversation.</span>
               </h2>
               <p className="text-xl text-gray-400 leading-relaxed mb-8">
-                No more hunting for the right workflow in a menu. Ask the agent to run your NIH compliance check, your subaward review, or your custom pipeline — and watch each step execute live, with approval gates and quality signals intact.
+                No more hunting for the right workflow in a menu. Ask the agent to run your NIH compliance check, your subaward review, or your custom pipeline, and watch each step execute live, with approval gates and quality signals intact.
               </p>
               <ul className="space-y-4">
                 {[
-                  'Ask in plain English — the agent picks the right workflow',
+                  'Ask in plain English, and the agent picks the right workflow',
                   'Live step-by-step status while workflows execute',
                   'Approval gates still pause for human review',
                   'Build new workflows from chat: describe the process, refine, verify',
@@ -916,7 +916,7 @@ export default function Landing() {
           <div className="mb-20 text-center">
             <h2 className="text-4xl font-bold text-white mb-6">Everything your research team needs, from one chat.</h2>
             <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-              Documents, knowledge bases, extractions, workflows — all reachable through conversation, all backed by validated quality.
+              Documents, knowledge bases, extractions, workflows: all reachable through conversation, all backed by validated quality.
             </p>
           </div>
 
@@ -933,7 +933,7 @@ export default function Landing() {
                 One chat, every capability
               </h3>
               <p className="text-gray-400 text-xl leading-relaxed mb-6 relative z-10 max-w-lg">
-                Search documents, query knowledge bases, run extractions, dispatch workflows, and build new test cases — all through natural conversation. 19 agent tools working behind one prompt.
+                Search documents, query knowledge bases, run extractions, dispatch workflows, and build new test cases, all through natural conversation. 19 agent tools working behind one prompt.
               </p>
               <div className="absolute -bottom-6 -right-6 w-40 h-40 bg-highlight/5 rounded-full blur-2xl group-hover:bg-highlight/10 transition-colors" />
             </div>
@@ -982,7 +982,7 @@ export default function Landing() {
                 Reproducible by design
               </h3>
               <p className="text-gray-400 text-xl leading-relaxed relative z-10">
-                Every workflow produces the same result for the same input. No prompt drift, no variability — just auditable processes.
+                Every workflow produces the same result for the same input. No prompt drift, no variability, just auditable processes.
               </p>
             </div>
 
@@ -1036,7 +1036,7 @@ export default function Landing() {
                   {
                     n: 1,
                     title: 'Ask in plain English',
-                    desc: '“Extract PI, budget, and deadline from the NIH proposal.” The agent picks the right tools — search, extract, validate.',
+                    desc: '“Extract PI, budget, and deadline from the NIH proposal.” The agent picks the right tools: search, extract, validate.',
                   },
                   {
                     n: 2,
@@ -1100,17 +1100,17 @@ export default function Landing() {
                     <div className="flex items-center gap-2 font-mono text-xs">
                       <Check className="w-3 h-3 text-green-500" />
                       <span className="text-blue-400">search_documents</span>
-                      <span className="text-gray-500">— 1 result</span>
+                      <span className="text-gray-500">- 1 result</span>
                     </div>
                     <div className="flex items-center gap-2 font-mono text-xs">
                       <Check className="w-3 h-3 text-green-500" />
                       <span className="text-purple-400">run_workflow</span>
-                      <span className="text-gray-500">— NIH Compliance · 8/8 steps</span>
+                      <span className="text-gray-500">- NIH Compliance · 8/8 steps</span>
                     </div>
                     <div className="flex items-center gap-2 font-mono text-xs">
                       <Loader2 className="w-3 h-3 animate-spin text-highlight" />
                       <span className="text-orange-400">run_extraction</span>
-                      <span className="text-gray-500">— finalizing…</span>
+                      <span className="text-gray-500">- finalizing…</span>
                     </div>
                   </div>
 
@@ -1154,12 +1154,12 @@ export default function Landing() {
                 <span className="text-highlight">Vandal Workflow Architect.</span>
               </h2>
               <p className="text-xl text-gray-400 leading-relaxed mb-8">
-                11 modules, 1,600 XP, and hands-on exercises that take you from AI literacy to governance. Learn how agentic chat, validated workflows, and institutional knowledge combine into a discipline — not a gadget.
+                11 modules, 1,600 XP, and hands-on exercises that take you from AI literacy to governance. Learn how agentic chat, validated workflows, and institutional knowledge combine into a discipline, not a gadget.
               </p>
               <ul className="space-y-3 mb-8">
                 {[
                   'Free for all research administrators',
-                  'Works inside Vandalizer — exercises run on real documents',
+                  'Works inside Vandalizer: exercises run on real documents',
                   'Earn the Certified badge visible on every workflow you publish',
                 ].map((text) => (
                   <li key={text} className="flex items-center gap-3 text-lg text-gray-300">

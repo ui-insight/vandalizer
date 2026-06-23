@@ -1009,7 +1009,7 @@ function ChatView({
               onClick={() => setIsInternalNote((v) => !v)}
               title={isInternalNote
                 ? 'Only other support agents will see this'
-                : 'Switch to an internal note — visible only to support agents'}
+                : 'Switch to an internal note, visible only to support agents'}
               className={
                 isInternalNote
                   ? 'inline-flex items-center gap-1 rounded-full border border-yellow-500 bg-yellow-200 px-2 py-0.5 text-[10px] font-semibold text-yellow-900'

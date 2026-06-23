@@ -69,7 +69,7 @@ export function KBPickerModal({ onSelect, onClose, folderTitle }: KBPickerModalP
         {kbs && (
           <div className="max-h-64 overflow-y-auto rounded-md border border-gray-200">
             {kbs.length === 0 ? (
-              <p className="px-3 py-4 text-sm text-gray-500">No knowledge bases yet — create one below.</p>
+              <p className="px-3 py-4 text-sm text-gray-500">No knowledge bases yet. Create one below.</p>
             ) : (
               <ul>
                 {kbs.map(kb => (

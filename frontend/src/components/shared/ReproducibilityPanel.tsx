@@ -51,18 +51,18 @@ export function ReproducibilityPanel({ run }: Props) {
     },
     {
       label: 'Judge temperature',
-      value: run.judge_temperature == null ? '—' : run.judge_temperature.toFixed(2),
+      value: run.judge_temperature == null ? '-' : run.judge_temperature.toFixed(2),
     },
     {
       label: 'RNG seed',
-      value: run.rng_seed != null ? String(run.rng_seed) : '—',
+      value: run.rng_seed != null ? String(run.rng_seed) : '-',
       title: 'Persisted so re-runs are deterministic given the same eval set + config space.',
     },
     {
       label: 'Judge variance',
       value: variance != null
         ? `σ=${(variance * 100).toFixed(1)}pts` + (meta?.n ? ` (n=${meta.n})` : '')
-        : '—',
+        : '-',
       title: meta?.sampled_query_uuids?.length
         ? `Sampled on queries: ${meta.sampled_query_uuids.slice(0, 5).join(', ')}${meta.sampled_query_uuids.length > 5 ? '…' : ''}`
         : undefined,
@@ -71,7 +71,7 @@ export function ReproducibilityPanel({ run }: Props) {
       label: 'Lift CI',
       value: ci
         ? `${fmtSignedPts(ci.lower * 100)} to ${fmtSignedPts(ci.upper * 100)} (n=${ci.n_queries}, p=${ci.p_value < 0.001 ? '<0.001' : ci.p_value.toFixed(3)})`
-        : '—',
+        : '-',
       title: ci
         ? `Paired-bootstrap CI, ${ci.n_iterations.toLocaleString()} resamples.`
         : 'Per-query CI unavailable for older runs.',
@@ -80,7 +80,7 @@ export function ReproducibilityPanel({ run }: Props) {
       label: 'Eval set',
       value: snapshot
         ? `${snapshot.total} queries · ${snapshot.auto_generated_count} auto / ${snapshot.user_authored_count} user`
-        : '—',
+        : '-',
       title: snapshot
         ? 'Snapshot taken at run start. Future runs comparing against this one will check expected-answer hashes for drift.'
         : undefined,

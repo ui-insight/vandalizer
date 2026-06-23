@@ -356,7 +356,7 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
                 />
                 <span>
                   <span className="block text-xs font-semibold text-amber-900">
-                    Submit without validation — request reviewer help
+                    Submit without validation: request reviewer help
                   </span>
                   <span className="block text-[11px] leading-snug text-amber-800 mt-0.5">
                     Reviewer will establish a validation baseline before approval. May take longer to review and could be returned for rework. Most submissions should be validated by the submitter first.

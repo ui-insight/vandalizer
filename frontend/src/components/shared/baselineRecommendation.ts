@@ -41,10 +41,10 @@ export function recommendationReason(
   const pct = Math.round(noBaselineScore * 100)
   const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
   if (noBaselineScore >= 0.85) {
-    return `Your model already answers ${pct}% of test cases ${ctx.withoutLabel} — a smaller budget is usually enough to confirm whether tuning adds anything.`
+    return `Your model already answers ${pct}% of test cases ${ctx.withoutLabel}, so a smaller budget is usually enough to confirm whether tuning adds anything.`
   }
   if (noBaselineScore < 0.6) {
-    return `${cap(ctx.withoutLabel)}, the model only gets ${pct}% — tuning has real room to help. Standard is a good default; bump to Thorough for a more confident answer.`
+    return `${cap(ctx.withoutLabel)}, the model only gets ${pct}%, so tuning has real room to help. Standard is a good default; bump to Thorough for a more confident answer.`
   }
   return `${cap(ctx.withoutLabel)}, the model gets ${pct}%. Standard is a sensible default.`
 }

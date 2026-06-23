@@ -283,7 +283,7 @@ export function KnowledgePanel() {
     api.addUrlsToKB(selectedKB.uuid, urls, crawlEnabled, maxCrawlPages, allowedDomains)
       .then((result) => {
         const n = result?.added ?? urls.length
-        toast(`Added ${n} URL${n === 1 ? '' : 's'} — crawling in background`, 'success')
+        toast(`Added ${n} URL${n === 1 ? '' : 's'}, crawling in background`, 'success')
         loadDetail(selectedKB.uuid)
         refresh()
       })
@@ -821,7 +821,7 @@ export function KnowledgePanel() {
                     fontStyle: selectedKB.description ? 'normal' : 'italic',
                     whiteSpace: 'pre-wrap',
                   }}>
-                    {selectedKB.description || 'No description yet — add one to help others understand what this KB is for.'}
+                    {selectedKB.description || 'No description yet. Add one to help others understand what this KB is for.'}
                   </div>
                   <button
                     onClick={() => {
@@ -1132,7 +1132,7 @@ export function KnowledgePanel() {
                           <div
                             style={{ fontSize: 12, color: '#e5e5e5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                             title={source.custom_name
-                              ? `${displayLabel} — original: ${autoLabel || (source.source_type === 'url' ? source.url : source.document_uuid) || ''}`
+                              ? `${displayLabel} (original: ${autoLabel || (source.source_type === 'url' ? source.url : source.document_uuid) || ''})`
                               : (source.source_type === 'url' ? (source.url || '') : (source.document_uuid || ''))}
                           >
                             {displayLabel}
@@ -1577,7 +1577,7 @@ export function KnowledgePanel() {
                     title: 'Remove from My KBs?',
                     message: (
                       <>
-                        Remove <strong>{kb?.title || 'this knowledge base'}</strong> from My KBs? This only removes your bookmark — the original knowledge base is unaffected, and you can add it again from Explore.
+                        Remove <strong>{kb?.title || 'this knowledge base'}</strong> from My KBs? This only removes your bookmark; the original knowledge base is unaffected, and you can add it again from Explore.
                       </>
                     ),
                     confirmLabel: 'Remove',

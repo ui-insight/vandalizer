@@ -237,7 +237,7 @@ export function ExaminerValidationDrawer({ request, currentUserId, onClose, onSa
                   <div>Submitter checks: <strong>{Array.isArray((submitterSnapshot as Record<string, unknown>).checks) ? ((submitterSnapshot as Record<string, unknown>).checks as unknown[]).length : 0}</strong></div>
                 )}
                 <div style={{ color: '#6b7280', fontSize: 11, marginTop: 4 }}>
-                  Your additions extend this set — they don't replace it. Edits to submitter cases require a return-for-rework instead.
+                  Your additions extend this set, they don't replace it. Edits to submitter cases require a return-for-rework instead.
                 </div>
               </div>
             ) : (

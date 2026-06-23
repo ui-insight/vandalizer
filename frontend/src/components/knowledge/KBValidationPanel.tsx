@@ -167,7 +167,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage }: Props) {
         setHistoryRefreshKey(k => k + 1)
       } else {
         setRunError(
-          'Validation is still running — large evaluation sets can take several ' +
+          'Validation is still running. Large evaluation sets can take several ' +
           'minutes. It will appear in the History tab when it finishes.',
         )
       }

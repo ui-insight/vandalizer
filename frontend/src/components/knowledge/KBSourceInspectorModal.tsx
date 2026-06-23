@@ -159,7 +159,7 @@ export function KBSourceInspectorModal({ kbUuid, source, onClose, onUpdated }: P
             value={sourceDraft}
             onChange={e => setSourceDraft(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); saveSource() } }}
-            placeholder={isDoc ? 'e.g. APM Ch.45 — uidaho.edu/apm/45' : 'Origin URL'}
+            placeholder={isDoc ? 'e.g. APM Ch.45, uidaho.edu/apm/45' : 'Origin URL'}
             maxLength={2000}
             disabled={savingSource}
             style={{
@@ -282,7 +282,7 @@ function SourceContentInspector({
                 >
                   {detail.url}
                 </a>
-              ) : (fallbackUrl || '—')}
+              ) : (fallbackUrl || '-')}
             </div>
           </>
         )}
@@ -293,7 +293,7 @@ function SourceContentInspector({
           </>
         )}
         <div style={{ color: '#888' }}>Status</div>
-        <div>{detail.status}{detail.error_message ? ` — ${detail.error_message}` : ''}</div>
+        <div>{detail.status}{detail.error_message ? `: ${detail.error_message}` : ''}</div>
         <div style={{ color: '#888' }}>Chunks</div>
         <div>{detail.chunk_count}</div>
         {detail.crawl_enabled && (

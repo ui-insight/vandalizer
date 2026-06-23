@@ -738,7 +738,7 @@ export function LibraryTab() {
             <p style={{ fontSize: 13, color: '#5f6368', marginBottom: 16 }}>
               When quality monitoring detects a drop, the system auto-tunes the affected
               knowledge base, extraction, or workflow in shadow mode. Candidates land here
-              for review — nothing is applied without your say-so.
+              for review. Nothing is applied without your say-so.
             </p>
             <OptimizerInbox />
           </div>
@@ -1227,7 +1227,7 @@ export function LibraryTab() {
                       })
                       if (!content) {
                         toast(
-                          `"${it.name}" has no prompt body — open it from the menu and add one.`,
+                          `"${it.name}" has no prompt body. Open it from the menu and add one.`,
                           'error',
                         )
                         return

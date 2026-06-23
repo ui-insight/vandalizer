@@ -252,7 +252,7 @@ export function RetroactiveBaselineDialog({ item, onClose, onSaved }: Props) {
             <label style={labelStyle}>Baseline reference score (optional, 0–100)</label>
             <input value={score} onChange={e => setScore(e.target.value)} type="number" min="0" max="100" placeholder="e.g. 85" style={{ ...inputStyle, maxWidth: 160 }} />
             <p style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
-              Drift monitoring compares the live config's score to this reference. Leave blank if unknown — set it after a real validation run.
+              Drift monitoring compares the live config's score to this reference. Leave blank if unknown, set it after a real validation run.
             </p>
           </div>
 

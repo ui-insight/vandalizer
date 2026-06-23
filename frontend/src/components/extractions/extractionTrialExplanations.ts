@@ -116,11 +116,11 @@ export function explainExtractionParameters(config: Config): ExtractionParamExpl
       label: 'Strategy',
       value: strategy ? STRATEGY_LABEL[strategy] : 'Default',
       why: strategy === 'two_pass'
-        ? 'Two passes — a first pass drafts the values, a second pass re-checks ' +
+        ? 'Two passes: a first pass drafts the values, a second pass re-checks ' +
           'and corrects them against the document. Slower, but usually more ' +
           'accurate on tricky fields.'
         : strategy === 'one_pass'
-          ? 'One pass — the AI reads the document once and fills every field in ' +
+          ? 'One pass: the AI reads the document once and fills every field in ' +
             'a single go. Faster and cheaper.'
           : 'Uses the standard extraction strategy.',
     },
@@ -131,7 +131,7 @@ export function explainExtractionParameters(config: Config): ExtractionParamExpl
       why: thinking
         ? 'The model works through its reasoning before committing to each ' +
           'value. Helps on fields that need inference or math, at extra time and cost.'
-        : 'The model answers directly without an explicit reasoning step — faster and cheaper.',
+        : 'The model answers directly without an explicit reasoning step, which is faster and cheaper.',
     },
     {
       key: 'consensus',
@@ -236,14 +236,14 @@ export function explainExtractionOutcome(trial: ExtractionTrial): string {
   }
   const liftPts = Math.round(lift * 100)
   if (liftPts > 0) {
-    return `This configuration scored ${scorePct}% — about ${liftPts} point` +
+    return `This configuration scored ${scorePct}%, about ${liftPts} point` +
       `${liftPts === 1 ? '' : 's'} higher than your current settings. The ` +
       'parameters below are what it changed to get there.'
   }
   if (liftPts < 0) {
-    return `This configuration scored ${scorePct}% — about ${Math.abs(liftPts)} point` +
+    return `This configuration scored ${scorePct}%, about ${Math.abs(liftPts)} point` +
       `${Math.abs(liftPts) === 1 ? '' : 's'} lower than your current settings, ` +
       'so the changes below didn’t help here.'
   }
-  return `This configuration scored ${scorePct}% — roughly tied with your current settings.`
+  return `This configuration scored ${scorePct}%, roughly tied with your current settings.`
 }

@@ -35,7 +35,7 @@ export const MODULES: ModuleDefinition[] = [
     number: 0,
     title: 'AI Literacy',
     subtitle: 'Understanding AI for Research Administration',
-    description: 'Welcome to the Vandal Workflow Architect certification. By the end of this program, you\'ll earn an official VWA credential recognizing your ability to design, validate, and deploy agentic AI workflows for research administration. This first module builds your foundation — what LLMs actually do, and how Vandalizer 5.0 combines conversational chat with validated workflows, quality scores, and source-linked answers to make AI trustworthy for professional RA work. No technical skills required yet.',
+    description: 'Welcome to the Vandal Workflow Architect certification. By the end of this program, you\'ll earn an official VWA credential recognizing your ability to design, validate, and deploy agentic AI workflows for research administration. This first module builds your foundation: what LLMs actually do, and how Vandalizer 5.0 combines conversational chat with validated workflows, quality scores, and source-linked answers to make AI trustworthy for professional RA work. No technical skills required yet.',
     objectives: [
       'Understand what an LLM is and how it generates text',
       'Learn the key terms you\'ll encounter throughout this certification',
@@ -336,7 +336,7 @@ export const MODULES: ModuleDefinition[] = [
       {
         title: 'Configuring fields for accuracy',
         objective: 'After this lesson, you\'ll be able to configure extraction fields that minimize hallucinations and missed values.',
-        content: 'The way you configure your Extraction fields directly impacts extraction quality:\n\n**Field names** should be specific and unambiguous. "PI Name" is better than "Name". "Total Budget (USD)" is better than "Budget".\n\n**Allowed values** (the field setting labeled "Allowed values" in the Extraction editor — sometimes called *enum values* in technical docs) constrain a field to a fixed list of options. For a field like "Document Type", you might set Allowed values to "Grant Proposal, Progress Report, Budget Justification". The LLM must pick one of those — it can\'t invent a new category. Use this any time the answer should be one of a known set: Yes/No, a status, a document type, a funding mechanism, etc.\n\n**Optional fields** should be marked as such. If a field like "Co-PI" won\'t appear in every document, marking it optional tells the extraction engine not to hallucinate a value when one doesn\'t exist.\n\n**Field descriptions** (in the title/searchphrase) give the LLM additional context about what to look for.',
+        content: 'The way you configure your Extraction fields directly impacts extraction quality:\n\n**Field names** should be specific and unambiguous. "PI Name" is better than "Name". "Total Budget (USD)" is better than "Budget".\n\n**Allowed values** (the field setting labeled "Allowed values" in the Extraction editor, sometimes called *enum values* in technical docs) constrain a field to a fixed list of options. For a field like "Document Type", you might set Allowed values to "Grant Proposal, Progress Report, Budget Justification". The LLM must pick one of those; it can\'t invent a new category. Use this any time the answer should be one of a known set: Yes/No, a status, a document type, a funding mechanism, etc.\n\n**Optional fields** should be marked as such. If a field like "Co-PI" won\'t appear in every document, marking it optional tells the extraction engine not to hallucinate a value when one doesn\'t exist.\n\n**Field descriptions** (in the title/searchphrase) give the LLM additional context about what to look for.',
         variant: 'concept',
         knowledgeCheck: {
           question: 'When should you mark an Extraction field as optional?',
@@ -449,7 +449,7 @@ export const MODULES: ModuleDefinition[] = [
     ],
     tips: [
       'The budget has personnel costs, supplies, travel, and subaward line items that should sum to $542,800',
-      'Use the Research node to analyze the extracted figures and check whether the line items add up — it runs two LLM passes over the data, no URL or API key required',
+      'Use the Research node to analyze the extracted figures and check whether the line items add up. It runs two LLM passes over the data, no URL or API key required',
       'Add a parallel Prompt task alongside the Research node to generate a budget narrative',
     ],
     lessons: [
@@ -481,7 +481,7 @@ export const MODULES: ModuleDefinition[] = [
           question: 'When you add multiple tasks to a single step, how do they run?',
           options: [
             { text: 'One at a time, in the order you added them', correct: false, explanation: 'Sequential execution would defeat the purpose of parallel tasks. Vandalizer runs them concurrently.' },
-            { text: 'Concurrently — they all run at the same time', correct: true, explanation: 'Correct! Multiple tasks within a step run in parallel — they all start at roughly the same time, and the step waits for them all to finish. Their results are collected and passed to the next step.' },
+            { text: 'Concurrently, they all run at the same time', correct: true, explanation: 'Correct! Multiple tasks within a step run in parallel: they all start at roughly the same time, and the step waits for them all to finish. Their results are collected and passed to the next step.' },
             { text: 'In a random order determined by server load', correct: false, explanation: 'Tasks run concurrently, not in a random order. All start at roughly the same time.' },
             { text: 'Only the first task runs; the rest are treated as fallbacks if it fails', correct: false, explanation: 'All tasks run. There\'s no fallback logic between tasks in a step.' },
           ],

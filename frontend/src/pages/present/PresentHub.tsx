@@ -52,7 +52,7 @@ export function PresentHub() {
           Present &amp; Pitch
         </h1>
         <p className="mt-4 text-lg text-gray-400 max-w-2xl leading-relaxed">
-          Ready-to-use material for introducing Vandalizer — pick your audience, then
+          Ready-to-use material for introducing Vandalizer. Pick your audience, then
           read it, present it live, or copy an elevator pitch. Everything here is public:
           share any link, no account needed.
         </p>

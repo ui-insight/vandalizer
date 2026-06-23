@@ -83,11 +83,11 @@ interface TaskTypeDef {
 
 const TASK_TYPES: TaskTypeDef[] = [
   { name: 'Extraction', label: 'Extractions', icon: Filter, color: '#dc2626', categories: ['all', 'text'], enabled: true,
-    description: 'Pulls structured fields out of the step input — names, dates, amounts, etc. — using prompts you define per field.' },
+    description: 'Pulls structured fields out of the step input (names, dates, amounts, etc.) using prompts you define per field.' },
   { name: 'Prompt', label: 'Prompts', icon: MousePointerClick, color: '#2563eb', categories: ['all', 'text'], enabled: true,
     description: 'Sends free-form instructions to the LLM and captures the response as text. Use for summaries, rewrites, or open-ended analysis.' },
   { name: 'Formatter', label: 'Format', icon: Outdent, color: '#16a34a', categories: ['all', 'text'], enabled: true,
-    description: 'Reformats the step input into a target shape — markdown, JSON, table, etc. — without further analysis.' },
+    description: 'Reformats the step input into a target shape (markdown, JSON, table, etc.) without further analysis.' },
   { name: 'Browser', label: 'Browser Automation', icon: Globe, color: '#2563eb', categories: ['all', 'web'], enabled: false,
     description: 'Drives a real browser to interact with web pages: click, type, scroll, capture results.' },
   { name: 'AddDocument', label: 'Add Document', icon: FileText, color: '#7c3aed', categories: ['all', 'files'], enabled: true,
@@ -101,7 +101,7 @@ const TASK_TYPES: TaskTypeDef[] = [
   { name: 'CrawlerNode', label: 'Crawler Node', icon: Bug, color: '#84cc16', categories: ['all', 'web'], enabled: true,
     description: 'Recursively follows links from a starting URL and collects page contents for downstream steps.' },
   { name: 'ResearchNode', label: 'Research Node', icon: Search, color: '#8b5cf6', categories: ['all', 'text'], enabled: true,
-    description: 'Two-pass analysis of the step input: first finds key points, then synthesizes them into a written report. Works on your documents — no URL needed.' },
+    description: 'Two-pass analysis of the step input: first finds key points, then synthesizes them into a written report. Works on your documents, no URL needed.' },
   { name: 'KnowledgeBaseQuery', label: 'Knowledge Base Query', icon: Sparkles, color: '#0ea5e9', categories: ['all', 'text'], enabled: true,
     description: 'Asks a question of a connected knowledge base via RAG and returns a cited answer, or the raw matching passages.' },
   { name: 'APINode', label: 'API Node', icon: Zap, color: '#f97316', categories: ['all', 'web'], enabled: true,
@@ -185,7 +185,7 @@ const TEST_STEP_SUPPORTED_TYPES = new Set([
 ])
 
 const TEST_STEP_TOOLTIP = [
-  'Tests this step in isolation — prior steps are NOT run.',
+  'Tests this step in isolation: prior steps are NOT run.',
   'If this step references earlier step output, that input will be empty.',
   '',
   'What it does:',
@@ -197,7 +197,7 @@ const TEST_STEP_TOOLTIP = [
   "What it doesn't do:",
   '• Run upstream steps to build context',
   '• Iterate over all selected documents (only the first is used)',
-  '• Persist the result — close the panel and it’s gone',
+  '• Persist the result; close the panel and it’s gone',
 ].join('\n')
 
 // ---------------------------------------------------------------------------
@@ -377,7 +377,7 @@ export function WorkflowEditorPanel() {
     const sharedBlock = workflow?.can_manage === false
     if (!verifiedBlock && !sharedBlock) return false
     const msg = verifiedBlock
-      ? "This workflow is verified — edits would change the verified version. Make a copy to edit?\n\nYour copy will be saved to your team."
+      ? "This workflow is verified, so edits would change the verified version. Make a copy to edit?\n\nYour copy will be saved to your team."
       : "This workflow is shared with you. Make a copy to edit?\n\nYour copy will be saved to your team."
     if (window.confirm(msg)) {
       void handleMakeCopy()
@@ -573,7 +573,7 @@ export function WorkflowEditorPanel() {
     try {
       const copy = (await duplicateWorkflow(openWorkflowId, openWorkflowShareToken ?? undefined)) as { id?: string }
       if (copy?.id) {
-        toast('Copied workflow — opening your editable version', 'success')
+        toast('Copied workflow. Opening your editable version.', 'success')
         openWorkflow(copy.id)
       } else {
         toast('Failed to copy workflow', 'error')
@@ -646,8 +646,8 @@ export function WorkflowEditorPanel() {
                 <span
                   title={
                     (workflow as Workflow & { verified?: boolean }).verified
-                      ? 'Verified workflow — make a copy to edit'
-                      : 'Shared with you — make a copy to edit'
+                      ? 'Verified workflow: make a copy to edit'
+                      : 'Shared with you: make a copy to edit'
                   }
                   onClick={(e) => { e.stopPropagation(); void handleMakeCopy() }}
                   style={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}
@@ -1006,7 +1006,7 @@ export function WorkflowEditorPanel() {
         {isNoInput && (
           <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 4 }}>
             <Play style={{ width: 12, height: 12 }} />
-            No input required — runs directly
+            No input required, runs directly
           </div>
         )}
         {runner.running && !runner.batchId ? (
@@ -2655,7 +2655,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
     try {
       const { entities } = await suggestFields(selectedDocUuids.slice(0, 1))
       if (entities.length === 0) {
-        setSuggestError('No fields suggested — document text may be empty.')
+        setSuggestError('No fields suggested. Document text may be empty.')
         return
       }
       setTaskData(prev => {
@@ -2797,7 +2797,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                       </label>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                         <span style={{ fontSize: 11, color: '#6b7280' }}>
-                          From saved set — edit in the Extractions library
+                          From saved set, edit in the Extractions library
                         </span>
                         <button
                           type="button"
@@ -2963,7 +2963,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                     </label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ fontSize: 11, color: '#6b7280' }}>
-                        From saved prompt — edit in the Library
+                        From saved prompt, edit in the Library
                       </span>
                       <button
                         type="button"
@@ -3146,7 +3146,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                     </label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ fontSize: 11, color: '#6b7280' }}>
-                        From saved formatter — edit in the Library
+                        From saved formatter, edit in the Library
                       </span>
                       <button
                         type="button"
@@ -3413,8 +3413,8 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                         color: '#374151', appearance: 'none', paddingRight: 32,
                       }}
                     >
-                      <option value="answer">Synthesized answer — LLM answers the question, with citations</option>
-                      <option value="passages">Matching passages — raw retrieved chunks for the next step</option>
+                      <option value="answer">Synthesized answer: LLM answers the question, with citations</option>
+                      <option value="passages">Matching passages: raw retrieved chunks for the next step</option>
                     </select>
                     <ChevronDown style={{
                       position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
@@ -3442,7 +3442,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                     }}
                   />
                   <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
-                    Supports {'{{ inputs.output }}'} to query with the previous step's output —
+                    Supports {'{{ inputs.output }}'} to query with the previous step's output,
                     e.g. look up the sponsor name an earlier step extracted.
                   </div>
                 </div>
@@ -3507,7 +3507,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                     }}
                   />
                   <p style={{ fontSize: 12, color: '#6b7280', marginTop: 6, lineHeight: 1.5 }}>
-                    Insert the previous step's output with <code style={{ fontFamily: 'monospace', background: '#f3f4f6', padding: '1px 4px', borderRadius: 4 }}>{'{{ inputs.output }}'}</code> — e.g.
+                    Insert the previous step's output with <code style={{ fontFamily: 'monospace', background: '#f3f4f6', padding: '1px 4px', borderRadius: 4 }}>{'{{ inputs.output }}'}</code>, e.g.
                     {' '}<code style={{ fontFamily: 'monospace', background: '#f3f4f6', padding: '1px 4px', borderRadius: 4 }}>{'.../records/{{ inputs.output.id }}'}</code>. Works in URL, Headers, and Request Body.
                   </p>
                 </div>
@@ -3611,7 +3611,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                         </div>
                         {credentials && matching.length === 0 && (
                           <p style={{ fontSize: 12, color: '#6b7280', marginTop: 6 }}>
-                            No matching credentials yet — click <strong>New</strong> to create one.
+                            No matching credentials yet. Click <strong>New</strong> to create one.
                           </p>
                         )}
                       </div>
@@ -3644,7 +3644,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                     }}
                   />
                   <p style={{ fontSize: 12, color: '#6b7280', marginTop: 6, lineHeight: 1.5 }}>
-                    A JSON Request Body is sent with <code style={{ fontFamily: 'monospace', background: '#f3f4f6', padding: '1px 4px', borderRadius: 4 }}>Content-Type: application/json</code> automatically — add it here only to override.
+                    A JSON Request Body is sent with <code style={{ fontFamily: 'monospace', background: '#f3f4f6', padding: '1px 4px', borderRadius: 4 }}>Content-Type: application/json</code> automatically. Add it here only to override.
                   </p>
                 </div>
                 <div>
@@ -3663,7 +3663,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                     }}
                   />
                   <p style={{ fontSize: 12, color: '#6b7280', marginTop: 6, lineHeight: 1.5 }}>
-                    Wrap the previous step's output with <code style={{ fontFamily: 'monospace', background: '#f3f4f6', padding: '1px 4px', borderRadius: 4 }}>{'{{ inputs.output }}'}</code> — it's inserted as JSON, so
+                    Wrap the previous step's output with <code style={{ fontFamily: 'monospace', background: '#f3f4f6', padding: '1px 4px', borderRadius: 4 }}>{'{{ inputs.output }}'}</code>, and it's inserted as JSON, so
                     {' '}<code style={{ fontFamily: 'monospace', background: '#f3f4f6', padding: '1px 4px', borderRadius: 4 }}>{'{"records": {{ inputs.output }}}'}</code> stays valid. Don't add your own quotes around it.
                     {' '}Leave this blank on a POST/PUT/PATCH and the upstream output is sent as the body automatically.
                   </p>
@@ -3825,7 +3825,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
               }
 
               const memberLabel = (m: { user_id: string; name: string | null; email: string | null; role: string }) =>
-                `${m.name || m.user_id}${m.email ? ` (${m.email})` : ''}${m.role !== 'member' ? ` — ${m.role}` : ''}`
+                `${m.name || m.user_id}${m.email ? ` (${m.email})` : ''}${m.role !== 'member' ? ` - ${m.role}` : ''}`
 
               return (
                 <div>
@@ -4032,7 +4032,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
               <Info style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0, marginTop: 1 }} />
               <div style={{ fontSize: 12, color: '#374151', lineHeight: 1.5 }}>
                 <strong>This step runs once per workflow run.</strong> Selected inputs are
-                combined into a single call — there's no fan-out over upstream items. If an
+                combined into a single call, with no fan-out over upstream items. If an
                 upstream step produced 5 results, this step receives one combined payload (not
                 five separate executions). Lists are stringified before reaching prompts.
               </div>
@@ -4041,7 +4041,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
               Data Sources
             </div>
             <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>
-              Pick one or more. Multiple selections are combined in labeled sections — e.g.,
+              Pick one or more. Multiple selections are combined in labeled sections, e.g.,
               check Step Input + Workflow Documents to give this step both the prior output and the original documents.
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -4060,7 +4060,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#202124' }}>Step Input</div>
                   <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                    Only the output of the immediately previous step — no documents, no earlier
+                    Only the output of the immediately previous step: no documents, no earlier
                     steps. Pair with another source to also include document context.
                   </div>
                 </div>
@@ -4081,7 +4081,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#202124' }}>Select a Document</div>
                   <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
-                    A single document pinned to this step now — used every run, regardless of
+                    A single document pinned to this step now, used every run, regardless of
                     what triggered the workflow.
                   </div>
                   {wantsSelectDocument && (
@@ -4589,7 +4589,7 @@ function WorkflowOutputCard({ status, sessionId, workflowName, running, runElaps
           marginBottom: 8, backgroundColor: '#fff',
         }}>
           <summary style={{ cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#374151' }}>
-            API request sent — {step}
+            API request sent: {step}
           </summary>
           <pre style={{
             marginTop: 8, fontSize: 12, fontFamily: 'monospace', whiteSpace: 'pre-wrap',
@@ -4907,7 +4907,7 @@ function WorkflowSourcesPanel({ sources }: { sources: WorkflowCitation[] }) {
             const locator = typeof c.page === 'number' ? `p. ${c.page}` : (c.sheet || null)
             const label = locator ? `${c.document_title} · ${locator}` : c.document_title
             const relevance = typeof c.similarity === 'number' ? `${Math.round(c.similarity * 100)}% match` : null
-            const tooltip = [relevance, c.content_preview || null].filter(Boolean).join(' — ')
+            const tooltip = [relevance, c.content_preview || null].filter(Boolean).join(' - ')
             return (
               <span
                 key={`${c.chunk_id ?? c.document_id ?? i}`}
@@ -5400,7 +5400,7 @@ function InputTab({ workflow, openWorkflowId, onRefresh }: {
       toast(
         err instanceof Error && err.message
           ? err.message
-          : "Couldn't change the input type — you may not have permission to edit this workflow. Duplicate it to make an editable copy.",
+          : "Couldn't change the input type. You may not have permission to edit this workflow. Duplicate it to make an editable copy.",
         'error',
       )
     } finally {
@@ -5515,7 +5515,7 @@ function InputTab({ workflow, openWorkflowId, onRefresh }: {
             </div>
             <div style={{ fontSize: 12, color: '#6b7280' }}>
               The workflow runs with no documents or text. Use this for steps that
-              generate or fetch their own content — API calls, knowledge-base
+              generate or fetch their own content: API calls, knowledge-base
               queries, or static prompts. Just press Run.
             </div>
           </div>
@@ -6246,7 +6246,7 @@ function ValidateTab({
       setPlanStale(false)
       setOrphanedCheckIds([])
     } catch {
-      toast('Could not update the plan — please try again', 'error')
+      toast('Could not update the plan. Please try again.', 'error')
     } finally {
       setConfirmingPlanFresh(false)
     }
@@ -6893,7 +6893,7 @@ function ValidateTab({
             <div style={{ marginTop: 8 }}>
               <ColdStartHero
                 theme="light"
-                headline="Get a quality grade for this workflow — and a checklist of fixes"
+                headline="Get a quality grade for this workflow, and a checklist of fixes"
                 body={
                   <>
                     A validation plan is a checklist of things the output should
@@ -6905,7 +6905,7 @@ function ValidateTab({
                 whatHappensNext={[
                   "We'll propose a checklist of quality checks from your steps",
                   'You review, edit, or remove any check you disagree with',
-                  "When you run the workflow, each check gets a pass / warn / fail — plus structural diagnostics that don't need a judge",
+                  "When you run the workflow, each check gets a pass / warn / fail, plus structural diagnostics that don't need a judge",
                 ]}
                 benefits={[
                   'See which step is the weakest link',
@@ -6984,7 +6984,7 @@ function ValidateTab({
                                   padding: '1px 6px', borderRadius: 4,
                                   backgroundColor: '#fef3c7', color: '#92400e', flexShrink: 0, whiteSpace: 'nowrap',
                                 }}
-                                title={`This check targets the step "${check.target_step}", which no longer exists in the workflow. It will SKIP during validation — regenerate the plan or edit the check.`}
+                                title={`This check targets the step "${check.target_step}", which no longer exists in the workflow. It will SKIP during validation. Regenerate the plan or edit the check.`}
                               >
                                 step no longer exists
                               </span>
@@ -7263,7 +7263,7 @@ function ValidateTab({
                     }}
                   >
                     <AlertTriangle style={{ width: 12, height: 12, color: '#d97706', flexShrink: 0 }} />
-                    Graded against a stale plan — regenerate the plan above before trusting this grade.
+                    Graded against a stale plan. Regenerate the plan above before trusting this grade.
                   </div>
                 )}
               </div>
@@ -7273,7 +7273,7 @@ function ValidateTab({
                   padding: '4px 8px', backgroundColor: '#f3f4f6',
                   borderRadius: 6, fontFamily: 'inherit',
                 }}
-                title="95% confidence interval — how much the grade could swing on a re-evaluation, based on how often check verdicts flipped when re-judged.">
+                title="95% confidence interval: how much the grade could swing on a re-evaluation, based on how often check verdicts flipped when re-judged.">
                   ± {gradeInfo.variancePts.toFixed(1)} pts
                 </div>
               )}
@@ -8023,7 +8023,7 @@ function NoWorkflowLiftCard({
     ? 'The multi-step workflow scores meaningfully better than just asking the AI directly. The orchestration is doing real work.'
     : liftNeutral
       ? "For this validation run, the workflow and a single prompt land in the same range. Consider whether the workflow's complexity is worth maintaining."
-      : 'A single LLM prompt scored higher than your workflow on this validation run. Worth investigating — the workflow may have a step that hurts more than it helps.'
+      : 'A single LLM prompt scored higher than your workflow on this validation run. Worth investigating: the workflow may have a step that hurts more than it helps.'
 
   return (
     <div style={{
@@ -8131,7 +8131,7 @@ function StaticDiagnosticsCard({
           Structural diagnostics
         </span>
         <span style={{ fontSize: 12, color: headerColor }}>
-          {headerText} — these are deterministic checks, independent of the LLM judge.
+          {headerText}: these are deterministic checks, independent of the LLM judge.
         </span>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -8163,10 +8163,10 @@ const DIAGNOSTIC_GUIDE: Record<string, { title: string; howToFix: string }> = {
   },
   ungrounded_extracted_value: {
     title: "Output value doesn't appear in the source document",
-    howToFix: 'Spot-check this field against the source. If the value is wrong, the model is guessing — try a stricter prompt or a more capable model.',
+    howToFix: 'Spot-check this field against the source. If the value is wrong, the model is guessing, so try a stricter prompt or a more capable model.',
   },
   low_source_grounding: {
-    title: 'Many output values are missing from the source — likely guessing',
+    title: 'Many output values are missing from the source: likely guessing',
     howToFix: 'Treat this step as unreliable until investigated. Inspect a few documents, then tighten the prompt or change the model.',
   },
   plan_stale_target_step: {
@@ -8183,7 +8183,7 @@ const DIAGNOSTIC_GUIDE: Record<string, { title: string; howToFix: string }> = {
   },
   error_shaped_step_output: {
     title: 'Step output looks like an error message, not a real result',
-    howToFix: 'Check the model or API for failures — the step almost certainly errored at runtime.',
+    howToFix: 'Check the model or API for failures. The step almost certainly errored at runtime.',
   },
 }
 
@@ -8343,7 +8343,7 @@ function StepRow({
             padding: '2px 6px', backgroundColor: '#f3f4f6', borderRadius: 4,
             minWidth: 50, textAlign: 'center',
           }}
-          title="95% confidence interval for this step — how much its score could swing on a re-evaluation."
+          title="95% confidence interval for this step: how much its score could swing on a re-evaluation."
         >
           ±{variancePts.toFixed(1)}
         </div>

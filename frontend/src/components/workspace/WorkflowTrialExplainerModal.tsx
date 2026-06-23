@@ -146,7 +146,7 @@ export function WorkflowTrialExplainerModal({ trial, onClose }: Props) {
           <Section title="What it changed, step by step">
             {steps.length === 0 ? (
               <p style={{ margin: 0, fontSize: 12, color: '#8f8f8f' }}>
-                No step-level changes — this trial ran the workflow with its current settings.
+                No step-level changes. This trial ran the workflow with its current settings.
               </p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

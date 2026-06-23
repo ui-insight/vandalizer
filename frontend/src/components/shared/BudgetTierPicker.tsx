@@ -123,7 +123,7 @@ export function BudgetTierPicker({
         Selected: <b>{tokensLabel}</b>{costLabel && <> · <b>{costLabel}</b></>}
       </div>
       <p style={{ margin: '8px 0 0 0', fontSize: 11, color: '#777', lineHeight: 1.5 }}>
-        Time estimates are approximate — actual runtime scales with your test-set
+        Time estimates are approximate. Actual runtime scales with your test-set
         size and current model speed, so larger test sets can take noticeably longer.
       </p>
     </div>

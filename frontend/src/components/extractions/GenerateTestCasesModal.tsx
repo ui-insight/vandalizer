@@ -27,9 +27,9 @@ interface Props {
 type Step = 'pick' | 'generating' | 'review'
 
 const COVERAGE_LABELS: Record<TestCaseCoverage, { label: string; description: string }> = {
-  quick: { label: 'Quick', description: 'up to 3 cases — fastest, lowest cost' },
-  standard: { label: 'Standard', description: 'up to 5 cases — recommended for most extractions' },
-  exhaustive: { label: 'Exhaustive', description: 'up to 10 cases — best coverage, highest cost' },
+  quick: { label: 'Quick', description: 'up to 3 cases: fastest, lowest cost' },
+  standard: { label: 'Standard', description: 'up to 5 cases: recommended for most extractions' },
+  exhaustive: { label: 'Exhaustive', description: 'up to 10 cases: best coverage, highest cost' },
 }
 
 export function GenerateTestCasesModal({ searchSetUuid, onClose, onSaved }: Props) {
@@ -180,7 +180,7 @@ function PickStep({
   return (
     <div>
       <p style={{ fontSize: 13, color: '#4b5563', lineHeight: 1.6, marginBottom: 14 }}>
-        Pick documents to extract from. We'll propose expected values for each — you review and
+        Pick documents to extract from. We'll propose expected values for each, and you review and
         edit before they're saved as test cases. Nothing is saved until you approve.
       </p>
       <div style={{ marginBottom: 14 }}>

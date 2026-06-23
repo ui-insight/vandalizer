@@ -88,7 +88,7 @@ export function ExtractionOptimizationHistoryPanel({
                 Each run scores your extraction against test cases and lands here, so
                 you can see whether model or strategy changes are actually helping.
                 A run takes <b style={{ color: '#bbb' }}>5–15 minutes</b> and costs
-                about <b style={{ color: '#bbb' }}>$1–$5</b> — nothing changes until
+                about <b style={{ color: '#bbb' }}>$1–$5</b>. Nothing changes until
                 you click Apply on a recipe.
               </div>
             </div>

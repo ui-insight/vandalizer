@@ -24,7 +24,7 @@ export function EvalSetCompositionStrip({
     return (
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         <Chip label={`${fallbackQueryCount} ${fallbackQueryCount === 1 ? 'query' : 'queries'}`} tone="neutral" />
-        <Chip label="no composition snapshot" tone="warn" title="This run pre-dates eval-set snapshots — composition info is unavailable." />
+        <Chip label="no composition snapshot" tone="warn" title="This run pre-dates eval-set snapshots, so composition info is unavailable." />
       </div>
     )
   }
@@ -58,7 +58,7 @@ export function EvalSetCompositionStrip({
           label={`${auto} auto · ${user} user`}
           tone={autoTone}
           title={autoRatio > 0.5
-            ? `${Math.round(autoRatio * 100)}% of the eval set is LLM-generated — scores may be optimistic if the judge shares assumptions with the generator.`
+            ? `${Math.round(autoRatio * 100)}% of the eval set is LLM-generated, so scores may be optimistic if the judge shares assumptions with the generator.`
             : 'Mix of LLM-generated and user-authored test queries.'}
         />
       )}

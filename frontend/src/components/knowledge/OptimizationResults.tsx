@@ -168,7 +168,7 @@ export function OptimizationResults({
           renderRow={(t) => <TrialRow trial={t} summariseConfig={summariseConfig} />}
           getRowKey={(t) => t.trial_id}
           onRowClick={setSelectedTrial}
-          title="Trials — tap any for a plain-English breakdown"
+          title="Trials: tap any for a plain-English breakdown"
         />
       )}
 
@@ -261,7 +261,7 @@ function BestConfigCard({
         {hasDefault && (
           <span style={{ fontSize: 11, color: '#888', marginLeft: 8 }}>
             {changed.length === 0
-              ? 'identical to default — no knobs changed'
+              ? 'identical to default, no knobs changed'
               : `${changed.length} knob${changed.length === 1 ? '' : 's'} changed vs default`}
           </span>
         )}

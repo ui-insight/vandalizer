@@ -43,7 +43,7 @@ export function CrossFieldViolationsPanel({ searchSetUuid, canManage, summary, r
       setMarkedIds(prev => new Set(prev).add(ruleId))
       if (res.rule.auto_disabled) {
         toast(
-          `Rule auto-disabled after ${res.rule.fp_count} false alarms — fix or re-enable it on the Rules card.`,
+          `Rule auto-disabled after ${res.rule.fp_count} false alarms. Fix or re-enable it on the Rules card.`,
           'info',
         )
       } else {
@@ -147,7 +147,7 @@ export function CrossFieldViolationsPanel({ searchSetUuid, canManage, summary, r
                         cursor: marked || busyId === ruleId ? 'default' : 'pointer',
                         whiteSpace: 'nowrap',
                       }}
-                      title={marked ? 'Already marked' : 'Mark as false alarm — increments the rule\'s FP counter'}
+                      title={marked ? 'Already marked' : 'Mark as false alarm: increments the rule\'s FP counter'}
                     >
                       {marked ? 'Marked' : busyId === ruleId ? '…' : 'False alarm'}
                     </button>
@@ -167,7 +167,7 @@ export function CrossFieldViolationsPanel({ searchSetUuid, canManage, summary, r
           <ul style={{ marginTop: 6, paddingLeft: 16, listStyle: 'disc' }}>
             {unparseables.map((r, i) => (
               <li key={i} style={{ marginBottom: 2 }}>
-                <code>{describeRule(r.rule)}</code> — {r.message}
+                <code>{describeRule(r.rule)}</code>: {r.message}
               </li>
             ))}
           </ul>

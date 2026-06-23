@@ -68,7 +68,7 @@ export function Deck({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={title ? `${title} — presentation` : 'Presentation'}
+      aria-label={title ? `${title}: presentation` : 'Presentation'}
       className="no-print fixed inset-0 z-[100] flex flex-col bg-[#0a0a0a] text-white"
     >
       {/* Top chrome */}

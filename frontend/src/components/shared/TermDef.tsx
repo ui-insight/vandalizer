@@ -24,7 +24,7 @@ const DEFINITIONS: Record<TermKey, Definition> = {
   },
   baseline: {
     short:
-      'What the score looks like before any tuning — your current setup, or no setup at all. We compare every trial against the baseline so you know whether tuning actually helped.',
+      'What the score looks like before any tuning, your current setup, or no setup at all. We compare every trial against the baseline so you know whether tuning actually helped.',
   },
   candidate: {
     short:
@@ -33,11 +33,11 @@ const DEFINITIONS: Record<TermKey, Definition> = {
   },
   tier: {
     short:
-      'How thoroughly we search — Quick tries fewer combinations and finishes faster, Thorough tries more and finishes slower. Standard is a sensible default.',
+      'How thoroughly we search: Quick tries fewer combinations and finishes faster, Thorough tries more and finishes slower. Standard is a sensible default.',
   },
   'noise-floor': {
     short:
-      "How much a score can wiggle from one run to the next, even on identical inputs. If a trial only beats the baseline by less than the noise floor, the win isn't real — we won't let you apply it.",
+      "How much a score can wiggle from one run to the next, even on identical inputs. If a trial only beats the baseline by less than the noise floor, the win isn't real, so we won't let you apply it.",
   },
   accuracy: {
     short:
@@ -49,7 +49,7 @@ const DEFINITIONS: Record<TermKey, Definition> = {
   },
   'expected-answer': {
     short:
-      "The correct answer for a test question — what you'd want the AI to say. The judge compares the AI's response against this.",
+      "The correct answer for a test question: what you'd want the AI to say. The judge compares the AI's response against this.",
   },
 }
 

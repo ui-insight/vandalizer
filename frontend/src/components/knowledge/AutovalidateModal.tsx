@@ -213,7 +213,7 @@ export function AutovalidateModal({ kbUuid, onConfirm, onClose, onSwitchToQuerie
     const parts: string[] = []
     if (cost_label) parts.push(cost_label)
     if (time) parts.push(`~${time}`)
-    return parts.length > 0 ? `Validate & improve — ${parts.join(', ')}` : 'Validate & improve'
+    return parts.length > 0 ? `Validate & improve: ${parts.join(', ')}` : 'Validate & improve'
   }
 
   return (
@@ -233,10 +233,10 @@ function ConceptStep() {
     <div style={{ fontSize: 13, color: '#ccc', lineHeight: 1.6 }}>
       <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: '#fff' }}>What is tuning?</h4>
       <p style={{ margin: '0 0 10px 0' }}>
-        We try many ways of using your knowledge base — different retrieval
-        settings, prompts, and models — and keep whichever combination answers
-        your test questions best. Another AI — the{' '}
-        <TermDef term="judge">judge</TermDef> — grades each answer against the{' '}
+        We try many ways of using your knowledge base (different retrieval
+        settings, prompts, and models) and keep whichever combination answers
+        your test questions best. Another AI, the{' '}
+        <TermDef term="judge">judge</TermDef>, grades each answer against the{' '}
         <TermDef term="expected-answer">expected answer</TermDef> you provided.
       </p>
       <h4 style={{ margin: '0 0 6px 0', fontSize: 13, color: '#fff' }}>What it changes</h4>
@@ -251,7 +251,7 @@ function ConceptStep() {
       <ul style={{ margin: '0 0 10px 0', paddingLeft: 18, color: '#bbb' }}>
         <li>Sources (we suggest improvements but never add or remove)</li>
         <li>Test queries</li>
-        <li>Settings — until you click Apply</li>
+        <li>Settings, until you click Apply</li>
       </ul>
       <h4 style={{ margin: '0 0 6px 0', fontSize: 13, color: '#fff' }}>Caveats</h4>
       <ul style={{ margin: 0, paddingLeft: 18, color: '#bbb' }}>
@@ -330,7 +330,7 @@ function TestSetStep({
       <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: '#fff' }}>How should we build the test set?</h4>
       <p style={{ margin: '0 0 12px 0', color: '#bbb' }}>
         Tuning grades each trial against these questions. As your KB grows, generate
-        new ones so recently added sources get covered — <b>you'll review the full
+        new ones so recently added sources get covered. <b>You'll review the full
         set before tuning starts</b>.
       </p>
       <button
@@ -354,7 +354,7 @@ function TestSetStep({
           <div><span style={{ color: '#888' }}>Question:</span> Who is the principal investigator on the Reed grant?</div>
           <div style={{ marginTop: 4 }}><span style={{ color: '#888' }}>Expected answer:</span> Dr. Maria Reed</div>
           <div style={{ marginTop: 6, fontSize: 11, color: '#888' }}>
-            The judge passes the AI's answer if it matches the expected answer — typo-tolerant and synonym-aware.
+            The judge passes the AI's answer if it matches the expected answer: typo-tolerant and synonym-aware.
           </div>
         </div>
       )}
@@ -584,7 +584,7 @@ function PreviewStep({
         {buildMode === 'existing' ? (
           <>We'll grade each tuning trial against these <b>{queries.length}</b> questions using a <TermDef term="judge">judge</TermDef>.</>
         ) : (
-          <>Tuning quality depends on these. Scan them and fix anything that looks off — edit or remove a question right here before continuing.</>
+          <>Tuning quality depends on these. Scan them and fix anything that looks off: edit or remove a question right here before continuing.</>
         )}
       </p>
       {buildMode === 'combined' && composition && composition.generated > 0 && (
@@ -784,10 +784,10 @@ function BaselineStep({
         </div>
         <div style={{ marginTop: 8, fontSize: 12, color: '#ddd' }}>
           {scorePct >= 85
-            ? <>The model already knows most of this material — tuning will probably gain a few points at best.</>
+            ? <>The model already knows most of this material, so tuning will probably gain a few points at best.</>
             : scorePct >= 60
               ? <>Decent floor. Tuning has room to improve answers that need your specific documents.</>
-              : <>Low floor — your knowledge base has a real job to do here. Tuning should help noticeably.</>}
+              : <>Low floor: your knowledge base has a real job to do here. Tuning should help noticeably.</>}
         </div>
       </div>
       <button
@@ -845,13 +845,13 @@ function AdvancedStep({
       />
       <Toggle
         label="Try re-chunking documents (advanced)"
-        description="Coming in v2 — disabled. Re-chunks + re-embeds for each chunking trial. Slower."
+        description="Coming in v2 (disabled). Re-chunks + re-embeds for each chunking trial. Slower."
         checked={false}
         disabled
       />
       <Toggle
         label="Try alternate embedding models (advanced)"
-        description="Coming in v2 — disabled. Re-embeds the entire KB for each embedding-model trial."
+        description="Coming in v2 (disabled). Re-embeds the entire KB for each embedding-model trial."
         checked={false}
         disabled
       />

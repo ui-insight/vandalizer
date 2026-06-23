@@ -282,7 +282,7 @@ export function ExtractionAutovalidateWizard({ searchSetUuid, onClose, onStarted
     const parts: string[] = []
     if (cost_label) parts.push(cost_label)
     if (time) parts.push(`~${time}`)
-    return parts.length > 0 ? `Validate & improve — ${parts.join(', ')}` : 'Validate & improve'
+    return parts.length > 0 ? `Validate & improve: ${parts.join(', ')}` : 'Validate & improve'
   }
 
   return (
@@ -324,16 +324,16 @@ function ConceptStep() {
     <div style={{ fontSize: 13, color: '#ccc', lineHeight: 1.6 }}>
       <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: '#fff' }}>What is tuning?</h4>
       <p style={{ margin: '0 0 10px 0' }}>
-        We try many ways of running your extraction — each combination of model,
-        strategy, and prompt shape is a <TermDef term="candidate">candidate</TermDef> — and keep whichever
-        one scores best against your <TermDef term="test-set">test cases</TermDef>. Another AI — the{' '}
-        <TermDef term="judge">judge</TermDef> — grades each answer, so different formats of the
+        We try many ways of running your extraction (each combination of model,
+        strategy, and prompt shape is a <TermDef term="candidate">candidate</TermDef>) and keep whichever
+        one scores best against your <TermDef term="test-set">test cases</TermDef>. Another AI, the{' '}
+        <TermDef term="judge">judge</TermDef>, grades each answer, so different formats of the
         same value still count as a match.
       </p>
       <h4 style={{ margin: '0 0 6px 0', fontSize: 13, color: '#fff' }}>What it changes</h4>
       <ul style={{ margin: '0 0 10px 0', paddingLeft: 18, color: '#bbb' }}>
         <li>Which LLM does the extracting</li>
-        <li>Strategy — one call vs. plan-then-extract (one-pass / two-pass)</li>
+        <li>Strategy: one call vs. plan-then-extract (one-pass / two-pass)</li>
         <li>Whether the model takes extra "thinking" time before answering</li>
         <li>Whether documents are sent as images (useful for fillable PDFs and scans)</li>
         <li>How long documents get split into chunks</li>
@@ -342,7 +342,7 @@ function ConceptStep() {
       <ul style={{ margin: '0 0 10px 0', paddingLeft: 18, color: '#bbb' }}>
         <li>Your extraction fields or prompts</li>
         <li>Your test cases</li>
-        <li>Your live config — until you click Apply</li>
+        <li>Your live config, until you click Apply</li>
       </ul>
       <h4 style={{ margin: '0 0 6px 0', fontSize: 13, color: '#fff' }}>Caveats</h4>
       <ul style={{ margin: 0, paddingLeft: 18, color: '#bbb' }}>
@@ -374,7 +374,7 @@ function TestCasesStep({
         <h4 style={{ margin: '0 0 8px 0', fontSize: 13, color: '#fff' }}>You don't have any test cases yet</h4>
         <p style={{ margin: '0 0 12px 0', color: '#bbb' }}>
           We need at least one example to check the AI's work against. Pick a few documents
-          and we'll suggest expected values for each one — you review them before they're saved.
+          and we'll suggest expected values for each one. You review them before they're saved.
         </p>
         <button
           onClick={onGenerate}
@@ -595,10 +595,10 @@ function BaselineStep({
         </div>
         <div style={{ marginTop: 8, fontSize: 12, color: '#ddd' }}>
           {scorePct >= 85
-            ? <>The model already handles most of this — tuning will probably gain a few points at best.</>
+            ? <>The model already handles most of this. Tuning will probably gain a few points at best.</>
             : scorePct >= 60
               ? <>Decent floor. Tuning has room to improve fields that need your specific config.</>
-              : <>Low floor — your custom settings have a real job to do here. Tuning should help noticeably.</>}
+              : <>Low floor: your custom settings have a real job to do here. Tuning should help noticeably.</>}
         </div>
       </div>
       <button

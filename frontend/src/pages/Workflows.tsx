@@ -199,7 +199,7 @@ export default function Workflows() {
                           message: (
                             <>
                               Remove <strong>{wf.name}</strong> from the team library?
-                              {' '}The workflow will not be deleted —{' '}
+                              {' '}The workflow will not be deleted:{' '}
                               {isCreator
                                 ? 'you will keep personal access, but other team members will lose access.'
                                 : 'only the workflow’s creator will keep access. You and other team members will no longer see it.'}

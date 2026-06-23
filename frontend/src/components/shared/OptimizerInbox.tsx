@@ -75,8 +75,8 @@ export function OptimizerInbox() {
 }
 
 function Row({ item }: { item: OptimizerInboxItem }) {
-  const score = item.score != null ? `${Math.round(item.score * 100)}` : '—'
-  const baseline = item.baseline_score != null ? `${Math.round(item.baseline_score * 100)}` : '—'
+  const score = item.score != null ? `${Math.round(item.score * 100)}` : '-'
+  const baseline = item.baseline_score != null ? `${Math.round(item.baseline_score * 100)}` : '-'
   const lift = (item.score != null && item.baseline_score != null)
     ? (item.score - item.baseline_score) * 100
     : null

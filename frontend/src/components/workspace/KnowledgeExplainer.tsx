@@ -101,7 +101,7 @@ export function KnowledgeExplainer({ onClose }: { onClose?: () => void }) {
               fontSize: 15, color: '#9aa3b8', maxWidth: 500, margin: '0 auto', lineHeight: 1.6,
             }}>
               A knowledge base turns a folder of documents, a stack of policies, or a website
-              into something you can talk to — with citations back to the exact source.
+              into something you can talk to, with citations back to the exact source.
             </p>
           </div>
 
@@ -120,7 +120,7 @@ export function KnowledgeExplainer({ onClose }: { onClose?: () => void }) {
             <Card
               icon={Search}
               title="Search"
-              body="Find the passages most relevant to any question — even when the wording doesn't match."
+              body="Find the passages most relevant to any question, even when the wording doesn't match."
             />
             <Card
               icon={BookOpen}
@@ -143,7 +143,7 @@ export function KnowledgeExplainer({ onClose }: { onClose?: () => void }) {
             <UseCase
               accent="#a78bfa"
               question="What's the F&A rate cap for the Gates Foundation?"
-              answer="Sponsor policies KB pulls the matching clause from 200+ indexed funder pages — with the source URL."
+              answer="Sponsor policies KB pulls the matching clause from 200+ indexed funder pages, with the source URL."
             />
             <UseCase
               accent="#34d399"
@@ -153,7 +153,7 @@ export function KnowledgeExplainer({ onClose }: { onClose?: () => void }) {
             <UseCase
               accent="#f472b6"
               question="What did we tell DCAA about Q3 indirect costs?"
-              answer="Audit response KB surfaces the exact correspondence and exhibits — searchable months after the fact."
+              answer="Audit response KB surfaces the exact correspondence and exhibits, searchable months after the fact."
             />
           </Section>
 
@@ -178,7 +178,7 @@ export function KnowledgeExplainer({ onClose }: { onClose?: () => void }) {
                   boxShadow: '0 6px 20px -6px rgba(96, 165, 250, 0.5)',
                 }}
               >
-                Got it — back to the knowledge base
+                Got it, back to the knowledge base
               </button>
             </div>
           )}

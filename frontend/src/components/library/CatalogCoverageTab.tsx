@@ -74,7 +74,7 @@ export function CatalogCoverageTab() {
           <span className="text-xs text-gray-500">({total} verified items)</span>
         </div>
         <p className="text-xs text-gray-500">
-          Verified catalog items by validation coverage. Items without a pinned baseline have no drift contract — clicking <strong>Establish baseline</strong> creates one retroactively.
+          Verified catalog items by validation coverage. Items without a pinned baseline have no drift contract. Clicking <strong>Establish baseline</strong> creates one retroactively.
         </p>
       </div>
 
@@ -157,7 +157,7 @@ export function CatalogCoverageTab() {
                       </span>
                     </td>
                     <td className="px-3 py-2 text-xs text-gray-600">
-                      {it.quality_score != null ? `${Math.round(it.quality_score)}%` : '—'}
+                      {it.quality_score != null ? `${Math.round(it.quality_score)}%` : '-'}
                     </td>
                     <td className="px-3 py-2 text-xs text-gray-600">
                       {it.official_baseline_score != null ? (
@@ -165,7 +165,7 @@ export function CatalogCoverageTab() {
                           <div>{Math.round(it.official_baseline_score)}% pinned</div>
                           <div className="text-[10px] text-gray-400">{it.official_baseline_test_case_count} case(s)</div>
                         </div>
-                      ) : '—'}
+                      ) : '-'}
                     </td>
                     <td className="px-3 py-2 text-xs text-gray-600">
                       {it.last_drift_check_at ? (
@@ -177,7 +177,7 @@ export function CatalogCoverageTab() {
                             </div>
                           )}
                         </div>
-                      ) : '—'}
+                      ) : '-'}
                     </td>
                     <td className="px-3 py-2 text-right">
                       <button

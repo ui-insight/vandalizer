@@ -171,7 +171,7 @@ function Row({
         {optimized.query}
       </span>
       <span style={{ textAlign: 'right', color: bScore != null ? scoreColor(bScore) : '#444' }}>
-        {bScore != null ? `${(bScore * 100).toFixed(0)}%` : '—'}
+        {bScore != null ? `${(bScore * 100).toFixed(0)}%` : '-'}
       </span>
       <span style={{ textAlign: 'right', color: scoreColor(oScore), fontWeight: 600 }}>
         {(oScore * 100).toFixed(0)}%
@@ -180,7 +180,7 @@ function Row({
         textAlign: 'right', color: deltaColor, fontWeight: 600,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 2,
       }}>
-        {deltaPts == null ? '—' : (
+        {deltaPts == null ? '-' : (
           <>
             {deltaPts > 5 ? <ArrowUpRight size={10} /> : deltaPts < -5 ? <ArrowDownRight size={10} /> : null}
             {deltaPts > 0 ? '+' : ''}{deltaPts.toFixed(0)}

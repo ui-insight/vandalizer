@@ -52,7 +52,7 @@ export function OptimizationProgressCard<TConfig>({
   runningLabel = 'Optimization running',
   queuedLabel = 'Optimization queued',
   scoreFloorLabel = 'Score to beat (baseline)',
-  scoreFloorDescription = 'How well the system performs without this optimization — the result needs to clear this bar.',
+  scoreFloorDescription = 'How well the system performs without this optimization. The result needs to clear this bar.',
   liftLabel = 'vs baseline',
   tokensBarLabel = 'Token budget',
 }: OptimizationProgressCardProps<TConfig>) {

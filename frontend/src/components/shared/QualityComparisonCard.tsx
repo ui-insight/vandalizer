@@ -169,7 +169,7 @@ export function QualityComparisonCard({
             </>
           ) : (
             <>
-              The LLM judge has natural variance when scoring the same answer twice — typically
+              The LLM judge has natural variance when scoring the same answer twice, typically
               ±{(legacyCi * 100).toFixed(1)}pts at 95% confidence. This is the legacy noise-floor
               estimate from 2 judge replays. New runs use a paired-bootstrap CI computed from
               per-query data, which is the honest comparison here.
@@ -216,7 +216,7 @@ export function QualityComparisonCard({
               <div style={{ marginTop: 4, fontSize: 11, color: '#888', lineHeight: 1.5 }}>
                 {liftCI
                   ? `The 95% CI on the per-query lift spans zero (${fmtSignedPts(liftCI.lower * 100)} to ${fmtSignedPts(liftCI.upper * 100)}, n=${liftCI.n_queries}, p=${liftCI.p_value < 0.001 ? '<0.001' : liftCI.p_value.toFixed(3)}). Treat the optimized run as equivalent to default.`
-                  : `The ${liftVsDefault > 0 ? '+' : ''}${liftVsDefault.toFixed(0)}pts difference is inside the judge's measurement noise (±${(legacyCi * 100).toFixed(1)}pts) — treat the optimized run as equivalent to default.`}
+                  : `The ${liftVsDefault > 0 ? '+' : ''}${liftVsDefault.toFixed(0)}pts difference is inside the judge's measurement noise (±${(legacyCi * 100).toFixed(1)}pts), so treat the optimized run as equivalent to default.`}
               </div>
             </>
           ) : (
@@ -285,7 +285,7 @@ function SignificanceBadge({
     bg = 'rgba(245, 158, 11, 0.12)'
     border = 'rgba(245, 158, 11, 0.35)'
     color = '#fbbf24'
-    tip = `95% CI on the per-query lift includes zero — we can't tell the optimized config apart from default at this sample size (n=${liftCI.n_queries}).`
+    tip = `95% CI on the per-query lift includes zero, so we can't tell the optimized config apart from default at this sample size (n=${liftCI.n_queries}).`
   }
   return (
     <span

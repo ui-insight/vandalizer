@@ -516,7 +516,7 @@ function ListView({
                           INTERNAL
                         </span>
                       )}
-                      {t.last_message_preview ? ` — ${t.last_message_preview}` : ''}
+                      {t.last_message_preview ? ` - ${t.last_message_preview}` : ''}
                     </div>
                   </div>
                   <div style={{ fontSize: 12, color: '#9ca3af', flexShrink: 0, marginLeft: 16 }}>
@@ -599,7 +599,7 @@ function NewTicketView({
       <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', padding: 24 }}>
         <h2 style={{ margin: '0 0 4px', fontSize: 18, fontWeight: 700 }}>File a Ticket</h2>
         <p style={{ margin: '0 0 20px', fontSize: 13, color: '#6b7280' }}>
-          Drops into the same queue as customer tickets — useful for QA and dogfooding the support flow.
+          Drops into the same queue as customer tickets, useful for QA and dogfooding the support flow.
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -1200,7 +1200,7 @@ function ChatView({
                 onClick={() => setIsInternalNote((v) => !v)}
                 title={isInternalNote
                   ? 'This will only be visible to other support agents'
-                  : 'Switch to an internal note — visible only to support agents'}
+                  : 'Switch to an internal note: visible only to support agents'}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6,
                   padding: '4px 10px', borderRadius: 999, cursor: 'pointer',

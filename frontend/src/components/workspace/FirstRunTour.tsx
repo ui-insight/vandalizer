@@ -24,7 +24,7 @@ const STEPS: TourStep[] = [
     accent: 'text-highlight',
     title: 'Welcome to Vandalizer 5.0',
     body:
-      'The chat on your left is the whole product. Ask it to search your files, run extractions, query knowledge bases, or dispatch workflows — all in plain English.',
+      'The chat on your left is the whole product. Ask it to search your files, run extractions, query knowledge bases, or dispatch workflows, all in plain English.',
   },
   {
     icon: BadgeCheck,
@@ -45,7 +45,7 @@ const STEPS: TourStep[] = [
     accent: 'text-gray-300',
     title: 'You control your inbox',
     body:
-      'Email preferences live on your Account page — opt in or out of tutorials, activity nudges, and announcements anytime.',
+      'Email preferences live on your Account page. Opt in or out of tutorials, activity nudges, and announcements anytime.',
   },
 ]
 

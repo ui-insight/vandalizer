@@ -839,7 +839,7 @@ function UserActivityHistory({ userId, email }: { userId: string; email: string 
 
       {capped && (
         <div style={{ padding: '10px 20px', background: '#fffbeb', borderBottom: '1px solid #fde68a', fontSize: 13, color: '#92400e', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <AlertCircle size={14} /> Showing the most recent events only — narrow the time range to see older history.
+          <AlertCircle size={14} /> Showing the most recent events only. Narrow the time range to see older history.
         </div>
       )}
 
@@ -871,8 +871,8 @@ function UserActivityHistory({ userId, email }: { userId: string; email: string 
                   <td style={{ padding: '10px 16px', fontSize: 13 }}>
                     {it.title || (it.resource_type ? <span style={{ color: '#9ca3af' }}>{it.resource_type}</span> : '-')}
                   </td>
-                  <td style={{ padding: '10px 16px' }}>{it.status ? <StatusBadge status={it.status} /> : <span style={{ color: '#d1d5db' }}>—</span>}</td>
-                  <td style={{ padding: '10px 16px', fontSize: 12, color: '#6b7280', fontFamily: 'ui-monospace, monospace' }}>{it.ip_address || '—'}</td>
+                  <td style={{ padding: '10px 16px' }}>{it.status ? <StatusBadge status={it.status} /> : <span style={{ color: '#d1d5db' }}>-</span>}</td>
+                  <td style={{ padding: '10px 16px', fontSize: 12, color: '#6b7280', fontFamily: 'ui-monospace, monospace' }}>{it.ip_address || '-'}</td>
                 </tr>
               ))}
             </tbody>
@@ -2916,7 +2916,7 @@ function ConfigTab() {
     try {
       const dataUrl = await readFileAsDataUrl(file)
       if (dataUrl.length > MAX_LOGO_BYTES) {
-        setThemeLogoError(`Image too large — keep encoded size under ${Math.round(MAX_LOGO_BYTES / 1024)} KB.`)
+        setThemeLogoError(`Image too large. Keep encoded size under ${Math.round(MAX_LOGO_BYTES / 1024)} KB.`)
         return
       }
       setThemeLogo(dataUrl)
@@ -2935,7 +2935,7 @@ function ConfigTab() {
     try {
       const dataUrl = await readFileAsDataUrl(file)
       if (dataUrl.length > MAX_LOGO_BYTES) {
-        setThemeIconError(`Image too large — keep encoded size under ${Math.round(MAX_LOGO_BYTES / 1024)} KB.`)
+        setThemeIconError(`Image too large. Keep encoded size under ${Math.round(MAX_LOGO_BYTES / 1024)} KB.`)
         return
       }
       setThemeIcon(dataUrl)
@@ -3597,7 +3597,7 @@ function ConfigTab() {
         <div style={sectionHeaderStyle}>
           <Play size={18} color="#6b7280" /> Prompt Playground
           <span style={{ fontSize: 12, fontWeight: 400, color: '#6b7280' }}>
-            — send a prompt to a configured model and see the raw round-trip
+            Send a prompt to a configured model and see the raw round-trip
           </span>
         </div>
         <div style={sectionBodyStyle}>
@@ -3998,7 +3998,7 @@ ${playgroundResult.request.user_prompt}`}
               </select>
             </div>
             <div style={{ marginTop: 12 }}>
-              <label style={labelStyle}>Search Endpoint{webSearchProvider === 'tavily' ? ' (optional — defaults to api.tavily.com)' : ''}</label>
+              <label style={labelStyle}>Search Endpoint{webSearchProvider === 'tavily' ? ' (optional, defaults to api.tavily.com)' : ''}</label>
               <input
                 type="url" value={webSearchEndpoint} onChange={e => setWebSearchEndpoint(e.target.value)}
                 placeholder={webSearchProvider === 'searxng' ? 'https://searx.your-domain.edu' : 'https://...'}
@@ -4035,7 +4035,7 @@ ${playgroundResult.request.user_prompt}`}
               )}
             </div>
             <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 10 }}>
-              Note: Test Search and chat use the saved configuration — click Save above before testing new values.
+              Note: Test Search and chat use the saved configuration. Click Save above before testing new values.
             </div>
           </div>
         </div>
@@ -4173,7 +4173,7 @@ ${playgroundResult.request.user_prompt}`}
                 </div>
               </div>
               <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>
-                Small square mark shown beside the logo (header & chat) and as the browser-tab favicon. A square, transparent PNG works best. The default Joe Vandal mark shows only on un-branded deployments — once you set an organization name or logo, leave this blank to hide it, or upload your own.
+                Small square mark shown beside the logo (header & chat) and as the browser-tab favicon. A square, transparent PNG works best. The default Joe Vandal mark shows only on un-branded deployments. Once you set an organization name or logo, leave this blank to hide it, or upload your own.
               </div>
               {themeIconError && (
                 <div style={{ fontSize: 12, color: '#b91c1c', marginTop: 6 }}>{themeIconError}</div>
@@ -4687,7 +4687,7 @@ ${playgroundResult.request.user_prompt}`}
                               type="number"
                               min={0}
                               value={p.warning_days_before ?? ''}
-                              placeholder="—"
+                              placeholder="-"
                               onChange={e => {
                                 const v = e.target.value
                                 update({ warning_days_before: v === '' ? undefined : Number(v) || 0 })
@@ -5996,7 +5996,7 @@ function V5LaunchAnnouncementPanel() {
       <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>v5.0 Launch Announcement</div>
       <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>
         Blast the v5.0 agentic-chat announcement email to users who haven&apos;t received it yet.
-        Idempotent — each user is emailed at most once. Run batches until &ldquo;sent&rdquo; hits 0.
+        Idempotent: each user is emailed at most once. Run batches until &ldquo;sent&rdquo; hits 0.
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
@@ -6077,7 +6077,7 @@ function AgenticDripBackfillPanel() {
     <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', padding: 20 }}>
       <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Agentic-chat drip backfill</div>
       <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>
-        Enroll pre-v5 users into the 5-step agentic-chat tutorial drip. Idempotent — users already enrolled
+        Enroll pre-v5 users into the 5-step agentic-chat tutorial drip. Idempotent: users already enrolled
         or opted-out are skipped. The first step fires on the next daily run.
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
@@ -7328,7 +7328,7 @@ function CertificationsTab() {
                           <Award size={14} /> Yes
                         </span>
                       ) : (
-                        <span style={{ color: '#9ca3af', fontSize: 13 }}>—</span>
+                        <span style={{ color: '#9ca3af', fontSize: 13 }}>-</span>
                       )}
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'right', fontSize: 13, color: '#6b7280' }}>
@@ -7366,7 +7366,7 @@ function CertificationsTab() {
 
       <div style={{ fontSize: 12, color: '#6b7280', padding: '8px 4px' }}>
         <strong>Note:</strong> The unlock toggle is a debugging aid. It lets a user select any unit
-        in the certification program without completing the prerequisites — it does not mark
+        in the certification program without completing the prerequisites. It does not mark
         modules as completed or grant XP.
       </div>
     </div>

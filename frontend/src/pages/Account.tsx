@@ -167,7 +167,7 @@ export default function Account() {
   const handleClearMemory = async () => {
     const ok = await confirm({
       title: 'Clear assistant memory',
-      message: "Clear what the assistant remembers? This only affects suggestions — your documents, templates, and workflows aren't changed.",
+      message: "Clear what the assistant remembers? This only affects suggestions, not your documents, templates, or workflows.",
       confirmLabel: 'Clear memory',
       destructive: true,
     })
@@ -314,7 +314,7 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
             <p className="text-sm text-gray-600">
               To personalize its suggestions, the chat assistant tracks which extraction
               templates, workflows, and knowledge bases you use most often in this team.
-              It doesn't read your conversations — just counts what you run.
+              It doesn't read your conversations. It just counts what you run.
             </p>
 
             {memoryError && (
@@ -336,7 +336,7 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
                     <div key={group.label}>
                       <p className="text-xs font-medium uppercase text-gray-400 mb-2">{group.label}</p>
                       {group.items.length === 0 ? (
-                        <p className="text-sm text-gray-400">—</p>
+                        <p className="text-sm text-gray-400">-</p>
                       ) : (
                         <ul className="space-y-1">
                           {group.items.map(item => (

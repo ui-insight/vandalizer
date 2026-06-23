@@ -101,7 +101,7 @@ export function AutomationsExplainer({ onClose }: { onClose?: () => void }) {
               fontSize: 15, color: '#9aa3b8', maxWidth: 500, margin: '0 auto', lineHeight: 1.6,
             }}>
               Automations watch for new files, run the right workflow on them, and put the
-              results wherever you need. Set one up once — then forget it exists.
+              results wherever you need. Set one up once, then forget it exists.
             </p>
           </div>
 
@@ -138,7 +138,7 @@ export function AutomationsExplainer({ onClose }: { onClose?: () => void }) {
             <UseCase
               accent="#f59e0b"
               trigger="New NIH award letter lands in /Awards/2026"
-              action="Extract sponsor terms, period dates, and budget — route a summary to compliance and the PI."
+              action="Extract sponsor terms, period dates, and budget, then route a summary to compliance and the PI."
             />
             <UseCase
               accent="#3b82f6"
@@ -178,7 +178,7 @@ export function AutomationsExplainer({ onClose }: { onClose?: () => void }) {
                   boxShadow: '0 6px 20px -6px rgba(234, 179, 8, 0.5)',
                 }}
               >
-                Got it — back to the automation
+                Got it, back to the automation
               </button>
             </div>
           )}

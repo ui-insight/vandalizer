@@ -33,7 +33,7 @@ export function PastRunBanner({ startedAt, onExit }: PastRunBannerProps) {
     }}>
       <Sparkles size={13} style={{ color: '#a78bfa', flexShrink: 0 }} />
       <span style={{ flex: 1 }}>
-        Viewing past run from <b>{when}</b> — read-only.
+        Viewing past run from <b>{when}</b> (read-only).
       </span>
       <button
         onClick={onExit}
@@ -75,7 +75,7 @@ const REMEDIATIONS: Record<string, { what: string; how: string }> = {
   },
   test_set_too_small: {
     what: "There aren't enough test questions to tune against.",
-    how: 'Open the Validate & improve wizard and add at least 5 questions with expected answers — auto-generation will fill in defaults if you skip this step.',
+    how: 'Open the Validate & improve wizard and add at least 5 questions with expected answers. Auto-generation will fill in defaults if you skip this step.',
   },
   judge_unavailable: {
     what: 'No LLM judge model is configured for your account.',
@@ -87,11 +87,11 @@ const REMEDIATIONS: Record<string, { what: string; how: string }> = {
   },
   budget_exhausted: {
     what: 'The run ran out of token budget before completing trials.',
-    how: 'Start a new run and pick a larger budget tier in Advanced settings — Standard or Thorough usually has enough headroom.',
+    how: 'Start a new run and pick a larger budget tier in Advanced settings. Standard or Thorough usually has enough headroom.',
   },
   unknown: {
     what: 'The run failed for an uncategorised reason.',
-    how: 'Retry once — most transient LLM/network glitches clear up on retry. The raw error message is below.',
+    how: 'Retry once: most transient LLM/network glitches clear up on retry. The raw error message is below.',
   },
 }
 

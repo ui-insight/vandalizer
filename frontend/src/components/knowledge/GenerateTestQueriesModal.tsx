@@ -36,7 +36,7 @@ export function GenerateTestQueriesModal({ onConfirm, onClose }: Props) {
         </div>
         <div style={{ fontSize: 12, color: '#aaa', marginBottom: 14 }}>
           The LLM will sample chunks from your KB and propose questions whose answers
-          require retrieval — useful for measuring how much your KB lifts answer
+          require retrieval, useful for measuring how much your KB lifts answer
           quality vs. a no-KB baseline.
         </div>
 

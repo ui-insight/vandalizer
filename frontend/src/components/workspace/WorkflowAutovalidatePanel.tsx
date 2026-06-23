@@ -469,7 +469,7 @@ function CompletedView({
             )}
             getRowKey={(t) => t.trial_id}
             onRowClick={setSelectedTrial}
-            title="Trials — tap any for a plain-English breakdown"
+            title="Trials: tap any for a plain-English breakdown"
           />
         </div>
       )}
@@ -542,7 +542,7 @@ function CompletedView({
                       }}
                     />
                   )}
-                  <strong style={{ color: '#e5e5e5' }}>{step}:</strong> {ov.model ?? '—'}
+                  <strong style={{ color: '#e5e5e5' }}>{step}:</strong> {ov.model ?? '-'}
                   {ov.prompt_variant && ov.prompt_variant !== 'default' && (
                     <span style={{ color: '#888' }}> · {ov.prompt_variant}</span>
                   )}
@@ -626,7 +626,7 @@ function summariseConfig(config: WorkflowOptimizationTrial['config']): string {
   if (entries.length === 0) return 'default'
   if (entries.length === 1) {
     const [step, ov] = entries[0]
-    return `${step}: ${ov.model ?? '—'}${ov.prompt_variant && ov.prompt_variant !== 'default' ? ` · ${ov.prompt_variant}` : ''}`
+    return `${step}: ${ov.model ?? '-'}${ov.prompt_variant && ov.prompt_variant !== 'default' ? ` · ${ov.prompt_variant}` : ''}`
   }
   // Multi-step trial — summarise as "N steps overridden"
   return `${entries.length} steps overridden`
@@ -634,6 +634,6 @@ function summariseConfig(config: WorkflowOptimizationTrial['config']): string {
 
 
 function formatScore(score: number | null): string {
-  if (score == null) return '—'
+  if (score == null) return '-'
   return `${(score * 100).toFixed(1)}%`
 }

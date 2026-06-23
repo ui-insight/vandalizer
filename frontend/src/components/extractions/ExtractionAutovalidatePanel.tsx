@@ -411,7 +411,7 @@ export function ExtractionAutovalidatePanel({ searchSetUuid, canManage, onApplie
         && displayedRun.score_sample_size.sample_size_factor < 1
         && displayedRun.score_sample_size.test_cases_needed > 0 && (
         <div style={{ fontSize: 11, color: '#fbbf24', marginTop: -4 }}>
-          Scores are discounted for a small test set — measured on{' '}
+          Scores are discounted for a small test set, measured on{' '}
           {displayedRun.score_sample_size.num_test_cases} test case
           {displayedRun.score_sample_size.num_test_cases === 1 ? '' : 's'}.
           Add {displayedRun.score_sample_size.test_cases_needed} more to score at full confidence.
@@ -435,7 +435,7 @@ export function ExtractionAutovalidatePanel({ searchSetUuid, canManage, onApplie
           <div style={{ fontWeight: 600 }}>No significant improvement</div>
           <div style={{ color: '#d1d5db' }}>
             The best trial was within the <TermDef term="noise-floor">judge's measurement noise</TermDef> (±{((displayedRun.judge_score_se ?? 0.02) * 200).toFixed(1)} pts confidence interval)
-            of your current settings. Apply is disabled — your settings already perform as well as anything we tried.
+            of your current settings. Apply is disabled: your settings already perform as well as anything we tried.
           </div>
         </div>
       )}
@@ -482,7 +482,7 @@ export function ExtractionAutovalidatePanel({ searchSetUuid, canManage, onApplie
           )}
           getRowKey={(t) => t.trial_id}
           onRowClick={setSelectedTrial}
-          title="Trials — tap any for a plain-English breakdown"
+          title="Trials: tap any for a plain-English breakdown"
         />
       )}
 
@@ -592,7 +592,7 @@ function IdleHero({
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
         <Sparkles size={18} style={{ color: '#a78bfa' }} />
-        <h3 style={{ margin: 0, fontSize: 15, color: '#fff' }}>Get an accuracy score for this extraction — and a one-click recipe to improve it</h3>
+        <h3 style={{ margin: 0, fontSize: 15, color: '#fff' }}>Get an accuracy score for this extraction, and a one-click recipe to improve it</h3>
       </div>
       <p style={{ margin: '0 0 12px 0', fontSize: 13, color: '#bbb', lineHeight: 1.5 }}>
         Typically <b>$1–$5</b> and <b>5–15 minutes</b>. We score your extraction
@@ -616,7 +616,7 @@ function IdleHero({
           }}>
             <li>We'll suggest expected values for a few documents</li>
             <li>You'll review them before anything else runs</li>
-            <li>We try many setups and recommend the best — you decide whether to apply</li>
+            <li>We try many setups and recommend the best, and you decide whether to apply</li>
           </ol>
         </div>
       )}
@@ -789,7 +789,7 @@ function ExtractionTrialRow({ trial }: { trial: ExtractionTrial }) {
       </span>
       {cf && (cf.pass + cf.fail) > 0 && (
         <span
-          title={`Cross-field rules — ${cf.pass} pass / ${cf.fail} fail${cf.unparseable ? ` / ${cf.unparseable} unparseable` : ''}`}
+          title={`Cross-field rules: ${cf.pass} pass / ${cf.fail} fail${cf.unparseable ? ` / ${cf.unparseable} unparseable` : ''}`}
           style={{
             fontSize: 10, padding: '1px 6px', borderRadius: 4,
             color: cf.fail === 0 ? '#22c55e' : cf.pass === 0 ? '#ef4444' : '#fbbf24',
@@ -987,7 +987,7 @@ function PostApplyDelta({
         )}
       </div>
       <div style={{ marginTop: 6, fontSize: 11, color: '#888' }}>
-        This is the official quality score — no need to run validation separately.
+        This is the official quality score, no need to run validation separately.
         Measured on {after.test_case_count} test case{after.test_case_count === 1 ? '' : 's'}
         {after.num_runs ? ` × ${after.num_runs} runs` : ''} on{' '}
         {new Date(after.ran_at).toLocaleString()}.
@@ -1026,12 +1026,12 @@ function WinnerExplanation({ run }: { run: ExtractionOptimizationRun }) {
       : 'The winning trial cleared the significance threshold against the runner-up.'
   } else if (reason === 'default_in_cluster') {
     body = bandPts != null
-      ? `Your current settings are within ±${bandPts} pts (2σ) of the best trial — the data can't justify changing them. Apply is disabled.`
+      ? `Your current settings are within ±${bandPts} pts (2σ) of the best trial, so the data can't justify changing them. Apply is disabled.`
       : 'Your current settings are statistically tied with the best trial. Apply is disabled.'
   } else if (reason === 'closest_to_default') {
-    body = 'Multiple non-default configs tied with the leader; we picked the one that changes the fewest knobs from your current settings — fewer surprises downstream.'
+    body = 'Multiple non-default configs tied with the leader; we picked the one that changes the fewest knobs from your current settings, for fewer surprises downstream.'
   } else if (reason === 'no_judge_variance') {
-    body = 'Judge variance could not be measured (judge was off, or too few samples to estimate σ). We used a default noise floor for the significance check — treat the lift as a rough estimate.'
+    body = 'Judge variance could not be measured (judge was off, or too few samples to estimate σ). We used a default noise floor for the significance check, so treat the lift as a rough estimate.'
   } else {
     body = `Winner selected by rule: ${reason}.`
   }

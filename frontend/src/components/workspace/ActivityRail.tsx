@@ -206,7 +206,7 @@ export function ActivityRail() {
             const titleFresh = freshTitleIds.has(activity.id)
             const effectiveStatus: ActivityEvent['status'] = stale ? 'failed' : activity.status
             const staleTooltip = stale
-              ? `Timed out — no progress for over ${staleThresholdMinutes} minutes.`
+              ? `Timed out: no progress for over ${staleThresholdMinutes} minutes.`
               : undefined
             const aiTitleReady = (activity.meta_summary as { description_generated?: boolean } | undefined)
               ?.description_generated === true

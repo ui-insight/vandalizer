@@ -244,7 +244,7 @@ export function VerificationNavBar({
               onClick={() => patch('approved')}
               disabled={busy}
               style={{ ...actionBtn, background: '#16a34a', color: '#fff', borderColor: '#16a34a' }}
-              title="Looks right — approve this value"
+              title="Looks right: approve this value"
             >
               {busy ? <Loader2 size={14} className="spin" /> : <Check size={14} />}
               Looks right
@@ -265,7 +265,7 @@ export function VerificationNavBar({
               onClick={() => patch('skipped')}
               disabled={busy}
               style={actionBtn}
-              title="Can't confirm from this document — skip"
+              title="Can't confirm from this document, so skip"
             >
               <SkipForward size={13} />
               Skip

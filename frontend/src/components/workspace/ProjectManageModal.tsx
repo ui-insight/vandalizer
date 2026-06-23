@@ -152,7 +152,7 @@ export function ProjectManageModal({ open, onClose }: { open: boolean; onClose: 
       message: (
         <>
           Delete <strong>{project.title}</strong>? This removes the project and
-          its sharing — your files and folders are kept.
+          its sharing. Your files and folders are kept.
         </>
       ),
       confirmLabel: 'Delete project',
@@ -178,7 +178,7 @@ export function ProjectManageModal({ open, onClose }: { open: boolean; onClose: 
       const url = `${window.location.origin}/join-project?token=${link.token}`
       setInviteUrl(url)
       await navigator.clipboard.writeText(url).catch(() => {})
-      toast('Invite link copied — share it with a PI', 'success')
+      toast('Invite link copied. Share it with a PI.', 'success')
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Failed to create link', 'error')
     } finally {

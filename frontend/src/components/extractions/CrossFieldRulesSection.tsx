@@ -129,7 +129,7 @@ export function CrossFieldRulesSection({ searchSetUuid, canManage, fieldNames }:
         <div>
           <h3 className="font-medium text-gray-900">Cross-Field Rules</h3>
           <p className="text-xs text-gray-500 mt-0.5">
-            Constraints that span fields — e.g. "Direct + Indirect = Total". The optimizer treats
+            Constraints that span fields, e.g. "Direct + Indirect = Total". The optimizer treats
             violation rate as part of the score, so good rules push it toward configs that satisfy them.
           </p>
         </div>
@@ -524,7 +524,7 @@ function RuleEditFields({
       return (
         <>
           <p className="text-xs text-gray-600">
-            Python expression — field names become variables with non-identifier characters replaced
+            Python expression: field names become variables with non-identifier characters replaced
             by underscores. Evaluated in a sandbox; numeric values are pre-converted.
           </p>
           <TextInput

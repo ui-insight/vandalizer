@@ -41,8 +41,8 @@ export function AssistantTab() {
     setWorkspaceMode('chat')
     const msg =
       c.outcome === 'finalized'
-        ? `I finished verifying extractions for "${c.documentTitle}". ${c.approvedCount} approved, ${c.correctedCount} corrected, ${c.skippedCount} skipped. Test case ${c.testCaseUuid ?? ''} has been locked in. What's next — should we run validation on this extraction set now, or add more test cases first?`
-        : `I cancelled the verification session for "${c.documentTitle}" — no test case was saved.`
+        ? `I finished verifying extractions for "${c.documentTitle}". ${c.approvedCount} approved, ${c.correctedCount} corrected, ${c.skippedCount} skipped. Test case ${c.testCaseUuid ?? ''} has been locked in. What's next? Should we run validation on this extraction set now, or add more test cases first?`
+        : `I cancelled the verification session for "${c.documentTitle}". No test case was saved.`
     sendChatMessage(msg)
     setVerificationCompletion(null)
   }, [verificationCompletion, sendChatMessage, setVerificationCompletion, setWorkspaceMode])

@@ -162,7 +162,7 @@ export function ExtractionEditorPanel() {
   // Block edits on verified extractions for non-examiners. Returns true if blocked.
   const blockedByVerified = (): boolean => {
     if (searchSet?.verified && !user?.is_examiner) {
-      toast('This extraction is verified — make a copy to edit', 'error')
+      toast('This extraction is verified. Make a copy to edit', 'error')
       return true
     }
     return false
@@ -321,7 +321,7 @@ export function ExtractionEditorPanel() {
       })
       const fileName = `${searchSet?.title || 'extraction'}-results-${new Date().toISOString().slice(0, 10)}.csv`
       await uploadFile({ contentAsBase64String: base64, fileName, extension: 'csv', folder: activeProjectRootFolder })
-      toast('Saved to project — indexing for chat…', 'success')
+      toast('Saved to project. Indexing for chat…', 'success')
       bumpActivitySignal()
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Failed to save to project', 'error')
@@ -581,7 +581,7 @@ export function ExtractionEditorPanel() {
         }}>
           <ShieldCheck style={{ width: 14, height: 14, flexShrink: 0, color: '#b45309' }} />
           <span style={{ flex: 1 }}>
-            This is a verified extraction. Make a copy to edit it — your edits won't affect the verified version.
+            This is a verified extraction. Make a copy to edit it; your edits won't affect the verified version.
           </span>
           <button
             onClick={handleClone}
@@ -1919,7 +1919,7 @@ response = requests.post(
 print(response.json())`
 
   const curlFileSnippet = `# Use an absolute path for the file. With a bare filename, curl resolves
-# the path against your current working directory — if the file isn't there
+# the path against your current working directory. If the file isn't there
 # curl prints a warning to stderr but still POSTs an empty body, which the
 # server will reject as a 400.
 curl -X POST "${endpoint}" \\
@@ -2093,7 +2093,7 @@ print(response.json())`
         Check the <code>documents</code> array in the response. <code>raw_text_len: 0</code>{' '}
         with <code>task_status: "complete"</code> usually means a scanned PDF where the OCR
         service couldn't extract text. <code>task_status: "error"</code> means text extraction
-        failed — see <code>error_message</code>. <code>processing: true</code> means the
+        failed; see <code>error_message</code>. <code>processing: true</code> means the
         worker didn't finish in time; retry the request or increase the timeout.
       </div>
     </div>
@@ -2838,7 +2838,7 @@ function ValidateTab({
             }}>
               <Shield style={{ width: 14, height: 14, color: '#0369a1', flexShrink: 0, marginTop: 2 }} />
               <div style={{ flex: 1, fontSize: 12, color: '#075985', lineHeight: 1.5 }}>
-                {portability.document_count} test case{portability.document_count !== 1 ? 's' : ''} reference{portability.document_count === 1 ? 's' : ''} a document. Validation runs from the saved text snapshot, so anyone who copies this extraction can re-run validation — they won't need the original documents.
+                {portability.document_count} test case{portability.document_count !== 1 ? 's' : ''} reference{portability.document_count === 1 ? 's' : ''} a document. Validation runs from the saved text snapshot, so anyone who copies this extraction can re-run validation, and they won't need the original documents.
               </div>
             </div>
           )
@@ -3392,7 +3392,7 @@ function ValidateTab({
               <button
                 onClick={handleDownloadResults}
                 disabled={downloadingResults}
-                title="Download the raw results (JSON + CSV) — every replicate's extracted value for every document, for archival and cross-model comparison"
+                title="Download the raw results (JSON + CSV): every replicate's extracted value for every document, for archival and cross-model comparison"
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 5,
                   padding: '5px 12px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',

@@ -124,7 +124,7 @@ export function LibraryItemRow({ item, scope, onPin, onFavorite, onClone, onShar
           {item.name}
           {item.verified && (
             <span
-              title="Verified — saved as a reference. Make a copy to edit."
+              title="Verified: saved as a reference. Make a copy to edit."
               style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}
             >
               <ShieldCheck size={13} style={{ color: '#b45309' }} />

@@ -13,7 +13,7 @@ import {
 } from '../../api/admin'
 
 function formatDateTime(iso: string | null): string {
-  if (!iso) return '—'
+  if (!iso) return '-'
   const d = iso.endsWith('Z') || iso.includes('+') ? new Date(iso) : new Date(iso + 'Z')
   return d.toLocaleString('en-US', {
     month: 'short',
@@ -25,7 +25,7 @@ function formatDateTime(iso: string | null): string {
 }
 
 function formatRetention(days?: number): string {
-  if (!days) return '—'
+  if (!days) return '-'
   if (days >= 365) {
     const years = days / 365
     return Number.isInteger(years) ? `${years} yr` : `${years.toFixed(1)} yr`
@@ -244,16 +244,16 @@ export function ComplianceTab() {
                     <td style={{ padding: '10px 16px' }}>
                       {row.classification
                         ? <ClassificationChip name={row.classification} levels={levels} />
-                        : <span style={{ color: '#9ca3af' }}>—</span>}
+                        : <span style={{ color: '#9ca3af' }}>-</span>}
                     </td>
                     <td style={{ padding: '10px 16px', color: '#6b7280' }}>
-                      {row.confidence != null ? `${Math.round(row.confidence * 100)}%` : '—'}
+                      {row.confidence != null ? `${Math.round(row.confidence * 100)}%` : '-'}
                     </td>
                     <td style={{ padding: '10px 16px', color: '#6b7280' }}>
                       {formatDateTime(row.classified_at)}
                     </td>
                     <td style={{ padding: '10px 16px', color: '#6b7280' }}>
-                      {row.classified_by || '—'}
+                      {row.classified_by || '-'}
                     </td>
                   </tr>
                 ))}
@@ -326,7 +326,7 @@ export function ComplianceTab() {
                     <td style={{ padding: '10px 16px', color: '#6b7280' }}>
                       {policy.soft_delete_grace_days
                         ? `${policy.soft_delete_grace_days} days`
-                        : '—'}
+                        : '-'}
                     </td>
                     <td style={{ padding: '10px 16px', color: '#6b7280' }}>
                       {count.toLocaleString()}
@@ -369,7 +369,7 @@ export function ComplianceTab() {
               <div style={{ fontWeight: 600 }}>
                 {retention.retention_config.activity_stale_threshold_minutes
                   ? `${retention.retention_config.activity_stale_threshold_minutes} min`
-                  : '—'}
+                  : '-'}
               </div>
             </div>
           </div>

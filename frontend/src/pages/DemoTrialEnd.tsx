@@ -159,7 +159,7 @@ export default function DemoTrialEnd() {
                 <h2 className="text-2xl font-bold text-white mb-4">You're back in!</h2>
                 <p className="text-gray-400 mb-6">
                   Your trial has been extended by another two weeks. Pick up right where you left
-                  off — and thanks for helping shape Vandalizer.
+                  off, and thanks for helping shape Vandalizer.
                 </p>
                 <button
                   onClick={enterApp}
@@ -176,7 +176,7 @@ export default function DemoTrialEnd() {
                 <Sparkles className="w-12 h-12 text-[#f1b300] mx-auto mb-4" />
                 <h2 className="text-2xl font-bold text-white mb-2">Your trial has wrapped up</h2>
                 <p className="text-gray-400">
-                  Hi {info.name} — Vandalizer is an evolving beta built for research offices, and
+                  Hi {info.name}, Vandalizer is an evolving beta built for research offices, and
                   feedback from trial users like you is actively shaping where it goes next. Trial
                   access keeps going as new releases land.
                 </p>
@@ -186,7 +186,7 @@ export default function DemoTrialEnd() {
                 // Low engagement → frictionless one-click renewal
                 <div className="text-center">
                   <p className="text-gray-300 mb-6">
-                    Looks like you were just getting started. No problem — grab another two weeks
+                    Looks like you were just getting started. No problem: grab another two weeks
                     and take it for a proper spin.
                   </p>
                   {error && (
@@ -215,7 +215,7 @@ export default function DemoTrialEnd() {
                 // Engaged → short notes in exchange for more time
                 <div>
                   <p className="text-gray-300 mb-6">
-                    Want another two weeks? Tell us a little about how it's going — your notes go
+                    Want another two weeks? Tell us a little about how it's going. Your notes go
                     straight to the team, and you'll be back in the moment you submit.
                   </p>
                   <SurveyWizard
@@ -235,7 +235,7 @@ export default function DemoTrialEnd() {
               <Mail className="w-12 h-12 text-[#f1b300] mx-auto mb-4" />
               <h2 className="text-2xl font-bold text-white mb-2">Let's keep this going</h2>
               <p className="text-gray-400 mb-6">
-                {info ? `Hi ${info.name} — you` : 'You'}'ve made the most of your trial extensions.
+                {info ? `Hi ${info.name}, you` : 'You'}'ve made the most of your trial extensions.
                 We'd love to talk about keeping Vandalizer in your office for good. Reach out and
                 we'll sort out continued access.
               </p>

@@ -434,7 +434,7 @@ export async function generateKBTestQueriesAndWait(
     }
   }
   throw new Error(
-    'Generation is taking longer than expected — it will keep running in the ' +
+    'Generation is taking longer than expected. It will keep running in the ' +
     'background. Check the Test Queries tab again shortly.',
   )
 }

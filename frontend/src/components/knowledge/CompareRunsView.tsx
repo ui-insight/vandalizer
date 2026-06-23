@@ -150,7 +150,7 @@ function RunHeader({ label, run, subtitle }: { label: string; run: KBOptimizatio
       <div style={{ fontSize: 11, color: '#aaa', marginTop: 2 }}>{subtitle}</div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 6 }}>
         <span style={{ fontSize: 22, fontWeight: 700, color: scoreColor((score ?? 0) * 100) }}>
-          {score != null ? `${(score * 100).toFixed(0)}%` : '—'}
+          {score != null ? `${(score * 100).toFixed(0)}%` : '-'}
         </span>
         {lift != null && (
           <span style={{ fontSize: 11, color: lift > 0 ? '#22c55e' : lift < 0 ? '#ef4444' : '#888' }}>
@@ -177,7 +177,7 @@ function EvalSetDrift({ left, right }: { left: KBOptimizationRun; right: KBOptim
   const ls = left.test_query_snapshot
   const rs = right.test_query_snapshot
   if (!ls || !rs) {
-    return <Note>One or both runs predate eval-set snapshots — drift cannot be computed.</Note>
+    return <Note>One or both runs predate eval-set snapshots, so drift cannot be computed.</Note>
   }
   const leftIds = new Set(ls.query_uuids)
   const rightIds = new Set(rs.query_uuids)
@@ -207,7 +207,7 @@ function EvalSetDrift({ left, right }: { left: KBOptimizationRun; right: KBOptim
       </div>
       {drifted && (
         <div style={{ marginTop: 6, color: '#fbbf24' }}>
-          ⚠ Eval set changed between runs — the score comparison isn't strictly apples-to-apples.
+          ⚠ Eval set changed between runs, so the score comparison isn't strictly apples-to-apples.
         </div>
       )}
     </div>
@@ -216,10 +216,10 @@ function EvalSetDrift({ left, right }: { left: KBOptimizationRun; right: KBOptim
 
 function JudgeDiff({ left, right }: { left: KBOptimizationRun; right: KBOptimizationRun }) {
   const rows = [
-    ['Judge model', left.judge_model || '—', right.judge_model || '—'],
-    ['Judge prompt', left.judge_prompt_version || '—', right.judge_prompt_version || '—'],
+    ['Judge model', left.judge_model || '-', right.judge_model || '-'],
+    ['Judge prompt', left.judge_prompt_version || '-', right.judge_prompt_version || '-'],
     ['Judge temperature', fmtNum(left.judge_temperature), fmtNum(right.judge_temperature)],
-    ['RNG seed', left.rng_seed != null ? String(left.rng_seed) : '—', right.rng_seed != null ? String(right.rng_seed) : '—'],
+    ['RNG seed', left.rng_seed != null ? String(left.rng_seed) : '-', right.rng_seed != null ? String(right.rng_seed) : '-'],
     ['Judge variance', fmtPct(left.judge_variance), fmtPct(right.judge_variance)],
   ]
   return (
@@ -242,8 +242,8 @@ function ConfigDiff({ left, right }: { left: Record<string, unknown>; right: Rec
         <DiffRow
           key={k}
           label={k}
-          left={String(left[k] ?? '—')}
-          right={String(right[k] ?? '—')}
+          left={String(left[k] ?? '-')}
+          right={String(right[k] ?? '-')}
         />
       ))}
     </div>
@@ -381,12 +381,12 @@ function formatRunLabel(run: KBOptimizationRun): string {
 }
 
 function fmtNum(n: number | null | undefined): string {
-  if (n == null) return '—'
+  if (n == null) return '-'
   return Number.isInteger(n) ? String(n) : n.toFixed(2)
 }
 
 function fmtPct(p: number | null | undefined): string {
-  if (p == null) return '—'
+  if (p == null) return '-'
   return `${(p * 100).toFixed(1)}%`
 }
 

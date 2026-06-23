@@ -17,7 +17,7 @@ import {
 marked.setOptions({ breaks: true, gfm: true })
 
 function fmtDate(iso: string | null): string {
-  if (!iso) return '—'
+  if (!iso) return '-'
   const d = iso.endsWith('Z') || iso.includes('+') ? new Date(iso) : new Date(iso + 'Z')
   return d.toLocaleString('en-US', {
     month: 'short',
@@ -510,7 +510,7 @@ function CreateKeyModal({
           ))}
         </div>
         <p style={{ fontSize: 11, color: '#6b7280', marginTop: 6 }}>
-          Action scopes (<code>:run</code>, <code>:write</code>) spend tokens or mutate state — issue
+          Action scopes (<code>:run</code>, <code>:write</code>) spend tokens or mutate state, so issue
           read-only first and add the rest only after review.
         </p>
       </div>

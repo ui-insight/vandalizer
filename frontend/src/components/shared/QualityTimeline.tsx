@@ -239,14 +239,14 @@ function Row({ item, sampleNoun }: { item: QualityHistoryItem; sampleNoun: strin
         backgroundColor: scoreColor(score),
       }} />
       <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-        {item.created_at ? new Date(item.created_at).toLocaleString() : '—'}
+        {item.created_at ? new Date(item.created_at).toLocaleString() : '-'}
         {isApply && (
           <span title="Recorded when an optimizer winning config was applied" style={{ marginLeft: 6, color: '#a78bfa' }}>
             · apply
           </span>
         )}
         {isPassive && (
-          <span title="Monthly auto-re-judge of the applied tuning — catches quiet regressions after Apply" style={{ marginLeft: 6, color: '#7dd3fc' }}>
+          <span title="Monthly auto-re-judge of the applied tuning, catching quiet regressions after Apply" style={{ marginLeft: 6, color: '#7dd3fc' }}>
             · auto-monthly
           </span>
         )}

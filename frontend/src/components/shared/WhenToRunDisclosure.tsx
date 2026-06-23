@@ -25,7 +25,7 @@ const BULLETS: Record<Kind, { when: string; why: string }[]> = {
   workflow: [
     { when: 'First time', why: 'after you\'ve configured the steps and want a baseline so future changes have something to beat' },
     { when: 'After step changes', why: 'when you\'ve swapped models, rewritten prompts, or restructured steps and want to confirm the change actually helped' },
-    { when: 'Before handing off', why: 'before teammates or production traffic start relying on the workflow — you don\'t want them finding the regressions' },
+    { when: 'Before handing off', why: 'before teammates or production traffic start relying on the workflow, since you don\'t want them finding the regressions' },
     { when: 'Quarterly', why: 'for workflows you depend on, since models drift and last quarter\'s best config may not be today\'s' },
   ],
 }

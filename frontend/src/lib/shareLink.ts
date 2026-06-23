@@ -28,7 +28,7 @@ export function useShareLink() {
       try {
         await navigator.clipboard.writeText(url)
         const what = label ? `“${label}”` : 'Link'
-        toast(`${what} copied — share it with anyone.`, 'success')
+        toast(`${what} copied. Share it with anyone.`, 'success')
       } catch {
         toast('Could not copy link to clipboard.', 'error')
       }

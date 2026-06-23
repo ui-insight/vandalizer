@@ -16,10 +16,10 @@ interface Props {
 type SortKey = 'title' | 'updated'
 
 function formatDate(d: string | null): string {
-  if (!d) return '—'
+  if (!d) return '-'
   const iso = !d.endsWith('Z') && !d.includes('+') && !d.includes('-', 10) ? d + 'Z' : d
   const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return '—'
+  if (Number.isNaN(date.getTime())) return '-'
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
@@ -75,7 +75,7 @@ export function KnowledgeBasesTab({ canEdit }: Props) {
           <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: '#111827' }}>Knowledge Bases</h2>
           <p style={{ fontSize: 13, color: '#6b7280', margin: '2px 0 0 0' }}>
             Every KB across all users and teams. {canEdit
-              ? 'Click the pencil to rename — e.g. add a date/version.'
+              ? 'Click the pencil to rename, e.g. add a date/version.'
               : 'Read-only (renaming requires full admin).'}
           </p>
         </div>
@@ -244,10 +244,10 @@ function KBRow({
               }}>{t}</span>
             ))}
           </div>
-        ) : <span style={{ color: '#d1d5db' }}>—</span>}
+        ) : <span style={{ color: '#d1d5db' }}>-</span>}
       </Td>
       <Td style={{ fontSize: 13, color: '#6b7280' }}>{kb.owner_email || kb.owner_id}</Td>
-      <Td style={{ fontSize: 13, color: '#6b7280' }}>{kb.team_name || '—'}</Td>
+      <Td style={{ fontSize: 13, color: '#6b7280' }}>{kb.team_name || '-'}</Td>
       <Td align="right" style={{ fontFamily: 'ui-monospace, monospace', fontSize: 13 }}>{kb.total_sources}</Td>
       <Td align="right" style={{ fontFamily: 'ui-monospace, monospace', fontSize: 13 }}>{kb.total_chunks}</Td>
       <Td><StatusPill status={kb.status} /></Td>

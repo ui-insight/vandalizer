@@ -31,7 +31,7 @@ export function ProjectsExplainer() {
         </h2>
         <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-gray-500">
           A project gathers the files, a knowledge base you can chat with, and the
-          workflows, extractions, and automations that act on them — so a grant, a
+          workflows, extractions, and automations that act on them, so a grant, a
           contract, or a review lives in one organized home.
         </p>
       </div>
@@ -46,12 +46,12 @@ export function ProjectsExplainer() {
         <Card
           icon={FolderOpen}
           title="Files"
-          body="A dedicated folder tree for every document this work touches — uploads, drafts, and source material."
+          body="A dedicated folder tree for every document this work touches: uploads, drafts, and source material."
         />
         <Card
           icon={Database}
           title="A knowledge base"
-          body="Turn the project's files into a knowledge base you can chat with and cite — answers grounded in this work's documents."
+          body="Turn the project's files into a knowledge base you can chat with and cite, with answers grounded in this work's documents."
         />
         <Card
           icon={Workflow}
@@ -61,7 +61,7 @@ export function ProjectsExplainer() {
         <Card
           icon={Zap}
           title="Automations"
-          body="Let new files trigger the right workflow automatically — results land back in the project."
+          body="Let new files trigger the right workflow automatically, with results landing back in the project."
         />
       </Section>
 

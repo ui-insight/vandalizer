@@ -83,7 +83,7 @@ export function KBValidationRunTab({ kbReady, canManage, numQueries, latestRun, 
             Validation running…
           </span>
           <span style={{ fontSize: 11, color: '#666' }}>
-            Large evaluation sets can take a few minutes. You can switch tabs — results appear here and in <b>History</b> when finished.
+            Large evaluation sets can take a few minutes. You can switch tabs; results appear here and in <b>History</b> when finished.
           </span>
         </div>
       ) : !latestRun ? (
@@ -156,7 +156,7 @@ function CertifiedQualityCard({ run }: { run: KBValidationResult }) {
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
         <span style={{ fontSize: 10, color: '#888', textTransform: 'uppercase', letterSpacing: 0.5 }}>Quality</span>
         <span style={{ fontSize: 22, fontWeight: 700, color: c.text }}>
-          {tierLabel} — {Math.round(run.score)}%
+          {tierLabel} - {Math.round(run.score)}%
         </span>
       </div>
       {penalized && bd && (

@@ -31,7 +31,7 @@ function CopyablePitch({
       await navigator.clipboard.writeText(text)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
-      toast(`${kind} pitch copied — paste it anywhere.`, 'success')
+      toast(`${kind} pitch copied. Paste it anywhere.`, 'success')
     } catch {
       toast('Could not copy to clipboard.', 'error')
     }

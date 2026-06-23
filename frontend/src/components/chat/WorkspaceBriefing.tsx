@@ -20,12 +20,12 @@ const STATUS_STYLES: Record<string, { color: string; Icon: typeof CheckCircle2 }
 function activityResumeMessage(item: RecentActivityItem): string {
   const t = item.title
   if (item.type === 'search_set_run') {
-    if (item.status === 'failed') return `My "${t}" extraction failed — help me understand what went wrong`
+    if (item.status === 'failed') return `My "${t}" extraction failed. Help me understand what went wrong`
     if (item.status === 'running') return `Check on my running "${t}" extraction`
     return `Show me the results from my "${t}" extraction`
   }
   if (item.type === 'workflow_run') {
-    if (item.status === 'failed') return `My "${t}" workflow failed — help me debug it`
+    if (item.status === 'failed') return `My "${t}" workflow failed. Help me debug it`
     if (item.status === 'running') return `Check on my running "${t}" workflow`
     return `Show me the results from my "${t}" workflow run`
   }
@@ -300,7 +300,7 @@ export function WorkspaceBriefing({
           }}
         >
           <span style={{ fontSize: 13, color: '#374151', lineHeight: 1.4 }}>
-            You've seen the demo — now upload one of your own documents and I'll help you build a custom template.
+            You've seen the demo. Now upload one of your own documents and I'll help you build a custom template.
           </span>
           <ArrowRight size={14} style={{ flexShrink: 0, color: 'var(--highlight-color, #eab308)', opacity: 0.6 }} />
         </button>
