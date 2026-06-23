@@ -489,6 +489,46 @@ class TestRunWorkflow:
         assert "error" in result
         assert "not found" in result["error"].lower()
 
+    @pytest.mark.asyncio
+    async def test_text_input_creates_temp_doc_and_runs(self):
+        from app.services.chat_tools import run_workflow
+
+        ctx = _make_context()
+        wf = MagicMock()
+        wf.name = "Bed Flow"
+        wf.verified = False
+        wf.user_id = "user1"
+        wf.team_id = "team1"
+        wf.input_config = {"trigger_type": "text_input"}
+        with patch("app.services.chat_tools.Workflow") as MockWF, \
+             patch("app.services.workflow_service.create_temp_documents_from_text", new_callable=AsyncMock, return_value=["TMP1"]) as mock_temp, \
+             patch("app.services.workflow_service.run_workflow", new_callable=AsyncMock, return_value="session-ti") as mock_run:
+            MockWF.get = AsyncMock(return_value=wf)
+            result = await run_workflow(ctx, "wf-1", text_input="Bed 2", confirmed=True)
+
+        assert result["session_id"] == "session-ti"
+        # Typed text became a temp document fed into the run.
+        mock_temp.assert_awaited_once()
+        assert "TMP1" in mock_run.await_args.kwargs["document_uuids"]
+
+    @pytest.mark.asyncio
+    async def test_text_input_required_when_missing(self):
+        from app.services.chat_tools import run_workflow
+
+        ctx = _make_context()
+        wf = MagicMock()
+        wf.name = "Bed Flow"
+        wf.verified = False
+        wf.user_id = "user1"
+        wf.team_id = "team1"
+        wf.input_config = {"trigger_type": "text_input"}
+        with patch("app.services.chat_tools.Workflow") as MockWF:
+            MockWF.get = AsyncMock(return_value=wf)
+            result = await run_workflow(ctx, "wf-1", confirmed=False)
+
+        assert "error" in result
+        assert "text input" in result["error"].lower()
+
 
 # ---------------------------------------------------------------------------
 # get_workflow_status
@@ -1535,3 +1575,45 @@ class TestCreateWorkflow:
 
         assert "error" in result
         mock_del.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_text_input_mode_persists_config(self):
+        from app.services.chat_tools import create_workflow
+
+        fake_wf = MagicMock()
+        fake_wf.id = "wf-ti"
+        fake_wf.name = "Bed Flow"
+        fake_wf.save = AsyncMock()
+
+        ctx = _make_context()
+        steps = [{"name": "Pull plants", "type": "extraction", "extractions": ["plant", "bed"]}]
+        with patch("app.services.workflow_service.create_workflow", new_callable=AsyncMock, return_value=fake_wf), \
+             patch("app.services.workflow_service.add_step", new_callable=AsyncMock, return_value={"id": "s1"}), \
+             patch("app.services.workflow_service.add_task", new_callable=AsyncMock, return_value={"id": "t1"}):
+            result = await create_workflow(ctx, "Bed Flow", steps, input_mode="text_input", confirmed=True)
+
+        assert result["input_mode"] == "text_input"
+        fake_wf.save.assert_awaited_once()
+        assert fake_wf.input_config == {"trigger_type": "text_input"}
+
+    @pytest.mark.asyncio
+    async def test_text_input_requires_content_step(self):
+        from app.services.chat_tools import create_workflow
+
+        ctx = _make_context()
+        # 'website' fetches a page but is not a content step that reads the input.
+        steps = [{"name": "Fetch", "type": "website", "url": "https://example.com"}]
+        result = await create_workflow(ctx, "Flow", steps, input_mode="text_input", confirmed=False)
+
+        assert "error" in result
+        assert "reads the input" in result["error"].lower()
+
+    @pytest.mark.asyncio
+    async def test_invalid_input_mode(self):
+        from app.services.chat_tools import create_workflow
+
+        ctx = _make_context()
+        result = await create_workflow(ctx, "Flow", [{"name": "S", "type": "summarize"}], input_mode="bogus")
+
+        assert "error" in result
+        assert "input_mode" in result["error"]

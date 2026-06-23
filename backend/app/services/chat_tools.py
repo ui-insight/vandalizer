@@ -1466,20 +1466,30 @@ async def add_url_to_kb(
 async def run_workflow(
     context: RunContext[AgenticChatDeps],
     workflow_id: str,
-    document_uuids: list[str],
+    document_uuids: list[str] | None = None,
+    text_input: str = "",
     confirmed: bool = False,
 ) -> dict:
-    """Start a workflow execution against documents. Returns a session ID for status polling.
+    """Start a workflow execution. Returns a session ID for status polling.
 
-    Call first with confirmed=false to preview. Then call again with confirmed=true after the user approves.
-    Workflows run asynchronously in the background. Use get_workflow_status to check progress.
+    A workflow runs on documents, on **typed text** (for text-input workflows),
+    or on nothing (for no-input workflows). Call first with confirmed=false to
+    preview, then again with confirmed=true after the user approves. Workflows
+    run asynchronously in the background — use get_workflow_status for progress.
 
     Args:
         context: The call context.
         workflow_id: The ID of the workflow to execute.
-        document_uuids: List of document UUIDs to process.
-        confirmed: Must be true to actually run. If false, returns a preview for user confirmation.
+        document_uuids: Document UUIDs to process. Omit for text-input or
+            no-input workflows.
+        text_input: For a text-input workflow, the text the user wants it to run
+            on (e.g. a bed name, a pasted snippet). It becomes the workflow's
+            input; any documents pinned to the workflow are included too.
+        confirmed: Must be true to actually run. If false, returns a preview.
     """
+    document_uuids = list(document_uuids or [])
+    text = (text_input or "").strip()
+
     # Look up workflow and verify access
     wf = await Workflow.get(workflow_id)
     if not wf:
@@ -1491,13 +1501,31 @@ async def run_workflow(
         if not (team_id and getattr(wf, "team_id", None) == team_id):
             return {"error": "You do not have access to this workflow."}
 
+    input_cfg = getattr(wf, "input_config", None) or {}
+    trigger_type = input_cfg.get("trigger_type") or "documents"
+    has_fixed = bool(input_cfg.get("fixed_documents"))
+
+    # Make sure the run will have something to chew on. "no_input" workflows run
+    # empty by design; everything else needs docs, typed text, or documents
+    # pinned to the workflow (those are merged in at execution time).
+    if trigger_type != "no_input" and not document_uuids and not text and not has_fixed:
+        if trigger_type == "text_input":
+            return {"error": f"Workflow \"{wf.name}\" runs on text input — give me the text to run it on (for example, the bed name or the details to process)."}
+        return {"error": f"Give me at least one document to run \"{wf.name}\" on."}
+
+    run_label = (
+        "typed input" if text and not document_uuids
+        else f"typed input + {len(document_uuids)} document(s)" if text
+        else f"{len(document_uuids)} document(s)" if document_uuids
+        else "its pinned inputs"
+    )
     gate = await _confirm_gate(
         context,
         tool_name="run_workflow",
-        key={"workflow_id": workflow_id, "docs": sorted(document_uuids)},
+        key={"workflow_id": workflow_id, "docs": sorted(document_uuids), "text": text[:200]},
         preview={
             "action": "run_workflow",
-            "preview": f"Run workflow \"{wf.name}\" on {len(document_uuids)} document(s)",
+            "preview": f"Run workflow \"{wf.name}\" on {run_label}",
             "needs_confirmation": True,
         },
         confirmed=confirmed,
@@ -1505,7 +1533,22 @@ async def run_workflow(
     if gate is not None:
         return gate
 
-    return await _execute_workflow(context, wf, document_uuids)
+    # Turn typed text into a transient document the workflow reads — the same
+    # path the visual runner uses. Done only after confirmation so an unconfirmed
+    # preview never leaves an orphaned temp document behind.
+    run_docs = list(document_uuids)
+    if text:
+        from app.services import workflow_service
+        try:
+            temp_uuids = await workflow_service.create_temp_documents_from_text(
+                [{"text": text, "label": "Chat text input"}], user_id,
+            )
+            run_docs.extend(temp_uuids)
+        except Exception as e:
+            logger.error("Failed to create temp document for workflow %s: %s", workflow_id, e)
+            return {"error": "Couldn't prepare the text input for this run — try again."}
+
+    return await _execute_workflow(context, wf, run_docs)
 
 
 async def _execute_workflow(
@@ -3490,6 +3533,8 @@ async def create_workflow(
     name: str,
     steps: list[dict],
     description: str = "",
+    input_mode: str = "documents",
+    fixed_document_uuids: list[str] | None = None,
     confirmed: bool = False,
 ) -> dict:
     """Build a multi-step workflow from a plain-language description of the steps.
@@ -3515,16 +3560,31 @@ async def create_workflow(
           "approval"    — pause for human review. "instructions" optional.
       - "is_output": optional bool — mark this step's result as a deliverable.
 
-    Steps are wired linearly: the first content step reads the documents the
-    workflow is run on; later steps read the previous step's output. Call first
-    with confirmed=false to preview the plan, then confirmed=true after the user
-    approves.
+    Steps are wired linearly: the first content step reads the workflow's input;
+    later steps read the previous step's output.
+
+    ``input_mode`` sets how the workflow is fed when run:
+      - "documents" (default) — runs on documents/folders the user picks.
+      - "text_input" — the user types text at run time (e.g. a bed name, a
+        pasted snippet); that text becomes the input the first step reads. Use
+        this when the user says they want to "type" or "input" something each
+        run. Requires at least one content step to read the text.
+      - "no_input" — runs with no input (e.g. a research/website step that
+        supplies its own data).
+    ``fixed_document_uuids`` pins documents that are ALWAYS included on every run
+    (handy with text_input — e.g. pin the source PDF so the typed bed name is
+    matched against it).
+
+    Call first with confirmed=false to preview the plan, then confirmed=true
+    after the user approves.
 
     Args:
         context: The call context.
         name: Name for the new workflow.
         steps: Ordered list of step specs (see above). At least one required.
         description: Optional description of what the workflow does.
+        input_mode: "documents" (default), "text_input", or "no_input".
+        fixed_document_uuids: Optional UUIDs always included alongside the input.
         confirmed: Must be true to actually create. If false, returns a preview.
     """
     if not name or not name.strip():
@@ -3533,6 +3593,10 @@ async def create_workflow(
         return {"error": "A workflow needs at least one step."}
     if len(steps) > 25:
         return {"error": "That's a lot of steps — keep workflows to 25 or fewer. Split big jobs into multiple workflows."}
+
+    input_mode = (input_mode or "documents").strip().lower()
+    if input_mode not in ("documents", "text_input", "no_input"):
+        return {"error": "input_mode must be 'documents', 'text_input', or 'no_input'."}
 
     model = context.deps.model_name or None
 
@@ -3564,14 +3628,20 @@ async def create_workflow(
             "is_output": bool(step.get("is_output")),
         })
 
+    # A text-input workflow must have a step that actually reads the typed text;
+    # otherwise the input silently goes nowhere.
+    if input_mode == "text_input" and not any(p["doc_consuming"] for p in plan):
+        return {"error": "A text-input workflow needs at least one step that reads the input (extraction, prompt, summarize, format, or research). Add one so the typed text is actually used."}
+
+    mode_suffix = {"text_input": " [text input]", "no_input": " [no input]"}.get(input_mode, "")
     preview_lines = "; ".join(f"{i + 1}. {p['label']} ({p['type']})" for i, p in enumerate(plan))
     gate = await _confirm_gate(
         context,
         tool_name="create_workflow",
-        key={"name": name, "steps": [{"t": p["type"], "n": p["label"]} for p in plan]},
+        key={"name": name, "mode": input_mode, "steps": [{"t": p["type"], "n": p["label"]} for p in plan]},
         preview={
             "action": "create_workflow",
-            "preview": f"Create workflow \"{name}\" with {len(plan)} step(s): {preview_lines}",
+            "preview": f"Create workflow \"{name}\"{mode_suffix} with {len(plan)} step(s): {preview_lines}",
             "needs_confirmation": True,
         },
         confirmed=confirmed,
@@ -3626,15 +3696,42 @@ async def create_workflow(
             logger.exception("Failed to clean up partial workflow %s", workflow_id)
         return {"error": "Something went wrong building the workflow. Nothing was saved — try again."}
 
+    # Persist the input trigger so the workflow knows how it's fed: documents
+    # (default), typed text at run time, or nothing. Mirrors the editor's shape
+    # ({trigger_type, fixed_documents:[{uuid,title}]}) so both paths agree, and
+    # the execution task auto-merges fixed_documents on every run.
+    input_config: dict = {}
+    if input_mode in ("text_input", "no_input"):
+        input_config["trigger_type"] = input_mode
+    if fixed_document_uuids:
+        fixed: list[dict] = []
+        for u in fixed_document_uuids:
+            d = await SmartDocument.find_one(SmartDocument.uuid == u)
+            if d:
+                fixed.append({"uuid": u, "title": d.title or "Document"})
+        if fixed:
+            input_config["fixed_documents"] = fixed
+    if input_config:
+        try:
+            wf.input_config = input_config
+            await wf.save()
+        except Exception:
+            logger.exception("Failed to persist input_config for workflow %s", workflow_id)
+
+    mode_note = {
+        "text_input": " It takes typed text input each run — tell me what to type and I'll run it.",
+        "no_input": " It runs with no input.",
+    }.get(input_mode, "")
     return {
         "workflow_id": workflow_id,
         "name": wf.name,
         "steps_created": len(plan),
+        "input_mode": input_mode,
         "verified": False,
         "message": (
-            f"Created workflow \"{wf.name}\" with {len(plan)} steps. It's ready to run on "
-            "documents, and you can fine-tune the steps or validate it in the workflow "
-            "editor. Want to run it now or open it to review?"
+            f"Created workflow \"{wf.name}\" with {len(plan)} steps.{mode_note} You can "
+            "fine-tune the steps or validate it in the workflow editor. Want to run it now "
+            "or open it to review?"
         ),
     }
 
