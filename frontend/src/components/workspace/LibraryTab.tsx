@@ -43,7 +43,17 @@ import { useLibraryFolders } from '../../hooks/useLibrary'
 
 type ScopeTab = 'mine' | 'team' | 'explore'
 type ViewFilter = 'all' | 'favorites' | 'pinned' | string  // string allows folder UUIDs
-type KindFilter = 'all' | 'workflow' | 'search_set'
+// Tasks/Prompts/Formatters are all stored as `search_set` items, distinguished
+// by the underlying set_type. The filter chips split them out so each is
+// browsable on its own (set_type defaults to 'extraction' when absent).
+type KindFilter = 'all' | 'workflow' | 'extraction' | 'prompt' | 'formatter'
+
+function matchesKindFilter(item: { kind: string; set_type: string | null }, filter: KindFilter): boolean {
+  if (filter === 'all') return true
+  if (filter === 'workflow') return item.kind === 'workflow'
+  if (item.kind !== 'search_set') return false
+  return (item.set_type || 'extraction') === filter
+}
 type SortOption = 'recent' | 'az'
 
 export function LibraryTab() {
@@ -242,7 +252,7 @@ export function LibraryTab() {
   const scopedItems = viewFilter === 'all' ? items.filter((i) => !i.folder) : items
 
   const filtered = scopedItems.filter((item) => {
-    if (kindFilter !== 'all' && item.kind !== kindFilter) return false
+    if (!matchesKindFilter(item, kindFilter)) return false
     if (viewFilter === 'favorites') return item.favorited
     if (viewFilter === 'pinned') return item.pinned
     if (collectionItemIds) return collectionItemIds.has(item.item_id)
@@ -251,8 +261,10 @@ export function LibraryTab() {
 
   const kindCounts = {
     all: scopedItems.length,
-    workflow: scopedItems.filter((i) => i.kind === 'workflow').length,
-    search_set: scopedItems.filter((i) => i.kind === 'search_set').length,
+    workflow: scopedItems.filter((i) => matchesKindFilter(i, 'workflow')).length,
+    extraction: scopedItems.filter((i) => matchesKindFilter(i, 'extraction')).length,
+    prompt: scopedItems.filter((i) => matchesKindFilter(i, 'prompt')).length,
+    formatter: scopedItems.filter((i) => matchesKindFilter(i, 'formatter')).length,
   }
 
   const sorted = [...filtered].sort((a, b) => {
@@ -662,7 +674,9 @@ export function LibraryTab() {
             {([
               { value: 'all' as const, label: 'All' },
               { value: 'workflow' as const, label: 'Workflows' },
-              { value: 'search_set' as const, label: 'Tasks' },
+              { value: 'extraction' as const, label: 'Tasks' },
+              { value: 'prompt' as const, label: 'Prompts' },
+              { value: 'formatter' as const, label: 'Formatters' },
             ]).map(({ value, label }) => {
               const active = kindFilter === value
               const count = kindCounts[value]
