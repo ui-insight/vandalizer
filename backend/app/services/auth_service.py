@@ -77,11 +77,13 @@ async def authenticate_with_reason(
         return None, AUTH_REASON_UNKNOWN_USER
     if not user.password_hash:
         return None, AUTH_REASON_SSO_ONLY
+    # A locked trial isn't an auth failure the user can fix by guessing harder,
+    # so surface it regardless of password correctness. We return the user (not
+    # None) so the login route can route them to the trial-end screen instead of
+    # a dead-end 401. The locked account never receives a real session token.
+    if user.is_demo_user and user.demo_status == "locked":
+        return user, AUTH_REASON_TRIAL_EXPIRED
     if not verify_password(password, user.password_hash):
-        # If the account is a locked trial, surface that instead of "wrong
-        # password" — the user can't recover access by guessing harder.
-        if user.is_demo_user and user.demo_status == "locked":
-            return None, AUTH_REASON_TRIAL_EXPIRED
         return None, AUTH_REASON_WRONG_PASSWORD
     # Silently backfill default-team membership for non-demo users
     if not user.is_demo_user:
@@ -93,8 +95,10 @@ async def authenticate_with_reason(
 
 
 async def authenticate(user_id: str, password: str) -> User | None:
-    user, _ = await authenticate_with_reason(user_id, password)
-    return user
+    user, reason = await authenticate_with_reason(user_id, password)
+    # Only a clean success (reason is None) counts as authenticated; a locked
+    # trial now returns the user alongside a reason, which is not a valid login.
+    return user if reason is None else None
 
 
 async def resolve_oauth_user(

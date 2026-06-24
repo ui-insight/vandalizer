@@ -110,6 +110,23 @@ async def login(
     user, reason = await auth_service.authenticate_with_reason(
         body.user_id, body.password
     )
+    # A locked trial returns the user with a trial-expired reason. Don't issue a
+    # session token (they're locked); instead return a success-shaped payload so
+    # the SPA routes them to the trial-end screen rather than showing a 401 that
+    # reads as "it won't let me in".
+    if user and reason == auth_service.AUTH_REASON_TRIAL_EXPIRED:
+        from app.models.demo import DemoApplication
+
+        demo_app = await DemoApplication.find_one(
+            DemoApplication.user_id == user.user_id
+        )
+        return {
+            "demo_expired": True,
+            "demo_uuid": demo_app.uuid if demo_app else None,
+            "demo_feedback_token": (
+                demo_app.post_questionnaire_token if demo_app else None
+            ),
+        }
     if not user:
         message = _LOGIN_ERROR_MESSAGES.get(
             reason or "", "We couldn't sign you in. Please try again."
@@ -128,19 +145,6 @@ async def login(
     )
     user_resp = await _user_response(user)
     result = user_resp.model_dump()
-
-    # If demo user is locked, include demo_expired flag so frontend can redirect
-    if user.is_demo_user and user.demo_status == "locked":
-        from app.models.demo import DemoApplication
-
-        demo_app = await DemoApplication.find_one(
-            DemoApplication.user_id == user.user_id
-        )
-        result["demo_expired"] = True
-        result["demo_uuid"] = demo_app.uuid if demo_app else None
-        result["demo_feedback_token"] = (
-            demo_app.post_questionnaire_token if demo_app else None
-        )
 
     return result
 

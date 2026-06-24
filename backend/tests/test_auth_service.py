@@ -245,8 +245,38 @@ class TestAuthenticateWithReason:
 
             user, reason = await authenticate_with_reason("alice", "nope")
 
-        assert user is None
+        # The user is returned (not None) so the login route can route them to
+        # the trial-end screen instead of a dead-end 401.
+        assert user is existing
         assert reason == AUTH_REASON_TRIAL_EXPIRED
+
+    @pytest.mark.asyncio
+    async def test_locked_trial_with_correct_password_returns_trial_expired(self):
+        # A locked trial must surface trial-expired even with the right password
+        # — they can't be allowed to log in normally.
+        existing = _make_user(is_demo_user=True)
+        existing.demo_status = "locked"
+
+        with (
+            patch("app.services.auth_service.User") as MockUser,
+            patch("app.services.auth_service.verify_password", return_value=True),
+        ):
+            MockUser.find_one = AsyncMock(return_value=existing)
+
+            from app.services.auth_service import (
+                AUTH_REASON_TRIAL_EXPIRED,
+                authenticate,
+                authenticate_with_reason,
+            )
+
+            user, reason = await authenticate_with_reason("alice", "pw")
+            assert user is existing
+            assert reason == AUTH_REASON_TRIAL_EXPIRED
+
+            # The authenticate() wrapper must NOT treat a locked trial as a
+            # successful login.
+            MockUser.find_one = AsyncMock(return_value=existing)
+            assert await authenticate("alice", "pw") is None
 
     @pytest.mark.asyncio
     async def test_successful_login_returns_no_reason(self):
