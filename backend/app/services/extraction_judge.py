@@ -64,9 +64,15 @@ EXTRACTION_JUDGE_SYSTEM_PROMPT = (
 )
 
 
-# Pydantic-ai agents are stateful (HTTP client). Cache per (model_name,) so we
-# don't create a new client per judge call.
-_agent_cache: dict[str, Agent] = {}
+# Pydantic-ai agents are stateful: each carries an httpx pool bound (via
+# get_agent_model -> _get_loop_http_client) to the event loop that built it.
+# Celery runs each task on its own loop, so an agent cached on a prior task's
+# (now-closed) loop fails a later call with "bound to a different event loop",
+# which the OpenAI SDK re-wraps as a zero-token "Connection error". Key the cache
+# on (loop, agent) and reuse only within the same running loop — see the same
+# fix in kb_validation_service._get_or_build_agent and the rule documented in
+# llm_service.create_chat_agent.
+_agent_cache: dict[str, tuple[asyncio.AbstractEventLoop, Agent]] = {}
 _system_config_doc_ctx: ContextVar[dict | None] = ContextVar("_ej_sys_cfg", default=None)
 
 
@@ -78,9 +84,15 @@ async def _ensure_system_config_loaded() -> None:
 
 
 def _get_agent(model_name: str) -> Agent:
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
     cached = _agent_cache.get(model_name)
-    if cached is not None:
-        return cached
+    if cached is not None and loop is not None and cached[0] is loop:
+        return cached[1]
+
     model = get_agent_model(
         model_name,
         system_config_doc=_system_config_doc_ctx.get(),
@@ -90,7 +102,8 @@ def _get_agent(model_name: str) -> Agent:
         system_prompt=EXTRACTION_JUDGE_SYSTEM_PROMPT,
         model_settings={"temperature": 0.0},
     )
-    _agent_cache[model_name] = agent
+    if loop is not None:
+        _agent_cache[model_name] = (loop, agent)
     return agent
 
 
