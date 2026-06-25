@@ -149,12 +149,15 @@ async def extend_trial(
 
 
 # ---------------------------------------------------------------------------
-# Admin endpoints (require auth + is_admin)
+# Admin endpoints (require auth + admin/staff)
 # ---------------------------------------------------------------------------
 
 
 def _require_admin(user: User) -> None:
-    if not user.is_admin:
+    # Staff are an analytics/operations role: they manage trial/demo data
+    # alongside full admins. Mirrors admin.py's _require_admin and the frontend
+    # Demo tab gate (isGlobalAdmin || isStaff).
+    if not (user.is_admin or user.is_staff):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required"
         )

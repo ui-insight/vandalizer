@@ -15,13 +15,16 @@ from app.utils.security import create_access_token
 _TEST_SETTINGS = Settings(jwt_secret_key="test-secret-key", environment="development")
 
 
-def _make_user(user_id="testuser", is_admin=False):
+def _make_user(user_id="testuser", is_admin=False, is_staff=False):
     user = MagicMock()
     user.id = "fake-id"
     user.user_id = user_id
     user.email = f"{user_id}@example.com"
     user.name = "Test User"
     user.is_admin = is_admin
+    # MagicMock attrs are truthy by default — pin it, or the audit gate
+    # (is_admin OR is_staff) lets every mock user through.
+    user.is_staff = is_staff
     user.is_examiner = False
     user.current_team = None
     user.organization_id = None
@@ -79,6 +82,23 @@ class TestQueryAuditLog:
             resp = await client.get("/api/audit/", cookies=cookies, headers=headers)
 
         assert resp.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_staff_can_query(self, client):
+        # Staff are the analytics role and may read the audit log (no is_admin).
+        user = _make_user(is_admin=False, is_staff=True)
+        entry = _make_audit_entry()
+        cookies, headers = _auth()
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.audit.audit_service") as mock_svc:
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.query_audit_log = AsyncMock(return_value=([entry], 1))
+
+            resp = await client.get("/api/audit/", cookies=cookies, headers=headers)
+
+        assert resp.status_code == 200
 
     @pytest.mark.asyncio
     async def test_admin_returns_entries(self, client):
