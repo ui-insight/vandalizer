@@ -58,6 +58,45 @@ def test_parse_verdict_truncates_reasoning():
     assert len(_parse_verdict({"reasoning": long})["reasoning"]) == 500
 
 
+def test_get_agent_reuses_within_same_loop():
+    """Same running loop + same model -> one agent, built once."""
+    import asyncio
+
+    extraction_judge._agent_cache.clear()
+    sentinel = object()
+    with patch.object(extraction_judge, "get_agent_model", return_value=MagicMock()), \
+         patch.object(extraction_judge, "Agent", return_value=sentinel) as agent_ctor:
+        async def _twice():
+            return extraction_judge._get_agent("m"), extraction_judge._get_agent("m")
+
+        a, b = asyncio.run(_twice())
+    extraction_judge._agent_cache.clear()
+    assert a is b is sentinel
+    assert agent_ctor.call_count == 1
+
+
+def test_get_agent_rebuilds_across_loops():
+    """A cached agent from a prior, now-closed loop is NOT reused on a new loop.
+
+    Regression for zero-token "Connection error": the agent's httpx pool is bound
+    to the loop that built it, so reusing it on a later Celery task's loop fails
+    with "bound to a different event loop".
+    """
+    import asyncio
+
+    extraction_judge._agent_cache.clear()
+    with patch.object(extraction_judge, "get_agent_model", return_value=MagicMock()), \
+         patch.object(extraction_judge, "Agent", side_effect=lambda *a, **k: object()) as agent_ctor:
+        async def _build():
+            return extraction_judge._get_agent("m")
+
+        first = asyncio.run(_build())
+        second = asyncio.run(_build())
+    extraction_judge._agent_cache.clear()
+    assert first is not second
+    assert agent_ctor.call_count == 2
+
+
 def test_parse_verdict_handles_garbage_input():
     # Non-dict input → defaults to score=0.0, verdict=FAIL
     out = _parse_verdict("garbage")

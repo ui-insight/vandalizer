@@ -1,6 +1,7 @@
 """LLM service  - provider classes and agent creation, ported from agents.py."""
 
 import asyncio
+import logging
 import weakref
 from dataclasses import dataclass
 from typing import Optional
@@ -21,6 +22,8 @@ from pydantic_ai.tools import RunContext
 
 from app.utils.encryption import decrypt_value
 
+logger = logging.getLogger(__name__)
+
 # ---------------------------------------------------------------------------
 # Agent caches  - prevent context leaks across requests
 # ---------------------------------------------------------------------------
@@ -38,6 +41,18 @@ def clear_agent_caches():
     _extraction_agent_cache.clear()
     _rag_agent_cache.clear()
     _prompt_agent_cache.clear()
+    # The judge services keep their own agent caches and import llm_service, so
+    # clear them via lazy import to avoid a circular import at module load.
+    try:
+        from app.services import kb_validation_service
+        kb_validation_service._agent_cache.clear()
+    except Exception:
+        logger.warning("Could not clear kb_validation agent cache", exc_info=True)
+    try:
+        from app.services import extraction_judge
+        extraction_judge._agent_cache.clear()
+    except Exception:
+        logger.warning("Could not clear extraction_judge agent cache", exc_info=True)
 
 
 # ---------------------------------------------------------------------------

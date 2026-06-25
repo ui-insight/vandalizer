@@ -1829,6 +1829,7 @@ def build_workflow_engine(
                     tasks.append(n)
                 elif task_name == "KnowledgeBaseQuery":
                     n = KnowledgeBaseQueryNode(data=task_data)
+                    n._sys_cfg = system_config_doc
                     tasks.append(n)
                 elif task_name == "Approval":
                     n = ApprovalNode(data=task_data)

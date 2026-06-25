@@ -108,7 +108,11 @@ app.add_exception_handler(AppError, _app_error_handler)
 
 
 # In development, return the full traceback in the response so errors are
-# immediately visible in API test tools and scripts.
+# immediately visible in API test tools and scripts. In production the Sentry
+# integration (see app/observability.py) captures unhandled exceptions and
+# uvicorn logs them, so we deliberately don't register a catch-all handler here:
+# a handler that returns a response makes Sentry's Starlette integration capture
+# the same error twice, doubling up issues.
 if not _boot_settings.is_production:
     import traceback as _tb
 

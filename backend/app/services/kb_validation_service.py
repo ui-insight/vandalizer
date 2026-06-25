@@ -19,9 +19,18 @@ from app.services.llm_service import RAG_SYSTEM_PROMPT, get_agent_model
 logger = logging.getLogger(__name__)
 
 
-# Module-level agent cache. Key: (purpose, model_name). Each judge/answer agent
-# is reused across queries within a process.
-_agent_cache: dict[tuple[str, str], Agent] = {}
+# Module-level agent cache. Key: (purpose, model_name); value: (event_loop, agent).
+# The agent is reused only for calls on the SAME running event loop that first
+# built it. A cached pydantic-ai Agent carries an httpx pool bound (via
+# get_agent_model -> _get_loop_http_client) to whichever loop first used it.
+# Celery runs each task (e.g. KB tuning, then a "Run Now" validation) on its own
+# fresh event loop in the same worker process, so reusing an agent built on a
+# prior, now-closed loop raises "bound to a different event loop", which the
+# OpenAI SDK re-wraps as a zero-token "Connection error" on every query. Keying
+# on the loop rebuilds the agent when the loop differs (mirrors
+# llm_service.create_chat_agent's "always build fresh across loops" rule) while
+# still reusing it across the many queries within a single validation run.
+_agent_cache: dict[tuple[str, str], tuple[asyncio.AbstractEventLoop, Agent]] = {}
 
 # Per-task SystemConfig snapshot. Set by public entry points (judge_test_queries,
 # _sample_judge_variance, run_kb_validation) so the sync agent-builder can pass
@@ -109,6 +118,12 @@ class RAGConfig(BaseModel):
     # T4.2: temperature passed to the answer-generation agent. Judge is pinned
     # to 0.0 elsewhere; this only affects the RAG answer.
     answer_temperature: float = 0.0
+    # Retrieval similarity floor (cosine, 0-1). Chunks scoring below this are
+    # dropped before generation. 0.0 = disabled (legacy behaviour). When the
+    # floor empties the candidate set, the empty-retrieval path produces a clean
+    # "not in the KB" refusal instead of letting the model answer from weakly
+    # related junk. Tune per KB via the Autovalidate optimizer; never guess it.
+    min_similarity: float = 0.0
 
     model_config = {"extra": "forbid"}
 
@@ -247,17 +262,30 @@ def _get_dm() -> DocumentManager:
 
 
 def _get_or_build_agent(purpose: str, model_name: str, system_prompt: str, model_settings: dict | None = None) -> Agent:
-    """Return a cached pydantic-ai Agent for the given purpose+model."""
+    """Return a pydantic-ai Agent for the given purpose+model.
+
+    Reuses a cached agent only when it was built on the currently running event
+    loop; otherwise rebuilds it. The agent's httpx pool is loop-bound, so a
+    cached agent from a prior Celery task's loop (e.g. KB tuning) would fail a
+    later "Run Now" validation with a "Connection error" — see _agent_cache.
+    """
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
     key = (purpose, model_name)
     cached = _agent_cache.get(key)
-    if cached is not None:
-        return cached
+    if cached is not None and loop is not None and cached[0] is loop:
+        return cached[1]
+
     model = get_agent_model(model_name, system_config_doc=_active_system_config_doc.get())
     kwargs: dict = {"system_prompt": system_prompt}
     if model_settings:
         kwargs["model_settings"] = model_settings
     agent = Agent(model, **kwargs)
-    _agent_cache[key] = agent
+    if loop is not None:
+        _agent_cache[key] = (loop, agent)
     return agent
 
 
@@ -304,6 +332,22 @@ async def _resolve_rag_config(kb_uuid: str, explicit: Optional[RAGConfig], k: in
     return RAGConfig(k=k)
 
 
+async def resolve_kb_min_similarity(kb_uuid: str) -> float:
+    """Return the per-KB retrieval similarity floor (0.0 = disabled).
+
+    Reads the KB's applied ``rag_config_override`` so the live chat path honours
+    the same floor the Autovalidate optimizer tunes — keeping the user-facing
+    surface and the validation harness in lockstep. Defaults to 0.0 (no gating)
+    on any lookup/parse failure so retrieval never silently over-filters.
+    """
+    try:
+        cfg = await _resolve_rag_config(kb_uuid, None, DEFAULT_K)
+        return cfg.min_similarity
+    except Exception as e:
+        logger.debug("min_similarity resolve failed for KB %s: %s", kb_uuid, e)
+        return 0.0
+
+
 async def _generate_kb_answer(
     kb_uuid: str,
     query: str,
@@ -344,7 +388,11 @@ async def _generate_kb_answer(
     # asks an LLM to pick the top cfg.k. Skips when results returned <=cfg.k
     # (nothing to rerank).
     retrieve_k = cfg.k * RERANK_POOL_MULTIPLIER if cfg.rerank == "llm" else cfg.k
-    results = await asyncio.to_thread(dm.query_kb, kb_uuid, retrieval_query, retrieve_k)
+    results = await asyncio.to_thread(
+        dm.query_kb, kb_uuid, retrieval_query, retrieve_k, cfg.min_similarity
+    )
+    # Empty *or* gated-empty: nothing cleared the relevance floor, so abstain
+    # rather than generate. Reuses the existing empty-retrieval refusal.
     if not results:
         return ("I could not find any relevant information in the knowledge base.", [], tokens)
     if cfg.rerank == "llm":

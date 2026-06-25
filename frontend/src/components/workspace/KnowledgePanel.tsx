@@ -1226,6 +1226,7 @@ export function KnowledgePanel() {
               kbUuid={selectedKB.uuid}
               kbReady={selectedKB.status === 'ready'}
               canManage={!!user && (selectedKB.user_id === user.user_id || isExaminerOrAdmin)}
+              onCloned={(newUuid) => { refresh(); loadDetail(newUuid) }}
             />
 
             {/* "What are knowledge bases?" pill */}

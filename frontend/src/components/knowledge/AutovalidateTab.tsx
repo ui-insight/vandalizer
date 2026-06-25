@@ -9,6 +9,7 @@ import {
   applyKBOptimization,
   revertKBOptimization,
   getKBFeedbackImpact,
+  cloneKnowledgeBase,
   type KBFeedbackImpact,
   type KBOptimizationRun,
   type StartOptimizationOptions,
@@ -32,11 +33,15 @@ interface Props {
    * user wants to review or write their own questions instead of using the
    * auto-generated set. */
   onSwitchToQueries?: () => void
+  /** Optional: called with the new KB's uuid after the user clones a KB they
+   * can't manage (e.g. a bookmarked verified catalog KB) so the panel can
+   * navigate to their own, manageable copy. */
+  onCloned?: (newUuid: string) => void
 }
 
 const POLL_INTERVAL_MS = 3000
 
-export function AutovalidateTab({ kbUuid, kbReady, canManage, queriesCount, onSwitchToQueries }: Props) {
+export function AutovalidateTab({ kbUuid, kbReady, canManage, queriesCount, onSwitchToQueries, onCloned }: Props) {
   const [run, setRun] = useState<KBOptimizationRun | null>(null)
   const [showModal, setShowModal] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -283,6 +288,7 @@ export function AutovalidateTab({ kbUuid, kbReady, canManage, queriesCount, onSw
         canManage={canManage}
         coldStart={queriesCount === 0}
         onStart={() => setShowModal(true)}
+        onCloned={onCloned}
       />
       {/* Surface past runs even before any new run is kicked off, so the user
           can revisit a previous optimization's results. */}
@@ -342,10 +348,30 @@ function FeedbackImpactCallout({ impact }: { impact: KBFeedbackImpact | null }) 
 }
 
 function IdleHero({
-  kbUuid, kbReady, canManage, coldStart, onStart,
-}: { kbUuid: string; kbReady: boolean; canManage: boolean; coldStart?: boolean; onStart: () => void }) {
+  kbUuid, kbReady, canManage, coldStart, onStart, onCloned,
+}: { kbUuid: string; kbReady: boolean; canManage: boolean; coldStart?: boolean; onStart: () => void; onCloned?: (newUuid: string) => void }) {
   const disabled = !kbReady || !canManage
   const reason = !kbReady ? 'KB is still building' : !canManage ? 'You cannot manage this KB' : null
+  // Blocked specifically because this isn't the user's KB (e.g. a bookmarked
+  // verified catalog KB they can view but not manage). Cloning makes an owned,
+  // editable copy they *can* validate — without touching the catalog original.
+  const blockedByManage = kbReady && !canManage
+  const [cloning, setCloning] = useState(false)
+  const [cloneError, setCloneError] = useState<string | null>(null)
+
+  const handleClone = async () => {
+    setCloning(true)
+    setCloneError(null)
+    try {
+      const clone = await cloneKnowledgeBase(kbUuid)
+      const newUuid = (clone as { uuid?: string }).uuid
+      if (newUuid && onCloned) onCloned(newUuid)
+    } catch (e) {
+      setCloneError((e as Error).message || 'Could not copy this knowledge base.')
+    } finally {
+      setCloning(false)
+    }
+  }
 
   // Fetch downstream impact (chat thumbs-up rate before/after the most recent
   // applied optimization) so we can show evidence the tuning actually helped
@@ -402,22 +428,53 @@ function IdleHero({
         <li>Find out which documents are pulling weight and which aren't</li>
       </ul>
       <WhenToRunDisclosure kind="kb" />
-      <button
-        onClick={onStart}
-        disabled={disabled}
-        title={reason || ''}
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          padding: '8px 16px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
-          color: disabled ? '#555' : '#fff',
-          background: disabled ? '#222' : 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)',
-          border: '1px solid ' + (disabled ? '#333' : '#7c3aed'),
-          borderRadius: 6, cursor: disabled ? 'not-allowed' : 'pointer',
-        }}
-      >
-        <Sparkles size={14} />
-        Validate &amp; improve
-      </button>
+      {blockedByManage ? (
+        <div>
+          <p style={{ margin: '0 0 10px 0', fontSize: 12, color: '#bbb', lineHeight: 1.5 }}>
+            This is a shared catalog knowledge base, so you can't change it
+            directly. Make your own copy to validate &amp; improve it — the
+            original stays untouched.
+          </p>
+          {cloneError && (
+            <p style={{ margin: '0 0 10px 0', fontSize: 12, color: '#fca5a5' }}>{cloneError}</p>
+          )}
+          <button
+            onClick={handleClone}
+            disabled={cloning || !onCloned}
+            title={!onCloned ? 'Cloning is unavailable here' : ''}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '8px 16px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+              color: cloning ? '#888' : '#fff',
+              background: cloning ? '#222' : 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)',
+              border: '1px solid ' + (cloning ? '#333' : '#7c3aed'),
+              borderRadius: 6, cursor: cloning ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {cloning
+              ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+              : <Sparkles size={14} />}
+            {cloning ? 'Copying…' : 'Clone to validate'}
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={onStart}
+          disabled={disabled}
+          title={reason || ''}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            padding: '8px 16px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+            color: disabled ? '#555' : '#fff',
+            background: disabled ? '#222' : 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)',
+            border: '1px solid ' + (disabled ? '#333' : '#7c3aed'),
+            borderRadius: 6, cursor: disabled ? 'not-allowed' : 'pointer',
+          }}
+        >
+          <Sparkles size={14} />
+          Validate &amp; improve
+        </button>
+      )}
     </div>
   )
 }

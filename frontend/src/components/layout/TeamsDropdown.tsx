@@ -131,8 +131,8 @@ export function TeamsDropdown() {
             </>
           )}
 
-          {/* Admin: System Configuration */}
-          {(user?.is_admin || user?.is_examiner) && (
+          {/* Admin / Analytics: full admins and staff (analytics-only) and examiners */}
+          {(user?.is_admin || user?.is_staff || user?.is_examiner) && (
             <>
               {!user?.is_support_agent && <hr className="my-1.5 border-0 h-px bg-[#cdcdcd]" />}
               <Link

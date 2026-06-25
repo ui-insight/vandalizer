@@ -42,10 +42,14 @@ router = APIRouter()
 
 async def _get_kb_or_404(uuid: str, user: User, *, manage: bool = False):
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    if manage:
+        # Manage actions get the richer gate: a viewable-but-unmanageable KB
+        # returns a logged 403 instead of a misleading bare 404.
+        return await _require_manageable_kb(uuid, user, user_org_ancestry)
     kb = await svc.get_knowledge_base(
         uuid,
         user,
-        manage=manage,
+        manage=False,
         user_org_ancestry=user_org_ancestry,
         allow_admin=True,
     )
@@ -423,6 +427,10 @@ async def get_knowledge_base(uuid: str, user: User = Depends(get_current_user)):
 @router.post("/{uuid}/update")
 async def update_knowledge_base(uuid: str, req: UpdateKBRequest, user: User = Depends(get_current_user)):
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    # Gate first so a viewable-but-unmanageable KB (e.g. a bookmarked verified
+    # KB) returns a logged 403, not the bare 404 the service emits for both
+    # "not found" and "not authorized".
+    await _require_manageable_kb(uuid, user, user_org_ancestry)
     kb = await svc.update_knowledge_base(
         uuid,
         user,
@@ -510,15 +518,7 @@ async def transfer_to_team(uuid: str, user: User = Depends(get_current_user)):
 @router.post("/{uuid}/add_documents")
 async def add_documents(uuid: str, req: AddDocumentsRequest, user: User = Depends(get_current_user)):
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
-    kb = await svc.get_knowledge_base(
-        uuid,
-        user,
-        manage=True,
-        user_org_ancestry=user_org_ancestry,
-        allow_admin=True,
-    )
-    if not kb:
-        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
     document_uuids = list(req.document_uuids)
     if req.folder_uuids:
         from app.services import folder_service
@@ -551,15 +551,7 @@ async def add_folder(uuid: str, req: AddFolderRequest, user: User = Depends(get_
     from app.services import document_service
 
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
-    kb = await svc.get_knowledge_base(
-        uuid,
-        user,
-        manage=True,
-        user_org_ancestry=user_org_ancestry,
-        allow_admin=True,
-    )
-    if not kb:
-        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
 
     doc_uuids = await document_service.collect_folder_document_uuids(
         folder_uuid=req.folder_uuid,
@@ -584,15 +576,7 @@ async def add_folder(uuid: str, req: AddFolderRequest, user: User = Depends(get_
 @limiter.limit("10/minute")
 async def add_urls(request: Request, uuid: str, req: AddUrlsRequest, user: User = Depends(get_current_user)):
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
-    kb = await svc.get_knowledge_base(
-        uuid,
-        user,
-        manage=True,
-        user_org_ancestry=user_org_ancestry,
-        allow_admin=True,
-    )
-    if not kb:
-        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
     if not req.urls:
         raise HTTPException(status_code=400, detail="No URLs provided")
     # Ingestion (fetch + optional crawl + embed) can run for minutes and would
@@ -686,15 +670,7 @@ async def update_source(
     present in the request are applied; an empty string clears that field.
     """
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
-    kb = await svc.get_knowledge_base(
-        uuid,
-        user,
-        manage=True,
-        user_org_ancestry=user_org_ancestry,
-        allow_admin=True,
-    )
-    if not kb:
-        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
 
     # Only touch fields the client actually sent — a PATCH that sets just
     # source_reference must not clear an existing custom_name (and vice versa).
@@ -713,15 +689,7 @@ async def update_source(
 @router.delete("/{uuid}/source/{source_uuid}")
 async def remove_source(uuid: str, source_uuid: str, user: User = Depends(get_current_user)):
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
-    kb = await svc.get_knowledge_base(
-        uuid,
-        user,
-        manage=True,
-        user_org_ancestry=user_org_ancestry,
-        allow_admin=True,
-    )
-    if not kb:
-        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
     ok = await svc.remove_source(kb, source_uuid)
     if not ok:
         raise HTTPException(status_code=404, detail="Source not found")
@@ -916,11 +884,7 @@ async def list_test_queries(uuid: str, user: User = Depends(get_current_user)):
 @router.post("/{uuid}/test-queries")
 async def create_test_query(uuid: str, request: Request, user: User = Depends(get_current_user)):
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
-    kb = await svc.get_knowledge_base(
-        uuid, user, manage=True, user_org_ancestry=user_org_ancestry, allow_admin=True,
-    )
-    if not kb:
-        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
     body = await request.json()
     query = body.get("query", "").strip()
     if not query:
@@ -939,6 +903,44 @@ async def create_test_query(uuid: str, request: Request, user: User = Depends(ge
     return _serialize_test_query(tq)
 
 
+async def _require_manageable_kb(uuid: str, user: User, user_org_ancestry: list[str]):
+    """Resolve a KB for a manage-level action, distinguishing "no such KB" from
+    "KB exists but you may not manage it".
+
+    A bare manage lookup collapses both cases into a 404 "Knowledge base not
+    found". That's misleading when the KB is sitting right there in the user's
+    list (e.g. a bookmarked verified KB), and it leaves no trace in the logs —
+    so a frontend/backend permission-gate mismatch reads as a missing record.
+    Here we fall back to a view-level check: a viewable-but-unmanageable KB
+    returns an actionable 403 and logs the role context needed to diagnose the
+    gate; a genuinely missing/invisible KB still returns 404.
+    """
+    kb = await svc.get_knowledge_base(
+        uuid, user, manage=True, user_org_ancestry=user_org_ancestry, allow_admin=True,
+    )
+    if kb:
+        return kb
+    viewable = await svc.get_knowledge_base(
+        uuid, user, manage=False, user_org_ancestry=user_org_ancestry, allow_admin=True,
+    )
+    if viewable:
+        logger.warning(
+            "KB manage denied: user=%s (admin=%s examiner=%s) cannot manage KB %s "
+            "(owner=%s verified=%s shared_with_team=%s) — has view access only",
+            user.user_id, user.is_admin, user.is_examiner, viewable.uuid,
+            viewable.user_id, viewable.verified, viewable.shared_with_team,
+        )
+        raise HTTPException(
+            status_code=403,
+            detail="You don't have permission to manage this knowledge base.",
+        )
+    logger.info(
+        "KB manage lookup miss: user=%s requested manage on KB %s — not found or not visible",
+        user.user_id, uuid,
+    )
+    raise HTTPException(status_code=404, detail="Knowledge base not found")
+
+
 @router.post("/{uuid}/test-queries/generate")
 async def generate_test_queries(
     uuid: str,
@@ -952,11 +954,7 @@ async def generate_test_queries(
       - async: bool — if true, enqueue Celery task and return {task_id}.
     """
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
-    kb = await svc.get_knowledge_base(
-        uuid, user, manage=True, user_org_ancestry=user_org_ancestry, allow_admin=True,
-    )
-    if not kb:
-        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
 
     body: dict = {}
     try:
@@ -1018,11 +1016,7 @@ async def test_query_generation_status(
     a 502 on larger KBs / slower models.
     """
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
-    kb = await svc.get_knowledge_base(
-        uuid, user, manage=True, user_org_ancestry=user_org_ancestry, allow_admin=True,
-    )
-    if not kb:
-        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
 
     from celery.result import AsyncResult
     from app.celery_app import celery
@@ -1078,11 +1072,7 @@ async def update_test_query(
     import datetime as _datetime
 
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
-    kb = await svc.get_knowledge_base(
-        uuid, user, manage=True, user_org_ancestry=user_org_ancestry, allow_admin=True,
-    )
-    if not kb:
-        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
     from app.models.kb_test_query import KBTestQuery
     tq = await KBTestQuery.find_one(
         KBTestQuery.uuid == query_uuid,
@@ -1112,11 +1102,7 @@ async def update_test_query(
 @router.delete("/{uuid}/test-queries/{query_uuid}")
 async def delete_test_query(uuid: str, query_uuid: str, user: User = Depends(get_current_user)):
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
-    kb = await svc.get_knowledge_base(
-        uuid, user, manage=True, user_org_ancestry=user_org_ancestry, allow_admin=True,
-    )
-    if not kb:
-        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
     from app.models.kb_test_query import KBTestQuery
     tq = await KBTestQuery.find_one(
         KBTestQuery.uuid == query_uuid,
@@ -1241,11 +1227,7 @@ async def start_kb_optimization(uuid: str, request: Request, user: User = Depend
         "use all saved, else auto-generate" when omitted.
     """
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
-    kb = await svc.get_knowledge_base(
-        uuid, user, manage=True, user_org_ancestry=user_org_ancestry, allow_admin=True,
-    )
-    if not kb:
-        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
 
     body = await request.json()
     try:
@@ -1400,11 +1382,7 @@ async def cancel_kb_optimization(uuid: str, run_uuid: str, user: User = Depends(
     """Request cancellation. The worker checks this flag between trials and
     transitions the run to status='cancelled' on its next loop iteration."""
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
-    kb = await svc.get_knowledge_base(
-        uuid, user, manage=True, user_org_ancestry=user_org_ancestry, allow_admin=True,
-    )
-    if not kb:
-        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
     from app.models.kb_optimization_run import KBOptimizationRun
     run = await KBOptimizationRun.find_one(
         KBOptimizationRun.uuid == run_uuid,
@@ -1427,11 +1405,7 @@ async def apply_kb_optimization(uuid: str, run_uuid: str, user: User = Depends(g
     started with apply_on_finish=True don't need to call this.
     """
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
-    kb = await svc.get_knowledge_base(
-        uuid, user, manage=True, user_org_ancestry=user_org_ancestry, allow_admin=True,
-    )
-    if not kb:
-        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
     from app.models.kb_optimization_run import KBOptimizationRun
     run = await KBOptimizationRun.find_one(
         KBOptimizationRun.uuid == run_uuid,
@@ -1454,11 +1428,7 @@ async def revert_kb_optimization(uuid: str, run_uuid: str, user: User = Depends(
     using the system defaults again).
     """
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
-    kb = await svc.get_knowledge_base(
-        uuid, user, manage=True, user_org_ancestry=user_org_ancestry, allow_admin=True,
-    )
-    if not kb:
-        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
     from app.models.kb_optimization_run import KBOptimizationRun
     run = await KBOptimizationRun.find_one(
         KBOptimizationRun.uuid == run_uuid,
@@ -1520,11 +1490,7 @@ async def baseline_probe(uuid: str, request: Request, user: User = Depends(get_c
     from app.services.workflow_validator import _resolve_model_name as _resolve_sync
 
     user_org_ancestry = await organization_service.get_user_org_ancestry(user)
-    kb = await svc.get_knowledge_base(
-        uuid, user, manage=True, user_org_ancestry=user_org_ancestry, allow_admin=True,
-    )
-    if not kb:
-        raise HTTPException(status_code=404, detail="Knowledge base not found")
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
 
     body: dict = {}
     try:

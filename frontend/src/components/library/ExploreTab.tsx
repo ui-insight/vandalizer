@@ -432,7 +432,7 @@ function CollectionLink({
         <Star className={`h-3 w-3 shrink-0 fill-current ${active ? 'text-yellow-300' : 'text-yellow-400'}`} />
       )}
       <span className={`text-xs shrink-0 ${active ? 'text-gray-300' : 'text-gray-500'}`}>
-        {collection.item_ids.length}
+        {collection.visible_count ?? collection.item_ids.length}
       </span>
     </button>
   )

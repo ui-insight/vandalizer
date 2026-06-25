@@ -26,8 +26,15 @@ def init_sentry(settings: Settings, *, with_celery: bool = False) -> None:
         return
 
     import sentry_sdk
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+    from sentry_sdk.integrations.starlette import StarletteIntegration
 
-    integrations = []
+    # Register the web integrations explicitly rather than leaning on Sentry's
+    # auto-enabling machinery. Auto-enable only fires when starlette/fastapi are
+    # importable at init() time and silently captures *nothing* if that ordering
+    # ever shifts — which is exactly how an unhandled 500 (e.g. /mgmt/v1/stats)
+    # can fail to surface in Sentry. Listing them keeps capture deterministic.
+    integrations = [StarletteIntegration(), FastApiIntegration()]
     if with_celery:
         from sentry_sdk.integrations.celery import CeleryIntegration
 

@@ -479,6 +479,9 @@ class TestKnowledgeCRUD:
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            # The route gates manage access (via _require_manageable_kb) before
+            # calling the service, so the manageable-KB lookup must resolve.
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
             mock_svc.update_knowledge_base = AsyncMock(return_value=kb)
 
             resp = await client.post(
@@ -504,6 +507,8 @@ class TestKnowledgeCRUD:
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            # Neither manage nor view lookup resolves → genuinely missing → 404.
+            mock_svc.get_knowledge_base = AsyncMock(return_value=None)
             mock_svc.update_knowledge_base = AsyncMock(return_value=None)
 
             resp = await client.post(
@@ -514,6 +519,39 @@ class TestKnowledgeCRUD:
             )
 
         assert resp.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_update_forbidden_when_view_only(self, client):
+        # A KB the user can view but not manage (e.g. a bookmarked verified
+        # catalog KB) returns an actionable 403, not a misleading 404.
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb(user_id="someone-else", verified=True)
+
+        async def fake_get_kb(uuid, user_arg, *, manage=False, **kw):
+            return None if manage else kb
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(side_effect=fake_get_kb)
+            mock_svc.update_knowledge_base = AsyncMock(return_value=None)
+
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/update",
+                json={"title": "Updated"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 403
+        # The service mutation must never run once the manage gate denies.
+        mock_svc.update_knowledge_base.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_delete_success(self, client):

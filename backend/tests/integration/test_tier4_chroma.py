@@ -162,3 +162,45 @@ class TestKBCollectionRoundTrip:
         doc_manager.delete_kb_collection("kb-4")
         # Second delete should be a no-op (collection no longer exists)
         doc_manager.delete_kb_collection("kb-4")
+
+    def test_query_kb_min_similarity_floor_gates_out_of_scope(self, doc_manager):
+        """A high relevance floor turns an off-topic query into an empty result.
+
+        The KB holds only grant-budget text. An unrelated query ("how do I bake
+        sourdough bread") still surfaces chunks at min_similarity=0.0 (default,
+        ungated) because vector search always returns the top-k. With a high
+        floor those weakly-related chunks fall below the threshold and drop out,
+        so the RAG caller sees an empty set and abstains.
+        """
+        doc_manager.add_to_kb(
+            kb_uuid="kb-floor",
+            source_id="budget",
+            source_name="budget.md",
+            raw_text=(
+                "The grant budget allocates $1.5M across three fiscal years. "
+                "Personnel costs cover two postdoctoral researchers and a "
+                "graduate assistant. Indirect cost recovery is 52 percent."
+            ),
+        )
+
+        off_topic = "how do I bake sourdough bread at home"
+
+        # Ungated: vector search returns chunks regardless of how weak the match.
+        ungated = doc_manager.query_kb("kb-floor", off_topic, k=4, min_similarity=0.0)
+        assert len(ungated) >= 1
+        # Every returned chunk carries a computed similarity in [0, 1].
+        for r in ungated:
+            assert 0.0 <= r["similarity"] <= 1.0
+
+        # A floor above the best off-topic score empties the result set.
+        best = max(r["similarity"] for r in ungated)
+        gated = doc_manager.query_kb(
+            "kb-floor", off_topic, k=4, min_similarity=best + 0.01,
+        )
+        assert gated == []
+
+        # An in-scope query still clears a moderate floor.
+        in_scope = doc_manager.query_kb(
+            "kb-floor", "what is the indirect cost rate", k=4, min_similarity=0.05,
+        )
+        assert len(in_scope) >= 1

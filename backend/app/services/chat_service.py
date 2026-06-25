@@ -704,8 +704,15 @@ async def chat_stream(
     if kb_uuid:
         try:
             from app.services.document_manager import get_document_manager
+            from app.services.kb_validation_service import resolve_kb_min_similarity
             dm = get_document_manager()
-            kb_results = await asyncio.to_thread(dm.query_kb, kb_uuid, message, 8)
+            # Honour the KB's tuned relevance floor. If retrieval clears nothing
+            # above it, kb_results is empty and we fall through to the empty-KB
+            # prompt below — the model abstains instead of answering from junk.
+            kb_min_similarity = await resolve_kb_min_similarity(kb_uuid)
+            kb_results = await asyncio.to_thread(
+                dm.query_kb, kb_uuid, message, 8, kb_min_similarity
+            )
             if kb_results:
                 kb_text = (
                     "\n\n## Retrieved Knowledge Base Snippets\n"

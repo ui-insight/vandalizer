@@ -5,7 +5,11 @@ import { useWorkspace } from '../contexts/WorkspaceContext'
 import type { WorkflowStatus } from '../types/workflow'
 
 export function useWorkflowRunner() {
-  const { bumpActivitySignal } = useWorkspace()
+  // openWorkflowShareToken is set when the open workflow was reached via a share
+  // link. Threading it through run/poll/cancel lets a recipient who isn't on the
+  // owner's team run the workflow (against their own docs) and poll its status —
+  // without it, every execution call would 404 with "Workflow not found".
+  const { bumpActivitySignal, openWorkflowShareToken } = useWorkspace()
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [batchId, setBatchId] = useState<string | null>(null)
   const [status, setStatus] = useState<WorkflowStatus | null>(null)
@@ -21,9 +25,11 @@ export function useWorkflowRunner() {
     }
   }, [])
 
+  const shareToken = openWorkflowShareToken ?? undefined
+
   const poll = useCallback(async (sid: string) => {
     try {
-      const s = await getWorkflowStatus(sid)
+      const s = await getWorkflowStatus(sid, shareToken)
       setStatus(s)
       const terminal = s.status === 'completed' || s.status === 'error' || s.status === 'failed' || s.status === 'canceled'
       const paused = s.status === 'pending_approval'
@@ -32,11 +38,11 @@ export function useWorkflowRunner() {
     } catch {
       // Keep polling on transient errors
     }
-  }, [stopPolling])
+  }, [stopPolling, shareToken])
 
   const pollBatch = useCallback(async (bid: string) => {
     try {
-      const s = await getBatchStatus(bid)
+      const s = await getBatchStatus(bid, shareToken)
       setBatchStatus(s)
       if (s.status === 'completed' || s.status === 'failed') {
         setRunning(false)
@@ -45,7 +51,7 @@ export function useWorkflowRunner() {
     } catch {
       // Keep polling on transient errors
     }
-  }, [stopPolling])
+  }, [stopPolling, shareToken])
 
   const start = useCallback(async (workflowId: string, documentUuids: string[], model?: string, batchMode?: boolean) => {
     setRunning(true)
@@ -60,7 +66,7 @@ export function useWorkflowRunner() {
         document_uuids: documentUuids,
         model,
         batch_mode: batchMode,
-      })
+      }, shareToken)
     } catch (err) {
       setRunning(false)
       throw err
@@ -78,7 +84,7 @@ export function useWorkflowRunner() {
     } else {
       setRunning(false)
     }
-  }, [poll, pollBatch, bumpActivitySignal])
+  }, [poll, pollBatch, bumpActivitySignal, shareToken])
 
   // Stop an in-flight single run. Batch runs are not cancellable yet, so this
   // no-ops when only a batch is active. After the request returns, poll once so
@@ -87,14 +93,14 @@ export function useWorkflowRunner() {
     if (!sessionId || batchId) return
     setCancelling(true)
     try {
-      await cancelWorkflow(sessionId)
+      await cancelWorkflow(sessionId, shareToken)
       await poll(sessionId)
     } catch {
       // Leave the run as-is on failure; the poller keeps the UI honest.
     } finally {
       setCancelling(false)
     }
-  }, [sessionId, batchId, poll])
+  }, [sessionId, batchId, poll, shareToken])
 
   const loadSession = useCallback(async (sid: string) => {
     stopPolling()
@@ -102,7 +108,7 @@ export function useWorkflowRunner() {
     setBatchId(null)
     setBatchStatus(null)
     try {
-      const s = await getWorkflowStatus(sid)
+      const s = await getWorkflowStatus(sid, shareToken)
       setStatus(s)
       const isTerminal = s.status === 'completed' || s.status === 'error' || s.status === 'failed' || s.status === 'canceled'
       const isPaused = s.status === 'pending_approval'
@@ -114,7 +120,7 @@ export function useWorkflowRunner() {
       setStatus(null)
       setRunning(false)
     }
-  }, [poll, stopPolling])
+  }, [poll, stopPolling, shareToken])
 
   const reset = useCallback(() => {
     setSessionId(null)

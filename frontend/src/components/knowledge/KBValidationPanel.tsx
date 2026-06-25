@@ -19,6 +19,9 @@ interface Props {
   kbUuid: string
   kbReady: boolean
   canManage: boolean
+  /** Called with the new KB's uuid after the user clones a KB they can't
+   * manage, so the parent can navigate to their own copy. */
+  onCloned?: (newUuid: string) => void
 }
 
 // Validation runs off the request/response path (a background Celery task), so
@@ -61,7 +64,7 @@ type LatestQualitySummary = {
   createdAt: string | null
 }
 
-export function KBValidationPanel({ kbUuid, kbReady, canManage }: Props) {
+export function KBValidationPanel({ kbUuid, kbReady, canManage, onCloned }: Props) {
   const [tab, setTab] = useState<Tab>('autovalidate')
   const [queries, setQueries] = useState<KBTestQuery[]>([])
   const [latestRun, setLatestRun] = useState<KBValidationResult | null>(null)
@@ -327,6 +330,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage }: Props) {
           canManage={canManage}
           queriesCount={queries.length}
           onSwitchToQueries={() => setTab('queries')}
+          onCloned={onCloned}
         />
       ) : tab === 'queries' ? (
         <KBTestQueriesTab

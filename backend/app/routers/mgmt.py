@@ -9,6 +9,7 @@ audit log with actor_type='api_key'.
 import datetime
 from typing import Optional
 
+from bson.decimal128 import Decimal128
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
@@ -30,6 +31,20 @@ router = APIRouter()
 
 DEFAULT_LIMIT = 50
 MAX_LIMIT = 500
+
+
+def _coerce_int(value: object) -> int:
+    """Best-effort conversion of a Mongo aggregation scalar to a Python int.
+
+    Aggregation accumulators can hand back ints, floats, BSON Decimal128 (when
+    legacy records stored a numeric field as NumberDecimal), or None on an empty
+    group. int() chokes on Decimal128 and None, so normalize first.
+    """
+    if value is None:
+        return 0
+    if isinstance(value, Decimal128):
+        return int(value.to_decimal())
+    return int(value)
 
 
 # ---------------------------------------------------------------------------
@@ -238,7 +253,11 @@ async def stats(_: ApiKey = Depends(require_mgmt_scope("metrics:read"))):
     token_agg = await SmartDocument.aggregate(
         [{"$group": {"_id": None, "total_tokens": {"$sum": "$token_count"}}}],
     ).to_list()
-    total_tokens = int(token_agg[0].get("total_tokens", 0)) if token_agg else 0
+    # $sum's result type follows the operands: if even one legacy stub record
+    # stored token_count as a NumberDecimal, Mongo promotes the whole sum to a
+    # Decimal128, and int(Decimal128) raises TypeError (likewise for None).
+    # Coerce defensively so bad legacy data can't 500 the endpoint.
+    total_tokens = _coerce_int(token_agg[0].get("total_tokens")) if token_agg else 0
     documents_size_bytes_total = total_tokens * 4  # ~4 bytes/token
 
     active_user_ids = await ActivityEvent.find(

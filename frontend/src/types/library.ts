@@ -180,6 +180,13 @@ export interface VerifiedCollection {
   promo_image_url: string | null
   featured: boolean
   item_ids: string[]
+  /**
+   * Count of items the current user can actually open (currently-verified and
+   * org-visible). Populated by the browse/featured endpoints; prefer this over
+   * `item_ids.length` for badges, since `item_ids` can include since-unverified,
+   * deleted, or org-restricted items that won't render.
+   */
+  visible_count?: number
   created_by_user_id: string
   created_at: string
   updated_at: string

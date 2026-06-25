@@ -203,14 +203,29 @@ support of Claude models (tool use, streaming, native thinking). The
 `openrouter` protocol routes through OpenRouter's OpenAI-compatible gateway
 with automatic app attribution. The other three (`openai`, `ollama`, `vllm`)
 all speak OpenAI-compatible HTTP, so any provider that exposes that interface
-works:
+works.
 
-- OpenAI / Azure OpenAI
-- Anthropic (native or via OpenAI-compat at `https://api.anthropic.com/v1/`)
-- OpenRouter
-- Ollama (local models)
-- vLLM
-- Any other provider exposing an OpenAI-compatible endpoint
+#### Provider compatibility
+
+The rule of thumb: if a provider exposes an OpenAI-compatible endpoint (the
+`/chat/completions` shape with a bearer API key), it works. Popular options:
+
+| Provider | Protocol | Endpoint URL | Status / notes |
+| --- | --- | --- | --- |
+| **OpenAI** | `openai` | leave blank (default) | Fully supported. |
+| **Azure OpenAI** | `openai` | your Azure resource base URL (e.g. `https://<resource>.openai.azure.com/openai/v1/`) | Supported. The newer Azure `v1` endpoint works directly; the older per-deployment URL with an `api-version` query param may need attention. |
+| **Anthropic (Claude)** | `anthropic` | leave blank (defaults to `https://api.anthropic.com`) | Native Messages API — first-class tool use, streaming, and thinking. |
+| **OpenRouter** | `openrouter` | leave blank (defaults to `https://openrouter.ai/api/v1`) | Native gateway with app attribution. Reaches many models through one key, including Gemini via `google/gemini-...`. |
+| **Google Gemini (direct)** | `openai` | `https://generativelanguage.googleapis.com/v1beta/openai/` | Works through Gemini's OpenAI-compatibility layer (not its native API). Smoke-test structured extraction before relying on it. |
+| **Ollama (local)** | `ollama` | `http://<host>:11434` | Local models; air-gap friendly. |
+| **vLLM (self-hosted)** | `vllm` | `http://<host>:<port>` | Set Context Window to match the server's `--max-model-len`. |
+| **Any OpenAI-compatible server** | `openai` | provider base URL | Works if it speaks `/chat/completions` with bearer-token auth. |
+| **Microsoft 365 Copilot** | — | — | **Not supported.** This is an end-user product (the assistant in Word/Teams/Outlook), not a developer model API — there is no endpoint or key to point Vandalizer at. For Microsoft-hosted models, use **Azure OpenAI** instead. |
+
+Notes that apply across providers:
+
+- **Custom HTTP headers** beyond the API key are not configurable in the UI. Providers needing only a bearer key (the common case) are unaffected.
+- **Structured output / tool calling** is exercised heavily by extractions and workflows. Native `openai`/`anthropic`/`openrouter` paths are well-proven; for other OpenAI-compatibility layers (e.g. Gemini), run a real extraction as a smoke test before calling them production-ready.
 
 Models can be added, removed, or rotated at any time without restarting the application.
 

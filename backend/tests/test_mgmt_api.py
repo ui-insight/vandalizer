@@ -228,6 +228,86 @@ class TestRequireMgmtScope:
         # 1M tokens * 4 bytes/token = 4M bytes.
         assert resp.json()["documents_size_bytes_total"] == 4_000_000
 
+    @pytest.mark.asyncio
+    async def test_stats_handles_decimal128_token_sum(self, client):
+        """$sum promotes its result to BSON Decimal128 the moment a single
+        legacy record stored token_count as a NumberDecimal. int(Decimal128)
+        raises TypeError, which used to 500 the endpoint — the sum must be
+        coerced defensively."""
+        from bson.decimal128 import Decimal128
+
+        wildcard = _make_key(scopes=["*"])
+        with (
+            patch("app.dependencies.ApiKey") as MockKey,
+            patch("app.dependencies.audit_service.log_event", new_callable=AsyncMock),
+            patch("app.routers.mgmt.User") as MockUser,
+            patch("app.routers.mgmt.Team") as MockTeam,
+            patch("app.routers.mgmt.SmartDocument") as MockDoc,
+            patch("app.routers.mgmt.Workflow") as MockWorkflow,
+            patch("app.routers.mgmt.WorkflowResult") as MockWR,
+            patch("app.routers.mgmt.ActivityEvent") as MockAct,
+        ):
+            MockKey.find_one = AsyncMock(return_value=wildcard)
+            for M in (MockUser, MockTeam, MockDoc, MockWorkflow, MockWR, MockAct):
+                M.find_all = MagicMock(return_value=MagicMock(
+                    count=AsyncMock(return_value=0),
+                    to_list=AsyncMock(return_value=[]),
+                ))
+                M.find = MagicMock(return_value=MagicMock(
+                    count=AsyncMock(return_value=0),
+                    distinct=AsyncMock(return_value=[]),
+                ))
+            MockDoc.aggregate = MagicMock(return_value=MagicMock(
+                to_list=AsyncMock(return_value=[
+                    {"_id": None, "total_tokens": Decimal128("1000000")}
+                ]),
+            ))
+
+            resp = await client.get(
+                "/api/mgmt/v1/stats",
+                headers={"X-API-Key": "vk_live_wildcard"},
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["documents_size_bytes_total"] == 4_000_000
+
+    @pytest.mark.asyncio
+    async def test_stats_handles_empty_collection(self, client):
+        """An empty SmartDocument collection yields no aggregation group at all;
+        the endpoint must report zero bytes rather than IndexError."""
+        wildcard = _make_key(scopes=["*"])
+        with (
+            patch("app.dependencies.ApiKey") as MockKey,
+            patch("app.dependencies.audit_service.log_event", new_callable=AsyncMock),
+            patch("app.routers.mgmt.User") as MockUser,
+            patch("app.routers.mgmt.Team") as MockTeam,
+            patch("app.routers.mgmt.SmartDocument") as MockDoc,
+            patch("app.routers.mgmt.Workflow") as MockWorkflow,
+            patch("app.routers.mgmt.WorkflowResult") as MockWR,
+            patch("app.routers.mgmt.ActivityEvent") as MockAct,
+        ):
+            MockKey.find_one = AsyncMock(return_value=wildcard)
+            for M in (MockUser, MockTeam, MockDoc, MockWorkflow, MockWR, MockAct):
+                M.find_all = MagicMock(return_value=MagicMock(
+                    count=AsyncMock(return_value=0),
+                    to_list=AsyncMock(return_value=[]),
+                ))
+                M.find = MagicMock(return_value=MagicMock(
+                    count=AsyncMock(return_value=0),
+                    distinct=AsyncMock(return_value=[]),
+                ))
+            MockDoc.aggregate = MagicMock(return_value=MagicMock(
+                to_list=AsyncMock(return_value=[]),
+            ))
+
+            resp = await client.get(
+                "/api/mgmt/v1/stats",
+                headers={"X-API-Key": "vk_live_wildcard"},
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["documents_size_bytes_total"] == 0
+
 
 # ---------------------------------------------------------------------------
 # New scopes: validation read/write/run, workflows:run, extractions:run

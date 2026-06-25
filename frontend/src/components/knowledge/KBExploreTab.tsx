@@ -121,7 +121,7 @@ function FeaturedCollectionCard({ collection, onClick }: { collection: VerifiedC
         </p>
       )}
       <span style={{ marginTop: 'auto', fontSize: 11, fontWeight: 500, color: C.textFaint }}>
-        {collection.item_ids.length} item{collection.item_ids.length !== 1 ? 's' : ''}
+        {(collection.visible_count ?? collection.item_ids.length)} item{(collection.visible_count ?? collection.item_ids.length) !== 1 ? 's' : ''}
       </span>
     </button>
   )
@@ -267,7 +267,7 @@ function CollectionLink({
         <Star size={11} fill="currentColor" style={{ color: active ? '#fde047' : '#facc15', flexShrink: 0, marginTop: 3 }} />
       )}
       <span style={{ fontSize: 11, color: active ? '#cbd5e1' : C.textFaint, flexShrink: 0, marginTop: 1 }}>
-        {collection.item_ids.length}
+        {collection.visible_count ?? collection.item_ids.length}
       </span>
     </button>
   )

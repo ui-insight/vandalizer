@@ -110,22 +110,31 @@ export function improvePrompt(data: {
 
 // Execution
 
-export function runWorkflow(workflowId: string, data: { document_uuids?: string[]; folder_uuids?: string[]; model?: string; batch_mode?: boolean }) {
+// `shareToken` is passed when running a workflow opened via a share link — it
+// grants the holder run access to a workflow they don't own / aren't on the team for.
+export function runWorkflow(
+  workflowId: string,
+  data: { document_uuids?: string[]; folder_uuids?: string[]; model?: string; batch_mode?: boolean },
+  shareToken?: string,
+) {
   return apiFetch<{ session_id?: string; batch_id?: string; activity_id?: string }>(`/api/workflows/${workflowId}/run`, {
     method: 'POST',
-    body: JSON.stringify(data),
+    body: JSON.stringify(shareToken ? { ...data, share_token: shareToken } : data),
   })
 }
 
-export function getWorkflowStatus(sessionId: string) {
-  return apiFetch<WorkflowStatus>(`/api/workflows/status?session_id=${encodeURIComponent(sessionId)}`)
+export function getWorkflowStatus(sessionId: string, shareToken?: string) {
+  const sp = new URLSearchParams({ session_id: sessionId })
+  if (shareToken) sp.set('share_token', shareToken)
+  return apiFetch<WorkflowStatus>(`/api/workflows/status?${sp.toString()}`)
 }
 
 // Stop an in-flight single run. The backend flips the result to "canceled" and
 // revokes the Celery task (terminate) so a mid-step run is interrupted.
-export function cancelWorkflow(sessionId: string) {
+export function cancelWorkflow(sessionId: string, shareToken?: string) {
+  const qs = shareToken ? `?share_token=${encodeURIComponent(shareToken)}` : ''
   return apiFetch<{ session_id: string; status: string }>(
-    `/api/workflows/sessions/${encodeURIComponent(sessionId)}/cancel`,
+    `/api/workflows/sessions/${encodeURIComponent(sessionId)}/cancel${qs}`,
     { method: 'POST' },
   )
 }
@@ -148,19 +157,24 @@ export interface BatchStatus {
   items: BatchStatusItem[]
 }
 
-export function getBatchStatus(batchId: string) {
-  return apiFetch<BatchStatus>(`/api/workflows/batch-status?batch_id=${encodeURIComponent(batchId)}`)
+export function getBatchStatus(batchId: string, shareToken?: string) {
+  const sp = new URLSearchParams({ batch_id: batchId })
+  if (shareToken) sp.set('share_token', shareToken)
+  return apiFetch<BatchStatus>(`/api/workflows/batch-status?${sp.toString()}`)
 }
 
 export function streamWorkflowStatus(
   sessionId: string,
   onStatus: (status: WorkflowStatus) => void,
   onError?: (err: unknown) => void,
+  shareToken?: string,
 ): () => void {
   let aborted = false
   const controller = new AbortController()
 
-  const url = `/api/workflows/status/stream?session_id=${encodeURIComponent(sessionId)}`
+  const sp = new URLSearchParams({ session_id: sessionId })
+  if (shareToken) sp.set('share_token', shareToken)
+  const url = `/api/workflows/status/stream?${sp.toString()}`
 
   ;(async () => {
     try {

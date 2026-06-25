@@ -737,6 +737,38 @@ async def list_verified_items(
     return {"items": paginated, "total": total}
 
 
+async def get_visible_verified_item_ids(
+    user_org_ancestry: list[str] | None = None,
+) -> set[str]:
+    """Return the item_ids that are currently verified AND visible to this user.
+
+    Collection badge counts must use this rather than ``len(item_ids)``: a
+    collection's ``item_ids`` is a static curated list that can still point to
+    items which were later un-verified, deleted, or are org-scoped to an org the
+    viewer isn't in. Those are dropped by ``list_verified_items`` when the
+    category is opened, so a raw ``len(item_ids)`` over-counts (e.g. badge says
+    "8 items" but only 2 actually render). This applies the same verified +
+    org-visibility filter so the badge matches the list.
+    """
+    items = await LibraryItem.find({"verified": True}).to_list()
+    all_meta = await VerifiedItemMetadata.find_all().to_list()
+    meta_map: dict[tuple[str, str], VerifiedItemMetadata] = {
+        (m.item_kind, m.item_id): m for m in all_meta
+    }
+    ancestry = set(user_org_ancestry) if user_org_ancestry is not None else None
+    visible: set[str] = set()
+    for item in items:
+        item_id_str = str(item.item_id)
+        meta = meta_map.get((item.kind.value, item_id_str))
+        item_org_ids = meta.organization_ids if meta else []
+        # Org-scoped items only show to members of a matching org; un-scoped
+        # items are visible to everyone.
+        if ancestry is not None and item_org_ids and not (set(item_org_ids) & ancestry):
+            continue
+        visible.add(item_id_str)
+    return visible
+
+
 async def get_item_metadata(item_kind: str, item_id: str) -> dict | None:
     """Get metadata for a verified item."""
     meta = await VerifiedItemMetadata.find_one(

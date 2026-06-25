@@ -36,10 +36,11 @@ from app.services.access_control import (
 # ---------------------------------------------------------------------------
 
 
-def _make_user(user_id="user1", is_admin=False):
+def _make_user(user_id="user1", is_admin=False, is_examiner=False):
     u = MagicMock()
     u.user_id = user_id
     u.is_admin = is_admin
+    u.is_examiner = is_examiner
     return u
 
 
@@ -521,6 +522,39 @@ class TestKnowledgeBaseAccess:
             object_roles={"team-obj-1": "admin"},
         )
         assert can_manage_knowledge_base(kb, user, access) is True
+
+    def test_examiner_can_manage_verified_kb_they_do_not_own(self):
+        # Examiners are the catalog-governance role: they curate verified KBs
+        # (validate & improve, tags, org-visibility) even when not the owner.
+        user = _make_user("examiner1", is_examiner=True)
+        kb = _make_knowledge_base(user_id="owner1", verified=True)
+        access = _team_access()
+        assert can_manage_knowledge_base(kb, user, access) is True
+
+    def test_examiner_cannot_manage_unverified_kb_they_do_not_own(self):
+        # The examiner branch is scoped to verified KBs — no new power over
+        # someone else's private/unverified KB.
+        user = _make_user("examiner1", is_examiner=True)
+        kb = _make_knowledge_base(user_id="owner1", verified=False)
+        access = _team_access()
+        assert can_manage_knowledge_base(kb, user, access) is False
+
+    def test_examiner_manage_on_verified_kb_respects_org_scope(self):
+        # Org-scoped verified KBs stay gated by the user's org ancestry, same
+        # as the view path.
+        user = _make_user("examiner1", is_examiner=True)
+        kb = _make_knowledge_base(
+            user_id="owner1",
+            verified=True,
+            organization_ids=["org-a"],
+        )
+        access = _team_access()
+        assert can_manage_knowledge_base(
+            kb, user, access, user_org_ancestry=["org-a"],
+        ) is True
+        assert can_manage_knowledge_base(
+            kb, user, access, user_org_ancestry=["org-b"],
+        ) is False
 
 
 # ---------------------------------------------------------------------------
@@ -1072,6 +1106,76 @@ class TestGetAuthorizedWorkflow:
             MockWF.get = AsyncMock()
 
             result = await get_authorized_workflow("bad-id", user)
+
+        assert result is None
+
+    async def test_matching_share_token_grants_view_access(self):
+        """An outsider with a token matching the workflow's grants view (run) access."""
+        user = _make_user("outsider")
+        wf = _make_workflow("owner1", team_id="team-abc")
+        wf.share_token = "tok-abc"
+
+        with (
+            patch("app.models.workflow.Workflow") as MockWF,
+            patch("beanie.PydanticObjectId", side_effect=lambda x: x),
+            patch(
+                "app.services.access_control.has_library_backed_object_access",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
+        ):
+            MockWF.get = AsyncMock(return_value=wf)
+
+            result = await get_authorized_workflow(
+                "wf-id", user, team_access=_team_access(), share_token="tok-abc"
+            )
+
+        assert result is wf
+
+    async def test_wrong_share_token_returns_none(self):
+        """A token that doesn't match the stored one grants nothing."""
+        user = _make_user("outsider")
+        wf = _make_workflow("owner1", team_id="team-abc")
+        wf.share_token = "tok-abc"
+
+        with (
+            patch("app.models.workflow.Workflow") as MockWF,
+            patch("beanie.PydanticObjectId", side_effect=lambda x: x),
+            patch(
+                "app.services.access_control.has_library_backed_object_access",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
+        ):
+            MockWF.get = AsyncMock(return_value=wf)
+
+            result = await get_authorized_workflow(
+                "wf-id", user, team_access=_team_access(), share_token="wrong-token"
+            )
+
+        assert result is None
+
+    async def test_share_token_does_not_grant_manage(self):
+        """A valid share token is view/run-only — it never grants manage rights."""
+        user = _make_user("outsider")
+        wf = _make_workflow("owner1", team_id="team-abc")
+        wf.share_token = "tok-abc"
+
+        with (
+            patch("app.models.workflow.Workflow") as MockWF,
+            patch("beanie.PydanticObjectId", side_effect=lambda x: x),
+            patch(
+                "app.services.access_control.has_library_backed_object_access",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
+        ):
+            MockWF.get = AsyncMock(return_value=wf)
+
+            result = await get_authorized_workflow(
+                "wf-id", user, team_access=_team_access(),
+                share_token="tok-abc", manage=True,
+            )
 
         assert result is None
 

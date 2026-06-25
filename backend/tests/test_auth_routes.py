@@ -179,6 +179,39 @@ class TestAuthLogin:
         assert resp.status_code == 401
         assert "sign you in" in resp.json()["detail"].lower()
 
+    @pytest.mark.asyncio
+    async def test_login_locked_trial_returns_demo_expired_not_401(self, client):
+        """A locked trial gets a 200 demo_expired payload (which routes the SPA
+        to the trial-end screen) instead of a dead-end 401 that reads as
+        'it won't let me in'."""
+        user = _make_user(is_demo_user=True, demo_status="locked")
+        demo_app = MagicMock()
+        demo_app.uuid = "demo-uuid-123"
+        demo_app.post_questionnaire_token = "feedback-token-abc"
+
+        with patch("app.routers.auth.auth_service") as mock_svc, \
+             patch("app.models.demo.DemoApplication") as MockDemoApp:
+            mock_svc.AUTH_REASON_TRIAL_EXPIRED = "trial_expired"
+            mock_svc.authenticate_with_reason = AsyncMock(
+                return_value=(user, "trial_expired")
+            )
+            MockDemoApp.find_one = AsyncMock(return_value=demo_app)
+            resp = await client.post("/api/auth/login", json={
+                "user_id": "testuser",
+                "password": "anything",
+            })
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["demo_expired"] is True
+        assert data["demo_feedback_token"] == "feedback-token-abc"
+        assert data["demo_uuid"] == "demo-uuid-123"
+
+        # No session cookies for a locked account.
+        cookies = {c.name: c for c in resp.cookies.jar}
+        assert "access_token" not in cookies
+        assert "refresh_token" not in cookies
+
 
 # ---------------------------------------------------------------------------
 # POST /api/auth/logout

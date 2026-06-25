@@ -188,9 +188,9 @@ Navigate to **Admin → System Config → Models** to add LLM providers. Each mo
 - **Name** — model identifier (e.g., `gpt-4o`, `claude-sonnet-4-20250514`, `llama3.1:70b`)
 - **API Key** — provider API key (stored encrypted in the database)
 - **Endpoint** — API URL (leave empty for OpenAI-hosted models)
-- **Protocol** — `openai`, `ollama`, or `vllm`
+- **Protocol** — `openai`, `anthropic`, `openrouter`, `ollama`, or `vllm` (or leave blank for auto-detect)
 
-Vandalizer supports any OpenAI-compatible API including OpenAI, Azure OpenAI, Ollama (local models), vLLM, and OpenRouter.
+Vandalizer works with any provider that exposes an OpenAI-compatible API — including OpenAI, Azure OpenAI, Anthropic (Claude), OpenRouter, Google Gemini (via its OpenAI-compatibility endpoint), Ollama (local models), and vLLM. It does **not** integrate with Microsoft 365 Copilot, which is an end-user product rather than a developer API. See the [provider compatibility table in `DEPLOY.md`](DEPLOY.md#provider-compatibility) for endpoint URLs and per-provider notes.
 
 ## PDF Processing & OCR
 

@@ -15,7 +15,7 @@ jobs:
     name: Backend Release Checks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -35,7 +35,7 @@ jobs:
     name: Backend Mypy (advisory)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -58,7 +58,7 @@ jobs:
     name: Backend Dependency Audit (advisory)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -95,7 +95,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -115,7 +115,7 @@ jobs:
     name: Backend Tier 4 (ChromaDB)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -129,7 +129,7 @@ jobs:
         run: make backend-install
 
       - name: Cache ChromaDB ONNX embedder
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cache/chroma
           key: chroma-onnx-${{ runner.os }}
@@ -151,7 +151,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -171,7 +171,7 @@ jobs:
     name: Frontend
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -194,7 +194,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [backend-static, backend-test, backend-test-t2, backend-test-t4, frontend]
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Build release containers
         run: make docker-build

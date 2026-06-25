@@ -25,8 +25,8 @@ async def query_audit_log(
     limit: int = Query(50, ge=1, le=200),
     user: User = Depends(get_current_user),
 ):
-    """Query audit log. Admin only."""
-    if not user.is_admin:
+    """Query audit log. Admin or staff (analytics role)."""
+    if not (user.is_admin or user.is_staff):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     parsed_start = None
@@ -87,7 +87,7 @@ async def export_audit_log(
     end_time: Optional[str] = None,
     user: User = Depends(get_current_user),
 ):
-    """Export audit log as CSV. Admin only.
+    """Export audit log as CSV. Admin or staff (analytics role).
 
     Pass ``actor_user_id`` to scope the export to a single user's trail (used by
     the per-user activity drill-down in the admin console).
@@ -97,7 +97,7 @@ async def export_audit_log(
 
     from fastapi.responses import StreamingResponse
 
-    if not user.is_admin:
+    if not (user.is_admin or user.is_staff):
         raise HTTPException(status_code=403, detail="Admin access required")
 
     parsed_start = None

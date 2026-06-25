@@ -478,10 +478,11 @@ async def run_workflow(
     model: str | None = None,
     activity_id: str | None = None,
     user: User | None = None,
+    share_token: str | None = None,
 ) -> str:
     """Start workflow execution. Returns session_id for polling."""
     if user is not None:
-        wf = await get_authorized_workflow(workflow_id, user)
+        wf = await get_authorized_workflow(workflow_id, user, share_token=share_token)
         if not wf:
             raise ValueError("Workflow not found")
         team_access = await get_team_access_context(user)
@@ -542,6 +543,7 @@ async def run_workflow(
 async def _get_authorized_workflow_result(
     session_id: str,
     user: User,
+    share_token: str | None = None,
 ) -> WorkflowResult | None:
     result = await WorkflowResult.find_one(WorkflowResult.session_id == session_id)
     if not result or not result.workflow:
@@ -549,16 +551,21 @@ async def _get_authorized_workflow_result(
 
     # Use the library-aware authorizer so users can poll status for verified
     # workflows they launched from the library but don't own / aren't on the team for.
-    workflow = await get_authorized_workflow(str(result.workflow), user)
+    # A valid share token grants the same poll access as the run that launched it.
+    workflow = await get_authorized_workflow(
+        str(result.workflow), user, share_token=share_token
+    )
     if not workflow:
         return None
 
     return result
 
 
-async def get_workflow_status(session_id: str, user: User | None = None) -> dict | None:
+async def get_workflow_status(
+    session_id: str, user: User | None = None, share_token: str | None = None
+) -> dict | None:
     if user is not None:
-        result = await _get_authorized_workflow_result(session_id, user)
+        result = await _get_authorized_workflow_result(session_id, user, share_token)
     else:
         result = await WorkflowResult.find_one(WorkflowResult.session_id == session_id)
     if not result:
@@ -587,7 +594,9 @@ async def get_workflow_status(session_id: str, user: User | None = None) -> dict
     }
 
 
-async def cancel_workflow(session_id: str, user: User) -> dict | None:
+async def cancel_workflow(
+    session_id: str, user: User, share_token: str | None = None
+) -> dict | None:
     """Cancel an in-flight workflow run.
 
     Flips the result to ``canceled`` (which the engine's between-steps check and
@@ -597,7 +606,7 @@ async def cancel_workflow(session_id: str, user: User) -> dict | None:
     state is returned unchanged. Returns ``None`` when the run is not found or
     the user is not authorized for it.
     """
-    result = await _get_authorized_workflow_result(session_id, user)
+    result = await _get_authorized_workflow_result(session_id, user, share_token)
     if not result:
         return None
 
@@ -654,13 +663,14 @@ async def run_workflow_batch(
     model: str | None = None,
     activity_id: str | None = None,
     user: User | None = None,
+    share_token: str | None = None,
 ) -> str:
     """Start a batched workflow execution — one run per document.
 
     Returns a ``batch_id`` that can be polled via ``get_batch_status``.
     """
     if user is not None:
-        wf = await get_authorized_workflow(workflow_id, user)
+        wf = await get_authorized_workflow(workflow_id, user, share_token=share_token)
         if not wf:
             raise ValueError("Workflow not found")
         team_access = await get_team_access_context(user)
@@ -720,7 +730,9 @@ async def run_workflow_batch(
     return batch_id
 
 
-async def get_batch_status(batch_id: str, user: User | None = None) -> dict | None:
+async def get_batch_status(
+    batch_id: str, user: User | None = None, share_token: str | None = None
+) -> dict | None:
     """Return aggregated status for a batch run."""
     results = await WorkflowResult.find(
         WorkflowResult.batch_id == batch_id,
@@ -734,8 +746,11 @@ async def get_batch_status(batch_id: str, user: User | None = None) -> dict | No
         if not first.workflow:
             return None
         # Library-aware: also allows batch status polling for verified workflows
-        # launched from the library (matches /run authorization).
-        workflow = await get_authorized_workflow(str(first.workflow), user)
+        # launched from the library (matches /run authorization). A valid share
+        # token grants the same poll access as the run that launched the batch.
+        workflow = await get_authorized_workflow(
+            str(first.workflow), user, share_token=share_token
+        )
         if not workflow:
             return None
 

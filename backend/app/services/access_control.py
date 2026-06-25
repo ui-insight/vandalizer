@@ -496,6 +496,7 @@ async def get_authorized_workflow(
     manage: bool = False,
     allow_admin: bool = False,
     team_access: TeamAccessContext | None = None,
+    share_token: str | None = None,
 ) -> "Workflow | None":
     from app.models.workflow import Workflow
     from beanie import PydanticObjectId
@@ -522,6 +523,18 @@ async def get_authorized_workflow(
             manage=manage,
             allow_admin=allow_admin,
         )
+    # A valid share token grants view-level access (run + poll status) only —
+    # never manage rights. This lets share-link recipients run the workflow
+    # against their own documents, mirroring the metadata-load path that
+    # already honors the token. Editing still requires duplicating the workflow.
+    if (
+        not allowed
+        and not manage
+        and share_token
+        and wf.share_token
+        and share_token == wf.share_token
+    ):
+        allowed = True
     return wf if allowed else None
 
 
@@ -631,6 +644,13 @@ def can_manage_knowledge_base(
         return True
     if not _org_scope_allows(knowledge_base.organization_ids, user_org_ancestry):
         return False
+    # Examiners are the catalog-governance role: they curate verified KBs
+    # (validate & improve, tags, org-visibility) even when they don't own them.
+    # Mirrors can_view_knowledge_base's verified branch and the frontend's
+    # `verified && isExaminerOrAdmin` manage gate. Scoped to verified only, so
+    # examiners gain no manage rights over private/team KBs they don't own.
+    if user.is_examiner and knowledge_base.verified:
+        return True
     return bool(
         knowledge_base.shared_with_team
         and _team_role(knowledge_base.team_id, team_access) in TEAM_MANAGE_ROLES
