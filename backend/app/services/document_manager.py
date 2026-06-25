@@ -305,12 +305,37 @@ class DocumentManager:
     # --- Knowledge Base methods ---
 
     def get_kb_collection(self, kb_uuid: str) -> chromadb.Collection:
-        """Get or create a ChromaDB collection for a knowledge base."""
+        """Get or create a ChromaDB collection for a knowledge base.
+
+        ``get_or_create_collection`` writes to the Chroma store, so this must
+        only be used on write paths (ingestion). Read paths (retrieval) must
+        use :meth:`get_kb_collection_readonly` — otherwise a read against a
+        not-yet-ingested KB silently creates an empty collection, and a read
+        against a read-only Chroma store raises "attempt to write a readonly
+        database" where the user only wanted to retrieve.
+        """
         collection_name = f"kb_{kb_uuid}"
         return self.client.get_or_create_collection(
             name=collection_name,
             embedding_function=self.embedding_function,
         )
+
+    def get_kb_collection_readonly(self, kb_uuid: str) -> Optional["chromadb.Collection"]:
+        """Fetch an existing KB collection for reads, never creating it.
+
+        Returns ``None`` when the collection doesn't exist yet (KB never
+        ingested). Unlike :meth:`get_kb_collection`, this issues no write, so
+        retrieval degrades to "no results" instead of failing on a read-only
+        Chroma store.
+        """
+        collection_name = f"kb_{kb_uuid}"
+        try:
+            return self.client.get_collection(
+                name=collection_name,
+                embedding_function=self.embedding_function,
+            )
+        except Exception:
+            return None
 
     def add_to_kb(
         self,
@@ -377,7 +402,9 @@ class DocumentManager:
         related junk" the same as "retrieved nothing" — handing the model an
         empty set so it abstains rather than answering from off-topic chunks.
         """
-        collection = self.get_kb_collection(kb_uuid)
+        collection = self.get_kb_collection_readonly(kb_uuid)
+        if collection is None:
+            return []
         results = collection.query(query_texts=[query], n_results=k)
 
         output = []
