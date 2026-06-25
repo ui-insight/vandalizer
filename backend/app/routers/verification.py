@@ -334,18 +334,40 @@ async def unverify_item(
 async def list_featured_collections(user: User = Depends(get_current_user)):
     """List featured collections (available to all users, not just examiners)."""
     from app.models.verification import VerifiedCollection
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    visible_ids = await svc.get_visible_verified_item_ids(user_org_ancestry)
     collections = await VerifiedCollection.find(
         VerifiedCollection.featured == True,  # noqa: E712
     ).sort("-updated_at").to_list()
-    return {"collections": [svc._collection_to_dict(c) for c in collections]}
+    result = []
+    for c in collections:
+        d = svc._collection_to_dict(c)
+        d["visible_count"] = len(set(c.item_ids) & visible_ids)
+        result.append(d)
+    return {"collections": result}
 
 
 @router.get("/collections/browse")
 async def browse_collections(user: User = Depends(get_current_user)):
-    """List all non-empty collections for catalog browsing (available to all users)."""
+    """List collections for catalog browsing (available to all users).
+
+    A collection's badge count reflects only items the caller can actually
+    open — currently-verified and org-visible — and collections with nothing
+    visible to this user are omitted, so the count never disagrees with the
+    list that renders when the category is opened.
+    """
     from app.models.verification import VerifiedCollection
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    visible_ids = await svc.get_visible_verified_item_ids(user_org_ancestry)
     collections = await VerifiedCollection.find_all().sort("-updated_at").to_list()
-    result = [svc._collection_to_dict(c) for c in collections if c.item_ids]
+    result = []
+    for c in collections:
+        visible_count = len(set(c.item_ids) & visible_ids)
+        if visible_count == 0:
+            continue
+        d = svc._collection_to_dict(c)
+        d["visible_count"] = visible_count
+        result.append(d)
     return {"collections": result}
 
 
