@@ -496,6 +496,7 @@ async def get_authorized_workflow(
     manage: bool = False,
     allow_admin: bool = False,
     team_access: TeamAccessContext | None = None,
+    share_token: str | None = None,
 ) -> "Workflow | None":
     from app.models.workflow import Workflow
     from beanie import PydanticObjectId
@@ -522,6 +523,18 @@ async def get_authorized_workflow(
             manage=manage,
             allow_admin=allow_admin,
         )
+    # A valid share token grants view-level access (run + poll status) only —
+    # never manage rights. This lets share-link recipients run the workflow
+    # against their own documents, mirroring the metadata-load path that
+    # already honors the token. Editing still requires duplicating the workflow.
+    if (
+        not allowed
+        and not manage
+        and share_token
+        and wf.share_token
+        and share_token == wf.share_token
+    ):
+        allowed = True
     return wf if allowed else None
 
 

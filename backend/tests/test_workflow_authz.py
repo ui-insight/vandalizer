@@ -393,6 +393,40 @@ class TestWorkflowRunAuthz:
         assert resp.status_code == 200
         assert resp.json()["session_id"] == "session-123"
 
+    @pytest.mark.asyncio
+    async def test_run_forwards_share_token(self, client):
+        """A share_token in the run body reaches get_authorized_workflow + the service."""
+        user = _make_user("outsider")
+        cookies, headers = _auth("outsider")
+
+        mock_wf_doc = MagicMock()
+        mock_wf_doc.name = "Shared WF"
+        mock_wf_doc.steps = [MagicMock(), MagicMock()]
+
+        mock_activity_obj = AsyncMock()
+        mock_activity_obj.id = "activity-1"
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "outsider", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.workflows.svc") as mock_svc, \
+             patch("app.routers.workflows._authorize_documents", new_callable=AsyncMock, return_value=["doc-1"]), \
+             patch("app.routers.workflows.get_authorized_workflow", new_callable=AsyncMock, return_value=mock_wf_doc) as mock_authz, \
+             patch("app.services.activity_service.activity_start", new_callable=AsyncMock, return_value=mock_activity_obj), \
+             patch("beanie.PydanticObjectId", side_effect=lambda x: x):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.run_workflow = AsyncMock(return_value="session-123")
+
+            resp = await client.post(
+                f"/api/workflows/{self._FAKE_OID}/run",
+                json={"document_uuids": ["doc-1"], "batch_mode": False, "share_token": "tok-abc"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert mock_authz.await_args.kwargs.get("share_token") == "tok-abc"
+        assert mock_svc.run_workflow.await_args.kwargs.get("share_token") == "tok-abc"
+
 
 # ---------------------------------------------------------------------------
 # Duplicate authorization

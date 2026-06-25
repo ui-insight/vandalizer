@@ -1109,6 +1109,76 @@ class TestGetAuthorizedWorkflow:
 
         assert result is None
 
+    async def test_matching_share_token_grants_view_access(self):
+        """An outsider with a token matching the workflow's grants view (run) access."""
+        user = _make_user("outsider")
+        wf = _make_workflow("owner1", team_id="team-abc")
+        wf.share_token = "tok-abc"
+
+        with (
+            patch("app.models.workflow.Workflow") as MockWF,
+            patch("beanie.PydanticObjectId", side_effect=lambda x: x),
+            patch(
+                "app.services.access_control.has_library_backed_object_access",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
+        ):
+            MockWF.get = AsyncMock(return_value=wf)
+
+            result = await get_authorized_workflow(
+                "wf-id", user, team_access=_team_access(), share_token="tok-abc"
+            )
+
+        assert result is wf
+
+    async def test_wrong_share_token_returns_none(self):
+        """A token that doesn't match the stored one grants nothing."""
+        user = _make_user("outsider")
+        wf = _make_workflow("owner1", team_id="team-abc")
+        wf.share_token = "tok-abc"
+
+        with (
+            patch("app.models.workflow.Workflow") as MockWF,
+            patch("beanie.PydanticObjectId", side_effect=lambda x: x),
+            patch(
+                "app.services.access_control.has_library_backed_object_access",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
+        ):
+            MockWF.get = AsyncMock(return_value=wf)
+
+            result = await get_authorized_workflow(
+                "wf-id", user, team_access=_team_access(), share_token="wrong-token"
+            )
+
+        assert result is None
+
+    async def test_share_token_does_not_grant_manage(self):
+        """A valid share token is view/run-only — it never grants manage rights."""
+        user = _make_user("outsider")
+        wf = _make_workflow("owner1", team_id="team-abc")
+        wf.share_token = "tok-abc"
+
+        with (
+            patch("app.models.workflow.Workflow") as MockWF,
+            patch("beanie.PydanticObjectId", side_effect=lambda x: x),
+            patch(
+                "app.services.access_control.has_library_backed_object_access",
+                new_callable=AsyncMock,
+                return_value=False,
+            ),
+        ):
+            MockWF.get = AsyncMock(return_value=wf)
+
+            result = await get_authorized_workflow(
+                "wf-id", user, team_access=_team_access(),
+                share_token="tok-abc", manage=True,
+            )
+
+        assert result is None
+
 
 # ---------------------------------------------------------------------------
 # TestGetAuthorizedSearchSet

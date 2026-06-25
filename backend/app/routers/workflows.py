@@ -496,25 +496,37 @@ async def list_workflows(
 
 
 @router.get("/status", response_model=WorkflowStatusResponse)
-async def get_workflow_status(session_id: str, user: User = Depends(get_current_user)):
-    status = await svc.get_workflow_status(session_id, user=user)
+async def get_workflow_status(
+    session_id: str,
+    share_token: str | None = Query(default=None),
+    user: User = Depends(get_current_user),
+):
+    status = await svc.get_workflow_status(session_id, user=user, share_token=share_token)
     if not status:
         raise HTTPException(status_code=404, detail="Workflow result not found")
     return WorkflowStatusResponse(**status)
 
 
 @router.get("/batch-status", response_model=BatchStatusResponse)
-async def get_batch_status(batch_id: str, user: User = Depends(get_current_user)):
-    status = await svc.get_batch_status(batch_id, user=user)
+async def get_batch_status(
+    batch_id: str,
+    share_token: str | None = Query(default=None),
+    user: User = Depends(get_current_user),
+):
+    status = await svc.get_batch_status(batch_id, user=user, share_token=share_token)
     if not status:
         raise HTTPException(status_code=404, detail="Batch not found")
     return status
 
 
 @router.get("/status/stream")
-async def stream_workflow_status(session_id: str, user: User = Depends(get_current_user)):
+async def stream_workflow_status(
+    session_id: str,
+    share_token: str | None = Query(default=None),
+    user: User = Depends(get_current_user),
+):
     """SSE endpoint that streams workflow status updates until completion."""
-    initial_status = await svc.get_workflow_status(session_id, user=user)
+    initial_status = await svc.get_workflow_status(session_id, user=user, share_token=share_token)
     if not initial_status:
         raise HTTPException(status_code=404, detail="Workflow result not found")
 
@@ -522,7 +534,7 @@ async def stream_workflow_status(session_id: str, user: User = Depends(get_curre
         last_json = ""
         not_found_retries = 0
         while True:
-            status = await svc.get_workflow_status(session_id, user=user)
+            status = await svc.get_workflow_status(session_id, user=user, share_token=share_token)
             if not status:
                 not_found_retries += 1
                 # Allow a few retries for the workflow result to appear in the DB
@@ -1101,8 +1113,10 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
     from app.services import activity_service
     from beanie import PydanticObjectId
 
-    # Authorize and look up workflow name and step count for activity
-    wf = await get_authorized_workflow(workflow_id, user)
+    # Authorize and look up workflow name and step count for activity.
+    # A share_token (present when the workflow was opened via a share link)
+    # grants run access to a workflow the user doesn't own / isn't on the team for.
+    wf = await get_authorized_workflow(workflow_id, user, share_token=req.share_token)
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
     document_uuids = await _authorize_documents(req.document_uuids, user)
@@ -1139,6 +1153,7 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
                 workflow_id, document_uuids, user.user_id, req.model,
                 activity_id=str(activity.id),
                 user=user,
+                share_token=req.share_token,
             )
             return {"batch_id": batch_id, "activity_id": str(activity.id)}
         else:
@@ -1146,6 +1161,7 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
                 workflow_id, document_uuids, user.user_id, req.model,
                 activity_id=str(activity.id),
                 user=user,
+                share_token=req.share_token,
             )
             activity.workflow_session_id = session_id
             await activity.save()
@@ -1157,9 +1173,13 @@ async def run_workflow(request: Request, workflow_id: str, req: RunWorkflowReque
 
 
 @router.post("/sessions/{session_id}/cancel")
-async def cancel_workflow_run(session_id: str, user: User = Depends(get_current_user)):
+async def cancel_workflow_run(
+    session_id: str,
+    share_token: str | None = Query(default=None),
+    user: User = Depends(get_current_user),
+):
     """Stop an in-flight workflow run (single-run sessions)."""
-    result = await svc.cancel_workflow(session_id, user)
+    result = await svc.cancel_workflow(session_id, user, share_token=share_token)
     if result is None:
         raise HTTPException(status_code=404, detail="Workflow run not found")
     return result

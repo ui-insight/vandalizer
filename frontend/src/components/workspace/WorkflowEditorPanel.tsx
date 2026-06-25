@@ -1066,6 +1066,34 @@ export function WorkflowEditorPanel() {
             )}
           </button>
         )}
+        {/* Shared / verified workflows are view-only (can_manage === false). Beyond
+            running them, offer a clear way to keep an editable copy — saved to the
+            viewer's own team library via the existing share-token duplicate flow. */}
+        {!canManage && (
+          <button
+            onClick={() => void handleMakeCopy()}
+            disabled={duplicating}
+            style={{
+              width: '100%', marginTop: 8, padding: '10px 16px', fontSize: 13, fontWeight: 600,
+              fontFamily: 'inherit', borderRadius: 'var(--ui-radius, 8px)',
+              border: '1px solid #d1d5db', backgroundColor: '#fff', color: '#374151',
+              cursor: duplicating ? 'wait' : 'pointer', opacity: duplicating ? 0.7 : 1,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            }}
+          >
+            {duplicating ? (
+              <>
+                <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />
+                Saving copy…
+              </>
+            ) : (
+              <>
+                <Copy style={{ width: 14, height: 14 }} />
+                Save a copy to my library
+              </>
+            )}
+          </button>
+        )}
       </div>
 
       {/* ===== EDIT STEP OVERLAY ===== */}
