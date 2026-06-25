@@ -455,8 +455,8 @@ export function LibraryTab() {
       descPlaceholder: "A one sentence description of the workflow's purpose.",
     },
     extraction: {
-      title: 'Name the task',
-      namePlaceholder: 'Name your extraction task',
+      title: 'Name the extraction',
+      namePlaceholder: 'Name your extraction',
       showDesc: false,
       descPlaceholder: '',
     },
@@ -674,7 +674,7 @@ export function LibraryTab() {
             {([
               { value: 'all' as const, label: 'All' },
               { value: 'workflow' as const, label: 'Workflows' },
-              { value: 'extraction' as const, label: 'Tasks' },
+              { value: 'extraction' as const, label: 'Extractions' },
               { value: 'prompt' as const, label: 'Prompts' },
               { value: 'formatter' as const, label: 'Formatters' },
             ]).map(({ value, label }) => {
@@ -1345,7 +1345,12 @@ export function LibraryTab() {
                   opacity: creating || uploading || !createName.trim() ? 0.5 : 1,
                 }}
               >
-                {creating ? 'Creating...' : createModalType === 'workflow' ? 'Create Workflow' : 'Create Task'}
+                {creating
+                  ? 'Creating...'
+                  : createModalType === 'workflow' ? 'Create Workflow'
+                  : createModalType === 'prompt' ? 'Create Prompt'
+                  : createModalType === 'formatter' ? 'Create Formatter'
+                  : 'Create Extraction'}
               </button>
               <button
                 onClick={closeCreateModal}
