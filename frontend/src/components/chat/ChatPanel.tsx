@@ -86,7 +86,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     setActivity,
   } = useChat()
 
-  const { bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, activeKBUuid, activeKBTitle, activateKB, deactivateKB, activeProjectUuid, activeProjectTitle, setCurrentConversationUuid, focusChatSignal } = useWorkspace()
+  const { bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, activeKBUuid, activeKBTitle, activateKB, deactivateKB, activeProjectUuid, activeProjectTitle, setCurrentConversationUuid, focusChatSignal, setWorkspaceMode } = useWorkspace()
 
   // When scoped to a project, surface its file/index status so the empty state
   // reflects the project (not a generic assistant) and sets honest expectations.
@@ -981,6 +981,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         onSend={handleSend}
         onAttachFile={handleAttachFile}
         onAttachLink={handleAttachLink}
+        onAddKnowledge={() => setWorkspaceMode('knowledge')}
         disabled={isStreaming}
         selectedModel={selectedModel}
         onModelChange={handleModelChange}

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, type KeyboardEvent, type ReactNode } from 'react'
-import { Send, Plus, FileUp, Globe, Download, ChevronDown, Cpu } from 'lucide-react'
+import { Send, Plus, FileUp, Globe, BookOpen, Download, ChevronDown, Cpu } from 'lucide-react'
 import { getModels } from '../../api/config'
 import type { ModelInfo } from '../../types/workflow'
 import { ModelEffortPicker } from '../ModelEffortPicker'
@@ -9,6 +9,8 @@ interface Props {
   onSend: (message: string) => void
   onAttachFile?: (files: File[]) => void
   onAttachLink?: (url: string) => void
+  // Opens the knowledge base screen so the user can pick a KB to chat with.
+  onAddKnowledge?: () => void
   disabled?: boolean
   selectedModel?: string
   onModelChange?: (model: string) => void
@@ -22,7 +24,7 @@ interface Props {
 }
 
 export function ChatInput({
-  onSend, onAttachFile, onAttachLink, disabled,
+  onSend, onAttachFile, onAttachLink, onAddKnowledge, disabled,
   selectedModel, onModelChange, onExport, hasMessages, hasDocuments,
   contextMeter, focusSignal,
 }: Props) {
@@ -207,6 +209,17 @@ export function ChatInput({
                   <Globe className="h-4 w-4 shrink-0" style={{ width: 18 }} />
                   <span>Add Website</span>
                 </button>
+                {onAddKnowledge && (
+                  <button
+                    role="menuitem"
+                    onClick={() => { onAddKnowledge(); setShowAddMenu(false) }}
+                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-left text-[#1f2937] hover:bg-black/[.04] transition-colors"
+                    style={{ minHeight: 40 }}
+                  >
+                    <BookOpen className="h-4 w-4 shrink-0" style={{ width: 18 }} />
+                    <span>Add Knowledge Base</span>
+                  </button>
+                )}
               </div>
             )}
           </div>
