@@ -177,6 +177,9 @@ class SystemConfig(Document):
     org_name: str = ""
     logo_data_url: str = ""
     icon_data_url: str = ""
+    # When true, the icon is still used as the favicon and chat avatar but is
+    # hidden from the top navigation header (next to the wordmark).
+    icon_hide_in_nav: bool = False
 
     # Authentication
     auth_methods: list[str] = ["password"]

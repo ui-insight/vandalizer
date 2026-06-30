@@ -197,6 +197,7 @@ async def get_theme():
         org_name=config.org_name,
         logo_data_url=config.logo_data_url,
         icon_data_url=config.icon_data_url,
+        icon_hide_in_nav=config.icon_hide_in_nav,
     )
 
 
@@ -215,6 +216,8 @@ async def update_theme(req: UpdateThemeConfigRequest, user: User = Depends(get_c
         config.logo_data_url = _validate_image_data_url(req.logo_data_url, "logo_data_url")
     if req.icon_data_url is not None:
         config.icon_data_url = _validate_image_data_url(req.icon_data_url, "icon_data_url")
+    if req.icon_hide_in_nav is not None:
+        config.icon_hide_in_nav = req.icon_hide_in_nav
     config.updated_at = datetime.datetime.now(datetime.timezone.utc)
     config.updated_by = user.user_id
     await config.save()
@@ -224,6 +227,7 @@ async def update_theme(req: UpdateThemeConfigRequest, user: User = Depends(get_c
         org_name=config.org_name,
         logo_data_url=config.logo_data_url,
         icon_data_url=config.icon_data_url,
+        icon_hide_in_nav=config.icon_hide_in_nav,
     )
 
 

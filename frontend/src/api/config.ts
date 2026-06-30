@@ -26,6 +26,7 @@ export interface ThemeConfig {
   org_name: string
   logo_data_url: string
   icon_data_url: string
+  icon_hide_in_nav?: boolean
 }
 
 export function getThemeConfig() {
@@ -50,6 +51,7 @@ export function updateThemeConfig(data: {
   org_name?: string
   logo_data_url?: string
   icon_data_url?: string
+  icon_hide_in_nav?: boolean
 }) {
   return apiFetch<ThemeConfig>('/api/config/theme', {
     method: 'PUT',

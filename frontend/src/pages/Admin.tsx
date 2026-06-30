@@ -2696,6 +2696,7 @@ function ConfigTab() {
   const [themeLogoError, setThemeLogoError] = useState<string | null>(null)
   const [themeIcon, setThemeIcon] = useState('')
   const [themeIconError, setThemeIconError] = useState<string | null>(null)
+  const [themeIconHideInNav, setThemeIconHideInNav] = useState(false)
   const [themeSaving, setThemeSaving] = useState(false)
   const [themeSaved, setThemeSaved] = useState(false)
 
@@ -2862,6 +2863,7 @@ function ConfigTab() {
       setThemeOrgName(t.org_name || '')
       setThemeLogo(t.logo_data_url || '')
       setThemeIcon(t.icon_data_url || '')
+      setThemeIconHideInNav(!!t.icon_hide_in_nav)
     }).catch(() => {})
   }, [])
 
@@ -2918,6 +2920,7 @@ function ConfigTab() {
         org_name: themeOrgName.trim(),
         logo_data_url: themeLogo,
         icon_data_url: themeIcon,
+        icon_hide_in_nav: themeIconHideInNav,
       })
       applyThemeToDOM(updated)
       await branding.refresh()
@@ -4133,6 +4136,14 @@ ${playgroundResult.request.user_prompt}`}
               <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6 }}>
                 Small square mark shown beside the logo (header & chat) and as the browser-tab favicon. A square, transparent PNG works best. The default Joe Vandal mark shows only on un-branded deployments — once you set an organization name or logo, leave this blank to hide it, or upload your own.
               </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#374151', marginTop: 8, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={themeIconHideInNav}
+                  onChange={e => setThemeIconHideInNav(e.target.checked)}
+                />
+                Hide icon from the navigation header (still used as favicon and chat avatar)
+              </label>
               {themeIconError && (
                 <div style={{ fontSize: 12, color: '#b91c1c', marginTop: 6 }}>{themeIconError}</div>
               )}

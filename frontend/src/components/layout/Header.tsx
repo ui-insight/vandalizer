@@ -13,7 +13,8 @@ export function Header() {
   const navigate = useNavigate()
   const workspace = useOptionalWorkspace()
   const branding = useBranding()
-  const brandIcon = branding.iconUrl
+  // Icon is still used as favicon + chat avatar; admins can hide it from the nav.
+  const brandIcon = branding.hideIconInNav ? null : branding.iconUrl
   const [supportOpen, setSupportOpen] = useState(false)
   const [supportTicket, setSupportTicket] = useState<string | undefined>()
   const [promptCardHidden, setPromptCardHidden] = useState(false)
