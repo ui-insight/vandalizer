@@ -539,7 +539,10 @@ async def get_trial_end_info(token: str) -> Optional[dict]:
         "engagement": engagement,
         "extensions_used": app.trial_extensions_used,
         "max_extensions": MAX_SELF_EXTENSIONS,
-        "can_self_extend": app.trial_extensions_used < MAX_SELF_EXTENSIONS,
+        # Renewals are unlimited — trial users can always keep going (engaged
+        # users in exchange for a few notes). We still track extensions_used for
+        # analytics, but it no longer gates access.
+        "can_self_extend": True,
         "already_extended": app.trial_extensions_used > 0,
     }
 
@@ -549,9 +552,11 @@ async def self_extend_trial(
 ) -> dict:
     """Self-serve trial renewal from the end-of-trial screen.
 
-    Extends the trial by TRIAL_DAYS and unlocks the account, up to
-    MAX_SELF_EXTENSIONS times. Optional post-trial notes are persisted as a
-    PostExperienceResponse. Returns {"ok": bool, ...}.
+    Extends the trial by TRIAL_DAYS and unlocks the account. Renewals are
+    unlimited — low-engagement users renew with one click, engaged users in
+    exchange for a few notes. ``trial_extensions_used`` is still incremented for
+    analytics but no longer caps access. Optional post-trial notes are persisted
+    as a PostExperienceResponse. Returns {"ok": bool, ...}.
     """
     if settings is None:
         settings = Settings()
@@ -561,9 +566,6 @@ async def self_extend_trial(
     )
     if not app:
         return {"ok": False, "reason": "invalid"}
-
-    if app.trial_extensions_used >= MAX_SELF_EXTENSIONS:
-        return {"ok": False, "reason": "cap_reached"}
 
     # Persist any post-trial notes the user left (reuses the feedback model).
     if notes:

@@ -508,22 +508,26 @@ class TestTrialExtensionWithRealDB:
         # New expiry is ~14 days out
         assert refreshed_app.expires_at.replace(tzinfo=datetime.timezone.utc) > now + datetime.timedelta(days=13)
 
-    async def test_self_extend_blocked_at_cap(self, mongo_client):
+    async def test_self_extend_is_unlimited(self, mongo_client):
+        # Renewals are unlimited — extending past the old 2-extension cap still
+        # unlocks the account and bumps the counter for analytics.
         from app.config import Settings
+        from app.models.demo import DemoApplication
         from app.models.user import User
         from app.services import demo_service
 
-        await self._make_locked_trial("capped", extensions_used=2)
+        app, _user = await self._make_locked_trial("uncapped", extensions_used=5)
         with patch.object(demo_service, "send_email", new_callable=AsyncMock):
             result = await demo_service.self_extend_trial(
-                "tok_capped", None, Settings()
+                "tok_uncapped", None, Settings()
             )
 
-        assert result["ok"] is False
-        assert result["reason"] == "cap_reached"
-        # User stays locked
-        refreshed_user = await User.find_one(User.user_id == "trial_capped@example.com")
-        assert refreshed_user.demo_status == "locked"
+        assert result["ok"] is True
+        refreshed_app = await DemoApplication.find_one(DemoApplication.uuid == app.uuid)
+        refreshed_user = await User.find_one(User.user_id == "trial_uncapped@example.com")
+        assert refreshed_app.status == "active"
+        assert refreshed_app.trial_extensions_used == 6
+        assert refreshed_user.demo_status == "active"
 
     async def test_self_extend_persists_notes(self, mongo_client):
         from app.config import Settings

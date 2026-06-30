@@ -131,13 +131,6 @@ async def extend_trial(
     """Self-serve trial renewal from the end-of-trial screen (+14 days)."""
     result = await demo_service.self_extend_trial(token, body.notes, settings)
     if not result.get("ok"):
-        reason = result.get("reason")
-        if reason == "cap_reached":
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="You've reached the self-serve renewal limit. "
-                "Get in touch and we'll keep your access going.",
-            )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Invalid trial token"
         )

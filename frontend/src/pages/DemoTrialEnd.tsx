@@ -2,13 +2,12 @@ import { useState, useEffect } from 'react'
 import { Link, useSearch, useNavigate } from '@tanstack/react-router'
 import {
   Sparkles,
-  CheckCircle,
   Loader2,
   ArrowLeft,
   ArrowRight,
   ExternalLink,
   AlertCircle,
-  Mail,
+  Heart,
   Rocket,
 } from 'lucide-react'
 import { Footer } from '../components/layout/Footer'
@@ -21,12 +20,11 @@ import { groupBySection } from '../lib/survey'
 import type { TrialEndInfo } from '../types/demo'
 
 // ---------------------------------------------------------------------------
-// End-of-trial screen — friendly renewal + beta positioning. Replaces the hard
-// lockout dead-end. Token-authenticated (the lock token), no session required.
+// End-of-trial screen — a warm thank-you + frictionless renewal. Replaces the
+// hard lockout dead-end. Renewals are unlimited: low-engagement users keep going
+// with one click, engaged users in exchange for a few notes. Token-authenticated
+// (the lock token), no session required.
 // ---------------------------------------------------------------------------
-
-// Matches the Landing page's "Get in Touch" convention (no public support inbox).
-const CONTACT_URL = 'https://github.com/ui-insight/vandalizer/issues'
 
 export default function DemoTrialEnd() {
   const search = useSearch({ strict: false }) as Record<string, string | undefined>
@@ -158,8 +156,8 @@ export default function DemoTrialEnd() {
                 <Rocket className="w-16 h-16 text-green-400 mx-auto mb-6" />
                 <h2 className="text-2xl font-bold text-white mb-4">You're back in!</h2>
                 <p className="text-gray-400 mb-6">
-                  Your trial has been extended by another two weeks. Pick up right where you left
-                  off — and thanks for helping shape Vandalizer.
+                  Your trial's extended by another two weeks. Pick up right where you left off —
+                  and thank you, genuinely, for helping shape where Vandalizer goes next.
                 </p>
                 <button
                   onClick={enterApp}
@@ -169,16 +167,18 @@ export default function DemoTrialEnd() {
                 </button>
               </div>
             </div>
-          ) : info && info.can_self_extend ? (
-            // --- Can still self-extend ---
+          ) : info ? (
+            // --- Warm thank-you + renewal (always available) ---
             <div className="p-8 rounded-2xl border border-white/10 bg-white/5">
               <div className="text-center mb-8">
-                <Sparkles className="w-12 h-12 text-[#f1b300] mx-auto mb-4" />
-                <h2 className="text-2xl font-bold text-white mb-2">Your trial has wrapped up</h2>
+                <Heart className="w-12 h-12 text-[#f1b300] mx-auto mb-4" />
+                <h2 className="text-2xl font-bold text-white mb-2">
+                  Thank you for trying Vandalizer
+                </h2>
                 <p className="text-gray-400">
-                  Hi {info.name} — Vandalizer is an evolving beta built for research offices, and
-                  feedback from trial users like you is actively shaping where it goes next. Trial
-                  access keeps going as new releases land.
+                  Hi {info.name} — Vandalizer is an early beta we're building hand in hand with
+                  research offices like yours. The way you've used it genuinely shapes where it
+                  goes next, and we're grateful you gave it a run. Let's keep you going.
                 </p>
               </div>
 
@@ -186,8 +186,8 @@ export default function DemoTrialEnd() {
                 // Low engagement → frictionless one-click renewal
                 <div className="text-center">
                   <p className="text-gray-300 mb-6">
-                    Looks like you were just getting started. No problem — grab another two weeks
-                    and take it for a proper spin.
+                    Looks like you were just getting started — no rush at all. Grab another two
+                    weeks, on us, and take it for a proper spin.
                   </p>
                   {error && (
                     <div className="mb-4 rounded-md bg-red-500/20 border border-red-500/30 p-3 text-sm text-red-300">
@@ -212,11 +212,12 @@ export default function DemoTrialEnd() {
                   <p className="mt-3 text-xs text-gray-500">Adds 14 more days, instantly.</p>
                 </div>
               ) : (
-                // Engaged → short notes in exchange for more time
+                // Engaged → a few notes in exchange for more time
                 <div>
                   <p className="text-gray-300 mb-6">
-                    Want another two weeks? Tell us a little about how it's going — your notes go
-                    straight to the team, and you'll be back in the moment you submit.
+                    You've put Vandalizer to real work — thank you. Tell us a little about how it's
+                    going; your notes go straight to the team, and you'll be back in with another
+                    two weeks the moment you submit.
                   </p>
                   <SurveyWizard
                     steps={steps}
@@ -229,35 +230,7 @@ export default function DemoTrialEnd() {
                 </div>
               )}
             </div>
-          ) : (
-            // --- Cap reached → route to a human ---
-            <div className="p-8 rounded-2xl border border-white/10 bg-white/5 text-center">
-              <Mail className="w-12 h-12 text-[#f1b300] mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-white mb-2">Let's keep this going</h2>
-              <p className="text-gray-400 mb-6">
-                {info ? `Hi ${info.name} — you` : 'You'}'ve made the most of your trial extensions.
-                We'd love to talk about keeping Vandalizer in your office for good. Reach out and
-                we'll sort out continued access.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <a
-                  href={CONTACT_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#f1b300] px-6 py-3 font-bold text-black hover:bg-[#d49e00] transition-colors"
-                >
-                  <Mail className="w-5 h-5" /> Get in touch
-                </a>
-                <Link
-                  to="/demo/feedback"
-                  search={{ token }}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-white/10 px-6 py-3 font-bold text-white hover:bg-white/20 transition-colors"
-                >
-                  <CheckCircle className="w-5 h-5" /> Share final feedback
-                </Link>
-              </div>
-            </div>
-          )}
+          ) : null}
         </div>
       </div>
 

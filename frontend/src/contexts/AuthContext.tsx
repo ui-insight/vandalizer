@@ -27,9 +27,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then(setUser)
       .catch((err) => {
         setUser(null)
-        // Check if 403 with DEMO_EXPIRED
+        // 403 DEMO_EXPIRED: trial lapsed mid-session. Capture the feedback token
+        // (carried on the error) so we can route to the renewal screen.
         if (err?.status === 403 && err?.message === 'DEMO_EXPIRED') {
           setDemoExpired(true)
+          setDemoFeedbackToken(err?.feedbackToken ?? null)
         }
       })
       .finally(() => setLoading(false))

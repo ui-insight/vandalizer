@@ -55,11 +55,19 @@ async def get_current_user(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
         )
-    # Block locked demo users from all API access
+    # Block locked demo users from all API access. Surface the end-of-trial
+    # feedback token so the frontend can route them straight to the renewal
+    # screen (mid-session expiry, where login didn't supply the token).
     if user.is_demo_user and user.demo_status == "locked":
+        from app.models.demo import DemoApplication
+
+        demo_app = await DemoApplication.find_one(
+            DemoApplication.user_id == user.user_id
+        )
+        feedback_token = demo_app.post_questionnaire_token if demo_app else None
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="DEMO_EXPIRED",
+            detail={"code": "DEMO_EXPIRED", "feedback_token": feedback_token},
         )
     return user
 

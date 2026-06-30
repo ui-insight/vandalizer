@@ -300,7 +300,9 @@ export default function Landing() {
   }, [user, demoExpired, inviteToken, nextPath])
 
   if (loading) return null
-  if (user && demoExpired && demoFeedbackToken) {
+  // Expired trial → renewal screen. Not gated on `user`: a mid-session expiry
+  // clears the user but we still have the feedback token to route with.
+  if (demoExpired && demoFeedbackToken) {
     return <Navigate to="/demo/trial-end" search={{ token: demoFeedbackToken }} />
   }
   if (user && !demoExpired) {
