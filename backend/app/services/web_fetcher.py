@@ -40,6 +40,20 @@ _USER_AGENT = (
     "Mozilla/5.0 (compatible; VandalizerBot/1.0; +https://vandalizer.uidaho.edu)"
 )
 
+# Browser-like headers. Many .gov/.edu sites sit behind a CDN/WAF (Akamai,
+# Cloudfront) that stalls or resets connections from clients that don't send a
+# full browser header set — the request hangs until our read timeout fires and
+# the source is recorded as an error. Sending Accept/Accept-Language alongside
+# the UA clears the most common of these heuristics.
+_DEFAULT_HEADERS = {
+    "User-Agent": _USER_AGENT,
+    "Accept": "text/html,application/xhtml+xml,application/pdf,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+}
+
+# Cap on the raw PDF payload we'll pull from a URL before extracting text.
+_MAX_PDF_BYTES = 50 * 1024 * 1024  # 50 MB
+
 
 @dataclass
 class WebFetchResult:
@@ -84,6 +98,68 @@ def _extract_main_text(html: str) -> str:
     for tag in soup.find_all(["script", "style", "nav", "footer", "header", "aside", "form", "noscript"]):
         tag.decompose()
     return _normalize_whitespace(soup.get_text(separator="\n"))
+
+
+def _looks_like_pdf(url: str, content_type: str) -> bool:
+    """True when a response is a PDF, by content-type or URL extension."""
+    if "application/pdf" in (content_type or "").lower():
+        return True
+    path = urlparse(url).path.lower()
+    return path.endswith(".pdf")
+
+
+def _extract_pdf_response(content: bytes, url: str) -> tuple[str, str]:
+    """Extract text + a title from PDF bytes fetched over HTTP.
+
+    Uses PyMuPDF (no OCR) to stay fast and dependency-light in the fetch path;
+    image-only PDFs will yield little text, which the caller treats as an empty
+    result. Title prefers the PDF's metadata, falling back to the URL filename.
+    """
+    if not content:
+        return "", urlparse(url).path.rsplit("/", 1)[-1] or urlparse(url).netloc
+    if len(content) > _MAX_PDF_BYTES:
+        logger.warning(
+            "PDF at %s is %d bytes (> %d cap) — skipping extraction",
+            url, len(content), _MAX_PDF_BYTES,
+        )
+        return "", urlparse(url).path.rsplit("/", 1)[-1] or urlparse(url).netloc
+
+    import os
+    import tempfile
+
+    from app.services.document_readers import extract_text_from_pdf
+
+    filename = urlparse(url).path.rsplit("/", 1)[-1] or urlparse(url).netloc
+    tmp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+        text = extract_text_from_pdf(tmp_path)
+        title = _pdf_title(tmp_path) or filename
+        return _normalize_whitespace(text or ""), title
+    except Exception as e:
+        logger.warning("Failed to extract PDF from %s: %s", url, e)
+        return "", filename
+    finally:
+        if tmp_path:
+            try:
+                os.unlink(tmp_path)
+            except OSError:
+                pass
+
+
+def _pdf_title(pdf_path: str) -> Optional[str]:
+    """Best-effort title from PDF metadata; None if unavailable."""
+    try:
+        import pymupdf
+
+        with pymupdf.open(pdf_path) as doc:
+            title = (doc.metadata or {}).get("title") or ""
+        title = title.strip()
+        return title[:300] or None
+    except Exception:
+        return None
 
 
 def _normalize_whitespace(text: str) -> str:
@@ -145,11 +221,27 @@ async def fetch_url(
     async with httpx.AsyncClient(
         timeout=settings.web_fetcher_timeout_seconds,
         follow_redirects=True,
-        headers={"User-Agent": _USER_AGENT},
+        headers=_DEFAULT_HEADERS,
     ) as client:
         resp = await client.get(url)
         status_code = resp.status_code
         resp.raise_for_status()
+
+        # PDF links (common for KB URL sources — agency forms, terms documents)
+        # must be parsed as PDFs, not decoded as HTML. trafilatura/BeautifulSoup
+        # on PDF bytes yields either nothing or raw binary, so without this a
+        # direct .pdf URL ingests garbage or fails outright.
+        if _looks_like_pdf(url, resp.headers.get("content-type", "")):
+            pdf_text, pdf_title = _extract_pdf_response(resp.content, url)
+            return WebFetchResult(
+                url=url,
+                title=pdf_title,
+                text=pdf_text[: settings.web_fetcher_max_chars],
+                raw_html=None,  # no HTML — nothing to crawl from a PDF
+                used_browser=False,
+                status_code=status_code,
+            )
+
         raw_html = resp.text[: settings.web_fetcher_max_chars]
 
     text = _extract_main_text(raw_html)

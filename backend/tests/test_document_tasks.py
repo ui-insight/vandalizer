@@ -273,6 +273,61 @@ class TestUpdateDocumentFields:
         update_document_fields(document_uuid="doc-1")
 
 
+class TestResumePendingKbSources:
+    @patch("app.tasks.document_tasks._check_folder_watch_automations")
+    @patch("app.tasks.document_tasks.celery_app")
+    @patch("app.tasks.document_tasks.get_sync_db")
+    def test_complete_redispatches_pending_sources(self, mock_get_db, mock_celery, mock_check):
+        from app.tasks.document_tasks import update_document_fields
+
+        db = MagicMock()
+        mock_get_db.return_value = db
+        db.smart_document.find_one.return_value = {"task_status": "extracting"}
+        db.smart_document.update_one.return_value = MagicMock(matched_count=1)
+        db.knowledge_base_sources.find.return_value = [
+            {"uuid": "src-1", "knowledge_base_uuid": "kb-1"},
+            {"uuid": "src-2", "knowledge_base_uuid": "kb-1"},
+        ]
+
+        update_document_fields(document_uuid="doc-1")
+
+        # Each pending source is handed to the re-ingest task on the documents queue.
+        assert mock_celery.send_task.call_count == 2
+        names = {c.args[0] for c in mock_celery.send_task.call_args_list}
+        assert names == {"tasks.documents.kb_ingest_document"}
+        dispatched = {c.kwargs["args"][0] for c in mock_celery.send_task.call_args_list}
+        assert dispatched == {"src-1", "src-2"}
+
+    @patch("app.tasks.document_tasks._check_folder_watch_automations")
+    @patch("app.tasks.knowledge_base_tasks._recalculate_kb")
+    @patch("app.tasks.document_tasks.celery_app")
+    @patch("app.tasks.document_tasks.get_sync_db")
+    def test_error_marks_pending_sources_errored(self, mock_get_db, mock_celery, mock_recalc, mock_check):
+        from app.tasks.document_tasks import update_document_fields
+
+        db = MagicMock()
+        mock_get_db.return_value = db
+        # First find_one: task_status for the gate. Second: error_message lookup.
+        db.smart_document.find_one.side_effect = [
+            {"task_status": "error"},
+            {"error_message": "It may be image-only or encrypted."},
+        ]
+        db.knowledge_base_sources.find.return_value = [
+            {"uuid": "src-1", "knowledge_base_uuid": "kb-1"},
+        ]
+
+        update_document_fields(document_uuid="doc-1")
+
+        # The waiting source is flipped to error with the document's message.
+        src_update = db.knowledge_base_sources.update_one.call_args[0]
+        assert src_update[0] == {"uuid": "src-1"}
+        assert src_update[1]["$set"]["status"] == "error"
+        assert "image-only" in src_update[1]["$set"]["error_message"]
+        mock_recalc.assert_called_once_with(db, "kb-1")
+        # No re-ingest dispatched on failure.
+        mock_celery.send_task.assert_not_called()
+
+
 # ---------------------------------------------------------------------------
 # _check_folder_watch_automations
 # ---------------------------------------------------------------------------

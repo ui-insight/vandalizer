@@ -195,6 +195,7 @@ class TestKbIngestDocument:
             source_id="src-uuid",
             source_name="test.pdf",
             raw_text="Some document text content.",
+            text_markers=[],
         )
 
         # Last update before _recalculate_kb should set status=ready

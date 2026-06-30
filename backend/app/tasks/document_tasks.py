@@ -423,6 +423,7 @@ def update_document_fields(self, document_uuid: str) -> None:
             {"uuid": document_uuid},
             {"$set": {"task_id": None}},
         )
+        _resume_pending_kb_sources(db, document_uuid, extraction_failed=True)
         return
 
     db.smart_document.update_one(
@@ -430,11 +431,61 @@ def update_document_fields(self, document_uuid: str) -> None:
         {"$set": {"task_id": None, "task_status": "complete"}},
     )
 
+    # Now that raw_text is populated, ingest any KB sources that were added
+    # before extraction finished and parked in "pending" (see
+    # knowledge_service._ingest_document_source).
+    _resume_pending_kb_sources(db, document_uuid, extraction_failed=False)
+
     # Check for folder watch automations targeting this document's folder
     try:
         _check_folder_watch_automations(db, document_uuid)
     except Exception as e:
         logger.error("Error checking folder watch automations for %s: %s", document_uuid, e)
+
+
+def _resume_pending_kb_sources(db, document_uuid: str, extraction_failed: bool) -> None:
+    """Settle KB document-sources that were waiting on this document's extraction.
+
+    A KB source added before its document finished extracting is parked in
+    "pending" by ``_ingest_document_source``. When extraction completes we
+    re-ingest those sources; when it fails we mark them errored so they don't
+    spin forever. No-op when nothing is waiting.
+    """
+    pending = list(
+        db.knowledge_base_sources.find(
+            {
+                "document_uuid": document_uuid,
+                "source_type": "document",
+                "status": "pending",
+            },
+            {"uuid": 1, "knowledge_base_uuid": 1},
+        )
+    )
+    if not pending:
+        return
+
+    if extraction_failed:
+        from app.tasks.knowledge_base_tasks import _recalculate_kb
+
+        doc = db.smart_document.find_one({"uuid": document_uuid}, {"error_message": 1})
+        message = (doc or {}).get("error_message") or "Document has no extractable text"
+        affected_kbs = set()
+        for src in pending:
+            db.knowledge_base_sources.update_one(
+                {"uuid": src["uuid"]},
+                {"$set": {"status": "error", "error_message": message}},
+            )
+            affected_kbs.add(src["knowledge_base_uuid"])
+        for kb_uuid in affected_kbs:
+            _recalculate_kb(db, kb_uuid)
+        return
+
+    for src in pending:
+        celery_app.send_task(
+            "tasks.documents.kb_ingest_document",
+            args=[src["uuid"]],
+            queue="documents",
+        )
 
 
 def _check_folder_watch_automations(db, document_uuid: str) -> None:

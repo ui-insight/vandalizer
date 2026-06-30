@@ -105,6 +105,7 @@ def kb_ingest_document(self, source_uuid: str) -> None:
             source_id=source_uuid,
             source_name=doc.get("title", ""),
             raw_text=raw_text,
+            text_markers=doc.get("text_markers") or [],
         )
 
         db.knowledge_base_sources.update_one(
