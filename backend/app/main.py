@@ -16,7 +16,7 @@ from app.exceptions import AppError
 from app.middleware.csrf import CSRFMiddleware
 from app.observability import init_sentry
 from app.rate_limit import limiter
-from app.routers import activity, admin, audit, auth, automations, browser_automation, certification, chat, config, credentials, demo, documents, extractions, feedback, feedback_prompt, files, folders, graph_webhooks, knowledge, library, mgmt, notifications, office, optimizer_inbox, organizations, projects, reviews, spaces, support, teams, verification, workflows
+from app.routers import activity, admin, audit, auth, automations, browser_automation, certification, chat, config, credentials, demo, documents, extractions, feedback, feedback_prompt, files, folders, graph_webhooks, knowledge, library, mgmt, notifications, office, optimizer_inbox, organizations, projects, reviews, spaces, support, teams, telemetry, verification, workflows
 
 
 @lru_cache
@@ -232,6 +232,11 @@ app.include_router(support.router, prefix="/api/support", tags=["support"])
 app.include_router(mgmt.router, prefix="/api/mgmt/v1", tags=["mgmt"])
 if _boot_settings.enable_trial_system:
     app.include_router(feedback_prompt.router, prefix="/api/feedback/prompts", tags=["feedback-prompts"])
+# Telemetry RECEIVER — only on the collector instance. Every other deployment of
+# this codebase leaves both the public ingest route and the admin analytics
+# route unregistered (404), so the feature is fully hidden off-collector.
+if _boot_settings.telemetry_collector_enabled:
+    app.include_router(telemetry.router, prefix="/api/telemetry", tags=["telemetry"])
 
 
 # ---------------------------------------------------------------------------

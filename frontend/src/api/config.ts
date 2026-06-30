@@ -116,6 +116,9 @@ export function getAutomationStats() {
 
 export interface FeatureFlags {
   m365_enabled: boolean
+  compliance_enabled?: boolean
+  // True only on the fleet collector instance — gates the admin Telemetry tab.
+  telemetry_collector_enabled?: boolean
 }
 
 export function getFeatureFlags() {

@@ -132,5 +132,14 @@ if not settings.enable_trial_system:
     for _key in ("demo-process-waitlist", "demo-check-expirations", "demo-send-expiry-warnings"):
         celery.conf.beat_schedule.pop(_key, None)
 
+# Anonymous deployment heartbeat — always scheduled; the task resolves the
+# effective opt-in decision (SystemConfig DB + env default) at run time and
+# no-ops when telemetry is disabled. Always-scheduling is what lets the in-app
+# opt-in banner enable telemetry without a worker restart.
+celery.conf.beat_schedule["telemetry-daily-heartbeat"] = {
+    "task": "tasks.telemetry.send_heartbeat",
+    "schedule": crontab(hour=7, minute=23),  # daily, off-peak, non-round minute
+}
+
 # Alias for import convenience
 celery_app = celery

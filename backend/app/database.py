@@ -47,6 +47,7 @@ from app.models.api_key import ApiKey
 from app.models.credential import Credential
 from app.models.llm_usage import LlmUsageRecord
 from app.models.project import Project, ProjectMembership, ProjectPin, ProjectJoinLink
+from app.models.telemetry import TelemetryHeartbeat
 
 ALL_MODELS = [
     User,
@@ -117,6 +118,7 @@ ALL_MODELS = [
     ProjectMembership,
     ProjectPin,
     ProjectJoinLink,
+    TelemetryHeartbeat,
 ]
 
 

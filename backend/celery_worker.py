@@ -33,6 +33,7 @@ from app.tasks import approval_tasks  # noqa: F401  — tasks.approvals.*
 from app.tasks import catalog_tasks  # noqa: F401  — tasks.catalog.upgrade
 from app.tasks import engagement_tasks  # noqa: F401  — tasks.engagement.*
 from app.tasks import retention_tasks  # noqa: F401  — tasks.retention.*
+from app.tasks import telemetry_tasks  # noqa: F401  — tasks.telemetry.send_heartbeat
 
 # Initialize Sentry in the worker process. Celery workers never import
 # app.main, so without this call task crashes are never reported. Task imports

@@ -73,6 +73,9 @@ import { CatalogTab } from '../components/admin/CatalogTab'
 import { ApiKeysTab } from '../components/admin/ApiKeysTab'
 import { ComplianceTab } from '../components/admin/ComplianceTab'
 import { KnowledgeBasesTab } from '../components/admin/KnowledgeBasesTab'
+import { TelemetryTab } from '../components/admin/TelemetryTab'
+import { TelemetryOptInBanner } from '../components/admin/TelemetryOptInBanner'
+import { getFeatureFlags } from '../api/config'
 
 function applyThemeToDOM(theme: ThemeConfig) {
   const root = document.documentElement
@@ -91,7 +94,7 @@ function readFileAsDataUrl(file: File): Promise<string> {
   })
 }
 
-type Tab = 'usage' | 'users' | 'teams' | 'organizations' | 'workflows' | 'quality' | 'knowledgebases' | 'compliance' | 'audit' | 'demo' | 'email' | 'certifications' | 'apikeys' | 'catalog' | 'config'
+type Tab = 'usage' | 'users' | 'teams' | 'organizations' | 'workflows' | 'quality' | 'knowledgebases' | 'compliance' | 'audit' | 'demo' | 'email' | 'certifications' | 'apikeys' | 'catalog' | 'telemetry' | 'config'
 
 const TABS: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'usage', label: 'Usage', icon: BarChart3 },
@@ -108,6 +111,7 @@ const TABS: { key: Tab; label: string; icon: typeof BarChart3 }[] = [
   { key: 'certifications', label: 'Certifications', icon: Award },
   { key: 'apikeys', label: 'API Keys', icon: KeyRound },
   { key: 'catalog', label: 'Catalog', icon: PackageOpen },
+  { key: 'telemetry', label: 'Telemetry', icon: Globe },
   { key: 'config', label: 'Config', icon: Settings },
 ]
 
@@ -7126,9 +7130,12 @@ export default function Admin() {
   const { currentTeam } = useTeams()
   const [activeTab, setActiveTab] = useState<Tab>('usage')
   const [trialEnabled, setTrialEnabled] = useState(false)
+  // Only true on the fleet collector instance; hides the Telemetry tab elsewhere.
+  const [telemetryCollector, setTelemetryCollector] = useState(false)
 
   useEffect(() => {
     getAuthConfig().then(c => setTrialEnabled(!!c.trial_system_enabled)).catch(() => {})
+    getFeatureFlags().then(f => setTelemetryCollector(!!f.telemetry_collector_enabled)).catch(() => {})
   }, [])
 
   // Honor ?tab=<key> deep links (e.g. the catalog-update notification).
@@ -7151,7 +7158,7 @@ export default function Admin() {
   // endpoints accept a team scope. Tabs whose backends require admin/staff (email,
   // plus everything in hiddenForNonAdmin) stay hidden so we never render a tab that
   // can only 403.
-  const hiddenForNonAdmin = ['config', 'catalog', 'quality', 'knowledgebases', 'compliance', 'demo', 'organizations', 'approvals', 'audit', 'certifications', 'apikeys', 'email', 'teams']
+  const hiddenForNonAdmin = ['config', 'catalog', 'quality', 'knowledgebases', 'compliance', 'demo', 'organizations', 'approvals', 'audit', 'certifications', 'apikeys', 'email', 'teams', 'telemetry']
   let visibleTabs = isGlobalAdmin
     ? TABS
     : isStaff
@@ -7160,6 +7167,10 @@ export default function Admin() {
 
   if (!trialEnabled) {
     visibleTabs = visibleTabs.filter(t => t.key !== 'demo')
+  }
+  // The Telemetry tab exists only on the collector instance.
+  if (!telemetryCollector) {
+    visibleTabs = visibleTabs.filter(t => t.key !== 'telemetry')
   }
 
   if (!hasAccess) {
@@ -7225,6 +7236,7 @@ export default function Admin() {
         <div style={{ flex: 1, padding: '20px 32px', minWidth: 0 }}>
           <UpdateBanner />
           {isGlobalAdmin && <CatalogUpdateBanner onView={() => setActiveTab('catalog')} />}
+          {isGlobalAdmin && <TelemetryOptInBanner />}
           {activeTab === 'usage' && <UsageTab />}
           {activeTab === 'users' && <UsersTab />}
           {activeTab === 'teams' && <TeamsTab />}
@@ -7239,6 +7251,7 @@ export default function Admin() {
           {activeTab === 'certifications' && (isGlobalAdmin || isStaff) && <CertificationsTab />}
           {activeTab === 'apikeys' && (isGlobalAdmin || isStaff) && <ApiKeysTab />}
           {activeTab === 'catalog' && isGlobalAdmin && <CatalogTab />}
+          {activeTab === 'telemetry' && isGlobalAdmin && telemetryCollector && <TelemetryTab />}
           {activeTab === 'config' && isGlobalAdmin && <ConfigTab />}
         </div>
       </div>

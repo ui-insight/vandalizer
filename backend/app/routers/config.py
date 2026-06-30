@@ -233,12 +233,18 @@ async def update_theme(req: UpdateThemeConfigRequest, user: User = Depends(get_c
 
 
 @router.get("/features")
-async def get_features(user: User = Depends(get_current_user)):
+async def get_features(
+    user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+):
     """Return feature flags for the current deployment."""
     config = await SystemConfig.get_config()
     return {
         "m365_enabled": False,
         "compliance_enabled": config.is_compliance_enabled(),
+        # True only on the fleet collector instance — gates the admin telemetry
+        # dashboard so it stays hidden on every other deployment.
+        "telemetry_collector_enabled": settings.telemetry_collector_enabled,
     }
 
 
