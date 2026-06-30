@@ -74,6 +74,7 @@ import { ApiKeysTab } from '../components/admin/ApiKeysTab'
 import { ComplianceTab } from '../components/admin/ComplianceTab'
 import { KnowledgeBasesTab } from '../components/admin/KnowledgeBasesTab'
 import { TelemetryTab } from '../components/admin/TelemetryTab'
+import { TelemetryOptInBanner } from '../components/admin/TelemetryOptInBanner'
 import { getFeatureFlags } from '../api/config'
 
 function applyThemeToDOM(theme: ThemeConfig) {
@@ -7235,6 +7236,7 @@ export default function Admin() {
         <div style={{ flex: 1, padding: '20px 32px', minWidth: 0 }}>
           <UpdateBanner />
           {isGlobalAdmin && <CatalogUpdateBanner onView={() => setActiveTab('catalog')} />}
+          {isGlobalAdmin && <TelemetryOptInBanner />}
           {activeTab === 'usage' && <UsageTab />}
           {activeTab === 'users' && <UsersTab />}
           {activeTab === 'teams' && <TeamsTab />}

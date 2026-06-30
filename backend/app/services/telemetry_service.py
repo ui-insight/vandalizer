@@ -94,12 +94,48 @@ def _coarse_environment(settings: Settings) -> str:
     return "production" if settings.is_production else "other"
 
 
-def build_heartbeat_payload(db: Database[dict], settings: Settings) -> dict[str, Any]:
+def resolve_runtime_config(db: Database[dict], settings: Settings) -> dict[str, Any]:
+    """Resolve the effective telemetry decision from the DB + env defaults.
+
+    Precedence: once an admin makes an explicit in-app decision
+    (SystemConfig.telemetry_config.decided), that DB value is authoritative for
+    enablement and identity. Until then, the env defaults (set by setup.sh)
+    govern. Read with sync pymongo so the Celery heartbeat task stays sync.
+    """
+    doc = db["system_config"].find_one() or {}
+    tele = doc.get("telemetry_config") or {}
+    decided = bool(tele.get("decided"))
+
+    enabled = bool(tele.get("enabled")) if decided else settings.telemetry_enabled
+    organization = (tele.get("organization") if decided else "") or settings.telemetry_organization
+    contact_email = (tele.get("contact_email") if decided else "") or settings.telemetry_contact_email
+
+    return {
+        "enabled": enabled,
+        "organization": (organization or "").strip(),
+        "contact_email": (contact_email or "").strip(),
+        "endpoint": settings.telemetry_endpoint,
+    }
+
+
+def build_heartbeat_payload(
+    db: Database[dict],
+    settings: Settings,
+    *,
+    organization: str | None = None,
+    contact_email: str | None = None,
+) -> dict[str, Any]:
     """Assemble the exact, fixed-shape JSON that the heartbeat will POST.
 
     Pure assembly — no network. Kept separate so it can be unit-tested and so
-    the local audit log and the wire payload are guaranteed identical.
+    the local audit log and the wire payload are guaranteed identical. The
+    identity args override the env defaults when provided (the caller resolves
+    them via resolve_runtime_config); None falls back to settings.
     """
+    if organization is None:
+        organization = settings.telemetry_organization
+    if contact_email is None:
+        contact_email = settings.telemetry_contact_email
     now = datetime.now(timezone.utc)
     active_since = now - timedelta(days=ACTIVE_WINDOW_DAYS)
 
@@ -124,14 +160,14 @@ def build_heartbeat_payload(db: Database[dict], settings: Settings) -> dict[str,
         },
     }
 
-    # Voluntary identity tier — added ONLY when the admin self-declared an
-    # organization. When blank, the key is omitted entirely so the payload is
-    # honestly anonymous (not an empty-string "identity"). contact_email rides
-    # along only if an org was also given.
-    organization = settings.telemetry_organization.strip()
+    # Voluntary identity tier — added ONLY when an organization is set. When
+    # blank, the key is omitted entirely so the payload is honestly anonymous
+    # (not an empty-string "identity"). contact_email rides along only if an org
+    # was also given.
+    organization = organization.strip()
     if organization:
         identity: dict[str, str] = {"organization": organization}
-        contact_email = settings.telemetry_contact_email.strip()
+        contact_email = contact_email.strip()
         if contact_email:
             identity["contact_email"] = contact_email
         payload["identity"] = identity
@@ -146,19 +182,25 @@ def send_heartbeat(db: Database[dict], settings: Settings) -> dict[str, Any]:
     return value / logs). Never raises on a delivery failure — telemetry is
     best-effort and must never disrupt the deployment it reports on.
     """
-    if not settings.telemetry_enabled:
+    resolved = resolve_runtime_config(db, settings)
+    if not resolved["enabled"]:
         return {"status": "disabled"}
 
-    if not settings.telemetry_endpoint:
-        # Opt-in flag flipped but no destination configured: do nothing rather
-        # than guess a domain. This is the safety interlock from config.py.
+    if not resolved["endpoint"]:
+        # Enabled but no destination (endpoint blanked to hard-disable sending):
+        # do nothing rather than guess a domain.
         logger.warning(
-            "telemetry_enabled is set but telemetry_endpoint is empty — "
-            "no heartbeat sent. Set telemetry_endpoint to opt in fully."
+            "telemetry is enabled but telemetry_endpoint is empty — no heartbeat "
+            "sent. Set telemetry_endpoint to opt in fully."
         )
         return {"status": "no_endpoint"}
 
-    payload = build_heartbeat_payload(db, settings)
+    payload = build_heartbeat_payload(
+        db,
+        settings,
+        organization=resolved["organization"],
+        contact_email=resolved["contact_email"],
+    )
 
     if settings.telemetry_log_payload:
         # The audit guarantee: an admin can grep the worker log and see the
@@ -167,7 +209,7 @@ def send_heartbeat(db: Database[dict], settings: Settings) -> dict[str, Any]:
 
     try:
         with httpx.Client(timeout=_POST_TIMEOUT_SECONDS) as client:
-            resp = client.post(settings.telemetry_endpoint, json=payload)
+            resp = client.post(resolved["endpoint"], json=payload)
             resp.raise_for_status()
     except httpx.HTTPError as exc:
         logger.info("Telemetry heartbeat delivery failed: %s", exc)

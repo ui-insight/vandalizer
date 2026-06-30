@@ -6,8 +6,15 @@ the full disclosure: exactly what is sent, what is never sent, and how to turn i
 on, off, or point it at your own collector.
 
 **It is off by default.** A fresh install sends nothing. Telemetry only happens
-after an administrator explicitly enables it (the `./setup.sh` installer asks,
-defaulting to *no*).
+after an administrator explicitly enables it. There are three ways they're asked:
+
+- `./setup.sh` asks on **first install** (defaulting to *no*).
+- `./setup.sh` asks again on **redeploy/upgrade** if the deployment was never
+  asked — so existing installs predating telemetry get the choice. It asks at
+  most once, and never blocks non-interactive auto-update/cron runs.
+- An **in-app banner** in the Admin panel offers a one-click opt-in to any global
+  admin whose deployment hasn't already decided (and wasn't already asked by the
+  installer).
 
 ## What is sent
 
@@ -71,22 +78,34 @@ The installer offers this as a separate, explicit choice (also defaulting to
 
 ## Enabling, disabling, and self-hosting
 
-All configuration is via environment variables (`backend/.env`):
+Telemetry can be controlled two ways, and a clear precedence keeps them from
+fighting:
+
+- **In-app (recommended):** the Admin opt-in banner. A global admin's choice is
+  stored in the database and takes effect on the next daily heartbeat — no
+  restart, no file editing. **Once an in-app choice is made, it is authoritative**
+  and overrides the env default below (so you can also use it to turn telemetry
+  back *off*).
+- **Environment variables (`backend/.env`):** the initial default, used until an
+  in-app decision exists. Best for `setup.sh`-driven and scripted deployments.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `TELEMETRY_ENABLED` | `false` | Master opt-in switch for the heartbeat. |
-| `TELEMETRY_ENDPOINT` | _(empty)_ | Where heartbeats are sent. Inert unless set. |
+| `TELEMETRY_ENABLED` | `false` | Initial opt-in state (until an in-app decision is made). |
+| `TELEMETRY_ENDPOINT` | _maintainers' collector_ | Where heartbeats are sent. Blank it to hard-disable sending. |
 | `TELEMETRY_LOG_PAYLOAD` | `true` | Log each payload locally before sending. |
+| `TELEMETRY_PROMPTED` | `false` | Set by `setup.sh` once it has asked, so the in-app banner won't re-ask. |
 | `TELEMETRY_ORGANIZATION` | _(empty)_ | Optional self-declared identity. |
 | `TELEMETRY_CONTACT_EMAIL` | _(empty)_ | Optional contact, sent only with an org. |
 
-The heartbeat is **inert unless both `TELEMETRY_ENABLED=true` and
-`TELEMETRY_ENDPOINT` are set**, so flipping the switch alone never sends data to
-a guessed destination.
+The single master gate is **enablement** (off by default) — nothing is sent
+until an admin opts in. `TELEMETRY_ENDPOINT` defaults to the maintainers'
+collector so an admin who enables via the in-app banner (e.g. on an older
+install whose `.env` predates telemetry) has somewhere to send to.
 
-- **To disable:** set `TELEMETRY_ENABLED=false` (or leave it). Takes effect on
-  the next worker restart.
+- **To disable:** click *No thanks* in the banner, or — on an env-driven
+  deployment that never used the banner — set `TELEMETRY_ENABLED=false` and
+  restart. To stop *all* sending regardless of state, blank `TELEMETRY_ENDPOINT`.
 - **To send to your own collector instead:** point `TELEMETRY_ENDPOINT` at any
   URL that accepts the JSON above — including your own Vandalizer instance acting
   as a collector (see below).

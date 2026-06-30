@@ -86,14 +86,25 @@ class Settings(BaseSettings):
     # emails, API keys, team names, or any free text.
     #
     # Trust guarantees baked into the implementation:
-    #   - Inert unless BOTH telemetry_enabled=True AND telemetry_endpoint is set,
-    #     so flipping the flag alone never leaks to a guessed domain.
+    #   - The single master gate is enablement (off by default); nothing is sent
+    #     until an admin opts in (via setup.sh or the in-app banner).
     #   - Every payload is logged locally (telemetry_log_payload) so an admin can
     #     read exactly what was sent.
     #   - Self-hosters can point telemetry_endpoint at their OWN collector.
+    #
+    # telemetry_enabled here is only the INITIAL/default state. The durable
+    # runtime decision lives in SystemConfig.telemetry_config (DB) once an admin
+    # decides via the in-app banner — so it can be toggled without an env edit or
+    # restart. See telemetry_service.resolve_runtime_config for the precedence.
     telemetry_enabled: bool = False
-    telemetry_endpoint: str = ""
+    # Defaulted so an admin who enables via the in-app banner on an existing
+    # install (whose .env predates telemetry) still has somewhere to send to.
+    # Override to self-host the collector, or blank it to hard-disable sending.
+    telemetry_endpoint: str = "https://vandalizer.nkn.uidaho.edu/api/telemetry/heartbeat"
     telemetry_log_payload: bool = True
+    # Set true by setup.sh once it has asked about telemetry (yes OR no), so the
+    # in-app banner never re-asks someone the installer already prompted.
+    telemetry_prompted: bool = False
 
     # Optional SECOND tier on top of the anonymous heartbeat: voluntary identity.
     # If an admin chooses to fill these in (typically at deploy time via
