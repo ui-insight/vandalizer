@@ -4,7 +4,7 @@ import DemoResend from './DemoResend'
 import type { ResendResult } from '../api/demo'
 
 const mockResend = vi.fn()
-const mockNavigate = vi.fn(() => null)
+const mockNavigate = vi.fn((_props?: { to?: string; search?: unknown }) => null)
 
 vi.mock('@tanstack/react-router', () => ({
   useParams: () => ({ uuid: 'app123' }),

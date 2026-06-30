@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.11, <3.13"
 resolution-markers = [
     "python_full_version >= '3.12' and sys_platform == 'win32'",
@@ -3628,7 +3628,7 @@ requires-dist = [
     { name = "pip-audit", marker = "extra == 'dev'", specifier = ">=2.9,<3" },
     { name = "playwright", specifier = ">=1.49,<2" },
     { name = "prometheus-fastapi-instrumentator", specifier = ">=7.0,<9" },
-    { name = "pydantic-ai-slim", extras = ["openai", "anthropic"], specifier = ">=1.56,<2" },
+    { name = "pydantic-ai-slim", extras = ["openai", "anthropic"], specifier = ">=1.56,<3" },
     { name = "pydantic-settings", specifier = ">=2.7,<3" },
     { name = "pyjwt", extras = ["crypto"], specifier = ">=2.12,<3" },
     { name = "pymongo", specifier = ">=4.0,<5" },
@@ -3643,7 +3643,7 @@ requires-dist = [
     { name = "python-multipart", specifier = ">=0.0.18,<1" },
     { name = "python3-saml", specifier = ">=1.16,<2" },
     { name = "redis", specifier = ">=5.0,<9" },
-    { name = "reportlab", specifier = ">=4.0,<5" },
+    { name = "reportlab", specifier = ">=4.0,<6" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.11,<1" },
     { name = "sentry-sdk", extras = ["fastapi", "celery"], specifier = ">=2.0,<3" },
     { name = "slowapi", specifier = ">=0.1,<1" },
