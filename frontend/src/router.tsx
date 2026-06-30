@@ -24,6 +24,7 @@ const Docs = lazy(() => import('./pages/Docs'))
 const Demo = lazy(() => import('./pages/Demo'))
 const DemoFeedback = lazy(() => import('./pages/DemoFeedback'))
 const DemoTrialEnd = lazy(() => import('./pages/DemoTrialEnd'))
+const DemoResend = lazy(() => import('./pages/DemoResend'))
 const InviteAccept = lazy(() => import('./pages/InviteAccept'))
 const JoinLinkAccept = lazy(() => import('./pages/JoinLinkAccept'))
 const JoinProjectAccept = lazy(() => import('./pages/JoinProjectAccept'))
@@ -402,6 +403,12 @@ const demoStatusRoute = createRoute({
   component: Demo,
 })
 
+const demoResendRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/demo/resend/$uuid',
+  component: DemoResend,
+})
+
 const routeTree = rootRoute.addChildren([
   landingRoute,
   loginRoute,
@@ -431,6 +438,7 @@ const routeTree = rootRoute.addChildren([
   demoFeedbackRoute,
   demoTrialEndRoute,
   demoStatusRoute,
+  demoResendRoute,
   organizationsRoute,
   credentialsRoute,
   auditLogRoute,

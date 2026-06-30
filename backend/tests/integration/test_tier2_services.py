@@ -565,3 +565,89 @@ class TestTrialExtensionWithRealDB:
         from app.services.demo_service import get_trial_end_info
 
         assert await get_trial_end_info("does_not_exist") is None
+
+
+# ---------------------------------------------------------------------------
+# demo_service.resend_credentials — status-aware recovery (no password rotation)
+# ---------------------------------------------------------------------------
+
+class TestResendCredentialsWithRealDB:
+    async def _make_active_trial(self, suffix: str):
+        from app.models.demo import DemoApplication
+        from app.models.user import User
+
+        uid = f"resend_{suffix}@example.com"
+        future = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=10)
+        user = User(
+            user_id=uid, email=uid, name=f"Resend {suffix}",
+            is_demo_user=True, demo_status="active", demo_expires_at=future,
+            password_hash="original-hash",
+        )
+        await user.insert()
+        app = DemoApplication(
+            uuid=f"resend_app_{suffix}", name=f"Resend {suffix}", email=uid,
+            organization="Test Org", status="active", user_id=uid, expires_at=future,
+        )
+        await app.insert()
+        return app, user
+
+    async def test_active_sends_link_without_rotating_password(self, mongo_client):
+        from app.config import Settings
+        from app.models.user import User
+        from app.services import demo_service
+
+        app, _user = await self._make_active_trial("active")
+        with patch.object(demo_service, "send_email", new_callable=AsyncMock, return_value=True), \
+                patch.object(demo_service, "_create_magic_login_token", new_callable=AsyncMock, return_value="https://x/link"):
+            result = await demo_service.resend_credentials(app.uuid, Settings())
+
+        assert result["status"] == "sent"
+        # The whole point: the password is NOT rotated on resend.
+        refreshed = await User.find_one(User.user_id == app.user_id)
+        assert refreshed.password_hash == "original-hash"
+
+    async def test_active_send_failure_reported(self, mongo_client):
+        from app.config import Settings
+        from app.services import demo_service
+
+        app, _user = await self._make_active_trial("failsend")
+        with patch.object(demo_service, "send_email", new_callable=AsyncMock, return_value=False), \
+                patch.object(demo_service, "_create_magic_login_token", new_callable=AsyncMock, return_value="https://x/link"):
+            result = await demo_service.resend_credentials(app.uuid, Settings())
+
+        assert result["status"] == "send_failed"
+
+    async def test_pending_application_is_not_found_404_but_waitlist(self, mongo_client):
+        from app.config import Settings
+        from app.models.demo import DemoApplication
+        from app.services import demo_service
+
+        app = DemoApplication(
+            uuid="resend_pending", name="Pending", email="pending@example.com",
+            organization="Test Org", status="pending",
+        )
+        await app.insert()
+        result = await demo_service.resend_credentials(app.uuid, Settings())
+        assert result["status"] == "pending"
+
+    async def test_expired_returns_renewal_token(self, mongo_client):
+        from app.config import Settings
+        from app.models.demo import DemoApplication
+        from app.services import demo_service
+
+        app = DemoApplication(
+            uuid="resend_expired", name="Expired", email="expired@example.com",
+            organization="Test Org", status="expired", user_id="expired@example.com",
+            post_questionnaire_token="renew_tok_123",
+        )
+        await app.insert()
+        result = await demo_service.resend_credentials(app.uuid, Settings())
+        assert result["status"] == "expired"
+        assert result["feedback_token"] == "renew_tok_123"
+
+    async def test_unknown_uuid_not_found(self, mongo_client):
+        from app.config import Settings
+        from app.services import demo_service
+
+        result = await demo_service.resend_credentials("nope", Settings())
+        assert result["status"] == "not_found"

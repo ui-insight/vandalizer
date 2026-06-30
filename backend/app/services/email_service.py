@@ -217,29 +217,33 @@ _CODE_STYLE = (
 def activation_email(
     name: str,
     user_id: str,
-    password: str,
     expires_at: str,
     frontend_url: str,
     magic_link: str | None = None,
 ) -> tuple[str, str]:
-    """Returns (subject, html_body) for demo account activation."""
+    """Returns (subject, html_body) for demo account activation.
+
+    Passwordless by design: the email leads with a one-click sign-in link rather
+    than an emailed password, so there's no credential to mistype, rotate, or
+    leak. Users who prefer a password can set one anytime via "Forgot password".
+    """
     subject = "Your Vandalizer Demo Account is Ready!"
+    # Primary CTA: the one-click link. Fall back to /login only if (unexpectedly)
+    # no link was minted.
     if magic_link:
-        magic_section = f"""
+        sign_in_section = f"""
       <p style="margin-top:24px"><a class="btn" href="{magic_link}">Click here to sign in</a></p>
-      <p style="font-size:13px;color:#6b7280">This one-click link expires in 48 hours. If it doesn't work, use the credentials below.</p>
-      <p style="margin-top:24px">Or sign in manually:</p>"""
+      <p style="font-size:13px;color:#6b7280">One click — no password needed. This sign-in link works for the next 14 days. Need a fresh one later? Just request another from the trial email.</p>"""
     else:
-        magic_section = ""
+        sign_in_section = f"""
+      <p style="margin-top:24px"><a class="btn" href="{frontend_url}/login">Sign in</a></p>"""
     html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
     <div class="container"><div class="card">
       <div class="logo">Vandalizer</div>
       <h1>Your demo account is active!</h1>
-      <p>Hi {name}, great news: your Vandalizer demo account is ready to go. You have <span class="highlight">2 weeks</span> of full platform access.</p>{magic_section}
-      <p><strong style="color:#fff">Username:</strong> <code style="{_CODE_STYLE}">{user_id}</code><br/><br/>
-         <strong style="color:#fff">Password:</strong> <code style="{_CODE_STYLE}">{password}</code></p>
+      <p>Hi {name}, great news: your Vandalizer demo account is ready to go. You have <span class="highlight">2 weeks</span> of full platform access.</p>{sign_in_section}
+      <p style="font-size:13px;color:#6b7280;margin-top:16px">Your account email is <code style="{_CODE_STYLE}">{user_id}</code>. Prefer to log in with a password? Set one anytime via <a href="{frontend_url}/login" style="color:#f1b300">Forgot password</a>.</p>
       <p>Your trial expires on <span class="highlight">{expires_at}</span>.</p>
-      <p style="margin-top:24px"><a class="btn" href="{frontend_url}/login">Sign In with Credentials</a></p>
       <div class="footer">Vandalizer</div>
     </div></div></body></html>"""
     return subject, html

@@ -235,6 +235,34 @@ async def forgot_password(
         logger.info("Password reset: no matching user for %s", email)
         return {"ok": True}
 
+    # A locked trial can't be recovered with a password — login rejects locked
+    # accounts regardless of the password. Sending a reset link is a dead end, so
+    # steer them to the renewal screen instead.
+    if user.is_demo_user and user.demo_status == "locked":
+        from app.models.demo import DemoApplication
+        from app.services.email_service import send_email, trial_expired_email
+
+        demo_app = await DemoApplication.find_one(
+            DemoApplication.user_id == user.user_id
+        )
+        if demo_app:
+            if not demo_app.post_questionnaire_token:
+                demo_app.post_questionnaire_token = secrets.token_urlsafe(16)
+                await demo_app.save()
+            trial_end_url = (
+                f"{settings.frontend_url}/demo/trial-end"
+                f"?token={demo_app.post_questionnaire_token}"
+            )
+            subject, html = trial_expired_email(
+                user.name or user.user_id, trial_end_url
+            )
+            await send_email(
+                user.email or email, subject, html, settings,
+                email_type="trial_expired",
+            )
+        logger.info("Password reset: routed locked trial %s to renewal", user.user_id)
+        return {"ok": True}
+
     # Generate token, store in Redis with 1-hour TTL
     token = secrets.token_urlsafe(32)
     r = aioredis.from_url(f"redis://{settings.redis_host}:6379")

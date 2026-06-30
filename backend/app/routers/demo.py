@@ -12,6 +12,7 @@ from app.schemas.demo import (
     WaitlistStatusResponse,
     PostExperienceRequest,
     PostExperienceResponseSchema,
+    ResendCredentialsResponse,
     DemoAdminStatsResponse,
     TrialEndInfoResponse,
     TrialExtensionRequest,
@@ -86,16 +87,29 @@ async def get_feedback(token: str):
     }
 
 
-@router.post("/resend-credentials/{uuid}")
+@router.post("/resend-credentials/{uuid}", response_model=ResendCredentialsResponse)
 async def resend_credentials(uuid: str, settings: Settings = Depends(get_settings)):
-    """Resend login credentials to the email on file for an active demo user."""
-    success = await demo_service.resend_credentials(uuid, settings)
-    if not success:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Application not found or not in active status",
-        )
-    return {"ok": True, "message": "New credentials sent to your email on file."}
+    """Resend a fresh sign-in link, or steer the user to the right next step.
+
+    Always 200: the status field tells the frontend whether the link was sent,
+    the user is still on the waitlist, or the trial has ended (route to renewal).
+    """
+    result = await demo_service.resend_credentials(uuid, settings)
+    status_value = result.get("status")
+    messages = {
+        "sent": "We just emailed you a fresh one-click sign-in link.",
+        "send_failed": "We couldn't send the email just now — please try again in a moment.",
+        "pending": "You're still on the waitlist — we'll email you the moment a spot opens up.",
+        "expired": "Your trial has wrapped up. Let's pick up where you left off.",
+        "not_found": "We couldn't find a trial for that link.",
+    }
+    return ResendCredentialsResponse(
+        ok=status_value == "sent",
+        status=status_value or "not_found",
+        message=messages.get(status_value, messages["not_found"]),
+        email=result.get("email"),
+        feedback_token=result.get("feedback_token"),
+    )
 
 
 @router.post("/feedback/{token}", response_model=PostExperienceResponseSchema)
