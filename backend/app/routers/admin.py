@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.config import Settings
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, get_settings
 from app.models.activity import ActivityEvent
 from app.models.audit_log import AdminAuditLog
 from app.models.system_config import SystemConfig
@@ -1429,6 +1429,72 @@ async def update_config(
     await _audit(user, "update_config", "Updated system configuration")
 
     return {"status": "ok"}
+
+
+# ---------------------------------------------------------------------------
+# Anonymous telemetry opt-in (installation-wide; global admin only)
+# ---------------------------------------------------------------------------
+
+
+class TelemetryOptInRequest(BaseModel):
+    enabled: bool
+    organization: Optional[str] = None
+    contact_email: Optional[str] = None
+
+
+def _telemetry_status(cfg: SystemConfig, settings: Settings) -> dict:
+    """Resolve the effective opt-in state for the admin UI.
+
+    Mirrors telemetry_service.resolve_runtime_config: a DB decision is
+    authoritative once made, else the env default governs. The banner shows only
+    when telemetry is off, no in-app decision exists, AND the installer never
+    already asked (settings.telemetry_prompted)."""
+    tele = cfg.get_telemetry_config()
+    decided = bool(tele.get("decided"))
+    effective = bool(tele.get("enabled")) if decided else settings.telemetry_enabled
+    return {
+        "effective_enabled": effective,
+        "decided": decided,
+        "organization": tele.get("organization", ""),
+        "show_banner": (not effective) and (not decided) and (not settings.telemetry_prompted),
+    }
+
+
+@router.get("/telemetry/optin")
+async def get_telemetry_optin(
+    user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+):
+    await _require_superadmin(user)
+    cfg = await SystemConfig.get_config()
+    return _telemetry_status(cfg, settings)
+
+
+@router.post("/telemetry/optin")
+async def set_telemetry_optin(
+    body: TelemetryOptInRequest,
+    user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+):
+    await _require_superadmin(user)
+    cfg = await SystemConfig.get_config()
+    tele = cfg.get_telemetry_config()
+    tele["decided"] = True
+    tele["enabled"] = bool(body.enabled)
+    if body.organization is not None:
+        tele["organization"] = body.organization.strip()
+    if body.contact_email is not None:
+        tele["contact_email"] = body.contact_email.strip()
+    cfg.telemetry_config = tele
+    cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
+    cfg.updated_by = user.user_id
+    await cfg.save()
+    await _audit(
+        user,
+        "update_telemetry_optin",
+        f"Anonymous telemetry {'enabled' if body.enabled else 'disabled'}",
+    )
+    return _telemetry_status(cfg, settings)
 
 
 # ---------------------------------------------------------------------------

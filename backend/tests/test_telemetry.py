@@ -41,7 +41,7 @@ class _FakeColl:
     def count_documents(self, _q):
         return self._count
 
-    def find_one(self, _q):
+    def find_one(self, _q=None):
         return self._state
 
     def update_one(self, *_a, **_k):
@@ -136,6 +136,52 @@ def test_payload_email_without_org_stays_anonymous():
     db = _FakeDB(_counts(user=1))
     s = Settings(telemetry_enabled=True, telemetry_contact_email="ra@uidaho.edu")
     assert "identity" not in tx.build_heartbeat_payload(db, s)
+
+
+# ---------------------------------------------------------------------------
+# Runtime resolution — DB decision vs. env default precedence
+# ---------------------------------------------------------------------------
+
+
+class _ResolveDB:
+    """Serves a configurable system_config doc; anything else is a stub."""
+
+    def __init__(self, sysdoc):
+        self._sysdoc = sysdoc
+
+    def __getitem__(self, name):
+        if name == "system_config":
+            return _FakeColl(0, self._sysdoc)
+        return _FakeColl(0, {"instance_id": "x"})
+
+
+def test_resolve_env_default_when_no_db_decision():
+    db = _ResolveDB({})  # no telemetry_config in the doc
+    r = tx.resolve_runtime_config(
+        db, Settings(telemetry_enabled=True, telemetry_organization="EnvOrg")
+    )
+    assert r["enabled"] is True
+    assert r["organization"] == "EnvOrg"
+
+
+def test_resolve_db_enable_overrides_env_off():
+    db = _ResolveDB({"telemetry_config": {"decided": True, "enabled": True, "organization": "DBOrg"}})
+    r = tx.resolve_runtime_config(db, Settings(telemetry_enabled=False))
+    assert r["enabled"] is True
+    assert r["organization"] == "DBOrg"
+
+
+def test_resolve_db_disable_overrides_env_on():
+    db = _ResolveDB({"telemetry_config": {"decided": True, "enabled": False}})
+    r = tx.resolve_runtime_config(db, Settings(telemetry_enabled=True))
+    assert r["enabled"] is False
+
+
+def test_resolve_undecided_db_ignores_db_identity():
+    # decided=False means the env governs even if stale identity sits in the doc.
+    db = _ResolveDB({"telemetry_config": {"decided": False, "organization": "StaleOrg"}})
+    r = tx.resolve_runtime_config(db, Settings(telemetry_enabled=True, telemetry_organization="EnvOrg"))
+    assert r["organization"] == "EnvOrg"
 
 
 # ---------------------------------------------------------------------------
@@ -303,3 +349,50 @@ async def test_analytics_aggregates_active_named_and_anonymous():
     assert [d["organization"] for d in out["named_deployments"]] == ["U of Idaho", "Stale U"]
     assert out["named_deployments"][0]["active"] is True
     assert out["named_deployments"][1]["active"] is False
+
+
+# ---------------------------------------------------------------------------
+# Admin opt-in banner status (show_banner / effective_enabled precedence)
+# ---------------------------------------------------------------------------
+
+
+def _cfg(tele):
+    """Stand-in for a SystemConfig exposing get_telemetry_config()."""
+    return SimpleNamespace(get_telemetry_config=lambda: tele)
+
+
+def test_banner_shows_for_fresh_unprompted_install():
+    from app.routers.admin import _telemetry_status
+
+    s = _telemetry_status(_cfg({"decided": False, "enabled": False, "organization": ""}), Settings())
+    assert s["show_banner"] is True
+    assert s["effective_enabled"] is False
+
+
+def test_banner_hidden_when_installer_already_prompted():
+    from app.routers.admin import _telemetry_status
+
+    s = _telemetry_status(
+        _cfg({"decided": False, "enabled": False, "organization": ""}),
+        Settings(telemetry_prompted=True),
+    )
+    assert s["show_banner"] is False
+
+
+def test_banner_hidden_when_env_already_enabled():
+    from app.routers.admin import _telemetry_status
+
+    s = _telemetry_status(_cfg({"decided": False}), Settings(telemetry_enabled=True))
+    assert s["show_banner"] is False
+    assert s["effective_enabled"] is True
+
+
+def test_db_decision_disables_overrides_env_and_hides_banner():
+    from app.routers.admin import _telemetry_status
+
+    s = _telemetry_status(
+        _cfg({"decided": True, "enabled": False, "organization": ""}),
+        Settings(telemetry_enabled=True),
+    )
+    assert s["effective_enabled"] is False
+    assert s["show_banner"] is False

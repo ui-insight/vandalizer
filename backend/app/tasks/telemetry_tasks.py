@@ -26,12 +26,12 @@ logger = logging.getLogger(__name__)
     default_retry_delay=300,
 )
 def send_heartbeat(self) -> dict:
-    """Send one anonymous deployment heartbeat (opt-in; no-op when disabled)."""
+    """Send one anonymous deployment heartbeat (opt-in; no-op when disabled).
+
+    The task is always scheduled; send_heartbeat resolves the effective decision
+    from SystemConfig (DB) + env each run, so toggling the in-app opt-in takes
+    effect on the next daily run without a worker restart.
+    """
     from app.services.telemetry_service import send_heartbeat as _send
 
-    settings = Settings()
-    if not settings.telemetry_enabled:
-        return {"status": "disabled"}
-
-    db = get_sync_db()
-    return _send(db, settings)
+    return _send(get_sync_db(), Settings())

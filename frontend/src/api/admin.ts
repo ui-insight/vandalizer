@@ -1,5 +1,25 @@
 import { apiFetch } from './client'
 
+// Telemetry opt-in (installation-wide; global admin)
+
+export interface TelemetryOptInStatus {
+  effective_enabled: boolean
+  decided: boolean
+  organization: string
+  show_banner: boolean
+}
+
+export function getTelemetryOptIn() {
+  return apiFetch<TelemetryOptInStatus>('/api/admin/telemetry/optin')
+}
+
+export function setTelemetryOptIn(body: { enabled: boolean; organization?: string; contact_email?: string }) {
+  return apiFetch<TelemetryOptInStatus>('/api/admin/telemetry/optin', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+}
+
 // Fleet telemetry analytics (collector instance only)
 
 export interface NamedDeployment {
