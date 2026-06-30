@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { FocusTrap } from 'focus-trap-react'
 import { AlertTriangle, X, Loader2 } from 'lucide-react'
 
 interface ConfirmDialogProps {
@@ -52,6 +53,9 @@ export function ConfirmDialog({
         if (e.target === e.currentTarget && !busy) onCancel()
       }}
     >
+      {/* Escape + outside-click are handled above; the trap only confines Tab
+          focus to the dialog and restores focus to the trigger on close. */}
+      <FocusTrap focusTrapOptions={{ escapeDeactivates: false, allowOutsideClick: true }}>
       <div
         role="dialog"
         aria-modal="true"
@@ -111,6 +115,7 @@ export function ConfirmDialog({
           </button>
         </div>
       </div>
+      </FocusTrap>
     </div>
   )
 }
