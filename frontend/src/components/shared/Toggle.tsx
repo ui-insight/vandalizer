@@ -9,6 +9,9 @@ interface ToggleProps {
 export function Toggle({ label, description, checked, onChange, disabled = false }: ToggleProps) {
   return (
     <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
       onClick={() => !disabled && onChange?.(!checked)}
       disabled={disabled}
       style={{

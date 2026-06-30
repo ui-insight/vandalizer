@@ -836,7 +836,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
 
         {/* Loading indicator */}
         {isStreaming && !streamingContent && !thinkingContent && (
-          <div style={{ padding: 15, marginBottom: 15, backgroundColor: '#00000008', borderRadius: 'var(--ui-radius, 12px)' }}>
+          <div role="status" aria-live="polite" style={{ padding: 15, marginBottom: 15, backgroundColor: '#00000008', borderRadius: 'var(--ui-radius, 12px)' }}>
             <div className="thinking-shimmer" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#9ca3af' }}>
               <ChevronRight size={14} />
               <StreamingLabel />
@@ -845,7 +845,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         )}
 
         {error && (
-          <div className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 border border-red-200">
+          <div role="alert" className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 border border-red-200">
             <div>{error}</div>
             {errorDetails?.suggestedAction === 'convert_to_kb' && (errorDetails.oversizeDocuments?.length ?? 0) > 0 && (
               <div className="mt-2 flex items-center gap-2">

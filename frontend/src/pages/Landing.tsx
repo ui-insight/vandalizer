@@ -55,22 +55,36 @@ function LandingLoginForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-3 w-full max-w-sm mx-auto">
       {error && (
-        <div className="rounded-md bg-red-500/20 border border-red-500/30 p-3 text-sm text-red-300">
+        <div
+          role="alert"
+          id="landing-login-error"
+          className="rounded-md bg-red-500/20 border border-red-500/30 p-3 text-sm text-red-300"
+        >
           {error}
         </div>
       )}
+      <label htmlFor="landing-login-email" className="sr-only">Email</label>
       <input
-        type="text"
+        id="landing-login-email"
+        type="email"
+        autoComplete="username"
         placeholder="Email"
         required
+        aria-invalid={!!error}
+        aria-describedby={error ? 'landing-login-error' : undefined}
         value={userId}
         onChange={(e) => setUserId(e.target.value)}
         className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-highlight/50 focus:outline-none focus:ring-1 focus:ring-highlight/50"
       />
+      <label htmlFor="landing-login-password" className="sr-only">Password</label>
       <input
+        id="landing-login-password"
         type="password"
+        autoComplete="current-password"
         placeholder="Password"
         required
+        aria-invalid={!!error}
+        aria-describedby={error ? 'landing-login-error' : undefined}
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-highlight/50 focus:outline-none focus:ring-1 focus:ring-highlight/50"
@@ -116,29 +130,46 @@ function LandingRegisterForm({ onSwitch }: { onSwitch: () => void }) {
   return (
     <form onSubmit={handleSubmit} className="space-y-3 w-full max-w-sm mx-auto">
       {error && (
-        <div className="rounded-md bg-red-500/20 border border-red-500/30 p-3 text-sm text-red-300">
+        <div
+          role="alert"
+          id="landing-register-error"
+          className="rounded-md bg-red-500/20 border border-red-500/30 p-3 text-sm text-red-300"
+        >
           {error}
         </div>
       )}
+      <label htmlFor="landing-register-name" className="sr-only">Full Name</label>
       <input
+        id="landing-register-name"
         type="text"
+        autoComplete="name"
         placeholder="Full Name"
         value={name}
         onChange={(e) => setName(e.target.value)}
         className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-highlight/50 focus:outline-none focus:ring-1 focus:ring-highlight/50"
       />
+      <label htmlFor="landing-register-email" className="sr-only">Email Address</label>
       <input
+        id="landing-register-email"
         type="email"
+        autoComplete="email"
         placeholder="Email Address"
         required
+        aria-invalid={!!error}
+        aria-describedby={error ? 'landing-register-error' : undefined}
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-highlight/50 focus:outline-none focus:ring-1 focus:ring-highlight/50"
       />
+      <label htmlFor="landing-register-password" className="sr-only">Password</label>
       <input
+        id="landing-register-password"
         type="password"
+        autoComplete="new-password"
         placeholder="Password"
         required
+        aria-invalid={!!error}
+        aria-describedby={error ? 'landing-register-error' : undefined}
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-highlight/50 focus:outline-none focus:ring-1 focus:ring-highlight/50"
@@ -333,6 +364,9 @@ export default function Landing() {
 
   return (
     <div className="landing-page bg-[#0a0a0a] text-gray-200 antialiased w-full min-h-screen relative">
+      {/* Page-level heading for assistive tech / document outline (the visual
+          hero uses section headings). */}
+      <h1 className="sr-only">{branding.orgName} — AI document intelligence for research administration</h1>
       {/* Fixed top nav */}
       <nav className="fixed top-0 inset-x-0 z-50 bg-[#0a0a0a]/80 backdrop-blur-md border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">

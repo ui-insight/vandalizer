@@ -42,13 +42,20 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       {/* Toast container */}
       {toasts.length > 0 && (
-        <div style={{
-          position: 'fixed', top: 16, right: 16, zIndex: 9999,
-          display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 380,
-        }}>
+        <div
+          role="region"
+          aria-label="Notifications"
+          style={{
+            position: 'fixed', top: 16, right: 16, zIndex: 9999,
+            display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 380,
+          }}
+        >
           {toasts.map(t => (
             <div
               key={t.id}
+              // Error toasts interrupt (assertive); success/info wait (polite).
+              role={t.type === 'error' ? 'alert' : 'status'}
+              aria-live={t.type === 'error' ? 'assertive' : 'polite'}
               onClick={() => dismiss(t.id)}
               style={{
                 padding: '12px 16px', borderRadius: 'var(--ui-radius, 12px)',
