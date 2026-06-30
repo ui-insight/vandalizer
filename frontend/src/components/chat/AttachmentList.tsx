@@ -34,6 +34,8 @@ export function AttachmentList({ fileAttachments, urlAttachments, selectedDocUui
           <span className="max-w-[120px] truncate">{selectedDocNames?.[uuid] || 'Document'}</span>
           {onDeselectDoc && (
             <button
+              type="button"
+              aria-label={`Deselect ${selectedDocNames?.[uuid] || 'document'}`}
               onClick={() => onDeselectDoc(uuid)}
               className="ml-1 text-gray-400 hover:text-red-500"
             >
@@ -52,6 +54,8 @@ export function AttachmentList({ fileAttachments, urlAttachments, selectedDocUui
           <span className="max-w-[120px] truncate">{att.filename}</span>
           {onRemoveFile && (
             <button
+              type="button"
+              aria-label={`Remove ${att.filename}`}
               onClick={() => onRemoveFile(att.id)}
               className="ml-1 text-gray-400 hover:text-red-500"
             >
@@ -77,6 +81,8 @@ export function AttachmentList({ fileAttachments, urlAttachments, selectedDocUui
           </a>
           {onRemoveUrl && (
             <button
+              type="button"
+              aria-label={`Remove ${att.title || att.url}`}
               onClick={() => onRemoveUrl(att.id)}
               className="ml-1 text-gray-400 hover:text-red-500"
             >
