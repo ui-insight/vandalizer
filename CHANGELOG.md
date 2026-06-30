@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- Branded deployments no longer flash the default Vandalizer theme (colors, logo, icon, favicon, title) for ~1s on load before the custom branding appears. The last-known theme is cached in `localStorage` and applied synchronously — by an inline bootstrap script in `index.html` before the bundle loads, and by the `BrandingProvider` initial state before the first React paint — then reconciled against `GET /api/config/theme` on mount. First-ever visit (empty cache) is unchanged.
+
 ## [v4.8.0] - 2026-07-01
 
 ### Added

@@ -4,6 +4,33 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/images/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      Apply the last-known custom theme before the app bundle loads, so a
+      branded deployment paints its own colors/favicon/title on the first
+      frame instead of flashing the default Vandalizer theme. The React app
+      reconciles this against the server (GET /api/config/theme) on mount.
+    -->
+    <script>
+      (function () {
+        try {
+          var raw = localStorage.getItem('vandalizer.theme')
+          if (!raw) return
+          var t = JSON.parse(raw)
+          var root = document.documentElement
+          if (t.highlight_color) root.style.setProperty('--highlight-color', t.highlight_color)
+          if (t.ui_radius) root.style.setProperty('--ui-radius', t.ui_radius)
+          if (t.org_name) document.title = t.org_name
+          if (t.icon_data_url && t.icon_data_url.indexOf('data:') === 0) {
+            var link = document.querySelector("link[rel='icon']") || document.createElement('link')
+            link.rel = 'icon'
+            link.href = t.icon_data_url
+            document.head.appendChild(link)
+          }
+        } catch (e) {
+          /* private mode / disabled storage — fall back to defaults */
+        }
+      })()
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
