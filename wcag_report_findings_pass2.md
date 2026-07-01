@@ -63,3 +63,15 @@ components** — fixing those cascades across the app.
 8. Verify (`make ci`) throughout; parallelize independent files.
 
 Scale: ~60+ files, hundreds of edits — larger than pass 1. Recommend executing in the batch order above with `make ci` gating each batch.
+
+---
+
+## Pass-2 status: COMPLETE
+
+All findings above remediated across ~88 files. Verified green: `tsc -b` clean,
+**0 lint errors**, 201 tests pass, build clean. Executed via the shared
+cascades (focus ring, status components, table headers) + a per-area agent
+fleet (each owning distinct files), with central `make ci` verification and a
+cleanup pass for files the sweep missed (workspace/KnowledgePanel,
+AutovalidateWizard, CompareRunsView, ProgressRow). Pass 3 will re-audit from
+scratch and add an automated axe/Lighthouse contrast gate.
