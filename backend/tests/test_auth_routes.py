@@ -121,15 +121,21 @@ class TestAuthMe:
         token = create_access_token("testuser", _TEST_SETTINGS)
 
         with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
-             patch("app.dependencies.User") as MockUser:
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.models.demo.DemoApplication") as MockDemoApp:
             MockUser.find_one = AsyncMock(return_value=user)
+            # get_current_user looks up the demo application to surface the
+            # end-of-trial feedback token; the lookup must be mocked or the
+            # Beanie query field access raises before the 403 is returned.
+            MockDemoApp.find_one = AsyncMock(return_value=None)
             resp = await client.get(
                 "/api/auth/me",
                 cookies={"access_token": token},
             )
 
         assert resp.status_code == 403
-        assert resp.json()["detail"] == "DEMO_EXPIRED"
+        # detail is a structured payload: {"code": ..., "feedback_token": ...}
+        assert resp.json()["detail"]["code"] == "DEMO_EXPIRED"
 
 
 # ---------------------------------------------------------------------------

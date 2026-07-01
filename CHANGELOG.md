@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **`test_me_demo_locked_user_blocked` failed on a clean `main`.** The `GET /api/auth/me` unit test for locked demo users had not been updated when `get_current_user` began looking up the `DemoApplication` to surface the end-of-trial feedback token: it mocked neither the lookup (so the Beanie query-field access raised `AttributeError: user_id` before the 403 was returned) nor the response shape (it still asserted the old string `"DEMO_EXPIRED"` detail rather than the structured `{"code": "DEMO_EXPIRED", "feedback_token": ...}` payload). Completed the test's mocking and assertion; no production code change. Fixes #533.
+
 ## [v4.7.0] - 2026-06-22
 
 ### Added
