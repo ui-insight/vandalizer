@@ -76,6 +76,19 @@ export function KnowledgePanel() {
   const confirm = useConfirm()
   const [activeTab, setActiveTab] = useState<TabKey>('mine')
   const [search, setSearch] = useState('')
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const handleTabKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>, index: number) => {
+    let nextIndex = index
+    if (e.key === 'ArrowRight') nextIndex = (index + 1) % TABS.length
+    else if (e.key === 'ArrowLeft') nextIndex = (index - 1 + TABS.length) % TABS.length
+    else if (e.key === 'Home') nextIndex = 0
+    else if (e.key === 'End') nextIndex = TABS.length - 1
+    else return
+    e.preventDefault()
+    setActiveTab(TABS[nextIndex].key)
+    setSearch('')
+    tabRefs.current[nextIndex]?.focus()
+  }
   const [creating, setCreating] = useState(false)
   const [allOrgs, setAllOrgs] = useState<Organization[]>([])
   const [showOrgsModal, setShowOrgsModal] = useState(false)
@@ -535,8 +548,9 @@ export function KnowledgePanel() {
         <div style={{ fontSize: 12, color: '#888', marginBottom: 16 }}>
           {verifyKB.title}
         </div>
-        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#aaa', marginBottom: 4 }}>Summary</label>
+        <label htmlFor="verify-summary" style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#aaa', marginBottom: 4 }}>Summary</label>
         <input
+          id="verify-summary"
           value={verifySummary}
           onChange={e => setVerifySummary(e.target.value)}
           placeholder="Brief summary of this knowledge base"
@@ -546,8 +560,9 @@ export function KnowledgePanel() {
             color: '#e5e5e5', outline: 'none', marginBottom: 12, boxSizing: 'border-box',
           }}
         />
-        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#aaa', marginBottom: 4 }}>Description</label>
+        <label htmlFor="verify-description" style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#aaa', marginBottom: 4 }}>Description</label>
         <textarea
+          id="verify-description"
           value={verifyDescription}
           onChange={e => setVerifyDescription(e.target.value)}
           placeholder="Detailed description, intended use, etc."
@@ -559,8 +574,9 @@ export function KnowledgePanel() {
             boxSizing: 'border-box',
           }}
         />
-        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#aaa', marginBottom: 4 }}>Category</label>
+        <label htmlFor="verify-category" style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#aaa', marginBottom: 4 }}>Category</label>
         <input
+          id="verify-category"
           value={verifyCategory}
           onChange={e => setVerifyCategory(e.target.value)}
           placeholder="e.g. Legal, Medical, Research"
@@ -622,6 +638,8 @@ export function KnowledgePanel() {
           }}
         >
           <button
+            type="button"
+            aria-label="Back to knowledge bases"
             onClick={() => { setSelectedKB(null); setEditingTitle(false); refresh() }}
             style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, display: 'flex' }}
           >
@@ -634,6 +652,7 @@ export function KnowledgePanel() {
               <input
                 ref={titleInputRef}
                 autoFocus
+                aria-label="Knowledge base title"
                 value={titleDraft}
                 maxLength={MAX_NAME_LENGTH}
                 onChange={e => setTitleDraft(e.target.value)}
@@ -651,6 +670,7 @@ export function KnowledgePanel() {
               />
               <button
                 type="button"
+                aria-label="Save title"
                 // Keep focus on the input through mousedown, then blur on click so
                 // the commit runs exactly once via onBlur (no double-save).
                 onMouseDown={e => e.preventDefault()}
@@ -675,6 +695,8 @@ export function KnowledgePanel() {
                 {selectedKB.title}
               </span>
               <button
+                type="button"
+                aria-label="Edit title"
                 onClick={() => { setTitleDraft(selectedKB.title); setEditingTitle(true) }}
                 title="Edit title"
                 style={{
@@ -733,8 +755,9 @@ export function KnowledgePanel() {
         </div>
 
         {detailLoading ? (
-          <div style={{ textAlign: 'center', padding: 40, color: '#888' }}>
-            <Loader2 style={{ width: 20, height: 20, margin: '0 auto', animation: 'spin 1s linear infinite' }} />
+          <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 40, color: '#888' }}>
+            <Loader2 aria-hidden="true" style={{ width: 20, height: 20, margin: '0 auto', animation: 'spin 1s linear infinite' }} />
+            <span style={{ position: 'absolute', width: 1, height: 1, padding: 0, margin: -1, overflow: 'hidden', clip: 'rect(0 0 0 0)', border: 0 }}>Loading knowledge base…</span>
           </div>
         ) : (
           <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px' }}>
@@ -744,6 +767,7 @@ export function KnowledgePanel() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <textarea
                     autoFocus
+                    aria-label="Knowledge base description"
                     value={descriptionDraft}
                     onChange={e => setDescriptionDraft(e.target.value)}
                     onKeyDown={e => {
@@ -824,6 +848,8 @@ export function KnowledgePanel() {
                     {selectedKB.description || 'No description yet — add one to help others understand what this KB is for.'}
                   </div>
                   <button
+                    type="button"
+                    aria-label="Edit description"
                     onClick={() => {
                       setDescriptionDraft(selectedKB.description || '')
                       setEditingDescription(true)
@@ -857,13 +883,13 @@ export function KnowledgePanel() {
 
             {/* Crawling / adding URLs progress banner */}
             {addingUrls && (
-              <div style={{
+              <div role="status" aria-live="polite" style={{
                 display: 'flex', alignItems: 'center', gap: 10,
                 padding: '10px 14px', marginBottom: 16, borderRadius: 8,
                 backgroundColor: 'rgba(217, 119, 6, 0.1)',
                 border: '1px solid rgba(217, 119, 6, 0.25)',
               }}>
-                <Loader2 size={16} style={{ color: '#d97706', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
+                <Loader2 size={16} aria-hidden="true" style={{ color: '#d97706', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 600, color: '#e5e5e5' }}>
                     Adding URLs & crawling pages...
@@ -928,6 +954,9 @@ export function KnowledgePanel() {
                 const pinned = projectPins.isPinned('knowledge_base', selectedKB.uuid)
                 return (
                   <button
+                    type="button"
+                    role="switch"
+                    aria-checked={pinned}
                     onClick={() => handleTogglePin(selectedKB.uuid)}
                     title={pinned ? `Unpin from ${activeProjectTitle || 'this project'}` : `Pin to ${activeProjectTitle || 'this project'}`}
                     style={{
@@ -945,6 +974,9 @@ export function KnowledgePanel() {
                 )
               })()}
               <button
+                type="button"
+                role="switch"
+                aria-checked={!!selectedKB.shared_with_team}
                 onClick={() => handleToggleShare(selectedKB)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6,
@@ -1084,6 +1116,15 @@ export function KnowledgePanel() {
                     <div
                       key={source.uuid}
                       onClick={() => { if (canInspect) setInspectingSource(source) }}
+                      role={canInspect ? 'button' : undefined}
+                      tabIndex={canInspect ? 0 : undefined}
+                      aria-label={canInspect ? `Inspect source: ${displayLabel}` : undefined}
+                      onKeyDown={canInspect ? (e) => {
+                        if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+                          e.preventDefault()
+                          setInspectingSource(source)
+                        }
+                      } : undefined}
                       title={canInspect ? 'Click to inspect this source' : undefined}
                       style={{
                         display: 'flex', alignItems: 'center', gap: 8,
@@ -1111,6 +1152,7 @@ export function KnowledgePanel() {
                         {isRenaming ? (
                           <input
                             autoFocus
+                            aria-label="Source name"
                             value={renameDraft}
                             onChange={e => setRenameDraft(e.target.value)}
                             onClick={e => e.stopPropagation()}
@@ -1174,6 +1216,8 @@ export function KnowledgePanel() {
                       {isRenaming ? (
                         <>
                           <button
+                            type="button"
+                            aria-label="Save name"
                             onClick={(e) => { e.stopPropagation(); handleRenameSource() }}
                             disabled={savingRename}
                             title="Save name"
@@ -1182,6 +1226,8 @@ export function KnowledgePanel() {
                             <Check size={14} style={{ color: '#22c55e' }} />
                           </button>
                           <button
+                            type="button"
+                            aria-label="Cancel rename"
                             onClick={(e) => { e.stopPropagation(); cancelRenameSource() }}
                             disabled={savingRename}
                             title="Cancel"
@@ -1200,6 +1246,8 @@ export function KnowledgePanel() {
                             }}
                           />
                           <button
+                            type="button"
+                            aria-label="Rename source"
                             onClick={(e) => { e.stopPropagation(); beginRenameSource(source) }}
                             title={source.custom_name ? 'Rename (or clear to revert to original)' : 'Rename source'}
                             style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }}
@@ -1207,6 +1255,8 @@ export function KnowledgePanel() {
                             <Pencil size={12} style={{ color: '#888' }} />
                           </button>
                           <button
+                            type="button"
+                            aria-label="Remove source"
                             onClick={(e) => { e.stopPropagation(); handleRemoveSource(source.uuid) }}
                             title="Remove source"
                             style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }}
@@ -1472,15 +1522,27 @@ export function KnowledgePanel() {
       </div>
 
       {/* Tabs */}
-      <div style={{
-        display: 'flex', gap: 0,
-        borderBottom: '1px solid #3a3a3a',
-        backgroundColor: '#191919',
-        flexShrink: 0,
-      }}>
-        {TABS.map(tab => (
+      <div
+        role="tablist"
+        aria-label="Knowledge base views"
+        style={{
+          display: 'flex', gap: 0,
+          borderBottom: '1px solid #3a3a3a',
+          backgroundColor: '#191919',
+          flexShrink: 0,
+        }}
+      >
+        {TABS.map((tab, index) => (
           <button
             key={tab.key}
+            ref={el => { tabRefs.current[index] = el }}
+            role="tab"
+            type="button"
+            id={`kb-tab-${tab.key}`}
+            aria-selected={activeTab === tab.key}
+            aria-controls="kb-tabpanel"
+            tabIndex={activeTab === tab.key ? 0 : -1}
+            onKeyDown={e => handleTabKeyDown(e, index)}
             onClick={() => { setActiveTab(tab.key); setSearch('') }}
             style={{
               flex: 1,
@@ -1538,7 +1600,7 @@ export function KnowledgePanel() {
 
       {/* Error */}
       {error && (
-        <div style={{
+        <div role="alert" style={{
           margin: '8px 12px 0', padding: '8px 12px', fontSize: 12,
           color: '#b91c1c', backgroundColor: '#fef2f2', borderRadius: 6,
           border: '1px solid #fecaca',
@@ -1547,6 +1609,12 @@ export function KnowledgePanel() {
         </div>
       )}
 
+      <div
+        role="tabpanel"
+        id="kb-tabpanel"
+        aria-labelledby={`kb-tab-${activeTab}`}
+        style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}
+      >
       {activeTab === 'explore' ? (
         <KBExploreTab onAdopted={refresh} />
       ) : (
@@ -1608,6 +1676,7 @@ export function KnowledgePanel() {
           />
         </div>
       )}
+      </div>
     </div>
 
     {showCreateModal && (
@@ -1688,6 +1757,8 @@ function KBTagsEditor({
             {t}
             {canManage && (
               <button
+                type="button"
+                aria-label={`Remove tag ${t}`}
                 onClick={() => removeTag(t)}
                 disabled={saving}
                 title="Remove tag"
@@ -1704,6 +1775,7 @@ function KBTagsEditor({
         ))}
         {canManage && tags.length < 20 && (
           <input
+            aria-label="Add a tag"
             value={draft}
             onChange={e => setDraft(e.target.value)}
             onKeyDown={e => {

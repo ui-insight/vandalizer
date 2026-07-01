@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { FocusTrap } from 'focus-trap-react'
 import { X, Loader2, ArrowLeftRight } from 'lucide-react'
 import {
   getKBOptimization,
@@ -75,6 +76,7 @@ export function CompareRunsView({
       }}
       onClick={onClose}
     >
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
       <div
         role="dialog"
         aria-modal="true"
@@ -116,6 +118,7 @@ export function CompareRunsView({
           <DiffBody left={other} right={current} />
         ) : null}
       </div>
+      </FocusTrap>
     </div>
   )
 }

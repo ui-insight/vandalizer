@@ -662,6 +662,8 @@ function PreviewStep({
                 </div>
                 <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
                   <button
+                    type="button"
+                    aria-label="Edit question"
                     onClick={() => startEdit(q)}
                     style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: '#888' }}
                     title="Edit question"
@@ -669,6 +671,8 @@ function PreviewStep({
                     <Pencil size={12} />
                   </button>
                   <button
+                    type="button"
+                    aria-label="Remove question"
                     onClick={() => handleDelete(q)}
                     style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: '#888' }}
                     title="Remove question"
