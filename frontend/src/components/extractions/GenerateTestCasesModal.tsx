@@ -373,6 +373,7 @@ function Row({
         disabled={disabled}
         onChange={e => onChange(e.target.value)}
         placeholder="(empty)"
+        aria-label={`Expected value for ${field}`}
         style={{
           padding: '4px 8px', fontSize: 12, fontFamily: 'inherit',
           color: '#1f2937',

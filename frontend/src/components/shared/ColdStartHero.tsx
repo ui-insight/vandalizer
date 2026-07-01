@@ -122,7 +122,7 @@ export function ColdStartHero({
           fontSize: 13,
           fontWeight: 600,
           fontFamily: 'inherit',
-          color: disabled ? (isDark ? '#555' : '#9ca3af') : '#fff',
+          color: disabled ? (isDark ? '#555' : '#6b7280') : '#fff',
           background: disabled
             ? (isDark ? '#222' : '#e5e7eb')
             : 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)',

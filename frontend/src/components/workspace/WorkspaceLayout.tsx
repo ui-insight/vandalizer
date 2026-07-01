@@ -61,6 +61,12 @@ export function WorkspaceLayout() {
   // Layout: [UtilityBar 48px] [Content per mode] [ActivityRail(right)]
   return (
     <div className="flex h-screen flex-col">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-[1000] focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:shadow-lg focus:ring-2 focus:ring-highlight"
+      >
+        Skip to main content
+      </a>
       <Header />
       <ProjectContextBar onOpenManage={() => setManageOpen(true)} />
       <ProjectManageModal open={manageOpen} onClose={() => setManageOpen(false)} />
@@ -95,9 +101,9 @@ export function WorkspaceLayout() {
             />
           )}
 
-          <div className="overflow-hidden flex-1 relative" style={{ zIndex: 11 }}>
+          <main id="main-content" className="overflow-hidden flex-1 relative" style={{ zIndex: 11 }}>
             <RightPanel />
-          </div>
+          </main>
         </div>
         <div
           className="shrink-0"

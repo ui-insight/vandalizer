@@ -70,13 +70,13 @@ export function OptimizationProgressCard<TConfig>({
   const elapsedSeconds = useElapsedSeconds(run.elapsed_seconds, run.started_at, run.status)
 
   return (
-    <div style={{
+    <div role="status" aria-live="polite" style={{
       padding: 16, background: 'linear-gradient(135deg, #1a1f2e 0%, #1f1f1f 100%)',
       border: '1px solid rgba(124, 58, 237, 0.3)', borderRadius: 8,
     }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <Loader2 size={16} style={{ color: '#a78bfa', animation: 'spin 1s linear infinite' }} />
+        <Loader2 size={16} aria-hidden="true" style={{ color: '#a78bfa', animation: 'spin 1s linear infinite' }} />
         <span style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>
           {run.status === 'queued' ? queuedLabel : runningLabel}
         </span>
@@ -230,7 +230,7 @@ export function OptimizationProgressCard<TConfig>({
             cursor: cancelling || run.cancel_requested ? 'not-allowed' : 'pointer',
           }}
         >
-          {cancelling ? <Loader2 size={11} style={{ animation: 'spin 1s linear infinite' }} /> : <X size={11} />}
+          {cancelling ? <Loader2 size={11} aria-hidden="true" style={{ animation: 'spin 1s linear infinite' }} /> : <X size={11} aria-hidden="true" />}
           {run.cancel_requested ? 'Cancelling…' : cancelling ? 'Sending…' : 'Cancel'}
         </button>
       </div>

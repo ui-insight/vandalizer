@@ -13,6 +13,7 @@ import { RenameDialog } from './RenameDialog'
 import { CreateFolderDialog } from './CreateFolderDialog'
 import { MoveFolderDialog } from './MoveFolderDialog'
 import { useConfirm } from '../shared/useConfirm'
+import { useToast } from '../../contexts/ToastContext'
 import { deleteFile, renameFile, downloadFile, downloadFilesAsZip, moveFile } from '../../api/files'
 import { createFolder, renameFolder, deleteFolder, convertFolderToTeam, moveFolder, exportFolder } from '../../api/folders'
 import { listAutomations } from '../../api/automations'
@@ -72,6 +73,7 @@ interface FileBrowserProps {
 export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSelectionChange, onDocNamesChange, onFolderSelectionChange, onSelectionProcessingChange, currentFolder: controlledFolder, onFolderNavigate, onAskAboutFolder, onRunWorkflowOnFolder, onAddFolderToKB, rootFolder = null, rootLabel, teamScopeUuid }: FileBrowserProps) {
   const { currentTeam } = useTeams()
   const confirm = useConfirm()
+  const { toast } = useToast()
 
   const [internalFolder, setInternalFolder] = useState<string | null>(null)
   const currentFolder = controlledFolder !== undefined ? controlledFolder : internalFolder
@@ -286,7 +288,7 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
       }
       await Promise.all(promises)
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Failed to delete')
+      toast(err instanceof Error ? err.message : 'Failed to delete', 'error')
     } finally {
       // Always clear selection + refresh: the user confirmed a destructive
       // action and the state of the items is now uncertain. Refresh
@@ -422,7 +424,7 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
       try {
         await moveFolder(moveTarget.uuid, parentId)
       } catch (err: unknown) {
-        alert(err instanceof Error ? err.message : 'Failed to move folder')
+        toast(err instanceof Error ? err.message : 'Failed to move folder', 'error')
       }
       setMoveTarget(null)
       refresh()
@@ -460,7 +462,7 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
           await deleteFolder(uuid)
         }
       } catch (err: unknown) {
-        alert(err instanceof Error ? err.message : `Failed to delete ${type}`)
+        toast(err instanceof Error ? err.message : `Failed to delete ${type}`, 'error')
       }
       refresh()
     },
@@ -491,7 +493,10 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
       {/* + Add button with dropdown menu - matches Flask _add_button.html */}
       <div ref={addMenuRef} className="relative inline-block mt-4">
         <button
+          type="button"
           onClick={() => setAddMenuOpen(!addMenuOpen)}
+          aria-expanded={addMenuOpen}
+          aria-haspopup="menu"
           className="flex items-center gap-1 rounded-[var(--ui-radius)] bg-highlight text-highlight-text px-3 py-1.5 text-sm font-bold hover:brightness-90 transition-all"
           style={{ borderRadius: 'var(--ui-radius, 12px)' }}
         >
@@ -501,6 +506,9 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
 
         {addMenuOpen && (
           <div
+            role="menu"
+            aria-label="Add"
+            onKeyDown={(e) => { if (e.key === 'Escape') setAddMenuOpen(false) }}
             className="absolute left-0 z-[1000] mt-2 min-w-[180px] rounded-lg border bg-white p-1.5"
             style={{
               borderColor: 'rgba(0,0,0,.15)',
@@ -508,6 +516,8 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
             }}
           >
             <button
+              role="menuitem"
+              type="button"
               onClick={() => {
                 setShowCreateFolder(true)
                 setAddMenuOpen(false)
@@ -518,6 +528,8 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
               <span>New Folder</span>
             </button>
             <button
+              role="menuitem"
+              type="button"
               onClick={() => {
                 setCreateTeamFolder(true)
                 setShowCreateFolder(true)
@@ -529,6 +541,8 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
               <span>New Team Folder</span>
             </button>
             <button
+              role="menuitem"
+              type="button"
               onClick={() => {
                 fileInputRef.current?.click()
                 setAddMenuOpen(false)
@@ -545,6 +559,7 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
           ref={fileInputRef}
           type="file"
           multiple
+          aria-label="Upload files"
           accept=".pdf,.doc,.docx,.xlsx,.xls,.csv,.txt,.md"
           className="hidden"
           onChange={(e) => {
@@ -662,7 +677,7 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
                   try {
                     await exportFolder(folder.uuid, folder.title)
                   } catch (err: unknown) {
-                    alert(err instanceof Error ? err.message : 'Failed to export folder')
+                    toast(err instanceof Error ? err.message : 'Failed to export folder', 'error')
                   }
                 }
               : undefined
@@ -685,7 +700,7 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
                     await convertFolderToTeam(contextMenu.item.uuid)
                     refresh()
                   } catch (err: unknown) {
-                    alert(err instanceof Error ? err.message : 'Failed to convert folder')
+                    toast(err instanceof Error ? err.message : 'Failed to convert folder', 'error')
                   }
                 }
               : undefined

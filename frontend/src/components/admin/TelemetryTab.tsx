@@ -39,7 +39,7 @@ function Distribution({ title, data }: { title: string; data: Record<string, num
     }}>
       <div style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 12 }}>{title}</div>
       {entries.length === 0 ? (
-        <div style={{ fontSize: 13, color: '#9ca3af' }}>No data yet</div>
+        <div style={{ fontSize: 13, color: '#6b7280' }}>No data yet</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {entries.map(([key, n]) => (
@@ -127,17 +127,17 @@ export function TelemetryTab() {
           </span>
         </div>
         {data.named_deployments.length === 0 ? (
-          <div style={{ padding: 24, fontSize: 13, color: '#9ca3af' }}>
+          <div style={{ padding: 24, fontSize: 13, color: '#6b7280' }}>
             No deployments have self-identified yet.
           </div>
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
               <tr style={{ textAlign: 'left', color: '#6b7280' }}>
-                <th style={{ padding: '8px 16px', fontWeight: 500 }}>Organization</th>
-                <th style={{ padding: '8px 16px', fontWeight: 500 }}>Version</th>
-                <th style={{ padding: '8px 16px', fontWeight: 500 }}>Environment</th>
-                <th style={{ padding: '8px 16px', fontWeight: 500 }}>Last seen</th>
+                <th scope="col" style={{ padding: '8px 16px', fontWeight: 500 }}>Organization</th>
+                <th scope="col" style={{ padding: '8px 16px', fontWeight: 500 }}>Version</th>
+                <th scope="col" style={{ padding: '8px 16px', fontWeight: 500 }}>Environment</th>
+                <th scope="col" style={{ padding: '8px 16px', fontWeight: 500 }}>Last seen</th>
               </tr>
             </thead>
             <tbody>

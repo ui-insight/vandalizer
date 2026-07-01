@@ -277,7 +277,7 @@ export function TeamSettings() {
   return (
     <PageLayout>
       <div className="mx-auto max-w-3xl space-y-6">
-        <h2 className="text-xl font-semibold text-gray-900">Teams</h2>
+        <h1 className="text-xl font-semibold text-gray-900">Teams</h1>
 
         {error && (
           <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</div>
@@ -291,6 +291,7 @@ export function TeamSettings() {
                 {editingName ? (
                   <>
                     <input
+                      aria-label="Team name"
                       type="text"
                       value={renameValue}
                       onChange={(e) => setRenameValue(e.target.value)}
@@ -302,12 +303,16 @@ export function TeamSettings() {
                       className="rounded-md border border-gray-300 px-2 py-1 text-sm font-medium focus:border-highlight focus:outline-none focus:ring-1 focus:ring-highlight"
                     />
                     <button
+                      type="button"
+                      aria-label="Save team name"
                       onClick={handleRename}
                       className="rounded p-1 text-green-600 hover:bg-green-50"
                     >
                       <Check className="h-4 w-4" />
                     </button>
                     <button
+                      type="button"
+                      aria-label="Cancel rename"
                       onClick={() => setEditingName(false)}
                       className="rounded p-1 text-gray-400 hover:bg-gray-100"
                     >
@@ -319,6 +324,8 @@ export function TeamSettings() {
                     <h3 className="font-medium text-gray-900">{currentTeam.name}</h3>
                     {canEdit && (
                       <button
+                        type="button"
+                        aria-label="Rename team"
                         onClick={() => {
                           setRenameValue(currentTeam.name)
                           setEditingName(true)
@@ -337,8 +344,8 @@ export function TeamSettings() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-100 text-left">
-                  <th className="px-4 py-2 text-xs font-medium uppercase text-gray-500">Member</th>
-                  <th className="px-4 py-2 text-xs font-medium uppercase text-gray-500">Role</th>
+                  <th scope="col" className="px-4 py-2 text-xs font-medium uppercase text-gray-500">Member</th>
+                  <th scope="col" className="px-4 py-2 text-xs font-medium uppercase text-gray-500">Role</th>
                   {canEdit && <th className="w-20 px-4 py-2" />}
                 </tr>
               </thead>
@@ -354,6 +361,7 @@ export function TeamSettings() {
                     <td className="px-4 py-3">
                       {canEdit && m.user_id !== user?.user_id && m.role !== 'owner' ? (
                         <select
+                          aria-label="Member role"
                           value={m.role}
                           onChange={(e) => handleRoleChange(m.user_id, e.target.value)}
                           className="rounded border border-gray-300 px-2 py-1 text-sm"
@@ -369,6 +377,8 @@ export function TeamSettings() {
                       <td className="px-4 py-3">
                         {m.user_id !== user?.user_id && m.role !== 'owner' && (
                           <button
+                            type="button"
+                            aria-label="Remove member"
                             onClick={() => handleRemove(m.user_id)}
                             className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
                           >
@@ -390,8 +400,9 @@ export function TeamSettings() {
             <h3 className="mb-3 font-medium text-gray-900">Invite Member</h3>
             <form onSubmit={handleInvite} className="flex items-end gap-3">
               <div className="flex-1">
-                <label className="block text-xs font-medium text-gray-500">Email</label>
+                <label htmlFor="invite-email" className="block text-xs font-medium text-gray-500">Email</label>
                 <input
+                  id="invite-email"
                   type="email"
                   required
                   value={inviteEmail}
@@ -401,8 +412,9 @@ export function TeamSettings() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500">Role</label>
+                <label htmlFor="invite-role" className="block text-xs font-medium text-gray-500">Role</label>
                 <select
+                  id="invite-role"
                   value={inviteRole}
                   onChange={(e) => setInviteRole(e.target.value)}
                   className="mt-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
@@ -433,7 +445,7 @@ export function TeamSettings() {
                       >
                         <div className="flex items-center gap-3">
                           <span className="text-gray-700">{inv.email}</span>
-                          <span className="text-xs text-gray-400">{inv.role}</span>
+                          <span className="text-xs text-gray-500">{inv.role}</span>
                           {expiry.label && (
                             <span
                               className={`text-xs ${expiry.expired ? 'font-medium text-red-600' : 'text-gray-400'}`}
@@ -472,8 +484,9 @@ export function TeamSettings() {
             </p>
             <div className="flex items-end gap-3">
               <div>
-                <label className="block text-xs font-medium text-gray-500">Role</label>
+                <label htmlFor="joinlink-role" className="block text-xs font-medium text-gray-500">Role</label>
                 <select
+                  id="joinlink-role"
                   value={joinLinkRole}
                   onChange={(e) => setJoinLinkRole(e.target.value)}
                   className="mt-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
@@ -483,8 +496,9 @@ export function TeamSettings() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-500">Expires in</label>
+                <label htmlFor="joinlink-expiry" className="block text-xs font-medium text-gray-500">Expires in</label>
                 <select
+                  id="joinlink-expiry"
                   value={joinLinkExpiry}
                   onChange={(e) => setJoinLinkExpiry(Number(e.target.value))}
                   className="mt-1 rounded-md border border-gray-300 px-3 py-2 text-sm"
@@ -518,7 +532,7 @@ export function TeamSettings() {
                         className="flex items-center justify-between rounded-md bg-gray-50 px-3 py-2 text-sm"
                       >
                         <div className="flex items-center gap-3">
-                          <span className="text-xs text-gray-400">{link.role}</span>
+                          <span className="text-xs text-gray-500">{link.role}</span>
                           <span className="text-xs text-gray-500">
                             {link.use_count} {link.use_count === 1 ? 'use' : 'uses'}
                           </span>
@@ -569,8 +583,9 @@ export function TeamSettings() {
             </p>
             <div className="flex items-end gap-3">
               <div className="flex-1">
-                <label className="block text-xs font-medium text-gray-500">New Owner</label>
+                <label htmlFor="transfer-target" className="block text-xs font-medium text-gray-500">New Owner</label>
                 <select
+                  id="transfer-target"
                   value={transferTarget}
                   onChange={(e) => setTransferTarget(e.target.value)}
                   className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
@@ -640,6 +655,7 @@ export function TeamSettings() {
           <form onSubmit={handleCreateTeam} className="flex items-end gap-3">
             <div className="flex-1">
               <input
+                aria-label="New team name"
                 type="text"
                 required
                 value={newTeamName}
@@ -667,7 +683,7 @@ export function TeamSettings() {
               <div key={t.uuid} className="flex items-center justify-between px-4 py-3">
                 <div>
                   <span className="text-sm font-medium text-gray-900">{t.name}</span>
-                  <span className="ml-2 text-xs text-gray-400">{t.role}</span>
+                  <span className="ml-2 text-xs text-gray-500">{t.role}</span>
                 </div>
                 {t.uuid !== currentTeam?.uuid && (
                   <button

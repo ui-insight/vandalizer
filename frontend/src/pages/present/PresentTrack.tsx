@@ -16,7 +16,7 @@ interface PresentTrackProps {
 export function PresentTrack({ track, onPresent, onPrint, pitchHighlight }: PresentTrackProps) {
   const Icon = track.icon
   return (
-    <div className="space-y-12">
+    <div id="main-content" tabIndex={-1} className="space-y-12">
       {/* Hero */}
       <header>
         <div className="flex items-center gap-3 mb-4">

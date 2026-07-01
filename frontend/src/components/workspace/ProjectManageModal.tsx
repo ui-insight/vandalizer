@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { FocusTrap } from 'focus-trap-react'
 import { useNavigate } from '@tanstack/react-router'
 import { useQueryClient } from '@tanstack/react-query'
 import { X, Users, Trash2, Link2, UserMinus, LogOut, Pencil } from 'lucide-react'
@@ -51,6 +52,13 @@ export function ProjectManageModal({ open, onClose }: { open: boolean; onClose: 
     listProjectMembers(uuid).then(setMembers).catch(() => {})
   }, [uuid])
   useEffect(() => { if (open) loadMembers() }, [open, loadMembers])
+
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, onClose])
 
   if (!open || !project) return null
 
@@ -200,8 +208,12 @@ export function ProjectManageModal({ open, onClose }: { open: boolean; onClose: 
       style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}
       onClick={onClose}
     >
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
       <div
         className="flex h-full w-full max-w-md flex-col overflow-y-auto bg-white shadow-xl"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Manage project"
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
@@ -212,6 +224,7 @@ export function ProjectManageModal({ open, onClose }: { open: boolean; onClose: 
               {editingTitle ? (
                 <input
                   autoFocus
+                  aria-label="Project title"
                   value={titleDraft}
                   onChange={e => setTitleDraft(e.target.value)}
                   onBlur={saveTitle}
@@ -243,6 +256,7 @@ export function ProjectManageModal({ open, onClose }: { open: boolean; onClose: 
               <>
                 <textarea
                   autoFocus
+                  aria-label="Project description"
                   value={descDraft}
                   onChange={e => setDescDraft(e.target.value)}
                   rows={2}
@@ -251,7 +265,7 @@ export function ProjectManageModal({ open, onClose }: { open: boolean; onClose: 
                 />
                 <div className="mt-1 flex gap-3">
                   <button onClick={saveDesc} className="text-xs font-medium text-highlight">Save</button>
-                  <button onClick={() => setEditingDesc(false)} className="text-xs text-gray-400">Cancel</button>
+                  <button onClick={() => setEditingDesc(false)} className="text-xs text-gray-500">Cancel</button>
                 </div>
               </>
             ) : project.description ? (
@@ -264,7 +278,7 @@ export function ProjectManageModal({ open, onClose }: { open: boolean; onClose: 
                 )}
               </p>
             ) : canManage ? (
-              <button onClick={() => { setDescDraft(''); setEditingDesc(true) }} className="text-sm text-gray-400 hover:text-gray-600">
+              <button onClick={() => { setDescDraft(''); setEditingDesc(true) }} className="text-sm text-gray-500 hover:text-gray-600">
                 + Add description
               </button>
             ) : null}
@@ -278,6 +292,7 @@ export function ProjectManageModal({ open, onClose }: { open: boolean; onClose: 
                 onChange={e => setState(e.target.value as ProjectState)}
                 className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-highlight"
                 title="Project status"
+                aria-label="Project status"
               >
                 {PROJECT_STATES.map(s => <option key={s} value={s} className="capitalize">{s}</option>)}
               </select>
@@ -324,7 +339,7 @@ export function ProjectManageModal({ open, onClose }: { open: boolean; onClose: 
                     <li key={m.user_id} className="flex items-center justify-between py-2">
                       <span className="min-w-0">
                         <span className="text-sm text-gray-800">{m.name || m.email || m.user_id}</span>
-                        <span className="ml-2 text-xs capitalize text-gray-400">{m.role}</span>
+                        <span className="ml-2 text-xs capitalize text-gray-500">{m.role}</span>
                       </span>
                       {m.role !== 'owner' && (
                         <button onClick={() => handleRemoveMember(m.user_id)} title="Remove member" className="p-1 text-gray-400 hover:text-red-500">
@@ -353,6 +368,7 @@ export function ProjectManageModal({ open, onClose }: { open: boolean; onClose: 
           </div>
         </div>
       </div>
+      </FocusTrap>
     </div>
   )
 }

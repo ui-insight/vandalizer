@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { FocusTrap } from 'focus-trap-react'
 import { X } from 'lucide-react'
 
 interface AddUrlsModalProps {
@@ -11,6 +12,14 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
   const [crawlEnabled, setCrawlEnabled] = useState(false)
   const [maxCrawlPages, setMaxCrawlPages] = useState(5)
   const [allowedDomains, setAllowedDomains] = useState('')
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
 
   const handleSubmit = () => {
     const urls = text
@@ -31,9 +40,12 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
       }}
       onClick={onClose}
     >
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
       <div
+        role="dialog"
+        aria-modal="true"
         style={{
-          width: 480, maxHeight: '80vh',
+          width: 480, maxWidth: '100vw', maxHeight: '80vh',
           backgroundColor: '#1e1e1e', borderRadius: 12,
           border: '1px solid #3a3a3a', padding: 24,
           display: 'flex', flexDirection: 'column', gap: 16,
@@ -56,13 +68,14 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
         <textarea
           value={text}
           onChange={e => setText(e.target.value)}
+          aria-label="URLs to add, one per line"
           placeholder={'https://example.com/page1\nhttps://example.com/page2'}
           rows={8}
           style={{
             width: '100%', padding: 12, fontSize: 13, fontFamily: 'inherit',
             backgroundColor: '#2a2a2a', color: '#e5e5e5',
             border: '1px solid #3a3a3a', borderRadius: 8,
-            resize: 'vertical', outline: 'none',
+            resize: 'vertical',
           }}
         />
 
@@ -83,8 +96,9 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
               The crawler will follow links on each page and add discovered pages as additional sources.
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <label style={{ fontSize: 13, color: '#aaa', minWidth: 80 }}>Max pages</label>
+              <label htmlFor="add-urls-max-pages" style={{ fontSize: 13, color: '#aaa', minWidth: 80 }}>Max pages</label>
               <input
+                id="add-urls-max-pages"
                 type="number"
                 value={maxCrawlPages}
                 onChange={e => setMaxCrawlPages(Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))}
@@ -94,13 +108,13 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
                   width: 72, padding: '6px 8px', fontSize: 13, fontFamily: 'inherit',
                   backgroundColor: '#2a2a2a', color: '#e5e5e5',
                   border: '1px solid #3a3a3a', borderRadius: 6,
-                  outline: 'none',
                 }}
               />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <label style={{ fontSize: 13, color: '#aaa' }}>Allowed domains (optional)</label>
+              <label htmlFor="add-urls-allowed-domains" style={{ fontSize: 13, color: '#aaa' }}>Allowed domains (optional)</label>
               <input
+                id="add-urls-allowed-domains"
                 type="text"
                 value={allowedDomains}
                 onChange={e => setAllowedDomains(e.target.value)}
@@ -109,7 +123,6 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
                   width: '100%', padding: '6px 8px', fontSize: 13, fontFamily: 'inherit',
                   backgroundColor: '#2a2a2a', color: '#e5e5e5',
                   border: '1px solid #3a3a3a', borderRadius: 6,
-                  outline: 'none',
                 }}
               />
               <div style={{ fontSize: 11, color: '#666' }}>
@@ -145,6 +158,7 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
           </button>
         </div>
       </div>
+      </FocusTrap>
     </div>
   )
 }

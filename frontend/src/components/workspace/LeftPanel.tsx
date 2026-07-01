@@ -225,6 +225,8 @@ export function LeftPanel() {
         <div style={{ paddingLeft: 15, width: 50, flexShrink: 0 }}>
           {viewingDoc && (
             <button
+              type="button"
+              aria-label="Close document"
               onClick={() => { setViewingDoc(null); setSelectedDocUuids([]); setSelectedDocNames({}); setHighlightTerms([]) }}
               className="bg-transparent border-0 p-0 cursor-pointer"
             >
@@ -250,6 +252,8 @@ export function LeftPanel() {
                 }}
               />
               <button
+                type="button"
+                aria-label="Close search"
                 onClick={handleCloseSearch}
                 className="bg-transparent border-0 p-0 cursor-pointer"
               >

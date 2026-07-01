@@ -7,6 +7,7 @@ import {
 import { PageLayout } from '../components/layout/PageLayout'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../contexts/ToastContext'
+import { useConfirm } from '../components/shared/useConfirm'
 import * as supportApi from '../api/support'
 import type {
   SupportTicket, SupportTicketSummary, SupportAttachment,
@@ -296,6 +297,7 @@ function ListView({
               <input
                 value={searchInput}
                 onChange={(e) => onSearchInputChange(e.target.value)}
+                aria-label="Search tickets"
                 placeholder="Search by #, name, email, or keyword…"
                 style={{
                   width: '100%', padding: '6px 30px 6px 30px', fontSize: 13,
@@ -353,6 +355,7 @@ function ListView({
               <select
                 value={priorityFilter}
                 onChange={(e) => onPriorityFilterChange(e.target.value as PriorityFilter)}
+                aria-label="Filter by priority"
                 style={{
                   padding: '4px 8px', fontSize: 12, border: '1px solid #e5e7eb',
                   borderRadius: 9999, background: '#fff',
@@ -371,6 +374,7 @@ function ListView({
               <select
                 value={classificationFilter}
                 onChange={(e) => onClassificationFilterChange(e.target.value as ClassificationFilter)}
+                aria-label="Filter by type"
                 style={{
                   padding: '4px 8px', fontSize: 12, border: '1px solid #e5e7eb',
                   borderRadius: 9999, background: '#fff',
@@ -389,6 +393,7 @@ function ListView({
               <select
                 value={tagFilter}
                 onChange={(e) => onTagFilterChange(e.target.value)}
+                aria-label="Filter by tag"
                 style={{
                   padding: '4px 8px', fontSize: 12, border: '1px solid #e5e7eb',
                   borderRadius: 9999, background: '#fff', color: tagFilter ? '#111827' : '#6b7280',
@@ -604,8 +609,9 @@ function NewTicketView({
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div>
-            <label style={labelStyle}>Subject</label>
+            <label htmlFor="sc-new-subject" style={labelStyle}>Subject</label>
             <input
+              id="sc-new-subject"
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
               placeholder="Brief summary of your issue"
@@ -614,8 +620,9 @@ function NewTicketView({
             />
           </div>
           <div>
-            <label style={labelStyle}>Priority</label>
+            <label htmlFor="sc-new-priority" style={labelStyle}>Priority</label>
             <select
+              id="sc-new-priority"
               value={priority}
               onChange={(e) => setPriority(e.target.value)}
               style={inputStyle}
@@ -626,8 +633,9 @@ function NewTicketView({
             </select>
           </div>
           <div>
-            <label style={labelStyle}>Type</label>
+            <label htmlFor="sc-new-classification" style={labelStyle}>Type</label>
             <select
+              id="sc-new-classification"
               value={classification}
               onChange={(e) => setClassification(e.target.value)}
               style={inputStyle}
@@ -638,8 +646,9 @@ function NewTicketView({
             </select>
           </div>
           <div>
-            <label style={labelStyle}>Description</label>
+            <label htmlFor="sc-new-description" style={labelStyle}>Description</label>
             <textarea
+              id="sc-new-description"
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               rows={6}
@@ -665,6 +674,7 @@ function NewTicketView({
                 ref={fileInputRef}
                 type="file"
                 multiple
+                aria-label="Upload files"
                 onChange={onPickFiles}
                 style={{ display: 'none' }}
               />
@@ -739,6 +749,7 @@ function ChatView({
 }) {
   const { user } = useAuth()
   const { toast } = useToast()
+  const confirm = useConfirm()
   const [ticket, setTicket] = useState<SupportTicket | null>(null)
   const [loading, setLoading] = useState(true)
   const [reply, setReply] = useState('')
@@ -857,7 +868,16 @@ function ChatView({
   }
 
   const handleDeleteAttachment = async (attachmentUuid: string, filename: string) => {
-    if (!window.confirm(`Remove "${filename}" from this ticket?`)) return
+    if (!(await confirm({
+      title: 'Remove attachment?',
+      message: (
+        <>
+          Remove "{filename}" from this ticket?
+        </>
+      ),
+      confirmLabel: 'Remove',
+      destructive: true,
+    }))) return
     try {
       const updated = await supportApi.deleteAttachment(ticketUuid, attachmentUuid)
       setTicket(updated)
@@ -975,6 +995,7 @@ function ChatView({
               <select
                 value={ticket.status}
                 onChange={(e) => handleStatusChange(e.target.value)}
+                aria-label="Change ticket status"
                 style={{ fontSize: 12, padding: '4px 8px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #d1d5db', fontFamily: 'inherit' }}
               >
                 <option value="open">Open</option>
@@ -1069,6 +1090,7 @@ function ChatView({
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       <textarea
                         autoFocus
+                        aria-label="Edit message"
                         value={editDraft}
                         onChange={(e) => setEditDraft(e.target.value)}
                         onKeyDown={(e) => {
@@ -1221,15 +1243,18 @@ function ChatView({
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
               <button
+                type="button"
                 onClick={() => fileInputRef.current?.click()}
                 title="Attach file"
+                aria-label="Attach file"
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4 }}
               >
                 <Paperclip size={16} />
               </button>
-              <input ref={fileInputRef} type="file" multiple onChange={handleFileUpload} style={{ display: 'none' }} />
+              <input ref={fileInputRef} type="file" multiple aria-label="Upload files" onChange={handleFileUpload} style={{ display: 'none' }} />
               <textarea
                 ref={replyRef}
+                aria-label={isInternalNote ? 'Internal note' : 'Reply'}
                 value={reply}
                 onChange={(e) => setReply(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
@@ -1463,6 +1488,7 @@ function WatcherBar({
             if (e.key === 'Escape') { setEmail(''); setAdding(false) }
           }}
           placeholder="user email…"
+          aria-label="Watcher email"
           type="email"
           disabled={busy}
           style={{
@@ -1561,6 +1587,7 @@ function TagEditor({
             if (e.key === 'Escape') { setDraft(''); setAdding(false) }
           }}
           placeholder="tag…"
+          aria-label="Add tag"
           style={{
             fontSize: 12, padding: '2px 8px', border: '1px solid #d1d5db',
             borderRadius: 9999, outline: 'none', minWidth: 80, fontFamily: 'inherit',

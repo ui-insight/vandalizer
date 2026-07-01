@@ -29,7 +29,7 @@ function Stars({ count, max = 3, size = 16 }: { count: number; max?: number; siz
           size={size}
           className={cn(
             'transition-all duration-300',
-            i < count ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300',
+            i < count ? 'text-yellow-400 fill-yellow-400' : 'text-gray-400',
           )}
         />
       ))}
@@ -110,7 +110,7 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
               className="w-10 h-10 flex items-center justify-center bg-highlight/10"
               style={{ borderRadius: 'var(--ui-radius, 12px)' }}
             >
-              <Icon size={22} className="text-highlight" />
+              <Icon size={22} className="text-highlight-on-light" />
             </div>
             <div>
               <h3 className="text-lg font-bold text-gray-900">
@@ -193,7 +193,7 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
                     <a
                       href="/"
                       className="text-xs font-medium mt-1 inline-block hover:underline"
-                      style={{ color: 'var(--highlight-color)' }}
+                      style={{ color: 'var(--highlight-on-light, #806600)' }}
                     >
                       Open Workspace &rarr;
                     </a>
@@ -252,7 +252,7 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
                 <button
                   onClick={() => handleTabChange('challenge')}
                   className="flex items-center gap-1 text-xs font-semibold hover:underline shrink-0"
-                  style={{ color: 'var(--highlight-color)' }}
+                  style={{ color: 'var(--highlight-on-light, #806600)' }}
                 >
                   Go to challenge
                   <ChevronRight size={12} />
@@ -438,7 +438,7 @@ export function ModuleDetail({ module, moduleProgress, onValidate, onComplete, o
             </div>
 
             {moduleProgress && (
-              <p className="mt-3 text-xs text-gray-400">
+              <p className="mt-3 text-xs text-gray-500">
                 {moduleProgress.attempts} attempt{moduleProgress.attempts !== 1 ? 's' : ''}
                 {completed && moduleProgress.completed ? ' \u00b7 Completed' : ''}
               </p>

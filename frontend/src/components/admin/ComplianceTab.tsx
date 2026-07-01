@@ -193,7 +193,7 @@ export function ComplianceTab() {
               <div style={{
                 flex: '1 1 140px', minWidth: 140,
                 padding: 12, borderRadius: 6,
-                backgroundColor: '#f9fafb', borderLeft: '3px solid #9ca3af',
+                backgroundColor: '#f9fafb', borderLeft: '3px solid #6b7280',
               }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 4 }}>
                   Unclassified
@@ -227,11 +227,11 @@ export function ComplianceTab() {
             <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ backgroundColor: '#f9fafb', color: '#6b7280', textAlign: 'left' }}>
-                  <th style={{ padding: '8px 16px', fontWeight: 500 }}>Title</th>
-                  <th style={{ padding: '8px 16px', fontWeight: 500 }}>Classification</th>
-                  <th style={{ padding: '8px 16px', fontWeight: 500 }}>Confidence</th>
-                  <th style={{ padding: '8px 16px', fontWeight: 500 }}>When</th>
-                  <th style={{ padding: '8px 16px', fontWeight: 500 }}>By</th>
+                  <th scope="col" style={{ padding: '8px 16px', fontWeight: 500 }}>Title</th>
+                  <th scope="col" style={{ padding: '8px 16px', fontWeight: 500 }}>Classification</th>
+                  <th scope="col" style={{ padding: '8px 16px', fontWeight: 500 }}>Confidence</th>
+                  <th scope="col" style={{ padding: '8px 16px', fontWeight: 500 }}>When</th>
+                  <th scope="col" style={{ padding: '8px 16px', fontWeight: 500 }}>By</th>
                 </tr>
               </thead>
               <tbody>
@@ -239,12 +239,12 @@ export function ComplianceTab() {
                   <tr key={row.uuid} style={{ borderTop: '1px solid #f3f4f6' }}>
                     <td style={{ padding: '10px 16px', maxWidth: 320, overflow: 'hidden',
                                  textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {row.title || <span style={{ color: '#9ca3af' }}>Untitled</span>}
+                      {row.title || <span style={{ color: '#6b7280' }}>Untitled</span>}
                     </td>
                     <td style={{ padding: '10px 16px' }}>
                       {row.classification
                         ? <ClassificationChip name={row.classification} levels={levels} />
-                        : <span style={{ color: '#9ca3af' }}>—</span>}
+                        : <span style={{ color: '#6b7280' }}>—</span>}
                     </td>
                     <td style={{ padding: '10px 16px', color: '#6b7280' }}>
                       {row.confidence != null ? `${Math.round(row.confidence * 100)}%` : '—'}
@@ -306,10 +306,10 @@ export function ComplianceTab() {
           <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ backgroundColor: '#f9fafb', color: '#6b7280', textAlign: 'left' }}>
-                <th style={{ padding: '8px 16px', fontWeight: 500 }}>Tier</th>
-                <th style={{ padding: '8px 16px', fontWeight: 500 }}>Retention period</th>
-                <th style={{ padding: '8px 16px', fontWeight: 500 }}>Grace before purge</th>
-                <th style={{ padding: '8px 16px', fontWeight: 500 }}>Documents</th>
+                <th scope="col" style={{ padding: '8px 16px', fontWeight: 500 }}>Tier</th>
+                <th scope="col" style={{ padding: '8px 16px', fontWeight: 500 }}>Retention period</th>
+                <th scope="col" style={{ padding: '8px 16px', fontWeight: 500 }}>Grace before purge</th>
+                <th scope="col" style={{ padding: '8px 16px', fontWeight: 500 }}>Documents</th>
               </tr>
             </thead>
             <tbody>

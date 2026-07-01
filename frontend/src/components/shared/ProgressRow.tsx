@@ -12,7 +12,14 @@ export function ProgressRow({ label, subtitle, pct, color }: ProgressRowProps) {
         <span>{label}</span>
         <span>{subtitle}</span>
       </div>
-      <div style={{ height: 6, backgroundColor: '#2a2a2a', borderRadius: 3, overflow: 'hidden' }}>
+      <div
+        role="progressbar"
+        aria-label={label}
+        aria-valuenow={Math.round(Math.min(100, Math.max(0, pct)))}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        style={{ height: 6, backgroundColor: '#2a2a2a', borderRadius: 3, overflow: 'hidden' }}
+      >
         <div style={{
           width: `${Math.min(100, Math.max(0, pct))}%`, height: '100%',
           backgroundColor: color, transition: 'width 0.3s',

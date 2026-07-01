@@ -203,6 +203,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Filter..."
+              aria-label="Filter automations"
               style={{
                 flex: 1, width: 60, padding: 0, fontSize: 11, fontFamily: 'inherit',
                 color: '#ccc', backgroundColor: 'transparent',
@@ -211,7 +212,9 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
             />
             {search && (
               <button
+                type="button"
                 onClick={() => setSearch('')}
+                aria-label="Clear filter"
                 style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, display: 'flex' }}
               >
                 <X size={10} style={{ color: '#555' }} />
@@ -224,7 +227,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
       {/* List */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 12px', position: 'relative' }}>
         {loading ? (
-          <div style={{ textAlign: 'center', padding: 40, color: '#888' }}>
+          <div role="status" aria-live="polite" aria-label="Loading automations" style={{ textAlign: 'center', padding: 40, color: '#888' }}>
             <Loader2 style={{ width: 20, height: 20, margin: '0 auto', animation: 'spin 1s linear infinite' }} />
           </div>
         ) : base.length === 0 && isProjectScoped && automations.length > 0 ? (
@@ -255,9 +258,18 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
               const badge = TRIGGER_BADGES[auto.trigger_type] || TRIGGER_BADGES.folder_watch
               const isRunning = activeIds.has(auto.id)
               return (
-                <button
+                <div
                   key={auto.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Open automation: ${auto.name}`}
                   onClick={() => openAutomation(auto.id)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      openAutomation(auto.id)
+                    }
+                  }}
                   style={{
                     display: 'block',
                     width: '100%',
@@ -292,6 +304,10 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
                       const pinned = projectPins.isPinned('automation', auto.id)
                       return (
                         <button
+                          type="button"
+                          role="switch"
+                          aria-checked={pinned}
+                          aria-label={pinned ? 'Unpin from this project' : 'Pin to this project'}
                           onClick={(e) => togglePin(e, auto.id)}
                           title={pinned ? 'Unpin from this project' : 'Pin to this project'}
                           style={{
@@ -330,7 +346,7 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
                   <div style={{ fontSize: 12, color: isRunning ? '#eab308' : '#999', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {isRunning ? 'Running...' : getActionName(auto)}
                   </div>
-                </button>
+                </div>
               )
             })}
           </div>

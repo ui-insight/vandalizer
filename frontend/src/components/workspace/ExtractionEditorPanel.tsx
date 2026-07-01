@@ -1,7 +1,7 @@
-import React, { Fragment, useCallback, useEffect, useRef, useState } from 'react'
+import React, { Fragment, useCallback, useEffect, useId, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ExtractionTutorial } from './ExtractionTutorial'
-import { X, Pencil, Loader2, Copy, Trash2, GripVertical, Plus, ChevronDown, ChevronRight, Play, TrendingUp, Sparkles, FileText, AlertTriangle, Eye, Shield, ShieldCheck, Download, Check, PenTool, Wrench, ClipboardCheck, SlidersHorizontal, Clock, Link2, FolderInput } from 'lucide-react'
+import { X, Pencil, Loader2, Copy, Trash2, GripVertical, Plus, ChevronDown, ChevronRight, ChevronUp, Play, TrendingUp, Sparkles, FileText, AlertTriangle, Eye, Shield, ShieldCheck, Download, Check, PenTool, Wrench, ClipboardCheck, SlidersHorizontal, Clock, Link2, FolderInput } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
 import { useAuth } from '../../hooks/useAuth'
@@ -472,6 +472,7 @@ export function ExtractionEditorPanel() {
           {editingTitle ? (
             <input
               autoFocus
+              aria-label="Extraction title"
               value={titleDraft}
               maxLength={MAX_NAME_LENGTH}
               onChange={(e) => setTitleDraft(e.target.value)}
@@ -505,18 +506,21 @@ export function ExtractionEditorPanel() {
                 {searchSet.title}
               </span>
               <button
+                type="button"
                 onClick={startEditTitle}
+                aria-label="Edit title"
+                title="Edit title"
                 style={{
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',
                   padding: 4,
-                  color: '#9ca3af',
+                  color: '#6b7280',
                   display: 'flex',
                   flexShrink: 0,
                 }}
               >
-                <Pencil style={{ width: 14, height: 14 }} />
+                <Pencil style={{ width: 14, height: 14 }} aria-hidden="true" />
               </button>
               {searchSet.quality_tier && (
                 <>
@@ -525,7 +529,7 @@ export function ExtractionEditorPanel() {
                 </>
               )}
               {searchSet.last_validated_at && (
-                <span style={{ fontSize: 11, color: '#9ca3af', whiteSpace: 'nowrap' }}>
+                <span style={{ fontSize: 11, color: '#6b7280', whiteSpace: 'nowrap' }}>
                   Validated {relativeTime(searchSet.last_validated_at)}
                 </span>
               )}
@@ -540,8 +544,10 @@ export function ExtractionEditorPanel() {
           </div>
         </div>
         <button
+          type="button"
           onClick={() => shareLink('extraction', searchSet.uuid, searchSet.title)}
           title="Copy share link"
+          aria-label="Copy share link"
           style={{
             background: 'none',
             border: 'none',
@@ -553,10 +559,13 @@ export function ExtractionEditorPanel() {
             flexShrink: 0,
           }}
         >
-          <Link2 style={{ width: 18, height: 18 }} />
+          <Link2 style={{ width: 18, height: 18 }} aria-hidden="true" />
         </button>
         <button
+          type="button"
           onClick={closeExtraction}
+          aria-label="Close extraction"
+          title="Close"
           style={{
             background: 'none',
             border: 'none',
@@ -568,7 +577,7 @@ export function ExtractionEditorPanel() {
             flexShrink: 0,
           }}
         >
-          <X style={{ width: 20, height: 20 }} />
+          <X style={{ width: 20, height: 20 }} aria-hidden="true" />
         </button>
       </div>
 
@@ -601,6 +610,8 @@ export function ExtractionEditorPanel() {
       {/* Tab bar */}
       <div
         ref={tabBarRef}
+        role="tablist"
+        aria-label="Extraction editor sections"
         style={{
           display: 'flex',
           gap: 0,
@@ -621,7 +632,26 @@ export function ExtractionEditorPanel() {
           return (
             <button
               key={tab}
+              type="button"
+              role="tab"
+              id={`extraction-tab-${tab}`}
+              aria-selected={isActive}
+              aria-controls={`extraction-tabpanel-${tab}`}
+              tabIndex={isActive ? 0 : -1}
               onClick={() => setActiveTab(tab)}
+              onKeyDown={(e) => {
+                const keys = TABS.map(t => t.key)
+                const idx = keys.indexOf(tab)
+                let next = idx
+                if (e.key === 'ArrowRight') next = (idx + 1) % keys.length
+                else if (e.key === 'ArrowLeft') next = (idx - 1 + keys.length) % keys.length
+                else if (e.key === 'Home') next = 0
+                else if (e.key === 'End') next = keys.length - 1
+                else return
+                e.preventDefault()
+                setActiveTab(keys[next])
+                tabBarRef.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus()
+              }}
               title={label}
               style={{
                 padding: tabsCompact ? '10px 12px' : '10px 16px',
@@ -639,10 +669,10 @@ export function ExtractionEditorPanel() {
                 gap: 6,
               }}
             >
-              <TabIcon style={{ width: 14, height: 14 }} />
+              <TabIcon style={{ width: 14, height: 14 }} aria-hidden="true" />
               {!tabsCompact && label}
               {tabDot && (
-                <span style={{
+                <span aria-hidden="true" style={{
                   width: 6, height: 6, borderRadius: '50%',
                   backgroundColor: tabDot, display: 'inline-block',
                 }} />
@@ -653,7 +683,7 @@ export function ExtractionEditorPanel() {
       </div>
 
       {/* Tab content — all tabs stay mounted to preserve state */}
-      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: activeTab === 'design' ? undefined : 'none' }}>
+      <div role="tabpanel" id="extraction-tabpanel-design" aria-labelledby="extraction-tab-design" hidden={activeTab !== 'design'} style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: activeTab === 'design' ? undefined : 'none' }}>
         <DesignTab
           items={items}
           itemsLoading={itemsLoading}
@@ -681,6 +711,7 @@ export function ExtractionEditorPanel() {
         ref={templateInputRef}
         type="file"
         accept=".pdf"
+        aria-label="Attach template PDF"
         style={{ display: 'none' }}
         onChange={(e) => {
           const f = e.target.files?.[0]
@@ -692,6 +723,7 @@ export function ExtractionEditorPanel() {
         ref={importDefInputRef}
         type="file"
         accept=".json"
+        aria-label="Import extraction definition JSON"
         style={{ display: 'none' }}
         onChange={async (e) => {
           const f = e.target.files?.[0]
@@ -712,7 +744,7 @@ export function ExtractionEditorPanel() {
           }
         }}
       />
-      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: activeTab === 'tools' ? undefined : 'none' }}>
+      <div role="tabpanel" id="extraction-tabpanel-tools" aria-labelledby="extraction-tab-tools" hidden={activeTab !== 'tools'} style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: activeTab === 'tools' ? undefined : 'none' }}>
         <ToolsTab
           onClone={handleClone}
           onDelete={handleDelete}
@@ -731,7 +763,7 @@ export function ExtractionEditorPanel() {
         />
       </div>
       {openExtractionId && (
-        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: activeTab === 'validate' ? undefined : 'none' }}>
+        <div role="tabpanel" id="extraction-tabpanel-validate" aria-labelledby="extraction-tab-validate" hidden={activeTab !== 'validate'} style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: activeTab === 'validate' ? undefined : 'none' }}>
           <ValidateTab
             searchSetUuid={openExtractionId}
             itemTitle={searchSet?.title}
@@ -745,7 +777,7 @@ export function ExtractionEditorPanel() {
           />
         </div>
       )}
-      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: activeTab === 'advanced' ? undefined : 'none' }}>
+      <div role="tabpanel" id="extraction-tabpanel-advanced" aria-labelledby="extraction-tab-advanced" hidden={activeTab !== 'advanced'} style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: activeTab === 'advanced' ? undefined : 'none' }}>
         <AdvancedTab
           config={config}
           useDefaults={useDefaults}
@@ -756,7 +788,7 @@ export function ExtractionEditorPanel() {
           onImportDefinition={() => importDefInputRef.current?.click()}
         />
       </div>
-      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: activeTab === 'history' ? undefined : 'none' }}>
+      <div role="tabpanel" id="extraction-tabpanel-history" aria-labelledby="extraction-tab-history" hidden={activeTab !== 'history'} style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: activeTab === 'history' ? undefined : 'none' }}>
         {openExtractionId && (
           <RunHistoryTab
             fetchHistory={() => getExtractionHistory(openExtractionId)}
@@ -771,11 +803,12 @@ export function ExtractionEditorPanel() {
           padding: '8px 24px', backgroundColor: '#eff6ff', borderTop: '1px solid #dbeafe',
           display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
         }}>
-          <Shield style={{ width: 14, height: 14, color: '#2563eb', flexShrink: 0 }} />
+          <Shield style={{ width: 14, height: 14, color: '#2563eb', flexShrink: 0 }} aria-hidden="true" />
           <span style={{ fontSize: 12, color: '#1e40af', flex: 1 }}>
             Check reliability with validation
           </span>
           <button
+            type="button"
             onClick={() => setActiveTab('validate')}
             style={{
               fontSize: 12, fontWeight: 600, color: '#2563eb', background: 'none',
@@ -785,16 +818,19 @@ export function ExtractionEditorPanel() {
             Validate
           </button>
           <button
+            type="button"
+            aria-label="Dismiss"
+            title="Dismiss"
             onClick={() => {
               setNudgeDismissed(true)
               if (openExtractionId) localStorage.setItem(`quality-nudge-dismissed-${openExtractionId}`, '1')
             }}
             style={{
               background: 'none', border: 'none', cursor: 'pointer', padding: 2,
-              color: '#9ca3af', display: 'flex',
+              color: '#6b7280', display: 'flex',
             }}
           >
-            <X style={{ width: 12, height: 12 }} />
+            <X style={{ width: 12, height: 12 }} aria-hidden="true" />
           </button>
         </div>
       )}
@@ -815,6 +851,7 @@ export function ExtractionEditorPanel() {
           <div style={{ flex: 1, position: 'relative' }}>
             <input
               value={newTerm}
+              aria-label="Add term to extract"
               onChange={(e) => setNewTerm(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleAddItem()}
               placeholder="Add term to extract..."
@@ -830,6 +867,7 @@ export function ExtractionEditorPanel() {
               }}
             />
             <button
+              type="button"
               onClick={handleAddItem}
               style={{
                 position: 'absolute',
@@ -869,6 +907,7 @@ export function ExtractionEditorPanel() {
             </label>
           )}
           <button
+            type="button"
             onClick={handleRun}
             disabled={running || (selectedDocUuids.length === 0 && !activeProjectUuid)}
             title={
@@ -899,7 +938,7 @@ export function ExtractionEditorPanel() {
           >
             {running ? (
               <>
-                <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />
+                <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} aria-hidden="true" />
                 RUNNING...
               </>
             ) : (
@@ -1042,6 +1081,16 @@ function DesignTab({
     setOverIdx(null)
   }
 
+  // Keyboard-accessible reorder (drag-and-drop is not keyboard operable)
+  const moveItem = (idx: number, dir: -1 | 1) => {
+    const target = idx + dir
+    if (target < 0 || target >= items.length) return
+    const reordered = [...items]
+    const [moved] = reordered.splice(idx, 1)
+    reordered.splice(target, 0, moved)
+    onReorder(reordered.map(i => i.id))
+  }
+
   return (
     <div style={{ padding: 24 }}>
       {/* Section header */}
@@ -1057,7 +1106,10 @@ function DesignTab({
         {hasResults && (
           <div ref={exportMenuRef} style={{ position: 'relative' }}>
             <button
+              type="button"
               onClick={() => setExportMenuOpen(v => !v)}
+              aria-haspopup="menu"
+              aria-expanded={exportMenuOpen}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -1071,12 +1123,13 @@ function DesignTab({
                 padding: 0,
               }}
             >
-              <Download style={{ width: 12, height: 12 }} />
+              <Download style={{ width: 12, height: 12 }} aria-hidden="true" />
               Export
-              <ChevronDown style={{ width: 10, height: 10 }} />
+              <ChevronDown style={{ width: 10, height: 10 }} aria-hidden="true" />
             </button>
             {exportMenuOpen && (
               <div
+                role="menu"
                 style={{
                   position: 'absolute',
                   right: 0,
@@ -1099,6 +1152,8 @@ function DesignTab({
                 ].map(opt => (
                   <button
                     key={opt.label}
+                    type="button"
+                    role="menuitem"
                     onClick={() => { setExportMenuOpen(false); opt.action() }}
                     style={{
                       display: 'flex',
@@ -1130,6 +1185,8 @@ function DesignTab({
       {/* Running status banner */}
       {running && tip && (
         <div
+          role="status"
+          aria-live="polite"
           style={{
             display: 'flex',
             alignItems: 'flex-start',
@@ -1142,6 +1199,7 @@ function DesignTab({
           }}
         >
           <Loader2
+            aria-hidden="true"
             style={{
               width: 16,
               height: 16,
@@ -1177,25 +1235,47 @@ function DesignTab({
           display: 'flex', alignItems: 'center', gap: 6,
           padding: '8px 0', borderBottom: '1px solid #e5e7eb',
         }}>
-          <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 500 }}>
+          <span id="result-set-selector-label" style={{ fontSize: 12, color: '#6b7280', fontWeight: 500 }}>
             Document:
           </span>
-          {resultSets.map((_, i) => (
-            <button
-              key={i}
-              onClick={() => onSetActiveResultIdx(i)}
-              style={{
-                padding: '3px 10px', fontSize: 12, fontWeight: 600,
-                fontFamily: 'inherit', borderRadius: 12, border: 'none',
-                cursor: 'pointer', transition: 'all 0.15s',
-                backgroundColor: i === activeResultIdx ? 'var(--highlight-color, #eab308)' : '#f3f4f6',
-                color: i === activeResultIdx ? 'var(--highlight-text-color, #000)' : '#374151',
-              }}
-            >
-              {i + 1}
-            </button>
-          ))}
-          <span style={{ fontSize: 11, color: '#9ca3af', marginLeft: 4 }}>
+          <div
+            role="radiogroup"
+            aria-labelledby="result-set-selector-label"
+            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+            onKeyDown={(e) => {
+              let next = activeResultIdx
+              if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (activeResultIdx + 1) % resultSets.length
+              else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (activeResultIdx - 1 + resultSets.length) % resultSets.length
+              else if (e.key === 'Home') next = 0
+              else if (e.key === 'End') next = resultSets.length - 1
+              else return
+              e.preventDefault()
+              onSetActiveResultIdx(next)
+              e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]')[next]?.focus()
+            }}
+          >
+            {resultSets.map((_, i) => (
+              <button
+                key={i}
+                type="button"
+                role="radio"
+                aria-checked={i === activeResultIdx}
+                aria-label={`Document ${i + 1}`}
+                tabIndex={i === activeResultIdx ? 0 : -1}
+                onClick={() => onSetActiveResultIdx(i)}
+                style={{
+                  padding: '3px 10px', fontSize: 12, fontWeight: 600,
+                  fontFamily: 'inherit', borderRadius: 12, border: 'none',
+                  cursor: 'pointer', transition: 'all 0.15s',
+                  backgroundColor: i === activeResultIdx ? 'var(--highlight-color, #eab308)' : '#f3f4f6',
+                  color: i === activeResultIdx ? 'var(--highlight-text-color, #000)' : '#374151',
+                }}
+              >
+                {i + 1}
+              </button>
+            ))}
+          </div>
+          <span style={{ fontSize: 11, color: '#6b7280', marginLeft: 4 }}>
             {resultSets.length} result{resultSets.length !== 1 ? 's' : ''}
           </span>
         </div>
@@ -1231,6 +1311,7 @@ function DesignTab({
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <GripVertical
+                    aria-hidden="true"
                     style={{
                       width: 14,
                       height: 14,
@@ -1243,7 +1324,7 @@ function DesignTab({
                     style={{
                       fontSize: 12,
                       fontWeight: 500,
-                      color: '#9ca3af',
+                      color: '#6b7280',
                       width: 20,
                       textAlign: 'right',
                       flexShrink: 0,
@@ -1255,6 +1336,7 @@ function DesignTab({
                   {editingId === item.id ? (
                     <input
                       autoFocus
+                      aria-label="Edit field name"
                       value={editDraft}
                       onChange={(e) => setEditDraft(e.target.value)}
                       onBlur={() => {
@@ -1297,40 +1379,85 @@ function DesignTab({
                     </span>
                   )}
                   <button
+                    type="button"
+                    onClick={() => moveItem(idx, -1)}
+                    disabled={idx === 0}
+                    aria-label={`Move ${item.searchphrase} up`}
+                    title="Move up"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: idx === 0 ? 'default' : 'pointer',
+                      padding: 4,
+                      color: '#6b7280',
+                      opacity: idx === 0 ? 0.4 : 1,
+                      display: 'flex',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <ChevronUp style={{ width: 14, height: 14 }} aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveItem(idx, 1)}
+                    disabled={idx === items.length - 1}
+                    aria-label={`Move ${item.searchphrase} down`}
+                    title="Move down"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: idx === items.length - 1 ? 'default' : 'pointer',
+                      padding: 4,
+                      color: '#6b7280',
+                      opacity: idx === items.length - 1 ? 0.4 : 1,
+                      display: 'flex',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <ChevronDown style={{ width: 14, height: 14 }} aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => {
                       const opening = expandedSettingsId !== item.id
                       setExpandedSettingsId(opening ? item.id : null)
                       if (opening) setEnumDraft(item.enum_values.join(', '))
                     }}
+                    aria-expanded={expandedSettingsId === item.id}
+                    aria-controls={`field-settings-${item.id}`}
+                    aria-label={`Field settings for ${item.searchphrase}`}
                     style={{
                       background: 'none',
                       border: 'none',
                       cursor: 'pointer',
                       padding: 4,
-                      color: '#9ca3af',
+                      color: '#6b7280',
                       display: 'flex',
                       flexShrink: 0,
                     }}
                     title="Field settings"
                   >
                     {expandedSettingsId === item.id
-                      ? <ChevronDown style={{ width: 14, height: 14 }} />
-                      : <ChevronRight style={{ width: 14, height: 14 }} />
+                      ? <ChevronDown style={{ width: 14, height: 14 }} aria-hidden="true" />
+                      : <ChevronRight style={{ width: 14, height: 14 }} aria-hidden="true" />
                     }
                   </button>
                   <button
+                    type="button"
                     onClick={() => onRemoveItem(item.id)}
+                    aria-label={`Remove ${item.searchphrase}`}
+                    title="Remove"
                     style={{
                       background: 'none',
                       border: 'none',
                       cursor: 'pointer',
                       padding: 4,
-                      color: '#9ca3af',
+                      color: '#6b7280',
                       display: 'flex',
                       flexShrink: 0,
                     }}
                   >
-                    <X style={{ width: 14, height: 14 }} />
+                    <X style={{ width: 14, height: 14 }} aria-hidden="true" />
                   </button>
                 </div>
                 {resultVal !== undefined && (
@@ -1367,7 +1494,7 @@ function DesignTab({
                   </div>
                 )}
                 {expandedSettingsId === item.id && (
-                  <div style={{
+                  <div id={`field-settings-${item.id}`} style={{
                     marginTop: 6,
                     marginLeft: 42,
                     padding: '8px 10px',
@@ -1384,11 +1511,12 @@ function DesignTab({
                         style={{ accentColor: '#2563eb' }}
                       />
                       <span style={{ color: '#374151', fontWeight: 500 }}>Optional</span>
-                      <span style={{ color: '#9ca3af' }}>skip accuracy penalty when not found</span>
+                      <span style={{ color: '#6b7280' }}>skip accuracy penalty when not found</span>
                     </label>
                     <div>
-                      <div style={{ color: '#374151', fontWeight: 500, marginBottom: 4 }}>Allowed values</div>
+                      <label htmlFor={`allowed-values-${item.id}`} style={{ display: 'block', color: '#374151', fontWeight: 500, marginBottom: 4 }}>Allowed values</label>
                       <input
+                        id={`allowed-values-${item.id}`}
                         value={enumDraft}
                         onChange={(e) => setEnumDraft(e.target.value)}
                         onBlur={() => {
@@ -1411,7 +1539,7 @@ function DesignTab({
                           boxSizing: 'border-box',
                         }}
                       />
-                      <div style={{ color: '#9ca3af', fontSize: 11, marginTop: 3 }}>
+                      <div style={{ color: '#6b7280', fontSize: 11, marginTop: 3 }}>
                         Comma-separated. LLM will pick from these values.
                       </div>
                     </div>
@@ -1450,7 +1578,7 @@ function QualityPulse({ searchSetUuid, itemCount = 0 }: { searchSetUuid?: string
         borderRadius: 8, backgroundColor: '#fafafa',
         display: 'flex', alignItems: 'center', gap: 12,
       }}>
-        <Shield style={{ width: 20, height: 20, color: '#9ca3af', flexShrink: 0 }} />
+        <Shield aria-hidden="true" style={{ width: 20, height: 20, color: '#6b7280', flexShrink: 0 }} />
         <div style={{ flex: 1 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>No validation data yet</div>
           <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
@@ -1477,7 +1605,7 @@ function QualityPulse({ searchSetUuid, itemCount = 0 }: { searchSetUuid?: string
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <QualityBadge tier={status.tier} score={status.score} />
           {status.last_validated_at && (
-            <span style={{ fontSize: 11, color: '#9ca3af' }}>
+            <span style={{ fontSize: 11, color: '#6b7280' }}>
               {relativeTime(status.last_validated_at)}
             </span>
           )}
@@ -1611,9 +1739,18 @@ function ToolCard({
   secondaryAction?: { label: string; onClick: () => void; disabled?: boolean }
 }) {
   return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
+    <div
+      role="button"
+      tabIndex={disabled ? -1 : 0}
+      aria-disabled={disabled || undefined}
+      onClick={() => { if (!disabled) onClick() }}
+      onKeyDown={(e) => {
+        if (disabled) return
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onClick()
+        }
+      }}
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -1640,7 +1777,7 @@ function ToolCard({
           color: danger ? '#dc2626' : '#202124',
         }}
       >
-        {danger && <Trash2 style={{ width: 14, height: 14 }} />}
+        {danger && <Trash2 style={{ width: 14, height: 14 }} aria-hidden="true" />}
         {title}
       </div>
       <div style={{ fontSize: 12, color: '#5f6368', lineHeight: 1.4 }}>{description}</div>
@@ -1649,13 +1786,22 @@ function ToolCard({
           <div style={{ borderTop: '1px solid #f3f4f6', marginTop: 4 }} />
           <span
             role="button"
+            tabIndex={secondaryAction.disabled ? -1 : 0}
+            aria-disabled={secondaryAction.disabled || undefined}
             onClick={(e) => {
               e.stopPropagation()
               if (!secondaryAction.disabled) secondaryAction.onClick()
             }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                e.stopPropagation()
+                if (!secondaryAction.disabled) secondaryAction.onClick()
+              }
+            }}
             style={{
               fontSize: 11,
-              color: secondaryAction.disabled ? '#9ca3af' : '#2563eb',
+              color: secondaryAction.disabled ? '#6b7280' : '#2563eb',
               cursor: secondaryAction.disabled ? 'not-allowed' : 'pointer',
               fontWeight: 500,
               paddingTop: 2,
@@ -1665,7 +1811,7 @@ function ToolCard({
           </span>
         </>
       )}
-    </button>
+    </div>
   )
 }
 
@@ -1746,6 +1892,7 @@ function AdvancedTab({
               Mode
             </div>
             <select
+              aria-label="Mode"
               value={mode}
               onChange={(e) =>
                 updateField({ mode: e.target.value as 'one_pass' | 'two_pass' })
@@ -1822,8 +1969,9 @@ function AdvancedTab({
             </label>
             {config.key_chunking?.enabled && (
               <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-                <label style={{ fontSize: 13, color: '#5f6368' }}>Max keys per chunk:</label>
+                <label htmlFor="max-keys-per-chunk" style={{ fontSize: 13, color: '#5f6368' }}>Max keys per chunk:</label>
                 <input
+                  id="max-keys-per-chunk"
                   type="number"
                   min={1}
                   value={config.key_chunking?.max_keys ?? 10}
@@ -1997,9 +2145,21 @@ print(response.json())`
         <label style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
           Run this extraction via API
         </label>
-          <div style={{ display: 'flex', gap: 4 }}>
-            <button onClick={() => setLang('python')} style={tabStyle(lang === 'python')}>Python</button>
-            <button onClick={() => setLang('curl')} style={tabStyle(lang === 'curl')}>cURL</button>
+          <div
+            role="radiogroup"
+            aria-label="API example language"
+            style={{ display: 'flex', gap: 4 }}
+            onKeyDown={(e) => {
+              if (e.key === 'ArrowRight' || e.key === 'ArrowLeft' || e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault()
+                const next = lang === 'python' ? 'curl' : 'python'
+                setLang(next)
+                e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]')[next === 'python' ? 0 : 1]?.focus()
+              }
+            }}
+          >
+            <button type="button" role="radio" aria-checked={lang === 'python'} tabIndex={lang === 'python' ? 0 : -1} onClick={() => setLang('python')} style={tabStyle(lang === 'python')}>Python</button>
+            <button type="button" role="radio" aria-checked={lang === 'curl'} tabIndex={lang === 'curl' ? 0 : -1} onClick={() => setLang('curl')} style={tabStyle(lang === 'curl')}>cURL</button>
           </div>
         </div>
 
@@ -2010,7 +2170,7 @@ print(response.json())`
         </div>
 
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
             Endpoint
           </div>
           <div style={{ ...codeBlockStyle, whiteSpace: 'nowrap' }}>
@@ -2019,7 +2179,7 @@ print(response.json())`
         </div>
 
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
             This extraction's UUID
           </div>
           <div style={{ ...codeBlockStyle, whiteSpace: 'nowrap' }}>
@@ -2055,7 +2215,7 @@ print(response.json())`
         />
 
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
             Response
           </div>
           <div style={codeBlockStyle}>
@@ -2064,7 +2224,7 @@ print(response.json())`
         </div>
 
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
             Status lookup (optional)
           </div>
           <div style={{ ...codeBlockStyle, whiteSpace: 'nowrap', marginBottom: 8 }}>
@@ -2080,7 +2240,7 @@ print(response.json())`
           />
         </div>
 
-      <div style={{ fontSize: 11, color: '#9ca3af', lineHeight: 1.6, marginTop: 8 }}>
+      <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.6, marginTop: 8 }}>
         Parameters: <code>search_set_uuid</code> (required), <code>files</code> (optional, multipart uploads),{' '}
         <code>document_uuids</code> (optional, comma-separated UUIDs of existing documents),{' '}
         <code>text</code> (optional, raw text to extract from) with an optional{' '}
@@ -2088,7 +2248,7 @@ print(response.json())`
         <code>text</code> must be provided.
       </div>
 
-      <div style={{ fontSize: 11, color: '#9ca3af', lineHeight: 1.6, marginTop: 8 }}>
+      <div style={{ fontSize: 11, color: '#6b7280', lineHeight: 1.6, marginTop: 8 }}>
         <strong style={{ color: '#6b7280' }}>Empty <code>results</code>?</strong>{' '}
         Check the <code>documents</code> array in the response. <code>raw_text_len: 0</code>{' '}
         with <code>task_status: "complete"</code> usually means a scanned PDF where the OCR
@@ -2107,10 +2267,11 @@ function ApiCodeBlock({ title, code, id, copied, onCopy, style }: {
   return (
     <div style={{ marginBottom: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           {title}
         </div>
         <button
+          type="button"
           onClick={() => onCopy(code, id)}
           style={{
             display: 'flex', alignItems: 'center', gap: 4, padding: '2px 8px', fontSize: 11,
@@ -2119,7 +2280,7 @@ function ApiCodeBlock({ title, code, id, copied, onCopy, style }: {
             color: copied === id ? '#16a34a' : '#6b7280',
           }}
         >
-          {copied === id ? <Check style={{ width: 12, height: 12 }} /> : <Copy style={{ width: 12, height: 12 }} />}
+          {copied === id ? <Check style={{ width: 12, height: 12 }} aria-hidden="true" /> : <Copy style={{ width: 12, height: 12 }} aria-hidden="true" />}
           {copied === id ? 'Copied' : 'Copy'}
         </button>
       </div>
@@ -2139,6 +2300,7 @@ function PassSettings({
   onChange: (v: { thinking?: boolean; structured?: boolean; model?: string }) => void
   models: ModelInfo[]
 }) {
+  const modelSelectId = useId()
   return (
     <div>
       <div style={{ fontSize: 13, fontWeight: 600, color: '#202124', marginBottom: 8 }}>
@@ -2162,8 +2324,9 @@ function PassSettings({
           <span style={{ fontSize: 13, color: '#374151' }}>Structured</span>
         </label>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <label style={{ fontSize: 13, color: '#5f6368' }}>Model:</label>
+          <label htmlFor={modelSelectId} style={{ fontSize: 13, color: '#5f6368' }}>Model:</label>
           <select
+            id={modelSelectId}
             value={value.model ?? ''}
             onChange={(e) => onChange({ ...value, model: e.target.value || undefined })}
             style={{
@@ -2316,15 +2479,24 @@ function ValidationProgressDisplay({
   const modelName = (mode === 'two_pass' ? config.two_pass?.pass1?.model : config.one_pass?.model) || 'system default'
 
   return (
-    <div style={{
+    <div aria-live="off" style={{
       border: '1px solid #dbeafe', borderRadius: 10, padding: 20,
       backgroundColor: '#f0f5ff',
     }}>
+      {/* Single terse live region — announces the phase only, not the whole ticking panel */}
+      <span className="sr-only" role="status" aria-live="polite">{progress.phase}</span>
       {/* Progress bar */}
-      <div style={{
-        height: 6, borderRadius: 3, backgroundColor: '#dbeafe',
-        marginBottom: 16, overflow: 'hidden',
-      }}>
+      <div
+        role="progressbar"
+        aria-valuenow={progress.pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label="Validation progress"
+        style={{
+          height: 6, borderRadius: 3, backgroundColor: '#dbeafe',
+          marginBottom: 16, overflow: 'hidden',
+        }}
+      >
         <div style={{
           height: '100%', borderRadius: 3,
           backgroundColor: '#3b82f6',
@@ -2335,7 +2507,7 @@ function ValidationProgressDisplay({
 
       {/* Current operation */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-        <Loader2 style={{ width: 16, height: 16, color: '#3b82f6', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
+        <Loader2 aria-hidden="true" style={{ width: 16, height: 16, color: '#3b82f6', animation: 'spin 1s linear infinite', flexShrink: 0 }} />
         <div>
           <div style={{ fontSize: 13, fontWeight: 600, color: '#1e40af' }}>
             Running {sources.length} {sources.length === 1 ? 'source' : 'sources'} &times; {numRuns} {numRuns === 1 ? 'replicate' : 'replicates'}
@@ -2794,17 +2966,27 @@ function ValidateTab({
       {/* Test cases — the shared input to tuning + detailed validation. */}
       <div>
         <div
+          role={sources.length > 0 ? 'button' : undefined}
+          tabIndex={sources.length > 0 ? 0 : undefined}
+          aria-expanded={sources.length > 0 ? !sourcesCollapsed : undefined}
+          aria-controls={sources.length > 0 ? 'test-cases-content' : undefined}
           style={{
             display: 'flex', alignItems: 'center', gap: 6, marginBottom: sourcesCollapsed ? 0 : 12,
             cursor: sources.length > 0 ? 'pointer' : 'default',
             userSelect: 'none',
           }}
           onClick={() => sources.length > 0 && setSourcesCollapsed(c => !c)}
+          onKeyDown={(e) => {
+            if (sources.length > 0 && (e.key === 'Enter' || e.key === ' ')) {
+              e.preventDefault()
+              setSourcesCollapsed(c => !c)
+            }
+          }}
         >
           {sources.length > 0 && (
             sourcesCollapsed
-              ? <ChevronRight style={{ width: 14, height: 14, color: '#9ca3af' }} />
-              : <ChevronDown style={{ width: 14, height: 14, color: '#9ca3af' }} />
+              ? <ChevronRight style={{ width: 14, height: 14, color: '#6b7280' }} aria-hidden="true" />
+              : <ChevronDown style={{ width: 14, height: 14, color: '#6b7280' }} aria-hidden="true" />
           )}
           <span style={{ fontSize: 14, fontWeight: 600, color: '#202124' }}>
             Test cases
@@ -2885,18 +3067,18 @@ function ValidateTab({
         })()}
 
         {sourcesCollapsed ? null : loadingSources ? (
-          <div style={{
+          <div role="status" style={{
             textAlign: 'center', color: '#888', fontSize: 13, padding: '24px 0',
             border: '1px dashed #d1d5db', borderRadius: 8,
           }}>
-            <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite', display: 'inline-block' }} /> Loading sources...
+            <Loader2 aria-hidden="true" style={{ width: 14, height: 14, animation: 'spin 1s linear infinite', display: 'inline-block' }} /> Loading sources...
           </div>
         ) : sources.length === 0 ? (
           <div style={{
             textAlign: 'center', padding: '32px 16px',
             border: '1px dashed #d1d5db', borderRadius: 8,
           }}>
-            <Shield style={{ width: 32, height: 32, color: '#9ca3af', margin: '0 auto 12px' }} />
+            <Shield aria-hidden="true" style={{ width: 32, height: 32, color: '#6b7280', margin: '0 auto 12px' }} />
             <div style={{ fontSize: 14, fontWeight: 600, color: '#374151', marginBottom: 4 }}>
               Validate your extraction
             </div>
@@ -2905,6 +3087,7 @@ function ValidateTab({
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
               <button
+                type="button"
                 onClick={() => setShowDocPicker(true)}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -2913,9 +3096,10 @@ function ValidateTab({
                   backgroundColor: '#191919', color: '#fff', cursor: 'pointer',
                 }}
               >
-                <Plus style={{ width: 14, height: 14 }} /> Add Documents
+                <Plus style={{ width: 14, height: 14 }} aria-hidden="true" /> Add Documents
               </button>
               <button
+                type="button"
                 onClick={addTextSource}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -2930,7 +3114,7 @@ function ValidateTab({
             </div>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+          <div id="test-cases-content" style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
             {sources.map((src, i) => {
               const isUuidLike = src.document_title && /^[0-9a-f-]{20,}$/i.test(src.document_title)
               const label = (!isUuidLike && src.document_title) || (src.source_type === 'text' ? `Text Chunk ${i + 1}` : `Document ${i + 1}`)
@@ -2938,13 +3122,13 @@ function ValidateTab({
               return (
                 <div key={src.id} style={{ padding: '10px 0', borderBottom: '1px solid #f0f0f0' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <FileText style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0 }} />
+                    <FileText aria-hidden="true" style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0 }} />
                     <span style={{ fontSize: 13, color: '#202124', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {label}
                     </span>
                     {docMissing && (
                       <span
-                        style={{ fontSize: 11, color: '#9ca3af', fontStyle: 'italic', flexShrink: 0 }}
+                        style={{ fontSize: 11, color: '#6b7280', fontStyle: 'italic', flexShrink: 0 }}
                         title="The source document was deleted. Validation still runs against the saved snapshot."
                       >
                         source deleted
@@ -2959,38 +3143,48 @@ function ValidateTab({
                     </span>
                     {src.source_type === 'document' && src.document_uuid && src.document_exists !== false && (
                       <button
+                        type="button"
                         onClick={() => viewDocument(src.document_uuid!, src.document_title || label)}
-                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#9ca3af', display: 'flex' }}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#6b7280', display: 'flex' }}
                         title="View document"
+                        aria-label={`View document ${label}`}
                       >
-                        <Eye style={{ width: 12, height: 12 }} />
+                        <Eye style={{ width: 12, height: 12 }} aria-hidden="true" />
                       </button>
                     )}
                     <button
+                      type="button"
                       onClick={() => toggleExpanded(src.id)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#9ca3af', display: 'flex' }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#6b7280', display: 'flex' }}
                       title="Expected Values"
+                      aria-label={`Expected values for ${label}`}
+                      aria-expanded={!!src.expanded}
+                      aria-controls={`source-expected-${src.id}`}
                     >
                       {src.expanded
-                        ? <ChevronDown style={{ width: 12, height: 12 }} />
-                        : <ChevronRight style={{ width: 12, height: 12 }} />
+                        ? <ChevronDown style={{ width: 12, height: 12 }} aria-hidden="true" />
+                        : <ChevronRight style={{ width: 12, height: 12 }} aria-hidden="true" />
                       }
                     </button>
                     <button
+                      type="button"
                       onClick={() => removeSource(src.id)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#9ca3af', display: 'flex' }}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#6b7280', display: 'flex' }}
+                      aria-label={`Remove ${label}`}
+                      title="Remove"
                     >
-                      <X style={{ width: 12, height: 12 }} />
+                      <X style={{ width: 12, height: 12 }} aria-hidden="true" />
                     </button>
                   </div>
 
                   {src.expanded && (
-                    <div style={{ marginTop: 8, marginLeft: 22 }}>
+                    <div id={`source-expected-${src.id}`} style={{ marginTop: 8, marginLeft: 22 }}>
                       {/* Text input for text sources */}
                       {src.source_type === 'text' && (
                         <div style={{ marginBottom: 8 }}>
                           <textarea
                             value={src.source_text ?? ''}
+                            aria-label="Source text"
                             onChange={e => updateSourceText(src.id, e.target.value)}
                             placeholder="Paste the text to extract from..."
                             rows={3}
@@ -3008,26 +3202,27 @@ function ValidateTab({
                         </div>
                         {src.source_type === 'document' && src.document_uuid && src.document_exists !== false && (
                           <button
+                            type="button"
                             onClick={() => fillFromExtraction(src)}
                             disabled={fillingSourceId === src.id}
                             style={{
                               display: 'inline-flex', alignItems: 'center', gap: 3,
                               padding: '2px 7px', fontSize: 11, fontFamily: 'inherit',
                               borderRadius: 4, border: '1px solid #d1d5db', backgroundColor: '#fff',
-                              color: fillingSourceId === src.id ? '#9ca3af' : '#5f6368',
+                              color: fillingSourceId === src.id ? '#6b7280' : '#5f6368',
                               cursor: fillingSourceId === src.id ? 'not-allowed' : 'pointer',
                             }}
                           >
                             {fillingSourceId === src.id ? (
-                              <><Loader2 style={{ width: 10, height: 10, animation: 'spin 1s linear infinite' }} /> Filling...</>
+                              <><Loader2 aria-hidden="true" style={{ width: 10, height: 10, animation: 'spin 1s linear infinite' }} /> Filling...</>
                             ) : (
-                              <><Sparkles style={{ width: 10, height: 10 }} /> Fill from extraction</>
+                              <><Sparkles aria-hidden="true" style={{ width: 10, height: 10 }} /> Fill from extraction</>
                             )}
                           </button>
                         )}
                       </div>
                       {fillError && !fillingSourceId && (
-                        <div style={{ fontSize: 11, color: '#dc2626', marginBottom: 6 }}>
+                        <div role="alert" style={{ fontSize: 11, color: '#dc2626', marginBottom: 6 }}>
                           {fillError}
                         </div>
                       )}
@@ -3047,6 +3242,7 @@ function ValidateTab({
                               </span>
                               <input
                                 value={src.expected_values[item.searchphrase] ?? ''}
+                                aria-label={`Expected value for ${item.searchphrase}`}
                                 onChange={e => updateExpectedValue(src.id, item.searchphrase, e.target.value)}
                                 placeholder={item.is_optional ? 'Expected value (optional field)' : 'Expected value'}
                                 style={{
@@ -3063,6 +3259,7 @@ function ValidateTab({
                                 <input
                                   type="checkbox"
                                   checked={item.is_optional}
+                                  aria-label={`Mark ${item.searchphrase} as optional`}
                                   onChange={() => onUpdateItem(item.id, { is_optional: !item.is_optional })}
                                   style={{ accentColor: '#2563eb', width: 12, height: 12 }}
                                 />
@@ -3088,6 +3285,7 @@ function ValidateTab({
         {!sourcesCollapsed && (
           <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
             <button
+              type="button"
               onClick={() => setShowDocPicker(true)}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -3096,9 +3294,10 @@ function ValidateTab({
                 color: '#202124', cursor: 'pointer',
               }}
             >
-              <Plus style={{ width: 12, height: 12 }} /> Add Documents
+              <Plus style={{ width: 12, height: 12 }} aria-hidden="true" /> Add Documents
             </button>
             <button
+              type="button"
               onClick={addTextSource}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -3107,7 +3306,7 @@ function ValidateTab({
                 color: '#202124', cursor: 'pointer',
               }}
             >
-              <Plus style={{ width: 12, height: 12 }} /> Add Text
+              <Plus style={{ width: 12, height: 12 }} aria-hidden="true" /> Add Text
             </button>
           </div>
         )}
@@ -3115,6 +3314,7 @@ function ValidateTab({
         {/* Quick add selected docs */}
         {!sourcesCollapsed && selectedDocUuids.length > 0 && (
           <button
+            type="button"
             onClick={() => {
               // We don't have titles here, so use UUIDs as labels
               const newDocs = selectedDocUuids
@@ -3153,8 +3353,9 @@ function ValidateTab({
           For the official score, use “Validate & improve” at the top.
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <label style={{ fontSize: 13, color: '#5f6368' }}>Replicates:</label>
+          <label htmlFor="detailed-validation-replicates" style={{ fontSize: 13, color: '#5f6368' }}>Replicates:</label>
           <input
+            id="detailed-validation-replicates"
             type="number"
             min={1}
             max={10}
@@ -3166,6 +3367,7 @@ function ValidateTab({
             }}
           />
           <button
+            type="button"
             onClick={handleRunValidation}
             disabled={validating || sources.length === 0}
             style={{
@@ -3178,9 +3380,9 @@ function ValidateTab({
             }}
           >
             {validating ? (
-              <><Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} /> Validating...</>
+              <><Loader2 aria-hidden="true" style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} /> Validating...</>
             ) : (
-              <><Play style={{ width: 14, height: 14 }} /> Run detailed validation</>
+              <><Play aria-hidden="true" style={{ width: 14, height: 14 }} /> Run detailed validation</>
             )}
           </button>
         </div>
@@ -3206,9 +3408,9 @@ function ValidateTab({
           backgroundColor: '#fff',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 12 }}>
-            <TrendingUp style={{ width: 14, height: 14, color: '#6b7280' }} />
+            <TrendingUp aria-hidden="true" style={{ width: 14, height: 14, color: '#6b7280' }} />
             <span style={{ fontSize: 13, fontWeight: 600, color: '#202124' }}>Quality History</span>
-            <span style={{ fontSize: 11, color: '#9ca3af' }}>({qualityHistory.length} runs)</span>
+            <span style={{ fontSize: 11, color: '#6b7280' }}>({qualityHistory.length} runs)</span>
           </div>
           <div style={{ width: '100%', height: 80 }}>
             <QualityHistoryChart runs={qualityHistory} />
@@ -3216,7 +3418,10 @@ function ValidateTab({
 
           {/* Expand toggle for run details */}
           <button
+            type="button"
             onClick={() => setHistoryExpanded(!historyExpanded)}
+            aria-expanded={historyExpanded}
+            aria-controls="quality-history-run-table"
             style={{
               display: 'flex', alignItems: 'center', gap: 4, marginTop: 8,
               fontSize: 11, color: '#6b7280', background: 'none', border: 'none',
@@ -3224,14 +3429,14 @@ function ValidateTab({
             }}
           >
             {historyExpanded
-              ? <ChevronDown style={{ width: 12, height: 12 }} />
-              : <ChevronRight style={{ width: 12, height: 12 }} />}
+              ? <ChevronDown style={{ width: 12, height: 12 }} aria-hidden="true" />
+              : <ChevronRight style={{ width: 12, height: 12 }} aria-hidden="true" />}
             {historyExpanded ? 'Hide run details' : 'Show all runs'}
           </button>
 
           {/* Collapsible run comparison table */}
           {historyExpanded && (
-            <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse', marginTop: 4 }}>
+            <table id="quality-history-run-table" style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse', marginTop: 4 }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
                   <th style={{ width: 20, padding: '4px 2px' }} />
@@ -3250,13 +3455,23 @@ function ValidateTab({
                   return (
                     <Fragment key={run.uuid}>
                       <tr
+                        role="button"
+                        tabIndex={0}
+                        aria-expanded={isExpanded}
+                        aria-label={`Run from ${new Date(run.created_at).toLocaleDateString()}, score ${Math.round(run.score)}`}
                         style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}
                         onClick={() => setExpandedRunId(isExpanded ? null : run.uuid)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            setExpandedRunId(isExpanded ? null : run.uuid)
+                          }
+                        }}
                       >
-                        <td style={{ padding: '4px 2px', color: '#9ca3af' }}>
+                        <td style={{ padding: '4px 2px', color: '#6b7280' }}>
                           {isExpanded
-                            ? <ChevronDown style={{ width: 12, height: 12 }} />
-                            : <ChevronRight style={{ width: 12, height: 12 }} />}
+                            ? <ChevronDown style={{ width: 12, height: 12 }} aria-hidden="true" />
+                            : <ChevronRight style={{ width: 12, height: 12 }} aria-hidden="true" />}
                         </td>
                         <td style={{ padding: '4px 6px', color: '#374151' }}>
                           {new Date(run.created_at).toLocaleDateString()}
@@ -3337,7 +3552,7 @@ function ValidateTab({
             padding: '12px 16px', borderRadius: 8,
             backgroundColor: '#ecfdf5', border: '1px solid #a7f3d0',
           }}>
-            <ShieldCheck style={{ width: 20, height: 20, color: '#059669', flexShrink: 0 }} />
+            <ShieldCheck aria-hidden="true" style={{ width: 20, height: 20, color: '#059669', flexShrink: 0 }} />
             <div style={{ flex: 1, fontSize: 13, color: '#065f46' }}>
               <strong>Great results!</strong> This extraction has a quality score of {Math.round(displayScore)}%. Consider sharing it with the public library so others can benefit.
             </div>
@@ -3345,6 +3560,7 @@ function ValidateTab({
               <span style={{ fontSize: 12, fontWeight: 600, color: '#059669', whiteSpace: 'nowrap' }}>Submitted!</span>
             ) : (
               <button
+                type="button"
                 onClick={(e) => { e.stopPropagation(); setShowSubmitDialog(true) }}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -3379,6 +3595,7 @@ function ValidateTab({
             <div style={{ fontSize: 14, fontWeight: 600, color: '#202124' }}>Detailed breakdown</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <button
+                type="button"
                 onClick={() => downloadValidationCSV(results)}
                 style={{
                   display: 'inline-flex', alignItems: 'center', gap: 5,
@@ -3387,9 +3604,10 @@ function ValidateTab({
                   color: '#374151', cursor: 'pointer',
                 }}
               >
-                <Download style={{ width: 13, height: 13 }} /> Download CSV
+                <Download style={{ width: 13, height: 13 }} aria-hidden="true" /> Download CSV
               </button>
               <button
+                type="button"
                 onClick={handleDownloadResults}
                 disabled={downloadingResults}
                 title="Download the raw results (JSON + CSV) — every replicate's extracted value for every document, for archival and cross-model comparison"
@@ -3402,8 +3620,8 @@ function ValidateTab({
                 }}
               >
                 {downloadingResults
-                  ? <Loader2 style={{ width: 13, height: 13, animation: 'spin 1s linear infinite' }} />
-                  : <Download style={{ width: 13, height: 13 }} />}
+                  ? <Loader2 aria-hidden="true" style={{ width: 13, height: 13, animation: 'spin 1s linear infinite' }} />
+                  : <Download style={{ width: 13, height: 13 }} aria-hidden="true" />}
                 Download raw data
               </button>
             </div>
@@ -3477,11 +3695,12 @@ function ValidateTab({
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Sparkles style={{ width: 14, height: 14, color: '#d97706' }} />
+                  <Sparkles aria-hidden="true" style={{ width: 14, height: 14, color: '#d97706' }} />
                   <span style={{ fontSize: 13, fontWeight: 600, color: '#92400e' }}>Improvement Suggestions</span>
                 </div>
                 {!suggestions && !loadingSuggestions && (
                   <button
+                    type="button"
                     onClick={handleGetSuggestions}
                     disabled={loadingSuggestions}
                     style={{
@@ -3496,8 +3715,8 @@ function ValidateTab({
                 )}
               </div>
               {loadingSuggestions && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#92400e', marginTop: 8 }}>
-                  <Loader2 style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />
+                <div role="status" aria-live="polite" style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#92400e', marginTop: 8 }}>
+                  <Loader2 aria-hidden="true" style={{ width: 14, height: 14, animation: 'spin 1s linear infinite' }} />
                   Analyzing validation results...
                 </div>
               )}
@@ -3556,7 +3775,10 @@ function ValidateTab({
           {results.sources.map((sr, si) => (
             <div key={si} style={{ border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden' }}>
               <button
+                type="button"
                 onClick={() => setExpandedSource(expandedSource === `${si}` ? null : `${si}`)}
+                aria-expanded={expandedSource === `${si}`}
+                aria-controls={`source-detail-${si}`}
                 style={{
                   width: '100%', display: 'flex', alignItems: 'center', gap: 8,
                   padding: '10px 14px', border: 'none', backgroundColor: '#fafafa',
@@ -3564,8 +3786,8 @@ function ValidateTab({
                 }}
               >
                 {expandedSource === `${si}`
-                  ? <ChevronDown style={{ width: 14, height: 14, color: '#5f6368', flexShrink: 0 }} />
-                  : <ChevronRight style={{ width: 14, height: 14, color: '#5f6368', flexShrink: 0 }} />
+                  ? <ChevronDown style={{ width: 14, height: 14, color: '#5f6368', flexShrink: 0 }} aria-hidden="true" />
+                  : <ChevronRight style={{ width: 14, height: 14, color: '#5f6368', flexShrink: 0 }} aria-hidden="true" />
                 }
                 <span style={{ fontSize: 13, fontWeight: 600, color: '#202124', flex: 1 }}>{sr.source_label}</span>
                 <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, backgroundColor: _scoreBg(sr.overall_accuracy), color: _scoreColor(sr.overall_accuracy) }}>
@@ -3577,7 +3799,7 @@ function ValidateTab({
               </button>
 
               {expandedSource === `${si}` && (
-                <div style={{ padding: '0 14px 14px' }}>
+                <div id={`source-detail-${si}`} style={{ padding: '0 14px 14px' }}>
                   <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse', marginTop: 8 }}>
                     <thead>
                       <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
@@ -3612,13 +3834,13 @@ function ValidateTab({
                                   {Math.round(f.accuracy * 100)}%
                                 </span>
                               ) : (
-                                <span style={{ color: '#9ca3af', fontSize: 11 }}>N/A</span>
+                                <span style={{ color: '#6b7280', fontSize: 11 }}>N/A</span>
                               )}
                             </td>
                             <td style={{ padding: '6px 4px', textAlign: 'center', fontSize: 10 }}>
                               {errorEntries.length > 0
                                 ? errorEntries.map(([t, c]) => `${t}:${c}`).join(', ')
-                                : <span style={{ color: '#9ca3af' }}>-</span>
+                                : <span style={{ color: '#6b7280' }}>-</span>
                               }
                             </td>
                           </tr>
@@ -3638,7 +3860,7 @@ function ValidateTab({
               backgroundColor: '#fffbeb',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                <AlertTriangle style={{ width: 14, height: 14, color: '#d97706' }} />
+                <AlertTriangle aria-hidden="true" style={{ width: 14, height: 14, color: '#d97706' }} />
                 <span style={{ fontSize: 13, fontWeight: 600, color: '#92400e' }}>Challenging Fields</span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -3712,6 +3934,7 @@ function ValidateTab({
             </div>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button
+                type="button"
                 disabled={autoFilling}
                 onClick={() => {
                   const docs = pendingDocs
@@ -3727,6 +3950,7 @@ function ValidateTab({
                 No, add empty
               </button>
               <button
+                type="button"
                 disabled={autoFilling}
                 onClick={() => {
                   const docs = pendingDocs
@@ -3770,8 +3994,8 @@ function QualityHistoryChart({ runs }: { runs: QualityHistoryRun[] }) {
     <ResponsiveContainer width="100%" height="100%">
       <LineChart data={data} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-        <XAxis dataKey="date" tick={{ fontSize: 9, fill: '#9ca3af' }} interval="preserveStartEnd" />
-        <YAxis domain={[0, 100]} tick={{ fontSize: 9, fill: '#9ca3af' }} />
+        <XAxis dataKey="date" tick={{ fontSize: 9, fill: '#6b7280' }} interval="preserveStartEnd" />
+        <YAxis domain={[0, 100]} tick={{ fontSize: 9, fill: '#6b7280' }} />
         <Tooltip
           contentStyle={{ fontSize: 11, borderRadius: 6, border: '1px solid #e5e7eb' }}
           formatter={(value, name) => {
@@ -3794,7 +4018,7 @@ function _summarizeConfig(config?: Record<string, unknown> | null): string {
 
 function _renderConfigDetails(config?: Record<string, unknown> | null): React.ReactNode {
   if (!config || Object.keys(config).length === 0) {
-    return <span style={{ fontSize: 11, color: '#9ca3af', fontStyle: 'italic' }}>System defaults were used</span>
+    return <span style={{ fontSize: 11, color: '#6b7280', fontStyle: 'italic' }}>System defaults were used</span>
   }
 
   const kvStyle: React.CSSProperties = {

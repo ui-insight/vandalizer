@@ -830,7 +830,7 @@ function XPBar({ current, nextThreshold, prevThreshold, nextLevel }: {
     <div className="w-full">
       <div className="flex items-center justify-between mb-1.5">
         <span className="text-xs font-medium text-gray-500">{current} XP</span>
-        <span className="text-xs text-gray-400">
+        <span className="text-xs text-gray-500">
           {nextThreshold - current} XP to {LEVEL_CONFIG[nextLevel]?.label || 'Max'}
         </span>
       </div>
@@ -856,6 +856,8 @@ function XPBar({ current, nextThreshold, prevThreshold, nextLevel }: {
 function ValidationResults({ result, onDismiss }: { result: ValidationResult; onDismiss: () => void }) {
   return (
     <div
+      role={result.passed ? 'status' : 'alert'}
+      aria-live={result.passed ? 'polite' : 'assertive'}
       className={cn(
         'border-2 p-4 cert-slide-in',
         result.passed ? 'border-green-200 bg-green-50' : 'border-amber-200 bg-amber-50',
@@ -886,8 +888,8 @@ function ValidationResults({ result, onDismiss }: { result: ValidationResult; on
             </div>
           )}
         </div>
-        <button onClick={onDismiss} className="text-gray-400 hover:text-gray-600">
-          <X size={16} />
+        <button type="button" onClick={onDismiss} aria-label="Dismiss results" className="text-gray-400 hover:text-gray-600">
+          <X size={16} aria-hidden="true" />
         </button>
       </div>
       <div className="space-y-1.5">
@@ -1090,7 +1092,7 @@ export default function Certification() {
     return (
       <PageLayout>
         <div className="p-6 max-w-5xl mx-auto">
-          <div className="text-gray-500 text-sm">Loading certification progress...</div>
+          <div role="status" aria-live="polite" className="text-gray-500 text-sm">Loading certification progress...</div>
         </div>
       </PageLayout>
     )
@@ -1156,7 +1158,7 @@ export default function Certification() {
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-200 text-sm"
                   style={{ borderRadius: 'var(--ui-radius, 12px)' }}
                 >
-                  <Award size={14} className="text-highlight" style={{ color: 'var(--highlight-color)' }} />
+                  <Award size={14} className="text-highlight-on-light" style={{ color: 'var(--highlight-on-light, #806600)' }} />
                   <span className="font-semibold text-gray-900">{completedCount}</span>
                   <span className="text-gray-500">/ 11 modules</span>
                 </div>
@@ -1164,7 +1166,7 @@ export default function Certification() {
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-200 text-sm"
                   style={{ borderRadius: 'var(--ui-radius, 12px)' }}
                 >
-                  <Zap size={14} className="text-highlight" style={{ color: 'var(--highlight-color)' }} />
+                  <Zap size={14} className="text-highlight-on-light" style={{ color: 'var(--highlight-on-light, #806600)' }} />
                   <span className="font-semibold text-gray-900">{displayXp}</span>
                   <span className="text-gray-500">/ {TOTAL_XP} XP</span>
                 </div>

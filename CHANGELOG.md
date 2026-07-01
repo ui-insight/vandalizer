@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **WCAG 2.1 AA accessibility across the app, plus an automated axe-core regression gate.** The frontend now conforms to WCAG 2.1 Level AA, verified over five review-and-fix passes. Highlights: every form control is programmatically labelled; modals trap focus and restore it on close (via `focus-trap-react`) and close on Escape; a global `:focus-visible` keyboard ring is applied consistently (and controls no longer suppress it with inline `outline:none`); a "Skip to main content" link and `<main>` landmark are present; each route sets a descriptive document title; text and icon contrast meets AA on light surfaces (including an accessible-on-light derivation of the brand highlight color); tab bars, radio-card groups, switches, and comboboxes expose correct ARIA roles/state with `aria-controls`↔`tabpanel` wiring and keyboard operation; status changes (toasts, chat, long-running panels) announce via polite live regions; native `confirm()`/`alert()` were replaced with the accessible in-app confirm/toast; personal-data fields carry `autocomplete`; and animations honor `prefers-reduced-motion`. A new Vitest + `vitest-axe` suite (`src/a11y.test.tsx`) asserts zero axe-core violations on representative remediated components so regressions are caught in CI. Findings for each pass are documented in `wcag_report_findings_pass1..5.md`.
+
 ## [v4.8.0] - 2026-07-01
 
 ### Added

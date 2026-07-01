@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { FocusTrap } from 'focus-trap-react'
 import { X } from 'lucide-react'
 
 interface Props {
@@ -24,9 +25,21 @@ export function ShareWithTeamDialog({ itemName, teamName, busy, onCancel, onConf
 
   const isBusy = busy || submitting
 
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel() }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [onCancel])
+
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/40" style={{ zIndex: 700 }}>
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Share with team"
+        className="bg-white rounded-lg shadow-xl w-full max-w-md p-6"
+      >
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Share with team</h3>
           <button onClick={onCancel} className="p-1 text-gray-400 hover:text-gray-600 rounded" disabled={isBusy}>
@@ -53,7 +66,7 @@ export function ShareWithTeamDialog({ itemName, teamName, busy, onCancel, onConf
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-highlight resize-none"
             autoFocus
           />
-          <div className="text-xs text-gray-400 text-right mt-1">{comment.length}/1000</div>
+          <div className="text-xs text-gray-500 text-right mt-1">{comment.length}/1000</div>
         </div>
 
         <div className="flex justify-end gap-2 mt-4">
@@ -73,6 +86,7 @@ export function ShareWithTeamDialog({ itemName, teamName, busy, onCancel, onConf
           </button>
         </div>
       </div>
+      </FocusTrap>
     </div>
   )
 }

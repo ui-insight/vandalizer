@@ -776,20 +776,20 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
           padding: '6px 12px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb',
           flexShrink: 0,
         }}>
-          <button onClick={zoomOut} style={btnStyle} title="Zoom out" disabled={zoom <= 0}>
+          <button type="button" onClick={zoomOut} style={btnStyle} title="Zoom out" aria-label="Zoom out" disabled={zoom <= 0}>
             <ZoomOut size={16} />
           </button>
-          <button onClick={resetZoom} style={{ ...btnStyle, width: 'auto', padding: '0 10px' }} title="Reset zoom">
+          <button type="button" onClick={resetZoom} style={{ ...btnStyle, width: 'auto', padding: '0 10px' }} title="Reset zoom" aria-label="Reset zoom">
             {Math.round(zoomLevel * 100)}%
           </button>
-          <button onClick={zoomIn} style={btnStyle} title="Zoom in" disabled={zoom >= ZOOM_LEVELS.length - 1}>
+          <button type="button" onClick={zoomIn} style={btnStyle} title="Zoom in" aria-label="Zoom in" disabled={zoom >= ZOOM_LEVELS.length - 1}>
             <ZoomIn size={16} />
           </button>
           <div style={{ width: 1, height: 20, backgroundColor: '#d1d5db', margin: '0 4px' }} />
-          <button onClick={openSearch} style={btnStyle} title="Find in document (⌘F / Ctrl+F)" aria-label="Find in document">
+          <button type="button" onClick={openSearch} style={btnStyle} title="Find in document (⌘F / Ctrl+F)" aria-label="Find in document">
             <Search size={16} />
           </button>
-          <button onClick={() => window.open(downloadUrl, '_blank')} style={btnStyle} title="Download original">
+          <button type="button" onClick={() => window.open(downloadUrl, '_blank')} style={btnStyle} title="Download original" aria-label="Download original">
             <Maximize2 size={16} />
           </button>
         </div>
@@ -810,7 +810,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
         }}>
           {docxText === null ? (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-              <Loader2 style={{ width: 32, height: 32, color: 'var(--highlight-color)', animation: 'spin 1s linear infinite' }} />
+              <Loader2 role="status" aria-label="Loading document" style={{ width: 32, height: 32, color: 'var(--highlight-on-light, #806600)', animation: 'spin 1s linear infinite' }} />
             </div>
           ) : extractionError ? (
             <div style={{
@@ -825,6 +825,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
                 {extractionError}
               </div>
               <button
+                type="button"
                 onClick={handleRetryExtraction}
                 disabled={retrying}
                 style={{
@@ -871,7 +872,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
       <div style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
         {processingOverlay}
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#525659' }}>
-          <div style={{ color: '#9ca3af', fontSize: 14 }}>Loading document...</div>
+          <div role="status" aria-live="polite" style={{ color: '#9ca3af', fontSize: 14 }}>Loading document...</div>
         </div>
       </div>
     )
@@ -887,20 +888,22 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
           padding: '6px 12px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb',
           flexShrink: 0,
         }}>
-          <button onClick={zoomOut} style={btnStyle} title="Zoom out" disabled={zoom <= 0}>
+          <button type="button" onClick={zoomOut} style={btnStyle} title="Zoom out" aria-label="Zoom out" disabled={zoom <= 0}>
             <ZoomOut size={16} />
           </button>
-          <button onClick={resetZoom} style={{ ...btnStyle, width: 'auto', padding: '0 10px' }} title="Reset zoom">
+          <button type="button" onClick={resetZoom} style={{ ...btnStyle, width: 'auto', padding: '0 10px' }} title="Reset zoom" aria-label="Reset zoom">
             {Math.round(zoomLevel * 100)}%
           </button>
-          <button onClick={zoomIn} style={btnStyle} title="Zoom in" disabled={zoom >= ZOOM_LEVELS.length - 1}>
+          <button type="button" onClick={zoomIn} style={btnStyle} title="Zoom in" aria-label="Zoom in" disabled={zoom >= ZOOM_LEVELS.length - 1}>
             <ZoomIn size={16} />
           </button>
           <div style={{ width: 1, height: 20, backgroundColor: '#d1d5db', margin: '0 4px' }} />
           <button
+            type="button"
             onClick={() => { if (blobUrl) window.open(blobUrl, '_blank') }}
             style={btnStyle}
             title="Open in new tab"
+            aria-label="Open in new tab"
             disabled={!blobUrl}
           >
             <Maximize2 size={16} />
@@ -924,7 +927,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
                 title="Document viewer"
               />
             ) : (
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#9ca3af', fontSize: 13 }}>
+              <div role="status" aria-live="polite" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#9ca3af', fontSize: 13 }}>
                 Loading...
               </div>
             )}
@@ -944,20 +947,20 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
         padding: '6px 12px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb',
         flexShrink: 0,
       }}>
-        <button onClick={zoomOut} style={btnStyle} title="Zoom out" aria-label="Zoom out" disabled={zoom <= 0}>
+        <button type="button" onClick={zoomOut} style={btnStyle} title="Zoom out" aria-label="Zoom out" disabled={zoom <= 0}>
           <ZoomOut size={16} />
         </button>
-        <button onClick={resetZoom} style={{ ...btnStyle, width: 'auto', padding: '0 10px' }} title="Reset zoom" aria-label="Reset zoom">
+        <button type="button" onClick={resetZoom} style={{ ...btnStyle, width: 'auto', padding: '0 10px' }} title="Reset zoom" aria-label="Reset zoom">
           {Math.round(zoomLevel * 100)}%
         </button>
-        <button onClick={zoomIn} style={btnStyle} title="Zoom in" aria-label="Zoom in" disabled={zoom >= ZOOM_LEVELS.length - 1}>
+        <button type="button" onClick={zoomIn} style={btnStyle} title="Zoom in" aria-label="Zoom in" disabled={zoom >= ZOOM_LEVELS.length - 1}>
           <ZoomIn size={16} />
         </button>
         <div style={{ width: 1, height: 20, backgroundColor: '#d1d5db', margin: '0 4px' }} />
-        <button onClick={openSearch} style={btnStyle} title="Find in document (⌘F / Ctrl+F)" aria-label="Find in document">
+        <button type="button" onClick={openSearch} style={btnStyle} title="Find in document (⌘F / Ctrl+F)" aria-label="Find in document">
           <Search size={16} />
         </button>
-        <button onClick={openPdfInNewTab} style={btnStyle} title="Open in new tab" aria-label="Open in new tab">
+        <button type="button" onClick={openPdfInNewTab} style={btnStyle} title="Open in new tab" aria-label="Open in new tab">
           <Maximize2 size={16} />
         </button>
       </div>
@@ -1003,6 +1006,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
             zIndex: 100,
           }}>
             <button
+              type="button"
               onClick={() => goToHighlight('prev')}
               style={{
                 ...btnStyle,
@@ -1027,11 +1031,12 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
               <span style={{ fontWeight: 700 }}>
                 &ldquo;{effectiveTerms[0]}&rdquo;
               </span>
-              <span style={{ marginLeft: 6, color: '#9ca3af', fontWeight: 400 }}>
+              <span style={{ marginLeft: 6, color: '#6b7280', fontWeight: 400 }}>
                 {currentHighlight + 1} of {totalHighlights}
               </span>
             </div>
             <button
+              type="button"
               onClick={() => goToHighlight('next')}
               style={{
                 ...btnStyle,
@@ -1046,6 +1051,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
             </button>
             {onClearHighlights && (
               <button
+                type="button"
                 onClick={onClearHighlights}
                 style={{
                   ...btnStyle,

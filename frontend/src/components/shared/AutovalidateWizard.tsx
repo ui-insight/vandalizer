@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Dispatch, ReactNode, SetStateAction } from 'react'
+import { FocusTrap } from 'focus-trap-react'
 import { Sparkles, X, ChevronRight, ChevronLeft } from 'lucide-react'
 import { WizardSteps } from './WizardSteps'
 
@@ -46,6 +47,12 @@ export function AutovalidateWizard<TOptions>({
   const [stepIndex, setStepIndex] = useState(0)
   const [options, setOptions] = useState<TOptions>(initialOptions)
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
   if (steps.length === 0) return null
   const currentStep = steps[stepIndex]
   const isLast = stepIndex === steps.length - 1
@@ -64,20 +71,28 @@ export function AutovalidateWizard<TOptions>({
       position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
     }}>
-      <div style={{
-        width: 520, maxHeight: '90vh', overflowY: 'auto',
-        padding: 22, backgroundColor: '#1f1f1f',
-        border: '1px solid #2e2e2e', borderRadius: 10,
-      }}>
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="autovalidate-wizard-title"
+        style={{
+          width: 520, maxHeight: '90vh', overflowY: 'auto',
+          padding: 22, backgroundColor: '#1f1f1f',
+          border: '1px solid #2e2e2e', borderRadius: 10,
+        }}
+      >
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-          <Sparkles size={18} style={{ color: '#a78bfa' }} />
-          <h3 style={{ margin: 0, fontSize: 16, color: '#fff' }}>{title}</h3>
+          <Sparkles size={18} aria-hidden="true" style={{ color: '#a78bfa' }} />
+          <h3 id="autovalidate-wizard-title" style={{ margin: 0, fontSize: 16, color: '#fff' }}>{title}</h3>
           <button
+            type="button"
+            aria-label="Close"
             onClick={onClose}
             style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: '#888' }}
           >
-            <X size={18} />
+            <X size={18} aria-hidden="true" />
           </button>
         </div>
 
@@ -106,6 +121,7 @@ export function AutovalidateWizard<TOptions>({
           )}
         </div>
       </div>
+      </FocusTrap>
     </div>
   )
 }

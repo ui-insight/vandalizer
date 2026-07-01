@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { X, Search, Loader2 } from 'lucide-react'
+import { FocusTrap } from 'focus-trap-react'
 import { importCatalogItems } from '../../api/library'
 import type { CatalogPreviewItem } from '../../api/library'
+import { useToast } from '../../contexts/ToastContext'
 
 function KindBadge({ kind }: { kind: string }) {
   const isWorkflow = kind === 'workflow'
@@ -35,6 +37,15 @@ export function CatalogImportDialog({
   const [selected, setSelected] = useState<Set<number>>(new Set(items.map(i => i.index)))
   const [search, setSearch] = useState('')
   const [importing, setImporting] = useState(false)
+  const { toast } = useToast()
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
 
   const toggle = (idx: number) => {
     setSelected(prev => {
@@ -70,7 +81,7 @@ export function CatalogImportDialog({
       await importCatalogItems(file, Array.from(selected))
       onImported()
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Import failed')
+      toast(err instanceof Error ? err.message : 'Import failed', 'error')
     } finally {
       setImporting(false)
     }
@@ -84,7 +95,11 @@ export function CatalogImportDialog({
         justifyContent: 'center', zIndex: 1000,
       }}
     >
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Import from Catalog"
         style={{
           backgroundColor: '#fff', borderRadius: 12, width: 520, maxHeight: '70vh',
           display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
@@ -93,7 +108,7 @@ export function CatalogImportDialog({
         {/* Header */}
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: 15, fontWeight: 600, color: '#202124' }}>Import from Catalog</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#5f6368', display: 'flex' }}>
+          <button type="button" onClick={onClose} aria-label="Close" style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#5f6368', display: 'flex' }}>
             <X style={{ width: 18, height: 18 }} />
           </button>
         </div>
@@ -101,16 +116,17 @@ export function CatalogImportDialog({
         {/* Search */}
         <div style={{ padding: '12px 20px', borderBottom: '1px solid #e5e7eb' }}>
           <div style={{ position: 'relative' }}>
-            <Search style={{ width: 14, height: 14, position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+            <Search style={{ width: 14, height: 14, position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
             <input
               autoFocus
+              aria-label="Filter catalog items"
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Filter items..."
               style={{
                 width: '100%', fontSize: 13, fontFamily: 'inherit',
                 border: '1px solid #d1d5db', borderRadius: 6, padding: '8px 10px 8px 32px',
-                outline: 'none', boxSizing: 'border-box',
+                boxSizing: 'border-box',
               }}
             />
           </div>
@@ -190,7 +206,7 @@ export function CatalogImportDialog({
               padding: '8px 16px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
               borderRadius: 6, border: 'none',
               backgroundColor: selected.size > 0 && !importing ? '#191919' : '#e5e7eb',
-              color: selected.size > 0 && !importing ? '#fff' : '#9ca3af',
+              color: selected.size > 0 && !importing ? '#fff' : '#6b7280',
               cursor: selected.size > 0 && !importing ? 'pointer' : 'not-allowed',
               display: 'flex', alignItems: 'center', gap: 6,
             }}
@@ -200,6 +216,7 @@ export function CatalogImportDialog({
           </button>
         </div>
       </div>
+      </FocusTrap>
     </div>
   )
 }

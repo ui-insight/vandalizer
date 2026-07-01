@@ -34,8 +34,10 @@ export function AttachmentList({ fileAttachments, urlAttachments, selectedDocUui
           <span className="max-w-[120px] truncate">{selectedDocNames?.[uuid] || 'Document'}</span>
           {onDeselectDoc && (
             <button
+              type="button"
+              aria-label={`Deselect ${selectedDocNames?.[uuid] || 'document'}`}
               onClick={() => onDeselectDoc(uuid)}
-              className="ml-1 text-gray-400 hover:text-red-500"
+              className="ml-1 text-gray-500 hover:text-red-500"
             >
               <X className="h-3 w-3" />
             </button>
@@ -48,12 +50,14 @@ export function AttachmentList({ fileAttachments, urlAttachments, selectedDocUui
           key={att.id}
           className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-xs text-gray-700 shadow-sm border border-gray-200"
         >
-          <FileText className="h-3 w-3 text-gray-400" />
+          <FileText className="h-3 w-3 text-gray-500" />
           <span className="max-w-[120px] truncate">{att.filename}</span>
           {onRemoveFile && (
             <button
+              type="button"
+              aria-label={`Remove ${att.filename}`}
               onClick={() => onRemoveFile(att.id)}
-              className="ml-1 text-gray-400 hover:text-red-500"
+              className="ml-1 text-gray-500 hover:text-red-500"
             >
               <X className="h-3 w-3" />
             </button>
@@ -72,13 +76,15 @@ export function AttachmentList({ fileAttachments, urlAttachments, selectedDocUui
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 text-gray-700 hover:text-gray-900"
           >
-            <ExternalLink className="h-3 w-3 text-gray-400" />
+            <ExternalLink className="h-3 w-3 text-gray-500" />
             <span className="max-w-[120px] truncate">{att.title || att.url}</span>
           </a>
           {onRemoveUrl && (
             <button
+              type="button"
+              aria-label={`Remove ${att.title || att.url}`}
               onClick={() => onRemoveUrl(att.id)}
-              className="ml-1 text-gray-400 hover:text-red-500"
+              className="ml-1 text-gray-500 hover:text-red-500"
             >
               <X className="h-3 w-3" />
             </button>

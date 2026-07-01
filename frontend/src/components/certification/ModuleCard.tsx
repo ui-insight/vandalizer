@@ -12,7 +12,7 @@ function Stars({ count, max = 3, size = 16 }: { count: number; max?: number; siz
           size={size}
           className={cn(
             'transition-all duration-300',
-            i < count ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300',
+            i < count ? 'text-yellow-400 fill-yellow-400' : 'text-gray-400',
           )}
           style={i < count ? { animationDelay: `${i * 0.15}s` } : undefined}
         />
@@ -86,8 +86,8 @@ export function ModuleCard({ module, completed, stars, locked, active, onClick, 
         <Stars count={stars} size={14} />
         <div className="flex items-center gap-2">
           {module.estimatedMinutes && (
-            <span className="flex items-center gap-0.5 text-[10px] text-gray-400">
-              <Clock size={10} />
+            <span className="flex items-center gap-0.5 text-[10px] text-gray-500">
+              <Clock size={10} aria-hidden="true" />
               ~{module.estimatedMinutes}m
             </span>
           )}

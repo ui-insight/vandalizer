@@ -49,9 +49,39 @@ export function getLuminance(hex: string): number {
   return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs
 }
 
-/** Returns '#ffffff' or '#000000' for best contrast against the given background. */
+/** WCAG contrast ratio (1–21) between two hex colors. */
+export function contrastRatio(hex1: string, hex2: string): number {
+  const l1 = getLuminance(hex1)
+  const l2 = getLuminance(hex2)
+  const lighter = Math.max(l1, l2)
+  const darker = Math.min(l1, l2)
+  return (lighter + 0.05) / (darker + 0.05)
+}
+
+/** Returns '#ffffff' or '#000000' — whichever yields the higher WCAG contrast
+ *  ratio against the given background. Uses the real ratio rather than a
+ *  luminance threshold, so custom brand colors near the boundary still get the
+ *  more legible text color. */
 export function getContrastTextColor(hex: string): string {
-  return getLuminance(hex) > 0.4 ? '#000000' : '#ffffff'
+  return contrastRatio(hex, '#000000') >= contrastRatio(hex, '#ffffff') ? '#000000' : '#ffffff'
+}
+
+/** Darken a color (preserving hue/saturation) until it meets the target WCAG
+ *  contrast ratio against a light background — for using the brand color as
+ *  *text/icons on white*, where the raw highlight (e.g. #eab308 ≈ 1.7:1) fails.
+ *  Returns the original color if it already passes. */
+export function getAccessibleOnLight(hex: string, bg = '#ffffff', target = 4.5): string {
+  if (contrastRatio(hex, bg) >= target) return hex
+  const { r, g, b } = hexToRgb(hex)
+  const { h, s } = rgbToHsl(r, g, b)
+  let { l } = rgbToHsl(r, g, b)
+  // Step lightness down until contrast is met (or we bottom out near black).
+  for (let i = 0; i < 100 && l > 0; i++) {
+    l = Math.max(0, l - 0.02)
+    const candidate = hslToHex(h, s, l)
+    if (contrastRatio(candidate, bg) >= target) return candidate
+  }
+  return '#1a1a1a'
 }
 
 /** Derive a deep, rich gradient partner by shifting hue slightly and darkening.

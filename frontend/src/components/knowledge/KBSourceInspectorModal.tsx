@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { FocusTrap } from 'focus-trap-react'
 import { X, FileText, Globe, ExternalLink, Loader2, AlertCircle, Check } from 'lucide-react'
 import { getKBSource, setKBSourceReference } from '../../api/knowledge'
 import type { KnowledgeBaseSource, KnowledgeBaseSourceDetail } from '../../types/knowledge'
@@ -39,6 +40,15 @@ export function KBSourceInspectorModal({ kbUuid, source, onClose, onUpdated }: P
     return () => { cancelled = true }
   }, [kbUuid, source.uuid])
 
+  // Close on Escape
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
   const savedSource = detail?.source_reference || (detail?.source_type === 'url' ? (detail?.url || '') : '')
   const sourceDirty = sourceDraft.trim() !== (savedSource || '').trim()
 
@@ -73,7 +83,11 @@ export function KBSourceInspectorModal({ kbUuid, source, onClose, onUpdated }: P
         zIndex: 1100, padding: 24,
       }}
     >
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Source: ${displayTitle}`}
         onClick={e => e.stopPropagation()}
         style={{
           width: '90vw', maxWidth: 960, height: '85vh',
@@ -91,8 +105,8 @@ export function KBSourceInspectorModal({ kbUuid, source, onClose, onUpdated }: P
           flexShrink: 0,
         }}>
           {isDoc
-            ? <FileText size={18} style={{ color: '#a78bfa', flexShrink: 0 }} />
-            : <Globe size={18} style={{ color: '#60a5fa', flexShrink: 0 }} />}
+            ? <FileText size={18} style={{ color: '#a78bfa', flexShrink: 0 }} aria-hidden="true" />
+            : <Globe size={18} style={{ color: '#60a5fa', flexShrink: 0 }} aria-hidden="true" />}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{
               fontSize: 14, fontWeight: 600, color: '#fff',
@@ -111,6 +125,8 @@ export function KBSourceInspectorModal({ kbUuid, source, onClose, onUpdated }: P
               {(['text', 'file'] as const).map(mode => (
                 <button
                   key={mode}
+                  type="button"
+                  aria-pressed={docView === mode}
                   onClick={() => setDocView(mode)}
                   style={{
                     fontSize: 12, padding: '4px 10px', fontFamily: 'inherit', cursor: 'pointer',
@@ -141,10 +157,12 @@ export function KBSourceInspectorModal({ kbUuid, source, onClose, onUpdated }: P
             </a>
           )}
           <button
+            type="button"
+            aria-label="Close"
             onClick={onClose}
             style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, color: '#888' }}
           >
-            <X size={18} />
+            <X size={18} aria-hidden="true" />
           </button>
         </div>
 
@@ -154,8 +172,9 @@ export function KBSourceInspectorModal({ kbUuid, source, onClose, onUpdated }: P
           display: 'flex', alignItems: 'center', gap: 8,
           padding: '8px 18px', borderBottom: '1px solid #2e2e2e', flexShrink: 0,
         }}>
-          <span style={{ fontSize: 11, color: '#888', flexShrink: 0 }}>Source</span>
+          <span id="kb-source-ref-label" style={{ fontSize: 11, color: '#888', flexShrink: 0 }}>Source</span>
           <input
+            aria-labelledby="kb-source-ref-label"
             value={sourceDraft}
             onChange={e => setSourceDraft(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); saveSource() } }}
@@ -165,11 +184,13 @@ export function KBSourceInspectorModal({ kbUuid, source, onClose, onUpdated }: P
             style={{
               flex: 1, fontSize: 12, color: '#e5e5e5',
               backgroundColor: '#161616', border: '1px solid #2e2e2e',
-              borderRadius: 5, padding: '5px 8px', fontFamily: 'inherit', outline: 'none',
+              borderRadius: 5, padding: '5px 8px', fontFamily: 'inherit',
             }}
           />
           {sourceDirty && (
             <button
+              type="button"
+              aria-label="Save source"
               onClick={saveSource}
               disabled={savingSource}
               title="Save source"
@@ -181,8 +202,8 @@ export function KBSourceInspectorModal({ kbUuid, source, onClose, onUpdated }: P
               }}
             >
               {savingSource
-                ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
-                : <Check size={12} />}
+                ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
+                : <Check size={12} aria-hidden="true" />}
               Save
             </button>
           )}
@@ -209,6 +230,7 @@ export function KBSourceInspectorModal({ kbUuid, source, onClose, onUpdated }: P
           )}
         </div>
       </div>
+      </FocusTrap>
     </div>
   )
 }
@@ -235,21 +257,22 @@ function SourceContentInspector({
 }) {
   if (loading) {
     return (
-      <div style={{
+      <div role="status" aria-live="polite" style={{
         flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
         color: '#888',
       }}>
-        <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+        <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
+        <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Loading source…</span>
       </div>
     )
   }
   if (error) {
     return (
-      <div style={{
+      <div role="alert" style={{
         flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
         gap: 8, color: '#ef4444', fontSize: 13,
       }}>
-        <AlertCircle size={16} />
+        <AlertCircle size={16} aria-hidden="true" />
         {error}
       </div>
     )

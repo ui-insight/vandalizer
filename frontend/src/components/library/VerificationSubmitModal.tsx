@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { FocusTrap } from 'focus-trap-react'
 import { X, ShieldCheck, ChevronRight, ChevronLeft, Upload } from 'lucide-react'
 import { submitForVerification } from '../../api/library'
 import { useAuth } from '../../hooks/useAuth'
@@ -52,6 +53,12 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
   const [dependencies, setDependencies] = useState('')
   const [intendedUseTags, setIntendedUseTags] = useState('')
   const [skipValidation, setSkipValidation] = useState(false)
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
 
   const stepIndex = STEPS.findIndex(s => s.key === step)
   const canGoBack = stepIndex > 0
@@ -110,14 +117,15 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
       onClick={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
     >
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
+      <div role="dialog" aria-modal="true" aria-label="Submit for Verification" className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
           <div className="flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5 text-green-600" />
+            <ShieldCheck className="h-5 w-5 text-green-600" aria-hidden="true" />
             <h3 className="text-base font-semibold text-gray-900">Submit for Verification</h3>
           </div>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100 text-gray-500">
+          <button type="button" onClick={onClose} aria-label="Close" className="p-1 rounded hover:bg-gray-100 text-gray-500">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -133,12 +141,12 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
                     ? 'bg-gray-900 text-white'
                     : i < stepIndex
                       ? 'text-green-600 hover:bg-green-50'
-                      : 'text-gray-400'
+                      : 'text-gray-500'
                 }`}
               >
                 {i + 1}. {s.label}
               </button>
-              {i < STEPS.length - 1 && <ChevronRight className="h-3 w-3 text-gray-300" />}
+              {i < STEPS.length - 1 && <ChevronRight className="h-3 w-3 text-gray-500" />}
             </div>
           ))}
         </div>
@@ -153,18 +161,21 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
           {step === 'basics' && (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Summary *</label>
+                <label htmlFor="vsm-summary" className="block text-sm font-medium text-gray-700 mb-1">Summary *</label>
                 <input
+                  id="vsm-summary"
                   type="text"
                   value={summary}
                   onChange={(e) => setSummary(e.target.value)}
                   placeholder="Brief name for this submission"
+                  aria-required="true"
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <label htmlFor="vsm-description" className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                 <textarea
+                  id="vsm-description"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   rows={4}
@@ -173,8 +184,9 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                <label htmlFor="vsm-category" className="block text-sm font-medium text-gray-700 mb-1">Category</label>
                 <select
+                  id="vsm-category"
                   value={category}
                   onChange={(e) => setCategory(e.target.value)}
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-1 focus:ring-gray-400"
@@ -184,8 +196,9 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Your Organization</label>
+                <label htmlFor="vsm-org" className="block text-sm font-medium text-gray-700 mb-1">Your Organization</label>
                 <input
+                  id="vsm-org"
                   type="text"
                   value={submitterOrg}
                   onChange={(e) => setSubmitterOrg(e.target.value)}
@@ -199,8 +212,9 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
           {step === 'details' && (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Run Instructions</label>
+                <label htmlFor="vsm-run-instructions" className="block text-sm font-medium text-gray-700 mb-1">Run Instructions</label>
                 <textarea
+                  id="vsm-run-instructions"
                   value={runInstructions}
                   onChange={(e) => setRunInstructions(e.target.value)}
                   rows={3}
@@ -209,8 +223,9 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Evaluation Notes</label>
+                <label htmlFor="vsm-evaluation-notes" className="block text-sm font-medium text-gray-700 mb-1">Evaluation Notes</label>
                 <textarea
+                  id="vsm-evaluation-notes"
                   value={evaluationNotes}
                   onChange={(e) => setEvaluationNotes(e.target.value)}
                   rows={3}
@@ -219,8 +234,9 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Known Limitations</label>
+                <label htmlFor="vsm-known-limitations" className="block text-sm font-medium text-gray-700 mb-1">Known Limitations</label>
                 <textarea
+                  id="vsm-known-limitations"
                   value={knownLimitations}
                   onChange={(e) => setKnownLimitations(e.target.value)}
                   rows={2}
@@ -229,8 +245,9 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Dependencies</label>
+                <label htmlFor="vsm-dependencies" className="block text-sm font-medium text-gray-700 mb-1">Dependencies</label>
                 <textarea
+                  id="vsm-dependencies"
                   value={dependencies}
                   onChange={(e) => setDependencies(e.target.value)}
                   rows={2}
@@ -244,8 +261,9 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
           {step === 'testing' && (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Example Inputs</label>
+                <label htmlFor="vsm-example-inputs" className="block text-sm font-medium text-gray-700 mb-1">Example Inputs</label>
                 <textarea
+                  id="vsm-example-inputs"
                   value={exampleInputs}
                   onChange={(e) => setExampleInputs(e.target.value)}
                   rows={3}
@@ -254,8 +272,9 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Expected Outputs</label>
+                <label htmlFor="vsm-expected-outputs" className="block text-sm font-medium text-gray-700 mb-1">Expected Outputs</label>
                 <textarea
+                  id="vsm-expected-outputs"
                   value={expectedOutputs}
                   onChange={(e) => setExpectedOutputs(e.target.value)}
                   rows={3}
@@ -264,8 +283,9 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Intended Use Tags</label>
+                <label htmlFor="vsm-intended-use-tags" className="block text-sm font-medium text-gray-700 mb-1">Intended Use Tags</label>
                 <textarea
+                  id="vsm-intended-use-tags"
                   value={intendedUseTags}
                   onChange={(e) => setIntendedUseTags(e.target.value)}
                   rows={2}
@@ -281,60 +301,60 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
               <h4 className="text-sm font-semibold text-gray-900">Review your submission</h4>
               <dl className="space-y-2 text-sm">
                 <div>
-                  <dt className="text-xs font-medium text-gray-400 uppercase">Summary</dt>
+                  <dt className="text-xs font-medium text-gray-500 uppercase">Summary</dt>
                   <dd className="text-gray-700">{summary || itemTitle}</dd>
                 </div>
                 {description && (
                   <div>
-                    <dt className="text-xs font-medium text-gray-400 uppercase">Description</dt>
+                    <dt className="text-xs font-medium text-gray-500 uppercase">Description</dt>
                     <dd className="text-gray-700 whitespace-pre-wrap">{description}</dd>
                   </div>
                 )}
                 {category && (
                   <div>
-                    <dt className="text-xs font-medium text-gray-400 uppercase">Category</dt>
+                    <dt className="text-xs font-medium text-gray-500 uppercase">Category</dt>
                     <dd className="text-gray-700">{category}</dd>
                   </div>
                 )}
                 {submitterOrg.trim() && (
                   <div>
-                    <dt className="text-xs font-medium text-gray-400 uppercase">Organization</dt>
+                    <dt className="text-xs font-medium text-gray-500 uppercase">Organization</dt>
                     <dd className="text-gray-700">{submitterOrg}</dd>
                   </div>
                 )}
                 {runInstructions && (
                   <div>
-                    <dt className="text-xs font-medium text-gray-400 uppercase">Run Instructions</dt>
+                    <dt className="text-xs font-medium text-gray-500 uppercase">Run Instructions</dt>
                     <dd className="text-gray-700 whitespace-pre-wrap">{runInstructions}</dd>
                   </div>
                 )}
                 {evaluationNotes && (
                   <div>
-                    <dt className="text-xs font-medium text-gray-400 uppercase">Evaluation Notes</dt>
+                    <dt className="text-xs font-medium text-gray-500 uppercase">Evaluation Notes</dt>
                     <dd className="text-gray-700 whitespace-pre-wrap">{evaluationNotes}</dd>
                   </div>
                 )}
                 {knownLimitations && (
                   <div>
-                    <dt className="text-xs font-medium text-gray-400 uppercase">Known Limitations</dt>
+                    <dt className="text-xs font-medium text-gray-500 uppercase">Known Limitations</dt>
                     <dd className="text-gray-700 whitespace-pre-wrap">{knownLimitations}</dd>
                   </div>
                 )}
                 {exampleInputs && (
                   <div>
-                    <dt className="text-xs font-medium text-gray-400 uppercase">Example Inputs</dt>
+                    <dt className="text-xs font-medium text-gray-500 uppercase">Example Inputs</dt>
                     <dd className="text-gray-700">{splitLines(exampleInputs).length} item(s)</dd>
                   </div>
                 )}
                 {expectedOutputs && (
                   <div>
-                    <dt className="text-xs font-medium text-gray-400 uppercase">Expected Outputs</dt>
+                    <dt className="text-xs font-medium text-gray-500 uppercase">Expected Outputs</dt>
                     <dd className="text-gray-700">{splitLines(expectedOutputs).length} item(s)</dd>
                   </div>
                 )}
                 {intendedUseTags && (
                   <div>
-                    <dt className="text-xs font-medium text-gray-400 uppercase">Intended Use Tags</dt>
+                    <dt className="text-xs font-medium text-gray-500 uppercase">Intended Use Tags</dt>
                     <dd className="flex flex-wrap gap-1 mt-1">
                       {splitLines(intendedUseTags).map((tag, i) => (
                         <span key={i} className="text-xs px-2 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
@@ -410,6 +430,7 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
           </div>
         </div>
       </div>
+      </FocusTrap>
     </div>,
     document.body,
   )

@@ -38,7 +38,7 @@ const BAR_COLORS = {
 function StatBar({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <span style={{ fontSize: 10.5, color: '#9ca3af', width: 74, flexShrink: 0, fontWeight: 500 }}>{label}</span>
+      <span style={{ fontSize: 10.5, color: '#6b7280', width: 74, flexShrink: 0, fontWeight: 500 }}>{label}</span>
       <div style={{ flex: 1, height: 5, backgroundColor: '#efefef', borderRadius: 3, overflow: 'hidden' }}>
         <div style={{
           width: `${Math.round(value * 100)}%`,
@@ -80,20 +80,24 @@ interface PickerProps {
 export function ModelEffortPicker({ models, selectedModel, onChange }: PickerProps) {
   if (models.length === 0) {
     return (
-      <div style={{ padding: '14px 16px', fontSize: 13, color: '#9ca3af', textAlign: 'center' }}>
+      <div style={{ padding: '14px 16px', fontSize: 13, color: '#6b7280', textAlign: 'center' }}>
         Loading models…
       </div>
     )
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 8 }}>
+    <div role="radiogroup" aria-label="Model" style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 8 }}>
       {models.map(model => {
         const selected = model.tag === selectedModel
 
         return (
           <button
             key={model.tag}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            aria-label={model.tag}
             onClick={() => onChange(model.tag)}
             style={{
               display: 'flex',
@@ -121,7 +125,7 @@ export function ModelEffortPicker({ models, selectedModel, onChange }: PickerPro
                 }} />
                 <span style={{ fontSize: 13, fontWeight: 700, color: '#111' }}>{model.tag}</span>
                 {model.external && (
-                  <span style={{ fontSize: 10, color: '#9ca3af', fontWeight: 500 }}>external</span>
+                  <span style={{ fontSize: 10, color: '#6b7280', fontWeight: 500 }}>external</span>
                 )}
               </div>
             </div>

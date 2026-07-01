@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { FocusTrap } from 'focus-trap-react'
 import { Search, ShieldCheck, X, Pencil, ShieldOff, Tag, FolderPlus, Download, Upload } from 'lucide-react'
 import { QualityContractBadge } from './QualityContractBadge'
+import { useToast } from '../../contexts/ToastContext'
 import { CatalogImportDialog } from './CatalogImportDialog'
 import { AuthorChip } from '../shared/AuthorChip'
 import { listVerifiedItems, updateItemMetadata, unverifyItem, listCollections, addToCollection, exportCatalogUrl, previewCatalogImport } from '../../api/library'
@@ -61,6 +63,12 @@ function MetadataModal({ item, onClose, onSaved }: MetadataModalProps) {
     listOrganizationsFlat().then(data => setAllOrgs(data.organizations)).catch(() => {})
   }, [])
 
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
+
   const toggleOrg = (uuid: string) => {
     setSelectedOrgIds(prev =>
       prev.includes(uuid) ? prev.filter(id => id !== uuid) : [...prev, uuid]
@@ -85,10 +93,11 @@ function MetadataModal({ item, onClose, onSaved }: MetadataModalProps) {
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4" style={{ zIndex: 700 }}>
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
+      <div role="dialog" aria-modal="true" aria-label="Edit Metadata" className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
           <h3 className="text-base font-semibold text-gray-900">Edit Metadata</h3>
-          <button onClick={onClose} className="p-1 rounded hover:bg-gray-100 text-gray-500">
+          <button type="button" onClick={onClose} aria-label="Close" className="p-1 rounded hover:bg-gray-100 text-gray-500">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -98,8 +107,9 @@ function MetadataModal({ item, onClose, onSaved }: MetadataModalProps) {
             <span className="font-mono">{item.name}</span>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Display Name</label>
+            <label htmlFor="metadata-display-name" className="block text-sm font-medium text-gray-700 mb-1">Display Name</label>
             <input
+              id="metadata-display-name"
               type="text"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
@@ -108,8 +118,9 @@ function MetadataModal({ item, onClose, onSaved }: MetadataModalProps) {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <label htmlFor="metadata-description" className="block text-sm font-medium text-gray-700 mb-1">Description</label>
             <textarea
+              id="metadata-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
@@ -119,9 +130,11 @@ function MetadataModal({ item, onClose, onSaved }: MetadataModalProps) {
           </div>
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-sm font-medium text-gray-700">Documentation (Markdown)</label>
+              <label htmlFor="metadata-markdown" className="text-sm font-medium text-gray-700">Documentation (Markdown)</label>
               <button
+                type="button"
                 onClick={() => setShowPreview(!showPreview)}
+                aria-expanded={showPreview}
                 className="text-xs text-gray-500 hover:text-gray-700"
               >
                 {showPreview ? 'Edit' : 'Preview'}
@@ -129,10 +142,11 @@ function MetadataModal({ item, onClose, onSaved }: MetadataModalProps) {
             </div>
             {showPreview ? (
               <div className="border border-gray-300 rounded-md p-3 min-h-[120px] text-sm text-gray-700 prose prose-sm max-w-none whitespace-pre-wrap">
-                {markdown || <span className="text-gray-400 italic">No documentation</span>}
+                {markdown || <span className="text-gray-500 italic">No documentation</span>}
               </div>
             ) : (
               <textarea
+                id="metadata-markdown"
                 value={markdown}
                 onChange={(e) => setMarkdown(e.target.value)}
                 rows={6}
@@ -185,6 +199,7 @@ function MetadataModal({ item, onClose, onSaved }: MetadataModalProps) {
           </button>
         </div>
       </div>
+      </FocusTrap>
     </div>
   )
 }
@@ -253,6 +268,7 @@ function CollectionPicker({
 
 export function VerifiedCatalog() {
   const confirm = useConfirm()
+  const { toast } = useToast()
   const [items, setItems] = useState<VerifiedCatalogItem[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -328,6 +344,7 @@ export function VerifiedCatalog() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search verified items..."
+            aria-label="Search verified items"
             className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400"
           />
         </div>
@@ -349,6 +366,7 @@ export function VerifiedCatalog() {
         <select
           value={qualityFilter}
           onChange={(e) => setQualityFilter(e.target.value as QualityFilter)}
+          aria-label="Filter by quality"
           className="px-3 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400"
         >
           <option value="">All Quality</option>
@@ -374,6 +392,7 @@ export function VerifiedCatalog() {
           <input
             ref={importInputRef}
             type="file"
+            aria-label="Upload files"
             accept=".json"
             className="hidden"
             onChange={async (e) => {
@@ -385,7 +404,7 @@ export function VerifiedCatalog() {
                 setImportFile(f)
                 setImportPreview(preview)
               } catch (err: unknown) {
-                alert(err instanceof Error ? err.message : 'Failed to read file')
+                toast(err instanceof Error ? err.message : 'Failed to read file', 'error')
               }
             }}
           />
@@ -393,9 +412,9 @@ export function VerifiedCatalog() {
       </div>
 
       {loading ? (
-        <div className="text-sm text-gray-500 py-8 text-center">Loading...</div>
+        <div role="status" aria-live="polite" className="text-sm text-gray-500 py-8 text-center">Loading...</div>
       ) : items.length === 0 ? (
-        <div className="text-sm text-gray-500 py-12 text-center">
+        <div role="status" aria-live="polite" className="text-sm text-gray-500 py-12 text-center">
           No verified items found.
         </div>
       ) : (
