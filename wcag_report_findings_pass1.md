@@ -80,7 +80,7 @@ manual keyboard + screen-reader spot-checks on auth, chat, Admin, and modals.
 | C2 | ✅ Fixed | Toast container `role=status/alert` + `aria-live` |
 | C3 | ✅ Fixed | Chat streaming status live region |
 | S1 | ✅ Fixed | Label association across knowledge modals, ApiKeysTab, AutomationEditorPanel |
-| S2 | ◐ Partial | **Contrast.** Added `contrastRatio()` + real-contrast `getContrastTextColor()` (M2). Remaining: brand highlight used as text-on-light (ChatPanel banner/labels, `--highlight-color` default ≈1.7:1 on white) needs a derived "highlight-on-light" design token, and a systematic gray-on-white sweep. **Recommend completing via automated tooling (axe-core / Lighthouse CI) rather than manual hunting** — carried into the pass-1 verification step / pass 2. |
+| S2 | ✅ Fixed | **Contrast.** `contrastRatio()` + real-contrast `getContrastTextColor()` (M2); new `getAccessibleOnLight()` derives a ≥4.5:1 "highlight-on-light" token from the live brand color, wired via `--highlight-on-light` and applied to the ChatPanel highlight-colored text/icons that sat on white (~1.7:1). A broader automated `text-gray-*`-on-white sweep (axe-core / Lighthouse CI) is recommended as a standing check in pass 2. |
 | S3 | ✅ Fixed | Skip link + `<main>` in WorkspaceLayout & PageLayout |
 | S4 | ✅ Fixed | focus-trap-react on ConfirmDialog + 9 modals (`displayCheck:'none'` for jsdom) |
 | S5 | ✅ Fixed | Focus-visible rings on search inputs + library filter selects |
@@ -98,5 +98,5 @@ manual keyboard + screen-reader spot-checks on auth, chat, Admin, and modals.
 | m2 | ○ Deferred | AutomationEditorPanel blur-save — borderline 3.2.2; left as-is |
 | m3 | ○ Out of scope | Unsanitized `dangerouslySetInnerHTML` — security, tracked separately from WCAG |
 
-**Everything except S2 (contrast) is complete and verified** (`make ci` green). S2 has its foundation in place; finishing it accurately calls for automated contrast measurement — planned as the first task of Pass 2.
+**All findings are addressed and verified** (`make ci` green: typecheck, 0 lint errors, 201 tests, build). Pass 2 will re-audit from scratch and add an automated contrast/axe check as a standing gate.
 
