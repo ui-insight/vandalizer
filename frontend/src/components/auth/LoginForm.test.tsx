@@ -27,11 +27,11 @@ describe('LoginForm', () => {
     mockLogin.mockResolvedValueOnce(undefined)
     render(<LoginForm />)
 
-    fireEvent.change(screen.getByPlaceholderText(/email/i), { target: { value: 'alice' } })
+    fireEvent.change(screen.getByPlaceholderText(/email/i), { target: { value: 'alice@example.com' } })
     fireEvent.change(screen.getByPlaceholderText(/password/i), { target: { value: 'secret' } })
     fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
 
-    await waitFor(() => expect(mockLogin).toHaveBeenCalledWith('alice', 'secret'))
+    await waitFor(() => expect(mockLogin).toHaveBeenCalledWith('alice@example.com', 'secret'))
   })
 
   it('shows loading state while submitting', async () => {
@@ -39,7 +39,7 @@ describe('LoginForm', () => {
     mockLogin.mockReturnValue(new Promise<void>((r) => { resolve = r }))
 
     render(<LoginForm />)
-    fireEvent.change(screen.getByPlaceholderText(/email/i), { target: { value: 'alice' } })
+    fireEvent.change(screen.getByPlaceholderText(/email/i), { target: { value: 'alice@example.com' } })
     fireEvent.change(screen.getByPlaceholderText(/password/i), { target: { value: 'pw' } })
     fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
 
@@ -53,7 +53,7 @@ describe('LoginForm', () => {
     mockLogin.mockRejectedValueOnce(new Error('Invalid credentials'))
     render(<LoginForm />)
 
-    fireEvent.change(screen.getByPlaceholderText(/email/i), { target: { value: 'alice' } })
+    fireEvent.change(screen.getByPlaceholderText(/email/i), { target: { value: 'alice@example.com' } })
     fireEvent.change(screen.getByPlaceholderText(/password/i), { target: { value: 'wrong' } })
     fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
 
@@ -65,7 +65,7 @@ describe('LoginForm', () => {
     mockLogin.mockResolvedValueOnce(undefined)
     render(<LoginForm />)
 
-    fireEvent.change(screen.getByPlaceholderText(/email/i), { target: { value: 'alice' } })
+    fireEvent.change(screen.getByPlaceholderText(/email/i), { target: { value: 'alice@example.com' } })
     fireEvent.change(screen.getByPlaceholderText(/password/i), { target: { value: 'wrong' } })
     fireEvent.click(screen.getByRole('button', { name: /sign in/i }))
     await waitFor(() => expect(screen.getByText('Bad credentials')).toBeInTheDocument())

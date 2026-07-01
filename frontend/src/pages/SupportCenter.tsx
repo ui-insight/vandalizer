@@ -7,6 +7,7 @@ import {
 import { PageLayout } from '../components/layout/PageLayout'
 import { useAuth } from '../hooks/useAuth'
 import { useToast } from '../contexts/ToastContext'
+import { useConfirm } from '../components/shared/useConfirm'
 import * as supportApi from '../api/support'
 import type {
   SupportTicket, SupportTicketSummary, SupportAttachment,
@@ -739,6 +740,7 @@ function ChatView({
 }) {
   const { user } = useAuth()
   const { toast } = useToast()
+  const confirm = useConfirm()
   const [ticket, setTicket] = useState<SupportTicket | null>(null)
   const [loading, setLoading] = useState(true)
   const [reply, setReply] = useState('')
@@ -857,7 +859,16 @@ function ChatView({
   }
 
   const handleDeleteAttachment = async (attachmentUuid: string, filename: string) => {
-    if (!window.confirm(`Remove "${filename}" from this ticket?`)) return
+    if (!(await confirm({
+      title: 'Remove attachment?',
+      message: (
+        <>
+          Remove "{filename}" from this ticket?
+        </>
+      ),
+      confirmLabel: 'Remove',
+      destructive: true,
+    }))) return
     try {
       const updated = await supportApi.deleteAttachment(ticketUuid, attachmentUuid)
       setTicket(updated)

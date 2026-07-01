@@ -55,7 +55,7 @@ export function ConfirmDialog({
     >
       {/* Escape + outside-click are handled above; the trap only confines Tab
           focus to the dialog and restores focus to the trigger on close. */}
-      <FocusTrap focusTrapOptions={{ escapeDeactivates: false, allowOutsideClick: true }}>
+      <FocusTrap focusTrapOptions={{ escapeDeactivates: false, allowOutsideClick: true, tabbableOptions: { displayCheck: 'none' } }}>
       <div
         role="dialog"
         aria-modal="true"

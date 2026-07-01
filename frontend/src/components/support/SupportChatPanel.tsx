@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../contexts/ToastContext'
+import { useConfirm } from '../shared/useConfirm'
 import * as supportApi from '../../api/support'
 import type { SupportTicket, SupportTicketSummary } from '../../types/support'
 
@@ -546,6 +547,7 @@ function ChatView({
 }) {
   const { user } = useAuth()
   const { toast } = useToast()
+  const confirm = useConfirm()
   const [ticket, setTicket] = useState<SupportTicket | null>(null)
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
@@ -659,7 +661,16 @@ function ChatView({
   }
 
   const handleDeleteAttachment = async (attachmentUuid: string, filename: string) => {
-    if (!window.confirm(`Remove "${filename}" from this ticket?`)) return
+    if (!(await confirm({
+      title: 'Remove attachment?',
+      message: (
+        <>
+          Remove "{filename}" from this ticket?
+        </>
+      ),
+      confirmLabel: 'Remove',
+      destructive: true,
+    }))) return
     try {
       const updated = await supportApi.deleteAttachment(ticketUuid, attachmentUuid)
       setTicket(updated)

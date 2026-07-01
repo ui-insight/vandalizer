@@ -44,7 +44,7 @@ export function SharedKBDeleteDialog({ open, kbTitle, onCancel, onChoose }: Prop
         if (e.target === e.currentTarget && !disabled) onCancel()
       }}
     >
-      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false }}>
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
       <div
         role="dialog"
         aria-modal="true"

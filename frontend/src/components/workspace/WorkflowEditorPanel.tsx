@@ -14,6 +14,7 @@ import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
 import { useAuth } from '../../hooks/useAuth'
 import { useShareLink } from '../../lib/shareLink'
+import { useConfirm } from '../shared/useConfirm'
 import { getProjectDocuments } from '../../api/projects'
 import {
   getWorkflow, addStep, deleteStep, addTask, deleteTask, updateTask,
@@ -209,6 +210,7 @@ export function WorkflowEditorPanel() {
   const { toast } = useToast()
   const { user } = useAuth()
   const shareLink = useShareLink()
+  const confirm = useConfirm()
   const { openWorkflowId, openWorkflowShareToken, openWorkflow, closeWorkflow, consumeWorkflowSession, selectedDocUuids, bumpActivitySignal, activeProjectUuid } = useWorkspace()
   const [workflow, setWorkflow] = useState<Workflow | null>(null)
   const [loading, setLoading] = useState(true)
@@ -376,12 +378,24 @@ export function WorkflowEditorPanel() {
     const verifiedBlock = isVerified && !user?.is_examiner
     const sharedBlock = workflow?.can_manage === false
     if (!verifiedBlock && !sharedBlock) return false
-    const msg = verifiedBlock
-      ? "This workflow is verified — edits would change the verified version. Make a copy to edit?\n\nYour copy will be saved to your team."
-      : "This workflow is shared with you. Make a copy to edit?\n\nYour copy will be saved to your team."
-    if (window.confirm(msg)) {
-      void handleMakeCopy()
-    }
+    const message = verifiedBlock
+      ? (
+        <>
+          This workflow is verified — edits would change the verified version. Make a copy to edit?
+          <br /><br />
+          Your copy will be saved to your team.
+        </>
+      )
+      : (
+        <>
+          This workflow is shared with you. Make a copy to edit?
+          <br /><br />
+          Your copy will be saved to your team.
+        </>
+      )
+    void confirm({ message, confirmLabel: 'Make a copy' }).then((ok) => {
+      if (ok) void handleMakeCopy()
+    })
     return true
   }
 
@@ -679,9 +693,16 @@ export function WorkflowEditorPanel() {
               e.target.value = ''
               if (!workflow) return
               const hasContent = (workflow.steps?.length ?? 0) > 0
-              if (hasContent && !window.confirm(
-                `This will replace all steps and configuration in "${workflow.name}" with the contents of the imported file. This cannot be undone. Continue?`
-              )) {
+              if (hasContent && !(await confirm({
+                title: 'Import workflow?',
+                message: (
+                  <>
+                    This will replace all steps and configuration in <strong>{workflow.name}</strong> with the contents of the imported file. This cannot be undone. Continue?
+                  </>
+                ),
+                confirmLabel: 'Import',
+                destructive: true,
+              }))) {
                 return
               }
               try {
@@ -5935,6 +5956,7 @@ function ValidateTab({
   canManage: boolean
 }) {
   const { toast } = useToast()
+  const confirm = useConfirm()
 
   // Plan state
   const [planChecks, setPlanChecks] = useState<ValidationCheckDefinition[]>([])
@@ -6227,7 +6249,12 @@ function ValidateTab({
 
   const handleDeleteExpectedOutput = async (expectedId: string) => {
     if (!workflowId) return
-    if (!window.confirm('Remove this expected output? Validation and tuning will no longer score against it.')) return
+    if (!(await confirm({
+      title: 'Remove expected output?',
+      message: 'Remove this expected output? Validation and tuning will no longer score against it.',
+      confirmLabel: 'Remove',
+      destructive: true,
+    }))) return
     setError(null)
     try {
       await deleteExpectedOutput(workflowId, expectedId)
@@ -6247,9 +6274,11 @@ function ValidateTab({
     // Regeneration replaces auto-generated checks; checks the user added by
     // hand are preserved by the backend. Confirm so that's not a surprise.
     const manualCount = planChecks.filter(c => c.source === 'manual').length
-    if (manualCount > 0 && !window.confirm(
-      `Regenerate plan? Your ${manualCount} custom check${manualCount === 1 ? '' : 's'} will be kept; the auto-generated checks will be replaced.`,
-    )) return
+    if (manualCount > 0 && !(await confirm({
+      title: 'Regenerate plan?',
+      message: `Regenerate plan? Your ${manualCount} custom check${manualCount === 1 ? '' : 's'} will be kept; the auto-generated checks will be replaced.`,
+      confirmLabel: 'Regenerate',
+    }))) return
     setGenerating(true)
     setError(null)
     try {

@@ -110,7 +110,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
         if (e.key === 'Escape') onClose()
       }}
     >
-      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false }}>
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
       <div
         role="dialog"
         aria-modal="true"
