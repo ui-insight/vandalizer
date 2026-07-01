@@ -77,7 +77,7 @@ export default function Workflows() {
       <div className="p-6 max-w-5xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-semibold text-gray-900">Workflows</h1>
-          <span className="text-sm text-gray-400">{workflows.length} total</span>
+          <span className="text-sm text-gray-500">{workflows.length} total</span>
         </div>
 
         {/* Create new */}
@@ -100,7 +100,7 @@ export default function Workflows() {
               Create
             </button>
           </div>
-          <div className="mt-1.5 text-xs text-gray-400">
+          <div className="mt-1.5 text-xs text-gray-500">
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={importing}
@@ -111,6 +111,7 @@ export default function Workflows() {
             <input
               ref={fileInputRef}
               type="file"
+              aria-label="Upload files"
               accept=".json,application/json"
               className="hidden"
               onChange={e => {
@@ -154,9 +155,9 @@ export default function Workflows() {
 
         {/* List */}
         {loading ? (
-          <div className="text-gray-500 text-sm">Loading...</div>
+          <div className="text-gray-500 text-sm" role="status" aria-live="polite">Loading...</div>
         ) : filtered.length === 0 ? (
-          <div className="text-gray-500 text-sm text-center py-12">
+          <div className="text-gray-500 text-sm text-center py-12" role="status" aria-live="polite">
             {search ? 'No workflows match your search.' : 'No workflows yet. Create one above to get started.'}
           </div>
         ) : (
@@ -173,7 +174,7 @@ export default function Workflows() {
                     <div className="text-sm text-gray-500 truncate">{wf.description}</div>
                   )}
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs text-gray-500">
                       {wf.steps?.length || 0} steps &middot; {wf.num_executions} runs
                     </span>
                     {wf.created_by && wf.created_by.user_id !== user?.user_id && (

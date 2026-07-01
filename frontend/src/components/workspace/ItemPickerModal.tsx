@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { FocusTrap } from 'focus-trap-react'
 import { Search, X, Workflow, FileText, Users, Compass, Loader2 } from 'lucide-react'
 import { listLibraries, listItems, listVerifiedItems } from '../../api/library'
 import { useAuth } from '../../hooks/useAuth'
@@ -180,7 +181,12 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
         padding: 20,
       }}
     >
-      <div style={{
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Select ${kindLabel}`}
+        style={{
         backgroundColor: '#fff', borderRadius: 12,
         width: '100%', maxWidth: inline ? 480 : 560, maxHeight: inline ? '90%' : '80vh',
         display: 'flex', flexDirection: 'column',
@@ -195,7 +201,9 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
             Select {kindLabel}
           </div>
           <button
+            type="button"
             onClick={onClose}
+            aria-label="Close"
             style={{
               background: 'none', border: 'none', cursor: 'pointer',
               color: '#6b7280', padding: 4, borderRadius: 6,
@@ -219,6 +227,7 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder={`Search ${kindPlural}...`}
+              aria-label={`Search ${kindPlural}`}
               style={{
                 border: 'none', outline: 'none', flex: 1,
                 backgroundColor: 'transparent', fontSize: 14,
@@ -227,7 +236,9 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
             />
             {search && (
               <button
+                type="button"
                 onClick={() => setSearch('')}
+                aria-label="Clear search"
                 style={{
                   background: 'none', border: 'none', cursor: 'pointer',
                   color: '#9ca3af', padding: 2, display: 'flex',
@@ -370,6 +381,7 @@ export function ItemPickerModal({ kind, onSelect, onClose, currentId, inline }: 
           )}
         </div>
       </div>
+      </FocusTrap>
     </div>
   )
 }

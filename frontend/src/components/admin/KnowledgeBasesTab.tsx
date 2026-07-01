@@ -85,6 +85,7 @@ export function KnowledgeBasesTab({ canEdit }: Props) {
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
+              aria-label="Search knowledge bases"
               placeholder="Search title, owner, team, tag…"
               style={{
                 padding: '8px 10px 8px 30px', fontSize: 13, fontFamily: 'inherit',
@@ -125,9 +126,9 @@ export function KnowledgeBasesTab({ canEdit }: Props) {
             <thead>
               <tr style={{ background: '#f9fafb', borderBottom: '1px solid #e5e7eb' }}>
                 <Th>#</Th>
-                <Th>
-                  <button onClick={() => setSort('title')} style={sortBtn(sort === 'title')}>
-                    Title <ArrowUpDown size={11} />
+                <Th ariaSort={sort === 'title' ? 'ascending' : 'none'}>
+                  <button type="button" onClick={() => setSort('title')} style={sortBtn(sort === 'title')}>
+                    Title <ArrowUpDown size={11} aria-hidden="true" />
                   </button>
                 </Th>
                 <Th>Tags</Th>
@@ -136,9 +137,9 @@ export function KnowledgeBasesTab({ canEdit }: Props) {
                 <Th align="right">Sources</Th>
                 <Th align="right">Chunks</Th>
                 <Th>Status</Th>
-                <Th align="right">
-                  <button onClick={() => setSort('updated')} style={sortBtn(sort === 'updated')}>
-                    Updated <ArrowUpDown size={11} />
+                <Th align="right" ariaSort={sort === 'updated' ? 'descending' : 'none'}>
+                  <button type="button" onClick={() => setSort('updated')} style={sortBtn(sort === 'updated')}>
+                    Updated <ArrowUpDown size={11} aria-hidden="true" />
                   </button>
                 </Th>
               </tr>
@@ -151,7 +152,7 @@ export function KnowledgeBasesTab({ canEdit }: Props) {
           </table>
         )}
       </div>
-      <div style={{ marginTop: 8, fontSize: 12, color: '#9ca3af' }}>
+      <div style={{ marginTop: 8, fontSize: 12, color: '#6b7280' }}>
         {filtered.length} of {kbs.length} knowledge base{kbs.length === 1 ? '' : 's'}
       </div>
     </div>
@@ -192,7 +193,7 @@ function KBRow({
 
   return (
     <tr style={{ borderBottom: '1px solid #f3f4f6' }}>
-      <Td style={{ color: '#9ca3af', fontWeight: 600 }}>{index + 1}</Td>
+      <Td style={{ color: '#6b7280', fontWeight: 600 }}>{index + 1}</Td>
       <Td>
         {editing ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -244,7 +245,7 @@ function KBRow({
               }}>{t}</span>
             ))}
           </div>
-        ) : <span style={{ color: '#d1d5db' }}>—</span>}
+        ) : <span style={{ color: '#6b7280' }}>—</span>}
       </Td>
       <Td style={{ fontSize: 13, color: '#6b7280' }}>{kb.owner_email || kb.owner_id}</Td>
       <Td style={{ fontSize: 13, color: '#6b7280' }}>{kb.team_name || '—'}</Td>
@@ -274,12 +275,20 @@ function StatusPill({ status }: { status: string }) {
   )
 }
 
-function Th({ children, align = 'left' }: { children: React.ReactNode; align?: 'left' | 'right' }) {
+function Th({ children, align = 'left', ariaSort }: {
+  children: React.ReactNode
+  align?: 'left' | 'right'
+  ariaSort?: 'ascending' | 'descending' | 'none'
+}) {
   return (
-    <th style={{
-      padding: '10px 16px', textAlign: align, fontSize: 11, fontWeight: 600,
-      color: '#6b7280', textTransform: 'uppercase', whiteSpace: 'nowrap',
-    }}>
+    <th
+      scope="col"
+      aria-sort={ariaSort}
+      style={{
+        padding: '10px 16px', textAlign: align, fontSize: 11, fontWeight: 600,
+        color: '#6b7280', textTransform: 'uppercase', whiteSpace: 'nowrap',
+      }}
+    >
       {children}
     </th>
   )

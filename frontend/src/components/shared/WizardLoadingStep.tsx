@@ -17,7 +17,7 @@ interface Props {
 export function WizardLoadingStep({ message, sub, error, onRetry, onSkip, skipLabel }: Props) {
   if (error) {
     return (
-      <div style={{
+      <div role="alert" style={{
         padding: '14px 16px',
         backgroundColor: 'rgba(239, 68, 68, 0.06)',
         border: '1px solid rgba(239, 68, 68, 0.25)',
@@ -52,11 +52,11 @@ export function WizardLoadingStep({ message, sub, error, onRetry, onSkip, skipLa
     )
   }
   return (
-    <div style={{
+    <div role="status" aria-live="polite" style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center',
       justifyContent: 'center', padding: '40px 16px', gap: 10,
     }}>
-      <Loader2 size={22} style={{ color: '#a78bfa', animation: 'spin 1s linear infinite' }} />
+      <Loader2 aria-hidden="true" size={22} style={{ color: '#a78bfa', animation: 'spin 1s linear infinite' }} />
       <div style={{ fontSize: 13, fontWeight: 600, color: '#e5e5e5' }}>{message}</div>
       {sub && <div style={{ fontSize: 11, color: '#888' }}>{sub}</div>}
     </div>

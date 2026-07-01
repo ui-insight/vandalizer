@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../contexts/ToastContext'
+import { useConfirm } from '../shared/useConfirm'
 import * as supportApi from '../../api/support'
 import type { SupportTicket, SupportTicketSummary } from '../../types/support'
 
@@ -129,7 +130,7 @@ const STATUS_DOT = {
 } as const
 
 const PRIORITY_COLORS = {
-  low: 'text-gray-400',
+  low: 'text-gray-500',
   normal: 'text-blue-500',
   high: 'text-red-500',
 } as const
@@ -232,7 +233,7 @@ function TicketListView({
                       )}
                       <p className={`truncate text-sm ${attention ? 'font-semibold text-gray-900' : 'font-medium text-gray-900'}`}>
                         {t.ticket_number != null && (
-                          <span className="mr-1 font-mono text-[11px] text-gray-400">#{t.ticket_number}</span>
+                          <span className="mr-1 font-mono text-[11px] text-gray-500">#{t.ticket_number}</span>
                         )}
                         {t.subject}
                       </p>
@@ -246,9 +247,9 @@ function TicketListView({
                     </p>
                   </div>
                   <div className="flex flex-col items-end gap-0.5 shrink-0">
-                    <span className="text-[10px] text-gray-400">{timeAgo(t.updated_at)}</span>
+                    <span className="text-[10px] text-gray-500">{timeAgo(t.updated_at)}</span>
                     {t.message_count > 1 && (
-                      <span className="text-[10px] text-gray-400">{t.message_count} msgs</span>
+                      <span className="text-[10px] text-gray-500">{t.message_count} msgs</span>
                     )}
                     {t.priority === 'high' && (
                       <span className="text-[10px] font-medium text-red-500">High</span>
@@ -259,7 +260,7 @@ function TicketListView({
             })}
             {closed.length > 0 && (
               <details className="border-t border-gray-100">
-                <summary className="cursor-pointer px-4 py-2 text-xs font-medium text-gray-400 hover:text-gray-600">
+                <summary className="cursor-pointer px-4 py-2 text-xs font-medium text-gray-500 hover:text-gray-600">
                   {closed.length} closed ticket{closed.length !== 1 ? 's' : ''}
                 </summary>
                 {closed.map((t) => (
@@ -272,12 +273,12 @@ function TicketListView({
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm text-gray-700">
                         {t.ticket_number != null && (
-                          <span className="mr-1 font-mono text-[11px] text-gray-400">#{t.ticket_number}</span>
+                          <span className="mr-1 font-mono text-[11px] text-gray-500">#{t.ticket_number}</span>
                         )}
                         {t.subject}
                       </p>
                     </div>
-                    <span className="text-[10px] text-gray-400">{timeAgo(t.updated_at)}</span>
+                    <span className="text-[10px] text-gray-500">{timeAgo(t.updated_at)}</span>
                   </button>
                 ))}
               </details>
@@ -366,28 +367,30 @@ function NewTicketView({
     <div ref={dropRef} className="relative flex flex-1 flex-col overflow-hidden">
       <DropOverlay show={dragOver} />
       <div className="flex items-center gap-2 border-b px-4 py-2">
-        <button onClick={onBack} className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+        <button type="button" onClick={onBack} aria-label="Back" className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
           <ArrowLeft className="h-4 w-4" />
         </button>
         <span className="text-sm font-medium text-gray-900">New Ticket</span>
       </div>
       <div className="flex-1 overflow-y-auto space-y-3 p-4">
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600">Subject</label>
+          <label htmlFor="support-new-subject" className="mb-1 block text-xs font-medium text-gray-600">Subject</label>
           <input
+            id="support-new-subject"
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="Brief summary of your issue"
             autoFocus
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600">Priority</label>
+          <label htmlFor="support-new-priority" className="mb-1 block text-xs font-medium text-gray-600">Priority</label>
           <select
+            id="support-new-priority"
             value={priority}
             onChange={(e) => setPriority(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="low">Low</option>
             <option value="normal">Normal</option>
@@ -395,11 +398,12 @@ function NewTicketView({
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600">Type</label>
+          <label htmlFor="support-new-classification" className="mb-1 block text-xs font-medium text-gray-600">Type</label>
           <select
+            id="support-new-classification"
             value={classification}
             onChange={(e) => setClassification(e.target.value)}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="bug">Bug</option>
             <option value="enhancement">Enhancement</option>
@@ -407,12 +411,13 @@ function NewTicketView({
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-600">Description</label>
+          <label htmlFor="support-new-description" className="mb-1 block text-xs font-medium text-gray-600">Description</label>
           <textarea
+            id="support-new-description"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             rows={4}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="Describe your issue..."
           />
         </div>
@@ -431,6 +436,7 @@ function NewTicketView({
               ref={fileInputRef}
               type="file"
               multiple
+              aria-label="Upload files"
               className="hidden"
               onChange={handleFilesPicked}
             />
@@ -546,6 +552,7 @@ function ChatView({
 }) {
   const { user } = useAuth()
   const { toast } = useToast()
+  const confirm = useConfirm()
   const [ticket, setTicket] = useState<SupportTicket | null>(null)
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState('')
@@ -659,7 +666,16 @@ function ChatView({
   }
 
   const handleDeleteAttachment = async (attachmentUuid: string, filename: string) => {
-    if (!window.confirm(`Remove "${filename}" from this ticket?`)) return
+    if (!(await confirm({
+      title: 'Remove attachment?',
+      message: (
+        <>
+          Remove "{filename}" from this ticket?
+        </>
+      ),
+      confirmLabel: 'Remove',
+      destructive: true,
+    }))) return
     try {
       const updated = await supportApi.deleteAttachment(ticketUuid, attachmentUuid)
       setTicket(updated)
@@ -735,7 +751,7 @@ function ChatView({
       {/* Chat header */}
       <div className="border-b px-4 py-2">
         <div className="flex items-center gap-2">
-          <button onClick={onBack} className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+          <button type="button" onClick={onBack} aria-label="Back" className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
             <ArrowLeft className="h-4 w-4" />
           </button>
           <div className="min-w-0 flex-1">
@@ -754,20 +770,20 @@ function ChatView({
               </span>
               {isSupportAgent && (
                 <>
-                  <span className="text-[10px] text-gray-300">|</span>
+                  <span className="text-[10px] text-gray-500">|</span>
                   <span className={`text-[10px] font-medium ${PRIORITY_COLORS[ticket.priority]}`}>
                     {ticket.priority}
                   </span>
                   {ticket.classification && (
                     <>
-                      <span className="text-[10px] text-gray-300">|</span>
+                      <span className="text-[10px] text-gray-500">|</span>
                       <span className="text-[10px] font-medium text-indigo-500">
                         {CLASSIFICATION_LABELS[ticket.classification]}
                       </span>
                     </>
                   )}
-                  <span className="text-[10px] text-gray-300">|</span>
-                  <span className="text-[10px] text-gray-400">{ticket.user_name || ticket.user_id}</span>
+                  <span className="text-[10px] text-gray-500">|</span>
+                  <span className="text-[10px] text-gray-500">{ticket.user_name || ticket.user_id}</span>
                 </>
               )}
             </div>
@@ -860,6 +876,7 @@ function ChatView({
                   <div className="flex flex-col gap-1.5">
                     <textarea
                       autoFocus
+                      aria-label="Edit message"
                       value={editDraft}
                       onChange={(e) => setEditDraft(e.target.value)}
                       onKeyDown={(e) => {
@@ -908,7 +925,7 @@ function ChatView({
                 ) : (
                   <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
                 )}
-                <p className={`mt-1 text-[10px] ${isInternal ? 'text-yellow-800' : (isMe ? 'text-blue-200' : 'text-gray-400')}`}>
+                <p className={`mt-1 text-[10px] ${isInternal ? 'text-yellow-800' : (isMe ? 'text-blue-200' : 'text-gray-500')}`}>
                   {timeAgo(msg.created_at)}
                   {msg.edited_at && <span className="ml-1 italic">(edited)</span>}
                 </p>
@@ -916,7 +933,7 @@ function ChatView({
               {isMe && !isEditing && (
                 <button
                   onClick={() => startEdit(msg)}
-                  className="mt-0.5 inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] text-gray-400 opacity-0 transition-opacity hover:bg-gray-100 hover:text-gray-600 group-hover:opacity-100"
+                  className="mt-0.5 inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] text-gray-500 opacity-0 transition-opacity hover:bg-gray-100 hover:text-gray-600 group-hover:opacity-100"
                   title="Edit message"
                 >
                   <Pencil className="h-2.5 w-2.5" />
@@ -1026,15 +1043,18 @@ function ChatView({
         )}
         <div className="flex items-end gap-1.5">
           <button
+            type="button"
             onClick={() => fileInputRef.current?.click()}
             className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
             title="Attach file"
+            aria-label="Attach file"
           >
             <Paperclip className="h-4 w-4" />
           </button>
-          <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileUpload} />
+          <input ref={fileInputRef} type="file" multiple aria-label="Upload files" className="hidden" onChange={handleFileUpload} />
           <textarea
             ref={messageRef}
+            aria-label="Message"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -1053,8 +1073,10 @@ function ChatView({
             }`}
           />
           <button
+            type="button"
             onClick={handleSend}
             disabled={!message.trim() || sending}
+            aria-label={isInternalNote ? 'Add internal note' : 'Send message'}
             className={`rounded-lg p-1.5 text-white disabled:opacity-50 ${
               isInternalNote ? 'bg-yellow-600 hover:bg-yellow-700' : 'bg-blue-600 hover:bg-blue-700'
             }`}
@@ -1126,14 +1148,14 @@ function WatcherBar({
   return (
     <div className="mt-2 ml-7 flex flex-wrap items-center gap-1.5">
       <span
-        className="inline-flex items-center gap-1 text-[10px] font-medium uppercase text-gray-400"
+        className="inline-flex items-center gap-1 text-[10px] font-medium uppercase text-gray-500"
         title="Tagged users follow this ticket and get notified on updates"
       >
         <Eye className="h-3 w-3" />
         Watchers
       </span>
       {watchers.length === 0 && !adding && (
-        <span className="text-[11px] text-gray-400">None</span>
+        <span className="text-[11px] text-gray-500">None</span>
       )}
       {watchers.map((w) => {
         const isMe = w.user_id === currentUserId
@@ -1157,6 +1179,7 @@ function WatcherBar({
       {adding ? (
         <input
           autoFocus
+          aria-label="Watcher email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           onBlur={() => { if (!busy) { setEmail(''); setAdding(false) } }}

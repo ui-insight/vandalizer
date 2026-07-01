@@ -8,6 +8,8 @@ import {
   type KBTestQuery,
 } from '../../api/knowledge'
 import { GenerateTestQueriesModal } from './GenerateTestQueriesModal'
+import { useConfirm } from '../shared/useConfirm'
+import { useToast } from '../../contexts/ToastContext'
 
 interface Props {
   kbUuid: string
@@ -57,6 +59,8 @@ export function draftToUpdatePayload(draft: DraftShape) {
 }
 
 export function KBTestQueriesTab({ kbUuid, kbReady, canManage, queries, onChange }: Props) {
+  const confirm = useConfirm()
+  const { toast } = useToast()
   const [showGen, setShowGen] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
   const [adding, setAdding] = useState(false)
@@ -106,7 +110,12 @@ export function KBTestQueriesTab({ kbUuid, kbReady, canManage, queries, onChange
   }
 
   const handleDelete = async (q: KBTestQuery) => {
-    if (!confirm(`Delete this test query?\n\n"${q.query}"`)) return
+    const ok = await confirm({
+      title: 'Delete test query',
+      message: `Delete this test query?\n\n"${q.query}"`,
+      destructive: true,
+    })
+    if (!ok) return
     await deleteKBTestQuery(kbUuid, q.uuid)
     await onChange()
   }
@@ -120,7 +129,7 @@ export function KBTestQueriesTab({ kbUuid, kbReady, canManage, queries, onChange
       await generateKBTestQueriesAndWait(kbUuid, { coverage })
       await onChange()
     } catch (e) {
-      alert(`Generation failed: ${(e as Error).message}`)
+      toast(`Generation failed: ${(e as Error).message}`, 'error')
     } finally {
       setGenerating(false)
     }
@@ -133,20 +142,22 @@ export function KBTestQueriesTab({ kbUuid, kbReady, canManage, queries, onChange
       {/* Action bar */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
         <button
+          type="button"
           onClick={() => setShowAdd(v => !v)}
           disabled={!!disabledReason}
           style={btn(!disabledReason)}
         >
-          <Plus size={12} />
+          <Plus size={12} aria-hidden="true" />
           Add manually
         </button>
         <button
+          type="button"
           onClick={() => setShowGen(true)}
           disabled={!!disabledReason || generating}
           style={btn(!disabledReason && !generating, '#7c3aed')}
           title={disabledReason || 'Auto-generate test queries from KB content'}
         >
-          {generating ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Sparkles size={12} />}
+          {generating ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" /> : <Sparkles size={12} aria-hidden="true" />}
           {generating ? 'Generating…' : 'Auto-generate (LLM)'}
         </button>
       </div>
@@ -160,17 +171,17 @@ export function KBTestQueriesTab({ kbUuid, kbReady, canManage, queries, onChange
         }}>
           <QueryFormFields draft={draft} onChange={setDraft} />
           <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={handleAdd} disabled={adding || !draft.query.trim()} style={btn(!adding && !!draft.query.trim(), '#15803d')}>
+            <button type="button" onClick={handleAdd} disabled={adding || !draft.query.trim()} style={btn(!adding && !!draft.query.trim(), '#15803d')}>
               {adding ? 'Adding…' : 'Save'}
             </button>
-            <button onClick={() => setShowAdd(false)} style={btn(true)}>Cancel</button>
+            <button type="button" onClick={() => setShowAdd(false)} style={btn(true)}>Cancel</button>
           </div>
         </div>
       )}
 
       {/* Queries list */}
       {queries.length === 0 ? (
-        <div style={{ fontSize: 12, color: '#888', padding: '20px 0', textAlign: 'center' }}>
+        <div role="status" style={{ fontSize: 12, color: '#888', padding: '20px 0', textAlign: 'center' }}>
           No test queries yet. Add some manually or auto-generate from KB content.
         </div>
       ) : (
@@ -187,18 +198,18 @@ export function KBTestQueriesTab({ kbUuid, kbReady, canManage, queries, onChange
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <QueryFormFields draft={editDraft} onChange={setEditDraft} />
                   <div style={{ display: 'flex', gap: 8 }}>
-                    <button onClick={handleUpdate} disabled={saving || !editDraft.query.trim()} style={btn(!saving && !!editDraft.query.trim(), '#15803d')}>
+                    <button type="button" onClick={handleUpdate} disabled={saving || !editDraft.query.trim()} style={btn(!saving && !!editDraft.query.trim(), '#15803d')}>
                       {saving ? 'Saving…' : 'Save'}
                     </button>
-                    <button onClick={() => setEditingUuid(null)} style={btn(true)}>Cancel</button>
+                    <button type="button" onClick={() => setEditingUuid(null)} style={btn(true)}>Cancel</button>
                   </div>
                 </div>
               ) : (
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                   {q.auto_generated ? (
-                    <Bot size={13} style={{ color: '#7c3aed', flexShrink: 0, marginTop: 2 }} />
+                    <Bot size={13} style={{ color: '#7c3aed', flexShrink: 0, marginTop: 2 }} aria-label="Auto-generated" />
                   ) : (
-                    <User size={13} style={{ color: '#888', flexShrink: 0, marginTop: 2 }} />
+                    <User size={13} style={{ color: '#888', flexShrink: 0, marginTop: 2 }} aria-label="User-authored" />
                   )}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 12, color: '#e5e5e5', marginBottom: 4 }}>{q.query}</div>
@@ -222,18 +233,22 @@ export function KBTestQueriesTab({ kbUuid, kbReady, canManage, queries, onChange
                   {canManage && (
                     <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
                       <button
+                        type="button"
                         onClick={() => startEdit(q)}
                         style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: '#666' }}
                         title="Edit"
+                        aria-label="Edit test query"
                       >
-                        <Pencil size={12} />
+                        <Pencil size={12} aria-hidden="true" />
                       </button>
                       <button
+                        type="button"
                         onClick={() => handleDelete(q)}
                         style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: '#666' }}
                         title="Delete"
+                        aria-label="Delete test query"
                       >
-                        <Trash2 size={12} />
+                        <Trash2 size={12} aria-hidden="true" />
                       </button>
                     </div>
                   )}
@@ -265,24 +280,28 @@ export function QueryFormFields({ draft, onChange }: { draft: DraftShape; onChan
   return (
     <>
       <input
+        aria-label="Query"
         placeholder="Query…"
         value={draft.query}
         onChange={e => onChange({ ...draft, query: e.target.value })}
         style={input()}
       />
       <textarea
+        aria-label="Expected answer"
         placeholder="Expected answer (the canonical correct answer the LLM judge will compare against)"
         value={draft.expected_answer}
         onChange={e => onChange({ ...draft, expected_answer: e.target.value })}
         style={{ ...input(), minHeight: 60, resize: 'vertical' as const }}
       />
       <input
+        aria-label="Expected source labels"
         placeholder="Expected source labels (comma-separated, optional)"
         value={draft.expected_source_labels}
         onChange={e => onChange({ ...draft, expected_source_labels: e.target.value })}
         style={input()}
       />
       <select
+        aria-label="Category"
         value={draft.category}
         onChange={e => onChange({ ...draft, category: e.target.value })}
         style={input()}
@@ -319,6 +338,5 @@ function input(): React.CSSProperties {
     background: '#1a1a1a', color: '#e5e5e5',
     border: '1px solid #333', borderRadius: 4,
     padding: '6px 8px', fontSize: 12, fontFamily: 'inherit',
-    outline: 'none',
   }
 }

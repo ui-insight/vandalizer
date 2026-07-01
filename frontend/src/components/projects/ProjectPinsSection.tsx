@@ -73,8 +73,8 @@ export function ProjectPinsSection({ projectUuid, onChange, onOpen }: { projectU
   return (
     <div className="mt-8">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-400">Pinned tools</h2>
-        <button onClick={() => setAdding(a => !a)} className="flex items-center gap-1 text-sm text-highlight hover:underline">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500">Pinned tools</h2>
+        <button type="button" onClick={() => setAdding(a => !a)} className="flex items-center gap-1 text-sm text-highlight hover:underline">
           <Plus size={14} /> Pin a tool
         </button>
       </div>
@@ -89,7 +89,7 @@ export function ProjectPinsSection({ projectUuid, onChange, onOpen }: { projectU
       )}
 
       {pins.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-gray-200 p-4 text-center text-sm text-gray-400">
+        <div className="rounded-lg border border-dashed border-gray-200 p-4 text-center text-sm text-gray-500">
           No pinned tools. Pin the workflows, extractions, automations, and knowledge bases you use for this project.
         </div>
       ) : (
@@ -99,12 +99,12 @@ export function ProjectPinsSection({ projectUuid, onChange, onOpen }: { projectU
             const Icon = meta.icon
             return (
               <div key={key(p)} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white p-3">
-                <Icon size={16} className="shrink-0 text-gray-400" />
-                <button onClick={() => open(p)} className="min-w-0 flex-1 text-left">
+                <Icon size={16} className="shrink-0 text-gray-500" />
+                <button type="button" onClick={() => open(p)} className="min-w-0 flex-1 text-left">
                   <div className="truncate text-sm font-medium text-gray-900">{p.name}</div>
-                  <div className="text-xs text-gray-400">{meta.label}</div>
+                  <div className="text-xs text-gray-500">{meta.label}</div>
                 </button>
-                <button onClick={() => unpin(p)} title="Unpin" className="p-1 text-gray-300 hover:text-red-500">
+                <button type="button" onClick={() => unpin(p)} title="Unpin" aria-label="Unpin" className="p-1 text-gray-500 hover:text-red-500">
                   <X size={14} />
                 </button>
               </div>
@@ -127,9 +127,9 @@ function PickerList({ title, items, pinType, pinnedSet, onPin }: {
   const available = items.filter(i => !pinnedSet.has(`${pinType}:${i.id}`))
   return (
     <div className="mb-2 last:mb-0">
-      <div className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-400">{title}</div>
+      <div className="mb-1 text-xs font-medium uppercase tracking-wide text-gray-500">{title}</div>
       {available.length === 0 ? (
-        <div className="text-xs text-gray-400">All pinned.</div>
+        <div className="text-xs text-gray-500">All pinned.</div>
       ) : (
         <div className="flex flex-wrap gap-1.5">
           {available.slice(0, 30).map(i => (

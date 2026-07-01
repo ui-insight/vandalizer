@@ -84,15 +84,21 @@ export function QualityTimeline({
 
   if (loading) {
     return (
-      <div style={{ textAlign: 'center', padding: 24, color: '#888' }}>
-        <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+      <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 24, color: '#888' }}>
+        <Loader2 size={18} aria-hidden="true" style={{ animation: 'spin 1s linear infinite' }} />
+        <span style={{
+          position: 'absolute', width: 1, height: 1, padding: 0, margin: -1,
+          overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0,
+        }}>
+          Loading quality history…
+        </span>
       </div>
     )
   }
 
   if (items.length === 0) {
     return (
-      <div style={{
+      <div role="status" aria-live="polite" style={{
         padding: 20, margin: '12px 0',
         background: 'linear-gradient(135deg, #1f1f2e 0%, #1a1a1a 100%)',
         border: '1px solid rgba(124, 58, 237, 0.25)', borderRadius: 8,

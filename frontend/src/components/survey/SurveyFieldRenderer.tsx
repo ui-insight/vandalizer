@@ -21,6 +21,7 @@ export function SurveyFieldRenderer({ field, value, onChange }: Props) {
           value={(value as string) || ''}
           onChange={(e) => onChange(field.key, e.target.value)}
           placeholder={field.placeholder}
+          aria-label={field.label}
           className={INPUT_CLASS}
         />
       )
@@ -34,6 +35,7 @@ export function SurveyFieldRenderer({ field, value, onChange }: Props) {
           onChange={(e) => onChange(field.key, e.target.value)}
           placeholder={field.placeholder}
           min="0"
+          aria-label={field.label}
           className={INPUT_CLASS}
         />
       )
@@ -46,6 +48,7 @@ export function SurveyFieldRenderer({ field, value, onChange }: Props) {
           onChange={(e) => onChange(field.key, e.target.value)}
           placeholder={field.placeholder}
           rows={3}
+          aria-label={field.label}
           className={`${INPUT_CLASS} resize-none`}
         />
       )
@@ -57,6 +60,7 @@ export function SurveyFieldRenderer({ field, value, onChange }: Props) {
           required={field.required}
           value={(value as string) || ''}
           onChange={(e) => onChange(field.key, e.target.value)}
+          aria-label={field.label}
           className={INPUT_CLASS}
         >
           <option value="" style={optionStyle}>Select...</option>
@@ -99,13 +103,14 @@ export function SurveyFieldRenderer({ field, value, onChange }: Props) {
       const ratings = (value as Record<string, string>) || {}
       return (
         <div className="overflow-x-auto -mx-1">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm" aria-label={field.label}>
             <thead>
               <tr>
-                <th className="text-left text-gray-400 font-medium pb-3 pr-4 min-w-[200px]" />
+                <th scope="col" className="text-left text-gray-400 font-medium pb-3 pr-4 min-w-[200px]" />
                 {LIKERT_LABELS.map((label, i) => (
                   <th
                     key={i}
+                    scope="col"
                     className="text-center text-gray-400 font-medium pb-3 px-2 min-w-[60px] text-xs"
                   >
                     {label}
@@ -115,11 +120,11 @@ export function SurveyFieldRenderer({ field, value, onChange }: Props) {
             </thead>
             <tbody>
               {field.statements?.map((stmt) => (
-                <tr key={stmt.key} className="border-t border-white/5">
-                  <td className="py-3 pr-4 text-gray-300 text-sm leading-snug">
+                <tr key={stmt.key} className="border-t border-white/5" role="radiogroup" aria-label={stmt.label}>
+                  <th scope="row" className="text-left font-normal py-3 pr-4 text-gray-300 text-sm leading-snug">
                     {stmt.label}
-                  </td>
-                  {LIKERT_LABELS.map((_, i) => (
+                  </th>
+                  {LIKERT_LABELS.map((label, i) => (
                     <td key={i} className="py-3 text-center">
                       <input
                         type="radio"
@@ -129,6 +134,7 @@ export function SurveyFieldRenderer({ field, value, onChange }: Props) {
                         onChange={() => {
                           onChange(field.key, { ...ratings, [stmt.key]: String(i + 1) })
                         }}
+                        aria-label={`${stmt.label}: ${label}`}
                         className="w-4 h-4 border-white/20 bg-white/5 text-[#f1b300] focus:ring-[#f1b300]/50"
                       />
                     </td>

@@ -86,6 +86,21 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, onCloned }: Prop
   const mountedRef = useRef(true)
   useEffect(() => () => { mountedRef.current = false }, [])
 
+  // Roving focus for the tab strip (keyboard arrow navigation).
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const onTabKeyDown = (e: React.KeyboardEvent, idx: number) => {
+    if (!['ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(e.key)) return
+    e.preventDefault()
+    const n = TAB_LABELS.length
+    const next =
+      e.key === 'ArrowRight' ? (idx + 1) % n
+      : e.key === 'ArrowLeft' ? (idx - 1 + n) % n
+      : e.key === 'Home' ? 0
+      : n - 1
+    setTab(TAB_LABELS[next].id)
+    tabRefs.current[next]?.focus()
+  }
+
   const refreshQueries = useCallback(async () => {
     try {
       const out = await listKBTestQueries(kbUuid)
@@ -240,10 +255,12 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, onCloned }: Prop
     >
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-        <ShieldCheck size={16} style={{ color: '#7d8590' }} />
+        <ShieldCheck size={16} style={{ color: '#7d8590' }} aria-hidden="true" />
         <span style={{ fontSize: 14, fontWeight: 600, color: '#e5e5e5' }}>Validation</span>
         {latestScore != null && (
           <span
+            role="status"
+            aria-live="polite"
             title={tooltip}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 4,
@@ -286,14 +303,22 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, onCloned }: Prop
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: 2, borderBottom: '1px solid #2e2e2e', marginBottom: 10 }}>
-        {TAB_LABELS.map(t => {
+      <div role="tablist" aria-label="Validation views" style={{ display: 'flex', gap: 2, borderBottom: '1px solid #2e2e2e', marginBottom: 10 }}>
+        {TAB_LABELS.map((t, idx) => {
           const active = tab === t.id
           const Icon = t.icon
           const isAuto = t.id === 'autovalidate'
           return (
             <button
               key={t.id}
+              type="button"
+              role="tab"
+              id={`vtab-${t.id}`}
+              aria-selected={active}
+              aria-controls="vtabpanel"
+              tabIndex={active ? 0 : -1}
+              ref={el => { tabRefs.current[idx] = el }}
+              onKeyDown={e => onTabKeyDown(e, idx)}
               onClick={() => setTab(t.id)}
               style={{
                 fontFamily: 'inherit',
@@ -311,7 +336,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, onCloned }: Prop
                 marginBottom: -1,
               }}
             >
-              {Icon && <Icon size={12} style={{ color: active ? (isAuto ? '#a78bfa' : '#fff') : '#888' }} />}
+              {Icon && <Icon size={12} style={{ color: active ? (isAuto ? '#a78bfa' : '#fff') : '#888' }} aria-hidden="true" />}
               {t.label}
             </button>
           )
@@ -319,9 +344,11 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, onCloned }: Prop
       </div>
 
       {/* Tab content */}
+      <div role="tabpanel" id="vtabpanel" aria-labelledby={`vtab-${tab}`}>
       {loading ? (
-        <div style={{ textAlign: 'center', padding: 24, color: '#888' }}>
-          <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+        <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 24, color: '#888' }}>
+          <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
+          <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Loading…</span>
         </div>
       ) : tab === 'autovalidate' ? (
         <AutovalidateTab
@@ -358,6 +385,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, onCloned }: Prop
           polling={running}
         />
       )}
+      </div>
     </div>
   )
 }

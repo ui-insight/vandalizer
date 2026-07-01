@@ -75,6 +75,7 @@ export function SurveyWizard({
               key={i}
               type="button"
               onClick={() => handleProgressClick(i)}
+              aria-label={`Go to step ${i + 1} of ${steps.length}: ${steps[i].title}`}
               className={cn(
                 'h-1.5 flex-1 rounded-full transition-colors',
                 i <= currentStep ? 'bg-[#f1b300]' : 'bg-white/10',

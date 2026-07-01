@@ -555,9 +555,10 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                 <Search size={16} style={{
                   position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)',
                   color: C.textFaint, pointerEvents: 'none',
-                }} />
+                }} aria-hidden="true" />
                 <input
-                  type="text"
+                  type="search"
+                  aria-label="Search knowledge bases"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search knowledge bases..."
@@ -566,18 +567,19 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                     fontSize: 13, fontFamily: 'inherit',
                     backgroundColor: C.card, color: C.text,
                     border: `1px solid ${C.border}`, borderRadius: 8,
-                    outline: 'none', boxSizing: 'border-box',
+                    boxSizing: 'border-box',
                   }}
                 />
               </div>
 
               <select
+                aria-label="Filter by quality tier"
                 value={qualityFilter}
                 onChange={(e) => setQualityFilter(e.target.value as QualityFilter)}
                 style={{
                   padding: '6px 10px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
                   border: `1px solid ${C.border}`, borderRadius: 8,
-                  backgroundColor: C.card, color: C.textMuted, outline: 'none', cursor: 'pointer',
+                  backgroundColor: C.card, color: C.textMuted, cursor: 'pointer',
                 }}
               >
                 <option value="">Any quality</option>
@@ -587,14 +589,15 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
               </select>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <ArrowUpDown size={13} style={{ color: C.textFaint }} />
+                <ArrowUpDown size={13} style={{ color: C.textFaint }} aria-hidden="true" />
                 <select
+                  aria-label="Sort knowledge bases"
                   value={sortOption}
                   onChange={(e) => setSortOption(e.target.value as SortOption)}
                   style={{
                     padding: '6px 10px', fontSize: 12, fontWeight: 500, fontFamily: 'inherit',
                     border: `1px solid ${C.border}`, borderRadius: 8,
-                    backgroundColor: C.card, color: C.textMuted, outline: 'none', cursor: 'pointer',
+                    backgroundColor: C.card, color: C.textMuted, cursor: 'pointer',
                   }}
                 >
                   {sortOptions.map(([val, label]) => (
@@ -614,12 +617,14 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                     backgroundColor: 'rgba(56, 189, 248, 0.12)', color: '#7dd3fc',
                     border: '1px solid rgba(56, 189, 248, 0.25)',
                   }}>
-                    <Tag size={10} /> {tagFilter}
+                    <Tag size={10} aria-hidden="true" /> {tagFilter}
                     <button
+                      type="button"
+                      aria-label={`Remove tag filter ${tagFilter}`}
                       onClick={() => setTagFilter('')}
                       style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'inherit', marginLeft: 2, display: 'flex', padding: 0 }}
                     >
-                      <X size={11} />
+                      <X size={11} aria-hidden="true" />
                     </button>
                   </span>
                 )}
@@ -629,12 +634,14 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                     padding: '3px 10px', borderRadius: 999, fontSize: 11,
                     backgroundColor: 'rgba(255,255,255,0.06)', color: C.text,
                   }}>
-                    <FolderOpen size={10} /> {activeCollection.title}
+                    <FolderOpen size={10} aria-hidden="true" /> {activeCollection.title}
                     <button
+                      type="button"
+                      aria-label={`Remove collection filter ${activeCollection.title}`}
                       onClick={() => setSelectedCollectionId(null)}
                       style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'inherit', marginLeft: 2, display: 'flex', padding: 0 }}
                     >
-                      <X size={11} />
+                      <X size={11} aria-hidden="true" />
                     </button>
                   </span>
                 )}
@@ -647,7 +654,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                 >
                   Clear all
                 </button>
-                <span style={{ fontSize: 11, color: C.textFaint, marginLeft: 'auto' }}>
+                <span role="status" aria-live="polite" style={{ fontSize: 11, color: C.textFaint, marginLeft: 'auto' }}>
                   {total} result{total !== 1 ? 's' : ''}
                 </span>
               </div>
@@ -655,13 +662,14 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
 
             {/* Error state */}
             {error && (
-              <div style={{
+              <div role="alert" style={{
                 borderRadius: 8, padding: '10px 14px', fontSize: 13,
                 color: '#fca5a5', backgroundColor: 'rgba(239, 68, 68, 0.1)',
                 border: '1px solid rgba(239, 68, 68, 0.25)', marginBottom: 14,
               }}>
                 {error}
                 <button
+                  type="button"
                   onClick={refresh}
                   style={{
                     marginLeft: 8, textDecoration: 'underline', fontWeight: 500,
@@ -675,16 +683,16 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
 
             {/* Loading */}
             {loading ? (
-              <div style={{
+              <div role="status" aria-live="polite" style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center',
                 justifyContent: 'center', padding: '80px 0', color: C.textFaint,
               }}>
-                <Loader2 size={28} style={{ animation: 'spin 1s linear infinite', marginBottom: 10 }} />
+                <Loader2 size={28} style={{ animation: 'spin 1s linear infinite', marginBottom: 10 }} aria-hidden="true" />
                 <p style={{ fontSize: 13, margin: 0 }}>Loading knowledge bases...</p>
               </div>
             ) : items.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '80px 16px' }}>
-                <BookOpen size={48} style={{ color: '#404040', margin: '0 auto 14px' }} />
+              <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: '80px 16px' }}>
+                <BookOpen size={48} style={{ color: '#404040', margin: '0 auto 14px' }} aria-hidden="true" />
                 <h3 style={{ fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 4 }}>
                   {hasActiveFilters ? 'No matching knowledge bases' : 'No verified knowledge bases yet'}
                 </h3>
@@ -695,6 +703,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                 </p>
                 {hasActiveFilters && (
                   <button
+                    type="button"
                     onClick={clearFilters}
                     style={{
                       marginTop: 16, padding: '6px 14px', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
@@ -760,7 +769,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                     <h3 style={{ fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 10 }}>All Items</h3>
                   )}
                   {!showHero && !loading && (
-                    <div style={{ fontSize: 11, color: C.textFaint, marginBottom: 10 }}>
+                    <div role="status" aria-live="polite" style={{ fontSize: 11, color: C.textFaint, marginBottom: 10 }}>
                       {total} item{total !== 1 ? 's' : ''}
                     </div>
                   )}
@@ -780,6 +789,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                 {hasMore && (
                   <div style={{ textAlign: 'center', marginTop: 28 }}>
                     <button
+                      type="button"
                       onClick={handleLoadMore}
                       disabled={loadingMore}
                       style={{
@@ -793,7 +803,7 @@ export function KBExploreTab({ onAdopted }: KBExploreTabProps) {
                     >
                       {loadingMore ? (
                         <>
-                          <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                          <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
                           Loading...
                         </>
                       ) : `Load more (${total - items.length} remaining)`}

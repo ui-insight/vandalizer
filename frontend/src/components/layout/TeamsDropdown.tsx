@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import type { KeyboardEvent } from 'react'
 import { Award, User, Users, Settings, LogOut, IdCard, Shield, ClipboardCheck, ChevronDown, MessageSquare, KeyRound } from 'lucide-react'
 import { Link } from '@tanstack/react-router'
 import { useTeams } from '../../hooks/useTeams'
@@ -12,19 +13,81 @@ export function TeamsDropdown() {
   const certPanel = useCertificationPanel()
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  // Collect the currently rendered menuitems (order = DOM order).
+  const getMenuItems = () =>
+    Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [])
+
+  // Close the menu and (by default) return focus to the trigger button.
+  const closeMenu = (restoreFocus = true) => {
+    setOpen(false)
+    if (restoreFocus) triggerRef.current?.focus()
+  }
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false)
+        // Restore focus to the trigger only when the click didn't land on
+        // another focusable element (avoids stealing focus).
+        requestAnimationFrame(() => {
+          if (document.activeElement === document.body) triggerRef.current?.focus()
+        })
+      }
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
+  // Move focus to the first menuitem when the menu opens.
+  useEffect(() => {
+    if (!open) return
+    const items = menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]')
+    items?.[0]?.focus()
+  }, [open])
+
+  // Roving keyboard navigation within the menu.
+  const handleMenuKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Escape') {
+      e.preventDefault()
+      closeMenu()
+      return
+    }
+
+    const items = getMenuItems()
+    if (items.length === 0) return
+
+    const currentIndex = items.indexOf(document.activeElement as HTMLElement)
+    let nextIndex: number
+
+    switch (e.key) {
+      case 'ArrowDown':
+        nextIndex = currentIndex < items.length - 1 ? currentIndex + 1 : 0
+        break
+      case 'ArrowUp':
+        nextIndex = currentIndex > 0 ? currentIndex - 1 : items.length - 1
+        break
+      case 'Home':
+        nextIndex = 0
+        break
+      case 'End':
+        nextIndex = items.length - 1
+        break
+      default:
+        return
+    }
+
+    e.preventDefault()
+    items[nextIndex]?.focus()
+  }
+
   return (
     <div ref={ref} className="relative inline-block">
       {/* Trigger button - matches Flask .btn .btn-secondary */}
       <button
+        ref={triggerRef}
         onClick={() => setOpen(!open)}
         aria-expanded={open}
         aria-haspopup="menu"
@@ -39,15 +102,14 @@ export function TeamsDropdown() {
       {/* Menu - matches Flask menu.css */}
       {open && (
         <div
+          ref={menuRef}
           role="menu"
           className="absolute right-0 z-[1000] mt-2 min-w-[180px] rounded-lg border bg-white p-1.5"
           style={{
             borderColor: 'rgba(0,0,0,.15)',
             boxShadow: '0 8px 24px rgba(0,0,0,.12)',
           }}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') setOpen(false)
-          }}
+          onKeyDown={handleMenuKeyDown}
         >
           {/* Team list */}
           {teams.map((team) => {
@@ -55,9 +117,11 @@ export function TeamsDropdown() {
             return (
               <button
                 key={team.uuid}
+                role="menuitem"
+                tabIndex={-1}
                 onClick={() => {
                   switchTeam(team.uuid)
-                  setOpen(false)
+                  closeMenu()
                 }}
                 className="menu-item flex w-full items-center gap-2.5 rounded-md px-3.5 py-2.5 text-sm text-left text-[#111] hover:bg-black/[.04] transition-colors"
               >
@@ -76,7 +140,9 @@ export function TeamsDropdown() {
           {/* Manage teams */}
           <Link
             to="/teams"
-            onClick={() => setOpen(false)}
+            role="menuitem"
+            tabIndex={-1}
+            onClick={() => closeMenu()}
             className="flex items-center gap-2.5 rounded-md px-3.5 py-2.5 text-sm text-[#111] hover:bg-black/[.04] transition-colors"
           >
             <Settings className="h-4 w-4 shrink-0" style={{ width: 18 }} />
@@ -86,7 +152,9 @@ export function TeamsDropdown() {
           {/* My Account */}
           <Link
             to="/account"
-            onClick={() => setOpen(false)}
+            role="menuitem"
+            tabIndex={-1}
+            onClick={() => closeMenu()}
             className="flex items-center gap-2.5 rounded-md px-3.5 py-2.5 text-sm text-[#111] hover:bg-black/[.04] transition-colors"
           >
             <IdCard className="h-4 w-4 shrink-0" style={{ width: 18 }} />
@@ -96,7 +164,9 @@ export function TeamsDropdown() {
           {/* Credentials */}
           <Link
             to="/credentials"
-            onClick={() => setOpen(false)}
+            role="menuitem"
+            tabIndex={-1}
+            onClick={() => closeMenu()}
             className="flex items-center gap-2.5 rounded-md px-3.5 py-2.5 text-sm text-[#111] hover:bg-black/[.04] transition-colors"
           >
             <KeyRound className="h-4 w-4 shrink-0" style={{ width: 18 }} />
@@ -105,9 +175,12 @@ export function TeamsDropdown() {
 
           {/* Certification */}
           <button
+            role="menuitem"
+            tabIndex={-1}
             onClick={() => {
               certPanel.openPanel()
-              setOpen(false)
+              // Don't restore focus to the trigger: the panel manages its own focus.
+              closeMenu(false)
             }}
             className="flex w-full items-center gap-2.5 rounded-md px-3.5 py-2.5 text-sm text-left text-[#111] hover:bg-black/[.04] transition-colors"
           >
@@ -122,7 +195,9 @@ export function TeamsDropdown() {
               <Link
                 to="/support"
                 search={{ ticket: undefined }}
-                onClick={() => setOpen(false)}
+                role="menuitem"
+                tabIndex={-1}
+                onClick={() => closeMenu()}
                 className="flex items-center gap-2.5 rounded-md px-3.5 py-2.5 text-sm text-[#111] hover:bg-black/[.04] transition-colors"
               >
                 <MessageSquare className="h-4 w-4 shrink-0" style={{ width: 18 }} />
@@ -137,7 +212,9 @@ export function TeamsDropdown() {
               {!user?.is_support_agent && <hr className="my-1.5 border-0 h-px bg-[#cdcdcd]" />}
               <Link
                 to="/admin"
-                onClick={() => setOpen(false)}
+                role="menuitem"
+                tabIndex={-1}
+                onClick={() => closeMenu()}
                 className="flex items-center gap-2.5 rounded-md px-3.5 py-2.5 text-sm text-[#111] hover:bg-black/[.04] transition-colors"
               >
                 <Shield className="h-4 w-4 shrink-0" style={{ width: 18 }} />
@@ -152,7 +229,9 @@ export function TeamsDropdown() {
               {!user?.is_admin && <hr className="my-1.5 border-0 h-px bg-[#cdcdcd]" />}
               <Link
                 to="/verification"
-                onClick={() => setOpen(false)}
+                role="menuitem"
+                tabIndex={-1}
+                onClick={() => closeMenu()}
                 className="flex items-center gap-2.5 rounded-md px-3.5 py-2.5 text-sm text-[#111] hover:bg-black/[.04] transition-colors"
               >
                 <ClipboardCheck className="h-4 w-4 shrink-0" style={{ width: 18 }} />
@@ -166,8 +245,10 @@ export function TeamsDropdown() {
 
           {/* Logout */}
           <button
+            role="menuitem"
+            tabIndex={-1}
             onClick={() => {
-              setOpen(false)
+              closeMenu(false)
               logout()
             }}
             className="flex w-full items-center gap-2.5 rounded-md px-3.5 py-2.5 text-sm text-left text-[#111] hover:bg-black/[.04] transition-colors"

@@ -143,7 +143,7 @@ function ProjectsDiagram() {
           <FolderKanban size={22} className="text-violet-600" />
         </div>
         <div className="text-sm font-semibold text-gray-900">Project</div>
-        <div className="flex items-center gap-1 text-[11px] text-gray-400">
+        <div className="flex items-center gap-1 text-[11px] text-gray-500">
           <Database size={11} /> KB
           <span className="mx-0.5">·</span>
           <Users size={11} /> Team

@@ -59,7 +59,7 @@ export default function Automation() {
       <div className="mx-auto max-w-5xl space-y-6">
         <div className="flex items-center gap-2">
           <Zap className="h-5 w-5 text-gray-400" />
-          <h2 className="text-xl font-semibold text-gray-900">Automation Dashboard</h2>
+          <h1 className="text-xl font-semibold text-gray-900">Automation Dashboard</h1>
         </div>
 
         {/* Stats cards */}
@@ -143,7 +143,7 @@ export default function Automation() {
                       )}
                     </div>
                     <div className="flex items-center gap-3 shrink-0 ml-4">
-                      <span className="text-xs text-gray-400">
+                      <span className="text-xs text-gray-500">
                         {wf.num_executions} run{wf.num_executions !== 1 ? 's' : ''}
                       </span>
                       {isPassive ? (
@@ -174,16 +174,16 @@ export default function Automation() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-100 text-left">
-                  <th className="px-4 py-2 text-xs font-medium uppercase text-gray-500">
+                  <th scope="col" className="px-4 py-2 text-xs font-medium uppercase text-gray-500">
                     Status
                   </th>
-                  <th className="px-4 py-2 text-xs font-medium uppercase text-gray-500">
+                  <th scope="col" className="px-4 py-2 text-xs font-medium uppercase text-gray-500">
                     Trigger
                   </th>
-                  <th className="px-4 py-2 text-xs font-medium uppercase text-gray-500">
+                  <th scope="col" className="px-4 py-2 text-xs font-medium uppercase text-gray-500">
                     Progress
                   </th>
-                  <th className="px-4 py-2 text-xs font-medium uppercase text-gray-500">
+                  <th scope="col" className="px-4 py-2 text-xs font-medium uppercase text-gray-500">
                     Started
                   </th>
                 </tr>

@@ -179,7 +179,7 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
   if (loading) {
     return (
       <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9fafb' }}>
-        <div style={{ color: '#9ca3af', fontSize: 14 }}>Loading spreadsheet...</div>
+        <div role="status" aria-live="polite" style={{ color: '#6b7280', fontSize: 14 }}>Loading spreadsheet...</div>
       </div>
     )
   }
@@ -187,7 +187,7 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
   if (error) {
     return (
       <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f9fafb' }}>
-        <div style={{ color: '#ef4444', fontSize: 14 }}>{error}</div>
+        <div role="alert" style={{ color: '#dc2626', fontSize: 14 }}>{error}</div>
       </div>
     )
   }
@@ -196,7 +196,7 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
     <div ref={rootRef} style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
       {/* Processing overlay */}
       {processing && (
-        <div style={{
+        <div role="status" aria-live="polite" style={{
           position: 'absolute', top: 0, left: 0, right: 0, zIndex: 50,
           display: 'flex', justifyContent: 'center', padding: '20px 24px',
         }}>
@@ -222,20 +222,20 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
         padding: '6px 12px', borderBottom: '1px solid #e5e7eb', backgroundColor: '#f9fafb',
         flexShrink: 0,
       }}>
-        <button onClick={() => setZoom(prev => Math.max(prev - 1, 0))} style={btnStyle} title="Zoom out" disabled={zoom <= 0}>
+        <button type="button" onClick={() => setZoom(prev => Math.max(prev - 1, 0))} style={btnStyle} title="Zoom out" aria-label="Zoom out" disabled={zoom <= 0}>
           <ZoomOut size={16} />
         </button>
-        <button onClick={() => setZoom(2)} style={{ ...btnStyle, width: 'auto', padding: '0 10px' }} title="Reset zoom">
+        <button type="button" onClick={() => setZoom(2)} style={{ ...btnStyle, width: 'auto', padding: '0 10px' }} title="Reset zoom" aria-label="Reset zoom">
           {Math.round(zoomLevel * 100)}%
         </button>
-        <button onClick={() => setZoom(prev => Math.min(prev + 1, ZOOM_LEVELS.length - 1))} style={btnStyle} title="Zoom in" disabled={zoom >= ZOOM_LEVELS.length - 1}>
+        <button type="button" onClick={() => setZoom(prev => Math.min(prev + 1, ZOOM_LEVELS.length - 1))} style={btnStyle} title="Zoom in" aria-label="Zoom in" disabled={zoom >= ZOOM_LEVELS.length - 1}>
           <ZoomIn size={16} />
         </button>
         <div style={{ width: 1, height: 20, backgroundColor: '#d1d5db', margin: '0 4px' }} />
-        <button onClick={openSearch} style={btnStyle} title="Find in document (⌘F / Ctrl+F)" aria-label="Find in document">
+        <button type="button" onClick={openSearch} style={btnStyle} title="Find in document (⌘F / Ctrl+F)" aria-label="Find in document">
           <Search size={16} />
         </button>
-        <button onClick={() => window.open(url, '_blank')} style={btnStyle} title="Open in new tab">
+        <button type="button" onClick={() => window.open(url, '_blank')} style={btnStyle} title="Open in new tab" aria-label="Open in new tab">
           <Maximize2 size={16} />
         </button>
       </div>
@@ -249,6 +249,7 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
           {sheets.map((name, i) => (
             <button
               key={name}
+              type="button"
               onClick={() => handleSheetChange(i)}
               style={{
                 padding: '6px 16px', fontSize: 12, fontWeight: i === activeSheet ? 600 : 400,
@@ -286,7 +287,7 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
           width: `${100 / zoomLevel}%`,
         }}>
           {headers.length === 0 && rows.length === 0 ? (
-            <div style={{ padding: 40, textAlign: 'center', color: '#9ca3af', fontSize: 14 }}>
+            <div role="status" style={{ padding: 40, textAlign: 'center', color: '#6b7280', fontSize: 14 }}>
               This sheet is empty
             </div>
           ) : (
@@ -296,9 +297,9 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
               {headers.length > 0 && (
                 <thead>
                   <tr>
-                    <th style={{
+                    <th scope="col" style={{
                       padding: '8px 12px', textAlign: 'center', fontSize: 11, fontWeight: 600,
-                      color: '#9ca3af', backgroundColor: '#f9fafb',
+                      color: '#6b7280', backgroundColor: '#f9fafb',
                       borderBottom: '2px solid #e5e7eb', borderRight: '1px solid #e5e7eb',
                       position: 'sticky', top: 0, zIndex: 2, width: 44,
                     }}>
@@ -309,7 +310,7 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
                       const isMatch = matchIdx >= 0
                       const isCurrent = matchIdx === currentMatchIdx
                       return (
-                        <th key={i}
+                        <th key={i} scope="col"
                           data-cell-r={-1}
                           data-cell-c={i}
                           style={{
@@ -335,7 +336,7 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
                   <tr key={ri} style={{ backgroundColor: ri % 2 === 0 ? '#fff' : '#fafafa' }}>
                     <td style={{
                       padding: '6px 12px', textAlign: 'center', fontSize: 11,
-                      color: '#9ca3af', borderBottom: '1px solid #f3f4f6',
+                      color: '#6b7280', borderBottom: '1px solid #f3f4f6',
                       borderRight: '1px solid #e5e7eb', backgroundColor: '#f9fafb',
                     }}>
                       {ri + 1}

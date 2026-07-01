@@ -124,7 +124,8 @@ export function ChatInput({
             value={linkUrl}
             onChange={(e) => setLinkUrl(e.target.value)}
             placeholder="Enter URL..."
-            className="flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-highlight focus:outline-none"
+            aria-label="Enter URL"
+            className="flex-1 rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-highlight focus:outline-none focus:ring-2 focus:ring-highlight-on-light"
             onKeyDown={(e) => e.key === 'Enter' && handleLinkSubmit()}
           />
           <button
@@ -144,7 +145,7 @@ export function ChatInput({
 
       {/* Ask question container */}
       <div
-        className="flex flex-col rounded-[var(--ui-radius)] p-2.5"
+        className="flex flex-col rounded-[var(--ui-radius)] p-2.5 focus-within:ring-2 focus-within:ring-highlight-on-light"
         style={{ backgroundColor: '#19191913' }}
       >
         {/* Text input area */}
@@ -228,6 +229,7 @@ export function ChatInput({
             ref={fileInputRef}
             type="file"
             multiple
+            aria-label="Attach files"
             className="hidden"
             onChange={handleFileChange}
           />
@@ -275,7 +277,8 @@ export function ChatInput({
             <div ref={exportMenuRef} className="relative">
               <button
                 onClick={() => setShowExportMenu(!showExportMenu)}
-                className="flex items-center justify-center rounded-[var(--ui-radius)] p-1.5 text-gray-400 hover:text-gray-600 transition-colors"
+                type="button"
+                className="flex items-center justify-center rounded-[var(--ui-radius)] p-1.5 text-gray-500 hover:text-gray-600 transition-colors"
                 aria-label="Export conversation"
                 aria-expanded={showExportMenu}
                 aria-haspopup="menu"
@@ -285,16 +288,20 @@ export function ChatInput({
 
               {showExportMenu && (
                 <div
+                  role="menu"
+                  aria-label="Export conversation format"
                   className="absolute right-0 z-[1000] min-w-[140px] rounded-[var(--ui-radius)] border bg-white p-1.5"
                   style={{ bottom: 'calc(100% + 8px)', borderColor: 'rgba(0,0,0,0.14)', boxShadow: '0 10px 28px rgba(0,0,0,0.16)' }}
+                  onKeyDown={(e) => { if (e.key === 'Escape') setShowExportMenu(false) }}
                 >
                   {['PDF', 'CSV', 'Text'].map(fmt => (
                     <button
                       key={fmt}
+                      role="menuitem"
                       onClick={() => { onExport(fmt.toLowerCase()); setShowExportMenu(false) }}
                       className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-left text-[#1f2937] hover:bg-black/[.04] transition-colors"
                     >
-                      <Download className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+                      <Download className="h-3.5 w-3.5 shrink-0 text-gray-500" />
                       {fmt}
                     </button>
                   ))}
@@ -305,6 +312,7 @@ export function ChatInput({
 
           {/* Send button */}
           <button
+            type="button"
             onClick={handleSend}
             disabled={!message.trim() || disabled}
             aria-label="Send message"

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { FocusTrap } from 'focus-trap-react'
 import { X, Folder as FolderIcon, Home, Users } from 'lucide-react'
 import { listAllFolders, type FolderSummary } from '../../api/folders'
 import type { Folder } from '../../types/document'
@@ -61,6 +62,7 @@ export function MoveFolderDialog({ folder, onSubmit, onClose }: MoveFolderDialog
         if (e.key === 'Escape') onClose()
       }}
     >
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
       <div
         className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl"
         role="dialog"
@@ -69,7 +71,7 @@ export function MoveFolderDialog({ folder, onSubmit, onClose }: MoveFolderDialog
       >
         <div className="mb-1 flex items-center justify-between">
           <h3 id="move-folder-dialog-title" className="text-lg font-medium text-gray-900">Move folder</h3>
-          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} aria-label="Close" className="text-gray-500 hover:text-gray-600">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -92,7 +94,7 @@ export function MoveFolderDialog({ folder, onSubmit, onClose }: MoveFolderDialog
                       onClick={() => onSubmit('0')}
                       className="flex w-full items-center gap-2.5 px-3 py-2.5 text-sm text-left text-[#111] hover:bg-black/[.04]"
                     >
-                      <Home className="h-4 w-4 shrink-0 text-gray-400" />
+                      <Home className="h-4 w-4 shrink-0 text-gray-500" />
                       Top level
                     </button>
                   </li>
@@ -107,7 +109,7 @@ export function MoveFolderDialog({ folder, onSubmit, onClose }: MoveFolderDialog
                       >
                         {isTeam
                           ? <Users className="h-4 w-4 shrink-0" style={{ color: 'rgb(0,128,128)' }} />
-                          : <FolderIcon className="h-4 w-4 shrink-0 text-gray-400" />}
+                          : <FolderIcon className="h-4 w-4 shrink-0 text-gray-500" />}
                         <span className="truncate">{d.path}</span>
                       </button>
                     </li>
@@ -128,6 +130,7 @@ export function MoveFolderDialog({ folder, onSubmit, onClose }: MoveFolderDialog
           </button>
         </div>
       </div>
+      </FocusTrap>
     </div>
   )
 }

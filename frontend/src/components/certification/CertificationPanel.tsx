@@ -82,7 +82,7 @@ function XPBar({ current, nextThreshold, prevThreshold, nextLevel }: {
     <div className="w-full">
       <div className="flex items-center justify-between mb-1.5">
         <span className="text-xs font-medium text-gray-500">{current} XP</span>
-        <span className="text-xs text-gray-400">
+        <span className="text-xs text-gray-500">
           {nextThreshold - current} XP to {LEVEL_CONFIG[nextLevel]?.label || 'Max'}
         </span>
       </div>
@@ -113,12 +113,12 @@ function ValidationResults({ result, onDismiss }: { result: ValidationResult; on
           {result.passed && (
             <div className="flex gap-0.5">
               {Array.from({ length: 3 }).map((_, i) => (
-                <Star key={i} size={14} className={cn('transition-all duration-300', i < result.stars ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300')} />
+                <Star key={i} size={14} className={cn('transition-all duration-300', i < result.stars ? 'text-yellow-400 fill-yellow-400' : 'text-gray-400')} />
               ))}
             </div>
           )}
         </div>
-        <button onClick={onDismiss} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
+        <button type="button" onClick={onDismiss} aria-label="Dismiss results" className="text-gray-500 hover:text-gray-600"><X size={16} aria-hidden="true" /></button>
       </div>
       <div className="space-y-1.5">
         {result.checks.map((check: ValidationCheck, i: number) => (
@@ -358,7 +358,7 @@ export function CertificationPanel() {
 
   // Panel content — two views: curriculum overview and module detail
   const panelContent = loading && !progress ? (
-    <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
+    <div role="status" aria-live="polite" className="flex-1 flex items-center justify-center text-gray-500 text-sm">
       Loading certification progress...
     </div>
   ) : activeModuleDef ? (
@@ -372,7 +372,7 @@ export function CertificationPanel() {
           <ChevronLeft size={15} />
           <span>Curriculum</span>
         </button>
-        <span className="text-gray-300">/</span>
+        <span className="text-gray-500">/</span>
         <span className="text-sm text-gray-700 font-medium truncate">
           Module {activeModuleDef.number}: {activeModuleDef.title}
         </span>
@@ -471,7 +471,7 @@ export function CertificationPanel() {
                   style={{ background: reached ? config.color : '#e5e7eb' }}
                 />
                 <div
-                  className={cn('mt-1.5 text-[9px] font-medium text-center transition-all', isCurrent ? 'font-bold' : reached ? '' : 'text-gray-400')}
+                  className={cn('mt-1.5 text-[9px] font-medium text-center transition-all', isCurrent ? 'font-bold' : reached ? '' : 'text-gray-500')}
                   style={reached ? { color: config.color } : undefined}
                 >
                   {config.label}
@@ -506,8 +506,8 @@ export function CertificationPanel() {
           onPointerMove={handleDragMove}
           onPointerUp={handleDragEnd}
         >
-          {mode === 'floating' && <GripHorizontal size={14} className="text-gray-300 shrink-0" />}
-          <Award size={16} className="text-highlight shrink-0" style={{ color: 'var(--highlight-color)' }} />
+          {mode === 'floating' && <GripHorizontal size={14} className="text-gray-500 shrink-0" />}
+          <Award size={16} aria-hidden="true" className="text-highlight shrink-0" style={{ color: 'var(--highlight-on-light, #806600)' }} />
           <span className="text-sm font-bold text-gray-900 flex-1">Certification</span>
 
           {/* Mode toggles */}
@@ -515,20 +515,23 @@ export function CertificationPanel() {
             {MODE_ICONS.map(({ mode: m, icon: Icon, label }) => (
               <button
                 key={m}
+                type="button"
                 onClick={() => setMode(m)}
                 title={label}
+                aria-label={label}
+                aria-pressed={mode === m}
                 className={cn(
                   'p-1.5 rounded-md transition-colors',
-                  mode === m ? 'bg-gray-100 text-gray-900' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50',
+                  mode === m ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:text-gray-600 hover:bg-gray-50',
                 )}
               >
-                <Icon size={14} />
+                <Icon size={14} aria-hidden="true" />
               </button>
             ))}
           </div>
 
-          <button onPointerDown={e => e.stopPropagation()} onClick={closePanel} title="Back to badge" className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-50 ml-1">
-            <X size={14} />
+          <button type="button" onPointerDown={e => e.stopPropagation()} onClick={closePanel} title="Back to badge" aria-label="Back to badge" className="p-1.5 rounded-md text-gray-500 hover:text-gray-600 hover:bg-gray-50 ml-1">
+            <X size={14} aria-hidden="true" />
           </button>
         </div>
 

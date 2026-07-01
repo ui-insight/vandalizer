@@ -29,15 +29,16 @@ export function ProjectContextBar({ onOpenManage }: { onOpenManage?: () => void 
         flexShrink: 0,
       }}
     >
-      <FolderKanban size={15} style={{ color: 'var(--highlight-color, #eab308)' }} />
+      <FolderKanban size={15} style={{ color: 'var(--highlight-on-light, #806600)' }} />
       <span style={{ color: '#6b7280', fontWeight: 500 }}>Project</span>
       <span style={{ color: '#111', fontWeight: 600 }}>{activeProjectTitle}</span>
       {activeProjectRole === 'viewer' && (
-        <span style={{ color: '#9ca3af', fontSize: 12 }}>· viewing</span>
+        <span style={{ color: '#6b7280', fontSize: 12 }}>· viewing</span>
       )}
       <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }}>
         {onOpenManage && (
           <button
+            type="button"
             onClick={onOpenManage}
             title="View details, share, rename, leave, or delete this project"
             style={{ display: 'flex', alignItems: 'center', gap: 5, background: 'var(--highlight-color, #eab308)', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', color: 'var(--highlight-text-color, #000)', fontSize: 12, fontWeight: 600 }}
@@ -47,6 +48,7 @@ export function ProjectContextBar({ onOpenManage }: { onOpenManage?: () => void 
           </button>
         )}
         <button
+          type="button"
           onClick={deactivateProject}
           title="Exit project scope"
           style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'transparent', border: 'none', cursor: 'pointer', color: '#6b7280', fontSize: 12, fontWeight: 500 }}

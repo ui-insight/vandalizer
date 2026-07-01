@@ -165,8 +165,9 @@ export function CollectionsManager() {
         <div className="border border-gray-200 rounded-lg p-4 bg-white mb-4">
           <div className="space-y-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+              <label htmlFor="new-collection-title" className="block text-sm font-medium text-gray-700 mb-1">Title</label>
               <input
+                id="new-collection-title"
                 type="text"
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
@@ -175,8 +176,9 @@ export function CollectionsManager() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+              <label htmlFor="new-collection-description" className="block text-sm font-medium text-gray-700 mb-1">Description</label>
               <textarea
+                id="new-collection-description"
                 value={newDescription}
                 onChange={(e) => setNewDescription(e.target.value)}
                 placeholder="Optional description..."
@@ -218,8 +220,17 @@ export function CollectionsManager() {
             return (
               <div key={col.id} className="border border-gray-200 rounded-lg bg-white">
                 <div
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={isSelected}
                   className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors ${isSelected ? 'bg-gray-50' : ''}`}
                   onClick={() => setSelectedId(isSelected ? null : col.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      setSelectedId(isSelected ? null : col.id)
+                    }
+                  }}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
@@ -227,11 +238,13 @@ export function CollectionsManager() {
                         <div className="space-y-2" onClick={e => e.stopPropagation()}>
                           <input
                             type="text"
+                            aria-label="Collection title"
                             value={editTitle}
                             onChange={(e) => setEditTitle(e.target.value)}
                             className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-gray-400"
                           />
                           <textarea
+                            aria-label="Collection description"
                             value={editDescription}
                             onChange={(e) => setEditDescription(e.target.value)}
                             rows={2}
@@ -273,23 +286,29 @@ export function CollectionsManager() {
                     {!isEditing && (
                       <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
                         <button
+                          type="button"
                           onClick={() => handleToggleFeatured(col)}
                           className={`p-1.5 rounded hover:bg-yellow-50 ${col.featured ? 'text-yellow-500' : 'text-gray-400'}`}
                           title={col.featured ? 'Remove from featured' : 'Mark as featured'}
+                          aria-label={col.featured ? 'Remove from featured' : 'Mark as featured'}
                         >
                           <Star className={`h-4 w-4 ${col.featured ? 'fill-current' : ''}`} />
                         </button>
                         <button
+                          type="button"
                           onClick={() => startEdit(col)}
                           className="p-1.5 rounded hover:bg-gray-100 text-gray-500"
                           title="Edit"
+                          aria-label="Edit collection"
                         >
                           <Pencil className="h-4 w-4" />
                         </button>
                         <button
+                          type="button"
                           onClick={() => handleDelete(col.id)}
                           className="p-1.5 rounded hover:bg-red-50 text-red-500"
                           title="Delete"
+                          aria-label="Delete collection"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -343,20 +362,24 @@ export function CollectionsManager() {
                               <div className="flex items-center gap-1 shrink-0">
                                 {item && workspace && (
                                   <button
+                                    type="button"
                                     onClick={() => {
                                       if (item.kind === 'workflow') workspace.openWorkflow(item.item_id)
                                       else workspace.openExtraction(item.item_id)
                                     }}
-                                    className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600"
+                                    className="p-1 rounded hover:bg-gray-100 text-gray-500 hover:text-gray-600"
                                     title="Open"
+                                    aria-label="Open item"
                                   >
                                     <ExternalLink className="h-3.5 w-3.5" />
                                   </button>
                                 )}
                                 <button
+                                  type="button"
                                   onClick={() => handleRemoveItem(itemId)}
                                   className="p-1 rounded hover:bg-red-50 text-red-500 shrink-0"
                                   title="Remove"
+                                  aria-label="Remove item from collection"
                                 >
                                   <X className="h-3.5 w-3.5" />
                                 </button>
@@ -372,7 +395,7 @@ export function CollectionsManager() {
                       <div className="mt-3 border border-gray-200 rounded-lg p-3 bg-white">
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-xs font-semibold text-gray-700">Add Verified Item</span>
-                          <button onClick={() => { setShowAddItem(false); setAddSearch('') }} className="p-1 rounded hover:bg-gray-100 text-gray-500">
+                          <button type="button" aria-label="Close" onClick={() => { setShowAddItem(false); setAddSearch('') }} className="p-1 rounded hover:bg-gray-100 text-gray-500">
                             <X className="h-4 w-4" />
                           </button>
                         </div>
@@ -380,6 +403,7 @@ export function CollectionsManager() {
                           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
                           <input
                             type="text"
+                            aria-label="Search verified items to add"
                             value={addSearch}
                             onChange={(e) => setAddSearch(e.target.value)}
                             placeholder="Search items..."

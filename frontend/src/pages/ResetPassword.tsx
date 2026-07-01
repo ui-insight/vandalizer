@@ -54,6 +54,8 @@ function ForgotPasswordForm() {
       )}
       <input
         type="email"
+        aria-label="Email address"
+        autoComplete="email"
         placeholder="Email address"
         required
         value={email}
@@ -132,6 +134,8 @@ function ResetPasswordForm({ token }: { token: string }) {
       )}
       <input
         type="password"
+        aria-label="New password"
+        autoComplete="new-password"
         placeholder="New password"
         required
         value={password}
@@ -140,6 +144,8 @@ function ResetPasswordForm({ token }: { token: string }) {
       />
       <input
         type="password"
+        aria-label="Confirm new password"
+        autoComplete="new-password"
         placeholder="Confirm new password"
         required
         value={confirm}

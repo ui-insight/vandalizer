@@ -72,7 +72,7 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
       <td style={{ padding: '12px 15px' }}>
         <div className="flex items-center min-w-0">
           {stillProcessing ? (
-            <Loader2 className="h-4 w-4 animate-spin shrink-0 mr-2.5" style={{ color: 'var(--highlight-color)' }} />
+            <Loader2 className="h-4 w-4 animate-spin shrink-0 mr-2.5" style={{ color: 'var(--highlight-on-light, #806600)' }} />
           ) : !doc.valid ? (
             <span
               className="shrink-0 mr-2.5 inline-flex items-center"
@@ -161,7 +161,7 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
       >
         <span className="group-hover:opacity-0 transition-opacity">
           {stillProcessing ? (
-            <span style={{ color: 'var(--highlight-color)' }}>{stageCopy(doc.task_status).short}</span>
+            <span style={{ color: 'var(--highlight-on-light, #806600)' }}>{stageCopy(doc.task_status).short}</span>
           ) : (
             (doc.updated_at || doc.created_at) && formatFileDate(doc.updated_at || doc.created_at)
           )}
@@ -184,6 +184,7 @@ export function FileRow({ doc, onClick, onContextMenu, selected, onToggleSelect,
           }}
         >
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation()
               onContextMenu(e)

@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Award, Sparkles, Star, Zap } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import type { CompletionResult } from '../../types/certification'
@@ -23,7 +24,7 @@ function Stars({ count, max = 3, size = 16 }: { count: number; max?: number; siz
           size={size}
           className={cn(
             'transition-all duration-300',
-            i < count ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300',
+            i < count ? 'text-yellow-400 fill-yellow-400' : 'text-gray-400',
           )}
           style={i < count ? { animationDelay: `${i * 0.15}s` } : undefined}
         />
@@ -42,6 +43,12 @@ export function CelebrationOverlay({
   tierCelebration?: { tierName: string; message: string } | null
 }) {
   const levelConfig = LEVEL_CONFIG[result.level] || LEVEL_CONFIG.novice
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onDismiss() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onDismiss])
 
   return (
     <div className="fixed inset-0 z-[9998] flex items-center justify-center" onClick={onDismiss}>
@@ -78,13 +85,13 @@ export function CelebrationOverlay({
             >
               <Award size={48} className="text-white" />
             </div>
-            <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-1">
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-1">
               University of Idaho
             </p>
             <h2 className="text-2xl font-bold text-gray-900 mb-1 title-shimmer">
               Vandal Workflow Architect
             </h2>
-            <p className="text-sm font-semibold mb-3" style={{ color: 'var(--highlight-color)' }}>
+            <p className="text-sm font-semibold mb-3" style={{ color: 'var(--highlight-on-light, #806600)' }}>
               Certified Professional
             </p>
             <p className="text-gray-600 text-sm mb-2">
@@ -97,9 +104,9 @@ export function CelebrationOverlay({
         ) : tierCelebration ? (
           <>
             <div className="mb-4">
-              <Award size={48} className="mx-auto text-highlight" style={{ color: 'var(--highlight-color)' }} />
+              <Award size={48} className="mx-auto text-highlight" style={{ color: 'var(--highlight-on-light, #806600)' }} />
             </div>
-            <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-2">
               Tier Complete
             </p>
             <h2 className="text-xl font-bold text-gray-900 mb-3">{tierCelebration.tierName} Complete!</h2>
@@ -108,7 +115,7 @@ export function CelebrationOverlay({
         ) : (
           <>
             <div className="mb-4">
-              <Sparkles size={48} className="mx-auto text-highlight" style={{ color: 'var(--highlight-color)' }} />
+              <Sparkles size={48} className="mx-auto text-highlight" style={{ color: 'var(--highlight-on-light, #806600)' }} />
             </div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Module Complete!</h2>
           </>
@@ -117,7 +124,7 @@ export function CelebrationOverlay({
         {/* XP earned */}
         <div className="flex items-center justify-center gap-6 my-6">
           <div className="text-center">
-            <div className="text-3xl font-bold" style={{ color: 'var(--highlight-color)' }}>
+            <div className="text-3xl font-bold" style={{ color: 'var(--highlight-on-light, #806600)' }}>
               +{result.xp_earned}
             </div>
             <div className="text-xs text-gray-500 font-medium">XP EARNED</div>

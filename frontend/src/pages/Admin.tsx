@@ -21,6 +21,7 @@ import { useTeams } from '../hooks/useTeams'
 import { getThemeConfig, updateThemeConfig } from '../api/config'
 import type { ThemeConfig } from '../api/config'
 import { useBranding, DEFAULT_ORG_NAME, DEFAULT_ICON_URL } from '../contexts/BrandingContext'
+import { useToast } from '../contexts/ToastContext'
 import {
   getUsageStats, getUsageTimeseries, getUserLeaderboard, getTeamLeaderboard,
   getTeamDetail, getUserDetail, getUserHistory,
@@ -265,29 +266,40 @@ function SortableHeader({ label, sortKey, currentSort, onSort, align = 'left' }:
   const active = currentSort.key === sortKey
   return (
     <th
-      onClick={() => onSort(sortKey)}
+      scope="col"
+      aria-sort={active ? (currentSort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
       style={{
-        padding: '10px 16px', textAlign: align, fontSize: 11, fontWeight: 600, color: '#6b7280',
-        textTransform: 'uppercase', cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap',
+        padding: 0, textAlign: align, whiteSpace: 'nowrap',
       }}
     >
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 4, width: '100%',
+          justifyContent: align === 'right' ? 'flex-end' : align === 'center' ? 'center' : 'flex-start',
+          padding: '10px 16px', fontSize: 11, fontWeight: 600, color: '#6b7280',
+          textTransform: 'uppercase', cursor: 'pointer', userSelect: 'none',
+          background: 'none', border: 'none', fontFamily: 'inherit',
+        }}
+      >
         {label}
-        {active ? (currentSort.dir === 'asc' ? <ChevronUp size={12} /> : <ChevronDown size={12} />) : <ArrowUpDown size={10} style={{ opacity: 0.4 }} />}
-      </span>
+        {active ? (currentSort.dir === 'asc' ? <ChevronUp size={12} aria-hidden="true" /> : <ChevronDown size={12} aria-hidden="true" />) : <ArrowUpDown size={10} aria-hidden="true" style={{ opacity: 0.4 }} />}
+      </button>
     </th>
   )
 }
 
-function SearchInput({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
+function SearchInput({ value, onChange, placeholder, ariaLabel }: { value: string; onChange: (v: string) => void; placeholder: string; ariaLabel?: string }) {
   return (
     <div style={{ position: 'relative', maxWidth: 300 }}>
-      <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+      <Search size={14} aria-hidden="true" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
       <input
         type="text"
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
+        aria-label={ariaLabel ?? placeholder ?? 'Search'}
         style={{
           width: '100%', padding: '7px 12px 7px 32px', borderRadius: 'var(--ui-radius, 12px)',
           border: '1px solid #e5e7eb', fontSize: 13, outline: 'none',
@@ -353,8 +365,8 @@ function TimeRangeSelector({
         )
       })}
       {onRefresh && (
-        <button onClick={onRefresh} style={{ marginLeft: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4 }}>
-          <RefreshCw size={16} />
+        <button type="button" onClick={onRefresh} aria-label="Refresh" style={{ marginLeft: 8, background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4 }}>
+          <RefreshCw size={16} aria-hidden="true" />
         </button>
       )}
     </div>
@@ -880,7 +892,7 @@ function UserActivityHistory({ userId, email }: { userId: string; email: string 
             </tbody>
           </table>
           <div style={{ padding: '12px 20px', display: 'flex', alignItems: 'center', gap: 12, borderTop: '1px solid #f3f4f6' }}>
-            <span style={{ fontSize: 12, color: '#9ca3af' }}>Showing {items.length} of {total}{email ? ` · ${email}` : ''}</span>
+            <span role="status" aria-live="polite" style={{ fontSize: 12, color: '#6b7280' }}>Showing {items.length} of {total}{email ? ` · ${email}` : ''}</span>
             <div style={{ flex: 1 }} />
             {items.length < total && (
               <button
@@ -997,7 +1009,7 @@ function UsersTab() {
             </thead>
             <tbody>
               {filtered.map((u, i) => (
-                <tr key={u.user_id} onClick={() => setSelectedUserId(u.user_id)} style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#f9fafb')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = '')}>
+                <tr key={u.user_id} tabIndex={0} role="button" aria-label={`View ${u.user_id}`} onClick={() => setSelectedUserId(u.user_id)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedUserId(u.user_id) } }} style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#f9fafb')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = '')}>
                   <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 600, color: '#9ca3af' }}>{i + 1}</td>
                   <td style={{ padding: '12px 16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -1437,17 +1449,36 @@ function TeamsTab() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Sub-tab bar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f9fafb', borderRadius: 10, padding: 4, width: 'fit-content' }}>
-        <button style={subTabStyle('manage')} onClick={() => setSubTab('manage')}>Manage Teams</button>
-        <button style={subTabStyle('stats')} onClick={() => setSubTab('stats')}>Usage Stats</button>
-        <button style={subTabStyle('isolated')} onClick={() => setSubTab('isolated')}>
+      <div
+        role="tablist"
+        aria-label="Teams views"
+        onKeyDown={e => {
+          const keys: Array<'manage' | 'stats' | 'isolated'> = ['manage', 'stats', 'isolated']
+          const idx = keys.indexOf(subTab)
+          if (idx < 0) return
+          let next = idx
+          if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (idx + 1) % keys.length
+          else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (idx - 1 + keys.length) % keys.length
+          else if (e.key === 'Home') next = 0
+          else if (e.key === 'End') next = keys.length - 1
+          else return
+          e.preventDefault()
+          setSubTab(keys[next])
+          const btns = e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')
+          btns[next]?.focus()
+        }}
+        style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f9fafb', borderRadius: 10, padding: 4, width: 'fit-content' }}
+      >
+        <button type="button" role="tab" id="admin-teams-tab-manage" aria-controls="admin-teams-panel-manage" aria-selected={subTab === 'manage'} tabIndex={subTab === 'manage' ? 0 : -1} style={subTabStyle('manage')} onClick={() => setSubTab('manage')}>Manage Teams</button>
+        <button type="button" role="tab" id="admin-teams-tab-stats" aria-controls="admin-teams-panel-stats" aria-selected={subTab === 'stats'} tabIndex={subTab === 'stats' ? 0 : -1} style={subTabStyle('stats')} onClick={() => setSubTab('stats')}>Usage Stats</button>
+        <button type="button" role="tab" id="admin-teams-tab-isolated" aria-controls="admin-teams-panel-isolated" aria-selected={subTab === 'isolated'} tabIndex={subTab === 'isolated' ? 0 : -1} style={subTabStyle('isolated')} onClick={() => setSubTab('isolated')}>
           Isolated Users {isolatedLoaded && isolated.length > 0 ? `(${isolated.length})` : ''}
         </button>
       </div>
 
       {/* ── Manage Teams ─────────────────────────────────────────── */}
       {subTab === 'manage' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div role="tabpanel" id="admin-teams-panel-manage" aria-labelledby="admin-teams-tab-manage" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {/* Create team */}
           <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', padding: '16px 20px' }}>
             <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>Create New Team</div>
@@ -1609,7 +1640,7 @@ function TeamsTab() {
 
       {/* ── Usage Stats ──────────────────────────────────────────── */}
       {subTab === 'stats' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div role="tabpanel" id="admin-teams-panel-stats" aria-labelledby="admin-teams-tab-stats" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <TimeRangeSelector value={statsDays} onChange={setStatsDays} includeAll onRefresh={refreshStats} />
           </div>
@@ -1644,7 +1675,7 @@ function TeamsTab() {
                 </thead>
                 <tbody>
                   {filteredStats.map((t) => (
-                    <tr key={t.team_id} onClick={() => setSelectedTeamId(t.team_id)} style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#f9fafb')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = '')}>
+                    <tr key={t.team_id} tabIndex={0} role="button" aria-label={`View team ${t.name || t.team_id}`} onClick={() => setSelectedTeamId(t.team_id)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedTeamId(t.team_id) } }} style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#f9fafb')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = '')}>
                       <td style={{ padding: '12px 16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                           <div style={{ width: 32, height: 32, borderRadius: 'var(--ui-radius, 12px)', backgroundColor: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -1676,7 +1707,7 @@ function TeamsTab() {
 
       {/* ── Isolated Users ───────────────────────────────────────── */}
       {subTab === 'isolated' && (
-        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
+        <div role="tabpanel" id="admin-teams-panel-isolated" aria-labelledby="admin-teams-tab-isolated" style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
           <div style={{ padding: '14px 20px', borderBottom: '1px solid #e5e7eb', fontSize: 14, fontWeight: 600 }}>
             Isolated Users (only on their personal team) ({isolated.length})
           </div>
@@ -1832,7 +1863,7 @@ function WorkflowsTab() {
                 {data.items.map(ev => {
                   const isExpanded = expandedId === ev.id
                   return (
-                    <tr key={ev.id} style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }} onClick={() => setExpandedId(isExpanded ? null : ev.id)}>
+                    <tr key={ev.id} tabIndex={0} role="button" aria-expanded={isExpanded} aria-label="Toggle event details" onClick={() => setExpandedId(isExpanded ? null : ev.id)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedId(isExpanded ? null : ev.id) } }} style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}>
                       <td style={{ padding: '10px 8px', textAlign: 'center' }}>
                         {isExpanded ? <ChevronDown size={14} color="#6b7280" /> : <ChevronRight size={14} color="#9ca3af" />}
                       </td>
@@ -3239,7 +3270,7 @@ function ConfigTab() {
           <Settings size={16} color="#6b7280" /> System Configuration
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {saved && <span style={{ fontSize: 13, color: '#16a34a' }}>Configuration saved!</span>}
+          {saved && <span role="status" aria-live="polite" style={{ fontSize: 13, color: '#16a34a' }}>Configuration saved!</span>}
           <button
             onClick={handleSaveConfig}
             disabled={saving}
@@ -3406,7 +3437,7 @@ function ConfigTab() {
               })}
             </div>
           ) : (
-            <div style={{ fontSize: 13, color: '#9ca3af' }}>No models configured.</div>
+            <div style={{ fontSize: 13, color: '#6b7280' }}>No models configured.</div>
           )}
 
           {showModelForm && (
@@ -3414,20 +3445,20 @@ function ConfigTab() {
               <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>{editingModelIndex !== null ? 'Edit Model' : 'New Model'}</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
-                  <label style={labelStyle}>Model Name</label>
-                  <input value={newModel.name} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, name: v })) }} placeholder="gpt-4o" style={inputStyle} />
+                  <label htmlFor="admin-model-name" style={labelStyle}>Model Name</label>
+                  <input id="admin-model-name" value={newModel.name} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, name: v })) }} placeholder="gpt-4o" style={inputStyle} />
                 </div>
                 <div>
-                  <label style={labelStyle}>Tag</label>
-                  <input value={newModel.tag} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, tag: v })) }} placeholder="openai" style={inputStyle} />
+                  <label htmlFor="admin-model-tag" style={labelStyle}>Tag</label>
+                  <input id="admin-model-tag" value={newModel.tag} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, tag: v })) }} placeholder="openai" style={inputStyle} />
                 </div>
                 <div>
-                  <label style={labelStyle}>Endpoint (optional)</label>
-                  <input value={newModel.endpoint} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, endpoint: v })) }} placeholder="https://..." style={inputStyle} />
+                  <label htmlFor="admin-model-endpoint" style={labelStyle}>Endpoint (optional)</label>
+                  <input id="admin-model-endpoint" value={newModel.endpoint} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, endpoint: v })) }} placeholder="https://..." style={inputStyle} />
                 </div>
                 <div>
-                  <label style={labelStyle}>API Protocol</label>
-                  <select value={newModel.api_protocol} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, api_protocol: v })) }} style={inputStyle}>
+                  <label htmlFor="admin-model-protocol" style={labelStyle}>API Protocol</label>
+                  <select id="admin-model-protocol" value={newModel.api_protocol} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, api_protocol: v })) }} style={inputStyle}>
                     <option value="">Auto-detect</option>
                     <option value="openai">OpenAI</option>
                     <option value="anthropic">Anthropic</option>
@@ -3437,14 +3468,14 @@ function ConfigTab() {
                   </select>
                 </div>
                 <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={labelStyle}>API Key (optional)</label>
-                  <input type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore name="vandalizer-model-api-key" value={newModel.api_key} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, api_key: v })) }} placeholder="sk-..." style={inputStyle} />
+                  <label htmlFor="admin-model-apikey" style={labelStyle}>API Key (optional)</label>
+                  <input id="admin-model-apikey" type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore name="vandalizer-model-api-key" value={newModel.api_key} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, api_key: v })) }} placeholder="sk-..." style={inputStyle} />
                 </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 12 }}>
                 <div>
-                  <label style={labelStyle}>Speed</label>
-                  <select value={newModel.speed} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, speed: v })) }} style={inputStyle}>
+                  <label htmlFor="admin-model-speed" style={labelStyle}>Speed</label>
+                  <select id="admin-model-speed" value={newModel.speed} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, speed: v })) }} style={inputStyle}>
                     <option value="">Not set</option>
                     <option value="fast">Fast</option>
                     <option value="standard">Standard</option>
@@ -3452,8 +3483,8 @@ function ConfigTab() {
                   </select>
                 </div>
                 <div>
-                  <label style={labelStyle}>Tier</label>
-                  <select value={newModel.tier} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, tier: v })) }} style={inputStyle}>
+                  <label htmlFor="admin-model-tier" style={labelStyle}>Tier</label>
+                  <select id="admin-model-tier" value={newModel.tier} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, tier: v })) }} style={inputStyle}>
                     <option value="">Not set</option>
                     <option value="high">High</option>
                     <option value="standard">Standard</option>
@@ -3461,8 +3492,8 @@ function ConfigTab() {
                   </select>
                 </div>
                 <div>
-                  <label style={labelStyle}>Privacy</label>
-                  <select value={newModel.privacy} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, privacy: v })) }} style={inputStyle}>
+                  <label htmlFor="admin-model-privacy" style={labelStyle}>Privacy</label>
+                  <select id="admin-model-privacy" value={newModel.privacy} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, privacy: v })) }} style={inputStyle}>
                     <option value="">Not set</option>
                     <option value="internal">Internal</option>
                     <option value="external">External</option>
@@ -3470,9 +3501,10 @@ function ConfigTab() {
                 </div>
               </div>
               <div style={{ marginTop: 12 }}>
-                <label style={labelStyle}>Context Window (tokens)</label>
+                <label htmlFor="admin-model-context-window" style={labelStyle}>Context Window (tokens)</label>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
                   <input
+                    id="admin-model-context-window"
                     type="number"
                     min={1}
                     value={newModel.context_window}
@@ -3503,7 +3535,7 @@ function ConfigTab() {
                   The serving cap (e.g. vLLM&rsquo;s <code>--max-model-len</code>), not the model card&rsquo;s theoretical max. Compaction and the oversize-doc check use this to decide what fits.
                 </div>
                 {probeResult && (
-                  <div style={{
+                  <div role="status" aria-live="polite" style={{
                     marginTop: 6, padding: '6px 10px', borderRadius: 'var(--ui-radius, 12px)',
                     background: probeResult.ok ? '#ecfdf5' : '#fef3c7',
                     border: `1px solid ${probeResult.ok ? '#a7f3d0' : '#fcd34d'}`,
@@ -3582,8 +3614,9 @@ function ConfigTab() {
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 220px', gap: 16, alignItems: 'start' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
-                <label style={labelStyle}>System Prompt (optional)</label>
+                <label htmlFor="admin-playground-system" style={labelStyle}>System Prompt (optional)</label>
                 <textarea
+                  id="admin-playground-system"
                   value={playgroundSystem}
                   onChange={e => setPlaygroundSystem(e.target.value)}
                   placeholder="e.g. You are a helpful assistant. Reply concisely."
@@ -3592,8 +3625,9 @@ function ConfigTab() {
                 />
               </div>
               <div>
-                <label style={labelStyle}>User Prompt</label>
+                <label htmlFor="admin-playground-user" style={labelStyle}>User Prompt</label>
                 <textarea
+                  id="admin-playground-user"
                   value={playgroundUser}
                   onChange={e => setPlaygroundUser(e.target.value)}
                   placeholder="Ask anything. The text below will be sent verbatim to the selected model."
@@ -3604,8 +3638,9 @@ function ConfigTab() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
-                <label style={labelStyle}>Model</label>
+                <label htmlFor="admin-playground-model" style={labelStyle}>Model</label>
                 <select
+                  id="admin-playground-model"
                   value={playgroundModel}
                   onChange={e => setPlaygroundModel(e.target.value)}
                   style={inputStyle}
@@ -3632,7 +3667,7 @@ function ConfigTab() {
                 <Play size={14} /> {playgroundSending ? 'Sending...' : 'Send'}
               </button>
               {playgroundResult && (
-                <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.6 }}>
+                <div role="status" aria-live="polite" style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.6 }}>
                   <div>Model: <span style={{ color: '#111', fontFamily: 'ui-monospace, monospace' }}>{playgroundResult.request.model}</span></div>
                   <div>Latency: {playgroundResult.latency_ms} ms</div>
                   {playgroundResult.tokens && (
@@ -3647,7 +3682,7 @@ function ConfigTab() {
           </div>
 
           {playgroundError && (
-            <div style={{ marginTop: 16, padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--ui-radius, 12px)', color: '#991b1b', fontSize: 13 }}>
+            <div role="alert" style={{ marginTop: 16, padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--ui-radius, 12px)', color: '#991b1b', fontSize: 13 }}>
               {playgroundError}
             </div>
           )}
@@ -3674,9 +3709,9 @@ ${playgroundResult.request.user_prompt}`}
               <div>
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
                   {playgroundResult.ok ? (
-                    <><CheckCircle2 size={13} color="#059669" /> Response</>
+                    <><CheckCircle2 size={13} color="#059669" aria-hidden="true" /> Response</>
                   ) : (
-                    <><XCircle size={13} color="#dc2626" /> Error</>
+                    <><XCircle size={13} color="#dc2626" aria-hidden="true" /> Error</>
                   )}
                 </div>
                 <pre style={{
@@ -3768,16 +3803,20 @@ ${playgroundResult.request.user_prompt}`}
                       </div>
                       <div style={{ display: 'flex', gap: 4 }}>
                         <button
+                          type="button"
+                          aria-label="Edit provider"
                           onClick={() => editingProviderIndex === i ? setEditingProviderIndex(null) : handleEditProvider(i)}
                           style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6b7280', padding: 4 }}
                         >
-                          <Pencil size={16} />
+                          <Pencil size={16} aria-hidden="true" />
                         </button>
                         <button
+                          type="button"
+                          aria-label="Delete provider"
                           onClick={() => handleDeleteProvider(i)}
                           style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', padding: 4 }}
                         >
-                          <Trash2 size={16} />
+                          <Trash2 size={16} aria-hidden="true" />
                         </button>
                       </div>
                     </div>
@@ -3786,8 +3825,9 @@ ${playgroundResult.request.user_prompt}`}
                         <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Edit Provider</div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                           <div>
-                            <label style={labelStyle}>Type</label>
+                            <label htmlFor={`admin-oauth-edit-${i}-type`} style={labelStyle}>Type</label>
                             <select
+                              id={`admin-oauth-edit-${i}-type`}
                               value={editingProvider.provider}
                               onChange={e => setEditingProvider({ ...editingProvider, provider: e.target.value })}
                               style={inputStyle}
@@ -3798,25 +3838,25 @@ ${playgroundResult.request.user_prompt}`}
                             </select>
                           </div>
                           <div>
-                            <label style={labelStyle}>Display Name</label>
-                            <input value={editingProvider.display_name} onChange={e => setEditingProvider({ ...editingProvider, display_name: e.target.value })} style={inputStyle} />
+                            <label htmlFor={`admin-oauth-edit-${i}-display-name`} style={labelStyle}>Display Name</label>
+                            <input id={`admin-oauth-edit-${i}-display-name`} value={editingProvider.display_name} onChange={e => setEditingProvider({ ...editingProvider, display_name: e.target.value })} style={inputStyle} />
                           </div>
                           <div>
-                            <label style={labelStyle}>Client ID</label>
-                            <input value={editingProvider.client_id} onChange={e => setEditingProvider({ ...editingProvider, client_id: e.target.value })} style={inputStyle} />
+                            <label htmlFor={`admin-oauth-edit-${i}-client-id`} style={labelStyle}>Client ID</label>
+                            <input id={`admin-oauth-edit-${i}-client-id`} value={editingProvider.client_id} onChange={e => setEditingProvider({ ...editingProvider, client_id: e.target.value })} style={inputStyle} />
                           </div>
                           <div>
-                            <label style={labelStyle}>Client Secret</label>
-                            <input type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore name="vandalizer-oauth-client-secret-edit" value={editingProvider.client_secret} onChange={e => setEditingProvider({ ...editingProvider, client_secret: e.target.value })} style={inputStyle} placeholder="Leave as *** to keep existing" />
+                            <label htmlFor={`admin-oauth-edit-${i}-client-secret`} style={labelStyle}>Client Secret</label>
+                            <input id={`admin-oauth-edit-${i}-client-secret`} type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore name="vandalizer-oauth-client-secret-edit" value={editingProvider.client_secret} onChange={e => setEditingProvider({ ...editingProvider, client_secret: e.target.value })} style={inputStyle} placeholder="Leave as *** to keep existing" />
                           </div>
                           <div style={{ gridColumn: '1 / -1' }}>
-                            <label style={labelStyle}>Redirect URI</label>
-                            <input value={editingProvider.redirect_uri} onChange={e => setEditingProvider({ ...editingProvider, redirect_uri: e.target.value })} style={inputStyle} />
+                            <label htmlFor={`admin-oauth-edit-${i}-redirect-uri`} style={labelStyle}>Redirect URI</label>
+                            <input id={`admin-oauth-edit-${i}-redirect-uri`} value={editingProvider.redirect_uri} onChange={e => setEditingProvider({ ...editingProvider, redirect_uri: e.target.value })} style={inputStyle} />
                           </div>
                           {editingProvider.provider === 'azure' && (
                             <div style={{ gridColumn: '1 / -1' }}>
-                              <label style={labelStyle}>Tenant ID</label>
-                              <input value={editingProvider.tenant_id} onChange={e => setEditingProvider({ ...editingProvider, tenant_id: e.target.value })} style={inputStyle} />
+                              <label htmlFor={`admin-oauth-edit-${i}-tenant-id`} style={labelStyle}>Tenant ID</label>
+                              <input id={`admin-oauth-edit-${i}-tenant-id`} value={editingProvider.tenant_id} onChange={e => setEditingProvider({ ...editingProvider, tenant_id: e.target.value })} style={inputStyle} />
                             </div>
                           )}
                         </div>
@@ -3950,8 +3990,8 @@ ${playgroundResult.request.user_prompt}`}
               <Play size={14} /> {ocrTesting ? 'Testing...' : 'Test Connection'}
             </button>
             {ocrTestResult && (
-              <span style={{ fontSize: 13, color: ocrTestResult.ok ? '#059669' : '#dc2626', fontWeight: 500 }}>
-                {ocrTestResult.ok ? <CheckCircle2 size={14} style={{ verticalAlign: -2, marginRight: 4 }} /> : <XCircle size={14} style={{ verticalAlign: -2, marginRight: 4 }} />}
+              <span role="status" aria-live="polite" style={{ fontSize: 13, color: ocrTestResult.ok ? '#059669' : '#dc2626', fontWeight: 500 }}>
+                {ocrTestResult.ok ? <CheckCircle2 size={14} aria-hidden="true" style={{ verticalAlign: -2, marginRight: 4 }} /> : <XCircle size={14} aria-hidden="true" style={{ verticalAlign: -2, marginRight: 4 }} />}
                 {ocrTestResult.message}
               </span>
             )}
@@ -4127,7 +4167,7 @@ ${playgroundResult.request.user_prompt}`}
             >
               {themeSaving ? 'Saving...' : 'Save Theme'}
             </button>
-            {themeSaved && <span style={{ fontSize: 13, color: '#16a34a' }}>Theme saved!</span>}
+            {themeSaved && <span role="status" aria-live="polite" style={{ fontSize: 13, color: '#16a34a' }}>Theme saved!</span>}
           </div>
         </div>
       </div>
@@ -4513,7 +4553,7 @@ ${playgroundResult.request.user_prompt}`}
             >
               {complianceSaving ? 'Saving...' : 'Save Compliance Settings'}
             </button>
-            {complianceSaved && <span style={{ marginLeft: 10, fontSize: 13, color: '#16a34a' }}>Saved!</span>}
+            {complianceSaved && <span role="status" aria-live="polite" style={{ marginLeft: 10, fontSize: 13, color: '#16a34a' }}>Saved!</span>}
           </div>
         </div>
       </div>
@@ -4606,6 +4646,7 @@ ${playgroundResult.request.user_prompt}`}
                               min={0}
                               value={p.warning_days_before ?? ''}
                               placeholder="—"
+                              aria-label="Retention period (days)"
                               onChange={e => {
                                 const v = e.target.value
                                 update({ warning_days_before: v === '' ? undefined : Number(v) || 0 })
@@ -4702,7 +4743,7 @@ ${playgroundResult.request.user_prompt}`}
             >
               {retentionSaving ? 'Saving...' : 'Save Retention Settings'}
             </button>
-            {retentionSaved && <span style={{ marginLeft: 10, fontSize: 13, color: '#16a34a' }}>Saved!</span>}
+            {retentionSaved && <span role="status" aria-live="polite" style={{ marginLeft: 10, fontSize: 13, color: '#16a34a' }}>Saved!</span>}
           </div>
         </div>
       </div>
@@ -4720,7 +4761,7 @@ ${playgroundResult.request.user_prompt}`}
         >
           {saving ? 'Saving...' : 'Save Configuration'}
         </button>
-        {saved && <span style={{ fontSize: 13, color: '#16a34a' }}>Configuration saved!</span>}
+        {saved && <span role="status" aria-live="polite" style={{ fontSize: 13, color: '#16a34a' }}>Configuration saved!</span>}
       </div>
     </div>
   )
@@ -4816,6 +4857,7 @@ function DemoResponseDetail({ responses }: { responses: Record<string, unknown> 
 
 function DemoTab() {
   const confirm = useConfirm()
+  const { toast } = useToast()
   const [subTab, setSubTab] = useState<'applications' | 'surveys'>('applications')
   const [stats, setStats] = useState<DemoAdminStats | null>(null)
   const [apps, setApps] = useState<DemoApp[]>([])
@@ -4927,7 +4969,7 @@ function DemoTab() {
 
       downloadCSV('demo_export.csv', headers, rows)
     } catch {
-      alert('Failed to export demo data')
+      toast('Failed to export demo data', 'error')
     } finally {
       setActionLoading(null)
     }
@@ -4955,7 +4997,7 @@ function DemoTab() {
       await restartDemoTrial(uuid)
       loadData()
     } catch {
-      alert('Failed to restart trial')
+      toast('Failed to restart trial', 'error')
     } finally {
       setActionLoading(null)
     }
@@ -4979,7 +5021,7 @@ function DemoTab() {
       await promoteDemoUser(uuid)
       loadData()
     } catch {
-      alert('Failed to promote user')
+      toast('Failed to promote user', 'error')
     } finally {
       setActionLoading(null)
     }
@@ -4989,9 +5031,9 @@ function DemoTab() {
     setActionLoading(`test-${email}`)
     try {
       await sendTestEmail(email)
-      alert(`Test email sent to ${email}`)
+      toast(`Test email sent to ${email}`, 'success')
     } catch {
-      alert('Failed to send test email. Check SMTP configuration.')
+      toast('Failed to send test email. Check SMTP configuration.', 'error')
     } finally {
       setActionLoading(null)
     }
@@ -5012,9 +5054,9 @@ function DemoTab() {
     setActionLoading(`resend-${uuid}`)
     try {
       await adminResendCredentials(uuid)
-      alert(`Credentials resent to ${email}`)
+      toast(`Credentials resent to ${email}`, 'success')
     } catch {
-      alert('Failed to resend credentials')
+      toast('Failed to resend credentials', 'error')
     } finally {
       setActionLoading(null)
     }
@@ -5025,9 +5067,9 @@ function DemoTab() {
     try {
       const result = await adminGetMagicLink(uuid)
       await navigator.clipboard.writeText(result.url)
-      alert('Magic link copied to clipboard! It expires in 24 hours and can only be used once.')
+      toast('Magic link copied to clipboard! It expires in 24 hours and can only be used once.', 'success')
     } catch {
-      alert('Failed to generate magic link')
+      toast('Failed to generate magic link', 'error')
     } finally {
       setActionLoading(null)
     }
@@ -6435,7 +6477,7 @@ function OrgMemberPanel({ org, onClose, onReload }: { org: Organization; onClose
         <h3 className="font-semibold text-gray-900 flex items-center gap-2">
           <Users className="h-4 w-4" /> Members of &ldquo;{org.name}&rdquo;
         </h3>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xs">Close</button>
+        <button type="button" onClick={onClose} className="text-gray-500 hover:text-gray-600 text-xs">Close</button>
       </div>
 
       {/* Add user search */}
@@ -6445,12 +6487,12 @@ function OrgMemberPanel({ org, onClose, onReload }: { org: Organization; onClose
           placeholder="Search by name or email..." className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm" />
         {searchQ.trim() && (
           <div className="mt-1 rounded border border-gray-200 bg-white max-h-32 overflow-y-auto">
-            {searching ? <div className="p-2 text-xs text-gray-400">Searching...</div>
-            : searchResults.length === 0 ? <div className="p-2 text-xs text-gray-400">No results</div>
+            {searching ? <div className="p-2 text-xs text-gray-500">Searching...</div>
+            : searchResults.length === 0 ? <div className="p-2 text-xs text-gray-500">No results</div>
             : searchResults.map(u => (
               <div key={u.user_id} className="flex items-center justify-between px-3 py-1.5 hover:bg-gray-50">
                 <span className="text-sm text-gray-700 truncate">{u.name || u.user_id}{u.email ? ` (${u.email})` : ''}</span>
-                {memberUserIds.has(u.user_id) ? <span className="text-xs text-gray-400">Assigned</span>
+                {memberUserIds.has(u.user_id) ? <span className="text-xs text-gray-500">Assigned</span>
                 : <button onClick={() => assignUser(u.user_id)}
                     className="text-xs px-2 py-0.5 rounded bg-blue-600 text-white hover:bg-blue-700">Add</button>}
               </div>
@@ -6470,7 +6512,7 @@ function OrgMemberPanel({ org, onClose, onReload }: { org: Organization; onClose
       </div>
 
       {/* Current members */}
-      {loading ? <div className="text-sm text-gray-400">Loading...</div> : (
+      {loading ? <div className="text-sm text-gray-500">Loading...</div> : (
         <div>
           {(members?.users.length || 0) > 0 && (
             <div className="mb-2">
@@ -6602,10 +6644,10 @@ function ImportDialog({ onClose, onImported }: { onClose: () => void; onImported
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Name</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Parent</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">Type</th>
-                      <th className="px-3 py-2 w-8"></th>
+                      <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500">Name</th>
+                      <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500">Parent</th>
+                      <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-gray-500">Type</th>
+                      <th scope="col" className="px-3 py-2 w-8"><span className="sr-only">Actions</span></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -6623,7 +6665,7 @@ function ImportDialog({ onClose, onImported }: { onClose: () => void; onImported
                           </select>
                         </td>
                         <td className="px-3 py-1.5">
-                          <button onClick={() => removeRow(i)} className="text-gray-400 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" /></button>
+                          <button type="button" aria-label="Remove row" onClick={() => removeRow(i)} className="text-gray-500 hover:text-red-600"><Trash2 className="h-3.5 w-3.5" aria-hidden="true" /></button>
                         </td>
                       </tr>
                     ))}
@@ -7191,7 +7233,7 @@ export default function Admin() {
     <PageLayout>
       <div style={{ display: 'flex', gap: 0, minHeight: 'calc(100vh - 130px)' }}>
         {/* Sidebar */}
-        <nav style={{
+        <nav aria-label="Admin sections" style={{
           width: 220, flexShrink: 0,
           borderRight: '1px solid #e5e7eb',
           backgroundColor: '#fff',
@@ -7211,6 +7253,8 @@ export default function Admin() {
               return (
                 <button
                   key={tab.key}
+                  type="button"
+                  aria-current={isActive ? 'page' : undefined}
                   onClick={() => setActiveTab(tab.key)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 10,

@@ -203,8 +203,9 @@ export function AutovalidateTab({ kbUuid, kbReady, canManage, queriesCount, onSw
 
   if (loading) {
     return (
-      <div style={{ textAlign: 'center', padding: 24, color: '#888' }}>
-        <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+      <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 24, color: '#888' }}>
+        <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
+        <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Loading…</span>
       </div>
     )
   }
@@ -231,8 +232,9 @@ export function AutovalidateTab({ kbUuid, kbReady, canManage, queriesCount, onSw
 
   if (viewingPastLoading) {
     return (
-      <div style={{ textAlign: 'center', padding: 24, color: '#888' }}>
-        <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} />
+      <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 24, color: '#888' }}>
+        <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
+        <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Loading…</span>
       </div>
     )
   }
@@ -392,7 +394,7 @@ function IdleHero({
       border: '1px solid rgba(124, 58, 237, 0.25)', borderRadius: 8,
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-        <Sparkles size={18} style={{ color: '#a78bfa' }} />
+        <Sparkles size={18} style={{ color: '#a78bfa' }} aria-hidden="true" />
         <h3 style={{ margin: 0, fontSize: 15, color: '#fff' }}>Get a quality score for this KB — and a one-click recipe to improve it</h3>
       </div>
       <FeedbackImpactCallout impact={impact} />
@@ -436,9 +438,10 @@ function IdleHero({
             original stays untouched.
           </p>
           {cloneError && (
-            <p style={{ margin: '0 0 10px 0', fontSize: 12, color: '#fca5a5' }}>{cloneError}</p>
+            <p role="alert" style={{ margin: '0 0 10px 0', fontSize: 12, color: '#fca5a5' }}>{cloneError}</p>
           )}
           <button
+            type="button"
             onClick={handleClone}
             disabled={cloning || !onCloned}
             title={!onCloned ? 'Cloning is unavailable here' : ''}
@@ -452,13 +455,14 @@ function IdleHero({
             }}
           >
             {cloning
-              ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
-              : <Sparkles size={14} />}
+              ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
+              : <Sparkles size={14} aria-hidden="true" />}
             {cloning ? 'Copying…' : 'Clone to validate'}
           </button>
         </div>
       ) : (
         <button
+          type="button"
           onClick={onStart}
           disabled={disabled}
           title={reason || ''}
@@ -471,7 +475,7 @@ function IdleHero({
             borderRadius: 6, cursor: disabled ? 'not-allowed' : 'pointer',
           }}
         >
-          <Sparkles size={14} />
+          <Sparkles size={14} aria-hidden="true" />
           Validate &amp; improve
         </button>
       )}

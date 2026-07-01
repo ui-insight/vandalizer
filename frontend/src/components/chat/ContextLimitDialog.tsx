@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { FocusTrap } from 'focus-trap-react'
 import { Scissors, Minimize2, Trash2, X, Loader2 } from 'lucide-react'
 
 interface ContextLimitDialogProps {
@@ -48,7 +49,12 @@ export function ContextLimitDialog({
       />
 
       {/* Dialog */}
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="context-limit-title"
+        onKeyDown={e => { if (e.key === 'Escape') onClose() }}
         style={{
           position: 'fixed',
           top: '50%',
@@ -74,7 +80,7 @@ export function ContextLimitDialog({
           }}
         >
           <div>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>
+            <h3 id="context-limit-title" style={{ margin: 0, fontSize: 16, fontWeight: 600 }}>
               {percent >= 100
                 ? 'Context Window Full'
                 : percent >= 90
@@ -86,13 +92,15 @@ export function ContextLimitDialog({
             </p>
           </div>
           <button
+            type="button"
             onClick={onClose}
+            aria-label="Close"
             style={{
               background: 'transparent',
               border: 'none',
               cursor: 'pointer',
               padding: 4,
-              color: '#9ca3af',
+              color: '#6b7280',
               display: 'flex',
             }}
           >
@@ -103,6 +111,7 @@ export function ContextLimitDialog({
         {/* Options */}
         <div style={{ padding: '12px 20px 20px' }}>
           <button
+            type="button"
             onClick={() => handleAction('truncate', onTruncate)}
             disabled={loading !== null}
             style={{
@@ -137,6 +146,7 @@ export function ContextLimitDialog({
           </button>
 
           <button
+            type="button"
             onClick={() => handleAction('compact', onCompact)}
             disabled={loading !== null}
             style={{
@@ -175,6 +185,7 @@ export function ContextLimitDialog({
           </button>
 
           <button
+            type="button"
             onClick={() => handleAction('clear', onClear)}
             disabled={loading !== null}
             style={{
@@ -208,6 +219,7 @@ export function ContextLimitDialog({
           </button>
         </div>
       </div>
+      </FocusTrap>
     </>
   )
 }
