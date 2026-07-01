@@ -88,9 +88,11 @@ export function GlobalSearch({ onDocClick }: GlobalSearchProps) {
           }}
           placeholder="Search document titles and content..."
           aria-label="Search documents"
+          onFocus={e => { e.currentTarget.style.boxShadow = '0 0 0 2px var(--highlight-color, #eab308)' }}
+          onBlur={e => { e.currentTarget.style.boxShadow = 'none' }}
           style={{
             flex: 1, border: 'none', background: 'none', outline: 'none',
-            fontSize: 15, color: '#111827',
+            fontSize: 15, color: '#111827', borderRadius: 4,
           }}
         />
         <button

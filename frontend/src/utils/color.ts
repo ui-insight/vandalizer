@@ -49,9 +49,21 @@ export function getLuminance(hex: string): number {
   return 0.2126 * rs + 0.7152 * gs + 0.0722 * bs
 }
 
-/** Returns '#ffffff' or '#000000' for best contrast against the given background. */
+/** WCAG contrast ratio (1–21) between two hex colors. */
+export function contrastRatio(hex1: string, hex2: string): number {
+  const l1 = getLuminance(hex1)
+  const l2 = getLuminance(hex2)
+  const lighter = Math.max(l1, l2)
+  const darker = Math.min(l1, l2)
+  return (lighter + 0.05) / (darker + 0.05)
+}
+
+/** Returns '#ffffff' or '#000000' — whichever yields the higher WCAG contrast
+ *  ratio against the given background. Uses the real ratio rather than a
+ *  luminance threshold, so custom brand colors near the boundary still get the
+ *  more legible text color. */
 export function getContrastTextColor(hex: string): string {
-  return getLuminance(hex) > 0.4 ? '#000000' : '#ffffff'
+  return contrastRatio(hex, '#000000') >= contrastRatio(hex, '#ffffff') ? '#000000' : '#ffffff'
 }
 
 /** Derive a deep, rich gradient partner by shifting hue slightly and darkening.

@@ -6,7 +6,9 @@ import {
   Navigate,
   Outlet,
   useNavigate,
+  useRouterState,
 } from '@tanstack/react-router'
+import { useBranding } from './contexts/BrandingContext'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
 import { useCertificationPanel } from './contexts/CertificationPanelContext'
 import { Workspace } from './pages/Workspace'
@@ -63,9 +65,40 @@ function CertificationRedirect() {
 // Route tree
 // ---------------------------------------------------------------------------
 
+// Per-route document titles (WCAG 2.4.2). Longest-prefix match; the workspace
+// root falls back to the bare org name. Titles read "<Page> — <Org>".
+const ROUTE_TITLES: Array<[string, string]> = [
+  ['/workflows', 'Workflows'],
+  ['/admin', 'Admin'],
+  ['/account', 'Account'],
+  ['/teams', 'Teams'],
+  ['/organizations', 'Organizations'],
+  ['/verification', 'Verification'],
+  ['/support', 'Support'],
+  ['/automation', 'Automations'],
+  ['/docs', 'Docs'],
+  ['/landing', 'Sign in'],
+  ['/login', 'Sign in'],
+  ['/register', 'Create account'],
+  ['/reset-password', 'Reset password'],
+  ['/invite', 'Accept invitation'],
+  ['/demo', 'Demo'],
+]
+
+function RouteTitle() {
+  const { orgName } = useBranding()
+  const pathname = useRouterState({ select: (s) => s.location.pathname })
+  useEffect(() => {
+    const match = ROUTE_TITLES.find(([prefix]) => pathname === prefix || pathname.startsWith(prefix + '/'))
+    document.title = match ? `${match[1]} — ${orgName}` : orgName
+  }, [pathname, orgName])
+  return null
+}
+
 const rootRoute = createRootRoute({
   component: () => (
     <Suspense fallback={<div className="p-6 text-gray-500 text-sm">Loading...</div>}>
+      <RouteTitle />
       <Outlet />
     </Suspense>
   ),

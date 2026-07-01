@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { FocusTrap } from 'focus-trap-react'
 import { X, Library, Plus, Loader2 } from 'lucide-react'
 import { listKnowledgeBasesV2, createKnowledgeBase } from '../../api/knowledge'
 import type { KnowledgeBase } from '../../types/knowledge'
@@ -43,6 +44,7 @@ export function KBPickerModal({ onSelect, onClose, folderTitle }: KBPickerModalP
       style={{ zIndex: 700 }}
       onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}
     >
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false }}>
       <div
         className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl"
         role="dialog"
@@ -116,6 +118,7 @@ export function KBPickerModal({ onSelect, onClose, folderTitle }: KBPickerModalP
           </button>
         )}
       </div>
+      </FocusTrap>
     </div>
   )
 }

@@ -84,9 +84,8 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
     load()
   }, [load])
 
-  useEffect(() => {
-    document.title = state.orgName
-  }, [state.orgName])
+  // Note: the document title is managed per-route by RouteTitle in router.tsx
+  // (WCAG 2.4.2), which falls back to the bare org name on the workspace root.
 
   return (
     <BrandingContext.Provider value={{ ...state, refresh: load }}>

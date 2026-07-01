@@ -30,10 +30,12 @@ export function KBSearchBar({ value, onChange, placeholder = 'Search knowledge b
         value={draft}
         onChange={e => setDraft(e.target.value)}
         placeholder={placeholder}
+        onFocus={e => { e.currentTarget.style.boxShadow = '0 0 0 2px var(--highlight-color, #eab308)' }}
+        onBlur={e => { e.currentTarget.style.boxShadow = 'none' }}
         style={{
           flex: 1, padding: '7px 0', fontSize: 12, fontFamily: 'inherit',
           color: '#e5e5e5', backgroundColor: 'transparent',
-          border: 'none', outline: 'none',
+          border: 'none', outline: 'none', borderRadius: 4,
         }}
       />
       {draft && (

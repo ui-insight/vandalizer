@@ -273,23 +273,29 @@ export function CollectionsManager() {
                     {!isEditing && (
                       <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
                         <button
+                          type="button"
                           onClick={() => handleToggleFeatured(col)}
                           className={`p-1.5 rounded hover:bg-yellow-50 ${col.featured ? 'text-yellow-500' : 'text-gray-400'}`}
                           title={col.featured ? 'Remove from featured' : 'Mark as featured'}
+                          aria-label={col.featured ? 'Remove from featured' : 'Mark as featured'}
                         >
                           <Star className={`h-4 w-4 ${col.featured ? 'fill-current' : ''}`} />
                         </button>
                         <button
+                          type="button"
                           onClick={() => startEdit(col)}
                           className="p-1.5 rounded hover:bg-gray-100 text-gray-500"
                           title="Edit"
+                          aria-label="Edit collection"
                         >
                           <Pencil className="h-4 w-4" />
                         </button>
                         <button
+                          type="button"
                           onClick={() => handleDelete(col.id)}
                           className="p-1.5 rounded hover:bg-red-50 text-red-500"
                           title="Delete"
+                          aria-label="Delete collection"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>

@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { FocusTrap } from 'focus-trap-react'
 import { X } from 'lucide-react'
 import { MAX_NAME_LENGTH, getNameError, normalizeName } from '../../utils/nameValidation'
 
@@ -30,6 +31,7 @@ export function RenameDialog({ currentName, onSubmit, onClose }: RenameDialogPro
         if (e.key === 'Escape') onClose()
       }}
     >
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false }}>
       <div
         className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl"
         role="dialog"
@@ -71,6 +73,7 @@ export function RenameDialog({ currentName, onSubmit, onClose }: RenameDialogPro
           </div>
         </form>
       </div>
+      </FocusTrap>
     </div>
   )
 }

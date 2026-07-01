@@ -69,6 +69,8 @@ export function DocumentSearchBar({
         onKeyDown={handleKeyDown}
         placeholder="Find in document"
         aria-label="Find in document"
+        onFocus={(e) => { e.currentTarget.style.boxShadow = '0 0 0 2px var(--highlight-color, #eab308)' }}
+        onBlur={(e) => { e.currentTarget.style.boxShadow = 'none' }}
         style={{
           width: 200,
           height: 28,
@@ -78,6 +80,7 @@ export function DocumentSearchBar({
           outline: 'none',
           background: 'transparent',
           color: '#111827',
+          borderRadius: 4,
         }}
       />
       <span

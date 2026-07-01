@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { FocusTrap } from 'focus-trap-react'
 import { X, Search, Loader2, FileText } from 'lucide-react'
 import { searchDocuments } from '../../api/documents'
 
@@ -16,6 +17,12 @@ export function DocumentPickerDialog({
   const [searching, setSearching] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const excludeRef = useCallback((uuid: string) => excludeUuids.includes(uuid), [excludeUuids.join(',')])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -55,6 +62,7 @@ export function DocumentPickerDialog({
       backgroundColor: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center',
       justifyContent: 'center', zIndex: 1000,
     }}>
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false }}>
       <div style={{
         backgroundColor: '#fff', borderRadius: 12, width: 480, maxHeight: '70vh',
         display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
@@ -135,6 +143,7 @@ export function DocumentPickerDialog({
           </button>
         </div>
       </div>
+      </FocusTrap>
     </div>
   )
 }

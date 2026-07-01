@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { FocusTrap } from 'focus-trap-react'
 import { Loader2 } from 'lucide-react'
 
 interface CreateKBModalProps {
@@ -16,6 +17,14 @@ export function CreateKBModal({ onClose, onCreate }: CreateKBModalProps) {
   useEffect(() => {
     titleRef.current?.focus()
   }, [])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
 
   const canSubmit = title.trim().length > 0 && !creating
 
@@ -39,7 +48,10 @@ export function CreateKBModal({ onClose, onCreate }: CreateKBModalProps) {
         display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
       }}
     >
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false }}>
       <div
+        role="dialog"
+        aria-modal="true"
         onClick={(e) => e.stopPropagation()}
         style={{
           backgroundColor: '#1e1e1e', borderRadius: 12, padding: 24, width: 440,
@@ -55,10 +67,11 @@ export function CreateKBModal({ onClose, onCreate }: CreateKBModalProps) {
           future-you) understand what it covers.
         </p>
 
-        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#aaa', marginBottom: 4 }}>
+        <label htmlFor="create-kb-title" style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#aaa', marginBottom: 4 }}>
           Title
         </label>
         <input
+          id="create-kb-title"
           ref={titleRef}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -71,10 +84,11 @@ export function CreateKBModal({ onClose, onCreate }: CreateKBModalProps) {
           }}
         />
 
-        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#aaa', marginBottom: 4 }}>
+        <label htmlFor="create-kb-description" style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#aaa', marginBottom: 4 }}>
           Description
         </label>
         <textarea
+          id="create-kb-description"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="What is in this knowledge base, and what should it be used for?"
@@ -134,6 +148,7 @@ export function CreateKBModal({ onClose, onCreate }: CreateKBModalProps) {
           </button>
         </div>
       </div>
+      </FocusTrap>
     </div>
   )
 }

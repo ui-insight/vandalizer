@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { FocusTrap } from 'focus-trap-react'
 import { X, Folder as FolderIcon, Home, Users } from 'lucide-react'
 import { listAllFolders, type FolderSummary } from '../../api/folders'
 import type { Folder } from '../../types/document'
@@ -61,6 +62,7 @@ export function MoveFolderDialog({ folder, onSubmit, onClose }: MoveFolderDialog
         if (e.key === 'Escape') onClose()
       }}
     >
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false }}>
       <div
         className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl"
         role="dialog"
@@ -128,6 +130,7 @@ export function MoveFolderDialog({ folder, onSubmit, onClose }: MoveFolderDialog
           </button>
         </div>
       </div>
+      </FocusTrap>
     </div>
   )
 }

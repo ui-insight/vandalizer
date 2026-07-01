@@ -87,13 +87,17 @@ export function ModelEffortPicker({ models, selectedModel, onChange }: PickerPro
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 8 }}>
+    <div role="radiogroup" aria-label="Model" style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: 8 }}>
       {models.map(model => {
         const selected = model.tag === selectedModel
 
         return (
           <button
             key={model.tag}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            aria-label={model.tag}
             onClick={() => onChange(model.tag)}
             style={{
               display: 'flex',

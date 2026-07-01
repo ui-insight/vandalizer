@@ -291,6 +291,8 @@ function KBGridCard({
         )}
         {onDelete && !isReference && (
           <button
+            type="button"
+            aria-label="Delete knowledge base"
             onClick={(e) => { e.stopPropagation(); onDelete(kb.uuid) }}
             style={{
               display: 'flex', alignItems: 'center', gap: 4,

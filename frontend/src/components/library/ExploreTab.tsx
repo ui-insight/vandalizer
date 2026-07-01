@@ -163,7 +163,7 @@ export function ItemDetailModal({
                 <p className="mt-1.5 text-sm text-white/80">{item.description}</p>
               )}
             </div>
-            <button onClick={onClose} className="p-1 rounded-lg hover:bg-white/10 text-white/60 hover:text-white">
+            <button type="button" onClick={onClose} aria-label="Close" className="p-1 rounded-lg hover:bg-white/10 text-white/60 hover:text-white">
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -351,6 +351,7 @@ function CatalogCard({
             <ShieldCheck className={`h-3.5 w-3.5 shrink-0 mt-0.5 ${
               item.quality_tier === 'gold' ? 'text-amber-500' : item.quality_tier === 'silver' ? 'text-gray-400' : 'text-green-500'
             }`} />
+            <span className="sr-only">Quality tier: {item.quality_tier || 'unrated'}</span>
             <span className="text-sm font-semibold text-gray-900 flex-1 min-w-0 group-hover:text-blue-700 transition-colors">
               {item.display_name || item.name}
             </span>
@@ -786,7 +787,7 @@ export function ExploreTab() {
               <select
                 value={qualityFilter}
                 onChange={(e) => setQualityFilter(e.target.value as QualityFilter)}
-                className="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg bg-white text-gray-600 focus:outline-none"
+                className="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg bg-white text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-highlight"
               >
                 <option value="">Any quality</option>
                 <option value="gold">Gold</option>
@@ -799,7 +800,7 @@ export function ExploreTab() {
                 <select
                   value={sortOption}
                   onChange={(e) => setSortOption(e.target.value as SortOption)}
-                  className="px-2 py-1.5 text-xs font-medium border border-gray-300 rounded-lg bg-white text-gray-600 focus:outline-none"
+                  className="px-2 py-1.5 text-xs font-medium border border-gray-300 rounded-lg bg-white text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-highlight"
                 >
                   {sortOptions.map(([val, label]) => (
                     <option key={val} value={val}>{label}</option>
@@ -814,13 +815,13 @@ export function ExploreTab() {
                 {tagFilter && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-blue-50 text-blue-700 border border-blue-200">
                     <Tag className="h-2.5 w-2.5" /> {tagFilter}
-                    <button onClick={() => setTagFilter('')} className="hover:text-blue-900 ml-0.5"><X className="h-3 w-3" /></button>
+                    <button type="button" onClick={() => setTagFilter('')} aria-label="Remove tag filter" className="hover:text-blue-900 ml-0.5"><X className="h-3 w-3" /></button>
                   </span>
                 )}
                 {selectedCollectionId && activeCollection && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-gray-100 text-gray-700">
                     <FolderOpen className="h-2.5 w-2.5" /> {activeCollection.title}
-                    <button onClick={() => setSelectedCollectionId(null)} className="hover:text-gray-900 ml-0.5"><X className="h-3 w-3" /></button>
+                    <button type="button" onClick={() => setSelectedCollectionId(null)} aria-label="Remove collection filter" className="hover:text-gray-900 ml-0.5"><X className="h-3 w-3" /></button>
                   </span>
                 )}
                 <button onClick={clearFilters} className="text-xs text-gray-500 hover:text-gray-700 underline">

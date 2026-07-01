@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import DOMPurify from 'dompurify'
+import { FocusTrap } from 'focus-trap-react'
 import { X, Loader2, AlertCircle, RefreshCw } from 'lucide-react'
 import { marked } from 'marked'
 import { pollStatus, retryExtraction } from '../../api/documents'
@@ -109,6 +110,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
         if (e.key === 'Escape') onClose()
       }}
     >
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false }}>
       <div
         role="dialog"
         aria-modal="true"
@@ -228,6 +230,7 @@ export function RawTextModal({ docUuid, onClose }: RawTextModalProps) {
           )}
         </div>
       </div>
+      </FocusTrap>
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { FocusTrap } from 'focus-trap-react'
 import { AlertTriangle, X, Loader2, Users, Trash2 } from 'lucide-react'
 
 export type SharedKBDeleteChoice = 'transfer' | 'unshare_and_delete'
@@ -43,6 +44,7 @@ export function SharedKBDeleteDialog({ open, kbTitle, onCancel, onChoose }: Prop
         if (e.target === e.currentTarget && !disabled) onCancel()
       }}
     >
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false }}>
       <div
         role="dialog"
         aria-modal="true"
@@ -124,6 +126,7 @@ export function SharedKBDeleteDialog({ open, kbTitle, onCancel, onChoose }: Prop
           </button>
         </div>
       </div>
+      </FocusTrap>
     </div>
   )
 }
