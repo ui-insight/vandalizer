@@ -1465,6 +1465,7 @@ export function KnowledgePanel() {
             <input
               ref={importInputRef}
               type="file"
+              aria-label="Upload files"
               accept=".json,application/json"
               style={{ display: 'none' }}
               onChange={(e) => {

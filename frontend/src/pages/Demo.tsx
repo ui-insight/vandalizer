@@ -407,6 +407,7 @@ export default function Demo() {
               id="demo-name"
               type="text"
               required
+              autoComplete="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               className={INPUT_CLASS}
@@ -429,6 +430,7 @@ export default function Demo() {
               id="demo-email"
               type="email"
               required
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className={INPUT_CLASS}
@@ -440,6 +442,7 @@ export default function Demo() {
               id="demo-org"
               type="text"
               required
+              autoComplete="organization"
               value={organization}
               onChange={(e) => setOrganization(e.target.value)}
               placeholder="e.g., University of Idaho"

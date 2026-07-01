@@ -14,6 +14,7 @@ import {
   type CreateApiKeyResponse,
 } from '../../api/admin'
 import { useToast } from '../../contexts/ToastContext'
+import { useConfirm } from '../shared/useConfirm'
 
 marked.setOptions({ breaks: true, gfm: true })
 
@@ -60,6 +61,7 @@ function StatusBadge({ keyItem }: { keyItem: ApiKeyListItem }) {
 
 export function ApiKeysTab() {
   const { toast } = useToast()
+  const confirm = useConfirm()
   const [keys, setKeys] = useState<ApiKeyListItem[]>([])
   const [loading, setLoading] = useState(false)
   const [includeRevoked, setIncludeRevoked] = useState(false)
@@ -86,7 +88,11 @@ export function ApiKeysTab() {
   }, [reload])
 
   const handleRevoke = async (keyId: string, name: string) => {
-    if (!confirm(`Revoke API key "${name}"? This is immediate and cannot be undone.`)) return
+    if (!(await confirm({
+      title: 'Revoke API key',
+      message: `Revoke API key "${name}"? This is immediate and cannot be undone.`,
+      destructive: true,
+    }))) return
     try {
       await revokeApiKey(keyId)
       await reload()

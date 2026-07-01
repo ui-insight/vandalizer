@@ -46,7 +46,7 @@ function StreamingLabel() {
       opacity: fade ? 1 : 0,
       transition: 'opacity 0.2s ease',
       fontSize: 13,
-      color: '#9ca3af',
+      color: '#6b7280',
     }}>
       {LOADING_WORDS[index]}&hellip;
     </span>
@@ -796,7 +796,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                     gap: 12,
                     margin: '12px 0',
                     fontSize: 11,
-                    color: '#9ca3af',
+                    color: '#6b7280',
                     userSelect: 'none',
                   }}>
                     <div style={{ flex: 1, height: 1, background: '#e5e7eb' }} />
@@ -837,7 +837,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         {/* Loading indicator */}
         {isStreaming && !streamingContent && !thinkingContent && (
           <div role="status" aria-live="polite" style={{ padding: 15, marginBottom: 15, backgroundColor: '#00000008', borderRadius: 'var(--ui-radius, 12px)' }}>
-            <div className="thinking-shimmer" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#9ca3af' }}>
+            <div className="thinking-shimmer" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#6b7280' }}>
               <ChevronRight size={14} />
               <StreamingLabel />
             </div>

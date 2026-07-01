@@ -392,6 +392,7 @@ export function VerifiedCatalog() {
           <input
             ref={importInputRef}
             type="file"
+            aria-label="Upload files"
             accept=".json"
             className="hidden"
             onChange={async (e) => {

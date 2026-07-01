@@ -330,6 +330,7 @@ function JoinRegisterForm({
         type="email"
         placeholder="Email"
         required
+        autoComplete="email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50"
@@ -337,6 +338,7 @@ function JoinRegisterForm({
       <input
         type="text"
         placeholder="Full name"
+        autoComplete="name"
         value={name}
         onChange={(e) => setName(e.target.value)}
         className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50"
@@ -399,6 +401,7 @@ function JoinLoginForm({
         type="text"
         placeholder="Email"
         required
+        autoComplete="email"
         value={userId}
         onChange={(e) => setUserId(e.target.value)}
         className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50"

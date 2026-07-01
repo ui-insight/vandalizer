@@ -67,7 +67,7 @@ export function ExaminerManager() {
       <div className="mb-6">
         <label className="block text-sm font-medium text-gray-700 mb-2">Search Users</label>
         <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
           <input
             type="text"
             value={searchQuery}
@@ -90,7 +90,7 @@ export function ExaminerManager() {
                 {searchResults.map((user) => (
                   <div key={user.user_id} className="flex items-center justify-between px-4 py-3">
                     <div className="flex items-center gap-3 min-w-0">
-                      <UserCircle className="h-5 w-5 text-gray-400 shrink-0" />
+                      <UserCircle className="h-5 w-5 text-gray-500 shrink-0" />
                       <div className="min-w-0">
                         <div className="text-sm font-medium text-gray-900 truncate">{user.name || 'Unknown'}</div>
                         <div className="text-xs text-gray-500 truncate">{user.email || user.user_id}</div>

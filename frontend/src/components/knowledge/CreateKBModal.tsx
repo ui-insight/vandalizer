@@ -77,6 +77,8 @@ export function CreateKBModal({ onClose, onCreate }: CreateKBModalProps) {
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && canSubmit) handleSubmit() }}
           placeholder="e.g. NIH Grant Proposals 2026"
+          aria-invalid={!!error}
+          aria-describedby={error ? 'create-kb-error' : undefined}
           style={{
             width: '100%', padding: '8px 10px', fontSize: 13, fontFamily: 'inherit',
             backgroundColor: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: 6,
@@ -106,7 +108,7 @@ export function CreateKBModal({ onClose, onCreate }: CreateKBModalProps) {
         </p>
 
         {error && (
-          <div style={{
+          <div id="create-kb-error" role="alert" style={{
             padding: '8px 12px', borderRadius: 6, marginBottom: 12,
             fontSize: 12, color: '#fca5a5',
             backgroundColor: 'rgba(239, 68, 68, 0.1)',

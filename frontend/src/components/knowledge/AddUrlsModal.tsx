@@ -45,7 +45,7 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
         role="dialog"
         aria-modal="true"
         style={{
-          width: 480, maxHeight: '80vh',
+          width: 480, maxWidth: '100vw', maxHeight: '80vh',
           backgroundColor: '#1e1e1e', borderRadius: 12,
           border: '1px solid #3a3a3a', padding: 24,
           display: 'flex', flexDirection: 'column', gap: 16,

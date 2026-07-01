@@ -185,11 +185,10 @@ export function VerificationQueue() {
             className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400"
           />
         </div>
-        <div role="tablist" aria-label="Verification views" className="flex items-center gap-2">
+        <div role="group" aria-label="Verification views" className="flex items-center gap-2">
           <button
             type="button"
-            role="tab"
-            aria-selected={view === 'pending'}
+            aria-pressed={view === 'pending'}
             onClick={() => setView('pending')}
             className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
               view === 'pending'
@@ -201,8 +200,7 @@ export function VerificationQueue() {
           </button>
           <button
             type="button"
-            role="tab"
-            aria-selected={view === 'mine'}
+            aria-pressed={view === 'mine'}
             onClick={() => setView('mine')}
             className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
               view === 'mine'

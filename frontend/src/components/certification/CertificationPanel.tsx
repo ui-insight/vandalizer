@@ -118,7 +118,7 @@ function ValidationResults({ result, onDismiss }: { result: ValidationResult; on
             </div>
           )}
         </div>
-        <button type="button" onClick={onDismiss} aria-label="Dismiss results" className="text-gray-400 hover:text-gray-600"><X size={16} aria-hidden="true" /></button>
+        <button type="button" onClick={onDismiss} aria-label="Dismiss results" className="text-gray-500 hover:text-gray-600"><X size={16} aria-hidden="true" /></button>
       </div>
       <div className="space-y-1.5">
         {result.checks.map((check: ValidationCheck, i: number) => (
@@ -372,7 +372,7 @@ export function CertificationPanel() {
           <ChevronLeft size={15} />
           <span>Curriculum</span>
         </button>
-        <span className="text-gray-300">/</span>
+        <span className="text-gray-500">/</span>
         <span className="text-sm text-gray-700 font-medium truncate">
           Module {activeModuleDef.number}: {activeModuleDef.title}
         </span>
@@ -506,7 +506,7 @@ export function CertificationPanel() {
           onPointerMove={handleDragMove}
           onPointerUp={handleDragEnd}
         >
-          {mode === 'floating' && <GripHorizontal size={14} className="text-gray-300 shrink-0" />}
+          {mode === 'floating' && <GripHorizontal size={14} className="text-gray-500 shrink-0" />}
           <Award size={16} aria-hidden="true" className="text-highlight shrink-0" style={{ color: 'var(--highlight-on-light, #806600)' }} />
           <span className="text-sm font-bold text-gray-900 flex-1">Certification</span>
 
@@ -530,7 +530,7 @@ export function CertificationPanel() {
             ))}
           </div>
 
-          <button type="button" onPointerDown={e => e.stopPropagation()} onClick={closePanel} title="Back to badge" aria-label="Back to badge" className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-50 ml-1">
+          <button type="button" onPointerDown={e => e.stopPropagation()} onClick={closePanel} title="Back to badge" aria-label="Back to badge" className="p-1.5 rounded-md text-gray-500 hover:text-gray-600 hover:bg-gray-50 ml-1">
             <X size={14} aria-hidden="true" />
           </button>
         </div>

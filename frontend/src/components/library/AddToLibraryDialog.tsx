@@ -47,7 +47,7 @@ export function AddToLibraryDialog({ libraries, itemId, kind, onClose, onAdded }
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6" role="dialog" aria-modal="true" aria-label="Add to Library">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Add to Library</h3>
-          <button type="button" onClick={onClose} aria-label="Close" className="p-1 text-gray-400 hover:text-gray-600 rounded">
+          <button type="button" onClick={onClose} aria-label="Close" className="p-1 text-gray-500 hover:text-gray-600 rounded">
             <X size={18} />
           </button>
         </div>

@@ -73,6 +73,7 @@ export function DocumentSearchBar({
         onBlur={(e) => { e.currentTarget.style.boxShadow = 'none' }}
         style={{
           width: 200,
+          maxWidth: '100%',
           height: 28,
           padding: '0 8px',
           fontSize: 13,

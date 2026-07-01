@@ -85,7 +85,7 @@ export function CelebrationOverlay({
             >
               <Award size={48} className="text-white" />
             </div>
-            <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-1">
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-1">
               University of Idaho
             </p>
             <h2 className="text-2xl font-bold text-gray-900 mb-1 title-shimmer">
@@ -106,7 +106,7 @@ export function CelebrationOverlay({
             <div className="mb-4">
               <Award size={48} className="mx-auto text-highlight" style={{ color: 'var(--highlight-color)' }} />
             </div>
-            <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-500 mb-2">
               Tier Complete
             </p>
             <h2 className="text-xl font-bold text-gray-900 mb-3">{tierCelebration.tierName} Complete!</h2>

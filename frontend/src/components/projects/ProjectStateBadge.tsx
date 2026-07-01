@@ -6,7 +6,7 @@ const STATE_STYLES: Record<ProjectState, string> = {
   submitted: 'bg-blue-100 text-blue-700',
   awarded: 'bg-purple-100 text-purple-700',
   closeout: 'bg-amber-100 text-amber-700',
-  archived: 'bg-gray-200 text-gray-500',
+  archived: 'bg-gray-200 text-gray-600',
 }
 
 export function ProjectStateBadge({ state }: { state: ProjectState }) {

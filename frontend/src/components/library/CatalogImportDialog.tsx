@@ -116,7 +116,7 @@ export function CatalogImportDialog({
         {/* Search */}
         <div style={{ padding: '12px 20px', borderBottom: '1px solid #e5e7eb' }}>
           <div style={{ position: 'relative' }}>
-            <Search style={{ width: 14, height: 14, position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+            <Search style={{ width: 14, height: 14, position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
             <input
               autoFocus
               aria-label="Filter catalog items"
@@ -206,7 +206,7 @@ export function CatalogImportDialog({
               padding: '8px 16px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
               borderRadius: 6, border: 'none',
               backgroundColor: selected.size > 0 && !importing ? '#191919' : '#e5e7eb',
-              color: selected.size > 0 && !importing ? '#fff' : '#9ca3af',
+              color: selected.size > 0 && !importing ? '#fff' : '#6b7280',
               cursor: selected.size > 0 && !importing ? 'pointer' : 'not-allowed',
               display: 'flex', alignItems: 'center', gap: 6,
             }}

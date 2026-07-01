@@ -102,7 +102,7 @@ export function CatalogCoverageTab() {
 
       {/* Kind filter */}
       <div className="flex items-center gap-2 mb-3">
-        <Filter className="h-3 w-3 text-gray-400" />
+        <Filter className="h-3 w-3 text-gray-500" />
         {(['', 'workflow', 'search_set', 'knowledge_base'] as const).map(k => (
           <button
             key={k || 'all'}
@@ -130,13 +130,13 @@ export function CatalogCoverageTab() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr className="text-left text-xs font-semibold text-gray-600">
-                <th className="px-3 py-2">Item</th>
-                <th className="px-3 py-2">Kind</th>
-                <th className="px-3 py-2">Coverage</th>
-                <th className="px-3 py-2">Current score</th>
-                <th className="px-3 py-2">Pinned</th>
-                <th className="px-3 py-2">Drift check</th>
-                <th className="px-3 py-2"></th>
+                <th scope="col" className="px-3 py-2">Item</th>
+                <th scope="col" className="px-3 py-2">Kind</th>
+                <th scope="col" className="px-3 py-2">Coverage</th>
+                <th scope="col" className="px-3 py-2">Current score</th>
+                <th scope="col" className="px-3 py-2">Pinned</th>
+                <th scope="col" className="px-3 py-2">Drift check</th>
+                <th scope="col" className="px-3 py-2"></th>
               </tr>
             </thead>
             <tbody>

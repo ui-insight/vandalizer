@@ -158,10 +158,10 @@ export function ApplyPreviewModal({
             <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ color: '#888', textAlign: 'left' }}>
-                  <th style={{ padding: '6px 8px', fontWeight: 500 }}>{capitalize(itemNoun)}</th>
-                  <th style={{ padding: '6px 8px', fontWeight: 500, textAlign: 'right' }}>Current</th>
-                  <th style={{ padding: '6px 8px', fontWeight: 500, textAlign: 'right' }}>After apply</th>
-                  <th style={{ padding: '6px 8px', fontWeight: 500, textAlign: 'right' }}>Δ</th>
+                  <th scope="col" style={{ padding: '6px 8px', fontWeight: 500 }}>{capitalize(itemNoun)}</th>
+                  <th scope="col" style={{ padding: '6px 8px', fontWeight: 500, textAlign: 'right' }}>Current</th>
+                  <th scope="col" style={{ padding: '6px 8px', fontWeight: 500, textAlign: 'right' }}>After apply</th>
+                  <th scope="col" style={{ padding: '6px 8px', fontWeight: 500, textAlign: 'right' }}>Δ</th>
                 </tr>
               </thead>
               <tbody>

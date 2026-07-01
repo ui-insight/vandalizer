@@ -40,7 +40,7 @@ export function RenameDialog({ currentName, onSubmit, onClose }: RenameDialogPro
       >
         <div className="mb-4 flex items-center justify-between">
           <h3 id="rename-dialog-title" className="text-lg font-medium text-gray-900">Rename</h3>
-          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} aria-label="Close" className="text-gray-500 hover:text-gray-600">
             <X className="h-5 w-5" />
           </button>
         </div>

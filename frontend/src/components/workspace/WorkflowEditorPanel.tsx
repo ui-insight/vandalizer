@@ -2295,6 +2295,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
   const [selectedDocTitle, setSelectedDocTitle] = useState('')
   const [docSearchResults, setDocSearchResults] = useState<{ uuid: string; title: string }[]>([])
   const [showDocDropdown, setShowDocDropdown] = useState(false)
+  const [docHighlight, setDocHighlight] = useState(0)
 
   // Saved tasks only store the UUID — fetch the title so the chip shows the
   // filename instead of a raw UUID when the editor reopens.
@@ -2315,6 +2316,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
   const [fixedDocSearch, setFixedDocSearch] = useState('')
   const [fixedDocResults, setFixedDocResults] = useState<{ uuid: string; title: string }[]>([])
   const [showFixedDocDropdown, setShowFixedDocDropdown] = useState(false)
+  const [fixedDocHighlight, setFixedDocHighlight] = useState(0)
   const [dragOver, setDragOver] = useState(false)
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -4213,9 +4215,10 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                         aria-controls="doc-search-listbox"
                         aria-autocomplete="list"
                         aria-haspopup="listbox"
+                        aria-activedescendant={showDocDropdown && docSearchResults.length > 0 ? `doc-search-opt-${Math.min(docHighlight, docSearchResults.length - 1)}` : undefined}
                         type="text"
                         value={docSearchQuery}
-                        onChange={e => setDocSearchQuery(e.target.value)}
+                        onChange={e => { setDocSearchQuery(e.target.value); setDocHighlight(0) }}
                         placeholder="Search documents..."
                         style={{
                           width: '100%', padding: '8px 12px', fontSize: 13,
@@ -4227,9 +4230,16 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                         onKeyDown={e => {
                           if (e.key === 'Escape') {
                             setShowDocDropdown(false)
+                          } else if (e.key === 'ArrowDown') {
+                            e.preventDefault()
+                            setShowDocDropdown(true)
+                            setDocHighlight(h => Math.min(h + 1, docSearchResults.length - 1))
+                          } else if (e.key === 'ArrowUp') {
+                            e.preventDefault()
+                            setDocHighlight(h => Math.max(h - 1, 0))
                           } else if (e.key === 'Enter' && showDocDropdown && docSearchResults.length > 0) {
                             e.preventDefault()
-                            const doc = docSearchResults[0]
+                            const doc = docSearchResults[Math.min(docHighlight, docSearchResults.length - 1)]
                             setSelectedDocUuid(doc.uuid)
                             setSelectedDocTitle(doc.title)
                             setDocSearchQuery(doc.title)
@@ -4248,11 +4258,13 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                             <div style={{ padding: '8px 12px', fontSize: 13, color: '#6b7280' }}>
                               No documents found
                             </div>
-                          ) : docSearchResults.map(doc => (
+                          ) : docSearchResults.map((doc, i) => (
                             <div
                               key={doc.uuid}
+                              id={`doc-search-opt-${i}`}
                               role="option"
                               aria-selected={doc.uuid === selectedDocUuid}
+                              onMouseEnter={() => setDocHighlight(i)}
                               onMouseDown={() => {
                                 setSelectedDocUuid(doc.uuid)
                                 setSelectedDocTitle(doc.title)
@@ -4262,10 +4274,8 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                               style={{
                                 padding: '8px 12px', fontSize: 13, cursor: 'pointer',
                                 display: 'flex', alignItems: 'center', gap: 8,
-                                backgroundColor: doc.uuid === selectedDocUuid ? '#f3f4f6' : '#fff',
+                                backgroundColor: i === Math.min(docHighlight, docSearchResults.length - 1) || doc.uuid === selectedDocUuid ? '#f3f4f6' : '#fff',
                               }}
-                              onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#f3f4f6' }}
-                              onMouseLeave={e => { e.currentTarget.style.backgroundColor = doc.uuid === selectedDocUuid ? '#f3f4f6' : '#fff' }}
                             >
                               <FileText style={{ width: 14, height: 14, color: '#6b7280', flexShrink: 0 }} />
                               <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -4362,9 +4372,10 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                             aria-controls="fixed-doc-listbox"
                             aria-autocomplete="list"
                             aria-haspopup="listbox"
+                            aria-activedescendant={showFixedDocDropdown && fixedDocResults.length > 0 ? `fixed-doc-opt-${Math.min(fixedDocHighlight, fixedDocResults.length - 1)}` : undefined}
                             type="text"
                             value={fixedDocSearch}
-                            onChange={e => setFixedDocSearch(e.target.value)}
+                            onChange={e => { setFixedDocSearch(e.target.value); setFixedDocHighlight(0) }}
                             placeholder="Search documents by name..."
                             style={{
                               width: '100%', padding: '7px 10px 7px 28px', fontSize: 12,
@@ -4376,9 +4387,16 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                             onKeyDown={e => {
                               if (e.key === 'Escape') {
                                 setShowFixedDocDropdown(false)
+                              } else if (e.key === 'ArrowDown') {
+                                e.preventDefault()
+                                setShowFixedDocDropdown(true)
+                                setFixedDocHighlight(h => Math.min(h + 1, fixedDocResults.length - 1))
+                              } else if (e.key === 'ArrowUp') {
+                                e.preventDefault()
+                                setFixedDocHighlight(h => Math.max(h - 1, 0))
                               } else if (e.key === 'Enter' && showFixedDocDropdown && fixedDocResults.length > 0) {
                                 e.preventDefault()
-                                addFixedDoc(fixedDocResults[0])
+                                addFixedDoc(fixedDocResults[Math.min(fixedDocHighlight, fixedDocResults.length - 1)])
                                 setFixedDocSearch('')
                                 setShowFixedDocDropdown(false)
                               }
@@ -4396,11 +4414,13 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                               <div style={{ padding: '7px 10px', fontSize: 12, color: '#6b7280' }}>
                                 No documents found
                               </div>
-                            ) : fixedDocResults.map(doc => (
+                            ) : fixedDocResults.map((doc, i) => (
                               <div
                                 key={doc.uuid}
+                                id={`fixed-doc-opt-${i}`}
                                 role="option"
-                                aria-selected={false}
+                                aria-selected={i === Math.min(fixedDocHighlight, fixedDocResults.length - 1)}
+                                onMouseEnter={() => setFixedDocHighlight(i)}
                                 onMouseDown={() => {
                                   addFixedDoc(doc)
                                   setFixedDocSearch('')
@@ -4409,9 +4429,8 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                                 style={{
                                   padding: '7px 10px', fontSize: 12, cursor: 'pointer',
                                   display: 'flex', alignItems: 'center', gap: 6,
+                                  backgroundColor: i === Math.min(fixedDocHighlight, fixedDocResults.length - 1) ? '#f3f4f6' : '#fff',
                                 }}
-                                onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#f3f4f6' }}
-                                onMouseLeave={e => { e.currentTarget.style.backgroundColor = '#fff' }}
                               >
                                 <FileText style={{ width: 13, height: 13, color: '#6b7280', flexShrink: 0 }} />
                                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -5243,7 +5262,7 @@ function BatchOutputCard({ batchStatus, running, runElapsed }: {
                   {item.document_title || item.session_id}
                 </span>
                 {itemRunning && item.current_step_name && (
-                  <span role="status" aria-live="polite" style={{ fontSize: 11, color: '#6b7280', flexShrink: 0 }}>{item.current_step_name}</span>
+                  <span style={{ fontSize: 11, color: '#6b7280', flexShrink: 0 }}>{item.current_step_name}</span>
                 )}
                 {itemDone && (
                   <ChevronDown style={{
@@ -7394,10 +7413,14 @@ function ValidateTab({
 
         {/* ---- Progress Display ---- */}
         {runPhase !== 'idle' && (
-          <div role="status" aria-live="polite" style={{
+          <div aria-live="off" style={{
             border: '1px solid #dbeafe', borderRadius: 10, padding: 20,
             backgroundColor: '#f0f5ff',
           }}>
+            {/* Single terse live region — announces the phase only, not the whole ticking panel */}
+            <span className="sr-only" role="status" aria-live="polite">
+              {runPhase === 'running' ? 'Running workflow' : 'Evaluating quality checks'}
+            </span>
             {/* Progress bar */}
             <div style={{
               height: 6, borderRadius: 3, backgroundColor: '#dbeafe',

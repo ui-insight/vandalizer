@@ -3445,20 +3445,20 @@ function ConfigTab() {
               <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>{editingModelIndex !== null ? 'Edit Model' : 'New Model'}</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
-                  <label style={labelStyle}>Model Name</label>
-                  <input value={newModel.name} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, name: v })) }} placeholder="gpt-4o" style={inputStyle} />
+                  <label htmlFor="admin-model-name" style={labelStyle}>Model Name</label>
+                  <input id="admin-model-name" value={newModel.name} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, name: v })) }} placeholder="gpt-4o" style={inputStyle} />
                 </div>
                 <div>
-                  <label style={labelStyle}>Tag</label>
-                  <input value={newModel.tag} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, tag: v })) }} placeholder="openai" style={inputStyle} />
+                  <label htmlFor="admin-model-tag" style={labelStyle}>Tag</label>
+                  <input id="admin-model-tag" value={newModel.tag} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, tag: v })) }} placeholder="openai" style={inputStyle} />
                 </div>
                 <div>
-                  <label style={labelStyle}>Endpoint (optional)</label>
-                  <input value={newModel.endpoint} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, endpoint: v })) }} placeholder="https://..." style={inputStyle} />
+                  <label htmlFor="admin-model-endpoint" style={labelStyle}>Endpoint (optional)</label>
+                  <input id="admin-model-endpoint" value={newModel.endpoint} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, endpoint: v })) }} placeholder="https://..." style={inputStyle} />
                 </div>
                 <div>
-                  <label style={labelStyle}>API Protocol</label>
-                  <select value={newModel.api_protocol} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, api_protocol: v })) }} style={inputStyle}>
+                  <label htmlFor="admin-model-protocol" style={labelStyle}>API Protocol</label>
+                  <select id="admin-model-protocol" value={newModel.api_protocol} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, api_protocol: v })) }} style={inputStyle}>
                     <option value="">Auto-detect</option>
                     <option value="openai">OpenAI</option>
                     <option value="anthropic">Anthropic</option>
@@ -3468,14 +3468,14 @@ function ConfigTab() {
                   </select>
                 </div>
                 <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={labelStyle}>API Key (optional)</label>
-                  <input type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore name="vandalizer-model-api-key" value={newModel.api_key} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, api_key: v })) }} placeholder="sk-..." style={inputStyle} />
+                  <label htmlFor="admin-model-apikey" style={labelStyle}>API Key (optional)</label>
+                  <input id="admin-model-apikey" type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore name="vandalizer-model-api-key" value={newModel.api_key} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, api_key: v })) }} placeholder="sk-..." style={inputStyle} />
                 </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 12 }}>
                 <div>
-                  <label style={labelStyle}>Speed</label>
-                  <select value={newModel.speed} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, speed: v })) }} style={inputStyle}>
+                  <label htmlFor="admin-model-speed" style={labelStyle}>Speed</label>
+                  <select id="admin-model-speed" value={newModel.speed} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, speed: v })) }} style={inputStyle}>
                     <option value="">Not set</option>
                     <option value="fast">Fast</option>
                     <option value="standard">Standard</option>
@@ -3483,8 +3483,8 @@ function ConfigTab() {
                   </select>
                 </div>
                 <div>
-                  <label style={labelStyle}>Tier</label>
-                  <select value={newModel.tier} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, tier: v })) }} style={inputStyle}>
+                  <label htmlFor="admin-model-tier" style={labelStyle}>Tier</label>
+                  <select id="admin-model-tier" value={newModel.tier} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, tier: v })) }} style={inputStyle}>
                     <option value="">Not set</option>
                     <option value="high">High</option>
                     <option value="standard">Standard</option>
@@ -3492,8 +3492,8 @@ function ConfigTab() {
                   </select>
                 </div>
                 <div>
-                  <label style={labelStyle}>Privacy</label>
-                  <select value={newModel.privacy} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, privacy: v })) }} style={inputStyle}>
+                  <label htmlFor="admin-model-privacy" style={labelStyle}>Privacy</label>
+                  <select id="admin-model-privacy" value={newModel.privacy} onChange={e => { const v = e.target.value; setNewModel(prev => ({ ...prev, privacy: v })) }} style={inputStyle}>
                     <option value="">Not set</option>
                     <option value="internal">Internal</option>
                     <option value="external">External</option>
@@ -3501,9 +3501,10 @@ function ConfigTab() {
                 </div>
               </div>
               <div style={{ marginTop: 12 }}>
-                <label style={labelStyle}>Context Window (tokens)</label>
+                <label htmlFor="admin-model-context-window" style={labelStyle}>Context Window (tokens)</label>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'stretch' }}>
                   <input
+                    id="admin-model-context-window"
                     type="number"
                     min={1}
                     value={newModel.context_window}
@@ -3613,8 +3614,9 @@ function ConfigTab() {
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 220px', gap: 16, alignItems: 'start' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
-                <label style={labelStyle}>System Prompt (optional)</label>
+                <label htmlFor="admin-playground-system" style={labelStyle}>System Prompt (optional)</label>
                 <textarea
+                  id="admin-playground-system"
                   value={playgroundSystem}
                   onChange={e => setPlaygroundSystem(e.target.value)}
                   placeholder="e.g. You are a helpful assistant. Reply concisely."
@@ -3623,8 +3625,9 @@ function ConfigTab() {
                 />
               </div>
               <div>
-                <label style={labelStyle}>User Prompt</label>
+                <label htmlFor="admin-playground-user" style={labelStyle}>User Prompt</label>
                 <textarea
+                  id="admin-playground-user"
                   value={playgroundUser}
                   onChange={e => setPlaygroundUser(e.target.value)}
                   placeholder="Ask anything. The text below will be sent verbatim to the selected model."
@@ -3635,8 +3638,9 @@ function ConfigTab() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div>
-                <label style={labelStyle}>Model</label>
+                <label htmlFor="admin-playground-model" style={labelStyle}>Model</label>
                 <select
+                  id="admin-playground-model"
                   value={playgroundModel}
                   onChange={e => setPlaygroundModel(e.target.value)}
                   style={inputStyle}
@@ -3821,8 +3825,9 @@ ${playgroundResult.request.user_prompt}`}
                         <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Edit Provider</div>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                           <div>
-                            <label style={labelStyle}>Type</label>
+                            <label htmlFor={`admin-oauth-edit-${i}-type`} style={labelStyle}>Type</label>
                             <select
+                              id={`admin-oauth-edit-${i}-type`}
                               value={editingProvider.provider}
                               onChange={e => setEditingProvider({ ...editingProvider, provider: e.target.value })}
                               style={inputStyle}
@@ -3833,25 +3838,25 @@ ${playgroundResult.request.user_prompt}`}
                             </select>
                           </div>
                           <div>
-                            <label style={labelStyle}>Display Name</label>
-                            <input value={editingProvider.display_name} onChange={e => setEditingProvider({ ...editingProvider, display_name: e.target.value })} style={inputStyle} />
+                            <label htmlFor={`admin-oauth-edit-${i}-display-name`} style={labelStyle}>Display Name</label>
+                            <input id={`admin-oauth-edit-${i}-display-name`} value={editingProvider.display_name} onChange={e => setEditingProvider({ ...editingProvider, display_name: e.target.value })} style={inputStyle} />
                           </div>
                           <div>
-                            <label style={labelStyle}>Client ID</label>
-                            <input value={editingProvider.client_id} onChange={e => setEditingProvider({ ...editingProvider, client_id: e.target.value })} style={inputStyle} />
+                            <label htmlFor={`admin-oauth-edit-${i}-client-id`} style={labelStyle}>Client ID</label>
+                            <input id={`admin-oauth-edit-${i}-client-id`} value={editingProvider.client_id} onChange={e => setEditingProvider({ ...editingProvider, client_id: e.target.value })} style={inputStyle} />
                           </div>
                           <div>
-                            <label style={labelStyle}>Client Secret</label>
-                            <input type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore name="vandalizer-oauth-client-secret-edit" value={editingProvider.client_secret} onChange={e => setEditingProvider({ ...editingProvider, client_secret: e.target.value })} style={inputStyle} placeholder="Leave as *** to keep existing" />
+                            <label htmlFor={`admin-oauth-edit-${i}-client-secret`} style={labelStyle}>Client Secret</label>
+                            <input id={`admin-oauth-edit-${i}-client-secret`} type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore name="vandalizer-oauth-client-secret-edit" value={editingProvider.client_secret} onChange={e => setEditingProvider({ ...editingProvider, client_secret: e.target.value })} style={inputStyle} placeholder="Leave as *** to keep existing" />
                           </div>
                           <div style={{ gridColumn: '1 / -1' }}>
-                            <label style={labelStyle}>Redirect URI</label>
-                            <input value={editingProvider.redirect_uri} onChange={e => setEditingProvider({ ...editingProvider, redirect_uri: e.target.value })} style={inputStyle} />
+                            <label htmlFor={`admin-oauth-edit-${i}-redirect-uri`} style={labelStyle}>Redirect URI</label>
+                            <input id={`admin-oauth-edit-${i}-redirect-uri`} value={editingProvider.redirect_uri} onChange={e => setEditingProvider({ ...editingProvider, redirect_uri: e.target.value })} style={inputStyle} />
                           </div>
                           {editingProvider.provider === 'azure' && (
                             <div style={{ gridColumn: '1 / -1' }}>
-                              <label style={labelStyle}>Tenant ID</label>
-                              <input value={editingProvider.tenant_id} onChange={e => setEditingProvider({ ...editingProvider, tenant_id: e.target.value })} style={inputStyle} />
+                              <label htmlFor={`admin-oauth-edit-${i}-tenant-id`} style={labelStyle}>Tenant ID</label>
+                              <input id={`admin-oauth-edit-${i}-tenant-id`} value={editingProvider.tenant_id} onChange={e => setEditingProvider({ ...editingProvider, tenant_id: e.target.value })} style={inputStyle} />
                             </div>
                           )}
                         </div>

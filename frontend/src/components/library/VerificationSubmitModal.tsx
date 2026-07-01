@@ -141,12 +141,12 @@ export function VerificationSubmitModal({ itemKind, itemId, itemTitle, onClose, 
                     ? 'bg-gray-900 text-white'
                     : i < stepIndex
                       ? 'text-green-600 hover:bg-green-50'
-                      : 'text-gray-400'
+                      : 'text-gray-500'
                 }`}
               >
                 {i + 1}. {s.label}
               </button>
-              {i < STEPS.length - 1 && <ChevronRight className="h-3 w-3 text-gray-300" />}
+              {i < STEPS.length - 1 && <ChevronRight className="h-3 w-3 text-gray-500" />}
             </div>
           ))}
         </div>

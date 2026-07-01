@@ -711,6 +711,7 @@ export function ExtractionEditorPanel() {
         ref={templateInputRef}
         type="file"
         accept=".pdf"
+        aria-label="Attach template PDF"
         style={{ display: 'none' }}
         onChange={(e) => {
           const f = e.target.files?.[0]
@@ -722,6 +723,7 @@ export function ExtractionEditorPanel() {
         ref={importDefInputRef}
         type="file"
         accept=".json"
+        aria-label="Import extraction definition JSON"
         style={{ display: 'none' }}
         onChange={async (e) => {
           const f = e.target.files?.[0]
@@ -1237,27 +1239,27 @@ function DesignTab({
             Document:
           </span>
           <div
-            role="tablist"
+            role="radiogroup"
             aria-labelledby="result-set-selector-label"
             style={{ display: 'flex', alignItems: 'center', gap: 6 }}
             onKeyDown={(e) => {
               let next = activeResultIdx
-              if (e.key === 'ArrowRight') next = (activeResultIdx + 1) % resultSets.length
-              else if (e.key === 'ArrowLeft') next = (activeResultIdx - 1 + resultSets.length) % resultSets.length
+              if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (activeResultIdx + 1) % resultSets.length
+              else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (activeResultIdx - 1 + resultSets.length) % resultSets.length
               else if (e.key === 'Home') next = 0
               else if (e.key === 'End') next = resultSets.length - 1
               else return
               e.preventDefault()
               onSetActiveResultIdx(next)
-              e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next]?.focus()
+              e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]')[next]?.focus()
             }}
           >
             {resultSets.map((_, i) => (
               <button
                 key={i}
                 type="button"
-                role="tab"
-                aria-selected={i === activeResultIdx}
+                role="radio"
+                aria-checked={i === activeResultIdx}
                 aria-label={`Document ${i + 1}`}
                 tabIndex={i === activeResultIdx ? 0 : -1}
                 onClick={() => onSetActiveResultIdx(i)}
@@ -1737,10 +1739,18 @@ function ToolCard({
   secondaryAction?: { label: string; onClick: () => void; disabled?: boolean }
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
+    <div
+      role="button"
+      tabIndex={disabled ? -1 : 0}
+      aria-disabled={disabled || undefined}
+      onClick={() => { if (!disabled) onClick() }}
+      onKeyDown={(e) => {
+        if (disabled) return
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onClick()
+        }
+      }}
       style={{
         display: 'flex',
         flexDirection: 'column',
@@ -1801,7 +1811,7 @@ function ToolCard({
           </span>
         </>
       )}
-    </button>
+    </div>
   )
 }
 
@@ -2136,20 +2146,20 @@ print(response.json())`
           Run this extraction via API
         </label>
           <div
-            role="tablist"
+            role="radiogroup"
             aria-label="API example language"
             style={{ display: 'flex', gap: 4 }}
             onKeyDown={(e) => {
-              if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+              if (e.key === 'ArrowRight' || e.key === 'ArrowLeft' || e.key === 'ArrowDown' || e.key === 'ArrowUp') {
                 e.preventDefault()
                 const next = lang === 'python' ? 'curl' : 'python'
                 setLang(next)
-                e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')[next === 'python' ? 0 : 1]?.focus()
+                e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]')[next === 'python' ? 0 : 1]?.focus()
               }
             }}
           >
-            <button type="button" role="tab" aria-selected={lang === 'python'} tabIndex={lang === 'python' ? 0 : -1} onClick={() => setLang('python')} style={tabStyle(lang === 'python')}>Python</button>
-            <button type="button" role="tab" aria-selected={lang === 'curl'} tabIndex={lang === 'curl' ? 0 : -1} onClick={() => setLang('curl')} style={tabStyle(lang === 'curl')}>cURL</button>
+            <button type="button" role="radio" aria-checked={lang === 'python'} tabIndex={lang === 'python' ? 0 : -1} onClick={() => setLang('python')} style={tabStyle(lang === 'python')}>Python</button>
+            <button type="button" role="radio" aria-checked={lang === 'curl'} tabIndex={lang === 'curl' ? 0 : -1} onClick={() => setLang('curl')} style={tabStyle(lang === 'curl')}>cURL</button>
           </div>
         </div>
 
@@ -2469,10 +2479,12 @@ function ValidationProgressDisplay({
   const modelName = (mode === 'two_pass' ? config.two_pass?.pass1?.model : config.one_pass?.model) || 'system default'
 
   return (
-    <div role="status" aria-live="polite" style={{
+    <div aria-live="off" style={{
       border: '1px solid #dbeafe', borderRadius: 10, padding: 20,
       backgroundColor: '#f0f5ff',
     }}>
+      {/* Single terse live region — announces the phase only, not the whole ticking panel */}
+      <span className="sr-only" role="status" aria-live="polite">{progress.phase}</span>
       {/* Progress bar */}
       <div
         role="progressbar"

@@ -111,6 +111,7 @@ export default function Workflows() {
             <input
               ref={fileInputRef}
               type="file"
+              aria-label="Upload files"
               accept=".json,application/json"
               className="hidden"
               onChange={e => {

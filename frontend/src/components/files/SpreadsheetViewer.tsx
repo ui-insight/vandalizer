@@ -297,7 +297,7 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
               {headers.length > 0 && (
                 <thead>
                   <tr>
-                    <th style={{
+                    <th scope="col" style={{
                       padding: '8px 12px', textAlign: 'center', fontSize: 11, fontWeight: 600,
                       color: '#6b7280', backgroundColor: '#f9fafb',
                       borderBottom: '2px solid #e5e7eb', borderRight: '1px solid #e5e7eb',
@@ -310,7 +310,7 @@ export function SpreadsheetViewer({ docUuid, processing, taskStatus: _taskStatus
                       const isMatch = matchIdx >= 0
                       const isCurrent = matchIdx === currentMatchIdx
                       return (
-                        <th key={i}
+                        <th key={i} scope="col"
                           data-cell-r={-1}
                           data-cell-c={i}
                           style={{

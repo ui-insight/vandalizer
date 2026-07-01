@@ -258,9 +258,18 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
               const badge = TRIGGER_BADGES[auto.trigger_type] || TRIGGER_BADGES.folder_watch
               const isRunning = activeIds.has(auto.id)
               return (
-                <button
+                <div
                   key={auto.id}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Open automation: ${auto.name}`}
                   onClick={() => openAutomation(auto.id)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      openAutomation(auto.id)
+                    }
+                  }}
                   style={{
                     display: 'block',
                     width: '100%',
@@ -334,10 +343,10 @@ export function AutomationsPanel({ activeIds = new Set<string>() }: { activeIds?
                       </span>
                     )}
                   </div>
-                  <div role="status" aria-live="polite" style={{ fontSize: 12, color: isRunning ? '#eab308' : '#999', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontSize: 12, color: isRunning ? '#eab308' : '#999', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {isRunning ? 'Running...' : getActionName(auto)}
                   </div>
-                </button>
+                </div>
               )
             })}
           </div>

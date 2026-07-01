@@ -251,7 +251,7 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
         aria-modal="true"
         aria-label="Add Documents"
         style={{
-          width: 560, maxHeight: '85vh',
+          width: 560, maxWidth: '100vw', maxHeight: '85vh',
           backgroundColor: '#1e1e1e', borderRadius: 12,
           border: dragActive ? '1px dashed var(--highlight-color, #eab308)' : '1px solid #3a3a3a',
           padding: 24,
@@ -296,6 +296,7 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
               ref={fileInputRef}
               type="file"
               multiple
+              aria-label="Upload files"
               accept={ACCEPT_ATTR}
               onChange={onFileInputChange}
               style={{ display: 'none' }}

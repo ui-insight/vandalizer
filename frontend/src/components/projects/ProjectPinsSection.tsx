@@ -99,12 +99,12 @@ export function ProjectPinsSection({ projectUuid, onChange, onOpen }: { projectU
             const Icon = meta.icon
             return (
               <div key={key(p)} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white p-3">
-                <Icon size={16} className="shrink-0 text-gray-400" />
+                <Icon size={16} className="shrink-0 text-gray-500" />
                 <button type="button" onClick={() => open(p)} className="min-w-0 flex-1 text-left">
                   <div className="truncate text-sm font-medium text-gray-900">{p.name}</div>
                   <div className="text-xs text-gray-500">{meta.label}</div>
                 </button>
-                <button type="button" onClick={() => unpin(p)} title="Unpin" aria-label="Unpin" className="p-1 text-gray-400 hover:text-red-500">
+                <button type="button" onClick={() => unpin(p)} title="Unpin" aria-label="Unpin" className="p-1 text-gray-500 hover:text-red-500">
                   <X size={14} />
                 </button>
               </div>
