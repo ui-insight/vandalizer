@@ -1158,7 +1158,7 @@ export default function Certification() {
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-200 text-sm"
                   style={{ borderRadius: 'var(--ui-radius, 12px)' }}
                 >
-                  <Award size={14} className="text-highlight" style={{ color: 'var(--highlight-color)' }} />
+                  <Award size={14} className="text-highlight-on-light" style={{ color: 'var(--highlight-on-light, #806600)' }} />
                   <span className="font-semibold text-gray-900">{completedCount}</span>
                   <span className="text-gray-500">/ 11 modules</span>
                 </div>
@@ -1166,7 +1166,7 @@ export default function Certification() {
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 border border-gray-200 text-sm"
                   style={{ borderRadius: 'var(--ui-radius, 12px)' }}
                 >
-                  <Zap size={14} className="text-highlight" style={{ color: 'var(--highlight-color)' }} />
+                  <Zap size={14} className="text-highlight-on-light" style={{ color: 'var(--highlight-on-light, #806600)' }} />
                   <span className="font-semibold text-gray-900">{displayXp}</span>
                   <span className="text-gray-500">/ {TOTAL_XP} XP</span>
                 </div>

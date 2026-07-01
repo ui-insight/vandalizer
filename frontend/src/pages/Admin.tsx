@@ -1469,16 +1469,16 @@ function TeamsTab() {
         }}
         style={{ display: 'flex', alignItems: 'center', gap: 4, background: '#f9fafb', borderRadius: 10, padding: 4, width: 'fit-content' }}
       >
-        <button type="button" role="tab" aria-selected={subTab === 'manage'} tabIndex={subTab === 'manage' ? 0 : -1} style={subTabStyle('manage')} onClick={() => setSubTab('manage')}>Manage Teams</button>
-        <button type="button" role="tab" aria-selected={subTab === 'stats'} tabIndex={subTab === 'stats' ? 0 : -1} style={subTabStyle('stats')} onClick={() => setSubTab('stats')}>Usage Stats</button>
-        <button type="button" role="tab" aria-selected={subTab === 'isolated'} tabIndex={subTab === 'isolated' ? 0 : -1} style={subTabStyle('isolated')} onClick={() => setSubTab('isolated')}>
+        <button type="button" role="tab" id="admin-teams-tab-manage" aria-controls="admin-teams-panel-manage" aria-selected={subTab === 'manage'} tabIndex={subTab === 'manage' ? 0 : -1} style={subTabStyle('manage')} onClick={() => setSubTab('manage')}>Manage Teams</button>
+        <button type="button" role="tab" id="admin-teams-tab-stats" aria-controls="admin-teams-panel-stats" aria-selected={subTab === 'stats'} tabIndex={subTab === 'stats' ? 0 : -1} style={subTabStyle('stats')} onClick={() => setSubTab('stats')}>Usage Stats</button>
+        <button type="button" role="tab" id="admin-teams-tab-isolated" aria-controls="admin-teams-panel-isolated" aria-selected={subTab === 'isolated'} tabIndex={subTab === 'isolated' ? 0 : -1} style={subTabStyle('isolated')} onClick={() => setSubTab('isolated')}>
           Isolated Users {isolatedLoaded && isolated.length > 0 ? `(${isolated.length})` : ''}
         </button>
       </div>
 
       {/* ── Manage Teams ─────────────────────────────────────────── */}
       {subTab === 'manage' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div role="tabpanel" id="admin-teams-panel-manage" aria-labelledby="admin-teams-tab-manage" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {/* Create team */}
           <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', padding: '16px 20px' }}>
             <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>Create New Team</div>
@@ -1640,7 +1640,7 @@ function TeamsTab() {
 
       {/* ── Usage Stats ──────────────────────────────────────────── */}
       {subTab === 'stats' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div role="tabpanel" id="admin-teams-panel-stats" aria-labelledby="admin-teams-tab-stats" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <TimeRangeSelector value={statsDays} onChange={setStatsDays} includeAll onRefresh={refreshStats} />
           </div>
@@ -1707,7 +1707,7 @@ function TeamsTab() {
 
       {/* ── Isolated Users ───────────────────────────────────────── */}
       {subTab === 'isolated' && (
-        <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
+        <div role="tabpanel" id="admin-teams-panel-isolated" aria-labelledby="admin-teams-tab-isolated" style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 'var(--ui-radius, 12px)', overflow: 'hidden' }}>
           <div style={{ padding: '14px 20px', borderBottom: '1px solid #e5e7eb', fontSize: 14, fontWeight: 600 }}>
             Isolated Users (only on their personal team) ({isolated.length})
           </div>

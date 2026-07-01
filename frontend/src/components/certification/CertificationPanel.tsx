@@ -113,7 +113,7 @@ function ValidationResults({ result, onDismiss }: { result: ValidationResult; on
           {result.passed && (
             <div className="flex gap-0.5">
               {Array.from({ length: 3 }).map((_, i) => (
-                <Star key={i} size={14} className={cn('transition-all duration-300', i < result.stars ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300')} />
+                <Star key={i} size={14} className={cn('transition-all duration-300', i < result.stars ? 'text-yellow-400 fill-yellow-400' : 'text-gray-400')} />
               ))}
             </div>
           )}

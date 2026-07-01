@@ -29,7 +29,7 @@ function Stars({ count, max = 3, size = 16 }: { count: number; max?: number; siz
           size={size}
           className={cn(
             'transition-all duration-300',
-            i < count ? 'text-yellow-400 fill-yellow-400' : 'text-gray-300',
+            i < count ? 'text-yellow-400 fill-yellow-400' : 'text-gray-400',
           )}
         />
       ))}
