@@ -151,6 +151,7 @@ export function AutomationEditorPanel() {
           {editingTitle ? (
             <input
               ref={titleInputRef}
+              aria-label="Automation name"
               value={titleValue}
               onChange={e => setTitleValue(e.target.value)}
               onBlur={handleTitleSave}
@@ -254,6 +255,7 @@ export function AutomationEditorPanel() {
         {/* Description */}
         <input
           type="text"
+          aria-label="Automation description"
           defaultValue={automation.description || ''}
           disabled={!canManage}
           onBlur={e => {
@@ -522,10 +524,11 @@ function FolderWatchConfig({ automation, onSave }: { automation: Automation; onS
 
   return (
     <div style={{ padding: '16px', marginBottom: 32, backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
-      <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>
+      <label htmlFor="automation-watch-folder" style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>
         Watch Folder
       </label>
       <select
+        id="automation-watch-folder"
         value={watchedFolder}
         onChange={e => onSave({ trigger_config: { ...config, folder_id: e.target.value || undefined } })}
         style={{
@@ -561,10 +564,11 @@ function FolderWatchConfig({ automation, onSave }: { automation: Automation; onS
         ))}
       </div>
 
-      <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>
+      <label htmlFor="automation-exclude-patterns" style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>
         Exclude Patterns
       </label>
       <input
+        id="automation-exclude-patterns"
         type="text"
         placeholder="e.g. draft*, temp_*"
         defaultValue={excludePatterns}
@@ -832,10 +836,11 @@ function OutputStorageCard({ automation, onSave }: { automation: Automation; onS
       {enabled && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 24 }}>
           <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
+            <label htmlFor="automation-storage-destination-folder" style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
               Destination Folder
             </label>
             <select
+              id="automation-storage-destination-folder"
               value={destinationFolder}
               onChange={e => updateStorage({ destination_folder: e.target.value })}
               style={{
@@ -852,10 +857,11 @@ function OutputStorageCard({ automation, onSave }: { automation: Automation; onS
           </div>
 
           <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
+            <label htmlFor="automation-storage-format" style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
               Format
             </label>
             <select
+              id="automation-storage-format"
               value={format}
               onChange={e => updateStorage({ format: e.target.value })}
               style={{
@@ -884,10 +890,11 @@ function OutputStorageCard({ automation, onSave }: { automation: Automation; onS
           </div>
 
           <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
+            <label htmlFor="automation-storage-file-naming" style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
               File Naming Pattern
             </label>
             <input
+              id="automation-storage-file-naming"
               type="text"
               defaultValue={fileNaming}
               onBlur={e => updateStorage({ file_naming: e.target.value })}
@@ -955,10 +962,11 @@ function OutputNotificationCard({ automation, onSave }: { automation: Automation
       {enabled && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 24 }}>
           <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
+            <label htmlFor="automation-notif-recipients" style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
               Recipients
             </label>
             <input
+              id="automation-notif-recipients"
               type="text"
               defaultValue={recipients}
               onBlur={e => updateNotification({ recipients_str: e.target.value })}
@@ -981,10 +989,11 @@ function OutputNotificationCard({ automation, onSave }: { automation: Automation
           </label>
 
           <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
+            <label htmlFor="automation-notif-conditions" style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
               Send when
             </label>
             <select
+              id="automation-notif-conditions"
               value={conditions}
               onChange={e => updateNotification({ conditions: e.target.value })}
               style={{

@@ -69,3 +69,34 @@ centralized where possible:
 
 Verification: `make ci` (frontend typecheck, lint, vitest, build) must pass;
 manual keyboard + screen-reader spot-checks on auth, chat, Admin, and modals.
+
+---
+
+## Pass-1 remediation status
+
+| ID | Status | Notes |
+|----|--------|-------|
+| C1 | ✅ Fixed | Login + Landing forms: labels, `type=email`, `autocomplete`, `role=alert` errors |
+| C2 | ✅ Fixed | Toast container `role=status/alert` + `aria-live` |
+| C3 | ✅ Fixed | Chat streaming status live region |
+| S1 | ✅ Fixed | Label association across knowledge modals, ApiKeysTab, AutomationEditorPanel |
+| S2 | ◐ Partial | **Contrast.** Added `contrastRatio()` + real-contrast `getContrastTextColor()` (M2). Remaining: brand highlight used as text-on-light (ChatPanel banner/labels, `--highlight-color` default ≈1.7:1 on white) needs a derived "highlight-on-light" design token, and a systematic gray-on-white sweep. **Recommend completing via automated tooling (axe-core / Lighthouse CI) rather than manual hunting** — carried into the pass-1 verification step / pass 2. |
+| S3 | ✅ Fixed | Skip link + `<main>` in WorkspaceLayout & PageLayout |
+| S4 | ✅ Fixed | focus-trap-react on ConfirmDialog + 9 modals (`displayCheck:'none'` for jsdom) |
+| S5 | ✅ Fixed | Focus-visible rings on search inputs + library filter selects |
+| S6 | ✅ Fixed | Per-route `document.title` via RouteTitle |
+| S7 | ✅ Fixed | Admin user/team/event rows keyboard-operable |
+| S8 | ✅ Fixed | Login/chat errors `role=alert` + `aria-describedby`/`aria-invalid` |
+| S9 | ✅ Fixed | aria-labels on icon-only buttons (attachments, banners, library) |
+| S10 | ✅ Fixed | Toggle `role=switch`; ModelEffortPicker radiogroup; Admin nav `aria-current` |
+| M1 | ✅ Fixed | ExploreTab quality tier: sr-only text |
+| M2 | ✅ Fixed | Real WCAG contrast-ratio text-color selection |
+| M3 | ✅ Fixed | 7 `window.confirm` → styled `useConfirm` |
+| M4 | ✅ Fixed | TeamsDropdown menuitem roles + roving keyboard nav + focus restore |
+| M5 | ✅ Fixed | Landing `<h1>` |
+| m1 | ✅ Fixed | CelebrationOverlay closes on Escape |
+| m2 | ○ Deferred | AutomationEditorPanel blur-save — borderline 3.2.2; left as-is |
+| m3 | ○ Out of scope | Unsanitized `dangerouslySetInnerHTML` — security, tracked separately from WCAG |
+
+**Everything except S2 (contrast) is complete and verified** (`make ci` green). S2 has its foundation in place; finishing it accurately calls for automated contrast measurement — planned as the first task of Pass 2.
+

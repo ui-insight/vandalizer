@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Award, Sparkles, Star, Zap } from 'lucide-react'
 import { cn } from '../../lib/cn'
 import type { CompletionResult } from '../../types/certification'
@@ -42,6 +43,12 @@ export function CelebrationOverlay({
   tierCelebration?: { tierName: string; message: string } | null
 }) {
   const levelConfig = LEVEL_CONFIG[result.level] || LEVEL_CONFIG.novice
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onDismiss() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onDismiss])
 
   return (
     <div className="fixed inset-0 z-[9998] flex items-center justify-center" onClick={onDismiss}>

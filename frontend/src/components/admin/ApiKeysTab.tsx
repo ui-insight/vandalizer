@@ -450,9 +450,10 @@ function CreateKeyModal({
         }}>{err}</div>
       )}
 
-      <label style={{ display: 'block', marginBottom: 12 }}>
+      <label htmlFor="apikey-name" style={{ display: 'block', marginBottom: 12 }}>
         <span style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Name</span>
         <input
+          id="apikey-name"
           type="text"
           value={name}
           onChange={e => setName(e.target.value)}
@@ -461,9 +462,10 @@ function CreateKeyModal({
         />
       </label>
 
-      <label style={{ display: 'block', marginBottom: 12 }}>
+      <label htmlFor="apikey-description" style={{ display: 'block', marginBottom: 12 }}>
         <span style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Description (optional)</span>
         <input
+          id="apikey-description"
           type="text"
           value={description}
           onChange={e => setDescription(e.target.value)}
@@ -515,11 +517,12 @@ function CreateKeyModal({
         </p>
       </div>
 
-      <label style={{ display: 'block', marginBottom: 16 }}>
+      <label htmlFor="apikey-expires-at" style={{ display: 'block', marginBottom: 16 }}>
         <span style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
           Expires at (optional)
         </span>
         <input
+          id="apikey-expires-at"
           type="datetime-local"
           value={expiresAt}
           onChange={e => setExpiresAt(e.target.value)}
