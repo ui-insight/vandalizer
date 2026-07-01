@@ -48,7 +48,7 @@ export function CreateKBModal({ onClose, onCreate }: CreateKBModalProps) {
         display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
       }}
     >
-      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false }}>
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
       <div
         role="dialog"
         aria-modal="true"

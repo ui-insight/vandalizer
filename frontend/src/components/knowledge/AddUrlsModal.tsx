@@ -40,7 +40,7 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
       }}
       onClick={onClose}
     >
-      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false }}>
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
       <div
         role="dialog"
         aria-modal="true"

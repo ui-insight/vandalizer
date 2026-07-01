@@ -62,7 +62,7 @@ export function MoveFolderDialog({ folder, onSubmit, onClose }: MoveFolderDialog
         if (e.key === 'Escape') onClose()
       }}
     >
-      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false }}>
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
       <div
         className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl"
         role="dialog"

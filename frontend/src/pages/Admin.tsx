@@ -997,7 +997,7 @@ function UsersTab() {
             </thead>
             <tbody>
               {filtered.map((u, i) => (
-                <tr key={u.user_id} onClick={() => setSelectedUserId(u.user_id)} style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#f9fafb')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = '')}>
+                <tr key={u.user_id} tabIndex={0} role="button" aria-label={`View ${u.user_id}`} onClick={() => setSelectedUserId(u.user_id)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedUserId(u.user_id) } }} style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#f9fafb')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = '')}>
                   <td style={{ padding: '12px 16px', fontSize: 14, fontWeight: 600, color: '#9ca3af' }}>{i + 1}</td>
                   <td style={{ padding: '12px 16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -1644,7 +1644,7 @@ function TeamsTab() {
                 </thead>
                 <tbody>
                   {filteredStats.map((t) => (
-                    <tr key={t.team_id} onClick={() => setSelectedTeamId(t.team_id)} style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#f9fafb')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = '')}>
+                    <tr key={t.team_id} tabIndex={0} role="button" aria-label={`View team ${t.name || t.team_id}`} onClick={() => setSelectedTeamId(t.team_id)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedTeamId(t.team_id) } }} style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }} onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#f9fafb')} onMouseLeave={e => (e.currentTarget.style.backgroundColor = '')}>
                       <td style={{ padding: '12px 16px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                           <div style={{ width: 32, height: 32, borderRadius: 'var(--ui-radius, 12px)', backgroundColor: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -1832,7 +1832,7 @@ function WorkflowsTab() {
                 {data.items.map(ev => {
                   const isExpanded = expandedId === ev.id
                   return (
-                    <tr key={ev.id} style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }} onClick={() => setExpandedId(isExpanded ? null : ev.id)}>
+                    <tr key={ev.id} tabIndex={0} role="button" aria-expanded={isExpanded} aria-label="Toggle event details" onClick={() => setExpandedId(isExpanded ? null : ev.id)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedId(isExpanded ? null : ev.id) } }} style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer' }}>
                       <td style={{ padding: '10px 8px', textAlign: 'center' }}>
                         {isExpanded ? <ChevronDown size={14} color="#6b7280" /> : <ChevronRight size={14} color="#9ca3af" />}
                       </td>
@@ -7191,7 +7191,7 @@ export default function Admin() {
     <PageLayout>
       <div style={{ display: 'flex', gap: 0, minHeight: 'calc(100vh - 130px)' }}>
         {/* Sidebar */}
-        <nav style={{
+        <nav aria-label="Admin sections" style={{
           width: 220, flexShrink: 0,
           borderRight: '1px solid #e5e7eb',
           backgroundColor: '#fff',
@@ -7211,6 +7211,8 @@ export default function Admin() {
               return (
                 <button
                   key={tab.key}
+                  type="button"
+                  aria-current={isActive ? 'page' : undefined}
                   onClick={() => setActiveTab(tab.key)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: 10,
