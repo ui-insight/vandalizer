@@ -11,6 +11,10 @@ from __future__ import annotations
 import datetime
 import re
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+from fastapi import HTTPException
 
 from app.services.support_service import (
     _build_search_clause,
@@ -489,3 +493,108 @@ class TestViewStripping:
         assert "messages" not in out
         assert "tags" not in out
         assert out["last_message_preview"] == "customer ping"
+
+
+class TestUpdateTicketSubject:
+    """Editing a filed ticket's subject: service applies a cleaned value, and
+    the router lets the owner (or support) do it while keeping the other
+    fields support-only."""
+
+    def _ticket(self, **over):
+        base = dict(subject="Old", user_id="alice", uuid="t1",
+                    tags=[], closed_at=None, save=AsyncMock())
+        base.update(over)
+        return SimpleNamespace(**base)
+
+    def _fake_model(self, ticket):
+        # SupportTicket.uuid is accessed to build the find_one query, which
+        # raises without init_beanie — a MagicMock stands in for the whole
+        # model (field access → sentinel, find_one → our ticket).
+        model = MagicMock()
+        model.find_one = AsyncMock(return_value=ticket)
+        return model
+
+    async def test_service_sets_trimmed_subject(self):
+        from app.services import support_service
+        ticket = self._ticket()
+        with (
+            patch.object(support_service, "SupportTicket", self._fake_model(ticket)),
+            patch.object(support_service, "_ticket_to_dict",
+                         AsyncMock(return_value={"ok": True})),
+        ):
+            out = await support_service.update_ticket("t1", subject="  New title  ")
+        assert ticket.subject == "New title"
+        ticket.save.assert_awaited_once()
+        assert out == {"ok": True}
+
+    async def test_service_ignores_blank_subject(self):
+        from app.services import support_service
+        ticket = self._ticket()
+        with (
+            patch.object(support_service, "SupportTicket", self._fake_model(ticket)),
+            patch.object(support_service, "_ticket_to_dict",
+                         AsyncMock(return_value={})),
+        ):
+            await support_service.update_ticket("t1", subject="   ")
+        assert ticket.subject == "Old"  # unchanged
+
+    async def test_router_owner_can_edit_subject(self):
+        from app.routers import support as support_router
+        body = support_router.UpdateTicketRequest(subject="New title")
+        user = SimpleNamespace(user_id="alice", is_admin=False)
+        update_mock = AsyncMock(return_value={"uuid": "t1", "subject": "New title"})
+        with (
+            patch.object(support_router.support_service, "get_ticket",
+                         AsyncMock(return_value={"user_id": "alice"})),
+            patch.object(support_router, "_is_support_user",
+                         AsyncMock(return_value=False)),
+            patch.object(support_router.support_service, "update_ticket", update_mock),
+            patch.object(support_router, "_view", lambda payload, is_support: payload),
+        ):
+            out = await support_router.update_ticket("t1", body, user)
+        assert out["subject"] == "New title"
+        update_mock.assert_awaited_once()
+        assert update_mock.call_args.kwargs["subject"] == "New title"
+
+    async def test_router_stranger_cannot_edit_subject(self):
+        from app.routers import support as support_router
+        body = support_router.UpdateTicketRequest(subject="Hacked")
+        user = SimpleNamespace(user_id="eve", is_admin=False)
+        with (
+            patch.object(support_router.support_service, "get_ticket",
+                         AsyncMock(return_value={"user_id": "alice"})),
+            patch.object(support_router, "_is_support_user",
+                         AsyncMock(return_value=False)),
+        ):
+            with pytest.raises(HTTPException) as exc:
+                await support_router.update_ticket("t1", body, user)
+        assert exc.value.status_code == 403
+
+    async def test_router_owner_cannot_change_status(self):
+        """Subject is owner-editable, but status stays support-only."""
+        from app.routers import support as support_router
+        body = support_router.UpdateTicketRequest(status="closed")
+        user = SimpleNamespace(user_id="alice", is_admin=False)  # owner, not support
+        with (
+            patch.object(support_router.support_service, "get_ticket",
+                         AsyncMock(return_value={"user_id": "alice"})),
+            patch.object(support_router, "_is_support_user",
+                         AsyncMock(return_value=False)),
+        ):
+            with pytest.raises(HTTPException) as exc:
+                await support_router.update_ticket("t1", body, user)
+        assert exc.value.status_code == 403
+
+    async def test_router_rejects_blank_subject(self):
+        from app.routers import support as support_router
+        body = support_router.UpdateTicketRequest(subject="   ")
+        user = SimpleNamespace(user_id="alice", is_admin=False)
+        with (
+            patch.object(support_router.support_service, "get_ticket",
+                         AsyncMock(return_value={"user_id": "alice"})),
+            patch.object(support_router, "_is_support_user",
+                         AsyncMock(return_value=False)),
+        ):
+            with pytest.raises(HTTPException) as exc:
+                await support_router.update_ticket("t1", body, user)
+        assert exc.value.status_code == 400
