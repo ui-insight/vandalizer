@@ -113,6 +113,54 @@ class TestAutomationStatsRoute:
         assert "start_time" in query
 
     @pytest.mark.asyncio
+    async def test_automation_stats_handles_naive_start_times(self, client):
+        """MongoDB returns datetimes tz-naive, so start_time comes back without
+        tzinfo. Comparing that to an aware ``now`` must not 500 (regression:
+        'can't compare offset-naive and offset-aware datetimes')."""
+        user = _make_user("viewer")
+        cookies, headers = _auth("viewer")
+        # Naive UTC, exactly as Beanie reads them back from Mongo.
+        now_naive = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+        visible_workflows = [SimpleNamespace(id="wf-1", input_config={})]
+        recent_results = [
+            SimpleNamespace(
+                id="run-1", workflow="wf-1", status="completed", trigger_type="manual",
+                is_passive=True, start_time=now_naive,
+                num_steps_completed=1, num_steps_total=1,
+            ),
+            SimpleNamespace(
+                id="run-2", workflow="wf-1", status="error", trigger_type="folder_watch",
+                is_passive=True, start_time=now_naive - datetime.timedelta(days=3),
+                num_steps_completed=0, num_steps_total=1,
+            ),
+        ]
+        mock_find = MagicMock()
+        mock_find.limit.return_value.to_list = AsyncMock(return_value=recent_results)
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "viewer", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch(
+                "app.routers.config.workflow_service.list_workflows",
+                new_callable=AsyncMock,
+            ) as mock_list_workflows,
+            patch("app.routers.config.WorkflowResult") as MockWorkflowResult,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_list_workflows.return_value = visible_workflows
+            MockWorkflowResult.find.return_value = mock_find
+
+            resp = await client.get("/api/config/automation-stats", cookies=cookies, headers=headers)
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["runs_today"] == 1
+        assert data["runs_today_failed"] == 0
+        assert data["runs_this_week"] == 2
+        # Sort (also naive/aware-sensitive) puts the newer run first.
+        assert data["recent_runs"][0]["id"] == "run-1"
+
+    @pytest.mark.asyncio
     async def test_automation_stats_skip_recent_run_query_without_visible_workflows(self, client):
         user = _make_user("viewer")
         cookies, headers = _auth("viewer")
