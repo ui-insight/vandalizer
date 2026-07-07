@@ -563,6 +563,9 @@ function ChatView({
   const [editingMessageUuid, setEditingMessageUuid] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState('')
   const [savingEdit, setSavingEdit] = useState(false)
+  const [editingSubject, setEditingSubject] = useState(false)
+  const [subjectDraft, setSubjectDraft] = useState('')
+  const [savingSubject, setSavingSubject] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const messageRef = useRef<HTMLTextAreaElement>(null)
@@ -726,6 +729,32 @@ function ChatView({
     }
   }
 
+  const startEditSubject = () => {
+    if (!ticket) return
+    setSubjectDraft(ticket.subject)
+    setEditingSubject(true)
+  }
+
+  const saveSubject = async () => {
+    if (!ticket) return
+    const trimmed = subjectDraft.trim()
+    if (!trimmed || trimmed === ticket.subject) {
+      setEditingSubject(false)
+      return
+    }
+    setSavingSubject(true)
+    try {
+      const updated = await supportApi.updateTicket(ticketUuid, { subject: trimmed })
+      setTicket(updated)
+      setEditingSubject(false)
+      onTicketUpdated()
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to update subject', 'error')
+    } finally {
+      setSavingSubject(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex flex-1 items-center justify-center">
@@ -755,12 +784,47 @@ function ChatView({
             <ArrowLeft className="h-4 w-4" />
           </button>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-gray-900">
-              {ticket.ticket_number != null && (
-                <span className="mr-1 font-mono text-[11px] text-gray-400">#{ticket.ticket_number}</span>
-              )}
-              {ticket.subject}
-            </p>
+            {editingSubject ? (
+              <div className="flex items-center gap-1">
+                {ticket.ticket_number != null && (
+                  <span className="font-mono text-[11px] text-gray-400">#{ticket.ticket_number}</span>
+                )}
+                <input
+                  autoFocus
+                  value={subjectDraft}
+                  onChange={e => setSubjectDraft(e.target.value)}
+                  onBlur={saveSubject}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') { e.preventDefault(); saveSubject() }
+                    if (e.key === 'Escape') setEditingSubject(false)
+                  }}
+                  maxLength={200}
+                  disabled={savingSubject}
+                  aria-label="Edit ticket subject"
+                  className="min-w-0 flex-1 rounded border border-gray-300 px-1.5 py-0.5 text-sm font-medium text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-60"
+                />
+              </div>
+            ) : (
+              <div className="flex items-center gap-1">
+                <p className="truncate text-sm font-medium text-gray-900">
+                  {ticket.ticket_number != null && (
+                    <span className="mr-1 font-mono text-[11px] text-gray-400">#{ticket.ticket_number}</span>
+                  )}
+                  {ticket.subject}
+                </p>
+                {(isSupportAgent || ticket.user_id === user?.user_id) && (
+                  <button
+                    type="button"
+                    onClick={startEditSubject}
+                    aria-label="Edit subject"
+                    title="Edit subject"
+                    className="rounded p-0.5 text-gray-300 hover:bg-gray-100 hover:text-gray-500"
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <StatusIcon className={`h-3 w-3 ${
                 ticket.status === 'closed' ? 'text-gray-400' : ticket.status === 'in_progress' ? 'text-blue-500' : 'text-yellow-500'

@@ -137,3 +137,79 @@ class TestAutomationStatsRoute:
         assert data["runs_this_week"] == 0
         assert data["recent_runs"] == []
         MockWorkflowResult.find.assert_not_called()
+
+
+class TestThemeRoute:
+    @pytest.mark.asyncio
+    async def test_get_theme_includes_icon_hide_in_nav(self, client):
+        cfg = SimpleNamespace(
+            highlight_color="#eab308",
+            ui_radius="12px",
+            org_name="Acme",
+            logo_data_url="",
+            icon_data_url="data:image/png;base64,AAAA",
+            icon_hide_in_nav=True,
+        )
+        with patch("app.routers.config.SystemConfig") as MockSC:
+            MockSC.get_config = AsyncMock(return_value=cfg)
+            resp = await client.get("/api/config/theme")
+
+        assert resp.status_code == 200
+        assert resp.json()["icon_hide_in_nav"] is True
+
+    @pytest.mark.asyncio
+    async def test_update_theme_persists_icon_hide_in_nav(self, client):
+        admin = _make_user("admin")
+        admin.is_admin = True
+        cookies, headers = _auth("admin")
+        cfg = SimpleNamespace(
+            highlight_color="#eab308",
+            ui_radius="12px",
+            org_name="",
+            logo_data_url="",
+            icon_data_url="",
+            icon_hide_in_nav=False,
+            updated_at=None,
+            updated_by=None,
+        )
+        cfg.save = AsyncMock()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.config.SystemConfig") as MockSC,
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockSC.get_config = AsyncMock(return_value=cfg)
+
+            resp = await client.put(
+                "/api/config/theme",
+                json={"icon_hide_in_nav": True},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.json()["icon_hide_in_nav"] is True
+        assert cfg.icon_hide_in_nav is True
+        cfg.save.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_update_theme_requires_admin(self, client):
+        user = _make_user("viewer")  # is_admin defaults to False
+        cookies, headers = _auth("viewer")
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "viewer", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+
+            resp = await client.put(
+                "/api/config/theme",
+                json={"icon_hide_in_nav": True},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 403

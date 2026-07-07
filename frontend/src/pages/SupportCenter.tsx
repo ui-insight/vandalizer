@@ -759,6 +759,9 @@ function ChatView({
   const [editingMessageUuid, setEditingMessageUuid] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState('')
   const [savingEdit, setSavingEdit] = useState(false)
+  const [editingSubject, setEditingSubject] = useState(false)
+  const [subjectDraft, setSubjectDraft] = useState('')
+  const [savingSubject, setSavingSubject] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const replyRef = useRef<HTMLTextAreaElement>(null)
@@ -845,6 +848,31 @@ function ChatView({
     }
   }
 
+  const startEditSubject = () => {
+    if (!ticket) return
+    setSubjectDraft(ticket.subject)
+    setEditingSubject(true)
+  }
+
+  const saveSubject = async () => {
+    if (!ticket) return
+    const trimmed = subjectDraft.trim()
+    if (!trimmed || trimmed === ticket.subject) {
+      setEditingSubject(false)
+      return
+    }
+    setSavingSubject(true)
+    try {
+      const updated = await supportApi.updateTicket(ticketUuid, { subject: trimmed })
+      setTicket(updated)
+      setEditingSubject(false)
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Could not update subject', 'error')
+    } finally {
+      setSavingSubject(false)
+    }
+  }
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const picked = Array.from(e.target.files ?? [])
     if (fileInputRef.current) fileInputRef.current.value = ''
@@ -925,19 +953,67 @@ function ChatView({
         {/* Header with requester + status controls */}
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap' }}>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {ticket.ticket_number != null && (
-                <span
-                  style={{
-                    fontSize: 13, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                    color: '#6b7280', marginRight: 8,
+            {editingSubject ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                {ticket.ticket_number != null && (
+                  <span
+                    style={{
+                      fontSize: 13, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                      color: '#6b7280',
+                    }}
+                  >
+                    #{ticket.ticket_number}
+                  </span>
+                )}
+                <input
+                  autoFocus
+                  value={subjectDraft}
+                  onChange={e => setSubjectDraft(e.target.value)}
+                  onBlur={saveSubject}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') { e.preventDefault(); saveSubject() }
+                    if (e.key === 'Escape') setEditingSubject(false)
                   }}
-                >
-                  #{ticket.ticket_number}
-                </span>
-              )}
-              {ticket.subject}
-            </h3>
+                  maxLength={200}
+                  disabled={savingSubject}
+                  aria-label="Edit ticket subject"
+                  style={{
+                    flex: 1, minWidth: 0, fontSize: 16, fontWeight: 600,
+                    padding: '2px 6px', border: '1px solid #d1d5db', borderRadius: 6,
+                  }}
+                />
+              </div>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {ticket.ticket_number != null && (
+                    <span
+                      style={{
+                        fontSize: 13, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                        color: '#6b7280', marginRight: 8,
+                      }}
+                    >
+                      #{ticket.ticket_number}
+                    </span>
+                  )}
+                  {ticket.subject}
+                </h3>
+                {!!user && (user.is_support_agent || ticket.user_id === user.user_id) && (
+                  <button
+                    type="button"
+                    onClick={startEditSubject}
+                    aria-label="Edit subject"
+                    title="Edit subject"
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', padding: 4,
+                      border: 'none', background: 'transparent', color: '#9ca3af', cursor: 'pointer',
+                    }}
+                  >
+                    <Pencil size={14} />
+                  </button>
+                )}
+              </div>
+            )}
             <div style={{ fontSize: 13, color: '#6b7280', marginTop: 4 }}>
               {ticket.user_name || ticket.user_id}
               {ticket.user_email ? ` (${ticket.user_email})` : ''}
