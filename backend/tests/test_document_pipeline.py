@@ -119,9 +119,11 @@ class TestExtractTextFromFilePlainFormats:
         # Caller may pass ".txt" or "TXT" or "txt"
         assert extract_text_from_file(path, ".TXT") == "plain"
 
-    def test_missing_file_returns_error_marker_not_raise(self):
+    def test_missing_file_returns_empty_not_raise(self):
+        # A missing source file is benign (deleted mid-processing / stale
+        # path): empty text, no raise, no error-marker masquerading as content.
         result = extract_text_from_file("/does/not/exist.txt", "txt")
-        assert result.startswith("[Error extracting content")
+        assert result == ""
 
 
 class TestExtractTextFromFileFallback:
