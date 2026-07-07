@@ -357,3 +357,151 @@ class TestKbIngestUrl:
         error_call = [c for c in calls if c[0][1].get("$set", {}).get("status") == "error"]
         assert len(error_call) == 1
         assert "Network down" in error_call[0][0][1]["$set"]["error_message"]
+
+
+# ---------------------------------------------------------------------------
+# kb_ingest_document idempotency
+# ---------------------------------------------------------------------------
+
+
+class TestKbIngestIdempotency:
+    @patch("app.services.document_manager.get_document_manager")
+    @patch("app.tasks.knowledge_base_tasks._get_db")
+    def test_deletes_stale_chunks_before_adding(self, mock_get_db, mock_get_dm):
+        """A Celery autoretry after a partial run must not double-add chunks."""
+        from app.tasks.knowledge_base_tasks import kb_ingest_document
+
+        db = MagicMock()
+        mock_get_db.return_value = db
+        db.knowledge_base_sources.find_one.return_value = _make_source()
+        db.smart_document.find_one.return_value = _make_doc()
+        db.knowledge_base_sources.find.return_value = []
+
+        dm = MagicMock()
+        dm.add_to_kb.return_value = 5
+        mock_get_dm.return_value = dm
+
+        kb_ingest_document("src-uuid")
+
+        method_order = [c[0] for c in dm.method_calls]
+        assert method_order.index("delete_kb_source") < method_order.index("add_to_kb")
+        dm.delete_kb_source.assert_called_once_with("kb-uuid", "src-uuid")
+
+
+# ---------------------------------------------------------------------------
+# kb_reingest
+# ---------------------------------------------------------------------------
+
+
+class TestKbReingest:
+    def _db(self, kb, sources, doc=None):
+        db = MagicMock()
+        db.knowledge_bases.find_one.return_value = kb
+        db.knowledge_base_sources.find.return_value = sources
+        db.smart_document.find_one.return_value = doc
+        return db
+
+    @patch("app.services.document_manager.get_document_manager")
+    @patch("app.tasks.knowledge_base_tasks._get_db")
+    def test_explicit_kb_rechunks_document_under_source_uuid(self, mock_get_db, mock_get_dm):
+        from app.tasks.knowledge_base_tasks import kb_reingest
+
+        source = _make_source(source_type="document")
+        db = self._db({"uuid": "kb-uuid", "implicit": False}, [source], _make_doc())
+        # _recalculate_kb also calls .find; return the source list both times.
+        db.knowledge_base_sources.find.return_value = [source]
+        mock_get_db.return_value = db
+        dm = MagicMock()
+        dm.add_to_kb.return_value = 7
+        mock_get_dm.return_value = dm
+
+        kb_reingest("kb-uuid")
+
+        method_order = [c[0] for c in dm.method_calls]
+        assert method_order.index("delete_kb_source") < method_order.index("add_to_kb")
+        dm.add_to_kb.assert_called_once_with(
+            kb_uuid="kb-uuid",
+            source_id="src-uuid",
+            source_name="test.pdf",
+            raw_text="Some document text content.",
+            text_markers=[],
+        )
+        ready_calls = [
+            c for c in db.knowledge_base_sources.update_one.call_args_list
+            if c[0][1].get("$set", {}).get("status") == "ready"
+        ]
+        assert ready_calls and ready_calls[0][0][1]["$set"]["chunk_count"] == 7
+
+    @patch("app.services.document_manager.get_document_manager")
+    @patch("app.tasks.knowledge_base_tasks._get_db")
+    def test_implicit_project_kb_keeps_document_uuid_convention(self, mock_get_db, mock_get_dm):
+        from app.tasks.knowledge_base_tasks import kb_reingest
+
+        source = _make_source(source_type="document")
+        db = self._db({"uuid": "kb-uuid", "implicit": True}, [source], _make_doc())
+        mock_get_db.return_value = db
+        dm = MagicMock()
+        dm.add_to_kb.return_value = 3
+        mock_get_dm.return_value = dm
+
+        kb_reingest("kb-uuid")
+
+        # Project KBs key chunks by document uuid; both id conventions cleared.
+        assert dm.add_to_kb.call_args.kwargs["source_id"] == "doc-uuid"
+        deleted = {c.args for c in dm.delete_kb_source.call_args_list}
+        assert ("kb-uuid", "src-uuid") in deleted
+        assert ("kb-uuid", "doc-uuid") in deleted
+
+    @patch("app.services.document_manager.get_document_manager")
+    @patch("app.tasks.knowledge_base_tasks._get_db")
+    def test_url_source_rechunks_from_stored_content(self, mock_get_db, mock_get_dm):
+        from app.tasks.knowledge_base_tasks import kb_reingest
+
+        source = _make_source(
+            document_uuid=None, source_type="url",
+            url="https://x.test/page", url_title="Page Title",
+            content="stored page content",
+        )
+        db = self._db({"uuid": "kb-uuid", "implicit": False}, [source])
+        mock_get_db.return_value = db
+        dm = MagicMock()
+        dm.add_to_kb.return_value = 2
+        mock_get_dm.return_value = dm
+
+        kb_reingest("kb-uuid")
+
+        dm.add_to_kb.assert_called_once_with(
+            kb_uuid="kb-uuid",
+            source_id="src-uuid",
+            source_name="Page Title",
+            raw_text="stored page content",
+            text_markers=[],
+        )
+
+    @patch("app.services.document_manager.get_document_manager")
+    @patch("app.tasks.knowledge_base_tasks._get_db")
+    def test_source_without_stored_text_is_left_untouched(self, mock_get_db, mock_get_dm):
+        from app.tasks.knowledge_base_tasks import kb_reingest
+
+        source = _make_source(source_type="document")
+        db = self._db({"uuid": "kb-uuid", "implicit": False}, [source], None)
+        mock_get_db.return_value = db
+        dm = MagicMock()
+        mock_get_dm.return_value = dm
+
+        kb_reingest("kb-uuid")
+
+        dm.add_to_kb.assert_not_called()
+        dm.delete_kb_source.assert_not_called()
+
+    @patch("app.tasks.knowledge_base_tasks._get_db")
+    def test_missing_kb_returns_early(self, mock_get_db):
+        from app.tasks.knowledge_base_tasks import kb_reingest
+
+        db = MagicMock()
+        db.knowledge_bases.find_one.return_value = None
+        mock_get_db.return_value = db
+
+        kb_reingest("kb-missing")
+
+        db.knowledge_base_sources.find.assert_not_called()

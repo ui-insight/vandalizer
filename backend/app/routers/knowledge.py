@@ -926,6 +926,28 @@ async def _require_manageable_kb(uuid: str, user: User, user_org_ancestry: list[
     raise HTTPException(status_code=404, detail="Knowledge base not found")
 
 
+@router.post("/{uuid}/reingest")
+async def reingest_knowledge_base(
+    uuid: str,
+    user: User = Depends(get_current_user),
+):
+    """Re-chunk and re-embed every source in the KB from stored text.
+
+    Applies chunking improvements (e.g. table-aware splitting) to existing
+    collections without re-uploading files. Runs as a background task; the KB
+    reports ``building`` until it completes.
+    """
+    user_org_ancestry = await organization_service.get_user_org_ancestry(user)
+    kb = await _require_manageable_kb(uuid, user, user_org_ancestry)
+
+    kb.status = "building"
+    await kb.save()
+
+    from app.tasks.knowledge_base_tasks import kb_reingest
+    task = kb_reingest.delay(kb.uuid)
+    return {"task_id": task.id, "status": "queued"}
+
+
 @router.post("/{uuid}/test-queries/generate")
 async def generate_test_queries(
     uuid: str,

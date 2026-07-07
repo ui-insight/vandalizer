@@ -219,3 +219,100 @@ class TestPageMarkerInterpolation:
 
         assert _interpolate_page_markers("anything", 0) == []
         assert _interpolate_page_markers("", 5) == []
+
+
+# ---------------------------------------------------------------------------
+# Table-aware chunking
+# ---------------------------------------------------------------------------
+
+
+def _docx_style_table(rows: int) -> str:
+    header = "| Category | Year 1 | Year 2 |"
+    sep = "|---|---|---|"
+    body = "\n".join(f"| Item {i} | {100 + i} | {200 + i} |" for i in range(rows))
+    return f"{header}\n{sep}\n{body}"
+
+
+class TestFindTableSpans:
+    def test_finds_table_with_separator_header(self):
+        from app.services.document_manager import _find_table_spans
+
+        text = "Intro paragraph.\n\n" + _docx_style_table(3) + "\n\nOutro."
+        spans = _find_table_spans(text)
+        assert len(spans) == 1
+        start, end, header = spans[0]
+        assert text[start:].startswith("| Category |")
+        assert header == "| Category | Year 1 | Year 2 |\n|---|---|---|"
+        assert text[start:end].endswith("| Item 2 | 102 | 202 |")
+
+    def test_xlsx_style_table_header_is_first_row(self):
+        from app.services.document_manager import _find_table_spans
+
+        # The xlsx serializer emits pipe rows with no |---| separator.
+        text = "## Sheet1\n| Category | Amount |\n| Travel | 5000 |\n| Equipment | 12000 |"
+        spans = _find_table_spans(text)
+        assert len(spans) == 1
+        assert spans[0][2] == "| Category | Amount |"
+
+    def test_single_pipe_line_is_not_a_table(self):
+        from app.services.document_manager import _find_table_spans
+
+        assert _find_table_spans("prose | with a pipe\nmore prose") == []
+
+
+class TestTableAwareChunking:
+    def test_continuation_chunks_repeat_table_header(self):
+        from app.services.document_manager import _split_text_with_offsets
+
+        text = "Budget summary follows.\n\n" + _docx_style_table(40)
+        chunks = _split_text_with_offsets(text, chunk_size=300, chunk_overlap=50)
+        assert len(chunks) >= 3
+
+        header = "| Category | Year 1 | Year 2 |"
+        table_chunks = [c for c, _ in chunks if "| Item" in c]
+        assert len(table_chunks) >= 2
+        for chunk in table_chunks:
+            assert chunk.splitlines()[0].startswith(header[:20]) or chunk.startswith(
+                "Budget summary"
+            ), f"table chunk lost its header: {chunk[:80]!r}"
+
+    def test_offsets_point_at_original_text_despite_decoration(self):
+        from app.services.document_manager import _split_text_with_offsets
+
+        text = "Budget summary follows.\n\n" + _docx_style_table(40)
+        header_block = "| Category | Year 1 | Year 2 |\n|---|---|---|"
+        for chunk, offset in _split_text_with_offsets(text, 300, 50):
+            body = chunk
+            if chunk.startswith(header_block) and not text.strip()[offset:].startswith(
+                header_block
+            ):
+                body = chunk[len(header_block) + 1:]  # strip decoration + newline
+            assert text.strip()[offset:offset + len(body)] == body
+
+    def test_rows_are_never_split_mid_row(self):
+        from app.services.document_manager import _split_text_with_offsets
+
+        text = _docx_style_table(60)  # table longer than any single chunk
+        original_lines = set(text.split("\n"))
+        for chunk, _ in _split_text_with_offsets(text, 300, 50):
+            for line in chunk.splitlines():
+                assert line in original_lines, f"row split mid-way: {line!r}"
+
+    def test_break_prefers_table_start_over_mid_table(self):
+        from app.services.document_manager import _split_text_with_offsets
+
+        # Prose ends past the window midpoint; the table then extends beyond
+        # the first window, so a naive break would land mid-table.
+        prose = "Narrative context sentence. " * 22   # ~615 chars
+        table = _docx_style_table(25)                  # ~600 chars
+        text = f"{prose.strip()}\n\n{table}"
+        chunks = _split_text_with_offsets(text, chunk_size=1000, chunk_overlap=200)
+        # First chunk should end before the table rather than slicing into it.
+        assert "| Item" not in chunks[0][0]
+
+    def test_non_table_text_is_undedecorated_and_offset_exact(self):
+        from app.services.document_manager import _split_text_with_offsets
+
+        text = ("Sentence about grants and budgets. " * 40).strip()
+        for chunk, offset in _split_text_with_offsets(text, 200, 40):
+            assert text[offset:offset + len(chunk)] == chunk
