@@ -540,7 +540,17 @@ def create_chat_agent(
     prompt_to_use = system_prompt or DEFAULT_CHAT_SYSTEM_PROMPT
     model = get_agent_model(agent_model, thinking_override=thinking_override, system_config_doc=system_config_doc)
     model_settings = build_thinking_model_settings(agent_model, thinking_override, system_config_doc)
-    return Agent(model, system_prompt=prompt_to_use, model_settings=model_settings)
+    # Pass the prompt as `instructions`, NOT `system_prompt`. pydantic-ai only
+    # injects a static `system_prompt` on the FIRST request of a run (when
+    # message_history is empty — see _agent_graph.GraphAgentDeps: `if not
+    # messages: parts.extend(_sys_parts(...))`). Multi-turn chat reconstructs
+    # history from stored ChatMessage text, which carries no system prompt, so
+    # with `system_prompt=` every turn after the first ran with NO grounding
+    # rules — KB chat silently dropped its cite-by-filename / refuse-when-
+    # unsupported guardrails on follow-up questions. `instructions` is
+    # re-applied on every model request (including tool-call loops), so the
+    # prompt is present on every turn. Single-shot callers are unaffected.
+    return Agent(model, instructions=prompt_to_use, model_settings=model_settings)
 
 
 def create_agentic_chat_agent(

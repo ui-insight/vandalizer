@@ -69,16 +69,20 @@ describe('DemoTrialEnd', () => {
     expect(screen.queryByRole('button', { name: /keep my trial going/i })).not.toBeInTheDocument()
   })
 
-  it('cap reached: shows the contact CTA instead of a renew option', async () => {
+  it('renewals are unlimited: still offers to keep going after prior extensions', async () => {
+    // Previously this was a "cap reached" dead-end; renewals are now unlimited.
     mockGetTrialEndInfo.mockResolvedValueOnce(
-      info({ can_self_extend: false, extensions_used: 2, already_extended: true }),
+      info({ engagement: 'low', extensions_used: 5, already_extended: true }),
     )
+    mockRequestTrialExtension.mockResolvedValueOnce({ ok: true, message: 'ok', expires_at: null })
 
     render(<DemoTrialEnd />)
 
-    expect(await screen.findByText(/let's keep this going/i)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /get in touch/i })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /keep my trial going/i })).not.toBeInTheDocument()
+    const btn = await screen.findByRole('button', { name: /keep my trial going/i })
+    expect(screen.queryByRole('link', { name: /get in touch/i })).not.toBeInTheDocument()
+
+    fireEvent.click(btn)
+    expect(await screen.findByText(/you're back in/i)).toBeInTheDocument()
   })
 
   it('invalid token: shows an error state', async () => {

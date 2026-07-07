@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { FocusTrap } from 'focus-trap-react'
 import { X, Loader2, ArrowLeftRight } from 'lucide-react'
 import {
   getKBOptimization,
@@ -54,6 +55,16 @@ export function CompareRunsView({
     return () => { cancelled = true }
   }, [open, kbUuid, currentRunUuid, otherRunUuid])
 
+  // Close on Escape
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, onClose])
+
   if (!open) return null
 
   return (
@@ -65,7 +76,11 @@ export function CompareRunsView({
       }}
       onClick={onClose}
     >
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Compare optimization runs"
         onClick={e => e.stopPropagation()}
         style={{
           width: 'min(1100px, 100%)',
@@ -75,11 +90,12 @@ export function CompareRunsView({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <ArrowLeftRight size={16} style={{ color: '#a78bfa' }} />
+          <ArrowLeftRight size={16} style={{ color: '#a78bfa' }} aria-hidden="true" />
           <h3 style={{ margin: 0, fontSize: 14, color: '#fff' }}>
             Compare optimization runs
           </h3>
           <button
+            type="button"
             onClick={onClose}
             style={{
               marginLeft: 'auto', background: 'transparent', border: 'none',
@@ -87,20 +103,22 @@ export function CompareRunsView({
             }}
             aria-label="Close"
           >
-            <X size={16} />
+            <X size={16} aria-hidden="true" />
           </button>
         </div>
 
         {loading ? (
-          <div style={{ textAlign: 'center', padding: 36, color: '#888' }}>
-            <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} />
+          <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 36, color: '#888' }}>
+            <Loader2 size={20} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
+            <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Loading runs…</span>
           </div>
         ) : error ? (
-          <div style={{ color: '#fca5a5', fontSize: 12 }}>{error}</div>
+          <div role="alert" style={{ color: '#fca5a5', fontSize: 12 }}>{error}</div>
         ) : current && other ? (
           <DiffBody left={other} right={current} />
         ) : null}
       </div>
+      </FocusTrap>
     </div>
   )
 }

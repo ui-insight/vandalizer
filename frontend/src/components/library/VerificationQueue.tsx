@@ -181,11 +181,14 @@ export function VerificationQueue() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search requests..."
+            aria-label="Search verification requests"
             className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400"
           />
         </div>
-        <div className="flex items-center gap-2">
+        <div role="group" aria-label="Verification views" className="flex items-center gap-2">
           <button
+            type="button"
+            aria-pressed={view === 'pending'}
             onClick={() => setView('pending')}
             className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
               view === 'pending'
@@ -196,6 +199,8 @@ export function VerificationQueue() {
             Review Queue
           </button>
           <button
+            type="button"
+            aria-pressed={view === 'mine'}
             onClick={() => setView('mine')}
             className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
               view === 'mine'
@@ -234,9 +239,9 @@ export function VerificationQueue() {
       )}
 
       {loading ? (
-        <div className="text-sm text-gray-500 py-8 text-center">Loading...</div>
+        <div role="status" aria-live="polite" className="text-sm text-gray-500 py-8 text-center">Loading...</div>
       ) : filtered.length === 0 ? (
-        <div className="text-sm text-gray-500 py-12 text-center">
+        <div role="status" aria-live="polite" className="text-sm text-gray-500 py-12 text-center">
           {view === 'pending' ? 'No pending verification requests.' : 'You have no submissions yet.'}
         </div>
       ) : (
@@ -256,17 +261,22 @@ export function VerificationQueue() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <button
+                          type="button"
                           onClick={() => setExpandedId(isExpanded ? null : req.uuid)}
+                          aria-expanded={isExpanded}
+                          aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
                           className="p-0.5 rounded hover:bg-gray-100 text-gray-400 shrink-0"
                         >
-                          {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                          {isExpanded ? <ChevronDown className="h-4 w-4" aria-hidden="true" /> : <ChevronRight className="h-4 w-4" aria-hidden="true" />}
                         </button>
                         <button
+                          type="button"
                           onClick={() => handleOpen(req)}
                           className="p-0.5 rounded hover:bg-blue-50 text-gray-400 hover:text-blue-600 shrink-0"
+                          aria-label="Open item"
                           title="Open item"
                         >
-                          <ExternalLink className="h-4 w-4" />
+                          <ExternalLink className="h-4 w-4" aria-hidden="true" />
                         </button>
                         <ShieldCheck className="h-4 w-4 text-gray-400 shrink-0" />
                         <span className="text-sm font-semibold text-gray-900 truncate">

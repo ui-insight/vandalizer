@@ -20,10 +20,11 @@ def process_onboarding_drips(self):
     """Send due onboarding drip emails."""
     from app.services.engagement_service import process_onboarding_drips as _run
     from app.database import init_db
+    from app.config import Settings
 
     loop = asyncio.new_event_loop()
     try:
-        loop.run_until_complete(init_db())
+        loop.run_until_complete(init_db(Settings()))
         count = loop.run_until_complete(_run())
         return {"sent": count}
     finally:
@@ -41,10 +42,11 @@ def process_inactivity_nudges(self):
     """Send inactivity nudge emails to users who haven't logged in recently."""
     from app.services.engagement_service import process_inactivity_nudges as _run
     from app.database import init_db
+    from app.config import Settings
 
     loop = asyncio.new_event_loop()
     try:
-        loop.run_until_complete(init_db())
+        loop.run_until_complete(init_db(Settings()))
         count = loop.run_until_complete(_run())
         return {"sent": count}
     finally:

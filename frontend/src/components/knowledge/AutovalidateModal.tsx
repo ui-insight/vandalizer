@@ -28,6 +28,7 @@ import { AutovalidateWizard, type WizardStep } from '../shared/AutovalidateWizar
 import { WizardLoadingStep } from '../shared/WizardLoadingStep'
 import { recommendLevel, recommendationReason } from '../shared/baselineRecommendation'
 import { TermDef } from '../shared/TermDef'
+import { useConfirm } from '../shared/useConfirm'
 
 interface Props {
   kbUuid: string
@@ -461,6 +462,7 @@ function PreviewStep({
   const [editDraft, setEditDraft] = useState<DraftShape>(EMPTY_DRAFT)
   const [saving, setSaving] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const confirm = useConfirm()
 
   const startEdit = (q: KBTestQuery) => {
     setActionError(null)
@@ -484,7 +486,18 @@ function PreviewStep({
   }
 
   const handleDelete = async (q: KBTestQuery) => {
-    if (!window.confirm(`Remove this test question?\n\n"${q.query}"`)) return
+    if (!(await confirm({
+      title: 'Remove test question?',
+      message: (
+        <>
+          Remove this test question?
+          <br /><br />
+          "{q.query}"
+        </>
+      ),
+      confirmLabel: 'Remove',
+      destructive: true,
+    }))) return
     setActionError(null)
     try {
       await deleteKBTestQuery(kbUuid, q.uuid)
@@ -649,6 +662,8 @@ function PreviewStep({
                 </div>
                 <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
                   <button
+                    type="button"
+                    aria-label="Edit question"
                     onClick={() => startEdit(q)}
                     style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: '#888' }}
                     title="Edit question"
@@ -656,6 +671,8 @@ function PreviewStep({
                     <Pencil size={12} />
                   </button>
                   <button
+                    type="button"
+                    aria-label="Remove question"
                     onClick={() => handleDelete(q)}
                     style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: '#888' }}
                     title="Remove question"

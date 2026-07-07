@@ -32,7 +32,9 @@ def expire_overdue_approvals_task(self):
         from app.database import init_db
         from app.services.approval_service import expire_overdue_approvals
 
-        await init_db(Settings())
+        # Periodic sweeper: indexes are ensured at app startup, so skip
+        # Beanie's per-collection index round-trips on every run.
+        await init_db(Settings(), skip_indexes=True)
         return await expire_overdue_approvals()
 
     return _run_async(_run())

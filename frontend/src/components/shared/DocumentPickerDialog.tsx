@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { FocusTrap } from 'focus-trap-react'
 import { X, Search, Loader2, FileText } from 'lucide-react'
 import { searchDocuments } from '../../api/documents'
 
@@ -16,6 +17,12 @@ export function DocumentPickerDialog({
   const [searching, setSearching] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const excludeRef = useCallback((uuid: string) => excludeUuids.includes(uuid), [excludeUuids.join(',')])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -55,19 +62,20 @@ export function DocumentPickerDialog({
       backgroundColor: 'rgba(0,0,0,0.3)', display: 'flex', alignItems: 'center',
       justifyContent: 'center', zIndex: 1000,
     }}>
-      <div style={{
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
+      <div role="dialog" aria-modal="true" aria-label="Add documents" style={{
         backgroundColor: '#fff', borderRadius: 12, width: 480, maxHeight: '70vh',
         display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
       }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: 15, fontWeight: 600, color: '#202124' }}>Add Documents</span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#5f6368', display: 'flex' }}>
+          <button type="button" aria-label="Close" onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: '#5f6368', display: 'flex' }}>
             <X style={{ width: 18, height: 18 }} />
           </button>
         </div>
         <div style={{ padding: '12px 20px', borderBottom: '1px solid #e5e7eb' }}>
           <div style={{ position: 'relative' }}>
-            <Search style={{ width: 14, height: 14, position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+            <Search style={{ width: 14, height: 14, position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
             <input
               autoFocus
               value={query}
@@ -76,7 +84,7 @@ export function DocumentPickerDialog({
               style={{
                 width: '100%', fontSize: 13, fontFamily: 'inherit',
                 border: '1px solid #d1d5db', borderRadius: 6, padding: '8px 10px 8px 32px',
-                outline: 'none', boxSizing: 'border-box',
+                boxSizing: 'border-box',
               }}
             />
           </div>
@@ -127,7 +135,7 @@ export function DocumentPickerDialog({
               padding: '8px 16px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
               borderRadius: 6, border: 'none',
               backgroundColor: selected.size > 0 ? '#191919' : '#e5e7eb',
-              color: selected.size > 0 ? '#fff' : '#9ca3af',
+              color: selected.size > 0 ? '#fff' : '#6b7280',
               cursor: selected.size > 0 ? 'pointer' : 'not-allowed',
             }}
           >
@@ -135,6 +143,7 @@ export function DocumentPickerDialog({
           </button>
         </div>
       </div>
+      </FocusTrap>
     </div>
   )
 }

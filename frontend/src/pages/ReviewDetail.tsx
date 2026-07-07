@@ -140,7 +140,7 @@ function ExtractionTableArtifact({ data, editing, value, onChange }: {
           <thead>
             <tr style={{ backgroundColor: '#f9fafb' }}>
               {keys.map(k => (
-                <th key={k} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: '#374151', borderBottom: '1px solid #e5e7eb' }}>
+                <th key={k} scope="col" style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: '#374151', borderBottom: '1px solid #e5e7eb' }}>
                   {k}
                 </th>
               ))}
@@ -328,7 +328,9 @@ export default function ReviewDetailPage() {
   const isMultiRowTable = review.artifact_kind === 'extraction_table' && Array.isArray(inner)
 
   return (
-    <div style={{ maxWidth: 920, margin: '0 auto', padding: '24px 24px 80px' }}>
+    <>
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-[1000] focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:shadow-lg focus:ring-2 focus:ring-highlight">Skip to main content</a>
+    <main id="main-content" style={{ maxWidth: 920, margin: '0 auto', padding: '24px 24px 80px' }}>
       <Link
         to="/reviews"
         style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#6b7280', textDecoration: 'none', marginBottom: 16 }}
@@ -480,6 +482,7 @@ export default function ReviewDetailPage() {
           )}
         </div>
       )}
-    </div>
+    </main>
+    </>
   )
 }

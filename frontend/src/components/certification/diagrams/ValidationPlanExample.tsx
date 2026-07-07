@@ -22,9 +22,9 @@ export function ValidationPlanExample() {
       <table className="w-full">
         <thead>
           <tr className="bg-gray-50 border-b border-gray-200">
-            <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-gray-500">Check</th>
-            <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-gray-500">Extracted Value</th>
-            <th className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-gray-500">Result</th>
+            <th scope="col" className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-gray-500">Check</th>
+            <th scope="col" className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-gray-500">Extracted Value</th>
+            <th scope="col" className="px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wider text-gray-500">Result</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">

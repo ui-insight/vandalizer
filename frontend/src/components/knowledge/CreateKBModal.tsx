@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { FocusTrap } from 'focus-trap-react'
 import { Loader2 } from 'lucide-react'
 
 interface CreateKBModalProps {
@@ -16,6 +17,14 @@ export function CreateKBModal({ onClose, onCreate }: CreateKBModalProps) {
   useEffect(() => {
     titleRef.current?.focus()
   }, [])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
 
   const canSubmit = title.trim().length > 0 && !creating
 
@@ -39,7 +48,10 @@ export function CreateKBModal({ onClose, onCreate }: CreateKBModalProps) {
         display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
       }}
     >
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
       <div
+        role="dialog"
+        aria-modal="true"
         onClick={(e) => e.stopPropagation()}
         style={{
           backgroundColor: '#1e1e1e', borderRadius: 12, padding: 24, width: 440,
@@ -55,26 +67,30 @@ export function CreateKBModal({ onClose, onCreate }: CreateKBModalProps) {
           future-you) understand what it covers.
         </p>
 
-        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#aaa', marginBottom: 4 }}>
+        <label htmlFor="create-kb-title" style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#aaa', marginBottom: 4 }}>
           Title
         </label>
         <input
+          id="create-kb-title"
           ref={titleRef}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && canSubmit) handleSubmit() }}
           placeholder="e.g. NIH Grant Proposals 2026"
+          aria-invalid={!!error}
+          aria-describedby={error ? 'create-kb-error' : undefined}
           style={{
             width: '100%', padding: '8px 10px', fontSize: 13, fontFamily: 'inherit',
             backgroundColor: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: 6,
-            color: '#e5e5e5', outline: 'none', marginBottom: 14, boxSizing: 'border-box',
+            color: '#e5e5e5', marginBottom: 14, boxSizing: 'border-box',
           }}
         />
 
-        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#aaa', marginBottom: 4 }}>
+        <label htmlFor="create-kb-description" style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#aaa', marginBottom: 4 }}>
           Description
         </label>
         <textarea
+          id="create-kb-description"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="What is in this knowledge base, and what should it be used for?"
@@ -82,7 +98,7 @@ export function CreateKBModal({ onClose, onCreate }: CreateKBModalProps) {
           style={{
             width: '100%', padding: '8px 10px', fontSize: 13, fontFamily: 'inherit',
             backgroundColor: '#2a2a2a', border: '1px solid #3a3a3a', borderRadius: 6,
-            color: '#e5e5e5', outline: 'none', marginBottom: 6, resize: 'vertical',
+            color: '#e5e5e5', marginBottom: 6, resize: 'vertical',
             boxSizing: 'border-box', lineHeight: 1.5,
           }}
         />
@@ -92,7 +108,7 @@ export function CreateKBModal({ onClose, onCreate }: CreateKBModalProps) {
         </p>
 
         {error && (
-          <div style={{
+          <div id="create-kb-error" role="alert" style={{
             padding: '8px 12px', borderRadius: 6, marginBottom: 12,
             fontSize: 12, color: '#fca5a5',
             backgroundColor: 'rgba(239, 68, 68, 0.1)',
@@ -134,6 +150,7 @@ export function CreateKBModal({ onClose, onCreate }: CreateKBModalProps) {
           </button>
         </div>
       </div>
+      </FocusTrap>
     </div>
   )
 }

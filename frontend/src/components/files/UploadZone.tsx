@@ -70,6 +70,7 @@ export function UploadZone({ onFilesSelected, highlighted }: UploadZoneProps) {
         ref={inputRef}
         type="file"
         multiple
+        aria-label="Upload files"
         accept=".pdf,.doc,.docx,.xlsx,.xls,.csv,.txt,.md"
         className="hidden"
         onChange={(e) => {

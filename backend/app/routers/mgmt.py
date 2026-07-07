@@ -260,9 +260,11 @@ async def stats(_: ApiKey = Depends(require_mgmt_scope("metrics:read"))):
     total_tokens = _coerce_int(token_agg[0].get("total_tokens")) if token_agg else 0
     documents_size_bytes_total = total_tokens * 4  # ~4 bytes/token
 
-    active_user_ids = await ActivityEvent.find(
-        {"started_at": {"$gte": cutoff_30d}}
-    ).distinct("user_id")
+    # Beanie's FindMany has no `.distinct()`; go through the motor collection,
+    # which takes the filter as its second argument.
+    active_user_ids = await ActivityEvent.get_motor_collection().distinct(
+        "user_id", {"started_at": {"$gte": cutoff_30d}}
+    )
 
     return StatsResponse(
         users_total=users_total,

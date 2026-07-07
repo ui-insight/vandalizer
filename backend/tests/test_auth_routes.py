@@ -119,17 +119,25 @@ class TestAuthMe:
     async def test_me_demo_locked_user_blocked(self, client):
         user = _make_user(is_demo_user=True, demo_status="locked")
         token = create_access_token("testuser", _TEST_SETTINGS)
+        demo_app = MagicMock()
+        demo_app.post_questionnaire_token = "feedback-token-abc"
 
         with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
-             patch("app.dependencies.User") as MockUser:
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.models.demo.DemoApplication") as MockDemoApp:
             MockUser.find_one = AsyncMock(return_value=user)
+            MockDemoApp.find_one = AsyncMock(return_value=demo_app)
             resp = await client.get(
                 "/api/auth/me",
                 cookies={"access_token": token},
             )
 
+        # A locked demo user is blocked with a 403 carrying the end-of-trial
+        # feedback token, so the SPA can route straight to the renewal screen.
         assert resp.status_code == 403
-        assert resp.json()["detail"] == "DEMO_EXPIRED"
+        detail = resp.json()["detail"]
+        assert detail["code"] == "DEMO_EXPIRED"
+        assert detail["feedback_token"] == "feedback-token-abc"
 
 
 # ---------------------------------------------------------------------------

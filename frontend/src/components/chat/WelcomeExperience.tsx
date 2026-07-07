@@ -31,7 +31,7 @@ function Step({ label, done, number }: StepProps) {
               }
             : {
                 backgroundColor: '#f3f4f6',
-                color: '#9ca3af',
+                color: '#6b7280',
                 border: '1px solid #e5e7eb',
               }),
         }}
@@ -77,7 +77,7 @@ export function OnboardingStepper({ status, hasChatAboutDocs }: OnboardingSteppe
         style={{
           fontSize: 11,
           fontWeight: 600,
-          color: '#9ca3af',
+          color: '#6b7280',
           textTransform: 'uppercase',
           letterSpacing: '0.05em',
           marginBottom: 8,

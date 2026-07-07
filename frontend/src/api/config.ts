@@ -26,6 +26,7 @@ export interface ThemeConfig {
   org_name: string
   logo_data_url: string
   icon_data_url: string
+  icon_hide_in_nav?: boolean
 }
 
 export function getThemeConfig() {
@@ -50,6 +51,7 @@ export function updateThemeConfig(data: {
   org_name?: string
   logo_data_url?: string
   icon_data_url?: string
+  icon_hide_in_nav?: boolean
 }) {
   return apiFetch<ThemeConfig>('/api/config/theme', {
     method: 'PUT',
@@ -141,6 +143,9 @@ export function getAutomationStats() {
 
 export interface FeatureFlags {
   m365_enabled: boolean
+  compliance_enabled?: boolean
+  // True only on the fleet collector instance — gates the admin Telemetry tab.
+  telemetry_collector_enabled?: boolean
 }
 
 export function getFeatureFlags() {

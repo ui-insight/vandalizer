@@ -200,6 +200,7 @@ async def get_theme():
         org_name=config.org_name,
         logo_data_url=config.logo_data_url,
         icon_data_url=config.icon_data_url,
+        icon_hide_in_nav=config.icon_hide_in_nav,
     )
 
 
@@ -218,6 +219,8 @@ async def update_theme(req: UpdateThemeConfigRequest, user: User = Depends(get_c
         config.logo_data_url = _validate_image_data_url(req.logo_data_url, "logo_data_url")
     if req.icon_data_url is not None:
         config.icon_data_url = _validate_image_data_url(req.icon_data_url, "icon_data_url")
+    if req.icon_hide_in_nav is not None:
+        config.icon_hide_in_nav = req.icon_hide_in_nav
     config.updated_at = datetime.datetime.now(datetime.timezone.utc)
     config.updated_by = user.user_id
     await config.save()
@@ -227,6 +230,7 @@ async def update_theme(req: UpdateThemeConfigRequest, user: User = Depends(get_c
         org_name=config.org_name,
         logo_data_url=config.logo_data_url,
         icon_data_url=config.icon_data_url,
+        icon_hide_in_nav=config.icon_hide_in_nav,
     )
 
 
@@ -236,12 +240,18 @@ async def update_theme(req: UpdateThemeConfigRequest, user: User = Depends(get_c
 
 
 @router.get("/features")
-async def get_features(user: User = Depends(get_current_user)):
+async def get_features(
+    user: User = Depends(get_current_user),
+    settings: Settings = Depends(get_settings),
+):
     """Return feature flags for the current deployment."""
     config = await SystemConfig.get_config()
     return {
         "m365_enabled": False,
         "compliance_enabled": config.is_compliance_enabled(),
+        # True only on the fleet collector instance — gates the admin telemetry
+        # dashboard so it stays hidden on every other deployment.
+        "telemetry_collector_enabled": settings.telemetry_collector_enabled,
     }
 
 

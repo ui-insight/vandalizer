@@ -247,7 +247,7 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
   return (
     <PageLayout>
       <div className="mx-auto max-w-2xl space-y-6">
-        <h2 className="text-xl font-semibold text-gray-900">My Account</h2>
+        <h1 className="text-xl font-semibold text-gray-900">My Account</h1>
 
         {/* Account Information — editable */}
         <div className="rounded-lg border border-gray-200 bg-white">
@@ -258,17 +258,19 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
           <div className="p-4">
             <div className="grid grid-cols-2 gap-x-8 gap-y-4">
               <div>
-                <label className="block text-xs font-medium uppercase text-gray-400 mb-1">User ID</label>
+                <label className="block text-xs font-medium uppercase text-gray-500 mb-1">User ID</label>
                 <p className="text-sm font-mono text-gray-900">{user?.user_id || '-'}</p>
               </div>
               <div>
-                <label className="block text-xs font-medium uppercase text-gray-400 mb-1">Role</label>
+                <label className="block text-xs font-medium uppercase text-gray-500 mb-1">Role</label>
                 <p className="text-sm text-gray-900">{user?.is_admin ? 'Administrator' : 'Member'}</p>
               </div>
               <div>
-                <label className="block text-xs font-medium uppercase text-gray-400 mb-1">Display Name</label>
+                <label htmlFor="account-name" className="block text-xs font-medium uppercase text-gray-500 mb-1">Display Name</label>
                 <input
+                  id="account-name"
                   type="text"
+                  autoComplete="name"
                   value={name}
                   onChange={e => setName(e.target.value)}
                   className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-highlight focus:outline-none focus:ring-1 focus:ring-highlight"
@@ -276,9 +278,11 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium uppercase text-gray-400 mb-1">Email</label>
+                <label htmlFor="account-email" className="block text-xs font-medium uppercase text-gray-500 mb-1">Email</label>
                 <input
+                  id="account-email"
                   type="email"
+                  autoComplete="email"
                   value={email}
                   onChange={e => setEmail(e.target.value)}
                   className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-highlight focus:outline-none focus:ring-1 focus:ring-highlight"
@@ -444,7 +448,7 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
             )}
 
             {tokenLoading ? (
-              <p className="text-sm text-gray-400">Loading token status...</p>
+              <p className="text-sm text-gray-500">Loading token status...</p>
             ) : hasToken ? (
               <>
                 {/* Active token status */}
@@ -453,7 +457,7 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
                     <Check className="h-3 w-3" /> Active
                   </span>
                   {tokenCreatedAt && (
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs text-gray-500">
                       Created {new Date(tokenCreatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </span>
                   )}
@@ -467,6 +471,7 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
                     </p>
                     <div className="flex items-center gap-2">
                       <input
+                        aria-label="API token"
                         type={tokenVisible ? 'text' : 'password'}
                         value={newToken}
                         readOnly

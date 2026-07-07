@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { FocusTrap } from 'focus-trap-react'
 import { X } from 'lucide-react'
 import { createCredential } from '../../api/credentials'
 import type { Credential, CredentialType } from '../../types/credential'
@@ -61,7 +62,7 @@ const labelStyle: React.CSSProperties = {
 const inputStyle: React.CSSProperties = {
   width: '100%', fontSize: 13, fontFamily: 'inherit',
   border: '1px solid #d1d5db', borderRadius: 6, padding: '8px 10px',
-  outline: 'none', boxSizing: 'border-box', background: '#fff',
+  boxSizing: 'border-box', background: '#fff',
 }
 const monoInputStyle: React.CSSProperties = {
   ...inputStyle,
@@ -126,8 +127,12 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
         alignItems: 'center', justifyContent: 'center', zIndex: 10000,
       }}
     >
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
       <div
         onClick={e => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="New credential"
         style={{
           backgroundColor: '#fff', borderRadius: 12, width: 560,
           maxHeight: '90vh', display: 'flex', flexDirection: 'column',
@@ -151,8 +156,9 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
         <div style={{ padding: '16px 20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
-              <label style={labelStyle}>Name</label>
+              <label htmlFor="cred-name" style={labelStyle}>Name</label>
               <input
+                id="cred-name"
                 autoFocus
                 type="text"
                 value={form.name}
@@ -162,8 +168,9 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
               />
             </div>
             <div>
-              <label style={labelStyle}>Type</label>
+              <label htmlFor="cred-type" style={labelStyle}>Type</label>
               <select
+                id="cred-type"
                 value={form.type}
                 onChange={e => setForm({ ...form, type: e.target.value as CredentialType })}
                 style={inputStyle}
@@ -175,8 +182,9 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
           </div>
 
           <div>
-            <label style={labelStyle}>Description</label>
+            <label htmlFor="cred-description" style={labelStyle}>Description</label>
             <input
+              id="cred-description"
               type="text"
               value={form.description}
               onChange={e => setForm({ ...form, description: e.target.value })}
@@ -188,8 +196,9 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
           {form.type === 'static_header' && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div>
-                <label style={labelStyle}>Header name</label>
+                <label htmlFor="cred-header-name" style={labelStyle}>Header name</label>
                 <input
+                  id="cred-header-name"
                   type="text"
                   value={form.header_name}
                   onChange={e => setForm({ ...form, header_name: e.target.value })}
@@ -198,8 +207,9 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
                 />
               </div>
               <div>
-                <label style={labelStyle}>Header value</label>
+                <label htmlFor="cred-header-value" style={labelStyle}>Header value</label>
                 <input
+                  id="cred-header-value"
                   type="password"
                   autoComplete="new-password"
                   data-1p-ignore
@@ -219,8 +229,9 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
             <>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <div>
-                  <label style={labelStyle}>Client ID</label>
+                  <label htmlFor="cred-client-id" style={labelStyle}>Client ID</label>
                   <input
+                    id="cred-client-id"
                     type="text"
                     value={form.client_id}
                     onChange={e => setForm({ ...form, client_id: e.target.value })}
@@ -228,8 +239,9 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
                   />
                 </div>
                 <div>
-                  <label style={labelStyle}>Token endpoint</label>
+                  <label htmlFor="cred-token-endpoint" style={labelStyle}>Token endpoint</label>
                   <input
+                    id="cred-token-endpoint"
                     type="url"
                     value={form.token_endpoint}
                     onChange={e => setForm({ ...form, token_endpoint: e.target.value })}
@@ -240,8 +252,9 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
                 <div>
-                  <label style={labelStyle}>Scope</label>
+                  <label htmlFor="cred-scope" style={labelStyle}>Scope</label>
                   <input
+                    id="cred-scope"
                     type="text"
                     value={form.scope}
                     onChange={e => setForm({ ...form, scope: e.target.value })}
@@ -250,8 +263,9 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
                   />
                 </div>
                 <div>
-                  <label style={labelStyle}>Audience</label>
+                  <label htmlFor="cred-audience" style={labelStyle}>Audience</label>
                   <input
+                    id="cred-audience"
                     type="text"
                     value={form.audience}
                     onChange={e => setForm({ ...form, audience: e.target.value })}
@@ -260,8 +274,9 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
                   />
                 </div>
                 <div>
-                  <label style={labelStyle}>Algorithm</label>
+                  <label htmlFor="cred-algorithm" style={labelStyle}>Algorithm</label>
                   <select
+                    id="cred-algorithm"
                     value={form.algorithm}
                     onChange={e => setForm({ ...form, algorithm: e.target.value })}
                     style={inputStyle}
@@ -275,8 +290,9 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
                 </div>
               </div>
               <div>
-                <label style={labelStyle}>Private key (PEM)</label>
+                <label htmlFor="cred-private-key" style={labelStyle}>Private key (PEM)</label>
                 <textarea
+                  id="cred-private-key"
                   value={form.private_key}
                   onChange={e => setForm({ ...form, private_key: e.target.value })}
                   rows={7}
@@ -288,7 +304,7 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
           )}
 
           {error && (
-            <div style={{
+            <div role="alert" style={{
               borderRadius: 6, border: '1px solid #fecaca', background: '#fef2f2',
               padding: '8px 10px', fontSize: 12, color: '#b91c1c',
             }}>
@@ -296,7 +312,7 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
             </div>
           )}
 
-          <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
+          <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
             Secrets are encrypted at rest and never returned to the client after creation.
           </div>
         </div>
@@ -339,6 +355,7 @@ export function CredentialQuickCreateModal({ open, initialType, onClose, onCreat
           </div>
         </div>
       </div>
+      </FocusTrap>
     </div>,
     document.body,
   )

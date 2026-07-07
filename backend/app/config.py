@@ -79,6 +79,53 @@ class Settings(BaseSettings):
     # for air-gapped or privacy-strict deployments.
     disable_update_check: bool = False
 
+    # Anonymous deployment telemetry — OPT-IN, OFF by default.
+    #
+    # When enabled, a once-daily heartbeat lets the maintainers see how many
+    # deployments exist and roughly how heavily they're used. It sends ONLY:
+    #   - a stable random instance UUID (generated locally, no link to identity)
+    #   - the running version and coarse environment (production / non-production)
+    #   - usage as COARSE BUCKETS ("11-50 users", not exact counts)
+    # It NEVER sends document content, filenames, titles, user identities,
+    # emails, API keys, team names, or any free text.
+    #
+    # Trust guarantees baked into the implementation:
+    #   - The single master gate is enablement (off by default); nothing is sent
+    #     until an admin opts in (via setup.sh or the in-app banner).
+    #   - Every payload is logged locally (telemetry_log_payload) so an admin can
+    #     read exactly what was sent.
+    #   - Self-hosters can point telemetry_endpoint at their OWN collector.
+    #
+    # telemetry_enabled here is only the INITIAL/default state. The durable
+    # runtime decision lives in SystemConfig.telemetry_config (DB) once an admin
+    # decides via the in-app banner — so it can be toggled without an env edit or
+    # restart. See telemetry_service.resolve_runtime_config for the precedence.
+    telemetry_enabled: bool = False
+    # Defaulted so an admin who enables via the in-app banner on an existing
+    # install (whose .env predates telemetry) still has somewhere to send to.
+    # Override to self-host the collector, or blank it to hard-disable sending.
+    telemetry_endpoint: str = "https://vandalizer.nkn.uidaho.edu/api/telemetry/heartbeat"
+    telemetry_log_payload: bool = True
+    # Set true by setup.sh once it has asked about telemetry (yes OR no), so the
+    # in-app banner never re-asks someone the installer already prompted.
+    telemetry_prompted: bool = False
+
+    # Optional SECOND tier on top of the anonymous heartbeat: voluntary identity.
+    # If an admin chooses to fill these in (typically at deploy time via
+    # setup.sh), the heartbeat additionally reports who the deployment is, so the
+    # maintainers can see *named* adoption rather than just counts. Empty by
+    # default — a blank organization keeps the heartbeat fully anonymous (the
+    # identity block is omitted from the payload entirely). NEVER auto-derived
+    # from email domains, IPs, or licenses; self-declared only.
+    telemetry_organization: str = ""
+    telemetry_contact_email: str = ""
+
+    # RECEIVER role — turns THIS deployment into the fleet telemetry collector.
+    # Off by default, so every other deployment running this same codebase keeps
+    # the ingest route and the admin analytics screen completely hidden. Only the
+    # maintainers' own instance (the heartbeat's default endpoint) sets this True.
+    telemetry_collector_enabled: bool = False
+
     # Web fetcher — controls Playwright fallback for JS-rendered pages.
     # When True (default), pages whose static HTML yields too little text are
     # re-fetched in a headless Chromium so client-rendered SPAs (Next.js,

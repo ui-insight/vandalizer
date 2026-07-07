@@ -109,7 +109,7 @@ function RunRow({ run, type }: { run: HistoryRun; type: 'workflow' | 'extraction
             </span>
           </div>
 
-          <div style={{ display: 'flex', gap: 12, marginTop: 4, fontSize: 11, color: '#9ca3af' }}>
+          <div style={{ display: 'flex', gap: 12, marginTop: 4, fontSize: 11, color: '#6b7280' }}>
             {run.duration_ms != null && (
               <span style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
                 <Clock style={{ width: 11, height: 11 }} />
@@ -184,7 +184,7 @@ export function RunHistoryTab({
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', padding: 48, color: '#9ca3af' }}>
+      <div role="status" aria-live="polite" aria-label="Loading run history" style={{ display: 'flex', justifyContent: 'center', padding: 48, color: '#6b7280' }}>
         <Loader2 style={{ width: 20, height: 20, animation: 'spin 1s linear infinite' }} />
       </div>
     )
@@ -200,7 +200,7 @@ export function RunHistoryTab({
 
   return (
     <div>
-      <div style={{ padding: '12px 24px 8px', fontSize: 12, color: '#9ca3af', fontWeight: 500 }}>
+      <div role="status" aria-live="polite" style={{ padding: '12px 24px 8px', fontSize: 12, color: '#6b7280', fontWeight: 500 }}>
         {runs.length} run{runs.length !== 1 ? 's' : ''}
       </div>
       {runs.map(run => (

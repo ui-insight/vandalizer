@@ -327,7 +327,7 @@ export function ActivityRail() {
         >
           <Award
             className="h-3.5 w-3.5 shrink-0"
-            style={{ color: certCertified ? '#eab308' : certStarted ? certConfig.color : 'var(--highlight-color)' }}
+            style={{ color: certCertified ? '#eab308' : certStarted ? certConfig.color : 'var(--highlight-on-light, #806600)' }}
           />
           {!railDocked && (
             certCertified ? (

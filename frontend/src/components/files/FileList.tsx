@@ -65,6 +65,19 @@ export function FileList({
     whiteSpace: 'nowrap',
   }
 
+  const sortButtonStyle: React.CSSProperties = {
+    font: 'inherit',
+    color: 'inherit',
+    background: 'none',
+    border: 'none',
+    padding: 0,
+    margin: 0,
+    cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    whiteSpace: 'nowrap',
+  }
+
   return (
     <table className="w-full" style={{ fontSize: '1.05em', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
       <colgroup>
@@ -74,31 +87,54 @@ export function FileList({
       </colgroup>
       <thead>
         <tr style={{ borderBottom: '1px solid #dddddd' }}>
-          <th style={{ padding: '8px 0 8px 15px', width: 32 }}>
+          <th scope="col" style={{ padding: '8px 0 8px 15px', width: 32 }}>
             {onToggleSelect && allUuids.length > 0 && (
               <input
                 type="checkbox"
                 checked={!!allSelected}
                 onChange={onToggleAll}
+                aria-label="Select all"
                 className="h-4 w-4 cursor-pointer accent-[var(--highlight-color)]"
               />
             )}
           </th>
           <th
+            scope="col"
+            aria-sort={sort?.column === 'name' ? (sort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
             style={headerStyle}
-            className={onSort ? 'hover:bg-[#a6b5c945] hover:text-[#191919] transition-colors' : undefined}
-            onClick={() => onSort?.('name')}
           >
-            Name
-            <SortIndicator column="name" sort={sort} />
+            {onSort ? (
+              <button
+                type="button"
+                onClick={() => onSort('name')}
+                className="hover:bg-[#a6b5c945] hover:text-[#191919] transition-colors"
+                style={sortButtonStyle}
+              >
+                Name
+                <SortIndicator column="name" sort={sort} />
+              </button>
+            ) : (
+              <>Name<SortIndicator column="name" sort={sort} /></>
+            )}
           </th>
           <th
+            scope="col"
+            aria-sort={sort?.column === 'modified' ? (sort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
             style={{ ...headerStyle, textAlign: 'right', paddingRight: 15 }}
-            className={onSort ? 'hover:bg-[#a6b5c945] hover:text-[#191919] transition-colors' : undefined}
-            onClick={() => onSort?.('modified')}
           >
-            Modified
-            <SortIndicator column="modified" sort={sort} />
+            {onSort ? (
+              <button
+                type="button"
+                onClick={() => onSort('modified')}
+                className="hover:bg-[#a6b5c945] hover:text-[#191919] transition-colors"
+                style={{ ...sortButtonStyle, justifyContent: 'flex-end', width: '100%' }}
+              >
+                Modified
+                <SortIndicator column="modified" sort={sort} />
+              </button>
+            ) : (
+              <>Modified<SortIndicator column="modified" sort={sort} /></>
+            )}
           </th>
         </tr>
       </thead>

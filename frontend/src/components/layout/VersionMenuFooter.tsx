@@ -29,7 +29,7 @@ export function VersionMenuFooter() {
   return (
     <>
       <hr className="my-1.5 border-0 h-px bg-[#cdcdcd]" />
-      <div className="px-3.5 py-1.5 text-xs text-gray-400" title={`Environment: ${info.environment}`}>
+      <div className="px-3.5 py-1.5 text-xs text-gray-500" title={`Environment: ${info.environment}`}>
         <div className="flex items-center gap-1.5">
           <span className={`h-1.5 w-1.5 rounded-full ${envDotColor(info.environment)}`} aria-hidden />
           <span className="font-medium text-gray-500">{info.deployment_label}</span>

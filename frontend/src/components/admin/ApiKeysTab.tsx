@@ -13,6 +13,8 @@ import {
   type ApiKeyListItem,
   type CreateApiKeyResponse,
 } from '../../api/admin'
+import { useToast } from '../../contexts/ToastContext'
+import { useConfirm } from '../shared/useConfirm'
 
 marked.setOptions({ breaks: true, gfm: true })
 
@@ -58,6 +60,8 @@ function StatusBadge({ keyItem }: { keyItem: ApiKeyListItem }) {
 }
 
 export function ApiKeysTab() {
+  const { toast } = useToast()
+  const confirm = useConfirm()
   const [keys, setKeys] = useState<ApiKeyListItem[]>([])
   const [loading, setLoading] = useState(false)
   const [includeRevoked, setIncludeRevoked] = useState(false)
@@ -84,12 +88,16 @@ export function ApiKeysTab() {
   }, [reload])
 
   const handleRevoke = async (keyId: string, name: string) => {
-    if (!confirm(`Revoke API key "${name}"? This is immediate and cannot be undone.`)) return
+    if (!(await confirm({
+      title: 'Revoke API key',
+      message: `Revoke API key "${name}"? This is immediate and cannot be undone.`,
+      destructive: true,
+    }))) return
     try {
       await revokeApiKey(keyId)
       await reload()
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Revoke failed')
+      toast(e instanceof Error ? e.message : 'Revoke failed', 'error')
     }
   }
 
@@ -176,14 +184,14 @@ export function ApiKeysTab() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
           <thead>
             <tr style={{ borderBottom: '2px solid #e5e7eb', textAlign: 'left' }}>
-              <th style={{ padding: 8 }}>Name</th>
-              <th style={{ padding: 8 }}>Prefix</th>
-              <th style={{ padding: 8 }}>Scopes</th>
-              <th style={{ padding: 8 }}>Status</th>
-              <th style={{ padding: 8 }}>Created</th>
-              <th style={{ padding: 8 }}>Last used</th>
-              <th style={{ padding: 8 }}>Expires</th>
-              <th style={{ padding: 8 }} />
+              <th scope="col" style={{ padding: 8 }}>Name</th>
+              <th scope="col" style={{ padding: 8 }}>Prefix</th>
+              <th scope="col" style={{ padding: 8 }}>Scopes</th>
+              <th scope="col" style={{ padding: 8 }}>Status</th>
+              <th scope="col" style={{ padding: 8 }}>Created</th>
+              <th scope="col" style={{ padding: 8 }}>Last used</th>
+              <th scope="col" style={{ padding: 8 }}>Expires</th>
+              <th scope="col" style={{ padding: 8 }}><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody>
@@ -222,12 +230,14 @@ export function ApiKeysTab() {
                 <td style={{ padding: 8 }}>
                   {!k.revoked_at && (
                     <button
+                      type="button"
                       onClick={() => handleRevoke(k.id, k.name)}
                       style={{
                         padding: 6, border: 'none', background: 'transparent',
                         color: '#dc2626', cursor: 'pointer',
                       }}
                       title="Revoke"
+                      aria-label={`Revoke API key ${k.name}`}
                     >
                       <Trash2 size={16} />
                     </button>
@@ -450,9 +460,10 @@ function CreateKeyModal({
         }}>{err}</div>
       )}
 
-      <label style={{ display: 'block', marginBottom: 12 }}>
+      <label htmlFor="apikey-name" style={{ display: 'block', marginBottom: 12 }}>
         <span style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Name</span>
         <input
+          id="apikey-name"
           type="text"
           value={name}
           onChange={e => setName(e.target.value)}
@@ -461,9 +472,10 @@ function CreateKeyModal({
         />
       </label>
 
-      <label style={{ display: 'block', marginBottom: 12 }}>
+      <label htmlFor="apikey-description" style={{ display: 'block', marginBottom: 12 }}>
         <span style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Description (optional)</span>
         <input
+          id="apikey-description"
           type="text"
           value={description}
           onChange={e => setDescription(e.target.value)}
@@ -515,11 +527,12 @@ function CreateKeyModal({
         </p>
       </div>
 
-      <label style={{ display: 'block', marginBottom: 16 }}>
+      <label htmlFor="apikey-expires-at" style={{ display: 'block', marginBottom: 16 }}>
         <span style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
           Expires at (optional)
         </span>
         <input
+          id="apikey-expires-at"
           type="datetime-local"
           value={expiresAt}
           onChange={e => setExpiresAt(e.target.value)}
@@ -617,10 +630,10 @@ function ModalShell({
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <h3 style={{ fontSize: 18, fontWeight: 700 }}>{title}</h3>
-          <button onClick={onClose} style={{
+          <button type="button" onClick={onClose} aria-label="Close dialog" style={{
             padding: 4, border: 'none', background: 'transparent', cursor: 'pointer',
           }}>
-            <X size={18} />
+            <X size={18} aria-hidden="true" />
           </button>
         </div>
         {children}

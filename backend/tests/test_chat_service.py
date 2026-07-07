@@ -184,6 +184,7 @@ class TestBuildInterruptedBody:
 
         body = _build_interrupted_body(["   \n  "], "context over budget")
         assert body.startswith("_(no response")
+        assert "context over budget" in body
 
 
 # ---------------------------------------------------------------------------
@@ -365,3 +366,55 @@ class TestHoldMessageForUnreadableDocs:
     def test_no_hold_when_no_docs_attached(self):
         # Plain chat with no document context — never holds.
         assert self._hold(document_uuids=[], skipped_no_text=[]) is None
+
+
+# ---------------------------------------------------------------------------
+# create_chat_agent grounding-prompt delivery (regression)
+# ---------------------------------------------------------------------------
+
+
+class TestChatAgentGroundingEveryTurn:
+    """The grounding prompt must reach the model on EVERY turn, not just the
+    first message of a conversation.
+
+    pydantic-ai injects a static ``system_prompt`` only when ``message_history``
+    is empty (``_agent_graph``: ``if not messages: parts.extend(_sys_parts())``).
+    Multi-turn chat rebuilds history from stored ChatMessage text, which carries
+    no system prompt, so ``create_chat_agent(..., system_prompt=)`` silently
+    dropped the KB cite-by-filename / refuse-when-unsupported guardrails on every
+    follow-up question — an out-of-scope question that was refused in a fresh
+    chat would get answered as a follow-up. The fix passes the prompt as
+    ``instructions``, which pydantic-ai re-sends on every model request.
+    """
+
+    def _agent_capturing_instructions(self, monkeypatch, prompt):
+        """Build a real create_chat_agent whose model records the
+        ``instructions`` seen on each request, with no network/config deps."""
+        from pydantic_ai.models.function import FunctionModel
+        from pydantic_ai.messages import ModelResponse, TextPart
+        from app.services import llm_service
+
+        seen: list = []
+
+        def fn(messages, info):
+            seen.append(getattr(messages[-1], "instructions", "NO_ATTR"))
+            return ModelResponse(parts=[TextPart("ok")])
+
+        monkeypatch.setattr(llm_service, "get_agent_model", lambda *a, **k: FunctionModel(fn))
+        monkeypatch.setattr(llm_service, "build_thinking_model_settings", lambda *a, **k: {})
+        agent = llm_service.create_chat_agent("test-model", system_prompt=prompt)
+        return agent, seen
+
+    @pytest.mark.asyncio
+    async def test_prompt_delivered_on_followup_turn(self, monkeypatch):
+        prompt = "GROUNDING: refuse when the snippets don't support an answer."
+        agent, seen = self._agent_capturing_instructions(monkeypatch, prompt)
+
+        first = await agent.run("an out-of-scope question")
+        # Replay history exactly as multi-turn chat does, then ask again.
+        await agent.run("another out-of-scope question", message_history=first.new_messages())
+
+        assert seen == [prompt, prompt], (
+            "grounding prompt must be present on the follow-up turn, not just "
+            f"the first; saw {seen}"
+        )

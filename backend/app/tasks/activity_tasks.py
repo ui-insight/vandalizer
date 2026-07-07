@@ -9,7 +9,7 @@ import logging
 import re
 
 from app.celery_app import celery_app
-from app.tasks import TRANSIENT_EXCEPTIONS
+from app.tasks import TRANSIENT_EXCEPTIONS, run_task_async
 
 logger = logging.getLogger(__name__)
 
@@ -253,8 +253,13 @@ def generate_activity_description_task(
         # workflow/chat/extraction total with the tiny title-gen count. The
         # ledger still meters it (attributed to the user).
         from app.services.metering import metered
+        # Run the agent in a dedicated event loop rather than run_sync's ambient
+        # one: run_sync grabs asyncio.get_event_loop(), which can hand back a
+        # closed loop left by a prior async task in this worker ("Event loop is
+        # closed"). run_task_async also releases the loop's pooled httpx client,
+        # which run_sync would otherwise leak (FD exhaustion).
         with metered("title_gen", user_id=user_id, team_id=activity.get("team_id")):
-            result = chat_agent.run_sync(prompt)
+            result = run_task_async(chat_agent.run(prompt))
         description = _clean_title(result.output)
 
         # Truncate to 8 words max; the UI clamps to 2 lines anyway.

@@ -38,6 +38,13 @@ CSRF_EXEMPT_PREFIXES = (
     "/api/teams/invite/accept/",
     "/api/teams/join-link/accept/",
     "/api/webhooks/",
+    # Fleet telemetry ingest. Heartbeats arrive cross-origin from arbitrary
+    # deployments we share no session or CSRF cookie with, so the double-submit
+    # token can never be present — only an exemption works. Safe: the endpoint is
+    # unauthenticated, write-only, strictly validated, and rate-limited, so CSRF
+    # (which protects cookie-authenticated actions) has nothing to protect here.
+    # Scoped to /heartbeat; /api/telemetry/analytics is a GET (already safe).
+    "/api/telemetry/heartbeat",
     "/api/demo/apply",
     "/api/demo/request-contact",
     "/api/demo/status/",

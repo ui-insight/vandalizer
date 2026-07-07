@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { FocusTrap } from 'focus-trap-react'
 import { Sparkles, X } from 'lucide-react'
 
 interface Props {
@@ -15,23 +16,39 @@ const OPTIONS: { id: 'quick' | 'standard' | 'exhaustive'; label: string; count: 
 export function GenerateTestQueriesModal({ onConfirm, onClose }: Props) {
   const [choice, setChoice] = useState<'quick' | 'standard' | 'exhaustive'>('standard')
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
   return (
     <div style={{
       position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
     }}>
-      <div style={{
-        width: 440, padding: 20, backgroundColor: '#1f1f1f',
-        border: '1px solid #2e2e2e', borderRadius: 10,
-      }}>
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Auto-generate test queries"
+        style={{
+          width: 440, padding: 20, backgroundColor: '#1f1f1f',
+          border: '1px solid #2e2e2e', borderRadius: 10,
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-          <Sparkles size={16} style={{ color: '#7c3aed' }} />
+          <Sparkles size={16} style={{ color: '#7c3aed' }} aria-hidden="true" />
           <h3 style={{ margin: 0, fontSize: 15, color: '#fff' }}>Auto-generate test queries</h3>
           <button
+            type="button"
+            aria-label="Close"
             onClick={onClose}
             style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', padding: 2, color: '#888' }}
           >
-            <X size={16} />
+            <X size={16} aria-hidden="true" />
           </button>
         </div>
         <div style={{ fontSize: 12, color: '#aaa', marginBottom: 14 }}>
@@ -46,6 +63,7 @@ export function GenerateTestQueriesModal({ onConfirm, onClose }: Props) {
             return (
               <button
                 key={opt.id}
+                type="button"
                 onClick={() => setChoice(opt.id)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10,
@@ -72,7 +90,7 @@ export function GenerateTestQueriesModal({ onConfirm, onClose }: Props) {
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button onClick={onClose} style={{
+          <button type="button" onClick={onClose} style={{
             padding: '6px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
             color: '#aaa', background: 'transparent', border: '1px solid #333',
             borderRadius: 6, cursor: 'pointer',
@@ -80,6 +98,7 @@ export function GenerateTestQueriesModal({ onConfirm, onClose }: Props) {
             Cancel
           </button>
           <button
+            type="button"
             onClick={() => onConfirm(choice)}
             style={{
               padding: '6px 14px', fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
@@ -91,6 +110,7 @@ export function GenerateTestQueriesModal({ onConfirm, onClose }: Props) {
           </button>
         </div>
       </div>
+      </FocusTrap>
     </div>
   )
 }

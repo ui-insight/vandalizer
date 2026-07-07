@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
+import { FocusTrap } from 'focus-trap-react'
 import { AlertTriangle, CheckCircle2, MinusCircle, X } from 'lucide-react'
 
 /** Generic per-item entry — matches ``optimization_common.build_apply_preview``. */
@@ -60,12 +61,20 @@ export function ApplyPreviewModal({
     })
   }, [preview.items])
 
+  useEffect(() => {
+    if (!open) return
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel() }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [open, onCancel])
+
   if (!open) return null
 
   return (
     <div
       role="dialog"
       aria-modal="true"
+      aria-label="Confirm apply"
       style={{
         position: 'fixed', inset: 0,
         background: 'rgba(0, 0, 0, 0.6)',
@@ -74,6 +83,7 @@ export function ApplyPreviewModal({
       }}
       onClick={onCancel}
     >
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
@@ -148,10 +158,10 @@ export function ApplyPreviewModal({
             <table style={{ width: '100%', fontSize: 12, borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ color: '#888', textAlign: 'left' }}>
-                  <th style={{ padding: '6px 8px', fontWeight: 500 }}>{capitalize(itemNoun)}</th>
-                  <th style={{ padding: '6px 8px', fontWeight: 500, textAlign: 'right' }}>Current</th>
-                  <th style={{ padding: '6px 8px', fontWeight: 500, textAlign: 'right' }}>After apply</th>
-                  <th style={{ padding: '6px 8px', fontWeight: 500, textAlign: 'right' }}>Δ</th>
+                  <th scope="col" style={{ padding: '6px 8px', fontWeight: 500 }}>{capitalize(itemNoun)}</th>
+                  <th scope="col" style={{ padding: '6px 8px', fontWeight: 500, textAlign: 'right' }}>Current</th>
+                  <th scope="col" style={{ padding: '6px 8px', fontWeight: 500, textAlign: 'right' }}>After apply</th>
+                  <th scope="col" style={{ padding: '6px 8px', fontWeight: 500, textAlign: 'right' }}>Δ</th>
                 </tr>
               </thead>
               <tbody>
@@ -246,6 +256,7 @@ export function ApplyPreviewModal({
           </div>
         </footer>
       </div>
+      </FocusTrap>
     </div>
   )
 }

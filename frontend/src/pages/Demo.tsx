@@ -294,6 +294,7 @@ function StatusCheck() {
       <form onSubmit={handleCheck} className="flex gap-3">
         <input
           type="text"
+          aria-label="Application ID"
           placeholder="Enter your application ID"
           value={uuid}
           onChange={(e) => setUuid(e.target.value)}
@@ -401,18 +402,21 @@ export default function Demo() {
       content: (
         <>
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Full Name *</label>
+            <label htmlFor="demo-name" className="block text-sm font-medium text-gray-300 mb-2">Full Name *</label>
             <input
+              id="demo-name"
               type="text"
               required
+              autoComplete="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               className={INPUT_CLASS}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Title</label>
+            <label htmlFor="demo-title" className="block text-sm font-medium text-gray-300 mb-2">Title</label>
             <input
+              id="demo-title"
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -421,20 +425,24 @@ export default function Demo() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">Email Address *</label>
+            <label htmlFor="demo-email" className="block text-sm font-medium text-gray-300 mb-2">Email Address *</label>
             <input
+              id="demo-email"
               type="email"
               required
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className={INPUT_CLASS}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">University / Organization *</label>
+            <label htmlFor="demo-org" className="block text-sm font-medium text-gray-300 mb-2">University / Organization *</label>
             <input
+              id="demo-org"
               type="text"
               required
+              autoComplete="organization"
               value={organization}
               onChange={(e) => setOrganization(e.target.value)}
               placeholder="e.g., University of Idaho"
@@ -470,6 +478,7 @@ export default function Demo() {
 
   return (
     <div className="bg-[#0a0a0a] text-gray-200 antialiased min-h-screen">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-[1000] focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:shadow-lg focus:ring-2 focus:ring-highlight">Skip to main content</a>
       {/* Nav */}
       <nav className="fixed top-0 inset-x-0 z-50 bg-[#0a0a0a]/80 backdrop-blur-md border-b border-white/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
@@ -494,7 +503,7 @@ export default function Demo() {
         </div>
       </nav>
 
-      <div className="relative z-10 pt-28 pb-16">
+      <main id="main-content" className="relative z-10 pt-28 pb-16">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Hero */}
           <div className="text-center mb-16">
@@ -570,7 +579,7 @@ export default function Demo() {
             </div>
           )}
         </div>
-      </div>
+      </main>
 
       <Footer />
     </div>

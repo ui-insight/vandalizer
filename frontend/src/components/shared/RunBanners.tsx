@@ -6,7 +6,7 @@ interface ErrorBannerProps {
 
 export function ErrorBanner({ message }: ErrorBannerProps) {
   return (
-    <div style={{
+    <div role="alert" style={{
       padding: 10, marginBottom: 10, fontSize: 12,
       color: '#fca5a5', backgroundColor: 'rgba(239, 68, 68, 0.1)',
       border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: 6,
@@ -101,7 +101,7 @@ export function FailedBanner({
 }: FailedBannerProps) {
   const remediation = errorCode ? REMEDIATIONS[errorCode] : null
   return (
-    <div style={{
+    <div role="alert" style={{
       padding: 14, backgroundColor: 'rgba(239, 68, 68, 0.08)',
       border: '1px solid rgba(239, 68, 68, 0.3)', borderRadius: 8,
     }}>
@@ -154,7 +154,7 @@ interface CancelledBannerProps {
 
 export function CancelledBanner({ completedTrials, onRunAgain, title = 'Optimization cancelled', retryLabel = 'Run again' }: CancelledBannerProps) {
   return (
-    <div style={{
+    <div role="status" style={{
       padding: 14, backgroundColor: '#1f1f1f',
       border: '1px solid #333', borderRadius: 8,
     }}>

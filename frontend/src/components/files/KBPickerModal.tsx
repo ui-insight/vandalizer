@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { FocusTrap } from 'focus-trap-react'
 import { X, Library, Plus, Loader2 } from 'lucide-react'
 import { listKnowledgeBasesV2, createKnowledgeBase } from '../../api/knowledge'
 import type { KnowledgeBase } from '../../types/knowledge'
@@ -43,6 +44,7 @@ export function KBPickerModal({ onSelect, onClose, folderTitle }: KBPickerModalP
       style={{ zIndex: 700 }}
       onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}
     >
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
       <div
         className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl"
         role="dialog"
@@ -51,7 +53,7 @@ export function KBPickerModal({ onSelect, onClose, folderTitle }: KBPickerModalP
       >
         <div className="mb-1 flex items-center justify-between">
           <h3 id="kb-picker-title" className="text-lg font-medium text-gray-900">Add to knowledge base</h3>
-          <button onClick={onClose} aria-label="Close" className="text-gray-400 hover:text-gray-600">
+          <button type="button" onClick={onClose} aria-label="Close" className="text-gray-500 hover:text-gray-700">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -59,7 +61,7 @@ export function KBPickerModal({ onSelect, onClose, folderTitle }: KBPickerModalP
           Add the documents in <strong className="text-gray-700">{folderTitle}</strong> to:
         </p>
 
-        {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
+        {error && <p role="alert" className="mb-2 text-sm text-red-600">{error}</p>}
         {!kbs && !error && (
           <p className="flex items-center gap-2 text-sm text-gray-500">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading…
@@ -75,11 +77,12 @@ export function KBPickerModal({ onSelect, onClose, folderTitle }: KBPickerModalP
                 {kbs.map(kb => (
                   <li key={kb.uuid}>
                     <button
+                      type="button"
                       disabled={busy}
                       onClick={() => { setBusy(true); onSelect(kb.uuid, kb.title) }}
                       className="flex w-full items-center gap-2.5 px-3 py-2.5 text-sm text-left text-[#111] hover:bg-black/[.04] disabled:opacity-50"
                     >
-                      <Library className="h-4 w-4 shrink-0 text-gray-400" />
+                      <Library className="h-4 w-4 shrink-0 text-gray-500" />
                       <span className="truncate">{kb.title}</span>
                     </button>
                   </li>
@@ -94,6 +97,7 @@ export function KBPickerModal({ onSelect, onClose, folderTitle }: KBPickerModalP
             <input
               autoFocus
               type="text"
+              aria-label="New knowledge base name"
               placeholder="New knowledge base name"
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
@@ -109,6 +113,7 @@ export function KBPickerModal({ onSelect, onClose, folderTitle }: KBPickerModalP
           </form>
         ) : (
           <button
+            type="button"
             onClick={() => setCreating(true)}
             className="mt-3 flex items-center gap-1.5 text-sm font-medium text-gray-700 hover:text-gray-900"
           >
@@ -116,6 +121,7 @@ export function KBPickerModal({ onSelect, onClose, folderTitle }: KBPickerModalP
           </button>
         )}
       </div>
+      </FocusTrap>
     </div>
   )
 }

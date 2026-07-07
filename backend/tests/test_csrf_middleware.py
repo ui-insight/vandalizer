@@ -174,6 +174,29 @@ class TestCSRFMiddleware:
         assert resp.status_code == 200
 
     @pytest.mark.asyncio
+    async def test_telemetry_heartbeat_bypasses_csrf(self, client):
+        """POST to /api/telemetry/heartbeat bypasses CSRF.
+
+        Fleet heartbeats arrive cross-origin from arbitrary deployments that
+        share no session or CSRF cookie with the collector, so the double-submit
+        token can never be present. Without the exemption every heartbeat 403s.
+        (The ingest route is only registered on the collector instance, so here
+        the request falls through to a 404 — the point is it MUST NOT be a 403
+        from the CSRF middleware.)
+        """
+        resp = await client.post(
+            "/api/telemetry/heartbeat",
+            json={
+                "schema": 1,
+                "instance_id": "diag-test-00000001",
+                "version": "test",
+                "environment": "other",
+                "metrics": {},
+            },
+        )
+        assert resp.status_code != 403, resp.text
+
+    @pytest.mark.asyncio
     async def test_saml_acs_bypasses_csrf(self, client):
         """POST to /api/auth/saml/acs (cross-site from IdP) bypasses CSRF.
 

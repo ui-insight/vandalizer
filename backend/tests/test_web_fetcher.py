@@ -238,3 +238,71 @@ def test_sync_wrapper_runs_async_path():
 
     assert isinstance(result, WebFetchResult)
     assert "reimburse" in result.text.lower()
+
+
+# ---------------------------------------------------------------------------
+# PDF URLs are parsed as PDFs, not decoded as HTML
+# ---------------------------------------------------------------------------
+
+def _tiny_pdf_bytes(text: str) -> bytes:
+    """Build a one-page text PDF in memory via PyMuPDF."""
+    import pymupdf
+
+    doc = pymupdf.open()
+    page = doc.new_page()
+    page.insert_text((72, 72), text)
+    data = doc.tobytes()
+    doc.close()
+    return data
+
+
+def _mock_pdf_client(content: bytes, content_type: str = "application/pdf", status: int = 200):
+    resp = MagicMock()
+    resp.content = content
+    resp.status_code = status
+    resp.headers = {"content-type": content_type}
+    resp.raise_for_status = MagicMock()
+    # resp.text would be binary garbage — assert we never read it for PDFs.
+    type(resp).text = property(lambda self: (_ for _ in ()).throw(
+        AssertionError("fetch_url must not decode PDF bytes as text")
+    ))
+
+    client = MagicMock()
+    client.get = AsyncMock(return_value=resp)
+    client.__aenter__ = AsyncMock(return_value=client)
+    client.__aexit__ = AsyncMock(return_value=False)
+    return client
+
+
+@pytest.mark.asyncio
+async def test_pdf_content_type_is_extracted_as_pdf():
+    settings = Settings(web_fetcher_browser_enabled=False)
+    pdf = _tiny_pdf_bytes("USDA General Terms and Conditions for Federal Awards")
+
+    with patch("app.services.web_fetcher.httpx.AsyncClient",
+               return_value=_mock_pdf_client(pdf)), \
+         patch("app.services.web_fetcher.validate_outbound_url",
+               return_value="https://www.usda.gov/x/terms.pdf"):
+        result = await fetch_url("https://www.usda.gov/x/terms.pdf", settings=settings)
+
+    assert "USDA General Terms" in result.text
+    # No HTML to crawl from a PDF — parent_html must be None.
+    assert result.raw_html is None
+    assert result.used_browser is False
+    assert result.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_pdf_detected_by_url_extension_when_content_type_generic():
+    """A .pdf URL served as octet-stream is still parsed as a PDF."""
+    settings = Settings(web_fetcher_browser_enabled=False)
+    pdf = _tiny_pdf_bytes("Effective December 31 2025")
+
+    with patch("app.services.web_fetcher.httpx.AsyncClient",
+               return_value=_mock_pdf_client(pdf, content_type="application/octet-stream")), \
+         patch("app.services.web_fetcher.validate_outbound_url",
+               return_value="https://example.gov/doc.pdf"):
+        result = await fetch_url("https://example.gov/doc.pdf", settings=settings)
+
+    assert "Effective December 31 2025" in result.text
+    assert result.raw_html is None

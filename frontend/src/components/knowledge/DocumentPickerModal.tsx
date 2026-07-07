@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { FocusTrap } from 'focus-trap-react'
 import { X, Search, FileText, Loader2, Check, Upload, FolderIcon } from 'lucide-react'
 import { searchDocuments, type SearchResult } from '../../api/documents'
 import { listAllFolders, type FolderSummary } from '../../api/folders'
@@ -73,6 +74,15 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
       setLoading(false)
     }
   }, [existingSourceUuids])
+
+  // Close on Escape
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
 
   // Load folders on mount
   useEffect(() => {
@@ -235,9 +245,13 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
       }}
       onClick={onClose}
     >
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Add Documents"
         style={{
-          width: 560, maxHeight: '85vh',
+          width: 560, maxWidth: '100vw', maxHeight: '85vh',
           backgroundColor: '#1e1e1e', borderRadius: 12,
           border: dragActive ? '1px dashed var(--highlight-color, #eab308)' : '1px solid #3a3a3a',
           padding: 24,
@@ -266,10 +280,12 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={{ fontSize: 16, fontWeight: 600, color: '#fff' }}>Add Documents</span>
           <button
+            type="button"
+            aria-label="Close"
             onClick={onClose}
             style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, display: 'flex' }}
           >
-            <X size={18} style={{ color: '#888' }} />
+            <X size={18} style={{ color: '#888' }} aria-hidden="true" />
           </button>
         </div>
 
@@ -280,11 +296,13 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
               ref={fileInputRef}
               type="file"
               multiple
+              aria-label="Upload files"
               accept={ACCEPT_ATTR}
               onChange={onFileInputChange}
               style={{ display: 'none' }}
             />
             <button
+              type="button"
               onClick={() => fileInputRef.current?.click()}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
@@ -293,7 +311,7 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
                 border: 'none', borderRadius: 6, cursor: 'pointer',
               }}
             >
-              <Upload size={14} />
+              <Upload size={14} aria-hidden="true" />
               Upload files
             </button>
             <span style={{ fontSize: 12, color: '#888' }}>
@@ -308,29 +326,31 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
         {/* Folder filter + Search */}
         <div style={{ display: 'flex', gap: 8 }}>
           <div style={{ position: 'relative', flex: 1 }}>
-            <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#666' }} />
+            <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#666' }} aria-hidden="true" />
             <input
               type="text"
+              aria-label="Search documents by name or content"
               value={query}
               onChange={e => setQuery(e.target.value)}
               placeholder="Search by name or content..."
               style={{
                 width: '100%', padding: '10px 12px 10px 34px', fontSize: 13, fontFamily: 'inherit',
                 backgroundColor: '#2a2a2a', color: '#e5e5e5',
-                border: '1px solid #3a3a3a', borderRadius: 8, outline: 'none',
+                border: '1px solid #3a3a3a', borderRadius: 8,
                 boxSizing: 'border-box',
               }}
             />
           </div>
           <div style={{ position: 'relative', width: 180 }}>
-            <FolderIcon size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#666', pointerEvents: 'none' }} />
+            <FolderIcon size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#666', pointerEvents: 'none' }} aria-hidden="true" />
             <select
+              aria-label="Filter by folder"
               value={folderFilter}
               onChange={e => setFolderFilter(e.target.value)}
               style={{
                 width: '100%', padding: '10px 10px 10px 30px', fontSize: 13, fontFamily: 'inherit',
                 backgroundColor: '#2a2a2a', color: '#e5e5e5',
-                border: '1px solid #3a3a3a', borderRadius: 8, outline: 'none',
+                border: '1px solid #3a3a3a', borderRadius: 8,
                 appearance: 'none', boxSizing: 'border-box', cursor: 'pointer',
               }}
             >
@@ -360,6 +380,7 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
               Include subfolders
             </label>
             <button
+              type="button"
               onClick={() => onSubmitFolder(folderFilter, includeSubfolders)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 6,
@@ -368,7 +389,7 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
                 border: 'none', borderRadius: 6, cursor: 'pointer', whiteSpace: 'nowrap',
               }}
             >
-              <FolderIcon size={13} />
+              <FolderIcon size={13} aria-hidden="true" />
               Add entire folder
             </button>
           </div>
@@ -384,9 +405,9 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
           }}>
             {uploads.map(u => (
               <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-                {u.status === 'uploading' && <Loader2 size={12} style={{ color: '#888', animation: 'spin 1s linear infinite' }} />}
-                {u.status === 'done' && <Check size={12} style={{ color: '#6a9955' }} />}
-                {u.status === 'error' && <X size={12} style={{ color: '#c75450' }} />}
+                {u.status === 'uploading' && <Loader2 size={12} style={{ color: '#888', animation: 'spin 1s linear infinite' }} aria-hidden="true" />}
+                {u.status === 'done' && <Check size={12} style={{ color: '#6a9955' }} aria-hidden="true" />}
+                {u.status === 'error' && <X size={12} style={{ color: '#c75450' }} aria-hidden="true" />}
                 <span style={{ color: '#ccc', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {u.name}
                 </span>
@@ -394,6 +415,7 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
                 {u.status === 'done' && <span style={{ color: '#6a9955', fontSize: 11 }}>uploaded &amp; selected</span>}
                 {u.status !== 'uploading' && (
                   <button
+                    type="button"
                     onClick={() => removeUpload(u.id)}
                     aria-label={`Remove ${u.name}`}
                     title="Remove"
@@ -402,7 +424,7 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
                       padding: 2, display: 'flex', color: '#888',
                     }}
                   >
-                    <X size={12} />
+                    <X size={12} aria-hidden="true" />
                   </button>
                 )}
               </div>
@@ -413,11 +435,12 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
         {/* Results */}
         <div style={{ flex: 1, overflowY: 'auto', maxHeight: 360, minHeight: 120 }}>
           {loading ? (
-            <div style={{ textAlign: 'center', padding: 30, color: '#888' }}>
-              <Loader2 style={{ width: 18, height: 18, margin: '0 auto', animation: 'spin 1s linear infinite' }} />
+            <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 30, color: '#888' }}>
+              <Loader2 style={{ width: 18, height: 18, margin: '0 auto', animation: 'spin 1s linear infinite' }} aria-hidden="true" />
+              <span style={{ position: 'absolute', width: 1, height: 1, overflow: 'hidden', clip: 'rect(0 0 0 0)' }}>Loading documents…</span>
             </div>
           ) : results.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 30, color: '#888', fontSize: 13 }}>
+            <div role="status" aria-live="polite" style={{ textAlign: 'center', padding: 30, color: '#888', fontSize: 13 }}>
               {query ? 'No documents found' : folderFilter ? 'No documents in this folder' : 'No documents available. Upload some above.'}
             </div>
           ) : (
@@ -428,6 +451,8 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
                 return (
                   <button
                     key={doc.uuid}
+                    type="button"
+                    aria-pressed={isSelected}
                     onClick={() => toggleDoc(doc.uuid)}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 10,
@@ -446,9 +471,9 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                       }}
                     >
-                      {isSelected && <Check size={12} style={{ color: '#000' }} />}
+                      {isSelected && <Check size={12} style={{ color: '#000' }} aria-hidden="true" />}
                     </div>
-                    <FileText size={14} style={{ color: '#888', flexShrink: 0 }} />
+                    <FileText size={14} style={{ color: '#888', flexShrink: 0 }} aria-hidden="true" />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{
                         fontSize: 13, color: '#e5e5e5', overflow: 'hidden',
@@ -474,12 +499,13 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
 
         {/* Footer */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: 12, color: '#888' }}>
+          <span role="status" aria-live="polite" style={{ fontSize: 12, color: '#888' }}>
             {selected.size > 0 ? `${selected.size} selected` : ''}
             {uploadingCount > 0 ? `${selected.size > 0 ? ' · ' : ''}${uploadingCount} uploading` : ''}
           </span>
           <div style={{ display: 'flex', gap: 8 }}>
             <button
+              type="button"
               onClick={onClose}
               style={{
                 padding: '8px 16px', fontSize: 13, fontWeight: 500, fontFamily: 'inherit',
@@ -490,6 +516,7 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
               Cancel
             </button>
             <button
+              type="button"
               onClick={handleSubmit}
               disabled={selected.size === 0 || uploadingCount > 0}
               style={{
@@ -505,6 +532,7 @@ export function DocumentPickerModal({ onSubmit, onClose, existingSourceUuids = [
           </div>
         </div>
       </div>
+      </FocusTrap>
     </div>
   )
 }

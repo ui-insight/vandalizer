@@ -28,9 +28,12 @@ export default function Present() {
   // Hub
   if (!params.audience) {
     return (
-      <PresentShell showSidebar={false}>
-        <PresentHub />
-      </PresentShell>
+      <>
+        <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-[1000] focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:shadow-lg focus:ring-2 focus:ring-highlight">Skip to main content</a>
+        <PresentShell showSidebar={false}>
+          <PresentHub />
+        </PresentShell>
+      </>
     )
   }
 
@@ -70,6 +73,7 @@ export default function Present() {
 
   return (
     <>
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-[1000] focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:shadow-lg focus:ring-2 focus:ring-highlight">Skip to main content</a>
       {/* On-screen read view — hidden when printing (the handout prints instead) */}
       <div className="no-print">
         <PresentShell activeAudience={audience}>

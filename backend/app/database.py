@@ -49,6 +49,7 @@ from app.models.api_key import ApiKey
 from app.models.credential import Credential
 from app.models.llm_usage import LlmUsageRecord
 from app.models.project import Project, ProjectMembership, ProjectPin, ProjectJoinLink
+from app.models.telemetry import TelemetryHeartbeat
 
 ALL_MODELS = [
     User,
@@ -121,6 +122,7 @@ ALL_MODELS = [
     ProjectMembership,
     ProjectPin,
     ProjectJoinLink,
+    TelemetryHeartbeat,
 ]
 
 
@@ -138,7 +140,15 @@ def get_client() -> AsyncIOMotorClient:
     return _client
 
 
-async def init_db(settings: Settings) -> None:
+async def init_db(settings: Settings, skip_indexes: bool = False) -> None:
+    """Initialize the Motor client and Beanie ODM.
+
+    ``skip_indexes=True`` skips Beanie's per-collection index management
+    (the ``listIndexes``/``buildInfo`` round-trips), which is redundant for
+    short-lived periodic Celery tasks — indexes are already ensured by the
+    web app startup. Leave it ``False`` for the app process so indexes are
+    created/updated on deploy.
+    """
     global _client
     _client = AsyncIOMotorClient(
         settings.mongo_host,
@@ -152,4 +162,5 @@ async def init_db(settings: Settings) -> None:
     await init_beanie(
         database=_client[settings.mongo_db],
         document_models=ALL_MODELS,
+        skip_indexes=skip_indexes,
     )

@@ -163,6 +163,10 @@ class TestRequireMgmtScope:
                 ))
                 M.find = MagicMock(return_value=MagicMock(
                     count=AsyncMock(return_value=0),
+                ))
+                # /stats reads distinct active users through the motor
+                # collection — Beanie's FindMany has no `.distinct()`.
+                M.get_motor_collection = MagicMock(return_value=MagicMock(
                     distinct=AsyncMock(return_value=[]),
                 ))
             # /stats now sums token_count via a Beanie aggregation rather than
@@ -208,6 +212,10 @@ class TestRequireMgmtScope:
                 ))
                 M.find = MagicMock(return_value=MagicMock(
                     count=AsyncMock(return_value=0),
+                ))
+                # /stats reads distinct active users through the motor
+                # collection — Beanie's FindMany has no `.distinct()`.
+                M.get_motor_collection = MagicMock(return_value=MagicMock(
                     distinct=AsyncMock(return_value=[]),
                 ))
             aggregate_mock = MagicMock(return_value=MagicMock(
@@ -255,6 +263,10 @@ class TestRequireMgmtScope:
                 ))
                 M.find = MagicMock(return_value=MagicMock(
                     count=AsyncMock(return_value=0),
+                ))
+                # /stats reads distinct active users through the motor
+                # collection — Beanie's FindMany has no `.distinct()`.
+                M.get_motor_collection = MagicMock(return_value=MagicMock(
                     distinct=AsyncMock(return_value=[]),
                 ))
             MockDoc.aggregate = MagicMock(return_value=MagicMock(
@@ -294,6 +306,10 @@ class TestRequireMgmtScope:
                 ))
                 M.find = MagicMock(return_value=MagicMock(
                     count=AsyncMock(return_value=0),
+                ))
+                # /stats reads distinct active users through the motor
+                # collection — Beanie's FindMany has no `.distinct()`.
+                M.get_motor_collection = MagicMock(return_value=MagicMock(
                     distinct=AsyncMock(return_value=[]),
                 ))
             MockDoc.aggregate = MagicMock(return_value=MagicMock(

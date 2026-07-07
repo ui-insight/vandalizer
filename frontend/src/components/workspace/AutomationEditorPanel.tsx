@@ -151,6 +151,7 @@ export function AutomationEditorPanel() {
           {editingTitle ? (
             <input
               ref={titleInputRef}
+              aria-label="Automation name"
               value={titleValue}
               onChange={e => setTitleValue(e.target.value)}
               onBlur={handleTitleSave}
@@ -160,7 +161,7 @@ export function AutomationEditorPanel() {
               }}
               style={{
                 fontSize: 18, fontWeight: 600, color: '#202124', border: '1px solid #d1d5db',
-                borderRadius: 4, padding: '2px 8px', fontFamily: 'inherit', outline: 'none',
+                borderRadius: 4, padding: '2px 8px', fontFamily: 'inherit',
                 flex: 1, marginRight: 8,
               }}
             />
@@ -254,6 +255,7 @@ export function AutomationEditorPanel() {
         {/* Description */}
         <input
           type="text"
+          aria-label="Automation description"
           defaultValue={automation.description || ''}
           disabled={!canManage}
           onBlur={e => {
@@ -263,7 +265,7 @@ export function AutomationEditorPanel() {
           placeholder="Add a description..."
           style={{
             width: '100%', padding: '6px 0', fontSize: 13, color: '#6b7280',
-            border: 'none', borderBottom: '1px solid transparent', outline: 'none',
+            border: 'none', borderBottom: '1px solid transparent',
             fontFamily: 'inherit', backgroundColor: 'transparent', marginBottom: 20,
             boxSizing: 'border-box',
           }}
@@ -346,7 +348,7 @@ export function AutomationEditorPanel() {
                 {!opt.enabled && (
                   <span style={{
                     fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 10,
-                    backgroundColor: '#f3f4f6', color: '#9ca3af', textTransform: 'uppercase',
+                    backgroundColor: '#f3f4f6', color: '#6b7280', textTransform: 'uppercase',
                   }}>
                     Coming Soon
                   </span>
@@ -381,7 +383,7 @@ export function AutomationEditorPanel() {
                 style={{
                   width: '100%', padding: '10px 14px', fontSize: 13,
                   border: '1.5px solid #d1d5db', borderRadius: 8, fontFamily: 'inherit',
-                  backgroundColor: '#fff', color: currentName ? '#111827' : '#9ca3af',
+                  backgroundColor: '#fff', color: currentName ? '#111827' : '#6b7280',
                   cursor: 'pointer', textAlign: 'left',
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 }}
@@ -522,16 +524,17 @@ function FolderWatchConfig({ automation, onSave }: { automation: Automation; onS
 
   return (
     <div style={{ padding: '16px', marginBottom: 32, backgroundColor: '#f9fafb', borderRadius: 8, border: '1px solid #e5e7eb' }}>
-      <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>
+      <label htmlFor="automation-watch-folder" style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>
         Watch Folder
       </label>
       <select
+        id="automation-watch-folder"
         value={watchedFolder}
         onChange={e => onSave({ trigger_config: { ...config, folder_id: e.target.value || undefined } })}
         style={{
           width: '100%', padding: '8px 12px', fontSize: 13,
           border: '1px solid #d1d5db', borderRadius: 6, fontFamily: 'inherit',
-          backgroundColor: '#fff', color: '#202124', outline: 'none', marginBottom: 16,
+          backgroundColor: '#fff', color: '#202124', marginBottom: 16,
         }}
       >
         <option value="">Select a folder to watch</option>
@@ -561,17 +564,18 @@ function FolderWatchConfig({ automation, onSave }: { automation: Automation; onS
         ))}
       </div>
 
-      <label style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>
+      <label htmlFor="automation-exclude-patterns" style={{ fontSize: 13, fontWeight: 600, color: '#374151', display: 'block', marginBottom: 8 }}>
         Exclude Patterns
       </label>
       <input
+        id="automation-exclude-patterns"
         type="text"
         placeholder="e.g. draft*, temp_*"
         defaultValue={excludePatterns}
         onBlur={e => onSave({ trigger_config: { ...config, exclude_patterns: e.target.value } })}
         style={{
           width: '100%', padding: '8px 12px', fontSize: 13, border: '1px solid #d1d5db',
-          borderRadius: 6, fontFamily: 'inherit', outline: 'none', marginBottom: 16,
+          borderRadius: 6, fontFamily: 'inherit', marginBottom: 16,
           boxSizing: 'border-box',
         }}
       />
@@ -584,7 +588,7 @@ function FolderWatchConfig({ automation, onSave }: { automation: Automation; onS
           style={{ width: 16, height: 16, accentColor: '#3b82f6' }}
         />
         <span style={{ fontWeight: 500 }}>Batch mode</span>
-        <span style={{ color: '#9ca3af', fontSize: 12 }}>wait and process files together</span>
+        <span style={{ color: '#6b7280', fontSize: 12 }}>wait and process files together</span>
       </label>
     </div>
   )
@@ -704,7 +708,7 @@ curl "${baseUrl}/api/workflows/status?session_id=SESSION_ID_FROM_RESPONSE" \\
 
       {/* Endpoint */}
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
           Endpoint
         </div>
         <div style={{ ...codeBlockStyle, whiteSpace: 'nowrap' }}>
@@ -744,7 +748,7 @@ curl "${baseUrl}/api/workflows/status?session_id=SESSION_ID_FROM_RESPONSE" \\
 
       {/* Response example */}
       <div style={{ marginBottom: 16 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
           Response
         </div>
         <div style={codeBlockStyle}>
@@ -774,7 +778,7 @@ function CodeBlock({ title, code, id, copied, onCopy, style }: {
   return (
     <div style={{ marginBottom: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        <div style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           {title}
         </div>
         <button
@@ -832,16 +836,17 @@ function OutputStorageCard({ automation, onSave }: { automation: Automation; onS
       {enabled && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 24 }}>
           <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
+            <label htmlFor="automation-storage-destination-folder" style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
               Destination Folder
             </label>
             <select
+              id="automation-storage-destination-folder"
               value={destinationFolder}
               onChange={e => updateStorage({ destination_folder: e.target.value })}
               style={{
                 width: '100%', padding: '8px 12px', fontSize: 13,
                 border: '1px solid #d1d5db', borderRadius: 6, fontFamily: 'inherit',
-                backgroundColor: '#fff', color: '#202124', outline: 'none',
+                backgroundColor: '#fff', color: '#202124',
               }}
             >
               <option value="">Select folder</option>
@@ -852,16 +857,17 @@ function OutputStorageCard({ automation, onSave }: { automation: Automation; onS
           </div>
 
           <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
+            <label htmlFor="automation-storage-format" style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
               Format
             </label>
             <select
+              id="automation-storage-format"
               value={format}
               onChange={e => updateStorage({ format: e.target.value })}
               style={{
                 width: '100%', padding: '8px 12px', fontSize: 13,
                 border: '1px solid #d1d5db', borderRadius: 6, fontFamily: 'inherit',
-                backgroundColor: '#fff', color: '#202124', outline: 'none',
+                backgroundColor: '#fff', color: '#202124',
               }}
             >
               {automation.action_type === 'extraction' ? (
@@ -884,20 +890,21 @@ function OutputStorageCard({ automation, onSave }: { automation: Automation; onS
           </div>
 
           <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
+            <label htmlFor="automation-storage-file-naming" style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
               File Naming Pattern
             </label>
             <input
+              id="automation-storage-file-naming"
               type="text"
               defaultValue={fileNaming}
               onBlur={e => updateStorage({ file_naming: e.target.value })}
               placeholder="{workflow_name}_{date}"
               style={{
                 width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
-                border: '1px solid #d1d5db', borderRadius: 6, outline: 'none', boxSizing: 'border-box',
+                border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box',
               }}
             />
-            <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
+            <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
               Variables: {'{workflow_name}'}, {'{date}'}, {'{timestamp}'}, {'{document_name}'}
             </div>
           </div>
@@ -955,17 +962,18 @@ function OutputNotificationCard({ automation, onSave }: { automation: Automation
       {enabled && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 24 }}>
           <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
+            <label htmlFor="automation-notif-recipients" style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
               Recipients
             </label>
             <input
+              id="automation-notif-recipients"
               type="text"
               defaultValue={recipients}
               onBlur={e => updateNotification({ recipients_str: e.target.value })}
               placeholder="email@example.com, another@example.com"
               style={{
                 width: '100%', padding: '8px 12px', fontSize: 13, fontFamily: 'inherit',
-                border: '1px solid #d1d5db', borderRadius: 6, outline: 'none', boxSizing: 'border-box',
+                border: '1px solid #d1d5db', borderRadius: 6, boxSizing: 'border-box',
               }}
             />
           </div>
@@ -981,16 +989,17 @@ function OutputNotificationCard({ automation, onSave }: { automation: Automation
           </label>
 
           <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
+            <label htmlFor="automation-notif-conditions" style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', display: 'block', marginBottom: 4 }}>
               Send when
             </label>
             <select
+              id="automation-notif-conditions"
               value={conditions}
               onChange={e => updateNotification({ conditions: e.target.value })}
               style={{
                 width: '100%', padding: '8px 12px', fontSize: 13,
                 border: '1px solid #d1d5db', borderRadius: 6, fontFamily: 'inherit',
-                backgroundColor: '#fff', color: '#202124', outline: 'none',
+                backgroundColor: '#fff', color: '#202124',
               }}
             >
               <option value="always">Always</option>

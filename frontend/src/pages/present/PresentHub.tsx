@@ -45,7 +45,7 @@ function PitchQuickCopy({ audience }: { audience: AudienceId }) {
 
 export function PresentHub() {
   return (
-    <div className="space-y-12">
+    <div id="main-content" tabIndex={-1} className="space-y-12">
       {/* Hero */}
       <header>
         <h1 className="text-4xl sm:text-5xl font-bold text-white tracking-tight">

@@ -65,6 +65,16 @@ DEFAULT_RETENTION_CONFIG = {
     "activity_stale_threshold_minutes": 30,
 }
 
+DEFAULT_TELEMETRY_CONFIG = {
+    # decided=True once an admin has made an explicit in-app choice; until then
+    # the env default (settings.telemetry_enabled) governs and the opt-in banner
+    # may show. organization/contact_email are the voluntary identity tier.
+    "decided": False,
+    "enabled": False,
+    "organization": "",
+    "contact_email": "",
+}
+
 DEFAULT_COMPLIANCE_CONFIG = {
     "enabled": False,
     "check_on_upload": True,
@@ -157,6 +167,11 @@ class SystemConfig(Document):
     # Compliance configuration (document content checks on upload)
     compliance_config: dict = {}
 
+    # Anonymous telemetry decision (see DEFAULT_TELEMETRY_CONFIG). Lets the
+    # in-app opt-in banner durably enable/disable the heartbeat without an env
+    # edit; empty until an admin decides.
+    telemetry_config: dict = {}
+
     # UI Configuration
     highlight_color: str = "#eab308"
     ui_radius: str = "12px"
@@ -169,6 +184,9 @@ class SystemConfig(Document):
     org_name: str = ""
     logo_data_url: str = ""
     icon_data_url: str = ""
+    # When true, the icon is still used as the favicon and chat avatar but is
+    # hidden from the top navigation header (next to the wordmark).
+    icon_hide_in_nav: bool = False
 
     # Authentication
     auth_methods: list[str] = ["password"]
@@ -251,6 +269,13 @@ class SystemConfig(Document):
         config = deepcopy(DEFAULT_COMPLIANCE_CONFIG)
         if self.compliance_config:
             _deep_merge(config, self.compliance_config)
+        return config
+
+    def get_telemetry_config(self) -> dict:
+        """Return telemetry decision with defaults merged in."""
+        config = deepcopy(DEFAULT_TELEMETRY_CONFIG)
+        if self.telemetry_config:
+            _deep_merge(config, self.telemetry_config)
         return config
 
     def is_compliance_enabled(self) -> bool:

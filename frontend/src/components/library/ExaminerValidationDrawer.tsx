@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { FocusTrap } from 'focus-trap-react'
 import { X, Plus, Trash2, Save, ExternalLink, AlertTriangle } from 'lucide-react'
 import { claimVerificationRequest, releaseVerificationRequest, setExaminerAdditions } from '../../api/library'
 import type { VerificationRequest, ExaminerBaselineAdditions } from '../../types/library'
@@ -19,7 +20,7 @@ interface CheckRow { description: string; target_step: string }
 const inputStyle: React.CSSProperties = {
   width: '100%', padding: '6px 10px',
   border: '1px solid #d1d5db', borderRadius: 6,
-  fontSize: 12, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box',
+  fontSize: 12, fontFamily: 'inherit', boxSizing: 'border-box',
 }
 const labelStyle: React.CSSProperties = {
   display: 'block', fontSize: 11, fontWeight: 600, color: '#374151', marginBottom: 3,
@@ -86,6 +87,12 @@ export function ExaminerValidationDrawer({ request, currentUserId, onClose, onSa
       }
     }
   }, [request.uuid, request.claimed_by_user_id, currentUserId])
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
 
   const handleSave = async () => {
     setSaving(true)
@@ -162,7 +169,12 @@ export function ExaminerValidationDrawer({ request, currentUserId, onClose, onSa
     }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div style={{
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Validation workshop"
+        style={{
         background: '#fff', width: '100%', maxWidth: 720, height: '100vh',
         display: 'flex', flexDirection: 'column', boxShadow: '-10px 0 30px rgba(0,0,0,0.2)',
       }}>
@@ -195,7 +207,10 @@ export function ExaminerValidationDrawer({ request, currentUserId, onClose, onSa
           </div>
         )}
         {claimError && !otherHolder && (
-          <div style={{
+          <div
+            role="status"
+            aria-live="polite"
+            style={{
             margin: '12px 20px 0', padding: '8px 12px',
             background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 6,
             fontSize: 12, color: '#991b1b',
@@ -204,7 +219,10 @@ export function ExaminerValidationDrawer({ request, currentUserId, onClose, onSa
           </div>
         )}
         {claimed && !otherHolder && (
-          <div style={{
+          <div
+            role="status"
+            aria-live="polite"
+            style={{
             margin: '12px 20px 0', padding: '6px 10px',
             background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 6,
             fontSize: 11, color: '#065f46',
@@ -400,7 +418,7 @@ export function ExaminerValidationDrawer({ request, currentUserId, onClose, onSa
           </div>
 
           {error && (
-            <div style={{ padding: '8px 12px', borderRadius: 6, background: '#fee2e2', border: '1px solid #fca5a5', fontSize: 12, color: '#991b1b' }}>
+            <div role="status" aria-live="polite" style={{ padding: '8px 12px', borderRadius: 6, background: '#fee2e2', border: '1px solid #fca5a5', fontSize: 12, color: '#991b1b' }}>
               {error}
             </div>
           )}
@@ -428,6 +446,7 @@ export function ExaminerValidationDrawer({ request, currentUserId, onClose, onSa
           </button>
         </div>
       </div>
+      </FocusTrap>
     </div>
   )
 

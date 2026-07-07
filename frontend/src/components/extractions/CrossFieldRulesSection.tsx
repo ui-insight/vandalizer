@@ -11,7 +11,7 @@
  * This component surfaces those states so users know which rules are pulling
  * their weight.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import { AlertCircle, Check, Lightbulb, Plus, Trash2, X } from 'lucide-react'
 import {
   getCrossFieldRules,
@@ -136,28 +136,34 @@ export function CrossFieldRulesSection({ searchSetUuid, canManage, fieldNames }:
         {canManage && (
           <div className="flex gap-2">
             <button
+              type="button"
               onClick={handleSuggest}
               disabled={loadingSuggestions || loading}
               className="flex items-center gap-1 px-2.5 py-1.5 border border-gray-300 rounded text-xs hover:bg-gray-50 disabled:opacity-50"
               title="Propose rules from your field names"
             >
-              <Lightbulb size={12} />
+              <Lightbulb size={12} aria-hidden="true" />
               {loadingSuggestions ? 'Thinking…' : 'Suggest'}
             </button>
             <div className="relative">
               <button
+                type="button"
                 onClick={() => setShowAddMenu(v => !v)}
                 disabled={saving}
+                aria-haspopup="menu"
+                aria-expanded={showAddMenu}
                 className="flex items-center gap-1 px-2.5 py-1.5 bg-highlight text-highlight-text rounded text-xs font-bold hover:brightness-90 disabled:opacity-50"
               >
-                <Plus size={12} />
+                <Plus size={12} aria-hidden="true" />
                 Add rule
               </button>
               {showAddMenu && (
-                <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded shadow-lg z-10 min-w-[180px]">
+                <div role="menu" className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded shadow-lg z-10 min-w-[180px]">
                   {(Object.keys(RULE_TYPE_LABELS) as CrossFieldRuleType[]).map(t => (
                     <button
                       key={t}
+                      type="button"
+                      role="menuitem"
                       onClick={() => {
                         setShowAddMenu(false)
                         setEditing(blankRule(t))
@@ -184,12 +190,14 @@ export function CrossFieldRulesSection({ searchSetUuid, canManage, fieldNames }:
                 {canManage && (
                   <div className="flex gap-1">
                     <button
+                      type="button"
                       onClick={() => acceptSuggestion(s)}
                       className="px-2 py-0.5 bg-amber-600 text-white rounded text-xs hover:bg-amber-700"
                     >
                       Accept
                     </button>
                     <button
+                      type="button"
                       onClick={() => dismissSuggestion(s)}
                       className="px-2 py-0.5 border border-gray-300 rounded text-xs hover:bg-gray-50"
                     >
@@ -276,7 +284,7 @@ function RuleRow({
               className="inline-flex items-center gap-0.5 text-[10px] font-medium text-red-700 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded"
               title={rule.auto_disabled_reason ?? undefined}
             >
-              <AlertCircle size={10} /> Auto-disabled
+              <AlertCircle size={10} aria-hidden="true" /> Auto-disabled
             </span>
           )}
           {rule.source === 'suggested' && (
@@ -296,24 +304,31 @@ function RuleRow({
       {canManage && (
         <div className="flex items-center gap-1 shrink-0">
           <button
+            type="button"
+            role="switch"
+            aria-checked={!disabled}
             onClick={onToggleEnabled}
-            className="p-1 text-gray-400 hover:text-gray-700 text-xs"
+            className="p-1 text-gray-500 hover:text-gray-700 text-xs"
             title={disabled ? 'Enable' : 'Disable'}
+            aria-label={disabled ? 'Enable rule' : 'Disable rule'}
           >
-            {disabled ? <Check size={14} /> : <X size={14} />}
+            {disabled ? <Check size={14} aria-hidden="true" /> : <X size={14} aria-hidden="true" />}
           </button>
           <button
+            type="button"
             onClick={onEdit}
             className="text-xs text-blue-600 hover:underline px-1"
           >
             Edit
           </button>
           <button
+            type="button"
             onClick={onDelete}
-            className="p-1 text-gray-400 hover:text-red-500"
+            className="p-1 text-gray-500 hover:text-red-500"
             title="Delete"
+            aria-label="Delete rule"
           >
-            <Trash2 size={14} />
+            <Trash2 size={14} aria-hidden="true" />
           </button>
         </div>
       )}
@@ -367,22 +382,33 @@ function RuleEditModal({
           <h3 className="font-medium text-gray-900">
             {rule.id ? 'Edit rule' : 'New rule'} · {RULE_TYPE_LABELS[draft.type]}
           </h3>
-          <button onClick={onCancel} className="text-gray-400 hover:text-gray-600">
-            <X size={18} />
+          <button
+            type="button"
+            onClick={onCancel}
+            aria-label="Close"
+            className="text-gray-500 hover:text-gray-600"
+          >
+            <X size={18} aria-hidden="true" />
           </button>
         </div>
         <div className="p-4 space-y-3">
           <RuleEditFields draft={draft} setDraft={setDraft} fieldNames={fieldNames} />
-          {error && <div className="text-xs text-red-600">{error}</div>}
+          {error && (
+            <div role="alert" className="text-xs text-red-600">
+              {error}
+            </div>
+          )}
         </div>
         <div className="flex justify-end gap-2 px-4 py-3 border-t border-gray-200 bg-gray-50">
           <button
+            type="button"
             onClick={onCancel}
             className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-white"
           >
             Cancel
           </button>
           <button
+            type="button"
             onClick={handleSave}
             disabled={saving || !!validationError}
             className="px-3 py-1.5 text-sm bg-highlight text-highlight-text rounded font-bold hover:brightness-90 disabled:opacity-50"
@@ -553,10 +579,14 @@ function FieldPicker({
   options: string[]
   onChange: (v: string) => void
 }) {
+  const id = useId()
   return (
     <div>
-      <label className="block text-xs font-medium text-gray-700 mb-1">{label}</label>
+      <label htmlFor={id} className="block text-xs font-medium text-gray-700 mb-1">
+        {label}
+      </label>
       <select
+        id={id}
         value={value}
         onChange={e => onChange(e.target.value)}
         className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"
@@ -583,16 +613,19 @@ function MultiFieldPicker({
   options: string[]
   onChange: (v: string[]) => void
 }) {
+  const labelId = useId()
   const toggle = (opt: string) => {
     if (value.includes(opt)) onChange(value.filter(v => v !== opt))
     else onChange([...value, opt])
   }
   return (
-    <div>
-      <label className="block text-xs font-medium text-gray-700 mb-1">{label}</label>
+    <div role="group" aria-labelledby={labelId}>
+      <span id={labelId} className="block text-xs font-medium text-gray-700 mb-1">
+        {label}
+      </span>
       <div className="border border-gray-300 rounded p-2 max-h-32 overflow-y-auto space-y-1">
         {options.length === 0 ? (
-          <div className="text-xs text-gray-400">No extraction fields available</div>
+          <div className="text-xs text-gray-500">No extraction fields available</div>
         ) : (
           options.map(opt => (
             <label key={opt} className="flex items-center gap-2 text-sm">
@@ -621,10 +654,14 @@ function TextInput({
   onChange: (v: string) => void
   placeholder?: string
 }) {
+  const id = useId()
   return (
     <div>
-      <label className="block text-xs font-medium text-gray-700 mb-1">{label}</label>
+      <label htmlFor={id} className="block text-xs font-medium text-gray-700 mb-1">
+        {label}
+      </label>
       <input
+        id={id}
         type="text"
         value={value}
         onChange={e => onChange(e.target.value)}
@@ -648,10 +685,14 @@ function NumberInput({
   step?: number
   nullable?: boolean
 }) {
+  const id = useId()
   return (
     <div className="flex-1">
-      <label className="block text-xs font-medium text-gray-700 mb-1">{label}</label>
+      <label htmlFor={id} className="block text-xs font-medium text-gray-700 mb-1">
+        {label}
+      </label>
       <input
+        id={id}
         type="number"
         value={value ?? ''}
         onChange={e => {
@@ -678,10 +719,14 @@ function Select({
   options: { value: string; label: string }[]
   onChange: (v: string) => void
 }) {
+  const id = useId()
   return (
     <div>
-      <label className="block text-xs font-medium text-gray-700 mb-1">{label}</label>
+      <label htmlFor={id} className="block text-xs font-medium text-gray-700 mb-1">
+        {label}
+      </label>
       <select
+        id={id}
         value={value}
         onChange={e => onChange(e.target.value)}
         className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded"

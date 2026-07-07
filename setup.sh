@@ -845,6 +845,9 @@ bootstrap() {
   local ORG_NAME=""
   prompt "Institution / organization name" "" ORG_NAME
 
+  # --- Anonymous usage telemetry (opt-in) — reuse the just-entered org name ---
+  configure_telemetry "$ORG_NAME"
+
   echo ""
   echo -e "  ${SYM_NEURAL}  ${BOLD}Verified catalog${RESET}"
   echo -e "  ${DIM}     The bootstrap will also seed research administration content:${RESET}"
@@ -1793,6 +1796,66 @@ asyncio.run(main())
   fi
 }
 
+# Anonymous telemetry opt-in. Asked at most once (TELEMETRY_PROMPTED in .env
+# guards re-asking), never blocks non-interactive runs (auto-update/cron), and
+# is shared by first-time bootstrap and every redeploy/upgrade. $1 = a suggested
+# org name (first install passes the just-entered ORG_NAME; redeploy passes "").
+configure_telemetry() {
+  [[ -t 0 ]] || return 0                                  # non-interactive — skip
+  [[ -f "$ENV_FILE" ]] || return 0
+  grep -q "^TELEMETRY_PROMPTED=true" "$ENV_FILE" 2>/dev/null && return 0  # already asked
+
+  local suggested_org="${1:-}"
+
+  echo ""
+  echo -e "  ${SYM_NEURAL}  ${BOLD}Usage telemetry${RESET} ${DIM}(optional)${RESET}"
+  echo -e "  ${DIM}     A once-a-day heartbeat helps the Vandalizer maintainers see how${RESET}"
+  echo -e "  ${DIM}     many deployments exist and roughly how heavily they're used.${RESET}"
+  echo -e "  ${DIM}     Sends ONLY: an anonymous random ID, the version, and coarse usage${RESET}"
+  echo -e "  ${DIM}     buckets (\"11-50 users\"). NEVER documents, names, emails, or keys.${RESET}"
+  echo -e "  ${DIM}     Change it anytime in Admin, or via TELEMETRY_* in backend/.env.${RESET}"
+  echo ""
+
+  # Mark as asked regardless of the answer, so neither setup.sh nor the in-app
+  # banner prompts again.
+  set_env "TELEMETRY_PROMPTED" "true"
+
+  if confirm "Send anonymous usage telemetry?" "n"; then
+    set_env "TELEMETRY_ENABLED" "true"
+    echo -e "  ${SYM_CHECK}  Anonymous telemetry ${BOLD}enabled${RESET}"
+
+    # Voluntary identity tier. Reuse a known org name if we have one; otherwise
+    # offer to enter one. Empty keeps the heartbeat anonymous.
+    local org="$suggested_org"
+    if [[ -n "$org" ]]; then
+      confirm "Identify this deployment as \"${org}\" (otherwise stays anonymous)?" "n" || org=""
+    else
+      prompt "Organization name to identify this deployment (blank = anonymous)" "" org
+    fi
+    if [[ -n "${org// /}" ]]; then
+      set_env "TELEMETRY_ORGANIZATION" "$org"
+      echo -e "  ${SYM_CHECK}  Telemetry will identify this deployment as ${BOLD}${org}${RESET}"
+    else
+      echo -e "  ${SYM_CHECK}  Telemetry will stay ${BOLD}anonymous${RESET}"
+    fi
+  else
+    set_env "TELEMETRY_ENABLED" "false"
+    echo -e "  ${SYM_CHECK}  Telemetry ${BOLD}disabled${RESET}"
+  fi
+
+  # The api/celery containers were created earlier in this run (install: line ~735;
+  # redeploy: line ~1872), so they still hold the pre-decision env. Compose only
+  # re-reads env_file on (re)create, not restart — so without this the flag we just
+  # wrote wouldn't take effect until the NEXT deploy. Recreate the two app
+  # containers that consume the telemetry setting (api for the manual check, celery
+  # for the scheduled heartbeat) so a single deploy is sufficient. Infra is left
+  # untouched; skipped if the stack isn't up yet.
+  if $COMPOSE_CMD ps --status running --services 2>/dev/null | grep -qx "api"; then
+    echo -e "  ${SYM_PULSE}  ${DIM}Applying telemetry setting to running services...${RESET}"
+    $COMPOSE_CMD up -d --force-recreate --no-deps api celery >> "$SETUP_LOG" 2>&1 || true
+  fi
+}
+
 # Shared rebuild+restart logic used by upgrade and redeploy
 do_redeploy() {
   echo ""
@@ -1832,6 +1895,10 @@ do_redeploy() {
 
   # One-time: capture the institution name if this deployment never set one.
   prompt_org_name_if_unset
+
+  # One-time: ask about anonymous telemetry if this deployment hasn't been asked
+  # (covers existing installs upgrading via redeploy/upgrade). No-op on cron.
+  configure_telemetry ""
 
   # Clean up dangling images and build cache to reclaim disk space
   echo ""

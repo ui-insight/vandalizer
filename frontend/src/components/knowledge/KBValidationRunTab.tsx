@@ -39,6 +39,7 @@ export function KBValidationRunTab({ kbReady, canManage, numQueries, latestRun, 
       {/* Run controls */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
         <button
+          type="button"
           onClick={handleRun}
           disabled={disabled}
           style={{
@@ -50,7 +51,7 @@ export function KBValidationRunTab({ kbReady, canManage, numQueries, latestRun, 
             borderRadius: 6, cursor: disabled ? 'not-allowed' : 'pointer',
           }}
         >
-          {running ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} /> : <Play size={13} />}
+          {running ? <Loader2 size={13} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" /> : <Play size={13} aria-hidden="true" />}
           {running ? 'Running…' : 'Run Validation'}
         </button>
         <label style={{ fontSize: 11, color: '#aaa', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -73,13 +74,13 @@ export function KBValidationRunTab({ kbReady, canManage, numQueries, latestRun, 
       </div>
 
       {error && (
-        <div style={{ fontSize: 12, color: '#ef4444', marginBottom: 10 }}>{error}</div>
+        <div role="alert" style={{ fontSize: 12, color: '#ef4444', marginBottom: 10 }}>{error}</div>
       )}
 
       {running && !latestRun ? (
-        <div style={{ fontSize: 12, color: '#888', padding: '20px 0', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+        <div role="status" aria-live="polite" style={{ fontSize: 12, color: '#888', padding: '20px 0', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-            <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} />
+            <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
             Validation running…
           </span>
           <span style={{ fontSize: 11, color: '#666' }}>
@@ -87,7 +88,7 @@ export function KBValidationRunTab({ kbReady, canManage, numQueries, latestRun, 
           </span>
         </div>
       ) : !latestRun ? (
-        <div style={{ fontSize: 12, color: '#888', padding: '20px 0', textAlign: 'center' }}>
+        <div role="status" style={{ fontSize: 12, color: '#888', padding: '20px 0', textAlign: 'center' }}>
           No validation run yet. Click <b>Run Validation</b> to evaluate this KB.
         </div>
       ) : (
@@ -247,6 +248,8 @@ function DetailRow({
       backgroundColor: '#222', border: '1px solid #2e2e2e', borderRadius: 6, overflow: 'hidden',
     }}>
       <button
+        type="button"
+        aria-expanded={expanded}
         onClick={onToggle}
         style={{
           display: 'flex', alignItems: 'center', gap: 8, width: '100%',
@@ -254,7 +257,7 @@ function DetailRow({
           cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
         }}
       >
-        {expanded ? <ChevronDown size={12} style={{ color: '#888' }} /> : <ChevronRight size={12} style={{ color: '#888' }} />}
+        {expanded ? <ChevronDown size={12} style={{ color: '#888' }} aria-hidden="true" /> : <ChevronRight size={12} style={{ color: '#888' }} aria-hidden="true" />}
         <VerdictDot verdict={j?.verdict ?? null} />
         <div style={{ flex: 1, minWidth: 0, fontSize: 12, color: '#e5e5e5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {detail.query}

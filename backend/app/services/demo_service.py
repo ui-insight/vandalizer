@@ -40,7 +40,9 @@ MAX_SELF_EXTENSIONS = 2
 # try it" — the end screen offers them a frictionless one-click extension.
 LOW_ENGAGEMENT_MAX_ARTIFACTS = 3
 
-MAGIC_LINK_TTL_SECONDS = 48 * 60 * 60
+# Magic sign-in links double as the primary credential for trial users, so they
+# need to outlive a vacation, not expire in 48h. Match the trial length.
+MAGIC_LINK_TTL_SECONDS = 14 * 24 * 60 * 60
 
 # Excludes look-alikes (I, O, i, l, o, 0, 1) so copied/typed passwords don't fail silently.
 _UNAMBIGUOUS_ALPHABET = (
@@ -236,14 +238,25 @@ async def _activate_application(app: DemoApplication, settings: Settings) -> Non
     app.recapture_next_at = now + datetime.timedelta(days=_RECAPTURE_SCHEDULE_DAYS[0])
     await app.save()
 
-    # Send activation email
+    # Send activation email. The account password is a random hash the user never
+    # sees — sign-in is via the magic link (or a password they set later). Surface
+    # send failures loudly: a silent failure leaves an active account whose owner
+    # never got a way in.
     magic_link = await _create_magic_login_token(user_id, settings)
     expires_str = expires_at.strftime("%B %d, %Y")
     subject, html = activation_email(
-        app.name, user_id, password, expires_str, settings.frontend_url,
+        app.name, user_id, expires_str, settings.frontend_url,
         magic_link=magic_link,
     )
-    await send_email(app.email, subject, html, settings, email_type="demo_activation")
+    sent = await send_email(
+        app.email, subject, html, settings, email_type="demo_activation"
+    )
+    if not sent:
+        logger.error(
+            "Activation email FAILED to send for demo user %s (account is active "
+            "but they have no way in — needs a resend)",
+            app.email,
+        )
 
 
 async def _find_or_create_org_team(
@@ -330,8 +343,13 @@ async def send_expiry_warnings(settings: Settings | None = None) -> int:
     for app in apps:
         if not app.expires_at:
             continue
-        days_left = max(1, (app.expires_at - now).days)
-        expires_str = app.expires_at.strftime("%B %d, %Y")
+        # MongoDB returns datetimes as offset-naive; normalize to UTC-aware
+        # before arithmetic against ``now`` (also offset-aware).
+        expires_at = app.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=datetime.timezone.utc)
+        days_left = max(1, (expires_at - now).days)
+        expires_str = expires_at.strftime("%B %d, %Y")
         subject, html = expiry_warning_email(
             app.name, days_left, expires_str, settings.frontend_url
         )
@@ -370,35 +388,57 @@ async def get_feedback_application(token: str) -> Optional[DemoApplication]:
     )
 
 
-async def resend_credentials(uuid: str, settings: Settings | None = None) -> bool:
-    """Reset password and resend activation email for an active demo user."""
+async def resend_credentials(uuid: str, settings: Settings | None = None) -> dict:
+    """Resend a fresh sign-in link for a demo application.
+
+    Returns a status dict the caller maps to UI/HTTP. Crucially this no longer
+    rotates the user's password — every send was minting a new password and
+    silently invalidating older emails, which is the root of "the password in
+    this email doesn't work." Sign-in is via a fresh magic link instead.
+
+    Status values:
+      - "sent"        active trial → a new sign-in link was emailed
+      - "send_failed" active trial but the email failed to send
+      - "pending"     still on the waitlist; no credentials exist yet
+      - "expired"     trial ended → caller should route to the renewal screen
+                      (feedback_token included)
+      - "not_found"   no such application
+    """
     if settings is None:
         settings = Settings()
 
     app = await DemoApplication.find_one(DemoApplication.uuid == uuid)
-    if not app or app.status != "active" or not app.user_id:
-        return False
+    if not app:
+        return {"status": "not_found"}
+
+    # Not yet activated → there are no credentials to resend.
+    if app.status == "pending" or not app.user_id:
+        return {"status": "pending"}
+
+    # Trial is over → a sign-in link won't help; send them to renewal instead.
+    if app.status in ("expired", "completed"):
+        return {"status": "expired", "feedback_token": app.post_questionnaire_token}
 
     user = await User.find_one(User.user_id == app.user_id)
     if not user:
-        return False
+        return {"status": "not_found"}
 
-    # Generate new password and update
-    password = _generate_demo_password()
-    user.password_hash = hash_password(password)
-    await user.save()
-
-    # Resend activation email with new credentials + fresh magic link
+    # Active → mint a fresh magic sign-in link (no password rotation).
     magic_link = await _create_magic_login_token(user.user_id, settings)
     expires_str = app.expires_at.strftime("%B %d, %Y") if app.expires_at else "N/A"
     subject, html = activation_email(
-        app.name, user.user_id, password, expires_str, settings.frontend_url,
+        app.name, user.user_id, expires_str, settings.frontend_url,
         magic_link=magic_link,
     )
-    await send_email(app.email, subject, html, settings, email_type="credentials_resend")
+    sent = await send_email(
+        app.email, subject, html, settings, email_type="credentials_resend"
+    )
+    if not sent:
+        logger.error("Resend sign-in link FAILED to send for demo user %s", app.email)
+        return {"status": "send_failed", "email": app.email}
 
-    logger.info("Resent credentials for demo user %s", app.email)
-    return True
+    logger.info("Resent sign-in link for demo user %s", app.email)
+    return {"status": "sent", "email": app.email}
 
 
 async def generate_magic_link(uuid: str, settings: Settings) -> str | None:
@@ -539,7 +579,10 @@ async def get_trial_end_info(token: str) -> Optional[dict]:
         "engagement": engagement,
         "extensions_used": app.trial_extensions_used,
         "max_extensions": MAX_SELF_EXTENSIONS,
-        "can_self_extend": app.trial_extensions_used < MAX_SELF_EXTENSIONS,
+        # Renewals are unlimited — trial users can always keep going (engaged
+        # users in exchange for a few notes). We still track extensions_used for
+        # analytics, but it no longer gates access.
+        "can_self_extend": True,
         "already_extended": app.trial_extensions_used > 0,
     }
 
@@ -549,9 +592,11 @@ async def self_extend_trial(
 ) -> dict:
     """Self-serve trial renewal from the end-of-trial screen.
 
-    Extends the trial by TRIAL_DAYS and unlocks the account, up to
-    MAX_SELF_EXTENSIONS times. Optional post-trial notes are persisted as a
-    PostExperienceResponse. Returns {"ok": bool, ...}.
+    Extends the trial by TRIAL_DAYS and unlocks the account. Renewals are
+    unlimited — low-engagement users renew with one click, engaged users in
+    exchange for a few notes. ``trial_extensions_used`` is still incremented for
+    analytics but no longer caps access. Optional post-trial notes are persisted
+    as a PostExperienceResponse. Returns {"ok": bool, ...}.
     """
     if settings is None:
         settings = Settings()
@@ -561,9 +606,6 @@ async def self_extend_trial(
     )
     if not app:
         return {"ok": False, "reason": "invalid"}
-
-    if app.trial_extensions_used >= MAX_SELF_EXTENSIONS:
-        return {"ok": False, "reason": "cap_reached"}
 
     # Persist any post-trial notes the user left (reuses the feedback model).
     if notes:
@@ -921,16 +963,16 @@ async def bulk_resend_credentials(settings: Settings | None = None) -> dict:
         app.recapture_next_at = now + datetime.timedelta(days=_RECAPTURE_SCHEDULE_DAYS[0])
         await app.save()
 
-        # Generate new password and update user
-        password = _generate_demo_password()
-        user.password_hash = hash_password(password)
+        # Extend the runway but do NOT rotate the password — rotating here was
+        # invalidating the sign-in details users already had. A fresh magic link
+        # is all they need.
         user.demo_expires_at = new_expires
         await user.save()
 
         magic_link = await _create_magic_login_token(user.user_id, settings)
         expires_str = new_expires.strftime("%B %d, %Y")
         subject, html = activation_email(
-            app.name, user.user_id, password, expires_str, settings.frontend_url,
+            app.name, user.user_id, expires_str, settings.frontend_url,
             magic_link=magic_link,
         )
         success = await send_email(app.email, subject, html, settings, email_type="bulk_credentials_resend")

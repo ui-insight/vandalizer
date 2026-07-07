@@ -819,7 +819,7 @@ export function LibraryTab() {
                 <Icon style={{ width: 13, height: 13, marginRight: 7, flexShrink: 0 }} />
                 <span style={{ flex: 1 }}>{label}</span>
                 {count > 0 && (
-                  <span style={{ marginLeft: 'auto', fontSize: 11, color: '#aaa', fontWeight: 400 }}>{count}</span>
+                  <span style={{ marginLeft: 'auto', fontSize: 11, color: '#6b7280', fontWeight: 400 }}>{count}</span>
                 )}
               </div>
             )
@@ -842,21 +842,23 @@ export function LibraryTab() {
                   Folders
                 </span>
                 <button
+                  type="button"
                   title="New folder"
+                  aria-label="New folder"
                   onClick={() => { setNewFolderMode(true); setNewFolderName('') }}
                   style={{
                     background: 'none',
                     border: 'none',
                     padding: '2px 4px',
                     cursor: 'pointer',
-                    color: '#aaa',
+                    color: '#6b7280',
                     display: 'flex',
                     alignItems: 'center',
                     borderRadius: 4,
                     lineHeight: 1,
                   }}
                   onMouseEnter={(e) => { e.currentTarget.style.color = '#555' }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = '#aaa' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = '#6b7280' }}
                 >
                   <FolderPlus style={{ width: 13, height: 13 }} />
                 </button>
@@ -902,7 +904,7 @@ export function LibraryTab() {
 
               {/* Folder list */}
               {folders.length === 0 && !newFolderMode && (
-                <div style={{ padding: '4px 12px', fontSize: 11, color: '#bbb', fontStyle: 'italic' }}>
+                <div style={{ padding: '4px 12px', fontSize: 11, color: '#6b7280', fontStyle: 'italic' }}>
                   No folders yet
                 </div>
               )}
@@ -989,6 +991,8 @@ export function LibraryTab() {
                           {folder.item_count}
                         </span>
                         <button
+                          type="button"
+                          aria-label="Folder actions"
                           className="folder-menu-btn"
                           onClick={(e) => {
                             e.stopPropagation()
@@ -1145,6 +1149,8 @@ export function LibraryTab() {
                 )}
               </div>
               <button
+                type="button"
+                aria-label="Clear collection filter"
                 onClick={() => setViewFilter('all')}
                 style={{
                   background: 'none',

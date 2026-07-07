@@ -82,7 +82,9 @@ export default function Reviews() {
   }, [reviews])
 
   return (
-    <div style={{ maxWidth: 920, margin: '0 auto', padding: '32px 24px' }}>
+    <>
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-[1000] focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:shadow-lg focus:ring-2 focus:ring-highlight">Skip to main content</a>
+    <main id="main-content" style={{ maxWidth: 920, margin: '0 auto', padding: '32px 24px' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 24 }}>
         <h1 style={{ fontSize: 24, fontWeight: 700, color: '#111827', margin: 0 }}>Reviews</h1>
         <Link to="/" search={{ mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: undefined, project: undefined, workflow_share_token: undefined } as never} style={{ fontSize: 13, color: '#6b7280', textDecoration: 'none' }}>
@@ -137,11 +139,11 @@ export default function Reviews() {
         </select>
       </div>
 
-      {loading && <div style={{ fontSize: 13, color: '#6b7280' }}>Loading...</div>}
-      {error && <div style={{ fontSize: 13, color: '#dc2626' }}>{error}</div>}
+      {loading && <div role="status" aria-live="polite" style={{ fontSize: 13, color: '#6b7280' }}>Loading...</div>}
+      {error && <div role="status" aria-live="polite" style={{ fontSize: 13, color: '#dc2626' }}>{error}</div>}
 
       {!loading && sorted.length === 0 && (
-        <div style={{ padding: 32, textAlign: 'center', fontSize: 13, color: '#6b7280', border: '1px dashed #e5e7eb', borderRadius: 8 }}>
+        <div role="status" aria-live="polite" style={{ padding: 32, textAlign: 'center', fontSize: 13, color: '#6b7280', border: '1px dashed #e5e7eb', borderRadius: 8 }}>
           {tab === 'mine'
             ? 'Nothing waiting for you.'
             : 'No reviews open on this team.'}
@@ -188,6 +190,7 @@ export default function Reviews() {
           )
         })}
       </div>
-    </div>
+    </main>
+    </>
   )
 }

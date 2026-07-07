@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { FocusTrap } from 'focus-trap-react'
 import { X, Folder } from 'lucide-react'
 import { listAllFolders, type FolderSummary } from '../../api/folders'
 import { saveResultToFolder, type SaveOutputFormat } from '../../api/workflows'
@@ -46,6 +47,12 @@ export function SaveWorkflowOutputDialog({ sessionId, workflowName, outputPrevie
   }, [activeProjectRootFolder])
 
   useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  useEffect(() => {
     if (fileName) return
     const date = new Date().toISOString().slice(0, 10)
     const slug = (workflowName || 'workflow').trim().replace(/\s+/g, '_')
@@ -83,13 +90,19 @@ export function SaveWorkflowOutputDialog({ sessionId, workflowName, outputPrevie
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black/40" style={{ zIndex: 700 }}>
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
+      <div
+        className="bg-white rounded-lg shadow-xl w-full max-w-md p-6"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="save-output-dialog-title"
+      >
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+          <h3 id="save-output-dialog-title" className="text-lg font-semibold text-gray-900 flex items-center gap-2">
             <Folder size={18} className="text-gray-500" />
             Save output to folder
           </h3>
-          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 rounded">
+          <button type="button" onClick={onClose} aria-label="Close" className="p-1 text-gray-400 hover:text-gray-600 rounded">
             <X size={18} />
           </button>
         </div>
@@ -104,8 +117,9 @@ export function SaveWorkflowOutputDialog({ sessionId, workflowName, outputPrevie
         )}
 
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Folder</label>
+          <label htmlFor="save-output-folder" className="block text-sm font-medium text-gray-700 mb-1">Folder</label>
           <select
+            id="save-output-folder"
             value={folderUuid}
             onChange={e => setFolderUuid(e.target.value)}
             disabled={loading || folders.length === 0}
@@ -122,8 +136,9 @@ export function SaveWorkflowOutputDialog({ sessionId, workflowName, outputPrevie
         </div>
 
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Format</label>
+          <label htmlFor="save-output-format" className="block text-sm font-medium text-gray-700 mb-1">Format</label>
           <select
+            id="save-output-format"
             value={format}
             onChange={e => setFormat(e.target.value as SaveOutputFormat)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-highlight"
@@ -137,18 +152,21 @@ export function SaveWorkflowOutputDialog({ sessionId, workflowName, outputPrevie
         </div>
 
         <div className="mb-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">File name</label>
+          <label htmlFor="save-output-filename" className="block text-sm font-medium text-gray-700 mb-1">File name</label>
           <input
+            id="save-output-filename"
             type="text"
             value={fileName}
             onChange={e => setFileName(e.target.value)}
             placeholder="2026-05-12_my_workflow_results"
+            aria-invalid={!!error}
+            aria-describedby={error ? 'save-output-error' : undefined}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-highlight"
           />
           <div className="text-xs text-gray-500 mt-1">Extension is added automatically.</div>
         </div>
 
-        {error && <div className="text-xs text-red-600 mb-2">{error}</div>}
+        {error && <div id="save-output-error" role="alert" className="text-xs text-red-600 mb-2">{error}</div>}
 
         <div className="flex justify-end gap-2 mt-4">
           <button
@@ -166,6 +184,7 @@ export function SaveWorkflowOutputDialog({ sessionId, workflowName, outputPrevie
           </button>
         </div>
       </div>
+      </FocusTrap>
     </div>
   )
 }

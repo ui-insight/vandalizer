@@ -16,6 +16,13 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     )
   }
 
+  // Expired trial → the renewal screen (warm thank-you + keep-going / feedback
+  // for more time). Checked before the !user redirect so a mid-session expiry,
+  // which clears the user, still lands here rather than on a bare landing page.
+  if (demoExpired && demoFeedbackToken) {
+    return <Navigate to="/demo/trial-end" search={{ token: demoFeedbackToken }} />
+  }
+
   if (!user) {
     const here = window.location.pathname + window.location.search
     const next = here && here !== '/' && !here.startsWith('/landing') ? here : undefined
@@ -25,10 +32,6 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
         search={{ error: undefined, invite_token: undefined, admin: undefined, next }}
       />
     )
-  }
-
-  if (demoExpired && demoFeedbackToken) {
-    return <Navigate to="/demo/feedback" search={{ token: demoFeedbackToken }} />
   }
 
   // Resume invite/join flow if the user just completed OAuth/SAML from

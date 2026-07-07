@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { FocusTrap } from 'focus-trap-react'
 import { X, Save, AlertTriangle, Plus, Trash2 } from 'lucide-react'
 import { pinRetroactiveBaseline } from '../../api/library'
 import type { CatalogCoverageItem } from '../../types/library'
@@ -38,6 +39,12 @@ export function RetroactiveBaselineDialog({ item, onClose, onSaved }: Props) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [warning, setWarning] = useState<string | null>(null)
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
 
   const handleSave = async () => {
     setSaving(true)
@@ -116,7 +123,12 @@ export function RetroactiveBaselineDialog({ item, onClose, onSaved }: Props) {
       }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div style={{
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={`${item.official_baseline_pinned_at ? 'Update' : 'Establish'} official baseline`}
+        style={{
         background: '#fff', borderRadius: 12, width: '100%', maxWidth: 680,
         maxHeight: '90vh', display: 'flex', flexDirection: 'column',
         boxShadow: '0 20px 60px rgba(0,0,0,0.2)', margin: '0 16px',
@@ -297,6 +309,7 @@ export function RetroactiveBaselineDialog({ item, onClose, onSaved }: Props) {
           </button>
         </div>
       </div>
+      </FocusTrap>
     </div>
   )
 

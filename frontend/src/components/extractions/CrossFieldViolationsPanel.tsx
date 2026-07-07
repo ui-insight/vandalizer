@@ -127,7 +127,7 @@ export function CrossFieldViolationsPanel({ searchSetUuid, canManage, summary, r
                     </div>
                     <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>{r.message}</div>
                     {(r.test_case_label || r.source_label) && (
-                      <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>
+                      <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>
                         on {r.test_case_label || r.source_label}
                       </div>
                     )}

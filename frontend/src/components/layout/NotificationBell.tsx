@@ -147,7 +147,7 @@ export function NotificationBell() {
           </div>
           <div className="max-h-80 overflow-y-auto">
             {notifications.length === 0 ? (
-              <div className="px-4 py-8 text-center text-sm text-gray-400">
+              <div className="px-4 py-8 text-center text-sm text-gray-500">
                 No notifications yet
               </div>
             ) : (
@@ -171,7 +171,7 @@ export function NotificationBell() {
                         <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.body}</p>
                       )}
                       {n.created_at && (
-                        <p className="text-xs text-gray-400 mt-1">{relativeTime(n.created_at)}</p>
+                        <p className="text-xs text-gray-500 mt-1">{relativeTime(n.created_at)}</p>
                       )}
                     </div>
                     {!n.read && (

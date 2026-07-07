@@ -61,7 +61,7 @@ export function JourneyMap({
                   )}>
                     {tier.name}
                   </h3>
-                  <span className="text-xs text-gray-400">&middot;</span>
+                  <span className="text-xs text-gray-500">&middot;</span>
                   <span className="text-xs font-medium text-gray-500">{tier.theme}</span>
                 </div>
                 <p className="text-xs text-gray-500 mt-0.5 italic">{tier.narrative}</p>
@@ -69,11 +69,11 @@ export function JourneyMap({
               <div className="shrink-0 text-right">
                 <span className={cn(
                   'text-sm font-bold',
-                  tierComplete ? 'text-green-600' : pct > 0 ? 'text-highlight' : 'text-gray-400',
-                )} style={pct > 0 && !tierComplete ? { color: 'var(--highlight-color)' } : undefined}>
+                  tierComplete ? 'text-green-600' : pct > 0 ? 'text-highlight' : 'text-gray-500',
+                )} style={pct > 0 && !tierComplete ? { color: 'var(--highlight-on-light, #806600)' } : undefined}>
                   {pct}%
                 </span>
-                <div className="text-[10px] text-gray-400">
+                <div className="text-[10px] text-gray-500">
                   {completedInTier}/{tierModules.length}
                 </div>
               </div>
@@ -99,7 +99,7 @@ export function JourneyMap({
                           'absolute -left-6 top-5 w-3 h-3 rounded-full border-2 z-10',
                           completed ? 'bg-green-500 border-green-500' : locked ? 'bg-gray-200 border-gray-300' : 'bg-white border-highlight',
                         )}
-                        style={!completed && !locked ? { borderColor: 'var(--highlight-color)' } : undefined}
+                        style={!completed && !locked ? { borderColor: 'var(--highlight-on-light, #806600)' } : undefined}
                       />
 
                       <div className="flex-1">

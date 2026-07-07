@@ -237,7 +237,7 @@ export default function Credentials() {
     <PageLayout>
       <div className="mx-auto max-w-3xl space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-900">Credentials</h2>
+          <h1 className="text-xl font-semibold text-gray-900">Credentials</h1>
           <button
             onClick={startCreate}
             className="flex items-center gap-1.5 rounded-md bg-highlight px-3 py-1.5 text-sm font-bold text-highlight-text hover:brightness-90"
@@ -265,8 +265,9 @@ export default function Credentials() {
             </h3>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium uppercase text-gray-400 mb-1">Name</label>
+                <label htmlFor="cred-name" className="block text-xs font-medium uppercase text-gray-500 mb-1">Name</label>
                 <input
+                  id="cred-name"
                   type="text"
                   value={form.name}
                   onChange={e => setForm({ ...form, name: e.target.value })}
@@ -275,8 +276,9 @@ export default function Credentials() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium uppercase text-gray-400 mb-1">Type</label>
+                <label htmlFor="cred-type" className="block text-xs font-medium uppercase text-gray-500 mb-1">Type</label>
                 <select
+                  id="cred-type"
                   value={form.type}
                   onChange={e => setForm({ ...form, type: e.target.value as CredentialType })}
                   disabled={editingId !== null}
@@ -292,8 +294,9 @@ export default function Credentials() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium uppercase text-gray-400 mb-1">Description</label>
+              <label htmlFor="cred-description" className="block text-xs font-medium uppercase text-gray-500 mb-1">Description</label>
               <input
+                id="cred-description"
                 type="text"
                 value={form.description}
                 onChange={e => setForm({ ...form, description: e.target.value })}
@@ -305,8 +308,9 @@ export default function Credentials() {
             {form.type === 'static_header' && (
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium uppercase text-gray-400 mb-1">Header name</label>
+                  <label htmlFor="cred-header-name" className="block text-xs font-medium uppercase text-gray-500 mb-1">Header name</label>
                   <input
+                    id="cred-header-name"
                     type="text"
                     value={form.header_name}
                     onChange={e => setForm({ ...form, header_name: e.target.value })}
@@ -315,8 +319,9 @@ export default function Credentials() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium uppercase text-gray-400 mb-1">Header value</label>
+                  <label htmlFor="cred-header-value" className="block text-xs font-medium uppercase text-gray-500 mb-1">Header value</label>
                   <input
+                    id="cred-header-value"
                     type="password"
                     autoComplete="new-password"
                     data-1p-ignore
@@ -336,8 +341,9 @@ export default function Credentials() {
               <>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium uppercase text-gray-400 mb-1">Client ID</label>
+                    <label htmlFor="cred-client-id" className="block text-xs font-medium uppercase text-gray-500 mb-1">Client ID</label>
                     <input
+                      id="cred-client-id"
                       type="text"
                       value={form.client_id}
                       onChange={e => setForm({ ...form, client_id: e.target.value })}
@@ -345,8 +351,9 @@ export default function Credentials() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium uppercase text-gray-400 mb-1">Token endpoint</label>
+                    <label htmlFor="cred-token-endpoint" className="block text-xs font-medium uppercase text-gray-500 mb-1">Token endpoint</label>
                     <input
+                      id="cred-token-endpoint"
                       type="url"
                       value={form.token_endpoint}
                       onChange={e => setForm({ ...form, token_endpoint: e.target.value })}
@@ -357,8 +364,9 @@ export default function Credentials() {
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-xs font-medium uppercase text-gray-400 mb-1">Scope</label>
+                    <label htmlFor="cred-scope" className="block text-xs font-medium uppercase text-gray-500 mb-1">Scope</label>
                     <input
+                      id="cred-scope"
                       type="text"
                       value={form.scope}
                       onChange={e => setForm({ ...form, scope: e.target.value })}
@@ -367,8 +375,9 @@ export default function Credentials() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium uppercase text-gray-400 mb-1">Audience</label>
+                    <label htmlFor="cred-audience" className="block text-xs font-medium uppercase text-gray-500 mb-1">Audience</label>
                     <input
+                      id="cred-audience"
                       type="text"
                       value={form.audience}
                       onChange={e => setForm({ ...form, audience: e.target.value })}
@@ -377,8 +386,9 @@ export default function Credentials() {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium uppercase text-gray-400 mb-1">Algorithm</label>
+                    <label htmlFor="cred-algorithm" className="block text-xs font-medium uppercase text-gray-500 mb-1">Algorithm</label>
                     <select
+                      id="cred-algorithm"
                       value={form.algorithm}
                       onChange={e => setForm({ ...form, algorithm: e.target.value })}
                       className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-highlight focus:outline-none focus:ring-1 focus:ring-highlight"
@@ -392,8 +402,9 @@ export default function Credentials() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium uppercase text-gray-400 mb-1">Private key (PEM)</label>
+                  <label htmlFor="cred-private-key" className="block text-xs font-medium uppercase text-gray-500 mb-1">Private key (PEM)</label>
                   <textarea
+                    id="cred-private-key"
                     value={form.private_key}
                     onChange={e => setForm({ ...form, private_key: e.target.value })}
                     rows={8}
@@ -454,7 +465,7 @@ export default function Credentials() {
                     {cred.description && (
                       <div className="mt-1 text-xs text-gray-500 truncate">{cred.description}</div>
                     )}
-                    <div className="mt-1 text-xs font-mono text-gray-400">{cred.id}</div>
+                    <div className="mt-1 text-xs font-mono text-gray-500">{cred.id}</div>
                   </div>
                   <div className="flex items-center gap-2">
                     {cred.type === 'oauth_client_credentials' && (

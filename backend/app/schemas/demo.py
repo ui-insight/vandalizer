@@ -23,6 +23,15 @@ class WaitlistStatusResponse(BaseModel):
     estimated_wait: Optional[str] = None
 
 
+class ResendCredentialsResponse(BaseModel):
+    ok: bool
+    # sent | send_failed | pending | expired | not_found
+    status: str
+    message: str
+    email: Optional[str] = None
+    feedback_token: Optional[str] = None
+
+
 class PostExperienceRequest(BaseModel):
     responses: dict
 

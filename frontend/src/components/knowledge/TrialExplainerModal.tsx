@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { FocusTrap } from 'focus-trap-react'
 import { X } from 'lucide-react'
 import type { OptimizationTrial } from '../../api/knowledge'
 import { scoreColor } from '../shared/TrialsTable'
@@ -65,6 +66,7 @@ export function TrialExplainerModal({ trial, onClose }: Props) {
         zIndex: 1000,
       }}
     >
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
@@ -115,6 +117,7 @@ export function TrialExplainerModal({ trial, onClose }: Props) {
             </div>
           </div>
           <button
+            type="button"
             aria-label="Close"
             onClick={onClose}
             style={{
@@ -122,7 +125,7 @@ export function TrialExplainerModal({ trial, onClose }: Props) {
               cursor: 'pointer', padding: 4, flexShrink: 0,
             }}
           >
-            <X size={16} />
+            <X size={16} aria-hidden="true" />
           </button>
         </header>
 
@@ -203,6 +206,7 @@ export function TrialExplainerModal({ trial, onClose }: Props) {
           </Section>
         </div>
       </div>
+      </FocusTrap>
     </div>
   )
 }

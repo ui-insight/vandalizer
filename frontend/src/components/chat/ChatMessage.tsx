@@ -215,18 +215,26 @@ export function ChatMessage({
           {hasThinking && (
             <div style={{ marginBottom: 10 }}>
               <button
+                type="button"
                 onClick={() => setThinkingExpanded(!thinkingExpanded)}
                 aria-expanded={thinkingExpanded}
                 aria-label={thinkingExpanded ? 'Collapse thinking' : 'Expand thinking'}
                 className={duration == null ? 'thinking-shimmer' : undefined}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 4,
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  padding: '2px 0', fontSize: 12, color: '#9ca3af',
-                  fontFamily: 'inherit', transition: 'color 0.15s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '2px 0',
+                  fontSize: 12,
+                  color: '#6b7280',
+                  fontFamily: 'inherit',
+                  transition: 'color 0.15s',
                 }}
-                onMouseEnter={e => { e.currentTarget.style.color = '#6b7280' }}
-                onMouseLeave={e => { e.currentTarget.style.color = '#9ca3af' }}
+                onMouseEnter={e => { e.currentTarget.style.color = '#4b5563' }}
+                onMouseLeave={e => { e.currentTarget.style.color = '#6b7280' }}
               >
                 <ChevronRight
                   size={14}
@@ -429,12 +437,13 @@ export function ChatMessage({
             paddingTop: 8, borderTop: '1px solid #00000010',
           }}>
             <button
+              type="button"
               onClick={() => handleFeedback('up')}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 width: 28, height: 28, borderRadius: 6, border: 'none',
                 background: feedback === 'up' ? '#dcfce7' : 'transparent',
-                color: feedback === 'up' ? '#16a34a' : '#9ca3af',
+                color: feedback === 'up' ? '#16a34a' : '#6b7280',
                 cursor: 'pointer', transition: 'all 0.15s',
               }}
               title="Good response"
@@ -443,12 +452,13 @@ export function ChatMessage({
               <ThumbsUp size={14} />
             </button>
             <button
+              type="button"
               onClick={() => handleFeedback('down')}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 width: 28, height: 28, borderRadius: 6, border: 'none',
                 background: feedback === 'down' ? '#fee2e2' : 'transparent',
-                color: feedback === 'down' ? '#dc2626' : '#9ca3af',
+                color: feedback === 'down' ? '#dc2626' : '#6b7280',
                 cursor: 'pointer', transition: 'all 0.15s',
               }}
               title="Poor response"
@@ -458,11 +468,12 @@ export function ChatMessage({
             </button>
             <div style={{ flex: 1 }} />
             <button
+              type="button"
               onClick={handleCopy}
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 width: 28, height: 28, borderRadius: 6, border: 'none',
-                background: 'transparent', color: copied ? '#16a34a' : '#9ca3af',
+                background: 'transparent', color: copied ? '#16a34a' : '#6b7280',
                 cursor: 'pointer', transition: 'all 0.15s',
               }}
               title="Copy message"
@@ -483,12 +494,14 @@ export function ChatMessage({
                 onChange={e => setComment(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') handleSubmitComment() }}
                 placeholder="What went wrong? (optional)"
+                aria-label="What went wrong? (optional)"
                 style={{
                   flex: 1, padding: '6px 10px', borderRadius: 6,
-                  border: '1px solid #d1d5db', fontSize: 13, outline: 'none',
+                  border: '1px solid #d1d5db', fontSize: 13,
                 }}
               />
               <button
+                type="button"
                 onClick={handleSubmitComment}
                 style={{
                   padding: '6px 12px', borderRadius: 6, border: 'none',
@@ -499,6 +512,7 @@ export function ChatMessage({
                 Send
               </button>
               <button
+                type="button"
                 onClick={() => setShowComment(false)}
                 style={{
                   padding: '6px 10px', borderRadius: 6, border: '1px solid #d1d5db',

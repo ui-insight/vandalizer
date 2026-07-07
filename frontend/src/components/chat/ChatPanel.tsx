@@ -65,7 +65,7 @@ function StreamingLabel() {
           opacity: fade ? 1 : 0,
           transition: 'opacity 0.2s ease',
           fontSize: 13,
-          color: '#9ca3af',
+          color: '#6b7280',
         }}
       >
         {words[index % words.length]}&hellip;
@@ -167,7 +167,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     setActivity,
   } = useChat()
 
-  const { bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, activeKBUuid, activeKBTitle, activateKB, deactivateKB, activeProjectUuid, activeProjectTitle, activeProjectRole, deactivateProject, setCurrentConversationUuid, focusChatSignal } = useWorkspace()
+  const { bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, activeKBUuid, activeKBTitle, activateKB, deactivateKB, activeProjectUuid, activeProjectTitle, activeProjectRole, deactivateProject, setCurrentConversationUuid, focusChatSignal, setWorkspaceMode } = useWorkspace()
 
   // When scoped to a project, surface its file/index status so the empty state
   // reflects the project (not a generic assistant) and sets honest expectations.
@@ -835,8 +835,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
             pointerEvents: 'none',
           }}
         >
-          <Upload size={32} style={{ color: 'var(--highlight-color, #eab308)' }} />
-          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--highlight-color, #eab308)' }}>
+          <Upload size={32} style={{ color: 'var(--highlight-on-light, #806600)' }} />
+          <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--highlight-on-light, #806600)' }}>
             Drop files to add to chat &amp; files
           </div>
           <div style={{ fontSize: 12, color: '#6b7280' }}>
@@ -863,7 +863,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       />
 
       {attachLoading && (
-        <div className="flex items-center gap-2 border-b border-gray-200 bg-[color-mix(in_srgb,var(--highlight-color),white_90%)] px-4 py-2 text-xs text-highlight">
+        <div className="flex items-center gap-2 border-b border-gray-200 bg-[color-mix(in_srgb,var(--highlight-color),white_90%)] px-4 py-2 text-xs text-highlight-on-light">
           <div className="chat-loader" style={{ width: 30 }} />
           Processing document... This may take a moment for PDFs and scanned files.
         </div>
@@ -1206,7 +1206,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                     gap: 12,
                     margin: '12px 0',
                     fontSize: 11,
-                    color: '#9ca3af',
+                    color: '#6b7280',
                     userSelect: 'none',
                   }}>
                     <div style={{ flex: 1, height: 1, background: '#e5e7eb' }} />
@@ -1260,8 +1260,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
 
         {/* Loading indicator */}
         {isStreaming && !streamingContent && !thinkingContent && activeToolCalls.length === 0 && toolResults.length === 0 && segments.length === 0 && (
-          <div style={{ padding: 15, marginBottom: 15, backgroundColor: '#00000008', borderRadius: 'var(--ui-radius, 12px)' }}>
-            <div className="thinking-shimmer" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#9ca3af' }}>
+          <div role="status" aria-live="polite" style={{ padding: 15, marginBottom: 15, backgroundColor: '#00000008', borderRadius: 'var(--ui-radius, 12px)' }}>
+            <div className="thinking-shimmer" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#6b7280' }}>
               <ChevronRight size={14} />
               <StreamingLabel />
             </div>
@@ -1298,7 +1298,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         })()}
 
         {error && (
-          <div className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 border border-red-200">
+          <div role="alert" className="mt-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 border border-red-200">
             <div className="flex items-start gap-2">
               <div className="flex-1">{error}</div>
               <button
@@ -1485,7 +1485,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
             padding: '6px 16px',
             fontSize: 12,
             fontWeight: 600,
-            color: 'var(--highlight-color, #eab308)',
+            color: 'var(--highlight-on-light, #806600)',
             backgroundColor: 'color-mix(in srgb, var(--highlight-color, #eab308) 10%, white)',
             borderTop: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 30%, white)',
           }}
@@ -1529,6 +1529,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         onSend={handleSend}
         onAttachFile={handleAttachFile}
         onAttachLink={handleAttachLink}
+        onAddKnowledge={() => setWorkspaceMode('knowledge')}
         disabled={isStreaming}
         isStreaming={isStreaming}
         onStop={stop}

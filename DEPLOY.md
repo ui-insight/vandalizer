@@ -160,6 +160,15 @@ All of these are stored in the `SystemConfig` document in MongoDB and applied at
 
 Because the project is open source under GPL v3, the footer keeps a small "Powered by Vandalizer" credit and the NSF GRANTED acknowledgement whenever custom branding is in effect, so creator and funder lineage stay visible.
 
+### Anonymous usage telemetry (optional)
+
+Vandalizer can send the maintainers an **opt-in, anonymous** daily heartbeat
+(deployment count, version, and coarse usage buckets — never document content,
+names, or emails). It is **off by default**; `./setup.sh` asks before enabling
+it, and you can optionally self-identify or point it at your own collector. See
+[docs/telemetry.md](docs/telemetry.md) for the full disclosure and the
+`TELEMETRY_*` variables.
+
 ### Production Configuration (reference)
 
 `./setup.sh` writes the production `backend/.env` for you. This subsection is a **reference** for what those variables mean — useful when you need to edit `.env` later, externalize a database, or rebuild the file by hand on the manual path.

@@ -1,5 +1,8 @@
 export class ApiError extends Error {
   status: number
+  // Set on 403 DEMO_EXPIRED responses so callers can route an expired trial
+  // user straight to the renewal screen.
+  feedbackToken?: string | null
   constructor(status: number, message: string) {
     super(message)
     this.status = status
@@ -142,8 +145,18 @@ export async function apiFetch<T>(
 
   if (res.status === 403) {
     const body = await res.json().catch(() => ({ detail: 'Forbidden' }))
-    if (body.detail === 'DEMO_EXPIRED') {
-      throw new ApiError(403, 'DEMO_EXPIRED')
+    const detail = body.detail
+    // DEMO_EXPIRED arrives either as the bare string (legacy) or as
+    // { code: 'DEMO_EXPIRED', feedback_token } so the renewal screen is reachable.
+    const isDemoExpired =
+      detail === 'DEMO_EXPIRED' ||
+      (detail && typeof detail === 'object' && detail.code === 'DEMO_EXPIRED')
+    if (isDemoExpired) {
+      const err = new ApiError(403, 'DEMO_EXPIRED')
+      if (detail && typeof detail === 'object') {
+        err.feedbackToken = detail.feedback_token ?? null
+      }
+      throw err
     }
     if (body.detail === 'CSRF validation failed' && attemptCsrfSelfHeal()) {
       throw new ApiError(403, 'CSRF validation failed (reloading)')

@@ -9,6 +9,7 @@ import {
   Pin, PinOff,
 } from 'lucide-react'
 import { useNavigate } from '@tanstack/react-router'
+import { FocusTrap } from 'focus-trap-react'
 import { QualityBadge } from './QualityBadge'
 import { AddToLibraryDialog } from './AddToLibraryDialog'
 import { AuthorChip } from '../shared/AuthorChip'
@@ -142,9 +143,19 @@ export function ItemDetailModal({
     : item.kind === 'knowledge_base' ? 'kb'
     : null
 
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
+
   return createPortal(
     <div className="fixed inset-0 z-[9990] flex items-start justify-center pt-[5vh] bg-black/40" onClick={onClose}>
+      <FocusTrap focusTrapOptions={{ allowOutsideClick: true, escapeDeactivates: false, tabbableOptions: { displayCheck: 'none' } }}>
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={item.display_name || item.name}
         className="w-full max-w-2xl max-h-[85vh] overflow-y-auto bg-white rounded-2xl shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
@@ -163,7 +174,7 @@ export function ItemDetailModal({
                 <p className="mt-1.5 text-sm text-white/80">{item.description}</p>
               )}
             </div>
-            <button onClick={onClose} className="p-1 rounded-lg hover:bg-white/10 text-white/60 hover:text-white">
+            <button type="button" onClick={onClose} aria-label="Close" className="p-1 rounded-lg hover:bg-white/10 text-white/60 hover:text-white">
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -284,6 +295,7 @@ export function ItemDetailModal({
           </div>
         </div>
       </div>
+      </FocusTrap>
     </div>,
     document.body,
   )
@@ -316,7 +328,7 @@ function FeaturedCollectionCard({
       {collection.description && (
         <p className="text-xs text-gray-500 mb-3">{collection.description}</p>
       )}
-      <span className="mt-auto text-xs font-medium text-gray-400">
+      <span className="mt-auto text-xs font-medium text-gray-500">
         {collection.item_ids.length} item{collection.item_ids.length !== 1 ? 's' : ''}
       </span>
     </button>
@@ -349,8 +361,9 @@ function CatalogCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-1.5 mb-1">
             <ShieldCheck className={`h-3.5 w-3.5 shrink-0 mt-0.5 ${
-              item.quality_tier === 'gold' ? 'text-amber-500' : item.quality_tier === 'silver' ? 'text-gray-400' : 'text-green-500'
+              item.quality_tier === 'gold' ? 'text-amber-500' : item.quality_tier === 'silver' ? 'text-gray-500' : 'text-green-500'
             }`} />
+            <span className="sr-only">Quality tier: {item.quality_tier || 'unrated'}</span>
             <span className="text-sm font-semibold text-gray-900 flex-1 min-w-0 group-hover:text-blue-700 transition-colors">
               {item.display_name || item.name}
             </span>
@@ -359,7 +372,7 @@ function CatalogCard({
             <KindBadge kind={item.kind} />
             <QualityBadge tier={item.quality_tier} score={item.quality_score} />
             {item.validation_run_count > 0 && (
-              <span className="text-[10px] text-gray-400">
+              <span className="text-[10px] text-gray-500">
                 {item.validation_run_count} val{item.validation_run_count !== 1 ? 's' : ''}
               </span>
             )}
@@ -378,7 +391,7 @@ function CatalogCard({
       )}
 
       {item.kind === 'knowledge_base' && (item.total_sources != null || item.total_chunks != null) && (
-        <div className="flex items-center gap-3 text-[11px] text-gray-400 mb-2">
+        <div className="flex items-center gap-3 text-[11px] text-gray-500 mb-2">
           {item.total_sources != null && <span>{item.total_sources} source{item.total_sources !== 1 ? 's' : ''}</span>}
           {item.total_chunks != null && <span>{item.total_chunks.toLocaleString()} chunks</span>}
         </div>
@@ -396,7 +409,7 @@ function CatalogCard({
             </span>
           ))}
           {item.tags.length > 4 && (
-            <span className="text-[10px] text-gray-400">+{item.tags.length - 4}</span>
+            <span className="text-[10px] text-gray-500">+{item.tags.length - 4}</span>
           )}
         </div>
       )}
@@ -426,7 +439,7 @@ function CollectionLink({
           : 'text-gray-700 hover:bg-gray-100'
       }`}
     >
-      <FolderOpen className={`h-3.5 w-3.5 shrink-0 mt-0.5 ${active ? 'text-gray-300' : 'text-gray-400'}`} />
+      <FolderOpen className={`h-3.5 w-3.5 shrink-0 mt-0.5 ${active ? 'text-gray-300' : 'text-gray-500'}`} />
       <span className="line-clamp-2 flex-1 min-w-0 text-left leading-snug">{collection.title}</span>
       {collection.featured && (
         <Star className={`h-3 w-3 shrink-0 fill-current ${active ? 'text-yellow-300' : 'text-yellow-400'}`} />
@@ -684,7 +697,7 @@ export function ExploreTab() {
             <div className="mt-4 mb-2">
               <div className="flex items-center gap-1 px-3 mb-1.5">
                 <Star className="h-3 w-3 text-yellow-400 fill-current" />
-                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Featured</span>
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Featured</span>
               </div>
               {featuredCollections.map(col => (
                 <CollectionLink
@@ -699,7 +712,7 @@ export function ExploreTab() {
 
           {collections.filter(c => !featuredCollections.some(f => f.id === c.id)).length > 0 && (
             <div className="mt-4 mb-2">
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider px-3">Collections</span>
+              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider px-3">Collections</span>
               <div className="mt-1.5 space-y-0.5">
                 {collections
                   .filter(c => !featuredCollections.some(f => f.id === c.id))
@@ -744,7 +757,7 @@ export function ExploreTab() {
                   <ArrowLeft className="h-3 w-3" /> All Items
                 </button>
                 <div className="flex items-center gap-2">
-                  <FolderOpen className="h-5 w-5 text-gray-400" />
+                  <FolderOpen className="h-5 w-5 text-gray-500" />
                   <h2 className="text-lg font-bold text-gray-900">{activeCollection.title}</h2>
                   {activeCollection.featured && <Star className="h-4 w-4 text-yellow-400 fill-current" />}
                 </div>
@@ -757,12 +770,13 @@ export function ExploreTab() {
             {/* Search + Filters */}
             <div className="flex items-center gap-3 mb-4 flex-wrap">
               <div className="relative flex-1 min-w-[200px] max-w-sm">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search items..."
+                  aria-label="Search catalog items"
                   className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400"
                 />
               </div>
@@ -786,7 +800,8 @@ export function ExploreTab() {
               <select
                 value={qualityFilter}
                 onChange={(e) => setQualityFilter(e.target.value as QualityFilter)}
-                className="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg bg-white text-gray-600 focus:outline-none"
+                aria-label="Filter by quality"
+                className="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-lg bg-white text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-highlight"
               >
                 <option value="">Any quality</option>
                 <option value="gold">Gold</option>
@@ -795,11 +810,12 @@ export function ExploreTab() {
               </select>
 
               <div className="flex items-center gap-1">
-                <ArrowUpDown className="h-3.5 w-3.5 text-gray-400" />
+                <ArrowUpDown className="h-3.5 w-3.5 text-gray-500" />
                 <select
                   value={sortOption}
                   onChange={(e) => setSortOption(e.target.value as SortOption)}
-                  className="px-2 py-1.5 text-xs font-medium border border-gray-300 rounded-lg bg-white text-gray-600 focus:outline-none"
+                  aria-label="Sort items"
+                  className="px-2 py-1.5 text-xs font-medium border border-gray-300 rounded-lg bg-white text-gray-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-highlight"
                 >
                   {sortOptions.map(([val, label]) => (
                     <option key={val} value={val}>{label}</option>
@@ -814,25 +830,25 @@ export function ExploreTab() {
                 {tagFilter && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-blue-50 text-blue-700 border border-blue-200">
                     <Tag className="h-2.5 w-2.5" /> {tagFilter}
-                    <button onClick={() => setTagFilter('')} className="hover:text-blue-900 ml-0.5"><X className="h-3 w-3" /></button>
+                    <button type="button" onClick={() => setTagFilter('')} aria-label="Remove tag filter" className="hover:text-blue-900 ml-0.5"><X className="h-3 w-3" /></button>
                   </span>
                 )}
                 {selectedCollectionId && activeCollection && (
                   <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-gray-100 text-gray-700">
                     <FolderOpen className="h-2.5 w-2.5" /> {activeCollection.title}
-                    <button onClick={() => setSelectedCollectionId(null)} className="hover:text-gray-900 ml-0.5"><X className="h-3 w-3" /></button>
+                    <button type="button" onClick={() => setSelectedCollectionId(null)} aria-label="Remove collection filter" className="hover:text-gray-900 ml-0.5"><X className="h-3 w-3" /></button>
                   </span>
                 )}
                 <button onClick={clearFilters} className="text-xs text-gray-500 hover:text-gray-700 underline">
                   Clear all
                 </button>
-                <span className="text-xs text-gray-400 ml-auto">{total} result{total !== 1 ? 's' : ''}</span>
+                <span role="status" aria-live="polite" className="text-xs text-gray-500 ml-auto">{total} result{total !== 1 ? 's' : ''}</span>
               </div>
             )}
 
             {/* Error state */}
             {error && (
-              <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 mb-4">
+              <div role="alert" className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700 mb-4">
                 {error}
                 <button onClick={refresh} className="ml-2 underline font-medium">Retry</button>
               </div>
@@ -840,8 +856,8 @@ export function ExploreTab() {
 
             {/* Loading */}
             {loading ? (
-              <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-                <Loader2 className="h-8 w-8 animate-spin mb-3" />
+              <div role="status" aria-live="polite" className="flex flex-col items-center justify-center py-20 text-gray-500">
+                <Loader2 className="h-8 w-8 animate-spin mb-3" aria-hidden="true" />
                 <p className="text-sm">Loading catalog...</p>
               </div>
             ) : items.length === 0 ? (
@@ -889,7 +905,7 @@ export function ExploreTab() {
                     <div className="flex items-center gap-2 mb-3">
                       <div className="h-4 w-4 rounded-full bg-gradient-to-br from-amber-400 to-amber-600" />
                       <h3 className="text-sm font-bold text-gray-900">Top Rated</h3>
-                      <span className="text-xs text-gray-400">{goldItems.length} gold-tier item{goldItems.length !== 1 ? 's' : ''}</span>
+                      <span className="text-xs text-gray-500">{goldItems.length} gold-tier item{goldItems.length !== 1 ? 's' : ''}</span>
                     </div>
                     <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))' }}>
                       {goldItems.slice(0, 6).map(item => (
@@ -910,7 +926,7 @@ export function ExploreTab() {
                     <h3 className="text-sm font-bold text-gray-900 mb-3">All Items</h3>
                   )}
                   {!showHero && !loading && (
-                    <div className="text-xs text-gray-400 mb-3">{total} item{total !== 1 ? 's' : ''}</div>
+                    <div className="text-xs text-gray-500 mb-3">{total} item{total !== 1 ? 's' : ''}</div>
                   )}
                 </div>
 
@@ -932,7 +948,7 @@ export function ExploreTab() {
                       disabled={loadingMore}
                       className="inline-flex items-center gap-2 px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
                     >
-                      {loadingMore ? <><Loader2 className="h-4 w-4 animate-spin" /> Loading...</> : `Load more (${total - items.length} remaining)`}
+                      {loadingMore ? <><Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> Loading...</> : `Load more (${total - items.length} remaining)`}
                     </button>
                   </div>
                 )}

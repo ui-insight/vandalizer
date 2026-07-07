@@ -37,6 +37,7 @@ class UpdateTicketRequest(BaseModel):
     priority: str | None = None
     assigned_to: str | None = None
     tags: list[str] | None = None
+    subject: str | None = None
 
 
 class AddWatcherRequest(BaseModel):
@@ -485,10 +486,36 @@ async def update_ticket(
     body: UpdateTicketRequest,
     user: User = Depends(get_current_user),
 ):
-    """Update ticket status/priority/assignment. Support users only."""
+    """Update a ticket.
+
+    Status, priority, assignment, and tags are support-staff only. The
+    ``subject`` (title) can also be edited by the ticket's own author, so users
+    can fix a title after filing.
+    """
+    ticket = await support_service.get_ticket(ticket_uuid)
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
     is_support = await _is_support_user(user)
-    if not is_support:
-        raise HTTPException(status_code=403, detail="Only support staff can update tickets")
+    is_owner = ticket.get("user_id") == user.user_id
+
+    support_only = any(
+        v is not None
+        for v in (body.status, body.priority, body.assigned_to, body.tags)
+    )
+    if support_only and not is_support:
+        raise HTTPException(
+            status_code=403,
+            detail="Only support staff can change status, priority, assignment, or tags",
+        )
+
+    if body.subject is not None:
+        if not (is_support or is_owner):
+            raise HTTPException(
+                status_code=403, detail="You can only edit your own ticket's subject"
+            )
+        if not body.subject.strip():
+            raise HTTPException(status_code=400, detail="Subject cannot be empty")
 
     result = await support_service.update_ticket(
         ticket_uuid=ticket_uuid,
@@ -496,6 +523,7 @@ async def update_ticket(
         priority=body.priority,
         assigned_to=body.assigned_to,
         tags=body.tags,
+        subject=body.subject,
         actor=user,
     )
     if not result:

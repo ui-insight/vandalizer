@@ -124,7 +124,9 @@ export function LessonStepper({
         {lessons.map((_, i) => (
           <button
             key={i}
+            type="button"
             onClick={() => setCurrentIndex(i)}
+            aria-label={`Lesson ${i + 1}: ${lessons[i].title}`}
             className={cn(
               'h-2 flex-1 transition-all duration-300',
               i === safeIndex
@@ -147,8 +149,8 @@ export function LessonStepper({
         <span className="text-xs font-medium text-gray-500">
           Lesson {safeIndex + 1} of {lessons.length}
         </span>
-        <span className="flex items-center gap-1 text-xs text-gray-400">
-          <Clock size={10} />
+        <span className="flex items-center gap-1 text-xs text-gray-500">
+          <Clock size={10} aria-hidden="true" />
           ~{readTime} min read
         </span>
       </div>

@@ -26,8 +26,16 @@ export function getWaitlistStatus(uuid: string) {
   return apiFetch<WaitlistStatusResponse>(`/api/demo/status/${uuid}`)
 }
 
+export interface ResendResult {
+  ok: boolean
+  status: 'sent' | 'send_failed' | 'pending' | 'expired' | 'not_found'
+  message: string
+  email?: string | null
+  feedback_token?: string | null
+}
+
 export function resendCredentials(uuid: string) {
-  return apiFetch<{ ok: boolean; message: string }>(`/api/demo/resend-credentials/${uuid}`, {
+  return apiFetch<ResendResult>(`/api/demo/resend-credentials/${uuid}`, {
     method: 'POST',
   })
 }
@@ -94,7 +102,7 @@ export function sendTestEmail(to: string) {
 }
 
 export function adminResendCredentials(demoUuid: string) {
-  return apiFetch<{ ok: boolean; message: string }>(`/api/demo/resend-credentials/${demoUuid}`, {
+  return apiFetch<ResendResult>(`/api/demo/resend-credentials/${demoUuid}`, {
     method: 'POST',
   })
 }

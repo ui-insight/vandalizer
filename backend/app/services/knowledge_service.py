@@ -1066,9 +1066,31 @@ async def _ingest_document_source(source: KnowledgeBaseSource, kb: KnowledgeBase
     await source.save()
     try:
         doc = await SmartDocument.find_one(SmartDocument.uuid == source.document_uuid)
-        if not doc or not (doc.raw_text or "").strip():
+        if not doc:
             source.status = "error"
-            source.error_message = "Document not found or has no text"
+            source.error_message = "Document not found"
+            await source.save()
+            return
+
+        if not (doc.raw_text or "").strip():
+            # No text yet. A document's text is populated asynchronously by the
+            # extraction worker (perform_extraction_and_update), so a source
+            # added right after upload routinely lands here while extraction is
+            # still in flight — for PDFs the OCR-first path can take minutes.
+            # Don't error permanently: park the source as "pending" and let the
+            # extraction-completion hook in update_document_fields re-ingest it
+            # once raw_text exists. Only error when extraction has actually
+            # finished (or failed) with no usable text.
+            in_flight = bool(doc.processing) or doc.task_status in (
+                "extracting", "readying", "layout",
+            )
+            if in_flight and doc.task_status != "error":
+                source.status = "pending"
+                source.error_message = None
+                await source.save()
+                return
+            source.status = "error"
+            source.error_message = doc.error_message or "Document has no extractable text"
             await source.save()
             return
 

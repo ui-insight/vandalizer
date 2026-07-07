@@ -326,11 +326,14 @@ function InviteRegisterForm({
         value={info.email}
         readOnly
         aria-label="Email"
+        autoComplete="email"
         className="w-full cursor-not-allowed rounded-lg border border-white/10 bg-white/[0.03] px-4 py-3 text-gray-400"
       />
       <input
         type="text"
         placeholder="Full name"
+        aria-label="Full name"
+        autoComplete="name"
         value={name}
         onChange={(e) => setName(e.target.value)}
         className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50"
@@ -338,6 +341,7 @@ function InviteRegisterForm({
       <input
         type="password"
         placeholder="Create a password"
+        aria-label="Create a password"
         required
         value={password}
         onChange={(e) => setPassword(e.target.value)}
@@ -393,7 +397,9 @@ function InviteLoginForm({
       <input
         type="text"
         placeholder="Email"
+        aria-label="Email"
         required
+        autoComplete="email"
         value={userId}
         onChange={(e) => setUserId(e.target.value)}
         className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-gray-500 focus:border-[#f1b300]/50 focus:outline-none focus:ring-1 focus:ring-[#f1b300]/50"
@@ -401,6 +407,7 @@ function InviteLoginForm({
       <input
         type="password"
         placeholder="Password"
+        aria-label="Password"
         required
         value={password}
         onChange={(e) => setPassword(e.target.value)}

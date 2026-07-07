@@ -6,7 +6,9 @@ import {
   Navigate,
   Outlet,
   useNavigate,
+  useRouterState,
 } from '@tanstack/react-router'
+import { useBranding } from './contexts/BrandingContext'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
 import { useCertificationPanel } from './contexts/CertificationPanelContext'
 import { Workspace } from './pages/Workspace'
@@ -24,6 +26,7 @@ const Docs = lazy(() => import('./pages/Docs'))
 const Demo = lazy(() => import('./pages/Demo'))
 const DemoFeedback = lazy(() => import('./pages/DemoFeedback'))
 const DemoTrialEnd = lazy(() => import('./pages/DemoTrialEnd'))
+const DemoResend = lazy(() => import('./pages/DemoResend'))
 const InviteAccept = lazy(() => import('./pages/InviteAccept'))
 const JoinLinkAccept = lazy(() => import('./pages/JoinLinkAccept'))
 const JoinProjectAccept = lazy(() => import('./pages/JoinProjectAccept'))
@@ -62,9 +65,40 @@ function CertificationRedirect() {
 // Route tree
 // ---------------------------------------------------------------------------
 
+// Per-route document titles (WCAG 2.4.2). Longest-prefix match; the workspace
+// root falls back to the bare org name. Titles read "<Page> — <Org>".
+const ROUTE_TITLES: Array<[string, string]> = [
+  ['/workflows', 'Workflows'],
+  ['/admin', 'Admin'],
+  ['/account', 'Account'],
+  ['/teams', 'Teams'],
+  ['/organizations', 'Organizations'],
+  ['/verification', 'Verification'],
+  ['/support', 'Support'],
+  ['/automation', 'Automations'],
+  ['/docs', 'Docs'],
+  ['/landing', 'Sign in'],
+  ['/login', 'Sign in'],
+  ['/register', 'Create account'],
+  ['/reset-password', 'Reset password'],
+  ['/invite', 'Accept invitation'],
+  ['/demo', 'Demo'],
+]
+
+function RouteTitle() {
+  const { orgName } = useBranding()
+  const pathname = useRouterState({ select: (s) => s.location.pathname })
+  useEffect(() => {
+    const match = ROUTE_TITLES.find(([prefix]) => pathname === prefix || pathname.startsWith(prefix + '/'))
+    document.title = match ? `${match[1]} — ${orgName}` : orgName
+  }, [pathname, orgName])
+  return null
+}
+
 const rootRoute = createRootRoute({
   component: () => (
     <Suspense fallback={<div className="p-6 text-gray-500 text-sm">Loading...</div>}>
+      <RouteTitle />
       <Outlet />
     </Suspense>
   ),
@@ -402,6 +436,12 @@ const demoStatusRoute = createRoute({
   component: Demo,
 })
 
+const demoResendRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/demo/resend/$uuid',
+  component: DemoResend,
+})
+
 const routeTree = rootRoute.addChildren([
   landingRoute,
   loginRoute,
@@ -431,6 +471,7 @@ const routeTree = rootRoute.addChildren([
   demoFeedbackRoute,
   demoTrialEndRoute,
   demoStatusRoute,
+  demoResendRoute,
   organizationsRoute,
   credentialsRoute,
   auditLogRoute,
