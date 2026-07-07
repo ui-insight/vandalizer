@@ -44,6 +44,8 @@ export interface Branding {
    *   NOT leak onto a white-labeled deployment. Render the icon only when set.
    */
   iconUrl: string | null
+  /** When true, hide the icon from the nav header (still used as favicon + chat avatar). */
+  hideIconInNav: boolean
   /** True when the admin has overridden the default name. Used to surface "Powered by Vandalizer" attribution. */
   isCustomized: boolean
   /** Re-fetch from server (called by admin after saving theme). */
@@ -74,6 +76,7 @@ function resolve(theme: ThemeConfig | null): Omit<Branding, 'refresh'> {
     logoUrl: customLogo || DEFAULT_LOGO_URL,
     logoDarkUrl: customLogo || DEFAULT_LOGO_DARK_URL,
     iconUrl: customIcon || (isCustomized ? null : DEFAULT_ICON_URL),
+    hideIconInNav: !!theme?.icon_hide_in_nav,
     isCustomized,
   }
 }
@@ -137,6 +140,7 @@ export function useBranding(): Branding {
       logoUrl: DEFAULT_LOGO_URL,
       logoDarkUrl: DEFAULT_LOGO_DARK_URL,
       iconUrl: DEFAULT_ICON_URL,
+      hideIconInNav: false,
       isCustomized: false,
       refresh: async () => {},
     }

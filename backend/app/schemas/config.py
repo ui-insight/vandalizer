@@ -44,6 +44,7 @@ class ThemeConfigResponse(BaseModel):
     org_name: str = ""
     logo_data_url: str = ""
     icon_data_url: str = ""
+    icon_hide_in_nav: bool = False
 
 
 class UpdateThemeConfigRequest(BaseModel):
@@ -52,6 +53,7 @@ class UpdateThemeConfigRequest(BaseModel):
     org_name: Optional[str] = None
     logo_data_url: Optional[str] = None
     icon_data_url: Optional[str] = None
+    icon_hide_in_nav: Optional[bool] = None
 
 
 class OnboardingStatusResponse(BaseModel):
