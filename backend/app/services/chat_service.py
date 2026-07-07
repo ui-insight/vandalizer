@@ -28,12 +28,12 @@ from app.services.context_budget import (
     plan_and_compact_context,
 )
 from app.services.llm_service import (
+    build_project_kb_empty_prompt,
     create_chat_agent,
     DOCUMENT_CHAT_SYSTEM_PROMPT,
     FIRST_SESSION_SYSTEM_PROMPT,
     HELP_CHAT_SYSTEM_PROMPT,
     KB_CHAT_SYSTEM_PROMPT,
-    PROJECT_KB_EMPTY_SYSTEM_PROMPT,
     VANDALIZER_CONTEXT,
 )
 
@@ -347,7 +347,12 @@ async def chat_stream(
     # and admit when the retrieved set doesn't actually contain the answer.
     have_context = bool(doc_segments or attachment_segments)
     if kb_sources:
-        system_prompt: Optional[str] = KB_CHAT_SYSTEM_PROMPT
+        # The manifest rides on the system prompt (re-sent every turn) so the
+        # model can distinguish "exists here but wasn't retrieved" from "not
+        # in this project" on follow-ups too.
+        system_prompt: Optional[str] = (
+            KB_CHAT_SYSTEM_PROMPT + _build_manifest_block(kb_manifest)
+        )
     elif have_context:
         system_prompt = DOCUMENT_CHAT_SYSTEM_PROMPT
     elif kb_uuid:
@@ -355,7 +360,9 @@ async def chat_stream(
         # docs not indexed yet, or no match). Do NOT fall through to system_prompt=None
         # — that lets the model freely hallucinate document contents. Tell it the KB
         # was empty for this query while still allowing general-knowledge answers.
-        system_prompt = PROJECT_KB_EMPTY_SYSTEM_PROMPT
+        system_prompt = build_project_kb_empty_prompt(
+            _build_manifest_block(kb_manifest)
+        )
     elif is_first_session:
         # First-session onboarding: conversational value discovery.
         # Do NOT inject VANDALIZER_CONTEXT here — it's a technical how-to dump
@@ -630,6 +637,55 @@ async def chat_stream(
     finally:
         await _meter.__aexit__(None, None, None)
 
+
+
+_MANIFEST_MAX_ENTRIES = 60
+_MANIFEST_MAX_CHARS = 3000
+
+
+def _build_manifest_block(manifest: list[dict]) -> str:
+    """Render the project's document list as a system-prompt section.
+
+    Appended to the system prompt (re-sent every turn) so the model always
+    knows what the project contains — the retrieved snippets alone can't tell
+    it whether an unretrieved document exists.
+    """
+    if not manifest:
+        return ""
+    lines: list[str] = []
+    total_chars = 0
+    shown = 0
+    for entry in manifest[:_MANIFEST_MAX_ENTRIES]:
+        name = (entry.get("name") or "").strip()
+        if not name:
+            continue
+        status = entry.get("status")
+        line = f"- {name}" + (" (still indexing)" if status and status != "ready" else "")
+        if total_chars + len(line) > _MANIFEST_MAX_CHARS:
+            break
+        lines.append(line)
+        total_chars += len(line)
+        shown += 1
+    if not lines:
+        return ""
+    more = len(manifest) - shown
+    more_note = f"\n…and {more} more document(s) not listed here." if more > 0 else ""
+    return (
+        "\n\n## Project Document Manifest\n"
+        f"This project contains {len(manifest)} document(s):\n"
+        + "\n".join(lines)
+        + more_note
+        + "\n\nManifest rules:\n"
+        "- If the user asks about a document listed above but none of the retrieved "
+        "snippets come from it, say the document is in this project but nothing from "
+        "it was retrieved for this question — suggest asking about it by name or "
+        "rephrasing. Never claim a listed document lacks content, or that a fact "
+        "\"isn't in the project\", just because no snippet from it was retrieved.\n"
+        "- If the user asks about a document NOT listed above, say it isn't part of "
+        "this project.\n"
+        "- A document marked \"(still indexing)\" can't be searched yet — say so if "
+        "the user asks about it.\n"
+    )
 
 
 def _select_diverse_chunks(

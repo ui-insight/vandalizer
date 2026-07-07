@@ -153,7 +153,10 @@ def ocr_extract_text_from_pdf(pdf_path: str, retries: int = 3) -> str:
         if attempt < retries - 1:
             _time.sleep(2 ** attempt)
 
-    logger.error("OCR failed after %d attempts for %s", retries, pdf_path)
+    # OCR failure is a handled degradation — the caller falls back to PyMuPDF —
+    # so log at warning, not error. An OCR outage (or a file removed mid-flight)
+    # must not page Sentry as a fault on every attempt-exhaustion.
+    logger.warning("OCR failed after %d attempts for %s", retries, pdf_path)
     return ""
 
 

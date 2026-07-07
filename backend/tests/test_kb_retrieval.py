@@ -355,3 +355,57 @@ async def test_get_kb_manifest_resolves_effective_names():
         "grant_proposal.pdf", "My Custom Label", "Page Title",
     ]
     assert manifest[1]["status"] == "processing"
+
+
+# ---------------------------------------------------------------------------
+# Manifest-aware prompts + numeric/consistency guardrails
+# ---------------------------------------------------------------------------
+
+
+def test_build_manifest_block_lists_names_and_statuses():
+    manifest = [
+        {"name": "Project Timeline.docx", "status": "ready"},
+        {"name": "budget.xlsx", "status": "processing"},
+    ]
+    block = chat_service._build_manifest_block(manifest)
+    assert "## Project Document Manifest" in block
+    assert "- Project Timeline.docx" in block
+    assert "- budget.xlsx (still indexing)" in block
+    assert "isn't part of this project" in block
+
+
+def test_build_manifest_block_empty_manifest_is_empty():
+    assert chat_service._build_manifest_block([]) == ""
+
+
+def test_build_manifest_block_caps_entries():
+    manifest = [{"name": f"doc_{i:03d}.pdf", "status": "ready"} for i in range(70)]
+    block = chat_service._build_manifest_block(manifest)
+    assert "doc_059.pdf" in block
+    assert "doc_060.pdf" not in block
+    assert "…and 10 more document(s)" in block
+
+
+def test_project_kb_empty_prompt_distinguishes_with_manifest():
+    from app.services.llm_service import (
+        PROJECT_KB_EMPTY_SYSTEM_PROMPT,
+        build_project_kb_empty_prompt,
+    )
+
+    plain = build_project_kb_empty_prompt(None)
+    assert plain == PROJECT_KB_EMPTY_SYSTEM_PROMPT
+
+    block = chat_service._build_manifest_block(
+        [{"name": "Project Timeline.docx", "status": "ready"}]
+    )
+    with_manifest = build_project_kb_empty_prompt(block)
+    assert "Project Timeline.docx" in with_manifest
+    assert "Not retrieved vs. not in this project" in with_manifest
+
+
+def test_kb_chat_prompt_has_numeric_and_consistency_guardrails():
+    from app.services.llm_service import KB_CHAT_SYSTEM_PROMPT
+
+    assert "Never derive figures" in KB_CHAT_SYSTEM_PROMPT
+    assert "Consistency questions" in KB_CHAT_SYSTEM_PROMPT
+    assert "same field, period, and unit" in KB_CHAT_SYSTEM_PROMPT
