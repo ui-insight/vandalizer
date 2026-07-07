@@ -684,6 +684,14 @@ def extract_text_from_file(file_path: str, file_extension: str) -> str:
                     with open(file_path, encoding="latin-1") as f:
                         return f.read()
 
+    except FileNotFoundError:
+        # A missing source file (deleted mid-processing, retention sweep, or a
+        # stale/relative path) is benign — there is nothing to extract. Return
+        # empty text rather than a placeholder that would masquerade as content,
+        # and log at warning so it doesn't page Sentry as a fault.
+        logger.warning("Source file not found for extraction: %s", file_path)
+        return ""
+
     except Exception as e:
         logger.error("Error extracting text from %s: %s", file_path, e)
         return f"[Error extracting content: {e!s}]"
