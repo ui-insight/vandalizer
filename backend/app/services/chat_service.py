@@ -362,6 +362,7 @@ async def chat_stream(
                         "sheet": sheet if isinstance(sheet, str) else None,
                         "chunk_id": r.get("chunk_id"),
                         "score": r.get("score"),
+                        "similarity": r.get("similarity"),
                         "content_preview": (r.get("content") or "")[:240],
                     })
                 doc_segments.insert(0, DocumentSegment(label="kb", text=kb_text))
@@ -595,6 +596,7 @@ async def chat_stream(
                     usage, activity_id, user_id,
                     thinking=thinking_text,
                     thinking_duration=thinking_duration,
+                    citations=kb_sources or None,
                 )
 
                 # Stream token usage so the frontend can display context utilization
@@ -713,6 +715,7 @@ async def _finalize(
     user_id: str,
     thinking: Optional[str] = None,
     thinking_duration: Optional[float] = None,
+    citations: Optional[list[dict]] = None,
 ) -> None:
     """Save assistant message and update activity metrics."""
     await conversation.add_message(
@@ -720,6 +723,7 @@ async def _finalize(
         assistant_message,
         thinking=thinking,
         thinking_duration=thinking_duration,
+        citations=citations,
     )
 
     if activity_id:
