@@ -32,6 +32,29 @@ async def create_project(
     return project_service.serialize_project(project)
 
 
+@router.post("/{project_uuid}/duplicate")
+async def duplicate_project(
+    project_uuid: str,
+    user: User = Depends(get_current_user),
+):
+    """Create a copy of a project the user can view.
+
+    The new project (its folder, implicit KB, record, and pin references) is
+    created synchronously and returned so it shows up immediately; its files and
+    KB content are deep-copied in the background and stream in as they finish.
+    """
+    source = await project_service.get_authorized_project(project_uuid, user)
+    if not source:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    new_project = await project_service.duplicate_project(source, user)
+
+    from app.tasks.project_tasks import duplicate_project_task
+
+    duplicate_project_task.delay(source.uuid, new_project.uuid, user.user_id)
+    return await project_service.summarize_project(new_project, user)
+
+
 @router.get("")
 async def list_projects(user: User = Depends(get_current_user)):
     projects = await project_service.list_projects(user)
