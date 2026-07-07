@@ -592,7 +592,23 @@ def extract_text_with_markers(file_path: str, file_extension: str) -> tuple[str,
             num_pages = _pdf_page_count(file_path)
             return ocr_text, _interpolate_page_markers(ocr_text, num_pages)
         # OCR unavailable / too little text — PyMuPDF gives us exact boundaries.
-        return _pymupdf_extract_with_pages(file_path)
+        # The PyMuPDF pass is a page-boundary refinement over the OCR text, not a
+        # hard requirement. If it fails (corrupt PDF, or the source file was
+        # removed between the OCR read and here — a document deleted mid-
+        # processing), a short-but-valid OCR result still beats losing the
+        # extraction and crashing the task.
+        try:
+            return _pymupdf_extract_with_pages(file_path)
+        except Exception as e:
+            if ocr_text and ocr_text.strip():
+                logger.warning(
+                    "PyMuPDF page extraction failed for %s (%s); using OCR text",
+                    file_path, e,
+                )
+                return ocr_text, _interpolate_page_markers(
+                    ocr_text, _pdf_page_count(file_path)
+                )
+            raise
 
     if ext == "xlsx":
         text = extract_text_from_xlsx(file_path)

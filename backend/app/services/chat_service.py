@@ -326,50 +326,14 @@ async def chat_stream(
     kb_sources: list[dict] = []
     if kb_uuid:
         try:
-            from app.services.document_manager import DocumentManager
-            from app.services.kb_validation_service import resolve_kb_min_similarity
-            dm = DocumentManager()
-            # Honour the KB's tuned relevance floor. If retrieval clears nothing
-            # above it, kb_results is empty and we fall through to the empty-KB
-            # prompt below — the model abstains instead of answering from junk.
-            kb_min_similarity = await resolve_kb_min_similarity(kb_uuid)
-            kb_results = await asyncio.to_thread(
-                dm.query_kb, kb_uuid, message, 8, kb_min_similarity
+            kb_segment, kb_sources = await _build_kb_segment(
+                kb_uuid, message, model_name,
             )
-            if kb_results:
-                kb_text = (
-                    "\n\n## Retrieved Knowledge Base Snippets\n"
-                    "_The following are partial excerpts from a larger corpus, ranked "
-                    "by similarity to the user's question. They may be incomplete, "
-                    "off-topic, or miss the best answer. Cite by filename only when a "
-                    "snippet actually supports your claim._\n"
-                )
-                for r in kb_results:
-                    meta = r.get("metadata") or {}
-                    src = meta.get("source_name", "Unknown")
-                    page = meta.get("page")
-                    sheet = meta.get("sheet")
-                    label = src
-                    if isinstance(page, int):
-                        label = f"{src} (p. {page})"
-                    elif isinstance(sheet, str) and sheet:
-                        label = f"{src} ({sheet})"
-                    kb_text += f"\n**Source: {label}**\n{r['content']}\n"
-                    kb_sources.append({
-                        "document_id": meta.get("source_id"),
-                        "document_title": src,
-                        "page": page if isinstance(page, int) else None,
-                        "sheet": sheet if isinstance(sheet, str) else None,
-                        "chunk_id": r.get("chunk_id"),
-                        "score": r.get("score"),
-                        "similarity": r.get("similarity"),
-                        "content_preview": (r.get("content") or "")[:240],
-                    })
-                doc_segments.insert(0, DocumentSegment(label="kb", text=kb_text))
-            else:
-                logger.warning("KB query returned no results for kb_uuid=%s", kb_uuid)
+            if kb_segment:
+                doc_segments.insert(0, kb_segment)
         except Exception as e:
             logger.error("KB context retrieval failed for kb_uuid=%s: %s", kb_uuid, e)
+            kb_sources = []
 
     # Select system prompt based on whether we have document context.
     # KB chat needs a stricter prompt: snippets are partial excerpts, so the model
@@ -660,6 +624,70 @@ async def chat_stream(
     finally:
         await _meter.__aexit__(None, None, None)
 
+
+
+async def _build_kb_segment(
+    kb_uuid: str,
+    message: str,
+    model_name: str,
+) -> tuple[Optional[DocumentSegment], list[dict]]:
+    """Retrieve KB context for one chat turn.
+
+    Returns ``(segment, kb_sources)``; the segment is None when nothing clears
+    the KB's tuned relevance floor, so the caller falls through to the empty-KB
+    prompt and the model abstains instead of answering from junk.
+    """
+    from app.services.kb_validation_service import (
+        _ensure_system_config_loaded,
+        retrieve_kb_chunks,
+    )
+
+    # The retrieval pipeline's optional LLM steps (rewrite/rerank) build their
+    # agents from the ContextVar'd SystemConfig snapshot.
+    await _ensure_system_config_loaded()
+
+    # Honour the KB's tuned retrieval knobs (k, min_similarity, query
+    # rewriting, rerank). cfg.model / prompt_variant / answer_temperature
+    # deliberately do NOT apply here — they tune the headless RAG answer
+    # generator, while chat keeps its own agent, prompt, and settings.
+    kb_results, rag_cfg, _ = await retrieve_kb_chunks(
+        kb_uuid, message, model_name, per_step_timeout=6.0,
+    )
+    kb_results = kb_results[: rag_cfg.k]
+    if not kb_results:
+        logger.warning("KB query returned no results for kb_uuid=%s", kb_uuid)
+        return None, []
+
+    kb_sources: list[dict] = []
+    kb_text = (
+        "\n\n## Retrieved Knowledge Base Snippets\n"
+        "_The following are partial excerpts from a larger corpus, ranked "
+        "by similarity to the user's question. They may be incomplete, "
+        "off-topic, or miss the best answer. Cite by filename only when a "
+        "snippet actually supports your claim._\n"
+    )
+    for r in kb_results:
+        meta = r.get("metadata") or {}
+        src = meta.get("source_name", "Unknown")
+        page = meta.get("page")
+        sheet = meta.get("sheet")
+        label = src
+        if isinstance(page, int):
+            label = f"{src} (p. {page})"
+        elif isinstance(sheet, str) and sheet:
+            label = f"{src} ({sheet})"
+        kb_text += f"\n**Source: {label}**\n{r['content']}\n"
+        kb_sources.append({
+            "document_id": meta.get("source_id"),
+            "document_title": src,
+            "page": page if isinstance(page, int) else None,
+            "sheet": sheet if isinstance(sheet, str) else None,
+            "chunk_id": r.get("chunk_id"),
+            "score": r.get("score"),
+            "similarity": r.get("similarity"),
+            "content_preview": (r.get("content") or "")[:240],
+        })
+    return DocumentSegment(label="kb", text=kb_text), kb_sources
 
 
 def _build_interrupted_body(full_response: list[str], reason: str) -> str:
