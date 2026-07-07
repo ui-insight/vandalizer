@@ -392,6 +392,7 @@ class DocumentManager:
         query: str,
         k: int = 8,
         min_similarity: float = 0.0,
+        where: Optional[dict] = None,
     ) -> list[dict[str, Any]]:
         """Similarity search on a KB collection.
 
@@ -401,11 +402,14 @@ class DocumentManager:
         in. A positive floor lets RAG callers treat "retrieved only weakly
         related junk" the same as "retrieved nothing" — handing the model an
         empty set so it abstains rather than answering from off-topic chunks.
+
+        ``where`` is an optional ChromaDB metadata filter (e.g. restrict the
+        search to specific sources by ``source_name``).
         """
         collection = self.get_kb_collection_readonly(kb_uuid)
         if collection is None:
             return []
-        results = collection.query(query_texts=[query], n_results=k)
+        results = collection.query(query_texts=[query], n_results=k, where=where)
 
         output = []
         if results and results.get("documents"):

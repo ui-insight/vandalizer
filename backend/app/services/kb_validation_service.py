@@ -371,6 +371,7 @@ async def retrieve_kb_chunks(
     config: Optional[RAGConfig] = None,
     overfetch_multiplier: int = 1,
     per_step_timeout: Optional[float] = None,
+    source_filter: Optional[list[str]] = None,
 ) -> tuple[list[dict], RAGConfig, int]:
     """Shared KB retrieval pipeline: config resolution → optional query
     rewrite → vector search → optional LLM rerank.
@@ -390,6 +391,11 @@ async def retrieve_kb_chunks(
     ``per_step_timeout`` bounds each optional LLM step (rewrite, rerank) —
     the live chat path uses it so a slow helper degrades to the non-LLM
     fallback instead of delaying the first streamed token indefinitely.
+
+    ``source_filter`` restricts the vector search to the given ``source_name``
+    metadata values (the exact ingestion-time names) — used by chat's
+    named-document targeting so a file the user asked about by name is
+    searched directly instead of competing with the whole corpus.
 
     Returns ``(results, resolved_config, tokens_used)``.
     """
@@ -415,8 +421,19 @@ async def retrieve_kb_chunks(
         RERANK_POOL_MULTIPLIER if cfg.rerank == "llm" else 1,
     )
     retrieve_k = cfg.k * pool_multiplier
+    where: Optional[dict] = None
+    if source_filter:
+        names = [n for n in source_filter if n]
+        if len(names) == 1:
+            where = {"source_name": names[0]}
+        elif names:
+            where = {"source_name": {"$in": names}}
+    # Only pass ``where`` when filtering — keeps the unfiltered call shape
+    # identical to the legacy path.
+    where_kwargs = {"where": where} if where else {}
     results = await asyncio.to_thread(
-        dm.query_kb, kb_uuid, retrieval_query, retrieve_k, cfg.min_similarity
+        dm.query_kb, kb_uuid, retrieval_query, retrieve_k, cfg.min_similarity,
+        **where_kwargs,
     )
 
     # Rerank scores against the *raw* query — the rewrite optimises for vector

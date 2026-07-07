@@ -209,24 +209,9 @@ def _source_response(s, *, document_title: str | None = None) -> KBSourceRespons
 
 
 async def _resolve_document_titles(sources) -> dict[str, str]:
-    """Batch-load SmartDocument titles for the given KB sources.
-
-    Title resolution is a display nicety — a lookup failure (missing collection
-    in a test, a deleted document, etc.) must not break the parent endpoint.
-    """
-    from app.models.document import SmartDocument
-
-    doc_uuids = [
-        s.document_uuid for s in sources
-        if s.source_type == "document" and s.document_uuid
-    ]
-    if not doc_uuids:
-        return {}
-    try:
-        docs = await SmartDocument.find({"uuid": {"$in": doc_uuids}}).to_list()
-    except Exception:
-        return {}
-    return {d.uuid: d.title for d in docs if d.title}
+    """Batch-load SmartDocument titles for the given KB sources."""
+    from app.services.knowledge_service import resolve_document_titles
+    return await resolve_document_titles(sources)
 
 
 @router.get("/list", response_model=list[KBResponse])

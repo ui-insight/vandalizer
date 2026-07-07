@@ -183,3 +183,175 @@ async def test_build_kb_segment_empty_retrieval_returns_none():
 
     assert segment is None
     assert sources == []
+
+
+# ---------------------------------------------------------------------------
+# Diversity selection, named-document targeting, manifest
+# ---------------------------------------------------------------------------
+
+
+def test_select_diverse_chunks_caps_dominant_source():
+    dominant = [_chunk(i, source="narrative.pdf") for i in range(6)]
+    short = [_chunk(9, source="timeline.docx")]
+    # Relevance order: narrative fills the top, timeline dead last.
+    results = dominant + short
+
+    selected = chat_service._select_diverse_chunks(results, k=4, max_per_source=3)
+
+    sources = [r["metadata"]["source_name"] for r in selected]
+    assert sources.count("narrative.pdf") == 3
+    assert "timeline.docx" in sources
+
+
+def test_select_diverse_chunks_backfills_single_source():
+    results = [_chunk(i, source="only.pdf") for i in range(5)]
+    selected = chat_service._select_diverse_chunks(results, k=4, max_per_source=2)
+    # Cap would leave slots empty; backfill keeps k full for single-source KBs.
+    assert len(selected) == 4
+
+
+def test_match_named_sources_matches_with_and_without_extension():
+    manifest = [
+        {"name": "Project Timeline.docx"},
+        {"name": "budget_justification.xlsx"},
+        {"name": "a.txt"},
+    ]
+    assert chat_service._match_named_sources(
+        "what does the project timeline say about milestones?", manifest,
+    ) == ["Project Timeline.docx"]
+    assert chat_service._match_named_sources(
+        "open budget_justification.xlsx please", manifest,
+    ) == ["budget_justification.xlsx"]
+    # Underscores/hyphens normalize to spaces.
+    assert chat_service._match_named_sources(
+        "check the budget justification numbers", manifest,
+    ) == ["budget_justification.xlsx"]
+
+
+def test_match_named_sources_ignores_short_names():
+    manifest = [{"name": "a.txt"}, {"name": "OK.pdf"}]
+    assert chat_service._match_named_sources("a fine question, ok?", manifest) == []
+
+
+def test_compose_kb_results_guarantees_named_slots():
+    general = [_chunk(i, source="narrative.pdf") for i in range(8)]
+    named = [_chunk(i, source="timeline.docx") for i in range(3)]
+
+    final = chat_service._compose_kb_results(general, named, k=4)
+
+    sources = [r["metadata"]["source_name"] for r in final]
+    # ceil(4/2) = 2 slots guaranteed for the named document, rest general.
+    assert sources.count("timeline.docx") == 2
+    assert len(final) == 4
+
+
+def test_compose_kb_results_dedupes_named_from_general():
+    shared = _chunk(0, source="timeline.docx")
+    general = [shared] + [_chunk(i, source="narrative.pdf") for i in range(1, 5)]
+    named = [shared, _chunk(1, source="timeline.docx")]
+
+    final = chat_service._compose_kb_results(general, named, k=4)
+
+    ids = [r["chunk_id"] for r in final]
+    assert len(ids) == len(set(ids)), "shared chunk must not appear twice"
+
+
+def test_query_kb_passes_where_filter_to_chroma():
+    from app.services.document_manager import DocumentManager
+
+    dm = object.__new__(DocumentManager)
+    fake_collection = MagicMock()
+    fake_collection.query = MagicMock(return_value={
+        "documents": [["some text"]],
+        "metadatas": [[{"source_name": "timeline.docx"}]],
+        "ids": [["src_chunk_0"]],
+        "distances": [[0.4]],
+    })
+    dm.get_kb_collection_readonly = MagicMock(return_value=fake_collection)
+
+    where = {"source_name": "timeline.docx"}
+    results = dm.query_kb("kb-1", "q?", 4, 0.0, where=where)
+
+    fake_collection.query.assert_called_once_with(
+        query_texts=["q?"], n_results=4, where=where,
+    )
+    assert len(results) == 1
+
+
+@pytest.mark.asyncio
+async def test_retrieve_kb_chunks_source_filter_builds_where():
+    fake_dm = MagicMock()
+    fake_dm.query_kb = MagicMock(return_value=[])
+    cfg = RAGConfig(k=4)
+
+    with patch.object(kb_validation_service, "_get_dm", return_value=fake_dm):
+        await kb_validation_service.retrieve_kb_chunks(
+            "kb-1", "q?", "test-model", config=cfg,
+            source_filter=["timeline.docx", "budget.xlsx"],
+        )
+
+    assert fake_dm.query_kb.call_args.kwargs["where"] == {
+        "source_name": {"$in": ["timeline.docx", "budget.xlsx"]},
+    }
+
+
+@pytest.mark.asyncio
+async def test_build_kb_segment_targets_named_document():
+    """A message naming a manifest file triggers a second, source-filtered
+    retrieval whose chunks are guaranteed slots in the final context."""
+    general = [_chunk(i, source="narrative.pdf") for i in range(6)]
+    named = [_chunk(0, source="Project Timeline.docx")]
+    cfg = RAGConfig(k=4)
+    calls = []
+
+    async def fake_retrieve(kb_uuid, message, model_name, **kwargs):
+        calls.append(kwargs)
+        if kwargs.get("source_filter"):
+            return named, cfg, 0
+        return general, cfg, 0
+
+    manifest = [{"name": "Project Timeline.docx", "status": "ready"}]
+
+    with patch.object(kb_validation_service, "_ensure_system_config_loaded",
+                      new=AsyncMock()), \
+         patch.object(kb_validation_service, "retrieve_kb_chunks",
+                      new=AsyncMock(side_effect=fake_retrieve)):
+        segment, sources = await chat_service._build_kb_segment(
+            "kb-1", "what does the project timeline say?", "test-model",
+            manifest=manifest,
+        )
+
+    assert len(calls) == 2
+    assert calls[1]["source_filter"] == ["Project Timeline.docx"]
+    titles = [s["document_title"] for s in sources]
+    assert "Project Timeline.docx" in titles
+    assert len(sources) == 4
+
+
+@pytest.mark.asyncio
+async def test_get_kb_manifest_resolves_effective_names():
+    from types import SimpleNamespace
+
+    from app.services import knowledge_service
+
+    sources = [
+        SimpleNamespace(uuid="s1", source_type="document", document_uuid="d1",
+                        custom_name=None, url=None, url_title=None, status="ready"),
+        SimpleNamespace(uuid="s2", source_type="document", document_uuid="d2",
+                        custom_name="My Custom Label", url=None, url_title=None,
+                        status="processing"),
+        SimpleNamespace(uuid="s3", source_type="url", document_uuid=None,
+                        custom_name=None, url="https://x.test/page",
+                        url_title="Page Title", status="ready"),
+    ]
+
+    with patch.object(knowledge_service, "get_kb_sources",
+                      new=AsyncMock(return_value=sources)), \
+         patch.object(knowledge_service, "resolve_document_titles",
+                      new=AsyncMock(return_value={"d1": "grant_proposal.pdf"})):
+        manifest = await knowledge_service.get_kb_manifest("kb-1")
+
+    assert [m["name"] for m in manifest] == [
+        "grant_proposal.pdf", "My Custom Label", "Page Title",
+    ]
+    assert manifest[1]["status"] == "processing"

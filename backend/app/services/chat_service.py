@@ -324,10 +324,16 @@ async def chat_stream(
 
     # KB context: query ChromaDB for relevant chunks and add as a segment.
     kb_sources: list[dict] = []
+    kb_manifest: list[dict] = []
     if kb_uuid:
         try:
+            from app.services.knowledge_service import get_kb_manifest
+            kb_manifest = await get_kb_manifest(kb_uuid)
+        except Exception as e:
+            logger.warning("KB manifest fetch failed for kb_uuid=%s: %s", kb_uuid, e)
+        try:
             kb_segment, kb_sources = await _build_kb_segment(
-                kb_uuid, message, model_name,
+                kb_uuid, message, model_name, manifest=kb_manifest,
             )
             if kb_segment:
                 doc_segments.insert(0, kb_segment)
@@ -626,10 +632,83 @@ async def chat_stream(
 
 
 
+def _select_diverse_chunks(
+    results: list[dict], k: int, max_per_source: int,
+) -> list[dict]:
+    """Pick up to ``k`` chunks in relevance order, capping any single source at
+    ``max_per_source`` so one long narrative document can't fill every slot.
+
+    A second pass backfills from the overflow so a single-source KB (or one
+    genuinely dominant document) still fills all ``k`` slots.
+    """
+    selected: list[dict] = []
+    overflow: list[dict] = []
+    counts: dict = {}
+    for r in results:
+        meta = r.get("metadata") or {}
+        src = meta.get("source_id") or meta.get("source_name")
+        if counts.get(src, 0) < max_per_source:
+            selected.append(r)
+            counts[src] = counts.get(src, 0) + 1
+        else:
+            overflow.append(r)
+        if len(selected) >= k:
+            break
+    if len(selected) < k:
+        selected.extend(overflow[: k - len(selected)])
+    return selected[:k]
+
+
+def _match_named_sources(message: str, manifest: list[dict]) -> list[str]:
+    """Return the manifest names the user's message mentions explicitly.
+
+    Normalized substring match: case-insensitive, extension-insensitive.
+    Names shorter than 5 characters with fewer than 2 tokens are skipped so a
+    file called "a.txt" doesn't match every message containing "a".
+    """
+    msg = " ".join((message or "").lower().split())
+    matched: list[str] = []
+    for entry in manifest:
+        name = (entry.get("name") or "").strip()
+        if not name:
+            continue
+        stem = name.rsplit(".", 1)[0] if "." in name else name
+        stem_norm = " ".join(stem.lower().replace("_", " ").replace("-", " ").split())
+        if len(stem_norm) < 5 and len(stem_norm.split()) < 2:
+            continue
+        if name.lower() in msg or (stem_norm and stem_norm in msg):
+            matched.append(name)
+    return matched
+
+
+def _compose_kb_results(
+    general: list[dict], named: list[dict], k: int,
+) -> list[dict]:
+    """Merge named-document hits with the general pool into the final top-k.
+
+    Named-document chunks are guaranteed up to ceil(k/2) slots (the document
+    the user asked about by name must not be crowded out), the rest are filled
+    from the general pool with a per-source diversity cap.
+    """
+    max_per_source = max(2, -(-k // 2))  # ceil(k/2)
+    if not named:
+        return _select_diverse_chunks(general, k, max_per_source)
+
+    quota = -(-k // 2)
+    final = named[:quota]
+    seen = {r.get("chunk_id") for r in final}
+    remaining = [r for r in general if r.get("chunk_id") not in seen]
+    final.extend(
+        _select_diverse_chunks(remaining, k - len(final), max_per_source)
+    )
+    return final[:k]
+
+
 async def _build_kb_segment(
     kb_uuid: str,
     message: str,
     model_name: str,
+    manifest: Optional[list[dict]] = None,
 ) -> tuple[Optional[DocumentSegment], list[dict]]:
     """Retrieve KB context for one chat turn.
 
@@ -650,10 +729,27 @@ async def _build_kb_segment(
     # rewriting, rerank). cfg.model / prompt_variant / answer_temperature
     # deliberately do NOT apply here — they tune the headless RAG answer
     # generator, while chat keeps its own agent, prompt, and settings.
+    # Over-fetch 3× so the diversity pass below has a pool to select from.
     kb_results, rag_cfg, _ = await retrieve_kb_chunks(
         kb_uuid, message, model_name, per_step_timeout=6.0,
+        overfetch_multiplier=3,
     )
-    kb_results = kb_results[: rag_cfg.k]
+
+    # Named-document targeting: when the message mentions a project file by
+    # name, run a second search restricted to that source and guarantee it a
+    # share of the final slots — short documents (timelines, letters) are
+    # otherwise routinely out-ranked by long narrative documents.
+    named_results: list[dict] = []
+    matched_names = _match_named_sources(message, manifest or [])
+    if matched_names:
+        named_results, _, _ = await retrieve_kb_chunks(
+            kb_uuid, message, model_name,
+            config=rag_cfg.with_overrides(rerank="off", query_rewriting=False),
+            source_filter=matched_names,
+            per_step_timeout=6.0,
+        )
+
+    kb_results = _compose_kb_results(kb_results, named_results, rag_cfg.k)
     if not kb_results:
         logger.warning("KB query returned no results for kb_uuid=%s", kb_uuid)
         return None, []
