@@ -73,7 +73,7 @@ class TestProcessPendingTriggers:
         cursor.limit.return_value = [event]
         db.workflow_trigger_event.find.return_value = cursor
         db.workflow.find_one.return_value = wf
-        db.smart_document.find.return_value = [{"_id": event["documents"][0], "title": "test.pdf", "extension": "pdf"}]
+        db.smart_document.find.return_value = [{"_id": event["documents"][0], "title": "test.pdf", "extension": "pdf", "raw_text": "text"}]
 
         with (
             patch("app.services.passive_triggers.apply_file_filters", return_value=[{"_id": event["documents"][0]}]),
@@ -85,6 +85,70 @@ class TestProcessPendingTriggers:
 
         assert result["processed"] == 1
         mock_execute.delay.assert_called_once_with(str(event["_id"]))
+
+    @patch("app.tasks.passive_tasks.execute_workflow_passive")
+    @patch("app.tasks.passive_tasks.get_sync_db")
+    def test_defers_when_input_still_extracting(self, mock_get_db, mock_execute):
+        from app.tasks.passive_tasks import process_pending_triggers
+
+        db = MagicMock()
+        mock_get_db.return_value = db
+
+        wf = _make_workflow()
+        event = _make_event(workflow_oid=wf["_id"], trigger_type="folder_watch", documents=[ObjectId()])
+        cursor = MagicMock()
+        cursor.limit.return_value = [event]
+        db.workflow_trigger_event.find.return_value = cursor
+        db.workflow.find_one.return_value = wf
+        db.smart_document.find.return_value = [
+            {"_id": event["documents"][0], "raw_text": "", "processing": True},
+        ]
+
+        with (
+            patch("app.services.passive_triggers.apply_file_filters", return_value=[{"_id": event["documents"][0]}]),
+            patch("app.services.passive_triggers.evaluate_conditions", return_value=True),
+            patch("app.services.passive_triggers.check_workflow_budget", return_value=(True, None)),
+            patch("app.services.passive_triggers.check_throttling", return_value=(True, None)),
+        ):
+            result = process_pending_triggers()
+
+        assert result["processed"] == 0
+        mock_execute.delay.assert_not_called()
+        # Event deferred (process_after bumped), not queued or skipped.
+        last_set = db.workflow_trigger_event.update_one.call_args[0][1]["$set"]
+        assert "process_after" in last_set
+        assert "status" not in last_set
+
+    @patch("app.tasks.passive_tasks.execute_workflow_passive")
+    @patch("app.tasks.passive_tasks.get_sync_db")
+    def test_skips_when_input_extraction_failed(self, mock_get_db, mock_execute):
+        from app.tasks.passive_tasks import process_pending_triggers
+
+        db = MagicMock()
+        mock_get_db.return_value = db
+
+        wf = _make_workflow()
+        event = _make_event(workflow_oid=wf["_id"], trigger_type="folder_watch", documents=[ObjectId()])
+        cursor = MagicMock()
+        cursor.limit.return_value = [event]
+        db.workflow_trigger_event.find.return_value = cursor
+        db.workflow.find_one.return_value = wf
+        db.smart_document.find.return_value = [
+            {"_id": event["documents"][0], "raw_text": "", "processing": False},
+        ]
+
+        with (
+            patch("app.services.passive_triggers.apply_file_filters", return_value=[{"_id": event["documents"][0]}]),
+            patch("app.services.passive_triggers.evaluate_conditions", return_value=True),
+            patch("app.services.passive_triggers.check_workflow_budget", return_value=(True, None)),
+            patch("app.services.passive_triggers.check_throttling", return_value=(True, None)),
+        ):
+            result = process_pending_triggers()
+
+        assert result["processed"] == 0
+        mock_execute.delay.assert_not_called()
+        last_set = db.workflow_trigger_event.update_one.call_args[0][1]["$set"]
+        assert last_set["status"] == "skipped"
 
     @patch("app.tasks.passive_tasks.execute_workflow_passive")
     @patch("app.tasks.passive_tasks.get_sync_db")
@@ -158,7 +222,7 @@ class TestProcessPendingTriggers:
         db.workflow.find_one.return_value = wf
         db.automation.find_one.return_value = {"_id": auto_oid, "enabled": True}
         db.smart_document.find.return_value = [
-            {"_id": event["documents"][0], "title": "t.pdf", "extension": "pdf"},
+            {"_id": event["documents"][0], "title": "t.pdf", "extension": "pdf", "raw_text": "text"},
         ]
 
         with (

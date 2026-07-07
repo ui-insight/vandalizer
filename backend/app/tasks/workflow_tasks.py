@@ -234,6 +234,81 @@ def _get_db():
     return get_sync_db()
 
 
+def _resolve_input_doc_uuids(workflow_doc: dict, trigger_step_data: dict) -> list[str]:
+    """Effective input document uuids for a run: trigger docs plus fixed docs.
+
+    Mirrors the merge that step-building performs (skips fixed docs in
+    ``no_input`` mode) so the pre-flight readiness gate looks at exactly the
+    documents the run will try to read.
+    """
+    doc_uuids = list((trigger_step_data or {}).get("doc_uuids", []) or [])
+    input_cfg = workflow_doc.get("input_config") or {}
+    if input_cfg.get("trigger_type") != "no_input":
+        for fd in input_cfg.get("fixed_documents", []) or []:
+            fd_uuid = fd.get("uuid") if isinstance(fd, dict) else str(fd)
+            if fd_uuid and fd_uuid not in doc_uuids:
+                doc_uuids.append(fd_uuid)
+    return doc_uuids
+
+
+def _classify_input_documents(db, workflow_doc: dict, doc_uuids: list[str]):
+    """Split a run's input documents by text-extraction readiness.
+
+    Returns ``(ready, processing, failed)`` where ``processing``/``failed`` are
+    lists of display titles. Own-origin documents (this workflow's own prior
+    output) are ignored — step-building skips them to avoid self-loops, so they
+    must not count toward or against readiness. ``ready`` counts documents that
+    already have usable ``raw_text``; ``processing`` are still extracting (a
+    race worth retrying); ``failed`` have finished with no text (extraction
+    failed, empty, or the document is missing).
+    """
+    workflow_id = str(workflow_doc.get("_id", ""))
+    ready = 0
+    processing: list[str] = []
+    failed: list[str] = []
+    for uuid in doc_uuids:
+        doc = db.smart_document.find_one(
+            {"uuid": uuid},
+            {"raw_text": 1, "processing": 1, "origin_workflow_id": 1, "title": 1},
+        )
+        if doc and doc.get("origin_workflow_id") == workflow_id:
+            continue
+        if doc and doc.get("raw_text"):
+            ready += 1
+        elif doc and doc.get("processing"):
+            processing.append(doc.get("title") or uuid)
+        else:
+            failed.append((doc.get("title") if doc else None) or uuid)
+    return ready, processing, failed
+
+
+def _mark_workflow_failed(db, workflow_result_id, activity_id, error_msg, error_payload=None):
+    """Flip a WorkflowResult (and its activity rail entry) to a failed state
+    with a user-facing message, matching the pre-flight oversize handler."""
+    from bson import ObjectId
+
+    update = {"status": "error", "error": error_msg}
+    if error_payload is not None:
+        update["error_payload"] = error_payload
+    db.workflow_result.update_one(
+        {"_id": ObjectId(workflow_result_id)}, {"$set": update}
+    )
+    if activity_id:
+        from datetime import datetime, timezone
+
+        try:
+            db.activity_event.update_one(
+                {"_id": ObjectId(activity_id)},
+                {"$set": {
+                    "status": "failed",
+                    "error": error_msg[:2000],
+                    "finished_at": datetime.now(timezone.utc),
+                }},
+            )
+        except Exception:
+            pass
+
+
 @celery_app.task(
     bind=True,
     name="tasks.workflow_next.execution",
@@ -272,6 +347,64 @@ def execute_workflow_task(self, workflow_result_id, workflow_id, trigger_step_da
 
     # Load system config for sync engine
     sys_config = db.system_config.find_one() or {}
+
+    # Pre-flight readiness gate. A run dispatched right after upload (e.g. a
+    # batch run over freshly uploaded files) can reach the worker before text
+    # extraction finishes, so every input document still has empty raw_text and
+    # the workflow would silently "complete" with no output. Rather than run on
+    # nothing, wait for extraction (retry) when documents are still processing,
+    # and fail with an actionable message when extraction has genuinely failed.
+    input_doc_uuids = _resolve_input_doc_uuids(workflow_doc, trigger_step_data)
+    if input_doc_uuids:
+        ready, processing, failed = _classify_input_documents(
+            db, workflow_doc, input_doc_uuids
+        )
+        # Only gate when the run has no usable text at all — this is exactly the
+        # "will produce no output" condition. A partial set (some docs ready)
+        # proceeds as before.
+        if ready == 0 and (processing or failed):
+            if processing and self.request.retries < self.max_retries:
+                delay = 10 * (self.request.retries + 1)
+                logger.info(
+                    "Workflow %s input still extracting (%d processing); "
+                    "retry %d/%d in %ds",
+                    workflow_id, len(processing),
+                    self.request.retries + 1, self.max_retries, delay,
+                )
+                raise self.retry(countdown=delay)
+
+            def _titles(names: list[str]) -> str:
+                shown = ", ".join(names[:3])
+                if len(names) > 3:
+                    shown += f", and {len(names) - 3} more"
+                return shown
+
+            if processing:
+                error_msg = (
+                    "Input document(s) were still being processed after several "
+                    f"retries: {_titles(processing)}. Wait for text extraction to "
+                    "finish (check the document's status), then run again."
+                )
+            else:
+                error_msg = (
+                    "This workflow's input document(s) have no readable text: "
+                    f"{_titles(failed)}. Text extraction may have failed (image-only, "
+                    "encrypted, or a temporary OCR outage). Open the document to retry "
+                    "extraction, or re-upload it, then run the workflow again."
+                )
+            logger.error(
+                "Workflow %s aborted pre-flight: no input document has raw_text "
+                "(processing=%d, failed=%d)",
+                workflow_id, len(processing), len(failed),
+            )
+            _mark_workflow_failed(
+                db, workflow_result_id, activity_id, error_msg,
+                error_payload={
+                    "code": "input_documents_unready",
+                    "unready_documents": (processing + failed)[:20],
+                },
+            )
+            return
 
     # Build steps data from workflow steps
     steps_data = [{"name": "Document", "data": trigger_step_data, "tasks": []}]

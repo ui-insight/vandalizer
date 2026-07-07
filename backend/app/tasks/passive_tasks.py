@@ -138,6 +138,43 @@ def process_pending_triggers(self) -> dict:
                 )
                 continue
 
+            # Readiness gate: a folder-watch event fires the instant a file
+            # lands, which can beat text extraction. Firing the workflow now
+            # would read empty raw_text and silently produce no output. Defer
+            # while any input is still extracting (bounded to 5 min from the
+            # event's creation), and skip loudly if extraction has failed.
+            run_doc_ids = event.get("documents", [])
+            if run_doc_ids:
+                run_docs = list(db.smart_document.find(
+                    {"_id": {"$in": run_doc_ids}},
+                    {"raw_text": 1, "processing": 1},
+                ))
+                if run_docs and not any(d.get("raw_text") for d in run_docs):
+                    still_processing = any(d.get("processing") for d in run_docs)
+                    created = event.get("created_at")
+                    try:
+                        waited = (now - created).total_seconds() if created else 0
+                    except TypeError:
+                        # Legacy events may carry a naive created_at.
+                        waited = 0
+                    if still_processing and waited < 300:
+                        db.workflow_trigger_event.update_one(
+                            {"_id": event["_id"]},
+                            {"$set": {"process_after": now + timedelta(seconds=30)}},
+                        )
+                        continue
+                    db.workflow_trigger_event.update_one(
+                        {"_id": event["_id"]},
+                        {"$set": {
+                            "status": "skipped",
+                            "error": (
+                                "Input document text is not ready — extraction "
+                                "is still in progress or failed. Workflow not run."
+                            ),
+                        }},
+                    )
+                    continue
+
             # Queue for execution
             db.workflow_trigger_event.update_one(
                 {"_id": event["_id"]},

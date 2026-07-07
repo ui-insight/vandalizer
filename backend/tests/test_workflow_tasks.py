@@ -44,9 +44,9 @@ def _mock_db(
     _tasks = {t["_id"]: t for t in (task_docs or [])}
     _docs = {d["uuid"]: d for d in (smart_docs or [])}
 
-    db.workflow_step.find_one.side_effect = lambda q: _steps.get(q.get("_id"))
-    db.workflow_step_task.find_one.side_effect = lambda q: _tasks.get(q.get("_id"))
-    db.smart_document.find_one.side_effect = lambda q: _docs.get(q.get("uuid"))
+    db.workflow_step.find_one.side_effect = lambda q, *a, **k: _steps.get(q.get("_id"))
+    db.workflow_step_task.find_one.side_effect = lambda q, *a, **k: _tasks.get(q.get("_id"))
+    db.smart_document.find_one.side_effect = lambda q, *a, **k: _docs.get(q.get("uuid"))
     db.search_set_item.find.return_value = search_set_items or []
     db.search_set.find_one.return_value = None
 
@@ -329,6 +329,7 @@ class TestExecuteWorkflowTask:
                 {"searchphrase": "Name", "searchtype": "extraction"},
                 {"searchphrase": "Date", "searchtype": "extraction"},
             ],
+            smart_docs=[{"uuid": "uuid1", "raw_text": "document text"}],
         )
         db.search_set.find_one.return_value = {"uuid": "ss-123"}
         mock_get_db.return_value = db
@@ -614,3 +615,130 @@ class TestResolveSavedPromptFormatter:
         _resolve_saved_prompt_formatter(db, "Extraction", data)
         assert "prompt" not in data
         db.search_set.find_one.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Pre-flight input-readiness gate
+# ---------------------------------------------------------------------------
+
+class TestClassifyInputDocuments:
+    def test_ready_processing_failed_and_missing(self):
+        from app.tasks.workflow_tasks import _classify_input_documents
+
+        wf_id = _fake_oid()
+        db = _mock_db(smart_docs=[
+            {"uuid": "ready", "raw_text": "text"},
+            {"uuid": "proc", "raw_text": "", "processing": True, "title": "Proc.pdf"},
+            {"uuid": "failed", "raw_text": "", "processing": False, "title": "Bad.pdf"},
+        ])
+        ready, processing, failed = _classify_input_documents(
+            db, {"_id": wf_id}, ["ready", "proc", "failed", "gone"],
+        )
+        assert ready == 1
+        assert processing == ["Proc.pdf"]
+        # A finished-but-empty doc and a missing uuid both count as failed.
+        assert failed == ["Bad.pdf", "gone"]
+
+    def test_own_origin_documents_are_ignored(self):
+        from app.tasks.workflow_tasks import _classify_input_documents
+
+        wf_id = _fake_oid()
+        db = _mock_db(smart_docs=[
+            {"uuid": "self", "raw_text": "", "origin_workflow_id": str(wf_id)},
+        ])
+        ready, processing, failed = _classify_input_documents(
+            db, {"_id": wf_id}, ["self"],
+        )
+        assert (ready, processing, failed) == (0, [], [])
+
+
+class TestInputReadinessGate:
+    @patch("app.tasks.workflow_tasks._get_db")
+    @patch("app.services.workflow_engine.build_workflow_engine")
+    def test_all_processing_retries(self, mock_build, mock_get_db):
+        from celery.exceptions import Retry
+        from app.tasks.workflow_tasks import execute_workflow_task
+
+        wf_id, result_id = _fake_oid(), _fake_oid()
+        db = _mock_db(
+            workflow_doc=_make_workflow_doc(wf_id=wf_id),
+            result_doc=_make_result_doc(result_id=result_id, workflow_id=wf_id),
+            smart_docs=[{"uuid": "uuid1", "raw_text": "", "processing": True}],
+        )
+        mock_get_db.return_value = db
+
+        # A still-extracting input should defer the run, not execute it.
+        with pytest.raises(Retry):
+            execute_workflow_task(
+                workflow_result_id=str(result_id),
+                workflow_id=str(wf_id),
+                trigger_step_data={"doc_uuids": ["uuid1"]},
+                model="gpt-4o",
+            )
+        mock_build.assert_not_called()
+
+    @patch("app.tasks.workflow_tasks._get_db")
+    @patch("app.services.workflow_engine.build_workflow_engine")
+    def test_all_failed_marks_error_without_running(self, mock_build, mock_get_db):
+        from app.tasks.workflow_tasks import execute_workflow_task
+
+        wf_id, result_id = _fake_oid(), _fake_oid()
+        db = _mock_db(
+            workflow_doc=_make_workflow_doc(wf_id=wf_id),
+            result_doc=_make_result_doc(result_id=result_id, workflow_id=wf_id),
+            smart_docs=[{"uuid": "uuid1", "raw_text": "", "processing": False,
+                         "title": "Bad.pdf"}],
+        )
+        mock_get_db.return_value = db
+
+        result = execute_workflow_task(
+            workflow_result_id=str(result_id),
+            workflow_id=str(wf_id),
+            trigger_step_data={"doc_uuids": ["uuid1"]},
+            model="gpt-4o",
+        )
+
+        assert result is None
+        mock_build.assert_not_called()
+        set_op = db.workflow_result.update_one.call_args[0][1]["$set"]
+        assert set_op["status"] == "error"
+        assert "Bad.pdf" in set_op["error"]
+        assert set_op["error_payload"]["code"] == "input_documents_unready"
+
+    @patch("app.tasks.workflow_tasks._get_db")
+    @patch("app.services.workflow_engine.build_workflow_engine")
+    def test_partial_readiness_proceeds(self, mock_build, mock_get_db):
+        from app.tasks.workflow_tasks import execute_workflow_task
+
+        wf_id, result_id, step_id, task_id = (
+            _fake_oid(), _fake_oid(), _fake_oid(), _fake_oid(),
+        )
+        db = _mock_db(
+            workflow_doc=_make_workflow_doc(wf_id=wf_id, step_ids=[step_id]),
+            result_doc=_make_result_doc(result_id=result_id, workflow_id=wf_id),
+            step_docs=[{"_id": step_id, "name": "S", "data": {}, "tasks": [task_id]}],
+            task_docs=[{"_id": task_id, "name": "Prompt", "data": {"prompt": "t"}}],
+            smart_docs=[
+                {"uuid": "ready", "raw_text": "text"},
+                {"uuid": "proc", "raw_text": "", "processing": True},
+            ],
+        )
+        mock_get_db.return_value = db
+
+        mock_engine = MagicMock()
+        mock_engine.execute.return_value = ("out", [{"name": "Doc", "output": ["x"]}])
+        mock_engine.usage = MagicMock(tokens_in=1, tokens_out=1)
+        mock_build.return_value = mock_engine
+
+        with patch("app.tasks.quality_tasks.auto_validate_workflow"), \
+             patch("app.tasks.activity_tasks.generate_activity_description_task"):
+            result = execute_workflow_task(
+                workflow_result_id=str(result_id),
+                workflow_id=str(wf_id),
+                trigger_step_data={"doc_uuids": ["ready", "proc"]},
+                model="gpt-4o",
+            )
+
+        # One ready document is enough — the gate must not block the run.
+        assert result["status"] == "completed"
+        mock_build.assert_called_once()
