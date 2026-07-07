@@ -1,17 +1,30 @@
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
 import {
   FolderKanban, FolderOpen, Database, Workflow, Zap, Users,
-  Sparkles, ArrowRight, FileText, type LucideIcon,
+  Sparkles, ArrowRight, FileText, X, type LucideIcon,
 } from 'lucide-react'
 
 /**
- * Empty-state onboarding for the Projects surfaces — mirrors the
- * Knowledge-base and Automations explainers, but light-themed to match the
- * (light) Projects page and drawer. Self-contained: drop it in wherever the
- * project list is empty.
+ * Onboarding for the Projects surfaces — mirrors the Knowledge-base and
+ * Automations explainers, but light-themed to match the (light) Projects page
+ * and drawer.
+ *
+ * Dual-mode, like KnowledgeExplainer: with no props it renders inline as the
+ * empty-state; passing `onClose` renders it as a full-panel modal overlay
+ * (with a close button, closes on Escape) so a "What are Projects?" link can
+ * reopen it after projects exist.
  */
-export function ProjectsExplainer() {
-  return (
+export function ProjectsExplainer({ onClose }: { onClose?: () => void } = {}) {
+  useEffect(() => {
+    if (!onClose) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  const body = (
     <div className="mx-auto max-w-2xl py-6">
       <style>{`
         @keyframes pjFlow { 0%,100% { opacity: .5; transform: translateX(0); } 50% { opacity: 1; transform: translateX(3px); } }
@@ -100,6 +113,28 @@ export function ProjectsExplainer() {
         <Step num="3" title="Build a knowledge base & pin tools" body="Turn the files into a chattable KB, and pin the workflows, extractions, and automations you'll use." />
         <Step num="4" title="Invite your team & track state" body="Add members or share a link, and move the project through draft → active → closeout as the work progresses." />
       </Section>
+    </div>
+  )
+
+  if (!onClose) return body
+
+  return (
+    <div
+      // Sit above the panel header as a modal. The Projects panel root is
+      // position: relative so inset-0 fills it.
+      className="absolute inset-0 z-[400] overflow-y-auto bg-white px-5"
+      role="dialog"
+      aria-modal="true"
+      aria-label="What are projects?"
+    >
+      <button
+        onClick={onClose}
+        aria-label="Close"
+        className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 hover:bg-gray-50"
+      >
+        <X size={18} />
+      </button>
+      {body}
     </div>
   )
 }
