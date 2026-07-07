@@ -343,8 +343,13 @@ async def send_expiry_warnings(settings: Settings | None = None) -> int:
     for app in apps:
         if not app.expires_at:
             continue
-        days_left = max(1, (app.expires_at - now).days)
-        expires_str = app.expires_at.strftime("%B %d, %Y")
+        # MongoDB returns datetimes as offset-naive; normalize to UTC-aware
+        # before arithmetic against ``now`` (also offset-aware).
+        expires_at = app.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=datetime.timezone.utc)
+        days_left = max(1, (expires_at - now).days)
+        expires_str = expires_at.strftime("%B %d, %Y")
         subject, html = expiry_warning_email(
             app.name, days_left, expires_str, settings.frontend_url
         )
