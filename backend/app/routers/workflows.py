@@ -1845,6 +1845,28 @@ async def start_workflow_optimization(
     apply_on_finish = bool(body.get("apply_on_finish", False))
     include_judge = bool(body.get("include_judge", True))
 
+    # Fail fast on missing preconditions so the user gets an immediate,
+    # actionable 400 instead of a queued run that dies in the worker (and no
+    # governance slot / failed run doc is spent on a doomed optimization). The
+    # worker keeps the same guards as a safety net.
+    if not wf.validation_plan:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Workflow has no validation plan. Generate or add checks first "
+                "(Validate tab → Generate plan)."
+            ),
+        )
+    from app.services.workflow_optimizer import _resolve_test_inputs
+    if not await _resolve_test_inputs(wf):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "No test inputs available. Mark at least one past workflow run "
+                "as 'expected output' on the Validate tab before optimizing."
+            ),
+        )
+
     from app.models.workflow_optimization_run import WorkflowOptimizationRun
     active = await WorkflowOptimizationRun.find_one(
         WorkflowOptimizationRun.workflow_id == workflow_id,

@@ -415,13 +415,14 @@ async def test_run_optimization_fails_when_no_validation_plan():
         AsyncMock(return_value=run_doc),
     ), patch.object(
         workflow_optimizer.Workflow, "get", AsyncMock(return_value=wf),
-    ):
+    ), patch.object(workflow_optimizer.logger, "exception") as mock_exc:
         result = await workflow_optimizer.run_optimization(
             workflow_id="507f1f77bcf86cd799439011", user_id="u1", run_uuid="opt-wf-1",
         )
 
     assert result.status == "failed"
     assert "validation plan" in (result.error_message or "")
+    mock_exc.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -437,13 +438,18 @@ async def test_run_optimization_fails_when_no_test_inputs():
         AsyncMock(return_value=run_doc),
     ), patch.object(
         workflow_optimizer.Workflow, "get", AsyncMock(return_value=wf),
-    ):
+    ), patch.object(workflow_optimizer.logger, "exception") as mock_exc, \
+         patch.object(workflow_optimizer.logger, "warning") as mock_warn:
         result = await workflow_optimizer.run_optimization(
             workflow_id="507f1f77bcf86cd799439011", user_id="u1", run_uuid="opt-wf-1",
         )
 
     assert result.status == "failed"
     assert "test inputs" in (result.error_message or "").lower()
+    # A missing-precondition failure must not page Sentry: it is logged at
+    # warning (breadcrumb), never via logger.exception (an error event).
+    mock_exc.assert_not_called()
+    mock_warn.assert_called()
 
 
 # ---------------------------------------------------------------------------

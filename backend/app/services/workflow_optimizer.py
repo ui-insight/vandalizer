@@ -43,6 +43,17 @@ from app.services.workflow_prompt_variants import PROMPT_VARIANTS
 logger = logging.getLogger(__name__)
 
 
+class OptimizationInputError(ValueError):
+    """A user-actionable precondition the optimizer can't proceed without —
+    e.g. no validation plan or no expected-output test inputs.
+
+    Subclasses ``ValueError`` so existing ``except ValueError`` callers are
+    unaffected. The outer handler treats it as an expected configuration gap:
+    the run is marked failed with the message for the UI, but it is logged at
+    ``warning`` (not ``exception``) so it does not page Sentry as a fault.
+    """
+
+
 # Per-trial token estimate for budget bookkeeping. Workflow trials run the
 # full pipeline N times (one per test input), so this is a deliberately wide
 # ceiling — the optimizer is conservative about fitting trials in a tier.
@@ -135,16 +146,16 @@ async def run_optimization(
         except Exception:
             wf = None
         if not wf:
-            raise ValueError(f"Workflow not found: {workflow_id}")
+            raise OptimizationInputError(f"Workflow not found: {workflow_id}")
         if not wf.validation_plan:
-            raise ValueError(
+            raise OptimizationInputError(
                 "Workflow has no validation plan. Generate or add checks first "
                 "(Validate tab → Generate plan)."
             )
 
         test_inputs = await _resolve_test_inputs(wf)
         if not test_inputs:
-            raise ValueError(
+            raise OptimizationInputError(
                 "No test inputs available. Mark at least one past workflow run "
                 "as 'expected output' on the Validate tab before optimizing."
             )
@@ -481,7 +492,15 @@ async def run_optimization(
         return run_doc
 
     except Exception as e:
-        logger.exception("Workflow optimization failed for %s", workflow_id)
+        if isinstance(e, OptimizationInputError):
+            # Expected configuration gap (no plan / no test inputs / missing
+            # workflow) — surface it on the run doc for the UI, but log at
+            # warning so it stays a breadcrumb instead of paging Sentry.
+            logger.warning(
+                "Workflow optimization precondition unmet for %s: %s", workflow_id, e
+            )
+        else:
+            logger.exception("Workflow optimization failed for %s", workflow_id)
         run_doc.status = "failed"
         run_doc.phase = "failed"
         run_doc.stopped_reason = "failed"
