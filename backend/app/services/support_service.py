@@ -715,11 +715,19 @@ async def update_ticket(
     priority: str | None = None,
     assigned_to: str | None = None,
     tags: list[str] | None = None,
+    subject: str | None = None,
     actor: User | None = None,
 ) -> dict | None:
     ticket = await SupportTicket.find_one(SupportTicket.uuid == ticket_uuid)
     if not ticket:
         return None
+
+    # The subject (title) can be corrected after filing. Caller authorizes who
+    # may do this (owner or support); here we just apply a cleaned value.
+    if subject is not None:
+        cleaned_subject = subject.strip()
+        if cleaned_subject:
+            ticket.subject = cleaned_subject[:500]
 
     if status:
         ticket.status = TicketStatus(status)
