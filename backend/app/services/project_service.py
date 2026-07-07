@@ -103,6 +103,179 @@ async def create_project(
     return project
 
 
+async def duplicate_project(source: Project, user: User) -> Project:
+    """Create a copy of ``source`` owned by ``user``, returning immediately.
+
+    Only the lightweight "shell" is built synchronously — a fresh root folder,
+    a fresh implicit KB, the Project record, and copies of the pin *references*
+    — so the new project appears in the list right away. The heavy content
+    (folder subtree, files, and KB ingestion) is deep-copied in the background
+    by ``copy_project_contents`` (enqueued by the router). The copy is always
+    **personal** to the caller (``team_id=None``), matching ``create_project``.
+    """
+    from app.services import knowledge_service
+
+    new_uuid = uuid_lib.uuid4().hex
+    title = f"{source.title} (Copy)"
+
+    root_folder = SmartFolder(
+        title=title,
+        parent_id="0",
+        user_id=user.user_id,
+        team_id=None,
+        created_by=user.user_id,
+        uuid=uuid_lib.uuid4().hex,
+    )
+    await root_folder.insert()
+
+    kb = await knowledge_service.create_knowledge_base(
+        title=title,
+        user_id=user.user_id,
+        team_id=None,
+        description=f"Implicit knowledge base for project “{title}”.",
+        implicit=True,
+    )
+
+    project = Project(
+        uuid=new_uuid,
+        title=title,
+        description=source.description,
+        owner_user_id=user.user_id,
+        team_id=None,
+        state="active",
+        root_folder_uuid=root_folder.uuid,
+        kb_uuid=kb.uuid,
+    )
+    await project.insert()
+
+    # Pins are references, never copies of the artifact — cheap to duplicate and
+    # safe to do synchronously so the new project's tools show up immediately.
+    src_pins = await ProjectPin.find(ProjectPin.project_uuid == source.uuid).to_list()
+    for pin in src_pins:
+        await ProjectPin(
+            project_uuid=new_uuid,
+            pin_type=pin.pin_type,
+            target_id=pin.target_id,
+            created_by=user.user_id,
+        ).insert()
+
+    return project
+
+
+async def copy_project_contents(
+    source_project_uuid: str,
+    new_project_uuid: str,
+    user_id: str,
+) -> dict:
+    """Deep-copy the source project's folder subtree + documents into the new
+    project, re-ingesting each file into the new project's implicit KB.
+
+    Runs in the background (see ``tasks.project.duplicate``). Idempotency isn't
+    guaranteed — it's meant to run once, right after ``duplicate_project`` built
+    the shell. Memberships and invite links are intentionally NOT copied: access
+    is per-project and shouldn't carry over to a personal copy.
+    """
+    import logging
+
+    from app.config import Settings
+    from app.services.storage import get_storage
+    from app.tasks.document_tasks import perform_semantic_ingestion
+
+    logger = logging.getLogger(__name__)
+
+    source = await Project.find_one(Project.uuid == source_project_uuid)
+    new = await Project.find_one(Project.uuid == new_project_uuid)
+    if not source or not new:
+        return {"folders": 0, "documents": 0}
+
+    storage = get_storage(Settings())
+
+    # 1. Recreate the folder subtree, mapping each old folder uuid to its new
+    #    one. Walk breadth-first from the root so a parent is always mapped
+    #    before its children (child.parent_id resolves via the map).
+    id_map: dict[str, str] = {source.root_folder_uuid: new.root_folder_uuid}
+    frontier = [source.root_folder_uuid]
+    while frontier:
+        children = await SmartFolder.find({"parent_id": {"$in": frontier}}).to_list()
+        next_frontier: list[str] = []
+        for child in children:
+            new_parent = id_map.get(child.parent_id)
+            if new_parent is None:
+                continue  # orphan (parent not copied) — shouldn't happen
+            new_child_uuid = uuid_lib.uuid4().hex
+            await SmartFolder(
+                title=child.title,
+                parent_id=new_parent,
+                user_id=user_id,
+                team_id=None,
+                created_by=user_id,
+                uuid=new_child_uuid,
+            ).insert()
+            id_map[child.uuid] = new_child_uuid
+            next_frontier.append(child.uuid)
+        frontier = next_frontier
+
+    # 2. Copy every (non-deleted) document in the subtree into the mapped folder,
+    #    duplicating the stored file so the copy is independent, then re-ingest.
+    docs = await SmartDocument.find(
+        {"folder": {"$in": list(id_map.keys())}, "soft_deleted": {"$ne": True}}
+    ).to_list()
+
+    copied = 0
+    for doc in docs:
+        new_doc_uuid = uuid_lib.uuid4().hex.upper()
+        ext = doc.extension or "pdf"
+        new_rel_path = f"{user_id}/{new_doc_uuid}.{ext}"
+        # Copy the underlying file to a new path. A duplicate must own its own
+        # file — sharing the path would let deleting one copy remove the other's
+        # bytes (delete_document physically removes the stored file).
+        src_path = doc.downloadpath or doc.path
+        try:
+            data = await storage.read(src_path)
+            await storage.write(new_rel_path, data)
+        except Exception:
+            logger.warning(
+                "duplicate_project: could not copy stored file for doc %s (%s); "
+                "sharing the source path", doc.uuid, src_path,
+            )
+            new_rel_path = src_path
+
+        new_doc = SmartDocument(
+            title=doc.title,
+            raw_text=doc.raw_text,
+            text_markers=list(doc.text_markers or []),
+            extension=ext,
+            path=new_rel_path,
+            downloadpath=new_rel_path,
+            uuid=new_doc_uuid,
+            user_id=user_id,
+            team_id=None,
+            folder=id_map.get(doc.folder),
+            token_count=doc.token_count,
+            num_pages=doc.num_pages,
+            classification=doc.classification,
+            classification_confidence=doc.classification_confidence,
+            classified_at=doc.classified_at,
+            classified_by=doc.classified_by,
+            valid=doc.valid,
+            processing=False,
+            chromadb_ready=False,
+            chunk_count=0,
+        )
+        await new_doc.insert()
+
+        # Ingest into ChromaDB (doc-level) and mirror into the new project's
+        # implicit KB. perform_semantic_ingestion resolves the owning project by
+        # folder ancestry, which now points at the new project.
+        if (new_doc.raw_text or "").strip():
+            perform_semantic_ingestion.delay(new_doc.raw_text, new_doc_uuid, user_id)
+        copied += 1
+
+    new.updated_at = datetime.datetime.now()
+    await new.save()
+    return {"folders": len(id_map), "documents": copied}
+
+
 async def list_projects(user: User) -> list[Project]:
     """Projects the user owns, can reach via team, or is a member of."""
     access = await access_control.get_team_access_context(user)

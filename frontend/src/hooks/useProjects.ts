@@ -34,6 +34,11 @@ export function useProjects() {
     onSuccess: () => qc.invalidateQueries({ queryKey }),
   })
 
+  const duplicateMutation = useMutation({
+    mutationFn: (uuid: string) => api.duplicateProject(uuid),
+    onSuccess: () => qc.invalidateQueries({ queryKey }),
+  })
+
   const updateMutation = useMutation({
     mutationFn: ({ uuid, data }: { uuid: string; data: ProjectUpdate }) =>
       api.updateProject(uuid, data),
@@ -48,10 +53,12 @@ export function useProjects() {
 
   const remove = (uuid: string) => removeMutation.mutateAsync(uuid)
 
+  const duplicate = (uuid: string) => duplicateMutation.mutateAsync(uuid)
+
   const update = (uuid: string, data: ProjectUpdate) =>
     updateMutation.mutateAsync({ uuid, data })
 
-  return { projects, loading, create, remove, update }
+  return { projects, loading, create, remove, duplicate, update }
 }
 
 export function useProject(uuid: string) {

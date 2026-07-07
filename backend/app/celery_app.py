@@ -28,6 +28,7 @@ celery.conf.task_routes = {
     "tasks.demo.*": {"queue": "default"},
     "tasks.retention.*": {"queue": "default"},
     "tasks.approvals.*": {"queue": "default"},
+    "tasks.project.*": {"queue": "documents"},
 }
 
 celery.conf.beat_schedule = {

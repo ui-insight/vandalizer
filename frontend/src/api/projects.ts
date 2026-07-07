@@ -20,6 +20,12 @@ export function createProject(data: { title: string; description?: string }) {
   })
 }
 
+export function duplicateProject(uuid: string) {
+  // The new project's shell is returned immediately; its files + KB content are
+  // deep-copied in the background and stream in as they finish.
+  return apiFetch<Project>(`/api/projects/${uuid}/duplicate`, { method: 'POST' })
+}
+
 export function getProject(uuid: string) {
   return apiFetch<ProjectOverview>(`/api/projects/${uuid}`)
 }
