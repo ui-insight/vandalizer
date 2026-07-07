@@ -45,6 +45,13 @@ def run_task_async(coro: "Coroutine[Any, Any, Any]") -> Any:
         except Exception as e:  # never mask the task's own result/error
             logger.warning("Failed to close loop HTTP client after task: %s", e)
         loop.close()
+        # Unset the now-closed loop as the thread's current loop. Otherwise a
+        # later sync task in the same worker that calls pydantic-ai's
+        # ``run_sync`` (e.g. tasks.activity.generate_description) would inherit
+        # this closed loop via ``asyncio.get_event_loop()`` and crash with
+        # "Event loop is closed". With it cleared, ``get_event_loop`` raises and
+        # the caller creates a fresh loop instead.
+        asyncio.set_event_loop(None)
 
 # ---------------------------------------------------------------------------
 # Shared sync MongoDB client (reused across Celery worker processes)
