@@ -634,8 +634,19 @@ def extract_text_from_file(file_path: str, file_extension: str) -> str:
                 return ocr_text
             # Fall back to PyMuPDF if OCR unavailable or returned nothing.
             logger.info("OCR returned %d chars, falling back to PyMuPDF", len(ocr_text))
-            text = extract_text_from_pdf(file_path)
-            return text
+            try:
+                return extract_text_from_pdf(file_path)
+            except Exception as e:
+                # Keep a short-but-valid OCR result rather than losing the
+                # extraction if the PyMuPDF fallback fails (corrupt PDF or the
+                # source file was removed mid-processing).
+                if ocr_text and ocr_text.strip():
+                    logger.warning(
+                        "PyMuPDF extraction failed for %s (%s); using OCR text",
+                        file_path, e,
+                    )
+                    return ocr_text
+                raise
 
         elif file_extension in ("html", "htm"):
             return convert_to_markdown(file_path, keep_data_uris=False)
