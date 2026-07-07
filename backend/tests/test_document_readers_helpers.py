@@ -178,3 +178,22 @@ class TestExtractDocxExtras:
         source = dr.__loader__.get_source(dr.__name__) or ""
         assert "defusedxml.ElementTree" in source
         assert "import xml.etree.ElementTree as ET" not in source
+
+
+class TestExtractTextFromFileMissingFile:
+    """A missing source file (deleted mid-processing / stale path) is benign:
+    return empty text and log at warning, never error -> Sentry, and never a
+    "[Error extracting content: ...]" placeholder that masquerades as content."""
+
+    def test_missing_txt_returns_empty_and_warns(self, tmp_path):
+        from unittest.mock import patch
+        import app.services.document_readers as dr
+
+        gone = str(tmp_path / "nope" / "8D112.txt")  # nonexistent
+        with patch.object(dr, "logger") as mock_logger:
+            result = dr.extract_text_from_file(gone, "txt")
+
+        assert result == ""
+        assert "[Error extracting content" not in result
+        mock_logger.error.assert_not_called()
+        mock_logger.warning.assert_called()
