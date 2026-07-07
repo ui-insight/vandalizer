@@ -409,3 +409,123 @@ def test_kb_chat_prompt_has_numeric_and_consistency_guardrails():
     assert "Never derive figures" in KB_CHAT_SYSTEM_PROMPT
     assert "Consistency questions" in KB_CHAT_SYSTEM_PROMPT
     assert "same field, period, and unit" in KB_CHAT_SYSTEM_PROMPT
+
+
+# ---------------------------------------------------------------------------
+# Conversation-aware retrieval query (condense)
+# ---------------------------------------------------------------------------
+
+
+def test_looks_anaphoric_table():
+    cases = [
+        ("what about year 2?", True),                       # short
+        ("And the indirect cost rate?", True),              # short + starter
+        ("Compare the Year 1 obligation figures in the budget justification "
+         "workbook against the award notice, then summarize any differences.",
+         False),                                            # long, self-contained
+        ("Summarize what it says about equipment spending across the full "
+         "progress report and the final approved budget documents please.",
+         True),                                             # long but pronoun
+        ("", False),
+    ]
+    for message, expected in cases:
+        assert chat_service._looks_anaphoric(message) is expected, message
+
+
+def test_recent_turns_flattens_history():
+    from pydantic_ai.messages import (
+        ModelRequest, ModelResponse, SystemPromptPart, TextPart, UserPromptPart,
+    )
+
+    history = [
+        ModelRequest(parts=[SystemPromptPart(content="system stuff")]),
+        ModelRequest(parts=[UserPromptPart(content="What is the IRB expiration date?")]),
+        ModelResponse(parts=[TextPart(content="It expires on 2027-03-01.")]),
+    ]
+    turns = chat_service._recent_turns(history)
+    assert turns == [
+        ("user", "What is the IRB expiration date?"),
+        ("assistant", "It expires on 2027-03-01."),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_condense_retrieval_query_uses_agent_output():
+    fake_agent = MagicMock()
+    fake_agent.run = AsyncMock(
+        return_value=_make_mock_run("IRB expiration date renewal year 2", tokens=12),
+    )
+    with patch.object(kb_validation_service, "_get_or_build_agent",
+                      return_value=fake_agent):
+        query, tokens = await kb_validation_service.condense_retrieval_query(
+            "what about year 2?",
+            [("user", "What is the IRB expiration date?"), ("assistant", "2027-03-01.")],
+            "test-model",
+        )
+    assert query == "IRB expiration date renewal year 2"
+    assert tokens == 12
+    prompt = fake_agent.run.await_args.args[0]
+    assert "What is the IRB expiration date?" in prompt
+    assert "what about year 2?" in prompt
+
+
+@pytest.mark.asyncio
+async def test_condense_retrieval_query_falls_back_to_keyword_carryover():
+    fake_agent = MagicMock()
+    fake_agent.run = AsyncMock(side_effect=RuntimeError("model down"))
+    with patch.object(kb_validation_service, "_get_or_build_agent",
+                      return_value=fake_agent):
+        query, tokens = await kb_validation_service.condense_retrieval_query(
+            "what about year 2?",
+            [("user", "What is the IRB expiration date?"), ("assistant", "2027.")],
+            "test-model",
+        )
+    # Last user turn prepended so retrieval still carries the topic keywords.
+    assert query == "What is the IRB expiration date?\nwhat about year 2?"
+    assert tokens == 0
+
+
+@pytest.mark.asyncio
+async def test_retrieve_kb_chunks_retrieval_query_overrides_search_text():
+    fake_dm = MagicMock()
+    fake_dm.query_kb = MagicMock(return_value=[])
+    # query_rewriting=True must be skipped when a condensed query is supplied.
+    cfg = RAGConfig(k=8, query_rewriting=True)
+
+    with patch.object(kb_validation_service, "_get_dm", return_value=fake_dm), \
+         patch.object(kb_validation_service, "_get_or_build_agent") as get_agent:
+        await kb_validation_service.retrieve_kb_chunks(
+            "kb-1", "what about year 2?", "test-model", config=cfg,
+            retrieval_query="IRB expiration date year 2",
+        )
+
+    fake_dm.query_kb.assert_called_once_with(
+        "kb-1", "IRB expiration date year 2", 8, 0.0,
+    )
+    get_agent.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_build_kb_segment_condenses_anaphoric_followups():
+    from pydantic_ai.messages import ModelRequest, ModelResponse, TextPart, UserPromptPart
+
+    cfg = RAGConfig(k=4)
+    history = [
+        ModelRequest(parts=[UserPromptPart(content="What is the IRB expiration date?")]),
+        ModelResponse(parts=[TextPart(content="2027-03-01.")]),
+    ]
+    retrieve = AsyncMock(return_value=([_chunk(0)], cfg, 0))
+    condense = AsyncMock(return_value=("IRB expiration date year 2", 0))
+
+    with patch.object(kb_validation_service, "_ensure_system_config_loaded",
+                      new=AsyncMock()), \
+         patch.object(kb_validation_service, "retrieve_kb_chunks", new=retrieve), \
+         patch.object(kb_validation_service, "condense_retrieval_query", new=condense):
+        await chat_service._build_kb_segment(
+            "kb-1", "what about year 2?", "test-model", history=history,
+        )
+
+    condense.assert_awaited_once()
+    assert retrieve.await_args.kwargs["retrieval_query"] == "IRB expiration date year 2"
+    # The raw message stays the primary query (answer prompt + rerank target).
+    assert retrieve.await_args.args[1] == "what about year 2?"

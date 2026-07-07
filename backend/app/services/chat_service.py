@@ -16,6 +16,7 @@ from pydantic_ai.messages import (
     TextPartDelta,
     ThinkingPart,
     ThinkingPartDelta,
+    UserPromptPart,
 )
 
 from app.models.activity import ActivityEvent, ActivityStatus
@@ -334,6 +335,7 @@ async def chat_stream(
         try:
             kb_segment, kb_sources = await _build_kb_segment(
                 kb_uuid, message, model_name, manifest=kb_manifest,
+                history=previous_messages,
             )
             if kb_segment:
                 doc_segments.insert(0, kb_segment)
@@ -639,6 +641,44 @@ async def chat_stream(
 
 
 
+_ANAPHORA_RE = re.compile(
+    r"\b(it|its|that|this|these|those|they|them|their|he|she|his|her|hers)\b",
+    re.IGNORECASE,
+)
+_FOLLOWUP_STARTERS = ("what about", "how about", "and ", "also ", "why", "same for")
+
+
+def _looks_anaphoric(message: str) -> bool:
+    """Heuristic: does this message likely depend on conversation context for
+    retrieval? Errs toward True — a needless condense only costs one bounded
+    LLM call, while retrieving on a bare "what about year 2?" loses grounding.
+    """
+    msg = " ".join((message or "").strip().lower().split())
+    if not msg:
+        return False
+    if len(msg) < 100:
+        return True
+    if _ANAPHORA_RE.search(msg):
+        return True
+    return msg.startswith(_FOLLOWUP_STARTERS)
+
+
+def _recent_turns(
+    history: list[ModelMessage], max_turns: int = 6,
+) -> list[tuple[str, str]]:
+    """Flatten pydantic-ai message history into (role, text) pairs for the
+    condense prompt. System parts are skipped; persisted user turns are the
+    bare messages (chat.py saves them before enrichment)."""
+    turns: list[tuple[str, str]] = []
+    for m in history:
+        for part in getattr(m, "parts", []):
+            if isinstance(part, UserPromptPart) and isinstance(part.content, str):
+                turns.append(("user", part.content))
+            elif isinstance(part, TextPart) and part.content:
+                turns.append(("assistant", part.content))
+    return turns[-max_turns:]
+
+
 _MANIFEST_MAX_ENTRIES = 60
 _MANIFEST_MAX_CHARS = 3000
 
@@ -765,6 +805,7 @@ async def _build_kb_segment(
     message: str,
     model_name: str,
     manifest: Optional[list[dict]] = None,
+    history: Optional[list[ModelMessage]] = None,
 ) -> tuple[Optional[DocumentSegment], list[dict]]:
     """Retrieve KB context for one chat turn.
 
@@ -774,12 +815,26 @@ async def _build_kb_segment(
     """
     from app.services.kb_validation_service import (
         _ensure_system_config_loaded,
+        condense_retrieval_query,
         retrieve_kb_chunks,
     )
 
     # The retrieval pipeline's optional LLM steps (rewrite/rerank) build their
     # agents from the ContextVar'd SystemConfig snapshot.
     await _ensure_system_config_loaded()
+
+    # Retrieval is per-turn and sees only the current message, so a follow-up
+    # like "what about year 2?" retrieves nothing useful even though the model
+    # "remembers" the topic. Condense anaphoric messages into a standalone
+    # search query using recent turns; the raw message still drives the answer
+    # prompt and rerank scoring.
+    retrieval_query: Optional[str] = None
+    if history and _looks_anaphoric(message):
+        recent = _recent_turns(history)
+        if recent:
+            retrieval_query, _ = await condense_retrieval_query(
+                message, recent, model_name,
+            )
 
     # Honour the KB's tuned retrieval knobs (k, min_similarity, query
     # rewriting, rerank). cfg.model / prompt_variant / answer_temperature
@@ -789,6 +844,7 @@ async def _build_kb_segment(
     kb_results, rag_cfg, _ = await retrieve_kb_chunks(
         kb_uuid, message, model_name, per_step_timeout=6.0,
         overfetch_multiplier=3,
+        retrieval_query=retrieval_query,
     )
 
     # Named-document targeting: when the message mentions a project file by
@@ -803,6 +859,7 @@ async def _build_kb_segment(
             config=rag_cfg.with_overrides(rerank="off", query_rewriting=False),
             source_filter=matched_names,
             per_step_timeout=6.0,
+            retrieval_query=retrieval_query,
         )
 
     kb_results = _compose_kb_results(kb_results, named_results, rag_cfg.k)

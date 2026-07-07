@@ -241,6 +241,52 @@ def _usage_tokens(run) -> int:
     )
 
 
+CONDENSE_QUERY_SYSTEM_PROMPT = (
+    "You rewrite the final message of a conversation as a standalone search "
+    "query. Resolve pronouns and references ('it', 'that section', 'the "
+    "second one') using the conversation. Keep every distinctive term — "
+    "names, filenames, numbers, dates. Output ONLY the rewritten query: no "
+    "prose, no quotes, no explanation."
+)
+
+
+async def condense_retrieval_query(
+    message: str,
+    recent_turns: list[tuple[str, str]],
+    model_name: str,
+    timeout: float = 5.0,
+) -> tuple[str, int]:
+    """Rewrite an anaphoric follow-up ("what about year 2?") as a standalone
+    retrieval query using recent conversation turns for referents.
+
+    Returns ``(query, tokens_used)``. On any failure or timeout falls back to
+    prepending the last user turn — a zero-cost keyword carryover that still
+    beats retrieving on the bare follow-up.
+    """
+    agent = _get_or_build_agent(
+        "kb_query_condenser", model_name, CONDENSE_QUERY_SYSTEM_PROMPT,
+    )
+    convo = "\n".join(
+        f"{role}: {(text or '')[:500]}" for role, text in recent_turns[-6:]
+    )
+    prompt = (
+        f"Conversation:\n{convo}\n\n"
+        f"Final message to rewrite as a standalone search query: {message}"
+    )
+    try:
+        run = await asyncio.wait_for(agent.run(prompt), timeout=timeout)
+        condensed = (run.output or "").strip()
+        if condensed:
+            return condensed, _usage_tokens(run)
+    except Exception as e:
+        logger.warning("Query condense failed; using keyword carryover: %s", e)
+    last_user = next(
+        (text for role, text in reversed(recent_turns) if role == "user" and text),
+        "",
+    )
+    return (f"{last_user}\n{message}" if last_user else message), 0
+
+
 async def _maybe_rewrite_query(query: str, model_name: str) -> tuple[str, int]:
     """If query rewriting is enabled, ask a prompt agent to optimise the query
     for retrieval. Falls back to the original query on any failure. Returns
@@ -372,6 +418,7 @@ async def retrieve_kb_chunks(
     overfetch_multiplier: int = 1,
     per_step_timeout: Optional[float] = None,
     source_filter: Optional[list[str]] = None,
+    retrieval_query: Optional[str] = None,
 ) -> tuple[list[dict], RAGConfig, int]:
     """Shared KB retrieval pipeline: config resolution → optional query
     rewrite → vector search → optional LLM rerank.
@@ -397,23 +444,28 @@ async def retrieve_kb_chunks(
     named-document targeting so a file the user asked about by name is
     searched directly instead of competing with the whole corpus.
 
+    ``retrieval_query`` overrides the text used for the vector search (e.g. a
+    conversation-condensed follow-up); ``query`` remains what rerank scores
+    against. When set, the tuned ``query_rewriting`` step is skipped — one
+    rewrite per turn.
+
     Returns ``(results, resolved_config, tokens_used)``.
     """
     cfg = await _resolve_rag_config(kb_uuid, config, DEFAULT_K)
     effective_model = cfg.model or model_name
     tokens = 0
 
-    retrieval_query = query
-    if cfg.query_rewriting:
+    effective_query = retrieval_query or query
+    if cfg.query_rewriting and retrieval_query is None:
         try:
-            retrieval_query, rewrite_tokens = await asyncio.wait_for(
+            effective_query, rewrite_tokens = await asyncio.wait_for(
                 _maybe_rewrite_query(query, effective_model),
                 timeout=per_step_timeout,
             )
             tokens += rewrite_tokens
         except asyncio.TimeoutError:
             logger.warning("KB query rewrite timed out; using raw query")
-            retrieval_query = query
+            effective_query = query
 
     dm = _get_dm()
     pool_multiplier = max(
@@ -432,7 +484,7 @@ async def retrieve_kb_chunks(
     # identical to the legacy path.
     where_kwargs = {"where": where} if where else {}
     results = await asyncio.to_thread(
-        dm.query_kb, kb_uuid, retrieval_query, retrieve_k, cfg.min_similarity,
+        dm.query_kb, kb_uuid, effective_query, retrieve_k, cfg.min_similarity,
         **where_kwargs,
     )
 
