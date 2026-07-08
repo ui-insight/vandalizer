@@ -30,6 +30,7 @@ import type { FileAttachment, UrlAttachment } from '../../types/chat'
 import type { ModelInfo } from '../../types/workflow'
 import { stageCopy, isDocReady } from '../../utils/processingStatus'
 import { partitionNewFiles } from './attachmentDedup'
+import { shouldAutoContinueAfterAttach } from './autoContinue'
 
 const LOADING_WORDS = [
   'Thinking', 'Vandalizing', 'Pondering', 'Analyzing',
@@ -570,6 +571,21 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     handleSendRef.current(message, includeOnboardingContext)
   }, [heldMessage, anySelectedProcessing, isStreaming])
 
+  // When the user attaches content right after the assistant asked for it, keep
+  // the conversation moving instead of leaving the assistant idle. We queue a
+  // brief acknowledgement as a held message; the effect above sends it once any
+  // freshly-uploaded doc finishes processing. Guards keep it unobtrusive: only
+  // when the assistant spoke last (it's waiting on the user), nothing is already
+  // streaming, and the user hasn't queued their own message (which takes
+  // precedence — handleSend overwrites this held message).
+  const maybeContinueAfterAttach = (what: string) => {
+    const last = messages[messages.length - 1]
+    if (!shouldAutoContinueAfterAttach({
+      lastMessageRole: last?.role, isStreaming, hasHeldMessage: !!heldMessage,
+    })) return
+    setHeldMessage({ message: `I've attached ${what}.` })
+  }
+
   const handleRunDemo = () => {
     demoTriggered.current = true
     send(
@@ -633,6 +649,9 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         queryClient.invalidateQueries({ queryKey: ['documents'] })
         const label = newUuids.length === 1 ? newNames[newUuids[0]] : `${newUuids.length} files`
         toast(`Added ${label}, processing…`, 'success')
+        maybeContinueAfterAttach(
+          newUuids.length === 1 ? `"${newNames[newUuids[0]]}"` : `${newUuids.length} documents`,
+        )
       }
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Failed to upload file', 'error')
@@ -657,6 +676,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       if (result.activity_id && result.conversation_uuid) {
         setActivity(result.activity_id, result.conversation_uuid)
       }
+      maybeContinueAfterAttach(result.title ? `"${result.title}"` : url)
     } catch (err) {
       toast(err instanceof Error ? err.message : 'Failed to add website', 'error')
     } finally {
