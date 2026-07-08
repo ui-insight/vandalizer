@@ -244,6 +244,17 @@ async def _confirm_gate(
 
     out = dict(preview)
     out["needs_confirmation"] = True
+    # Make it impossible for the model to read this result as a completed
+    # action. Without these the model routinely narrates success ("the PDFs
+    # are now indexed") on the preview turn even though nothing was written,
+    # leaving the user thinking the write happened when it did not.
+    out["status"] = "awaiting_user_confirmation"
+    out["assistant_instruction"] = (
+        f"This action has NOT been performed. '{tool_name}' is only staged and "
+        "is waiting for the user to approve it with the Confirm button. Do NOT "
+        "tell the user it is done, added, saved, created, indexed, or running. "
+        "Describe what WILL happen and ask them to confirm."
+    )
     return out
 
 

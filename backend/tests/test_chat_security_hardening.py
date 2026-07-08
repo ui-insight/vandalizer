@@ -191,6 +191,23 @@ async def test_confirm_gate_same_turn_self_confirm_is_downgraded():
 
 
 @pytest.mark.asyncio
+async def test_confirm_gate_preview_signals_action_not_performed():
+    """A gated preview must be unmistakably 'not done' so the model can't
+    narrate success (e.g. 'the PDFs are now indexed') on the preview turn."""
+    from app.services.chat_tools import _confirm_gate
+
+    conv = _FakeConversation()
+    ctx = _ctx(conv, turn_marker=5)
+    out = await _confirm_gate(
+        ctx, tool_name="add_documents_to_kb", key=KEY, confirmed=True, preview=PREVIEW
+    )
+    assert out is not None
+    assert out["status"] == "awaiting_user_confirmation"
+    assert "NOT" in out["assistant_instruction"]
+    assert "add_documents_to_kb" in out["assistant_instruction"]
+
+
+@pytest.mark.asyncio
 async def test_confirm_gate_preview_then_confirm_across_turns_executes():
     from app.services.chat_tools import _confirm_gate
 
