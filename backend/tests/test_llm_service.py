@@ -4,9 +4,29 @@ import asyncio
 
 from app.services import llm_service
 from app.services.llm_service import (
+    FIRST_SESSION_SYSTEM_PROMPT,
     SUPPORTED_PROTOCOLS,
     detect_api_protocol,
 )
+
+
+class TestFirstSessionPromptEscapeHatch:
+    """A brand-new user who asks for a concrete action (e.g. build a workflow)
+    must be served, not funneled into onboarding Q&A. The onboarding prompt
+    must permit fulfilling such requests with tools and override its own
+    'never perform a task' funnel."""
+
+    def test_permits_creating_a_workflow_via_tool(self):
+        p = FIRST_SESSION_SYSTEM_PROMPT
+        assert "create_workflow" in p
+
+    def test_escape_hatch_overrides_the_no_task_funnel(self):
+        p = FIRST_SESSION_SYSTEM_PROMPT
+        # The escape hatch must explicitly outrank the pacing / never-perform
+        # rules, or the model keeps asking onboarding questions.
+        assert "overrides the pacing" in p
+        # And the closing rule must no longer be an unconditional ban.
+        assert "This does NOT override HARD RULE 6" in p
 
 
 class TestExplicitProtocol:
