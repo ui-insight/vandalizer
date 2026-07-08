@@ -180,6 +180,43 @@ class TestExtractDocxExtras:
         assert "import xml.etree.ElementTree as ET" not in source
 
 
+class TestExtractWithMarkersOcrFallback:
+    """When OCR returns short-but-valid text and the PyMuPDF page-boundary
+    refinement fails (corrupt PDF, or the source file removed mid-processing),
+    the OCR text must be used rather than crashing the extraction task."""
+
+    def test_pymupdf_failure_uses_ocr_text(self):
+        from unittest.mock import patch
+        import app.services.document_readers as dr
+
+        with patch.object(dr, "ocr_extract_text_from_pdf", return_value="short ocr text"), \
+             patch.object(dr, "_pymupdf_extract_with_pages",
+                          side_effect=FileNotFoundError("no such file: 'gone.pdf'")), \
+             patch.object(dr, "_pdf_page_count", return_value=1):
+            text, markers = dr.extract_text_with_markers("gone.pdf", "pdf")
+
+        assert text == "short ocr text"
+        assert isinstance(markers, list)
+
+    def test_pymupdf_failure_reraises_without_ocr_text(self):
+        from unittest.mock import patch
+        import app.services.document_readers as dr
+
+        with patch.object(dr, "ocr_extract_text_from_pdf", return_value=""), \
+             patch.object(dr, "_pymupdf_extract_with_pages",
+                          side_effect=FileNotFoundError("no such file: 'gone.pdf'")):
+            with pytest.raises(FileNotFoundError):
+                dr.extract_text_with_markers("gone.pdf", "pdf")
+
+    def test_extract_text_from_file_pymupdf_failure_uses_ocr_text(self):
+        from unittest.mock import patch
+        import app.services.document_readers as dr
+
+        with patch.object(dr, "ocr_extract_text_from_pdf", return_value="short ocr text"), \
+             patch.object(dr, "extract_text_from_pdf",
+                          side_effect=FileNotFoundError("no such file: 'gone.pdf'")):
+            assert dr.extract_text_from_file("gone.pdf", "pdf") == "short ocr text"
+
 class TestExtractTextFromFileMissingFile:
     """A missing source file (deleted mid-processing / stale path) is benign:
     return empty text and log at warning, never error -> Sentry, and never a

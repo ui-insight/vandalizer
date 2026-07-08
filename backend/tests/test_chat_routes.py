@@ -277,6 +277,52 @@ class TestChatConversations:
         data = resp.json()
         assert len(data["messages"]) == 2
 
+    @pytest.mark.asyncio
+    async def test_get_history_includes_persisted_citations(self, client):
+        """Citations saved on an assistant message flow through /history."""
+        user = _make_user()
+        cookies, headers = _auth()
+
+        citation = {
+            "document_id": "src-1",
+            "document_title": "budget.xlsx",
+            "page": None,
+            "sheet": "Year 1",
+            "chunk_id": "src-1_chunk_3",
+            "score": 0.42,
+            "similarity": 0.79,
+            "content_preview": "| Category | Amount |",
+        }
+        conv = MagicMock()
+        conv.uuid = "conv-1"
+        conv.user_id = "testuser"
+        conv.get_messages = AsyncMock(return_value=[
+            {"role": "user", "content": "What is the Year 1 total?"},
+            {"role": "assistant", "content": "It is $10,000.", "citations": [citation]},
+        ])
+        conv.get_url_attachments = AsyncMock(return_value=[])
+        conv.get_file_attachments = AsyncMock(return_value=[])
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.chat.ChatConversation") as MockConv,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            MockConv.find_one = AsyncMock(return_value=conv)
+            MockConv.uuid = "uuid"
+            MockConv.user_id = "user_id"
+
+            resp = await client.get(
+                "/api/chat/history/conv-1",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["messages"][1]["citations"] == [citation]
+
 
 class TestChatDelete:
     """Cover DELETE /history/{uuid}."""

@@ -89,16 +89,70 @@ def _split_text(text: str, chunk_size: int, chunk_overlap: int) -> list[str]:
     return [c for c, _ in _split_text_with_offsets(text, chunk_size, chunk_overlap)]
 
 
+_TABLE_ROW_RE = re.compile(r"^\s*\|.*\|\s*$")
+_TABLE_SEPARATOR_RE = re.compile(r"^\s*\|[\s\-:|]+\|\s*$")
+# Don't decorate continuation chunks with headers longer than this — a huge
+# header would crowd out the chunk's own content in the embedding.
+_TABLE_HEADER_MAX_CHARS = 300
+
+
+def _find_table_spans(text: str) -> list[tuple[int, int, str]]:
+    """Locate markdown pipe tables (runs of ≥2 consecutive ``| … |`` lines).
+
+    Returns ``(start_offset, end_offset, header_text)`` per table, where
+    ``header_text`` is the first row plus the ``|---|`` separator row when one
+    follows (MarkItDown .docx tables have one; the xlsx serializer's sheets
+    don't). Used by the splitter to avoid breaking mid-table and to repeat the
+    header on continuation chunks so numbers keep their column context.
+    """
+    spans: list[tuple[int, int, str]] = []
+    rows: list[tuple[int, str]] = []
+    pos = 0
+
+    def _close() -> None:
+        if len(rows) < 2:
+            return
+        header = rows[0][1]
+        if _TABLE_SEPARATOR_RE.match(rows[1][1]):
+            header = f"{header}\n{rows[1][1]}"
+        spans.append((rows[0][0], rows[-1][0] + len(rows[-1][1]), header))
+
+    for line in text.split("\n"):
+        if _TABLE_ROW_RE.match(line):
+            rows.append((pos, line))
+        else:
+            _close()
+            rows = []
+        pos += len(line) + 1
+    _close()
+    return spans
+
+
 def _split_text_with_offsets(
     text: str, chunk_size: int, chunk_overlap: int,
 ) -> list[tuple[str, int]]:
     """Same as _split_text but also returns each chunk's start offset in the
     normalized source text. The offset lets callers map a chunk back to its
     location (page number, sheet name, etc.) when source markers are known.
+
+    Markdown pipe tables get special treatment: the splitter prefers breaking
+    before a table (or at a row boundary inside one) instead of mid-row, and a
+    chunk that starts inside a table is prefixed with that table's header rows
+    so its numbers keep their column labels. The header prefix is decoration
+    only — the returned offset still points at the chunk's original position,
+    so page/sheet marker mapping is unaffected.
     """
     normalized = text.strip()
     if not normalized:
         return []
+
+    table_spans = _find_table_spans(normalized) if "|" in normalized else []
+
+    def _span_containing(pos: int) -> tuple[int, int, str] | None:
+        for span in table_spans:
+            if span[0] < pos < span[1]:
+                return span
+        return None
 
     chunks: list[tuple[str, int]] = []
     start = 0
@@ -108,11 +162,23 @@ def _split_text_with_offsets(
     while start < text_length:
         end = min(text_length, start + chunk_size)
         if end < text_length:
-            preferred_break = normalized.rfind("\n\n", start + chunk_size // 2, end)
-            if preferred_break == -1:
-                preferred_break = normalized.rfind(" ", start + chunk_size // 2, end)
-            if preferred_break > start:
-                end = preferred_break
+            span = _span_containing(end)
+            if span is not None and span[0] > start + chunk_size // 2:
+                # The window ends mid-table and the table starts late enough in
+                # the window: break before the table instead of through it.
+                end = span[0]
+            elif span is not None:
+                # Mid-table with no room to break before it (table longer than
+                # the window): break at a row boundary, never mid-row.
+                row_break = normalized.rfind("\n", start + chunk_size // 2, end)
+                if row_break > start:
+                    end = row_break
+            else:
+                preferred_break = normalized.rfind("\n\n", start + chunk_size // 2, end)
+                if preferred_break == -1:
+                    preferred_break = normalized.rfind(" ", start + chunk_size // 2, end)
+                if preferred_break > start:
+                    end = preferred_break
 
         # Track where the *stripped* chunk actually starts in the source so
         # marker lookup matches a meaningful position.
@@ -120,7 +186,16 @@ def _split_text_with_offsets(
         chunk = chunk_raw.strip()
         if chunk:
             leading = len(chunk_raw) - len(chunk_raw.lstrip())
-            chunks.append((chunk, start + leading))
+            offset = start + leading
+            span = _span_containing(offset)
+            if (
+                span is not None
+                and offset > span[0]
+                and 0 < len(span[2]) <= _TABLE_HEADER_MAX_CHARS
+                and not chunk.startswith(span[2])
+            ):
+                chunk = f"{span[2]}\n{chunk}"
+            chunks.append((chunk, offset))
 
         if end >= text_length:
             break
@@ -128,6 +203,17 @@ def _split_text_with_offsets(
         next_start = max(start + step, end - chunk_overlap)
         if next_start <= start:
             next_start = end
+        # Don't let the overlap restart mid-row: snap to the start of the row
+        # (or the next row when snapping back would stall the loop).
+        span = _span_containing(next_start)
+        if span is not None:
+            row_start = normalized.rfind("\n", span[0], next_start) + 1
+            if row_start > start:
+                next_start = row_start
+            else:
+                next_newline = normalized.find("\n", next_start)
+                if next_newline != -1:
+                    next_start = next_newline + 1
         start = next_start
 
     return chunks
@@ -392,6 +478,7 @@ class DocumentManager:
         query: str,
         k: int = 8,
         min_similarity: float = 0.0,
+        where: Optional[dict] = None,
     ) -> list[dict[str, Any]]:
         """Similarity search on a KB collection.
 
@@ -401,11 +488,14 @@ class DocumentManager:
         in. A positive floor lets RAG callers treat "retrieved only weakly
         related junk" the same as "retrieved nothing" — handing the model an
         empty set so it abstains rather than answering from off-topic chunks.
+
+        ``where`` is an optional ChromaDB metadata filter (e.g. restrict the
+        search to specific sources by ``source_name``).
         """
         collection = self.get_kb_collection_readonly(kb_uuid)
         if collection is None:
             return []
-        results = collection.query(query_texts=[query], n_results=k)
+        results = collection.query(query_texts=[query], n_results=k, where=where)
 
         output = []
         if results and results.get("documents"):

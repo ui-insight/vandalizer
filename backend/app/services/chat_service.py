@@ -16,6 +16,7 @@ from pydantic_ai.messages import (
     TextPartDelta,
     ThinkingPart,
     ThinkingPartDelta,
+    UserPromptPart,
 )
 
 from app.models.activity import ActivityEvent, ActivityStatus
@@ -28,12 +29,12 @@ from app.services.context_budget import (
     plan_and_compact_context,
 )
 from app.services.llm_service import (
+    build_project_kb_empty_prompt,
     create_chat_agent,
     DOCUMENT_CHAT_SYSTEM_PROMPT,
     FIRST_SESSION_SYSTEM_PROMPT,
     HELP_CHAT_SYSTEM_PROMPT,
     KB_CHAT_SYSTEM_PROMPT,
-    PROJECT_KB_EMPTY_SYSTEM_PROMPT,
     VANDALIZER_CONTEXT,
 )
 
@@ -324,51 +325,23 @@ async def chat_stream(
 
     # KB context: query ChromaDB for relevant chunks and add as a segment.
     kb_sources: list[dict] = []
+    kb_manifest: list[dict] = []
     if kb_uuid:
         try:
-            from app.services.document_manager import DocumentManager
-            from app.services.kb_validation_service import resolve_kb_min_similarity
-            dm = DocumentManager()
-            # Honour the KB's tuned relevance floor. If retrieval clears nothing
-            # above it, kb_results is empty and we fall through to the empty-KB
-            # prompt below — the model abstains instead of answering from junk.
-            kb_min_similarity = await resolve_kb_min_similarity(kb_uuid)
-            kb_results = await asyncio.to_thread(
-                dm.query_kb, kb_uuid, message, 8, kb_min_similarity
+            from app.services.knowledge_service import get_kb_manifest
+            kb_manifest = await get_kb_manifest(kb_uuid)
+        except Exception as e:
+            logger.warning("KB manifest fetch failed for kb_uuid=%s: %s", kb_uuid, e)
+        try:
+            kb_segment, kb_sources = await _build_kb_segment(
+                kb_uuid, message, model_name, manifest=kb_manifest,
+                history=previous_messages,
             )
-            if kb_results:
-                kb_text = (
-                    "\n\n## Retrieved Knowledge Base Snippets\n"
-                    "_The following are partial excerpts from a larger corpus, ranked "
-                    "by similarity to the user's question. They may be incomplete, "
-                    "off-topic, or miss the best answer. Cite by filename only when a "
-                    "snippet actually supports your claim._\n"
-                )
-                for r in kb_results:
-                    meta = r.get("metadata") or {}
-                    src = meta.get("source_name", "Unknown")
-                    page = meta.get("page")
-                    sheet = meta.get("sheet")
-                    label = src
-                    if isinstance(page, int):
-                        label = f"{src} (p. {page})"
-                    elif isinstance(sheet, str) and sheet:
-                        label = f"{src} ({sheet})"
-                    kb_text += f"\n**Source: {label}**\n{r['content']}\n"
-                    kb_sources.append({
-                        "document_id": meta.get("source_id"),
-                        "document_title": src,
-                        "page": page if isinstance(page, int) else None,
-                        "sheet": sheet if isinstance(sheet, str) else None,
-                        "chunk_id": r.get("chunk_id"),
-                        "score": r.get("score"),
-                        "content_preview": (r.get("content") or "")[:240],
-                    })
-                doc_segments.insert(0, DocumentSegment(label="kb", text=kb_text))
-            else:
-                logger.warning("KB query returned no results for kb_uuid=%s", kb_uuid)
+            if kb_segment:
+                doc_segments.insert(0, kb_segment)
         except Exception as e:
             logger.error("KB context retrieval failed for kb_uuid=%s: %s", kb_uuid, e)
+            kb_sources = []
 
     # Select system prompt based on whether we have document context.
     # KB chat needs a stricter prompt: snippets are partial excerpts, so the model
@@ -376,7 +349,12 @@ async def chat_stream(
     # and admit when the retrieved set doesn't actually contain the answer.
     have_context = bool(doc_segments or attachment_segments)
     if kb_sources:
-        system_prompt: Optional[str] = KB_CHAT_SYSTEM_PROMPT
+        # The manifest rides on the system prompt (re-sent every turn) so the
+        # model can distinguish "exists here but wasn't retrieved" from "not
+        # in this project" on follow-ups too.
+        system_prompt: Optional[str] = (
+            KB_CHAT_SYSTEM_PROMPT + _build_manifest_block(kb_manifest)
+        )
     elif have_context:
         system_prompt = DOCUMENT_CHAT_SYSTEM_PROMPT
     elif kb_uuid:
@@ -384,7 +362,9 @@ async def chat_stream(
         # docs not indexed yet, or no match). Do NOT fall through to system_prompt=None
         # — that lets the model freely hallucinate document contents. Tell it the KB
         # was empty for this query while still allowing general-knowledge answers.
-        system_prompt = PROJECT_KB_EMPTY_SYSTEM_PROMPT
+        system_prompt = build_project_kb_empty_prompt(
+            _build_manifest_block(kb_manifest)
+        )
     elif is_first_session:
         # First-session onboarding: conversational value discovery.
         # Do NOT inject VANDALIZER_CONTEXT here — it's a technical how-to dump
@@ -595,6 +575,7 @@ async def chat_stream(
                     usage, activity_id, user_id,
                     thinking=thinking_text,
                     thinking_duration=thinking_duration,
+                    citations=kb_sources or None,
                 )
 
                 # Stream token usage so the frontend can display context utilization
@@ -660,6 +641,264 @@ async def chat_stream(
 
 
 
+_ANAPHORA_RE = re.compile(
+    r"\b(it|its|that|this|these|those|they|them|their|he|she|his|her|hers)\b",
+    re.IGNORECASE,
+)
+_FOLLOWUP_STARTERS = ("what about", "how about", "and ", "also ", "why", "same for")
+
+
+def _looks_anaphoric(message: str) -> bool:
+    """Heuristic: does this message likely depend on conversation context for
+    retrieval? Errs toward True — a needless condense only costs one bounded
+    LLM call, while retrieving on a bare "what about year 2?" loses grounding.
+    """
+    msg = " ".join((message or "").strip().lower().split())
+    if not msg:
+        return False
+    if len(msg) < 100:
+        return True
+    if _ANAPHORA_RE.search(msg):
+        return True
+    return msg.startswith(_FOLLOWUP_STARTERS)
+
+
+def _recent_turns(
+    history: list[ModelMessage], max_turns: int = 6,
+) -> list[tuple[str, str]]:
+    """Flatten pydantic-ai message history into (role, text) pairs for the
+    condense prompt. System parts are skipped; persisted user turns are the
+    bare messages (chat.py saves them before enrichment)."""
+    turns: list[tuple[str, str]] = []
+    for m in history:
+        for part in getattr(m, "parts", []):
+            if isinstance(part, UserPromptPart) and isinstance(part.content, str):
+                turns.append(("user", part.content))
+            elif isinstance(part, TextPart) and part.content:
+                turns.append(("assistant", part.content))
+    return turns[-max_turns:]
+
+
+_MANIFEST_MAX_ENTRIES = 60
+_MANIFEST_MAX_CHARS = 3000
+
+
+def _build_manifest_block(manifest: list[dict]) -> str:
+    """Render the project's document list as a system-prompt section.
+
+    Appended to the system prompt (re-sent every turn) so the model always
+    knows what the project contains — the retrieved snippets alone can't tell
+    it whether an unretrieved document exists.
+    """
+    if not manifest:
+        return ""
+    lines: list[str] = []
+    total_chars = 0
+    shown = 0
+    for entry in manifest[:_MANIFEST_MAX_ENTRIES]:
+        name = (entry.get("name") or "").strip()
+        if not name:
+            continue
+        status = entry.get("status")
+        line = f"- {name}" + (" (still indexing)" if status and status != "ready" else "")
+        if total_chars + len(line) > _MANIFEST_MAX_CHARS:
+            break
+        lines.append(line)
+        total_chars += len(line)
+        shown += 1
+    if not lines:
+        return ""
+    more = len(manifest) - shown
+    more_note = f"\n…and {more} more document(s) not listed here." if more > 0 else ""
+    return (
+        "\n\n## Project Document Manifest\n"
+        f"This project contains {len(manifest)} document(s):\n"
+        + "\n".join(lines)
+        + more_note
+        + "\n\nManifest rules:\n"
+        "- If the user asks about a document listed above but none of the retrieved "
+        "snippets come from it, say the document is in this project but nothing from "
+        "it was retrieved for this question — suggest asking about it by name or "
+        "rephrasing. Never claim a listed document lacks content, or that a fact "
+        "\"isn't in the project\", just because no snippet from it was retrieved.\n"
+        "- If the user asks about a document NOT listed above, say it isn't part of "
+        "this project.\n"
+        "- A document marked \"(still indexing)\" can't be searched yet — say so if "
+        "the user asks about it.\n"
+    )
+
+
+def _select_diverse_chunks(
+    results: list[dict], k: int, max_per_source: int,
+) -> list[dict]:
+    """Pick up to ``k`` chunks in relevance order, capping any single source at
+    ``max_per_source`` so one long narrative document can't fill every slot.
+
+    A second pass backfills from the overflow so a single-source KB (or one
+    genuinely dominant document) still fills all ``k`` slots.
+    """
+    selected: list[dict] = []
+    overflow: list[dict] = []
+    counts: dict = {}
+    for r in results:
+        meta = r.get("metadata") or {}
+        src = meta.get("source_id") or meta.get("source_name")
+        if counts.get(src, 0) < max_per_source:
+            selected.append(r)
+            counts[src] = counts.get(src, 0) + 1
+        else:
+            overflow.append(r)
+        if len(selected) >= k:
+            break
+    if len(selected) < k:
+        selected.extend(overflow[: k - len(selected)])
+    return selected[:k]
+
+
+def _match_named_sources(message: str, manifest: list[dict]) -> list[str]:
+    """Return the manifest names the user's message mentions explicitly.
+
+    Normalized substring match: case-insensitive, extension-insensitive.
+    Names shorter than 5 characters with fewer than 2 tokens are skipped so a
+    file called "a.txt" doesn't match every message containing "a".
+    """
+    msg = " ".join((message or "").lower().split())
+    matched: list[str] = []
+    for entry in manifest:
+        name = (entry.get("name") or "").strip()
+        if not name:
+            continue
+        stem = name.rsplit(".", 1)[0] if "." in name else name
+        stem_norm = " ".join(stem.lower().replace("_", " ").replace("-", " ").split())
+        if len(stem_norm) < 5 and len(stem_norm.split()) < 2:
+            continue
+        if name.lower() in msg or (stem_norm and stem_norm in msg):
+            matched.append(name)
+    return matched
+
+
+def _compose_kb_results(
+    general: list[dict], named: list[dict], k: int,
+) -> list[dict]:
+    """Merge named-document hits with the general pool into the final top-k.
+
+    Named-document chunks are guaranteed up to ceil(k/2) slots (the document
+    the user asked about by name must not be crowded out), the rest are filled
+    from the general pool with a per-source diversity cap.
+    """
+    max_per_source = max(2, -(-k // 2))  # ceil(k/2)
+    if not named:
+        return _select_diverse_chunks(general, k, max_per_source)
+
+    quota = -(-k // 2)
+    final = named[:quota]
+    seen = {r.get("chunk_id") for r in final}
+    remaining = [r for r in general if r.get("chunk_id") not in seen]
+    final.extend(
+        _select_diverse_chunks(remaining, k - len(final), max_per_source)
+    )
+    return final[:k]
+
+
+async def _build_kb_segment(
+    kb_uuid: str,
+    message: str,
+    model_name: str,
+    manifest: Optional[list[dict]] = None,
+    history: Optional[list[ModelMessage]] = None,
+) -> tuple[Optional[DocumentSegment], list[dict]]:
+    """Retrieve KB context for one chat turn.
+
+    Returns ``(segment, kb_sources)``; the segment is None when nothing clears
+    the KB's tuned relevance floor, so the caller falls through to the empty-KB
+    prompt and the model abstains instead of answering from junk.
+    """
+    from app.services.kb_validation_service import (
+        _ensure_system_config_loaded,
+        condense_retrieval_query,
+        retrieve_kb_chunks,
+    )
+
+    # The retrieval pipeline's optional LLM steps (rewrite/rerank) build their
+    # agents from the ContextVar'd SystemConfig snapshot.
+    await _ensure_system_config_loaded()
+
+    # Retrieval is per-turn and sees only the current message, so a follow-up
+    # like "what about year 2?" retrieves nothing useful even though the model
+    # "remembers" the topic. Condense anaphoric messages into a standalone
+    # search query using recent turns; the raw message still drives the answer
+    # prompt and rerank scoring.
+    retrieval_query: Optional[str] = None
+    if history and _looks_anaphoric(message):
+        recent = _recent_turns(history)
+        if recent:
+            retrieval_query, _ = await condense_retrieval_query(
+                message, recent, model_name,
+            )
+
+    # Honour the KB's tuned retrieval knobs (k, min_similarity, query
+    # rewriting, rerank). cfg.model / prompt_variant / answer_temperature
+    # deliberately do NOT apply here — they tune the headless RAG answer
+    # generator, while chat keeps its own agent, prompt, and settings.
+    # Over-fetch 3× so the diversity pass below has a pool to select from.
+    kb_results, rag_cfg, _ = await retrieve_kb_chunks(
+        kb_uuid, message, model_name, per_step_timeout=6.0,
+        overfetch_multiplier=3,
+        retrieval_query=retrieval_query,
+    )
+
+    # Named-document targeting: when the message mentions a project file by
+    # name, run a second search restricted to that source and guarantee it a
+    # share of the final slots — short documents (timelines, letters) are
+    # otherwise routinely out-ranked by long narrative documents.
+    named_results: list[dict] = []
+    matched_names = _match_named_sources(message, manifest or [])
+    if matched_names:
+        named_results, _, _ = await retrieve_kb_chunks(
+            kb_uuid, message, model_name,
+            config=rag_cfg.with_overrides(rerank="off", query_rewriting=False),
+            source_filter=matched_names,
+            per_step_timeout=6.0,
+            retrieval_query=retrieval_query,
+        )
+
+    kb_results = _compose_kb_results(kb_results, named_results, rag_cfg.k)
+    if not kb_results:
+        logger.warning("KB query returned no results for kb_uuid=%s", kb_uuid)
+        return None, []
+
+    kb_sources: list[dict] = []
+    kb_text = (
+        "\n\n## Retrieved Knowledge Base Snippets\n"
+        "_The following are partial excerpts from a larger corpus, ranked "
+        "by similarity to the user's question. They may be incomplete, "
+        "off-topic, or miss the best answer. Cite by filename only when a "
+        "snippet actually supports your claim._\n"
+    )
+    for r in kb_results:
+        meta = r.get("metadata") or {}
+        src = meta.get("source_name", "Unknown")
+        page = meta.get("page")
+        sheet = meta.get("sheet")
+        label = src
+        if isinstance(page, int):
+            label = f"{src} (p. {page})"
+        elif isinstance(sheet, str) and sheet:
+            label = f"{src} ({sheet})"
+        kb_text += f"\n**Source: {label}**\n{r['content']}\n"
+        kb_sources.append({
+            "document_id": meta.get("source_id"),
+            "document_title": src,
+            "page": page if isinstance(page, int) else None,
+            "sheet": sheet if isinstance(sheet, str) else None,
+            "chunk_id": r.get("chunk_id"),
+            "score": r.get("score"),
+            "similarity": r.get("similarity"),
+            "content_preview": (r.get("content") or "")[:240],
+        })
+    return DocumentSegment(label="kb", text=kb_text), kb_sources
+
+
 def _build_interrupted_body(full_response: list[str], reason: str) -> str:
     """Compose an assistant-turn body from any partial stream content + a reason."""
     partial = _THINK_BLOCK_RE.sub("", "".join(full_response)).strip()
@@ -713,6 +952,7 @@ async def _finalize(
     user_id: str,
     thinking: Optional[str] = None,
     thinking_duration: Optional[float] = None,
+    citations: Optional[list[dict]] = None,
 ) -> None:
     """Save assistant message and update activity metrics."""
     await conversation.add_message(
@@ -720,6 +960,7 @@ async def _finalize(
         assistant_message,
         thinking=thinking,
         thinking_duration=thinking_duration,
+        citations=citations,
     )
 
     if activity_id:

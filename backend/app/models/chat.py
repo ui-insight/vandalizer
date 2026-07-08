@@ -27,6 +27,7 @@ class ChatMessage(Document):
     message: str
     thinking: Optional[str] = None
     thinking_duration: Optional[float] = None
+    citations: Optional[list[dict]] = None
     created_at: datetime.datetime = Field(default_factory=datetime.datetime.now)
 
     class Settings:
@@ -38,6 +39,8 @@ class ChatMessage(Document):
             d["thinking"] = self.thinking
         if self.thinking_duration is not None:
             d["thinking_duration"] = self.thinking_duration
+        if self.citations:
+            d["citations"] = self.citations
         return d
 
     def to_model_message(self) -> ModelMessage:
@@ -125,12 +128,14 @@ class ChatConversation(Document):
         content: str,
         thinking: Optional[str] = None,
         thinking_duration: Optional[float] = None,
+        citations: Optional[list[dict]] = None,
     ) -> ChatMessage:
         msg = ChatMessage(
             role=role,
             message=content,
             thinking=thinking or None,
             thinking_duration=thinking_duration,
+            citations=citations or None,
         )
         await msg.insert()
         self.messages.append(msg.id)

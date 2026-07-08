@@ -256,10 +256,23 @@ def perform_document_validation(
         text = doc.get("raw_text", "") if doc else ""
 
     if not text:
-        # Try reading from file
+        # Try reading from file. Resolve the path the same way the extraction
+        # task does: prefer the doc's stored (relative) path joined onto
+        # upload_dir. Callers pass ``document_path`` inconsistently — some an
+        # absolute local path, some the bare relative ``doc.path`` — and a
+        # relative path fails to open from the worker's CWD (the "[Errno 2] No
+        # such file" OCR failures on tasks.upload.validation).
+        from app.config import Settings
         from app.services.document_readers import extract_text_from_file
-        ext = os.path.splitext(document_path)[1].lstrip(".")
-        text = extract_text_from_file(document_path, ext)
+
+        rel_or_abs = (doc.get("path") if doc else "") or document_path or ""
+        file_path = (
+            rel_or_abs
+            if os.path.isabs(rel_or_abs)
+            else os.path.join(Settings().upload_dir, rel_or_abs)
+        )
+        ext = os.path.splitext(file_path)[1].lstrip(".")
+        text = extract_text_from_file(file_path, ext)
 
     compliance = settings["rules"]
     effective_chunk_size = chunk_size or settings["chunk_size"]

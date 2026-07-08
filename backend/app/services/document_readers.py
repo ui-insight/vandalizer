@@ -153,7 +153,10 @@ def ocr_extract_text_from_pdf(pdf_path: str, retries: int = 3) -> str:
         if attempt < retries - 1:
             _time.sleep(2 ** attempt)
 
-    logger.error("OCR failed after %d attempts for %s", retries, pdf_path)
+    # OCR failure is a handled degradation — the caller falls back to PyMuPDF —
+    # so log at warning, not error. An OCR outage (or a file removed mid-flight)
+    # must not page Sentry as a fault on every attempt-exhaustion.
+    logger.warning("OCR failed after %d attempts for %s", retries, pdf_path)
     return ""
 
 
@@ -592,7 +595,23 @@ def extract_text_with_markers(file_path: str, file_extension: str) -> tuple[str,
             num_pages = _pdf_page_count(file_path)
             return ocr_text, _interpolate_page_markers(ocr_text, num_pages)
         # OCR unavailable / too little text — PyMuPDF gives us exact boundaries.
-        return _pymupdf_extract_with_pages(file_path)
+        # The PyMuPDF pass is a page-boundary refinement over the OCR text, not a
+        # hard requirement. If it fails (corrupt PDF, or the source file was
+        # removed between the OCR read and here — a document deleted mid-
+        # processing), a short-but-valid OCR result still beats losing the
+        # extraction and crashing the task.
+        try:
+            return _pymupdf_extract_with_pages(file_path)
+        except Exception as e:
+            if ocr_text and ocr_text.strip():
+                logger.warning(
+                    "PyMuPDF page extraction failed for %s (%s); using OCR text",
+                    file_path, e,
+                )
+                return ocr_text, _interpolate_page_markers(
+                    ocr_text, _pdf_page_count(file_path)
+                )
+            raise
 
     if ext == "xlsx":
         text = extract_text_from_xlsx(file_path)
@@ -618,8 +637,19 @@ def extract_text_from_file(file_path: str, file_extension: str) -> str:
                 return ocr_text
             # Fall back to PyMuPDF if OCR unavailable or returned nothing.
             logger.info("OCR returned %d chars, falling back to PyMuPDF", len(ocr_text))
-            text = extract_text_from_pdf(file_path)
-            return text
+            try:
+                return extract_text_from_pdf(file_path)
+            except Exception as e:
+                # Keep a short-but-valid OCR result rather than losing the
+                # extraction if the PyMuPDF fallback fails (corrupt PDF or the
+                # source file was removed mid-processing).
+                if ocr_text and ocr_text.strip():
+                    logger.warning(
+                        "PyMuPDF extraction failed for %s (%s); using OCR text",
+                        file_path, e,
+                    )
+                    return ocr_text
+                raise
 
         elif file_extension in ("html", "htm"):
             return convert_to_markdown(file_path, keep_data_uris=False)

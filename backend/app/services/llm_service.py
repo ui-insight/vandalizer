@@ -625,7 +625,18 @@ KB_CHAT_SYSTEM_PROMPT = VANDALIZER_IDENTITY_PREAMBLE + (
     "not paper over the gap with a confident-sounding guess.\n"
     "- **Never attribute a claim to a source that doesn't support it.** If you can't "
     "point to a specific snippet for a fact, either drop the fact or mark it as general "
-    "knowledge using the prefix above.\n\n"
+    "knowledge using the prefix above.\n"
+    "- **Never derive figures.** Do not calculate, sum, average, extrapolate, or "
+    "convert numbers that are not explicitly stated in a retrieved snippet. If the "
+    "user asks for a figure the snippets don't state, say it is not stated in the "
+    "retrieved sources and stop — a derived estimate presented confidently is worse "
+    "than no answer.\n"
+    "- **Consistency questions** (do two documents agree on X?): quote the exact "
+    "field and value from each document with its citation, confirm both values refer "
+    "to the same field, period, and unit, and only then declare match or mismatch. "
+    "Two different fields in one document (e.g. submission date vs. receipt date) are "
+    "not a cross-document discrepancy. If you can only retrieve the value from one "
+    "side, say the comparison is incomplete — never infer the missing side.\n\n"
     "## Format\n"
     "- Be concise. Short Markdown bullets and headings — no walls of text.\n"
     "- Do NOT restate the question.\n"
@@ -653,6 +664,29 @@ PROJECT_KB_EMPTY_SYSTEM_PROMPT = VANDALIZER_IDENTITY_PREAMBLE + (
     "- Be concise. Short Markdown bullets — no walls of text.\n"
     "- Do NOT restate the question.\n"
 )
+
+
+def build_project_kb_empty_prompt(manifest_block: Optional[str] = None) -> str:
+    """System prompt for a project/KB chat turn where retrieval returned nothing.
+
+    Without a manifest the plain constant applies (the model can't know what
+    the project contains). With one, the model can — and must — distinguish
+    "that document exists here but wasn't retrieved" from "no such document in
+    this project" instead of conflating both into "couldn't find it".
+    """
+    if not manifest_block:
+        return PROJECT_KB_EMPTY_SYSTEM_PROMPT
+    return PROJECT_KB_EMPTY_SYSTEM_PROMPT + manifest_block + (
+        "\n## Not retrieved vs. not in this project\n"
+        "Retrieval returned nothing for THIS question, but the manifest above is "
+        "the authoritative list of what the project contains.\n"
+        "- If the document the user asked about IS listed: say it is in this "
+        "project but nothing from it was retrieved for this question — suggest "
+        "asking about it by name or rephrasing. Do NOT imply the document or the "
+        "fact doesn't exist.\n"
+        "- If it is NOT listed: say that document isn't part of this project.\n"
+    )
+
 
 HELP_CHAT_SYSTEM_PROMPT = VANDALIZER_IDENTITY_PREAMBLE + (
     "You are the built-in assistant for **Vandalizer**, an open-source AI-powered "

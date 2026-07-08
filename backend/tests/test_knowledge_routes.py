@@ -1725,3 +1725,62 @@ class TestAdminKBInventory:
         assert body["total"] == 1
         assert body["knowledge_bases"][0]["title"] == "APM Chapter 45"
         assert body["knowledge_bases"][0]["tags"] == ["v2026-06"]
+
+
+class TestKnowledgeReingest:
+    @pytest.mark.asyncio
+    async def test_reingest_dispatches_task_and_sets_building(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.tasks.knowledge_base_tasks.kb_reingest") as mock_task,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(return_value=kb)
+            mock_task.delay = MagicMock(return_value=MagicMock(id="task-123"))
+
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/reingest",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert resp.json() == {"task_id": "task-123", "status": "queued"}
+        assert kb.status == "building"
+        kb.save.assert_awaited()
+        mock_task.delay.assert_called_once_with("kb-uuid-1")
+
+    @pytest.mark.asyncio
+    async def test_reingest_view_only_user_gets_403(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+        kb = _mock_kb(user_id="someone-else", verified=True)
+
+        async def gated_lookup(uuid, u, manage=False, **kw):
+            return None if manage else kb
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.get_knowledge_base = AsyncMock(side_effect=gated_lookup)
+
+            resp = await client.post(
+                "/api/knowledge/kb-uuid-1/reingest",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 403

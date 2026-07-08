@@ -191,6 +191,59 @@ async def get_kb_sources(kb_uuid: str) -> list[KnowledgeBaseSource]:
     ).sort(-KnowledgeBaseSource.created_at).to_list()
 
 
+async def resolve_document_titles(sources) -> dict[str, str]:
+    """Batch-load SmartDocument titles for the given KB sources.
+
+    Title resolution is a display nicety — a lookup failure (missing collection
+    in a test, a deleted document, etc.) must not break the caller.
+    """
+    doc_uuids = [
+        s.document_uuid for s in sources
+        if s.source_type == "document" and s.document_uuid
+    ]
+    if not doc_uuids:
+        return {}
+    try:
+        docs = await SmartDocument.find({"uuid": {"$in": doc_uuids}}).to_list()
+    except Exception:
+        return {}
+    return {d.uuid: d.title for d in docs if d.title}
+
+
+async def get_kb_manifest(kb_uuid: str, limit: int = 60) -> list[dict]:
+    """Compact listing of a KB's sources for chat prompt injection and
+    named-document retrieval targeting.
+
+    Each entry's ``name`` mirrors the effective display name that ingestion
+    (and ``update_source_name``) writes into ChromaDB ``source_name`` metadata:
+    custom_name → document title → url_title → url. Non-ready sources are
+    included with their status so chat can say "still indexing" instead of
+    denying the document exists.
+    """
+    sources = await get_kb_sources(kb_uuid)
+    sources = sources[:limit]
+    titles = await resolve_document_titles(sources)
+
+    manifest: list[dict] = []
+    for s in sources:
+        name = s.custom_name
+        if not name:
+            if s.source_type == "url":
+                name = s.url_title or s.url
+            else:
+                name = titles.get(s.document_uuid or "") or s.document_uuid
+        if not name:
+            continue
+        manifest.append({
+            "name": name,
+            "source_uuid": s.uuid,
+            "document_uuid": s.document_uuid,
+            "source_type": s.source_type,
+            "status": s.status,
+        })
+    return manifest
+
+
 async def update_knowledge_base(
     uuid: str, user: User,
     title: str | None = None, description: str | None = None,
