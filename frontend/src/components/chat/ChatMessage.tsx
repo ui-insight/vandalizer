@@ -7,6 +7,7 @@ import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
 import { ToolCallDisplay, ToolStatusLine, toolResultToText, pickHighlightPhrase } from './ToolCallDisplay'
 import { renderMarkdown, THINK_BLOCK_RE, THINK_TRAILING_RE } from './markdown'
+import { routeActionClick } from './actionRoute'
 import type { ChatMessage as ChatMessageType, Citation, StreamSegment, ToolCallInfo, ToolResultInfo } from '../../types/chat'
 
 const THINKING_WORDS = [
@@ -95,10 +96,14 @@ export function ChatMessage({
   const handleActionClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const target = (e.target as HTMLElement).closest<HTMLElement>('[data-action]')
     if (!target) return
-    const action = target.getAttribute('data-action')
-    if (action === 'start-cert') certPanel.openPanel()
-    else if (action === 'upload-docs') setWorkspaceMode('files')
-  }, [certPanel, setWorkspaceMode])
+    const route = routeActionClick(target.getAttribute('data-action'), target.textContent || '')
+    if (route.kind === 'cert') certPanel.openPanel()
+    else if (route.kind === 'files') setWorkspaceMode('files')
+    // Improvised action buttons (create-kb, build-workflow, …) have no dedicated
+    // route; send their label so the assistant performs them via its tools
+    // instead of the click dead-ending.
+    else if (route.kind === 'send' && onSendMessage) onSendMessage(route.message)
+  }, [certPanel, setWorkspaceMode, onSendMessage])
 
   const handleFeedback = async (rating: 'up' | 'down') => {
     const prev = feedback
