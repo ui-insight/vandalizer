@@ -155,6 +155,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     errorDetails,
     clearError,
     retry,
+    continueRun,
     contextTokens,
     contextMode,
     contextCutoffIndex,
@@ -1355,6 +1356,18 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                 </button>
                 <span className="text-xs text-red-600/80">
                   Builds a searchable index so chat can read the document a chunk at a time.
+                </span>
+              </div>
+            ) : errorDetails?.suggestedAction === 'continue' ? (
+              <div className="mt-2 flex items-center gap-2">
+                <button
+                  onClick={continueRun}
+                  className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-red-700"
+                >
+                  Continue
+                </button>
+                <span className="text-xs text-red-600/80">
+                  Picks up where the response left off — completed work is kept.
                 </span>
               </div>
             ) : (

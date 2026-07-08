@@ -299,6 +299,18 @@ def _microcompact_enabled(sys_config_doc: dict | None) -> bool:
 # Auto-compaction (uplift plan Phase 4).
 AUTOCOMPACT_MAX_CONSECUTIVE_FAILURES = 3
 
+# Resumable usage-limit hits (uplift plan Phase 5). Each Continue is a real
+# user click, but the cap still matters: a task that can't finish within 3
+# continuations needs rescoping, not a fourth identical attempt.
+MAX_RESUME_ATTEMPTS = 3
+RESUME_INSTRUCTION_REMINDER = (
+    "Your previous reply stopped early because it hit the per-turn tool "
+    "budget. Resume the task exactly where it left off — no apology, no "
+    "recap of work already done. Prefer fewer, larger steps: batch related "
+    "lookups into single calls, skip redundant verification, and finish the "
+    "remaining work directly."
+)
+
 
 def _autocompact_enabled(sys_config_doc: dict | None) -> bool:
     chat_cfg = (sys_config_doc or {}).get("chat_config") or {}
@@ -1126,6 +1138,16 @@ async def chat_stream(
         if project_block:
             reminder_blocks.append(project_block)
 
+    # One-shot resume instruction (uplift plan Phase 5): the previous turn
+    # stopped at the tool budget and the user chose to continue.
+    if getattr(conversation, "resume_pending", False):
+        conversation.resume_pending = False
+        try:
+            await conversation.save()
+        except Exception as e:
+            logger.warning("Could not clear resume_pending: %s", e)
+        reminder_blocks.append(RESUME_INSTRUCTION_REMINDER)
+
     # Instruction base. First-session keeps its own conversation-stable base
     # (the whole conversation is a distinct behavioral mode); everything else
     # uses ONE base per agent type so the cached prefix never shifts when the
@@ -1374,7 +1396,10 @@ async def chat_stream(
 
         iter_kwargs: dict = {
             "message_history": previous_messages,
-            "usage_limits": UsageLimits(request_limit=25, tool_calls_limit=15),
+            # Raised from 25/15 (uplift plan Phase 5): with the resumable
+            # Continue flow these are backstops against runaway loops, not
+            # walls a legitimate multi-step task should hit.
+            "usage_limits": UsageLimits(request_limit=40, tool_calls_limit=25),
         }
         if deps is not None:
             iter_kwargs["deps"] = deps
@@ -1557,7 +1582,48 @@ async def chat_stream(
 
     except UsageLimitExceeded:
         logger.warning("Chat usage limit reached for user %s", user_id)
-        yield json.dumps({"kind": "error", "content": "This response used too many tool calls. Try breaking your request into smaller steps."}) + "\n"
+        # Arm the resumable-continue flow (uplift plan Phase 5). Fields are
+        # set BEFORE persisting the partial turn so one save carries both.
+        resumable = conversation.resume_attempts < MAX_RESUME_ATTEMPTS
+        conversation.resume_attempts += 1
+        if resumable:
+            conversation.resume_pending = True
+        # Persist the partial turn — previously this path saved nothing,
+        # leaving consecutive user turns in history (which pydantic-ai
+        # rejects on the next request).
+        try:
+            await _save_failed_assistant_turn(
+                conversation,
+                _build_interrupted_body(
+                    full_response, "stopped at the per-turn tool budget"
+                ),
+                activity_id,
+                "usage limit",
+                thinking="".join(full_thinking) or None,
+                thinking_duration=thinking_duration,
+            )
+        except Exception as save_err:
+            logger.error("Failed to persist usage-limited turn: %s", save_err)
+        if resumable:
+            yield json.dumps({
+                "kind": "error",
+                "code": "usage_limit_resumable",
+                "suggested_action": "continue",
+                "content": (
+                    "This response hit its tool budget before finishing. "
+                    "Press Continue to pick up where it left off, or refine "
+                    "the request into smaller steps."
+                ),
+            }) + "\n"
+        else:
+            yield json.dumps({
+                "kind": "error",
+                "code": "usage_limit",
+                "content": (
+                    "This task keeps hitting the per-turn tool budget. "
+                    "Break it into smaller, more specific requests."
+                ),
+            }) + "\n"
         if activity_id:
             ev = await ActivityEvent.get(activity_id)
             if ev:
@@ -2339,9 +2405,17 @@ async def _finalize(
     # fall back to token counting". Failed turns never stamp: their extra
     # placeholder message shifts the message count, which is exactly the
     # staleness signal the meter checks.
+    fields_dirty = False
     if context_anchor_tokens > 0:
         conversation.last_context_tokens = context_anchor_tokens
         conversation.last_context_message_count = len(conversation.messages)
+        fields_dirty = True
+    # A successfully completed turn ends any resume sequence (Phase 5).
+    if conversation.resume_attempts or conversation.resume_pending:
+        conversation.resume_attempts = 0
+        conversation.resume_pending = False
+        fields_dirty = True
+    if fields_dirty:
         await conversation.save()
 
     if activity_id:

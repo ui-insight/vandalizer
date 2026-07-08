@@ -178,7 +178,7 @@ export interface StreamChunk {
   status?: 'started' | 'done' | 'failed'
   // Error-only: machine-readable failure code + optional suggested recovery.
   code?: string
-  suggested_action?: 'convert_to_kb'
+  suggested_action?: 'convert_to_kb' | 'continue'
   oversize_documents?: OversizeDocument[]
   // sources kind only: citation list emitted before the LLM streams text.
   sources?: Citation[]

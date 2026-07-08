@@ -11,7 +11,7 @@ export interface ContextNotice {
 export interface ChatError {
   message: string
   code?: string
-  suggestedAction?: 'convert_to_kb'
+  suggestedAction?: 'convert_to_kb' | 'continue'
   oversizeDocuments?: OversizeDocument[]
 }
 
@@ -365,6 +365,18 @@ export function useChat() {
     send(...args)
   }, [send])
 
+  /** Resume a turn that stopped at the tool budget (usage_limit_resumable).
+   * Unlike retry(), this keeps the partial exchange — the backend armed a
+   * one-shot "resume directly, no recap" instruction for the next turn. */
+  const continueRun = useCallback(() => {
+    const args = lastSendArgsRef.current
+    if (!args) return
+    const [, ...contextArgs] = args
+    setError(null)
+    setErrorDetails(null)
+    send('Continue', ...contextArgs)
+  }, [send])
+
   const setActivity = useCallback((newActivityId: string, newConversationUuid: string) => {
     setActivityId(newActivityId)
     setConversationUuid(newConversationUuid)
@@ -386,6 +398,7 @@ export function useChat() {
     errorDetails,
     clearError,
     retry,
+    continueRun,
     contextTokens,
     contextMode,
     contextCutoffIndex,

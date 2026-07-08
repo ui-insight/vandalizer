@@ -460,14 +460,24 @@ class TestCitationPersistence:
         assert "citations" not in msg.to_dict()
 
     @pytest.mark.asyncio
-    async def test_finalize_passes_citations_to_add_message(self):
+    def _finalize_conversation(self):
+        """MagicMock with concrete post-turn bookkeeping fields — _finalize
+        reads resume/anchor state, and bare Mock attributes are truthy."""
         from unittest.mock import AsyncMock
-
-        from app.models.chat import ChatRole
-        from app.services.chat_service import _finalize
 
         conversation = MagicMock()
         conversation.add_message = AsyncMock()
+        conversation.save = AsyncMock()
+        conversation.resume_attempts = 0
+        conversation.resume_pending = False
+        conversation.messages = []
+        return conversation
+
+    async def test_finalize_passes_citations_to_add_message(self):
+        from app.models.chat import ChatRole
+        from app.services.chat_service import _finalize
+
+        conversation = self._finalize_conversation()
         citations = [self._citation()]
 
         await _finalize(
@@ -479,6 +489,35 @@ class TestCitationPersistence:
         args, kwargs = conversation.add_message.await_args
         assert args[0] == ChatRole.ASSISTANT
         assert kwargs["citations"] == citations
+        conversation.save.assert_not_awaited()  # nothing dirty on this path
+
+    async def test_finalize_resets_resume_state_on_success(self):
+        from app.services.chat_service import _finalize
+
+        conversation = self._finalize_conversation()
+        conversation.resume_attempts = 2
+        conversation.resume_pending = True
+
+        await _finalize(conversation, "answer", [], None, None, "user-1")
+
+        assert conversation.resume_attempts == 0
+        assert conversation.resume_pending is False
+        conversation.save.assert_awaited_once()
+
+    async def test_finalize_stamps_usage_anchor(self):
+        from app.services.chat_service import _finalize
+
+        conversation = self._finalize_conversation()
+        conversation.messages = ["m1", "m2"]
+
+        await _finalize(
+            conversation, "answer", [], None, None, "user-1",
+            context_anchor_tokens=42_000,
+        )
+
+        assert conversation.last_context_tokens == 42_000
+        assert conversation.last_context_message_count == 2
+        conversation.save.assert_awaited_once()
 
 
 class TestOpenDocumentsBlock:

@@ -97,7 +97,15 @@ def _get_loop_http_client() -> httpx.AsyncClient:
         asyncio.set_event_loop(loop)
     client = _loop_http_clients.get(loop)
     if client is None or client.is_closed:
-        client = httpx.AsyncClient(timeout=httpx.Timeout(read_timeout, connect=10.0))
+        client = httpx.AsyncClient(
+            timeout=httpx.Timeout(read_timeout, connect=10.0),
+            # Connect-level retries (uplift plan Phase 5): httpx re-attempts
+            # only connection establishment, never a request that reached the
+            # server — safe for non-idempotent LLM calls, and it absorbs the
+            # oauthdev-style "container can't reach the gateway right now"
+            # blips before they surface as ModelAPIError.
+            transport=httpx.AsyncHTTPTransport(retries=2),
+        )
         _loop_http_clients[loop] = client
     return client
 
@@ -379,6 +387,113 @@ def build_prompt_cache_model_settings(
     }
 
 
+# Transient-failure retry policy (uplift plan Phase 5). Applied at the model
+# layer so every LLM caller in the app benefits and each request in a
+# tool-call loop retries independently (a failure on request 3 never redoes
+# requests 1-2). Backoff: 0.5s · 2^(n-1), capped at 32s, plus 0-25% jitter.
+MAX_TRANSIENT_LLM_RETRIES = 4
+_TRANSIENT_STATUS_CODES = frozenset({408, 429, 500, 502, 503, 504, 529})
+_TRANSIENT_ERROR_INDICATORS = (
+    "connection error",
+    "connection reset",
+    "connection refused",
+    "peer closed connection",
+    "server disconnected",
+    "temporarily unavailable",
+    "overloaded",
+    "timed out",
+    "timeout",
+)
+# Never retry these even though some gateways report them with 5xx-ish
+# phrasing: retrying can't fix an oversized prompt or a bad credential.
+_NON_RETRYABLE_INDICATORS = (
+    "context length",
+    "context_length",
+    "prompt is too long",
+    "maximum context",
+    "input length",
+    "api key",
+    "api_key",
+    "authentication",
+    "unauthorized",
+    "permission",
+)
+
+
+def is_transient_llm_error(exc: Exception) -> bool:
+    """True when retrying the identical request can plausibly succeed."""
+    status = getattr(exc, "status_code", None)
+    if status is not None:
+        return status in _TRANSIENT_STATUS_CODES
+    msg = str(exc).lower()
+    if any(tok in msg for tok in _NON_RETRYABLE_INDICATORS):
+        return False
+    return any(tok in msg for tok in _TRANSIENT_ERROR_INDICATORS)
+
+
+def _retry_backoff_seconds(attempt: int) -> float:
+    import random
+
+    return min(0.5 * (2 ** (attempt - 1)), 32.0) * (1.0 + random.random() * 0.25)
+
+
+class RetryingModel(WrapperModel):
+    """Retries transient provider failures before any output was produced.
+
+    ``request`` retries wholesale; ``request_stream`` retries only failures
+    raised while OPENING the stream — once entered, a mid-stream error means
+    partial output may have been consumed and the caller's partial-turn
+    handling owns it. CancelledError passes through untouched (BaseException).
+    """
+
+    async def request(self, messages, model_settings, model_request_parameters):
+        attempt = 0
+        while True:
+            try:
+                return await self.wrapped.request(
+                    messages, model_settings, model_request_parameters
+                )
+            except Exception as e:
+                if attempt >= MAX_TRANSIENT_LLM_RETRIES or not is_transient_llm_error(e):
+                    raise
+                attempt += 1
+                delay = _retry_backoff_seconds(attempt)
+                logger.warning(
+                    "Transient LLM failure, retrying in %.1fs (%d/%d): %s",
+                    delay, attempt, MAX_TRANSIENT_LLM_RETRIES, e,
+                )
+                await asyncio.sleep(delay)
+
+    @asynccontextmanager
+    async def request_stream(
+        self, messages, model_settings, model_request_parameters, run_context=None
+    ):
+        attempt = 0
+        while True:
+            entered = False
+            try:
+                async with self.wrapped.request_stream(
+                    messages, model_settings, model_request_parameters, run_context
+                ) as stream:
+                    entered = True
+                    yield stream
+                    return
+            except Exception as e:
+                if (
+                    entered
+                    or attempt >= MAX_TRANSIENT_LLM_RETRIES
+                    or not is_transient_llm_error(e)
+                ):
+                    raise
+                attempt += 1
+                delay = _retry_backoff_seconds(attempt)
+                logger.warning(
+                    "Transient LLM stream-open failure, retrying in %.1fs (%d/%d): %s",
+                    delay, attempt, MAX_TRANSIENT_LLM_RETRIES, e,
+                )
+                await asyncio.sleep(delay)
+
+
 class MeteredModel(WrapperModel):
     """Transparent wrapper that records token usage on every model call.
 
@@ -454,9 +569,12 @@ def get_agent_model(
 
     Sync  - safe for Celery workers. The returned MeteredModel is a drop-in
     Model that Agent(...) accepts unchanged.
+
+    Wrap order matters: RetryingModel inside MeteredModel, so metering records
+    once per successful call rather than once per retry attempt.
     """
     model = _build_agent_model(agent_model, thinking_override, system_config_doc)
-    return MeteredModel(model)
+    return MeteredModel(RetryingModel(model))
 
 
 def _build_agent_model(

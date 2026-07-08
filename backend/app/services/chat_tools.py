@@ -170,6 +170,21 @@ def _kb_access_ok(kb: "KnowledgeBase", user_id: str, team_id: Optional[str]) -> 
     return False
 
 
+def _err(message: str, hint: Optional[str] = None) -> dict:
+    """Tool-error envelope with an optional corrective hint.
+
+    Soft by design (uplift plan Phase 5): pydantic-ai's ModelRetry becomes
+    run-FATAL once a tool exceeds its retry budget, so errors return as
+    normal results the model can read and adapt to — the loop never dies on a
+    stubborn call. ``hint`` names the exact next call to make ("call
+    list_folders, retry with a returned uuid"), because the model corrects
+    far better from a concrete instruction than from a bare not-found.
+    """
+    if hint:
+        return {"error": message, "hint": hint}
+    return {"error": message}
+
+
 def _confirm_fingerprint(tool_name: str, key: dict) -> str:
     """Stable fingerprint of a write action, used to match preview→confirm."""
     raw = tool_name + "|" + json.dumps(key, sort_keys=True, default=str)
@@ -1011,7 +1026,13 @@ async def get_document_text(
     """
     doc = await SmartDocument.find_one(SmartDocument.uuid == document_uuid)
     if not doc:
-        return {"error": f"Document '{document_uuid}' not found."}
+        return _err(
+            f"Document '{document_uuid}' not found.",
+            hint=(
+                "Find the right document with search_documents (by title) or "
+                "list_documents, then retry with the exact uuid returned."
+            ),
+        )
 
     # Authorization: must belong to user's team or the user directly
     team_id = context.deps.team_id
@@ -1060,7 +1081,13 @@ async def run_extraction(
     # Load the search set
     ss = await SearchSet.find_one(SearchSet.uuid == extraction_set_uuid)
     if not ss:
-        return {"error": f"Extraction set '{extraction_set_uuid}' not found."}
+        return _err(
+            f"Extraction set '{extraction_set_uuid}' not found.",
+            hint=(
+                "Call list_extraction_sets or search_library to find the "
+                "template, then retry with the uuid it returns."
+            ),
+        )
 
     # Authorization: must be accessible to user
     team_id = context.deps.team_id
@@ -1130,7 +1157,14 @@ async def _execute_extraction(
             doc_names.append(doc.title or doc_uuid)
 
     if not doc_texts:
-        return {"error": "No accessible documents with text content found."}
+        return _err(
+            "No accessible documents with text content found.",
+            hint=(
+                "The documents may still be processing or belong to another "
+                "team. Use search_documents to locate them, and check the "
+                "document status before retrying."
+            ),
+        )
 
     # Run extraction synchronously in a thread
     sys_cfg = context.deps.system_config_doc
@@ -1262,7 +1296,13 @@ async def check_compliance(
 
     ss = await SearchSet.find_one(SearchSet.uuid == extraction_set_uuid)
     if not ss:
-        return {"error": f"Extraction set '{extraction_set_uuid}' not found."}
+        return _err(
+            f"Extraction set '{extraction_set_uuid}' not found.",
+            hint=(
+                "Call list_extraction_sets or search_library to find the "
+                "template, then retry with the uuid it returns."
+            ),
+        )
 
     # Authorization mirrors run_extraction.
     team_id = context.deps.team_id
@@ -1413,7 +1453,13 @@ async def add_documents_to_kb(
     """
     kb = await KnowledgeBase.find_one(KnowledgeBase.uuid == kb_uuid)
     if not kb:
-        return {"error": f"Knowledge base '{kb_uuid}' not found."}
+        return _err(
+            f"Knowledge base '{kb_uuid}' not found.",
+            hint=(
+                "Call list_knowledge_bases and retry with one of the "
+                "returned kb uuids."
+            ),
+        )
 
     # Authorization — owner or a team-shared KB matching the caller's team.
     user = context.deps.user
@@ -1466,7 +1512,13 @@ async def add_url_to_kb(
     """
     kb = await KnowledgeBase.find_one(KnowledgeBase.uuid == kb_uuid)
     if not kb:
-        return {"error": f"Knowledge base '{kb_uuid}' not found."}
+        return _err(
+            f"Knowledge base '{kb_uuid}' not found.",
+            hint=(
+                "Call list_knowledge_bases and retry with one of the "
+                "returned kb uuids."
+            ),
+        )
 
     user = context.deps.user
     if not _kb_access_ok(kb, user.user_id, context.deps.team_id):
@@ -1543,7 +1595,13 @@ async def run_workflow(
     # Look up workflow and verify access
     wf = await Workflow.get(workflow_id)
     if not wf:
-        return {"error": f"Workflow '{workflow_id}' not found."}
+        return _err(
+            f"Workflow '{workflow_id}' not found.",
+            hint=(
+                "Call list_workflows or search_library to find the workflow, "
+                "then retry with the uuid it returns."
+            ),
+        )
 
     team_id = context.deps.team_id
     user_id = context.deps.user_id
@@ -1696,7 +1754,14 @@ async def get_workflow_status(
         session_id, user=context.deps.user,
     )
     if not status:
-        return {"error": f"Workflow session '{session_id}' not found."}
+        return _err(
+            f"Workflow session '{session_id}' not found.",
+            hint=(
+                "The session_id must come from a run_workflow result in this "
+                "conversation — check the earlier result, or run the workflow "
+                "again."
+            ),
+        )
 
     result: dict = {
         "status": status["status"],
@@ -1772,7 +1837,13 @@ async def approve_workflow_step(
         ApprovalRequest.uuid == approval_request_id
     )
     if not approval:
-        return {"error": f"Approval request '{approval_request_id}' not found."}
+        return _err(
+            f"Approval request '{approval_request_id}' not found.",
+            hint=(
+                "Call get_workflow_status for the session to list its pending "
+                "approvals, then retry with the id it shows."
+            ),
+        )
     if approval.status != STATUS_PENDING:
         return {
             "error": (
@@ -1865,7 +1936,13 @@ async def reject_workflow_step(
         ApprovalRequest.uuid == approval_request_id
     )
     if not approval:
-        return {"error": f"Approval request '{approval_request_id}' not found."}
+        return _err(
+            f"Approval request '{approval_request_id}' not found.",
+            hint=(
+                "Call get_workflow_status for the session to list its pending "
+                "approvals, then retry with the id it shows."
+            ),
+        )
     if approval.status != STATUS_PENDING:
         return {
             "error": (
@@ -1951,7 +2028,13 @@ async def list_test_cases(
     """
     ss = await SearchSet.find_one(SearchSet.uuid == extraction_set_uuid)
     if not ss:
-        return {"error": f"Extraction set '{extraction_set_uuid}' not found."}
+        return _err(
+            f"Extraction set '{extraction_set_uuid}' not found.",
+            hint=(
+                "Call list_extraction_sets or search_library to find the "
+                "template, then retry with the uuid it returns."
+            ),
+        )
 
     team_id = context.deps.team_id
     user_id = context.deps.user_id
@@ -2009,7 +2092,13 @@ async def propose_test_case(
 
     ss = await SearchSet.find_one(SearchSet.uuid == extraction_set_uuid)
     if not ss:
-        return {"error": f"Extraction set '{extraction_set_uuid}' not found."}
+        return _err(
+            f"Extraction set '{extraction_set_uuid}' not found.",
+            hint=(
+                "Call list_extraction_sets or search_library to find the "
+                "template, then retry with the uuid it returns."
+            ),
+        )
 
     user_id = context.deps.user_id
     team_id = context.deps.team_id
@@ -2019,7 +2108,13 @@ async def propose_test_case(
 
     doc = await SmartDocument.find_one(SmartDocument.uuid == document_uuid)
     if not doc:
-        return {"error": f"Document '{document_uuid}' not found."}
+        return _err(
+            f"Document '{document_uuid}' not found.",
+            hint=(
+                "Find the right document with search_documents (by title) or "
+                "list_documents, then retry with the exact uuid returned."
+            ),
+        )
     if team_id:
         if doc.team_id != team_id and doc.user_id != user_id:
             return {"error": "You do not have access to this document."}
@@ -2161,7 +2256,13 @@ async def create_extraction_from_document(
         docs.append(doc)
 
     if not docs:
-        return {"error": "No accessible documents found."}
+        return _err(
+            "No accessible documents found.",
+            hint=(
+                "Use search_documents or list_documents to find documents "
+                "you can access, then retry with those uuids."
+            ),
+        )
 
     if any(not d.raw_text for d in docs):
         # At least one doc is missing text — filter them out; reject if none remain
@@ -2316,7 +2417,13 @@ async def run_validation(
 
     ss = await SearchSet.find_one(SearchSet.uuid == extraction_set_uuid)
     if not ss:
-        return {"error": f"Extraction set '{extraction_set_uuid}' not found."}
+        return _err(
+            f"Extraction set '{extraction_set_uuid}' not found.",
+            hint=(
+                "Call list_extraction_sets or search_library to find the "
+                "template, then retry with the uuid it returns."
+            ),
+        )
 
     user_id = context.deps.user_id
     team_id = context.deps.team_id
@@ -2529,7 +2636,13 @@ async def get_optimization_run(
 
     run = await get_run_by_uuid(surface, run_uuid)
     if not run:
-        return {"error": f"Optimization run '{run_uuid}' not found."}
+        return _err(
+            f"Optimization run '{run_uuid}' not found.",
+            hint=(
+                "Call list_optimization_recommendations, or use the run uuid "
+                "returned by start_optimization, then retry."
+            ),
+        )
 
     item_id = getattr(run, "kb_uuid", None) or getattr(run, "search_set_uuid", None) or getattr(run, "workflow_id", None)
     _, _, err = await _get_optimizable_item(context, kind, item_id)
@@ -2674,7 +2787,13 @@ async def apply_optimization(
 
     run = await get_run_by_uuid(surface, run_uuid)
     if not run:
-        return {"error": f"Optimization run '{run_uuid}' not found."}
+        return _err(
+            f"Optimization run '{run_uuid}' not found.",
+            hint=(
+                "Call list_optimization_recommendations, or use the run uuid "
+                "returned by start_optimization, then retry."
+            ),
+        )
 
     item_id = getattr(run, "kb_uuid", None) or getattr(run, "search_set_uuid", None) or getattr(run, "workflow_id", None)
     item, title, err = await _get_optimizable_item(context, kind, item_id)
@@ -2872,7 +2991,13 @@ async def save_to_folder(
             folder_uuid, user, team_access=context.deps.team_access,
         )
         if not folder:
-            return {"error": "Folder not found or you don't have access to it."}
+            return _err(
+                "Folder not found or you don't have access to it.",
+                hint=(
+                    "Call list_folders and retry with one of the returned "
+                    "folder uuids."
+                ),
+            )
         target_folder = folder.uuid
         team_id = folder.team_id
         folder_name = f'"{folder.title}"'
@@ -3399,7 +3524,13 @@ async def create_automation(
             folder_uuid, user, team_access=context.deps.team_access,
         )
         if not folder:
-            return {"error": "Folder not found or you don't have access to it."}
+            return _err(
+                "Folder not found or you don't have access to it.",
+                hint=(
+                    "Call list_folders and retry with one of the returned "
+                    "folder uuids."
+                ),
+            )
         trigger_config = {"folder_id": folder.uuid}
         trigger_desc = f'when a document is added to "{folder.title}"'
     else:  # schedule

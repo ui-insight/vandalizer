@@ -212,6 +212,15 @@ class ChatConversation(Document):
     last_context_tokens: int = 0
     last_context_message_count: int = -1
 
+    # Resumable usage-limit hits (uplift plan Phase 5). When a turn stops at
+    # the per-turn tool budget, resume_pending arms a one-shot "resume
+    # directly, no recap" reminder for the next turn (the frontend offers a
+    # Continue button). resume_attempts counts consecutive limit hits so a
+    # task that can't finish in 3 continuations stops being offered one;
+    # reset on any successfully completed turn.
+    resume_attempts: int = 0
+    resume_pending: bool = False
+
     # Auto-compaction circuit breaker (uplift plan Phase 4). Consecutive
     # failed auto-compact attempts; at 3 the trigger stops retrying (Claude
     # Code once measured 1,279 sessions burning ~250K calls/day on a hopeless
