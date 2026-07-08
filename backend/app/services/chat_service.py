@@ -807,11 +807,12 @@ async def chat_stream(
     # reference them by UUID without a blind search_documents call. Without
     # this, the model has to search by filename — which is both fragile and
     # expensive on large workspaces (see chat_tools.search_documents).
-    if documents:
-        open_docs_block = _build_open_documents_block(documents)
-        if open_docs_block:
-            base = system_prompt if system_prompt is not None else AGENTIC_CHAT_SYSTEM_PROMPT
-            system_prompt = base + "\n\n" + open_docs_block
+    open_docs_block = _build_open_documents_block(
+        documents, file_attachments, url_attachments
+    )
+    if open_docs_block:
+        base = system_prompt if system_prompt is not None else AGENTIC_CHAT_SYSTEM_PROMPT
+        system_prompt = base + "\n\n" + open_docs_block
 
     # Tell the agent it's inside a project, and what that project contains
     # (pinned workflows/extractions with their ids, file/KB counts). This is
@@ -1542,18 +1543,53 @@ def _get_full_text(documents: list[SmartDocument]) -> str:
     return "".join(parts)
 
 
-def _build_open_documents_block(documents: list[SmartDocument]) -> str:
-    """Format the documents currently open in chat so the model can reference
-    them by UUID without calling search_documents.
+def _build_open_documents_block(
+    documents: list[SmartDocument],
+    file_attachments: list | None = None,
+    url_attachments: list | None = None,
+) -> str:
+    """Format everything currently attached to this chat — selected documents,
+    uploaded files, and fetched URLs — so the model can (a) reference documents
+    by UUID without calling search_documents and (b) answer "what's attached?"
+    accurately and consistently.
+
+    This is the single authoritative list of attachments. The model cannot
+    remove any of these: they are user-controlled tabs in the attachments bar,
+    each removed by its own ✕ button. The block says so explicitly so the model
+    stops hallucinating a "cleared" / "detached" success it cannot perform.
     """
+    file_attachments = file_attachments or []
+    url_attachments = url_attachments or []
+    if not (documents or file_attachments or url_attachments):
+        return ""
+
     lines = [
-        "## Documents open in this chat",
-        "The user has these documents selected. Use their UUIDs directly for "
-        "tools like run_extraction or get_document_text — do NOT call "
-        "search_documents to look them up.",
+        "## Attached to this chat",
+        "These items are attached to the current conversation. This is the "
+        "complete, authoritative list — if something is not listed here, it is "
+        "NOT attached. When the user asks what is attached, answer from this "
+        "list exactly.",
+        "",
+        "You CANNOT remove, detach, or clear any of them, and there is no tool "
+        "to clear the conversation. Each is a tab in the attachments bar above "
+        "the chat input that only the user can close with its ✕ button. If the "
+        "user asks you to remove/detach/clear an attachment or the "
+        "conversation, do NOT claim you did it — say you can't, name what is "
+        "attached, and tell them to click the ✕ on that item's pill above the "
+        "chat input.",
+        "",
+        "For documents below, use their UUIDs directly for tools like "
+        "run_extraction or get_document_text — do NOT call search_documents to "
+        "look them up.",
     ]
     for doc in documents:
-        lines.append(f'- "{doc.title}" (uuid: {doc.uuid})')
+        lines.append(f'- Document: "{doc.title}" (uuid: {doc.uuid})')
+    for att in file_attachments:
+        lines.append(f'- Uploaded file: "{getattr(att, "filename", "file")}"')
+    for att in url_attachments:
+        title = getattr(att, "title", None) or getattr(att, "url", "URL")
+        url = getattr(att, "url", "")
+        lines.append(f'- URL: "{title}" ({url})' if url else f'- URL: "{title}"')
     return "\n".join(lines)
 
 

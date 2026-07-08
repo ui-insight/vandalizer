@@ -479,3 +479,34 @@ class TestCitationPersistence:
         args, kwargs = conversation.add_message.await_args
         assert args[0] == ChatRole.ASSISTANT
         assert kwargs["citations"] == citations
+
+
+class TestOpenDocumentsBlock:
+    """The attachments block is the model's single source of truth for what is
+    attached and must state that the model cannot remove any of it."""
+
+    def _b(self, *args):
+        from app.services.chat_service import _build_open_documents_block
+        return _build_open_documents_block(*args)
+
+    def test_no_attachments_returns_empty(self):
+        assert self._b([]) == ""
+        assert self._b([], [], []) == ""
+
+    def test_lists_all_attachment_types(self):
+        doc = MagicMock(title="Grant.pdf", uuid="u1")
+        file_att = MagicMock(filename="notes.docx")
+        url_att = MagicMock(title="NSF Policy", url="https://nsf.gov/x")
+        out = self._b([doc], [file_att], [url_att])
+        assert '"Grant.pdf" (uuid: u1)' in out
+        assert "notes.docx" in out
+        assert "NSF Policy" in out
+        assert "https://nsf.gov/x" in out
+
+    def test_states_it_cannot_remove_attachments(self):
+        doc = MagicMock(title="Grant.pdf", uuid="u1")
+        out = self._b([doc])
+        assert "CANNOT" in out
+        assert "✕" in out
+        # Must not imply the model can clear the conversation itself.
+        assert "no tool to clear the conversation" in out
