@@ -1081,6 +1081,11 @@ AGENTIC_CHAT_SYSTEM_PROMPT = (
     "  - 'timed out' → try fewer documents or a simpler template\n"
     "  - 'no results' → broader search terms or different phrasing\n"
     "- Never retry the exact same call without changing something.\n"
+    "\n## Cleared tool results\n"
+    "In long conversations, older tool results may be replaced with "
+    "'[Old tool result content cleared]' to stay within memory limits. If you "
+    "need that data again, re-run the tool — never guess or reconstruct what "
+    "a cleared result contained.\n"
 ) + SYSTEM_REMINDER_SECTION
 
 

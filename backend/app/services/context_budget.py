@@ -547,6 +547,18 @@ def rough_text_tokens(text: str) -> int:
     return max(1, len(text) // _CHAR_TO_TOKEN_RATIO)
 
 
+def effective_input_window(
+    context_window: int, response_reserve: Optional[int] = None
+) -> int:
+    """Input tokens actually available after reserving response space."""
+    reserve = (
+        response_reserve
+        if response_reserve is not None
+        else _default_response_reserve(context_window)
+    )
+    return max(1, context_window - reserve)
+
+
 def estimate_next_request_tokens(
     *,
     anchor_tokens: int,
@@ -628,12 +640,7 @@ def build_context_meter(
     estimate_source: str = "token_count",
 ) -> ContextMeter:
     """Place an estimate on the warn/compact/block escalation ladder."""
-    reserve = (
-        response_reserve
-        if response_reserve is not None
-        else _default_response_reserve(context_window)
-    )
-    effective = max(1, context_window - reserve)
+    effective = effective_input_window(context_window, response_reserve)
 
     if context_window < _SMALL_WINDOW_TOKENS:
         warn_at = int(effective * _SMALL_WARN_FRACTION)

@@ -167,6 +167,13 @@ class SystemConfig(Document):
     # Compliance configuration (document content checks on upload)
     compliance_config: dict = {}
 
+    # Agentic-chat behavior flags (harness uplift plan). Keys:
+    #   "microcompact_enabled": bool (default True) — clear old read-tool
+    #       results from replayed history near the context budget (Phase 3).
+    # Missing keys mean "use the default" so deployments never need a
+    # migration to pick up new phases.
+    chat_config: dict = {}
+
     # Anonymous telemetry decision (see DEFAULT_TELEMETRY_CONFIG). Lets the
     # in-app opt-in banner durably enable/disable the heartbeat without an env
     # edit; empty until an admin decides.

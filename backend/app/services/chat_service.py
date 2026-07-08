@@ -33,8 +33,10 @@ from app.services.config_service import get_llm_model_by_name, get_user_model_na
 from app.services.context_budget import (
     build_context_meter,
     DocumentSegment,
+    effective_input_window,
     estimate_next_request_tokens,
     plan_and_compact_context,
+    resolve_context_window,
 )
 from app.services.llm_service import (
     AGENTIC_CHAT_SYSTEM_PROMPT,
@@ -277,6 +279,66 @@ def _note_cache_usage(conversation_uuid: str, usage, model_name: str) -> tuple[i
         _CACHE_READ_BASELINE.pop(next(iter(_CACHE_READ_BASELINE)))
     _CACHE_READ_BASELINE[conversation_uuid] = per_request_read
     return cache_read, cache_write
+
+
+# Micro-compaction (uplift plan Phase 3): once the estimated context crosses
+# this fraction of the effective window, old read-tool results are cleared
+# from replayed history. Triggered (not continuous) so the replayed prefix —
+# and the provider prompt cache — stays byte-stable between advances.
+MICROCOMPACT_TRIGGER_FRACTION = 0.60
+# Messages whose tool results are always kept verbatim: the last ~3 exchanges
+# before the current user message.
+MICROCOMPACT_KEEP_RECENT_MESSAGES = 6
+
+
+def _microcompact_enabled(sys_config_doc: dict | None) -> bool:
+    chat_cfg = (sys_config_doc or {}).get("chat_config") or {}
+    return bool(chat_cfg.get("microcompact_enabled", True))
+
+
+async def _maybe_advance_microcompact_boundary(
+    conversation: ChatConversation,
+    model_name: str,
+    message: str,
+    model_config: Optional[dict],
+) -> bool:
+    """Advance the tool-result clearing boundary when context runs high.
+
+    Requires a valid usage anchor — without one the estimate is a tokenizer
+    pass we haven't done yet, so the trigger simply waits a turn until the
+    next anchor lands. On advance: the anchor is dropped (it measured the
+    pre-clearing context; this turn's meter falls back to counting the cleared
+    replay) and the cache baseline is reset (the cleared prefix legitimately
+    drops cache reads — that's the trade being made, not a regression).
+    """
+    anchor = conversation.last_context_tokens or 0
+    if anchor <= 0 or conversation.last_context_message_count != len(conversation.messages) - 1:
+        return False
+
+    window = resolve_context_window(model_name, model_config)
+    effective = effective_input_window(window)
+    estimated = estimate_next_request_tokens(anchor_tokens=anchor, new_text=message)
+    trigger_at = int(effective * MICROCOMPACT_TRIGGER_FRACTION)
+    if estimated < trigger_at:
+        return False
+
+    # -1: the current user message is already persisted and never clears.
+    new_boundary = max(
+        0, len(conversation.messages) - 1 - MICROCOMPACT_KEEP_RECENT_MESSAGES
+    )
+    if new_boundary <= (conversation.tool_results_cleared_before or 0):
+        return False
+
+    conversation.tool_results_cleared_before = new_boundary
+    conversation.last_context_tokens = 0
+    conversation.last_context_message_count = -1
+    await conversation.save()
+    _CACHE_READ_BASELINE.pop(conversation.uuid, None)
+    logger.info(
+        "Micro-compaction: conversation=%s boundary→%d (estimated %d ≥ trigger %d, window %d)",
+        conversation.uuid, new_boundary, estimated, trigger_at, window,
+    )
+    return True
 
 
 def _final_request_context_tokens(result) -> int:
@@ -725,11 +787,31 @@ async def chat_stream(
     if not is_first_session and conversation.is_first_session:
         is_first_session = True
 
+    # Micro-compaction (uplift plan Phase 3): when the anchored estimate says
+    # this conversation is past the trigger, advance the persisted clearing
+    # boundary BEFORE replaying history so old read-tool results replay as a
+    # small marker. Failures never block the turn — worst case is an
+    # unclipped replay that the budget planner handles as before.
+    model_config = await get_llm_model_by_name(model_name)
+    compactable_tools = None
+    if _microcompact_enabled(sys_config_doc):
+        try:
+            await _maybe_advance_microcompact_boundary(
+                conversation, model_name, message, model_config,
+            )
+        except Exception as e:
+            logger.warning("Micro-compaction check failed: %s", e)
+        if (conversation.tool_results_cleared_before or 0) > 0:
+            from app.services.chat_tools import COMPACTABLE_TOOLS
+            compactable_tools = COMPACTABLE_TOOLS
+
     # Load message history, excluding the user message we just saved (chat.py
     # saves the bare message before calling chat_stream).  We re-send it as
     # the enriched prompt below so the model only sees the version that
     # includes document / KB / attachment context.
-    previous_messages: list[ModelMessage] = await conversation.to_model_messages()
+    previous_messages: list[ModelMessage] = await conversation.to_model_messages(
+        compactable_tools=compactable_tools,
+    )
     if previous_messages:
         previous_messages = previous_messages[:-1]
 
@@ -952,7 +1034,7 @@ async def chat_stream(
     # Resolve the model's context window and compact oversize components.
     # The reminder bundle is counted with the system prompt: it isn't part of
     # the instructions, but it's per-turn overhead the budget must reserve.
-    model_config = await get_llm_model_by_name(model_name)
+    # (model_config was fetched above, before the micro-compaction check.)
     compacted = plan_and_compact_context(
         model_name=model_name,
         model_config=model_config,

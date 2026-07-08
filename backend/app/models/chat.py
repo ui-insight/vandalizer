@@ -24,6 +24,14 @@ class ChatRole(str, Enum):
     ASSISTANT = "assistant"
 
 
+# Replay-time micro-compaction (uplift plan Phase 3): old read-tool results
+# are replaced with this marker when the conversation nears its context
+# budget. Replay-only — the stored segments (and the UI/audit trail) keep the
+# full payloads. The agentic system prompt tells the model it can re-run the
+# tool if it needs the data again.
+CLEARED_TOOL_RESULT_MARKER = "[Old tool result content cleared]"
+
+
 class ChatMessage(Document):
     role: ChatRole
     message: str
@@ -54,7 +62,9 @@ class ChatMessage(Document):
             d["citations"] = self.citations
         return d
 
-    def to_model_messages(self) -> list[ModelMessage]:
+    def to_model_messages(
+        self, cleared_tool_call_ids: frozenset[str] | set[str] = frozenset(),
+    ) -> list[ModelMessage]:
         """Reconstruct pydantic-ai messages for this stored chat message.
 
         Assistant turns may expand into multiple messages when tool calls were
@@ -63,6 +73,11 @@ class ChatMessage(Document):
         chunks. Walking ``segments`` preserves the interleaved order so the
         model sees real tool results on the next turn instead of fabricating
         them from its own prior text.
+
+        Tool results whose call id is in ``cleared_tool_call_ids`` replay as
+        ``CLEARED_TOOL_RESULT_MARKER`` instead of their stored content
+        (micro-compaction; the ToolCallPart/ToolReturnPart pairing stays
+        intact so the API never sees an orphaned tool call).
         """
         if self.role == ChatRole.USER:
             return [ModelRequest(parts=[UserPromptPart(content=self.message)])]
@@ -114,9 +129,12 @@ class ChatMessage(Document):
                 call_id = result.get("tool_call_id") or ""
                 if not call_id:
                     continue
+                content = result.get("content", "")
+                if call_id in cleared_tool_call_ids:
+                    content = CLEARED_TOOL_RESULT_MARKER
                 request_parts.append(ToolReturnPart(
                     tool_name=result.get("tool_name", ""),
-                    content=result.get("content", ""),
+                    content=content,
                     tool_call_id=call_id,
                 ))
 
@@ -194,6 +212,14 @@ class ChatConversation(Document):
     last_context_tokens: int = 0
     last_context_message_count: int = -1
 
+    # Replay-time micro-compaction boundary (uplift plan Phase 3). Compactable
+    # tool results in messages BEFORE this index replay as
+    # CLEARED_TOOL_RESULT_MARKER. Monotonic — it only advances (chat_service
+    # moves it when the context estimate crosses the trigger), so the replayed
+    # prefix stays byte-stable between advances and the provider prompt cache
+    # keeps hitting.
+    tool_results_cleared_before: int = 0
+
     # Write-tool confirmation handshake. Each entry is
     # {"fp": <fingerprint>, "turn": <message-count when armed>, "tool": <name>}.
     # A write tool only executes when a matching entry was armed on an EARLIER
@@ -244,7 +270,52 @@ class ChatConversation(Document):
         msgs.sort(key=lambda m: order.get(m.id, 0))
         return [m.to_dict() for m in msgs]
 
-    async def to_model_messages(self) -> list[ModelMessage]:
+    def _cleared_tool_call_ids(
+        self, msgs: list["ChatMessage"], compactable_tools: frozenset[str] | set[str],
+    ) -> set[str]:
+        """Tool-call ids whose results replay as the cleared marker.
+
+        A result is cleared when its message sits before the persisted
+        ``tool_results_cleared_before`` boundary AND its tool is compactable
+        (read-type, safely re-runnable — never write-tool previews, which the
+        confirm gate replays verbatim). Floor: the single most recent
+        compactable result in the whole conversation is always kept, so the
+        model retains at least one concrete result to ground on even when
+        every result is old.
+        """
+        boundary = self.tool_results_cleared_before or 0
+        if boundary <= 0 or not compactable_tools:
+            return set()
+
+        last_compactable_id: str | None = None
+        for m in msgs:
+            for seg in (m.segments or []):
+                if seg.get("kind") != "tool_result":
+                    continue
+                r = seg.get("result", {})
+                if r.get("tool_name") in compactable_tools and r.get("tool_call_id"):
+                    last_compactable_id = r["tool_call_id"]
+
+        cleared: set[str] = set()
+        for i, m in enumerate(msgs):
+            if i >= boundary:
+                break
+            for seg in (m.segments or []):
+                if seg.get("kind") != "tool_result":
+                    continue
+                r = seg.get("result", {})
+                call_id = r.get("tool_call_id")
+                if (
+                    call_id
+                    and call_id != last_compactable_id
+                    and r.get("tool_name") in compactable_tools
+                ):
+                    cleared.add(call_id)
+        return cleared
+
+    async def to_model_messages(
+        self, compactable_tools: frozenset[str] | set[str] | None = None,
+    ) -> list[ModelMessage]:
         msgs = await ChatMessage.find({"_id": {"$in": self.messages}}).to_list()
         order = {mid: i for i, mid in enumerate(self.messages)}
         msgs.sort(key=lambda m: order.get(m.id, 0))
@@ -257,6 +328,12 @@ class ChatConversation(Document):
                 content=f"Previous conversation summary:\n{self.compact_summary}"
             )]))
 
+        cleared_ids = (
+            self._cleared_tool_call_ids(msgs, compactable_tools)
+            if compactable_tools
+            else set()
+        )
+
         # Only include messages from the cutoff index onward
         if self.context_mode in ("truncated", "compacted") and self.context_cutoff_index > 0:
             active_msgs = msgs[self.context_cutoff_index:]
@@ -264,7 +341,7 @@ class ChatConversation(Document):
             active_msgs = msgs
 
         for m in active_msgs:
-            result.extend(m.to_model_messages())
+            result.extend(m.to_model_messages(cleared_tool_call_ids=cleared_ids))
         return result
 
     async def get_file_attachments(self) -> list[FileAttachment]:

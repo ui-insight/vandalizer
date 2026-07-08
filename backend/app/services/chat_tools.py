@@ -3854,3 +3854,34 @@ TOOLS = [
     # Phase 10 — Workflow authoring
     create_workflow,
 ]
+
+
+# Tools whose old results may be cleared from replayed history when the
+# conversation nears its context budget (micro-compaction — see
+# ChatConversation.to_model_messages and the uplift plan Phase 3). Only
+# read-type tools whose results are safely re-obtainable by calling the tool
+# again. NEVER add gated write tools here: their preview results must replay
+# verbatim for the confirm-gate handshake, and a cleared preview could let the
+# model mis-describe what the user approved. Status/decision tools
+# (get_workflow_status, get_optimization_run) stay out too — their results are
+# small and anchor in-flight processes.
+COMPACTABLE_TOOLS: frozenset[str] = frozenset({
+    "search_documents",
+    "list_documents",
+    "list_folders",
+    "search_knowledge_base",
+    "list_knowledge_bases",
+    "list_extraction_sets",
+    "list_workflows",
+    "get_quality_info",
+    "search_library",
+    "get_app_help",
+    "fetch_url",
+    "web_search",
+    "get_document_text",
+    "run_extraction",
+    "check_compliance",
+    "list_test_cases",
+    "list_optimization_recommendations",
+    "list_project_documents",
+})
