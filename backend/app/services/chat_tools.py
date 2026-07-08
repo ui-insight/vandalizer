@@ -253,7 +253,9 @@ async def _confirm_gate(
         f"This action has NOT been performed. '{tool_name}' is only staged and "
         "is waiting for the user to approve it with the Confirm button. Do NOT "
         "tell the user it is done, added, saved, created, indexed, or running. "
-        "Describe what WILL happen and ask them to confirm."
+        "A Confirm/Cancel control is shown to the user automatically, so do NOT "
+        "call this tool again this turn and do NOT ask a separate yes/no "
+        "question in your reply — just briefly state what you have prepared."
     )
     return out
 

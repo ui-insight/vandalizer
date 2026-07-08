@@ -194,6 +194,28 @@ export function ChatMessage({
     return ids
   }, [activeToolCalls])
 
+  // Duplicate confirmation cards to suppress. A model may call the same write
+  // tool more than once in a single turn (e.g. a preview followed by a
+  // self-confirm the gate downgrades to another preview), which would render
+  // two identical "Confirm / Cancel" cards for one action. Keep only the first
+  // occurrence of each awaiting-confirmation action within this message.
+  const suppressedConfirmCallIds = useMemo(() => {
+    const suppressed = new Set<string>()
+    if (!segments) return suppressed
+    const seen = new Set<string>()
+    for (const seg of segments) {
+      if (seg.kind !== 'tool_call') continue
+      const content = resultMap.get(seg.call.tool_call_id)?.content as
+        | Record<string, unknown>
+        | undefined
+      if (!content || content.needs_confirmation !== true) continue
+      const key = `${seg.call.tool_name}|${String(content.preview ?? '')}`
+      if (seen.has(key)) suppressed.add(seg.call.tool_call_id)
+      else seen.add(key)
+    }
+    return suppressed
+  }, [segments, resultMap])
+
   return (
     <div
       style={{
@@ -286,6 +308,8 @@ export function ChatMessage({
                   )
                 }
                 if (seg.kind === 'tool_call') {
+                  // Drop duplicate confirmation cards for the same action.
+                  if (suppressedConfirmCallIds.has(seg.call.tool_call_id)) return null
                   const result = resultMap.get(seg.call.tool_call_id)
                   const isActive = !result && (isStreamingProp || activeCallIds.has(seg.call.tool_call_id))
                   return (
