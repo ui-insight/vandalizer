@@ -719,9 +719,20 @@ def create_agentic_chat_agent(
     prefix between turns and defeating the provider prompt cache.
     """
     from app.services.chat_deps import AgenticChatDeps
-    from app.services.chat_tools import TOOLS
+    from app.services.chat_tools import PARALLEL_SAFE_TOOLS, TOOLS
 
-    cache_key = f"agentic_{agent_model}_{thinking_override}"
+    # Parallel tool execution (uplift plan Phase 7). pydantic-ai runs a
+    # response's tool calls concurrently by default; we make that fail-closed
+    # by registering everything outside PARALLEL_SAFE_TOOLS as sequential
+    # (one sequential tool serializes its whole batch — pydantic-ai
+    # semantics, acceptable since mixed read+write batches are rare). The
+    # kill switch forces everything sequential. Flag is read at agent
+    # construction and baked into the cache key, so flipping it applies to
+    # new processes / uncached models.
+    chat_cfg = (system_config_doc or {}).get("chat_config") or {}
+    parallel_enabled = bool(chat_cfg.get("parallel_tools_enabled", True))
+
+    cache_key = f"agentic_{agent_model}_{thinking_override}_{parallel_enabled}"
 
     if cache_key not in _agentic_chat_agent_cache:
         model = get_agent_model(
@@ -737,7 +748,13 @@ def create_agentic_chat_agent(
             ) or None,
         )
         for tool_fn in TOOLS:
-            agent.tool(tool_fn)
+            agent.tool(
+                tool_fn,
+                sequential=(
+                    not parallel_enabled
+                    or tool_fn.__name__ not in PARALLEL_SAFE_TOOLS
+                ),
+            )
         _agentic_chat_agent_cache[cache_key] = agent
 
     return _agentic_chat_agent_cache[cache_key]
@@ -851,6 +868,13 @@ AGENTIC_CHAT_SYSTEM_PROMPT = (
     "create knowledge bases, set up automations that run work on a trigger, check quality "
     "metrics, search the web, and save your output back into the user's folders as a "
     "reusable document — all by calling your tools.\n\n"
+    "## Parallel lookups\n"
+    "When you need several INDEPENDENT read-only lookups — texts of multiple "
+    "documents, a document search plus a KB search, several list calls — "
+    "issue them as multiple tool calls in a single response; they run "
+    "concurrently. Keep actions that create, modify, or run things as their "
+    "own single calls, and never parallelize calls where one depends on "
+    "another's result.\n\n"
     "## Local-first rule (IMPORTANT)\n"
     "Always favor the user's own workspace over the web. For any question, reach for "
     "search_documents and search_knowledge_base FIRST. Only call web_search when the "

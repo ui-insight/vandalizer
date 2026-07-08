@@ -172,6 +172,9 @@ class SystemConfig(Document):
     #       results from replayed history near the context budget (Phase 3).
     #   "autocompact_enabled": bool (default True) — summarize older
     #       conversation automatically past the compact threshold (Phase 4).
+    #   "parallel_tools_enabled": bool (default True) — run read-only tool
+    #       calls from one response concurrently; write tools always
+    #       serialize regardless (Phase 7). Read at agent construction.
     # Missing keys mean "use the default" so deployments never need a
     # migration to pick up new phases.
     chat_config: dict = {}

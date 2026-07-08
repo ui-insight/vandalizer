@@ -4068,3 +4068,17 @@ COMPACTABLE_TOOLS: frozenset[str] = frozenset({
     "list_optimization_recommendations",
     "list_project_documents",
 })
+
+
+# Tools that may execute CONCURRENTLY when the model issues several calls in
+# one response (uplift plan Phase 7). Fail-closed: anything not listed here is
+# registered sequential — every gated write tool serializes so two mutations
+# (or a mutation and a read of its target) never race, and the confirm-gate's
+# pending_confirmations bookkeeping is never written from two calls at once.
+# The read set is COMPACTABLE_TOOLS (read-only, re-runnable) plus the two
+# read-only status tools that were excluded from compaction for staleness
+# reasons, not safety ones.
+PARALLEL_SAFE_TOOLS: frozenset[str] = COMPACTABLE_TOOLS | frozenset({
+    "get_workflow_status",
+    "get_optimization_run",
+})
