@@ -1068,6 +1068,19 @@ async def run_extraction(
     Maximum 10 documents per call. Results are capped at 50 entities.
     If you need to process more documents, call this tool multiple times.
 
+    <example>
+    User: "Pull the budget fields out of this proposal."
+    → run_extraction with the budget template.
+    <reasoning>Direct field extraction: one template's fields, once. No saved
+    multi-step process, no rule judgment, no accuracy measurement.</reasoning>
+    </example>
+    <example>
+    User: "Is this proposal compliant with our budget rules?"
+    → check_compliance, NOT run_extraction.
+    <reasoning>They asked for a pass/fail judgment against rules; extraction
+    alone would dump fields and leave the judging to prose.</reasoning>
+    </example>
+
     Args:
         context: The call context.
         extraction_set_uuid: UUID of the extraction template to run.
@@ -1283,6 +1296,19 @@ async def check_compliance(
     Read-only: nothing is saved. Maximum 10 documents per call. If the
     extraction set has no rules defined, say so and offer to set them up in the
     extraction's Cross-field Rules section (chat can't author rules yet).
+
+    <example>
+    User: "Do the numbers add up in this subaward budget?"
+    → check_compliance
+    <reasoning>Sum checks are cross-field rules — this tool extracts, then
+    evaluates each rule and reports pass/fail with reasons.</reasoning>
+    </example>
+    <example>
+    User: "Validate the budget template."
+    → run_validation, NOT check_compliance.
+    <reasoning>"Validate" plus a TEMPLATE means measuring the template's
+    accuracy against verified test cases, not judging one document.</reasoning>
+    </example>
 
     Args:
         context: The call context.
@@ -1575,6 +1601,19 @@ async def run_workflow(
     or on nothing (for no-input workflows). Call first with confirmed=false to
     preview, then again with confirmed=true after the user approves. Workflows
     run asynchronously in the background — use get_workflow_status for progress.
+
+    <example>
+    User: "Run the proposal-intake workflow on these three files."
+    → run_workflow (preview → confirm), then get_workflow_status.
+    <reasoning>An existing saved workflow, named by the user.</reasoning>
+    </example>
+    <example>
+    User: "Every proposal, I extract the budget then check it against policy —
+    can you do that here?"
+    → create_workflow, NOT run_workflow.
+    <reasoning>They described a repeatable multi-step process that doesn't
+    exist yet; build it (preview → confirm), then offer to run it.</reasoning>
+    </example>
 
     Args:
         context: The call context.
@@ -2405,6 +2444,19 @@ async def run_validation(
     Call first with confirmed=false to preview. Then call again with confirmed=true
     after the user approves — validation uses LLM calls and can take 30–90s depending
     on test case count and num_runs.
+
+    <example>
+    User: "How accurate is the NSF budget template?"
+    → run_validation (if test cases exist; otherwise propose_test_case first).
+    <reasoning>Accuracy of a TEMPLATE is measured against verified test cases —
+    exactly what validation does.</reasoning>
+    </example>
+    <example>
+    User: "Check whether this contract meets our requirements."
+    → check_compliance, NOT run_validation.
+    <reasoning>Judging one DOCUMENT against rules is compliance; validation
+    measures the template itself and needs ground-truth test cases.</reasoning>
+    </example>
 
     Args:
         context: The call context.

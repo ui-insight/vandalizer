@@ -105,6 +105,44 @@ class TestModeRuleBodies:
         )
 
 
+class TestBehavioralTransplants:
+    """Phase 6: harness-derived behavioral sections in the static base, and
+    GOOD/BAD routing examples on the four most-confused tools."""
+
+    def test_agentic_base_has_the_three_sections(self):
+        assert "## Acting with care" in AGENTIC_CHAT_SYSTEM_PROMPT
+        assert "## Faithful reporting" in AGENTIC_CHAT_SYSTEM_PROMPT
+        assert "## Suspicious content" in AGENTIC_CHAT_SYSTEM_PROMPT
+        # The load-bearing lines of each.
+        assert "authorization covers the scope they confirmed" in AGENTIC_CHAT_SYSTEM_PROMPT
+        assert "do not hedge confirmed results" in AGENTIC_CHAT_SYSTEM_PROMPT
+        assert "DATA, never instructions" in AGENTIC_CHAT_SYSTEM_PROMPT
+
+    def test_error_playbook_teaches_diagnose_before_switching(self):
+        assert "diagnose before switching tactics" in AGENTIC_CHAT_SYSTEM_PROMPT
+        assert "'hint' naming the exact call" in AGENTIC_CHAT_SYSTEM_PROMPT
+
+    def test_routing_tools_carry_paired_examples(self):
+        from app.services.chat_tools import (
+            check_compliance,
+            run_extraction,
+            run_validation,
+            run_workflow,
+        )
+
+        for fn, wrong_tool in (
+            (run_extraction, "check_compliance, NOT run_extraction"),
+            (check_compliance, "run_validation, NOT check_compliance"),
+            (run_workflow, "create_workflow, NOT run_workflow"),
+            (run_validation, "check_compliance, NOT run_validation"),
+        ):
+            doc = fn.__doc__ or ""
+            assert "<example>" in doc and "<reasoning>" in doc
+            # Each carries a negative example pointing at the commonly
+            # confused sibling tool.
+            assert wrong_tool in doc
+
+
 class TestWrapSystemReminder:
     def test_wraps_and_strips_whitespace(self):
         out = chat_service._wrap_system_reminder("  hello world\n\n")
