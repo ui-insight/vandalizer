@@ -341,9 +341,20 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     updateSearch((prev) => ({ ...prev, automation: undefined }))
   }, [updateSearch])
 
+  // Selected documents/folders live at the workspace level (not inside
+  // ChatPanel), so remounting the chat on "New chat" does NOT clear them.
+  // Every fresh-chat entry point must drop them explicitly, or a document
+  // attached to the previous chat stays attached in the new one.
+  const clearChatAttachments = useCallback(() => {
+    setSelectedDocUuids([])
+    setSelectedDocNames({})
+    setSelectedFolderUuids([])
+  }, [])
+
   const resetToHome = useCallback(() => {
     updateSearch(() => emptyWorkspaceSearch())
     localStorage.setItem('workspace:mode', 'chat')
+    clearChatAttachments()
     setNewChatSignal(prev => prev + 1)
     setLoadConversationId(null)
     setPendingChatMessage(null)
@@ -357,14 +368,15 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setActiveProjectRootFolder(null)
     setActiveProjectTeamId(null)
     setActiveProjectRole(null)
-  }, [updateSearch])
+  }, [updateSearch, clearChatAttachments])
 
   // ── Chat callbacks ──────────────────────────────────────────────────────
 
   const triggerNewChat = useCallback(() => {
+    clearChatAttachments()
     setNewChatSignal(prev => prev + 1)
     updateSearch((prev) => ({ ...prev, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined }))
-  }, [updateSearch])
+  }, [updateSearch, clearChatAttachments])
 
   const focusChat = useCallback(() => {
     // Clear any right-panel overlay so the chat is visible, but keep the
@@ -393,10 +405,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setStoredRaw(KB_STORAGE_KEY, uuid)
     setActiveKBUuid(uuid)
     setActiveKBTitle(title)
+    clearChatAttachments()
     setNewChatSignal(prev => prev + 1)
     localStorage.setItem('workspace:mode', 'chat')
     updateSearch((prev) => ({ ...prev, mode: undefined, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined }))
-  }, [updateSearch])
+  }, [updateSearch, clearChatAttachments])
 
   const deactivateKB = useCallback(() => {
     setStoredRaw(KB_STORAGE_KEY, null)
@@ -415,10 +428,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setStoredRaw(KB_STORAGE_KEY, null)
     setActiveKBUuid(null)
     setActiveKBTitle(null)
+    clearChatAttachments()
     setNewChatSignal(prev => prev + 1)
     localStorage.setItem('workspace:mode', 'chat')
     updateSearch((prev) => ({ ...prev, mode: undefined, workflow: undefined, extraction: undefined, automation: undefined, tab: undefined }))
-  }, [updateSearch])
+  }, [updateSearch, clearChatAttachments])
 
   const deactivateProject = useCallback(() => {
     setStoredRaw(PROJECT_STORAGE_KEY, null)
@@ -493,6 +507,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
           setStoredRaw(KB_STORAGE_KEY, null)
           setActiveKBUuid(null)
           setActiveKBTitle(null)
+          clearChatAttachments()
           setNewChatSignal(prev => prev + 1)
           // Land in whatever mode was requested (e.g. ?project=X&mode=files),
           // defaulting to chat. Viewers (shared-in PIs) are chat-only.
@@ -524,7 +539,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         replace: true,
       })
     })
-  }, [search.project, search.mode, navigate])
+  }, [search.project, search.mode, navigate, clearChatAttachments])
 
   // Rehydrate the active project/KB scope on a fresh load (e.g. browser reload).
   // Scope lives in ephemeral React state, so without this a refresh would drop
