@@ -159,6 +159,7 @@ export interface StreamChunk {
     | 'context_budget'
     | 'context_meter'
     | 'context_notice'
+    | 'compaction'
     | 'sources'
   content: string
   duration?: number
@@ -173,6 +174,8 @@ export interface StreamChunk {
   meter?: ContextMeterInfo
   action?: string
   tokens_dropped?: number
+  // compaction kind only: auto-compaction lifecycle for this turn.
+  status?: 'started' | 'done' | 'failed'
   // Error-only: machine-readable failure code + optional suggested recovery.
   code?: string
   suggested_action?: 'convert_to_kb'

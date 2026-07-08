@@ -296,6 +296,52 @@ def _microcompact_enabled(sys_config_doc: dict | None) -> bool:
     return bool(chat_cfg.get("microcompact_enabled", True))
 
 
+# Auto-compaction (uplift plan Phase 4).
+AUTOCOMPACT_MAX_CONSECUTIVE_FAILURES = 3
+
+
+def _autocompact_enabled(sys_config_doc: dict | None) -> bool:
+    chat_cfg = (sys_config_doc or {}).get("chat_config") or {}
+    return bool(chat_cfg.get("autocompact_enabled", True))
+
+
+def reset_cache_baseline(conversation_uuid: str) -> None:
+    """Forget the cache-regression baseline after a legitimate context edit
+    (compaction/truncation) so the expected cache-read drop isn't flagged."""
+    _CACHE_READ_BASELINE.pop(conversation_uuid, None)
+
+
+def _autocompact_needed(
+    conversation: ChatConversation,
+    model_name: str,
+    message: str,
+    model_config: Optional[dict],
+) -> bool:
+    """Past the compact threshold, judged by the anchored estimate.
+
+    Anchor-only on purpose: without a valid anchor (first turn, failed turn,
+    fresh compaction) we haven't measured anything trustworthy yet, and the
+    next successful turn re-anchors — worst case compaction waits one turn.
+    This also sequences naturally after micro-compaction, which drops the
+    anchor when it advances: clearing gets a turn to take effect before
+    summarization is considered.
+    """
+    anchor = conversation.last_context_tokens or 0
+    if anchor <= 0 or conversation.last_context_message_count != len(conversation.messages) - 1:
+        return False
+    from app.services.context_budget import METER_BLOCKED, METER_COMPACT
+
+    window = resolve_context_window(model_name, model_config)
+    meter = build_context_meter(
+        estimated_tokens=estimate_next_request_tokens(
+            anchor_tokens=anchor, new_text=message,
+        ),
+        context_window=window,
+        estimate_source="usage_anchor",
+    )
+    return meter.state in (METER_COMPACT, METER_BLOCKED)
+
+
 async def _maybe_advance_microcompact_boundary(
     conversation: ChatConversation,
     model_name: str,
@@ -804,6 +850,75 @@ async def chat_stream(
         if (conversation.tool_results_cleared_before or 0) > 0:
             from app.services.chat_tools import COMPACTABLE_TOOLS
             compactable_tools = COMPACTABLE_TOOLS
+
+    # Auto-compaction (uplift plan Phase 4): when micro-compaction wasn't
+    # enough and the anchored estimate is past the compact threshold,
+    # summarize the older conversation before building this turn's request.
+    # Failures count toward a circuit breaker so a hopeless conversation
+    # doesn't burn a summarization call every turn forever.
+    if _autocompact_enabled(sys_config_doc) and _autocompact_needed(
+        conversation, model_name, message, model_config,
+    ):
+        if conversation.consecutive_autocompact_failures >= AUTOCOMPACT_MAX_CONSECUTIVE_FAILURES:
+            yield json.dumps({
+                "kind": "context_notice",
+                "content": (
+                    "This conversation is too large to summarize automatically. "
+                    "Start a new chat, or use the context menu to clear or trim "
+                    "older messages."
+                ),
+                "action": "autocompact_unavailable",
+                "tokens_dropped": 0,
+            }) + "\n"
+        else:
+            from app.services.chat_compaction import CompactionError, compact_conversation
+
+            yield json.dumps({
+                "kind": "compaction",
+                "content": "Summarizing earlier conversation to free up memory…",
+                "status": "started",
+            }) + "\n"
+            try:
+                compaction = await compact_conversation(
+                    conversation,
+                    model_name=model_name,
+                    sys_config_doc=sys_config_doc,
+                    user_id=user_id,
+                    team_id=str(user.current_team) if user and user.current_team else None,
+                )
+                reset_cache_baseline(conversation.uuid)
+                yield json.dumps({
+                    "kind": "compaction",
+                    "content": "",
+                    "status": "done",
+                }) + "\n"
+                yield json.dumps({
+                    "kind": "context_notice",
+                    "content": (
+                        f"Summarized {compaction.summarized_count} earlier "
+                        "messages to free up memory. The recent conversation "
+                        "is kept verbatim."
+                    ),
+                    "action": "auto_compacted",
+                    "tokens_dropped": 0,
+                }) + "\n"
+            except CompactionError as e:
+                conversation.consecutive_autocompact_failures += 1
+                try:
+                    await conversation.save()
+                except Exception as save_err:
+                    logger.error("Could not persist autocompact failure count: %s", save_err)
+                logger.warning(
+                    "Auto-compaction failed for conversation=%s (%d/%d): %s",
+                    conversation.uuid,
+                    conversation.consecutive_autocompact_failures,
+                    AUTOCOMPACT_MAX_CONSECUTIVE_FAILURES, e,
+                )
+                yield json.dumps({
+                    "kind": "compaction",
+                    "content": "",
+                    "status": "failed",
+                }) + "\n"
 
     # Load message history, excluding the user message we just saved (chat.py
     # saves the bare message before calling chat_stream).  We re-send it as

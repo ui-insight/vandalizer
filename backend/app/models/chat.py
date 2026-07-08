@@ -212,6 +212,12 @@ class ChatConversation(Document):
     last_context_tokens: int = 0
     last_context_message_count: int = -1
 
+    # Auto-compaction circuit breaker (uplift plan Phase 4). Consecutive
+    # failed auto-compact attempts; at 3 the trigger stops retrying (Claude
+    # Code once measured 1,279 sessions burning ~250K calls/day on a hopeless
+    # compact loop). Reset to 0 on any successful compaction.
+    consecutive_autocompact_failures: int = 0
+
     # Replay-time micro-compaction boundary (uplift plan Phase 3). Compactable
     # tool results in messages BEFORE this index replay as
     # CLEARED_TOOL_RESULT_MARKER. Monotonic — it only advances (chat_service

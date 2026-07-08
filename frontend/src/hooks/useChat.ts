@@ -74,6 +74,10 @@ export function useChat() {
   // turn's meter arrives within the first stream chunks and replacing beats a
   // flash of "no meter" every turn.
   const [contextMeter, setContextMeter] = useState<ContextMeterInfo | null>(null)
+  // Auto-compaction lifecycle for the in-flight turn ('started' while the
+  // backend summarizes older messages — can take a while, so the UI shows a
+  // status line instead of dead air).
+  const [compactionStatus, setCompactionStatus] = useState<'started' | 'done' | 'failed' | null>(null)
 
   const streamingRef = useRef('')
   const thinkingRef = useRef('')
@@ -99,6 +103,7 @@ export function useChat() {
       setSegments([])
       setContextPlan(null)
       setContextNotices([])
+      setCompactionStatus(null)
       streamingRef.current = ''
       thinkingRef.current = ''
       thinkingDurationRef.current = null
@@ -221,6 +226,8 @@ export function useChat() {
               if (chunk.meter) {
                 setContextMeter(chunk.meter)
               }
+            } else if (chunk.kind === 'compaction') {
+              setCompactionStatus(chunk.status ?? null)
             } else if (chunk.kind === 'sources') {
               if (chunk.sources?.length) {
                 const seen = new Set(citationsRef.current.map(citationKey))
@@ -335,6 +342,7 @@ export function useChat() {
     setContextPlan(null)
     setContextNotices([])
     setContextMeter(null)
+    setCompactionStatus(null)
   }, [])
 
   const clearError = useCallback(() => {
@@ -384,6 +392,7 @@ export function useChat() {
     contextPlan,
     contextNotices,
     contextMeter,
+    compactionStatus,
     setContextTokens,
     setContextMode,
     setContextCutoffIndex,

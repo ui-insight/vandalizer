@@ -703,55 +703,38 @@ async def compact_context(
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
 
-    messages = await conversation.get_messages()
-    if not messages:
+    if not conversation.messages:
         raise HTTPException(status_code=400, detail="No messages to compact")
 
-    # Build conversation text for summarization
-    conversation_text = "\n".join(
-        f"{m['role']}: {m['content']}" for m in messages
-    )
-
     from app.models.system_config import SystemConfig
+    from app.services.chat_compaction import CompactionError, compact_conversation
+    from app.services.chat_service import reset_cache_baseline
     from app.services.config_service import get_user_model_name
-    from app.services.llm_service import create_chat_agent, COMPACT_SYSTEM_PROMPT
 
     model_name = await get_user_model_name(user.user_id)
     cfg = await SystemConfig.get_config()
     sys_config_doc = cfg.model_dump() if cfg else {}
 
-    agent = create_chat_agent(
-        model_name,
-        system_prompt=COMPACT_SYSTEM_PROMPT,
-        system_config_doc=sys_config_doc,
-    )
-    from app.services.metering import metered_async
-    async with metered_async(
-        "chat_summarize",
-        user_id=user.user_id,
-        team_id=str(user.current_team) if getattr(user, "current_team", None) else None,
-    ):
-        result = await agent.run(
-            f"Summarize this conversation:\n\n{conversation_text}"
+    try:
+        # keep_tail=False: the user explicitly asked to compact NOW, so
+        # summarize everything (the auto path keeps a verbatim tail instead).
+        result = await compact_conversation(
+            conversation,
+            model_name=model_name,
+            sys_config_doc=sys_config_doc,
+            user_id=user.user_id,
+            team_id=str(user.current_team) if getattr(user, "current_team", None) else None,
+            keep_tail=False,
         )
-
-    summary = result.output if hasattr(result, "output") else str(result.data)
-    cutoff = len(conversation.messages)
-
-    conversation.context_mode = "compacted"
-    conversation.compact_summary = summary
-    conversation.context_cutoff_index = cutoff
-    # The usage anchor measured the pre-compaction context; next turn falls
-    # back to token counting and re-anchors on real usage after that.
-    conversation.last_context_tokens = 0
-    conversation.last_context_message_count = -1
-    await conversation.save()
+    except CompactionError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    reset_cache_baseline(conversation.uuid)
 
     return {
         "success": True,
         "context_mode": "compacted",
-        "context_cutoff_index": cutoff,
-        "summary": summary,
+        "context_cutoff_index": result.cutoff,
+        "summary": result.summary,
     }
 
 

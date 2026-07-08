@@ -170,6 +170,8 @@ class SystemConfig(Document):
     # Agentic-chat behavior flags (harness uplift plan). Keys:
     #   "microcompact_enabled": bool (default True) — clear old read-tool
     #       results from replayed history near the context budget (Phase 3).
+    #   "autocompact_enabled": bool (default True) — summarize older
+    #       conversation automatically past the compact threshold (Phase 4).
     # Missing keys mean "use the default" so deployments never need a
     # migration to pick up new phases.
     chat_config: dict = {}

@@ -1098,17 +1098,51 @@ DEFAULT_CHAT_SYSTEM_PROMPT = VANDALIZER_IDENTITY_PREAMBLE + (
     "- Keep answers under 150 words unless the user explicitly asks for detail.\n"
 ) + SYSTEM_REMINDER_SECTION
 
+# Conversation-compaction prompt (uplift plan Phase 4; structure from Claude
+# Code's compact prompt). The <analysis> scratchpad is stripped before storage
+# (chat_compaction.format_compact_summary); only <summary> survives. The
+# "All User Messages" and verbatim-next-step sections are the two that most
+# prevent intent drift after compaction — do not trim them.
 COMPACT_SYSTEM_PROMPT = (
-    "You are a conversation summarizer. Given a conversation history, produce a concise "
-    "summary that preserves all key facts, decisions, context, and user preferences mentioned. "
-    "The summary will replace the original messages as context for future responses, so include "
-    "anything the assistant would need to maintain continuity.\n\n"
+    "CRITICAL: Respond with TEXT ONLY. Do NOT call any tools and do NOT produce "
+    "anything except the two blocks described below. Everything you need is in "
+    "the conversation transcript the user provides.\n\n"
+    "You are summarizing a document-intelligence chat conversation so it can "
+    "continue with your summary standing in for the older messages. The "
+    "assistant will resume from your summary plus the most recent messages, so "
+    "capture every detail it would need to continue seamlessly.\n\n"
+    "First, write an <analysis> block: walk the conversation chronologically "
+    "and identify each user request, what the assistant did (which tools ran "
+    "and what they returned), decisions made, quality/validation metrics that "
+    "were surfaced, errors and how they were resolved, and — especially — any "
+    "user feedback or corrections that changed direction.\n\n"
+    "Then write a <summary> block with exactly these sections:\n"
+    "1. Primary Request and Intent — everything the user is trying to "
+    "accomplish, in detail.\n"
+    "2. Key Domain Context — sponsors, programs, deadlines, budget figures, "
+    "compliance requirements, and other research-administration facts "
+    "established so far.\n"
+    "3. Documents, Knowledge Bases, and Workflows — every item touched, by "
+    "exact name (and id when shown), with one line on why it matters.\n"
+    "4. Tool Actions and Outcomes — what was run and what it produced, "
+    "including any accuracy or validation metrics reported.\n"
+    "5. Errors and Resolutions — what failed and what fixed it.\n"
+    "6. All User Messages — a verbatim list of every user message (excluding "
+    "tool output). This is critical for tracking the user's feedback and "
+    "changing intent.\n"
+    "7. Pending Items — actions awaiting user confirmation, unfinished tasks, "
+    "open questions.\n"
+    "8. Current Work — precisely what was in progress in the most recent "
+    "exchanges.\n"
+    "9. Next Step — only if one follows directly from the user's most recent "
+    "explicit request, and quote that request verbatim so nothing drifts. "
+    "Write 'None' if there is no clear next step.\n\n"
     "## Rules\n"
-    "- Preserve specific names, dates, numbers, and technical details.\n"
-    "- Note any user preferences or instructions that should carry forward.\n"
-    "- Summarize decisions and conclusions, not just topics discussed.\n"
-    "- Keep the summary under 500 words.\n"
+    "- Preserve exact names, ids, dates, figures, and quality percentages.\n"
+    "- Note user preferences and instructions that should carry forward.\n"
     "- Write in third person (e.g. 'The user asked about...').\n"
+    "- Remember: TEXT ONLY — one <analysis> block, then one <summary> block, "
+    "nothing else.\n"
 )
 
 # Mode-specific rule bodies. Each ``*_RULES`` constant is the behavioral core

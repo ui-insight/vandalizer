@@ -160,6 +160,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     contextCutoffIndex,
     contextNotices,
     contextMeter,
+    compactionStatus,
     setContextTokens,
     setContextMode,
     setContextCutoffIndex,
@@ -1392,6 +1393,14 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
                 Manage memory
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Auto-compaction can take a while — show progress instead of dead
+            air; the context_notice that follows reports the outcome. */}
+        {compactionStatus === 'started' && (
+          <div className="mt-2 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-800 border border-blue-200">
+            Summarizing earlier conversation to free up memory…
           </div>
         )}
 
