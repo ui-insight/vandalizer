@@ -159,6 +159,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     contextMode,
     contextCutoffIndex,
     contextNotices,
+    contextMeter,
     setContextTokens,
     setContextMode,
     setContextCutoffIndex,
@@ -246,20 +247,23 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     return match?.context_window ?? 128000
   })()
 
-  // When usage crosses 90%, show a dismissible inline nudge rather than a
+  // When context runs low, show a dismissible inline nudge rather than a
   // blocking modal — far less jarring for a first-time user mid-conversation.
+  // The backend meter (warn/compact/block ladder) is authoritative when
+  // present; the local 90%-of-window ratio is the fallback before the first
+  // context_meter chunk arrives.
   useEffect(() => {
-    if (contextTokens > 0 && contextWindow > 0) {
-      const ratio = contextTokens / contextWindow
-      if (ratio >= 0.9 && !contextNudgeShownRef.current) {
-        contextNudgeShownRef.current = true
-        setShowContextNudge(true)
-      } else if (ratio < 0.9) {
-        contextNudgeShownRef.current = false
-        setShowContextNudge(false)
-      }
+    const low = contextMeter
+      ? contextMeter.state !== 'ok'
+      : contextTokens > 0 && contextWindow > 0 && contextTokens / contextWindow >= 0.9
+    if (low && !contextNudgeShownRef.current) {
+      contextNudgeShownRef.current = true
+      setShowContextNudge(true)
+    } else if (!low) {
+      contextNudgeShownRef.current = false
+      setShowContextNudge(false)
     }
-  }, [contextTokens, contextWindow])
+  }, [contextTokens, contextWindow, contextMeter])
 
   // Seed the first-session conversation with an opening assistant message
   useEffect(() => {
@@ -1561,10 +1565,12 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         memoryControl={<MemoryPanel />}
         focusSignal={focusChatSignal}
         contextMeter={
-          messages.length > 0 && contextTokens > 0 ? (
+          messages.length > 0 && (contextMeter || contextTokens > 0) ? (
             <ContextMeter
-              tokensUsed={contextTokens}
-              contextWindow={contextWindow}
+              tokensUsed={contextMeter?.estimated_tokens ?? contextTokens}
+              contextWindow={contextMeter?.context_window ?? contextWindow}
+              state={contextMeter?.state}
+              percentUntilCompact={contextMeter?.percent_until_compact}
               onClick={() => setShowContextDialog(true)}
             />
           ) : null
@@ -1578,7 +1584,13 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         onTruncate={handleTruncate}
         onCompact={handleCompact}
         onClear={handleClearContext}
-        percent={contextWindow > 0 ? Math.round((contextTokens / contextWindow) * 100) : 0}
+        percent={
+          contextMeter
+            ? Math.round((contextMeter.estimated_tokens / contextMeter.effective_window) * 100)
+            : contextWindow > 0
+              ? Math.round((contextTokens / contextWindow) * 100)
+              : 0
+        }
       />
     </div>
   )

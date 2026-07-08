@@ -4,6 +4,11 @@ interface ContextMeterProps {
   tokensUsed: number
   contextWindow: number
   onClick: () => void
+  // Backend-computed escalation state (types/chat.ContextMeterInfo). When
+  // provided it drives the color instead of the local ratio thresholds —
+  // the backend knows the real response reserve and compact threshold.
+  state?: 'ok' | 'warning' | 'compact' | 'blocked'
+  percentUntilCompact?: number
 }
 
 function formatTokenCount(n: number): string {
@@ -12,7 +17,7 @@ function formatTokenCount(n: number): string {
   return String(n)
 }
 
-export function ContextMeter({ tokensUsed, contextWindow, onClick }: ContextMeterProps) {
+export function ContextMeter({ tokensUsed, contextWindow, onClick, state, percentUntilCompact }: ContextMeterProps) {
   const [hover, setHover] = useState(false)
 
   if (tokensUsed <= 0 || contextWindow <= 0) return null
@@ -20,15 +25,27 @@ export function ContextMeter({ tokensUsed, contextWindow, onClick }: ContextMete
   const ratio = Math.min(tokensUsed / contextWindow, 1)
   const percent = Math.round(ratio * 100)
 
-  // Color transitions: gray <70%, amber 70-90%, red >90%
+  // Color: backend state wins; local ratio thresholds are the fallback for
+  // turns before the first context_meter chunk arrives.
   let strokeColor = '#9ca3af'
   let textColor = '#6b7280'
-  if (ratio >= 0.9) {
+  const effectiveState =
+    state ?? (ratio >= 0.9 ? 'compact' : ratio >= 0.7 ? 'warning' : 'ok')
+  if (effectiveState === 'compact' || effectiveState === 'blocked') {
     strokeColor = '#ef4444'
     textColor = '#ef4444'
-  } else if (ratio >= 0.7) {
+  } else if (effectiveState === 'warning') {
     strokeColor = '#f59e0b'
     textColor = '#d97706'
+  }
+
+  let tooltip = `${formatTokenCount(tokensUsed)} / ${formatTokenCount(contextWindow)} tokens used`
+  if (state === 'blocked') {
+    tooltip += ' · context full — compact or start a new chat'
+  } else if (state === 'compact') {
+    tooltip += ' · compaction recommended'
+  } else if (state === 'warning' && percentUntilCompact != null) {
+    tooltip += ` · ${percentUntilCompact}% until compaction is recommended`
   }
 
   const size = 30
@@ -55,7 +72,7 @@ export function ContextMeter({ tokensUsed, contextWindow, onClick }: ContextMete
           transition: 'background 0.15s',
           ...(hover ? { background: '#f3f4f6' } : {}),
         }}
-        title={`${formatTokenCount(tokensUsed)} / ${formatTokenCount(contextWindow)} tokens used`}
+        title={tooltip}
         aria-label={`Context usage: ${percent}%`}
       >
         <svg width={size} height={size} style={{ transform: 'rotate(-90deg)' }}>

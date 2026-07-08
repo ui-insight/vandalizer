@@ -184,6 +184,16 @@ class ChatConversation(Document):
     context_cutoff_index: int = 0
     compact_summary: Optional[str] = None
 
+    # Usage anchor for cheap context estimation (uplift plan Phase 2).
+    # Stamped after each successful turn: the provider-reported context size
+    # of that turn's final model request (input + cache read/write + output),
+    # and the stored-message count at stamping time. The next turn's size is
+    # then anchor + rough(new user message) — no tokenizer pass over history.
+    # message_count mismatch (or 0 anchor) means "anchor stale, fall back to
+    # token counting"; truncate/compact/clear endpoints reset these.
+    last_context_tokens: int = 0
+    last_context_message_count: int = -1
+
     # Write-tool confirmation handshake. Each entry is
     # {"fp": <fingerprint>, "turn": <message-count when armed>, "tool": <name>}.
     # A write tool only executes when a matching entry was armed on an EARLIER

@@ -96,9 +96,16 @@ _CONTEXT_WINDOW_FALLBACKS: list[tuple[str, int]] = [
     ("mistral", 32_768),
     ("qwen", 131_072),
     ("gemma", 8_192),
+    # Conservative catch-all: every Claude generation since 3 has had at least
+    # a 200k window. Must stay after the specific claude-* entries.
+    ("claude", 200_000),
 ]
 
 DEFAULT_CONTEXT_WINDOW = 65_536
+
+# Models we've already warned about falling back to the default window —
+# once per process per model, not once per turn.
+_window_fallback_warned: set[str] = set()
 
 
 def resolve_context_window(
@@ -107,6 +114,9 @@ def resolve_context_window(
     """Return the max input-context length for a model, in tokens.
 
     Priority: ``model_config['context_window']`` → fallback registry → default.
+    Hitting the default is almost always an admin-config gap (the registry is
+    a convenience, not a source of truth), so it logs a warning once per model:
+    a wrong window makes every budget/threshold decision wrong.
     """
     if model_config:
         raw = model_config.get("context_window")
@@ -121,6 +131,14 @@ def resolve_context_window(
     for pattern, window in _CONTEXT_WINDOW_FALLBACKS:
         if pattern in name:
             return window
+    if model_name and model_name not in _window_fallback_warned:
+        _window_fallback_warned.add(model_name)
+        logger.warning(
+            "No context_window configured for model %r and no registry match; "
+            "assuming %d tokens. Set context_window in the model's System "
+            "Config entry — budgets and context warnings are wrong without it.",
+            model_name, DEFAULT_CONTEXT_WINDOW,
+        )
     return DEFAULT_CONTEXT_WINDOW
 
 
@@ -500,6 +518,163 @@ def plan_and_compact_context(
         history=history,
         plan=plan,
         actions=actions,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Usage-anchored estimation + context meter (uplift plan Phase 2)
+# ---------------------------------------------------------------------------
+#
+# The tiktoken counting above re-encodes the entire request every turn and is
+# only approximate for non-OpenAI tokenizers anyway. The cheap, more honest
+# alternative (Claude Code's approach): anchor on the provider's *reported*
+# usage from the previous turn's final model request — that number IS the
+# context size, no tokenizer needed — and char-estimate only what's new since.
+# Because the anchor is stamped after the whole turn persists, the only new
+# content at the next turn's pre-flight is the user's new message.
+
+# Conservative pad on rough estimates: under-estimating fires warnings too
+# late, which is the expensive direction (Claude Code pads 4/3 for the same
+# reason).
+_ESTIMATE_PAD_NUM = 4
+_ESTIMATE_PAD_DEN = 3
+
+
+def rough_text_tokens(text: str) -> int:
+    """Char-based token estimate (~4 chars/token), no tokenizer, no pad."""
+    if not text:
+        return 0
+    return max(1, len(text) // _CHAR_TO_TOKEN_RATIO)
+
+
+def estimate_next_request_tokens(
+    *,
+    anchor_tokens: int,
+    new_text: str,
+) -> int:
+    """Estimate the next request's input size from the previous turn's anchor.
+
+    ``anchor_tokens`` is the previous turn's final-request context size as
+    reported by the provider (input + cache_read + cache_write + output — the
+    output becomes replayed history next turn). ``new_text`` is everything new
+    since the anchor: in practice the user's new message (the per-turn
+    reminder/document blocks were already counted inside the anchor's request
+    and are re-sent at roughly the same size). The rough delta is padded 4/3;
+    the exact anchor is not.
+    """
+    delta = rough_text_tokens(new_text)
+    return anchor_tokens + delta * _ESTIMATE_PAD_NUM // _ESTIMATE_PAD_DEN
+
+
+# Threshold ladder (tokens of headroom below the effective window). Values
+# from Claude Code's autoCompact.ts, which arrived at them empirically:
+# warn with ~20k left, compact with ~13k (or 6% of window) left, hard-block
+# with 3k left. Small windows use percentages instead — flat buffers would
+# consume most of the budget.
+_WARN_BUFFER_TOKENS = 20_000
+_COMPACT_BUFFER_TOKENS = 13_000
+_COMPACT_BUFFER_WINDOW_FRACTION = 0.06
+_BLOCK_BUFFER_TOKENS = 3_000
+_SMALL_WINDOW_TOKENS = 32_000
+_SMALL_WARN_FRACTION = 0.75
+_SMALL_COMPACT_FRACTION = 0.85
+_SMALL_BLOCK_FRACTION = 0.97
+
+METER_OK = "ok"
+METER_WARNING = "warning"
+METER_COMPACT = "compact"
+METER_BLOCKED = "blocked"
+
+
+@dataclass
+class ContextMeter:
+    """Per-turn context utilization + the escalation ladder state.
+
+    ``state`` escalates ok → warning → compact → blocked. ``compact`` means
+    "past the auto-compact threshold" — Phase 4 will act on it; until then the
+    UI treats it as a strong warning. ``percent_until_compact`` is headroom
+    relative to the compact threshold (0 once past it).
+    """
+
+    estimated_tokens: int
+    context_window: int
+    effective_window: int
+    warn_threshold: int
+    compact_threshold: int
+    block_threshold: int
+    state: str
+    percent_until_compact: int
+    estimate_source: str  # "usage_anchor" | "token_count"
+
+    def to_dict(self) -> dict:
+        return {
+            "estimated_tokens": self.estimated_tokens,
+            "context_window": self.context_window,
+            "effective_window": self.effective_window,
+            "warn_threshold": self.warn_threshold,
+            "compact_threshold": self.compact_threshold,
+            "block_threshold": self.block_threshold,
+            "state": self.state,
+            "percent_until_compact": self.percent_until_compact,
+            "estimate_source": self.estimate_source,
+        }
+
+
+def build_context_meter(
+    *,
+    estimated_tokens: int,
+    context_window: int,
+    response_reserve: Optional[int] = None,
+    estimate_source: str = "token_count",
+) -> ContextMeter:
+    """Place an estimate on the warn/compact/block escalation ladder."""
+    reserve = (
+        response_reserve
+        if response_reserve is not None
+        else _default_response_reserve(context_window)
+    )
+    effective = max(1, context_window - reserve)
+
+    if context_window < _SMALL_WINDOW_TOKENS:
+        warn_at = int(effective * _SMALL_WARN_FRACTION)
+        compact_at = int(effective * _SMALL_COMPACT_FRACTION)
+        block_at = int(effective * _SMALL_BLOCK_FRACTION)
+    else:
+        compact_buffer = max(
+            _COMPACT_BUFFER_TOKENS,
+            int(context_window * _COMPACT_BUFFER_WINDOW_FRACTION),
+        )
+        warn_at = effective - max(_WARN_BUFFER_TOKENS, compact_buffer + 4_000)
+        compact_at = effective - compact_buffer
+        block_at = effective - _BLOCK_BUFFER_TOKENS
+
+    # The ladder must be strictly ordered even for odd window configs.
+    warn_at = max(1, min(warn_at, compact_at - 1))
+    block_at = max(compact_at + 1, block_at)
+
+    if estimated_tokens >= block_at:
+        state = METER_BLOCKED
+    elif estimated_tokens >= compact_at:
+        state = METER_COMPACT
+    elif estimated_tokens >= warn_at:
+        state = METER_WARNING
+    else:
+        state = METER_OK
+
+    percent = 0
+    if compact_at > 0:
+        percent = max(0, round((compact_at - estimated_tokens) / compact_at * 100))
+
+    return ContextMeter(
+        estimated_tokens=estimated_tokens,
+        context_window=context_window,
+        effective_window=effective,
+        warn_threshold=warn_at,
+        compact_threshold=compact_at,
+        block_threshold=block_at,
+        state=state,
+        percent_until_compact=percent,
+        estimate_source=estimate_source,
     )
 
 

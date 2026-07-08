@@ -677,6 +677,10 @@ async def truncate_context(
 
     conversation.context_mode = "truncated"
     conversation.context_cutoff_index = cutoff
+    # The usage anchor measured the pre-truncation context; next turn falls
+    # back to token counting and re-anchors on real usage after that.
+    conversation.last_context_tokens = 0
+    conversation.last_context_message_count = -1
     await conversation.save()
 
     return {
@@ -737,6 +741,10 @@ async def compact_context(
     conversation.context_mode = "compacted"
     conversation.compact_summary = summary
     conversation.context_cutoff_index = cutoff
+    # The usage anchor measured the pre-compaction context; next turn falls
+    # back to token counting and re-anchors on real usage after that.
+    conversation.last_context_tokens = 0
+    conversation.last_context_message_count = -1
     await conversation.save()
 
     return {
@@ -763,6 +771,10 @@ async def clear_context(
     conversation.context_mode = "truncated"
     conversation.context_cutoff_index = len(conversation.messages)
     conversation.compact_summary = None
+    # The usage anchor measured the pre-clear context; next turn falls back
+    # to token counting and re-anchors on real usage after that.
+    conversation.last_context_tokens = 0
+    conversation.last_context_message_count = -1
     await conversation.save()
 
     return {

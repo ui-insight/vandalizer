@@ -31,7 +31,9 @@ from app.models.user import User
 from app.services.access_control import TeamAccessContext
 from app.services.config_service import get_llm_model_by_name, get_user_model_name
 from app.services.context_budget import (
+    build_context_meter,
     DocumentSegment,
+    estimate_next_request_tokens,
     plan_and_compact_context,
 )
 from app.services.llm_service import (
@@ -275,6 +277,36 @@ def _note_cache_usage(conversation_uuid: str, usage, model_name: str) -> tuple[i
         _CACHE_READ_BASELINE.pop(next(iter(_CACHE_READ_BASELINE)))
     _CACHE_READ_BASELINE[conversation_uuid] = per_request_read
     return cache_read, cache_write
+
+
+def _final_request_context_tokens(result) -> int:
+    """Context size of the run's FINAL model request, provider-reported.
+
+    input + cache read/write + output of the last response — the output
+    becomes replayed history next turn, so the sum is the conversation's
+    context footprint going forward. This is the usage anchor for cheap
+    next-turn estimation (uplift plan Phase 2). Deliberately NOT the run's
+    aggregate usage: a tool loop with N requests reads the context N times,
+    which would overcount by ~N×. Returns 0 when the provider reported
+    nothing (caller falls back to token counting).
+    """
+    try:
+        messages = result.new_messages()
+    except Exception:
+        return 0
+    for msg in reversed(messages):
+        u = getattr(msg, "usage", None)
+        if u is None:
+            continue
+        total = (
+            int(getattr(u, "input_tokens", 0) or 0)
+            + int(getattr(u, "cache_read_tokens", 0) or 0)
+            + int(getattr(u, "cache_write_tokens", 0) or 0)
+            + int(getattr(u, "output_tokens", 0) or 0)
+        )
+        if total > 0:
+            return total
+    return 0
 
 
 def _brand_org_json_chunk(chunk: str, org: str | None) -> str:
@@ -947,6 +979,38 @@ async def chat_stream(
             "tokens_dropped": action.tokens_dropped,
         }) + "\n"
 
+    # Context meter (uplift plan Phase 2): estimate the request we're about
+    # to send and place it on the warn/compact/block ladder. Prefer the
+    # previous turn's usage anchor — the provider-reported context size, no
+    # tokenizer pass — and fall back to the plan's tiktoken count when the
+    # anchor is missing or stale (first turn, failed turn in between, context
+    # truncated/compacted, provider didn't report usage).
+    _anchor = getattr(conversation, "last_context_tokens", 0) or 0
+    _anchor_count = getattr(conversation, "last_context_message_count", -1)
+    # Anchor is valid only when exactly the current user message (persisted by
+    # the router before chat_stream runs) arrived since it was stamped.
+    if _anchor > 0 and _anchor_count == len(conversation.messages) - 1:
+        meter = build_context_meter(
+            estimated_tokens=estimate_next_request_tokens(
+                anchor_tokens=_anchor, new_text=message,
+            ),
+            context_window=compacted.plan.context_window,
+            response_reserve=compacted.plan.response_reserve,
+            estimate_source="usage_anchor",
+        )
+    else:
+        meter = build_context_meter(
+            estimated_tokens=compacted.plan.total_input_tokens,
+            context_window=compacted.plan.context_window,
+            response_reserve=compacted.plan.response_reserve,
+            estimate_source="token_count",
+        )
+    yield json.dumps({
+        "kind": "context_meter",
+        "content": "",
+        "meter": meter.to_dict(),
+    }) + "\n"
+
     # Emit KB sources before the LLM streams its answer so the UI can render
     # citation chips alongside (or just before) the response.
     if kb_sources:
@@ -1260,6 +1324,9 @@ async def chat_stream(
                     tool_results=streamed_tool_results or None,
                     segments=cleaned_segments or None,
                     citations=streamed_citations or None,
+                    context_anchor_tokens=_final_request_context_tokens(
+                        agent_run.result
+                    ),
                 )
 
                 # Stream token usage so the frontend can display context utilization
@@ -2056,6 +2123,7 @@ async def _finalize(
     tool_results: Optional[list[dict]] = None,
     segments: Optional[list[dict]] = None,
     citations: Optional[list[dict]] = None,
+    context_anchor_tokens: int = 0,
 ) -> None:
     """Save assistant message and update activity metrics."""
     await conversation.add_message(
@@ -2068,6 +2136,16 @@ async def _finalize(
         segments=segments,
         citations=citations,
     )
+
+    # Stamp the usage anchor for next turn's cheap context estimate (uplift
+    # plan Phase 2). Only on provider-reported usage — 0 means "no anchor,
+    # fall back to token counting". Failed turns never stamp: their extra
+    # placeholder message shifts the message count, which is exactly the
+    # staleness signal the meter checks.
+    if context_anchor_tokens > 0:
+        conversation.last_context_tokens = context_anchor_tokens
+        conversation.last_context_message_count = len(conversation.messages)
+        await conversation.save()
 
     if activity_id:
         ev = await ActivityEvent.get(activity_id)

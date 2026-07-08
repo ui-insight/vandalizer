@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react'
 import { streamChat, getHistory } from '../api/chat'
-import type { ChatMessage, Citation, ContextBudgetPlan, OversizeDocument, StreamChunk, StreamSegment, ToolCallInfo, ToolResultInfo } from '../types/chat'
+import type { ChatMessage, Citation, ContextBudgetPlan, ContextMeterInfo, OversizeDocument, StreamChunk, StreamSegment, ToolCallInfo, ToolResultInfo } from '../types/chat'
 
 export interface ContextNotice {
   action: string
@@ -70,6 +70,10 @@ export function useChat() {
   const [contextCutoffIndex, setContextCutoffIndex] = useState(0)
   const [contextPlan, setContextPlan] = useState<ContextBudgetPlan | null>(null)
   const [contextNotices, setContextNotices] = useState<ContextNotice[]>([])
+  // Latest backend-computed meter. Deliberately NOT cleared on send — the new
+  // turn's meter arrives within the first stream chunks and replacing beats a
+  // flash of "no meter" every turn.
+  const [contextMeter, setContextMeter] = useState<ContextMeterInfo | null>(null)
 
   const streamingRef = useRef('')
   const thinkingRef = useRef('')
@@ -213,6 +217,10 @@ export function useChat() {
                   setContextTokens(chunk.plan.total_input_tokens)
                 }
               }
+            } else if (chunk.kind === 'context_meter') {
+              if (chunk.meter) {
+                setContextMeter(chunk.meter)
+              }
             } else if (chunk.kind === 'sources') {
               if (chunk.sources?.length) {
                 const seen = new Set(citationsRef.current.map(citationKey))
@@ -326,6 +334,7 @@ export function useChat() {
     setContextCutoffIndex(0)
     setContextPlan(null)
     setContextNotices([])
+    setContextMeter(null)
   }, [])
 
   const clearError = useCallback(() => {
@@ -374,6 +383,7 @@ export function useChat() {
     contextCutoffIndex,
     contextPlan,
     contextNotices,
+    contextMeter,
     setContextTokens,
     setContextMode,
     setContextCutoffIndex,

@@ -117,6 +117,22 @@ export interface OversizeDocument {
   token_count: number
 }
 
+// Backend-computed context meter (chat_service Phase 2): honest estimate of
+// the request being sent plus the warn/compact/block escalation ladder.
+// Prefer this over any frontend-derived ratio — the backend knows the real
+// window, the response reserve, and the provider-reported usage anchor.
+export interface ContextMeterInfo {
+  estimated_tokens: number
+  context_window: number
+  effective_window: number
+  warn_threshold: number
+  compact_threshold: number
+  block_threshold: number
+  state: 'ok' | 'warning' | 'compact' | 'blocked'
+  percent_until_compact: number
+  estimate_source: 'usage_anchor' | 'token_count'
+}
+
 export interface Citation {
   document_id?: string | null
   document_title: string
@@ -141,6 +157,7 @@ export interface StreamChunk {
     | 'tool_result'
     | 'usage'
     | 'context_budget'
+    | 'context_meter'
     | 'context_notice'
     | 'sources'
   content: string
@@ -153,6 +170,7 @@ export interface StreamChunk {
   response_tokens?: number
   total_tokens?: number
   plan?: ContextBudgetPlan
+  meter?: ContextMeterInfo
   action?: string
   tokens_dropped?: number
   // Error-only: machine-readable failure code + optional suggested recovery.
