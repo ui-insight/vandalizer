@@ -36,14 +36,14 @@ from app.services.context_budget import (
 )
 from app.services.llm_service import (
     AGENTIC_CHAT_SYSTEM_PROMPT,
-    build_project_kb_empty_prompt,
+    build_project_kb_empty_reminder,
     create_agentic_chat_agent,
     create_chat_agent,
     DEFAULT_CHAT_SYSTEM_PROMPT,
-    DOCUMENT_CHAT_SYSTEM_PROMPT,
+    DOCUMENT_CHAT_RULES,
     FIRST_SESSION_SYSTEM_PROMPT,
-    HELP_CHAT_SYSTEM_PROMPT,
-    KB_CHAT_SYSTEM_PROMPT,
+    HELP_CHAT_RULES,
+    KB_CHAT_RULES,
     VANDALIZER_CONTEXT,
 )
 
@@ -218,6 +218,63 @@ def _brand_org_text(text: str, org: str | None) -> str:
         "built for research administration",
     )
     return text
+
+
+def _wrap_system_reminder(text: str) -> str:
+    """Wrap a volatile context block for injection into the user prompt.
+
+    Volatile per-turn context (workspace inventory, open documents, project
+    state, mode rules) rides inside <system-reminder> tags on the CURRENT
+    user message instead of the system prompt, so the instructions — and with
+    them the provider prompt cache — stay byte-stable across turns. The static
+    prompts teach the model these tags are system context, not user text
+    (llm_service.SYSTEM_REMINDER_SECTION).
+    """
+    return f"<system-reminder>\n{text.strip()}\n</system-reminder>"
+
+
+# Prompt-cache observability (uplift plan Phase 1.5). Per-conversation
+# baseline of cache-read tokens per model request, so an unexpected drop —
+# >5% AND >=2000 tokens, the thresholds Claude Code's cache-break detector
+# uses — is logged. Warning-level only (a cost signal, not a failure — see
+# the Sentry noise convention). Process-local and best-effort: multi-worker
+# deployments each track their own baseline, and a miss just costs a log line.
+_CACHE_READ_BASELINE: dict[str, int] = {}
+_CACHE_BASELINE_MAX = 1024
+
+
+def _note_cache_usage(conversation_uuid: str, usage, model_name: str) -> tuple[int, int]:
+    """Record per-turn cache token usage; warn on an unexpected cache break.
+
+    Returns ``(cache_read_tokens, cache_write_tokens)`` run totals for the
+    usage chunk. The regression comparison is normalized per model request:
+    a turn with N tool-loop requests reads the cached prefix N times, so raw
+    run totals would false-positive on the next low-tool-count turn.
+    """
+    cache_read = int(getattr(usage, "cache_read_tokens", 0) or 0)
+    cache_write = int(getattr(usage, "cache_write_tokens", 0) or 0)
+    requests = max(int(getattr(usage, "requests", 1) or 1), 1)
+    per_request_read = cache_read // requests
+
+    prev = _CACHE_READ_BASELINE.get(conversation_uuid)
+    if (
+        prev is not None
+        and prev - per_request_read >= 2000
+        and prev - per_request_read > prev * 0.05
+    ):
+        logger.warning(
+            "Prompt cache regression: conversation=%s model=%s per-request "
+            "cache_read dropped %d -> %d (run totals: read=%d write=%d requests=%d)",
+            conversation_uuid, model_name, prev, per_request_read,
+            cache_read, cache_write, requests,
+        )
+    if (
+        conversation_uuid not in _CACHE_READ_BASELINE
+        and len(_CACHE_READ_BASELINE) >= _CACHE_BASELINE_MAX
+    ):
+        _CACHE_READ_BASELINE.pop(next(iter(_CACHE_READ_BASELINE)))
+    _CACHE_READ_BASELINE[conversation_uuid] = per_request_read
+    return cache_read, cache_write
 
 
 def _brand_org_json_chunk(chunk: str, org: str | None) -> str:
@@ -751,40 +808,51 @@ async def chat_stream(
         except Exception as e:
             logger.warning("Workspace inventory failed: %s", e)
 
-    # Select system prompt based on whether we have document context.
+    # Static instruction base + volatile <system-reminder> blocks.
+    #
+    # The instruction base must be byte-stable across every turn of a
+    # conversation so the provider prompt cache can hit (Phase 1 of
+    # .claude/agentic-chat-harness-uplift-plan.md). Everything that varies per
+    # turn — workspace inventory, KB manifest, open documents, project state,
+    # and mode-specific rules — is injected as <system-reminder> blocks on the
+    # CURRENT user prompt instead. History replays raw user text
+    # (ChatMessage.to_model_messages), so stale reminders never accumulate.
+    #
     # Note: run_demo is handled via scripted demo and returns early above, so
     # it never reaches this block.
-    # KB chat needs a stricter prompt: snippets are partial excerpts, so the model
-    # must cite by filename, distinguish grounded answers from general knowledge,
-    # and admit when the retrieved set doesn't actually contain the answer.
     have_context = bool(doc_segments or attachment_segments)
+    reminder_blocks: list[str] = []
+    kb_empty_mode = False
+
+    # Mode rules — same precedence as the pre-Phase-1 per-turn prompt swap:
+    # KB retrieval hit > attached documents > empty-KB project > first-session
+    # > onboarding help.
     if kb_sources:
-        # The manifest rides on the system prompt (re-sent every turn) so the
-        # model can distinguish "exists here but wasn't retrieved" from "not
-        # in this project" on follow-ups too.
-        system_prompt: Optional[str] = (
-            KB_CHAT_SYSTEM_PROMPT + _build_manifest_block(kb_manifest)
-        )
-        if inventory:
-            system_prompt = system_prompt + "\n\n" + inventory
+        # KB chat needs the strictest rules: snippets are partial excerpts, so
+        # the model must cite by filename, distinguish grounded answers from
+        # general knowledge, and admit when the retrieved set doesn't actually
+        # contain the answer. The manifest rides along every turn so the model
+        # can distinguish "exists here but wasn't retrieved" from "not in this
+        # project" on follow-ups too.
+        reminder_blocks.append(KB_CHAT_RULES + _build_manifest_block(kb_manifest))
     elif have_context:
-        system_prompt = DOCUMENT_CHAT_SYSTEM_PROMPT
-        if inventory:
-            system_prompt = system_prompt + "\n\n" + inventory
+        reminder_blocks.append(DOCUMENT_CHAT_RULES)
     elif kb_uuid:
-        # A project/KB chat was requested but retrieval returned nothing (empty KB,
-        # docs not indexed yet, or no match). Do NOT fall through to system_prompt=None
-        # — that lets the model freely hallucinate document contents. Tell it the KB
-        # was empty for this query while still allowing general-knowledge answers.
-        system_prompt = build_project_kb_empty_prompt(
-            _build_manifest_block(kb_manifest)
+        # A project/KB chat was requested but retrieval returned nothing (empty
+        # KB, docs not indexed yet, or no match). Do NOT skip the rules block —
+        # that lets the model freely hallucinate document contents. Tell it the
+        # KB was empty for this query while still allowing general-knowledge
+        # answers.
+        kb_empty_mode = True
+        reminder_blocks.append(
+            build_project_kb_empty_reminder(_build_manifest_block(kb_manifest))
         )
     elif is_first_session:
-        # First-session onboarding: conversational value discovery.
-        # Do NOT inject VANDALIZER_CONTEXT here — it's a technical how-to dump
-        # that causes the LLM to skip the conversation and spit out directions.
-        # The FIRST_SESSION_SYSTEM_PROMPT already has everything it needs.
-        system_prompt = FIRST_SESSION_SYSTEM_PROMPT
+        # First-session onboarding: conversational value discovery, handled by
+        # the FIRST_SESSION_SYSTEM_PROMPT instruction base below. Do NOT inject
+        # VANDALIZER_CONTEXT here — it's a technical how-to dump that causes
+        # the LLM to skip the conversation and spit out directions.
+        pass
     elif include_onboarding_context:
         # Inject Vandalizer help context only when explicitly requested
         # (triggered by the placeholder pills in the chat UI).
@@ -796,12 +864,14 @@ async def chat_stream(
                 "--- END ONBOARDING CONTEXT ---"
             ),
         ))
-        system_prompt = HELP_CHAT_SYSTEM_PROMPT
-    else:
-        if inventory:
-            system_prompt = AGENTIC_CHAT_SYSTEM_PROMPT + "\n\n" + inventory
-        else:
-            system_prompt = None  # uses default
+        reminder_blocks.append(HELP_CHAT_RULES)
+
+    # Workspace inventory (already "" for first-session/help/demo paths).
+    # Excluded in empty-KB mode for parity with the pre-Phase-1 behavior: that
+    # mode is a hard "don't invent project contents" stance and the inventory's
+    # capability nudges dilute it.
+    if inventory and not kb_empty_mode:
+        reminder_blocks.append(inventory)
 
     # Expose open documents to the agent so tools like run_extraction can
     # reference them by UUID without a blind search_documents call. Without
@@ -811,8 +881,7 @@ async def chat_stream(
         documents, file_attachments, url_attachments
     )
     if open_docs_block:
-        base = system_prompt if system_prompt is not None else AGENTIC_CHAT_SYSTEM_PROMPT
-        system_prompt = base + "\n\n" + open_docs_block
+        reminder_blocks.append(open_docs_block)
 
     # Tell the agent it's inside a project, and what that project contains
     # (pinned workflows/extractions with their ids, file/KB counts). This is
@@ -826,15 +895,38 @@ async def chat_stream(
             logger.warning("Project context build failed: %s", e)
             project_block = ""
         if project_block:
-            base = system_prompt if system_prompt is not None else AGENTIC_CHAT_SYSTEM_PROMPT
-            system_prompt = base + "\n\n" + project_block
+            reminder_blocks.append(project_block)
+
+    # Instruction base. First-session keeps its own conversation-stable base
+    # (the whole conversation is a distinct behavioral mode); everything else
+    # uses ONE base per agent type so the cached prefix never shifts when the
+    # user attaches a doc or a KB lookup hits/misses mid-conversation.
+    if is_first_session and not (kb_sources or have_context or kb_uuid):
+        instruction_base = FIRST_SESSION_SYSTEM_PROMPT
+    elif user and team_access:
+        instruction_base = AGENTIC_CHAT_SYSTEM_PROMPT
+    else:
+        instruction_base = DEFAULT_CHAT_SYSTEM_PROMPT
+
+    # Branding is deployment-stable, so branded instructions stay byte-stable.
+    _org_name = (sys_config_doc or {}).get("org_name") or ""
+    instructions_text = _brand_org_text(instruction_base, _org_name)
+    reminder_bundle = "\n\n".join(
+        _wrap_system_reminder(b) for b in reminder_blocks if b and b.strip()
+    )
+    if reminder_bundle:
+        reminder_bundle = _brand_org_text(reminder_bundle, _org_name)
 
     # Resolve the model's context window and compact oversize components.
+    # The reminder bundle is counted with the system prompt: it isn't part of
+    # the instructions, but it's per-turn overhead the budget must reserve.
     model_config = await get_llm_model_by_name(model_name)
     compacted = plan_and_compact_context(
         model_name=model_name,
         model_config=model_config,
-        system_prompt=system_prompt or "",
+        system_prompt=(
+            instructions_text + ("\n\n" + reminder_bundle if reminder_bundle else "")
+        ),
         user_message=message,
         history=previous_messages,
         documents=doc_segments,
@@ -937,9 +1029,17 @@ async def chat_stream(
     else:
         prompt = message
 
+    # Volatile context rides on the current user prompt (see the reminder-
+    # block comment above). Reminders lead, the user's actual ask stays last
+    # for recency. History replay uses the raw stored message, so these blocks
+    # exist only on the live turn.
+    if reminder_bundle:
+        prompt = f"{reminder_bundle}\n\n{prompt}"
+
     # Select agent — agentic (with tools) when user context is available.
-    # Agents are cached by model; per-request system prompts (including
-    # workspace inventory) are passed via ``instructions`` at iter() time.
+    # Agents are cached by model; the stable instruction base is passed via
+    # ``instructions`` at iter() time, and all volatile context (workspace
+    # inventory, mode rules, etc.) already rides on `prompt` as reminders.
     deps = None
     if user and team_access:
         from app.services.chat_deps import AgenticChatDeps
@@ -974,8 +1074,14 @@ async def chat_stream(
             model_name, system_config_doc=sys_config_doc,
         )
     else:
+        # Bake the branded base directly: create_chat_agent builds a fresh
+        # Agent per call (no cache to poison), and run-level instructions
+        # APPEND to construction-level ones in pydantic-ai — passing the base
+        # at iter() time on top of the baked default would duplicate it and
+        # leak the unbranded copy on white-labeled deployments.
         agent = create_chat_agent(
-            model_name, system_config_doc=sys_config_doc,
+            model_name, system_prompt=instructions_text,
+            system_config_doc=sys_config_doc,
         )
 
     # Stream the response
@@ -1011,19 +1117,14 @@ async def chat_stream(
         }
         if deps is not None:
             iter_kwargs["deps"] = deps
-        # White-label: the canned prompts identify as "Vandalizer"; branded
-        # deployments speak as the configured org instead. When system_prompt is
-        # None (empty-workspace chat), resolve the same default the agent would
-        # otherwise use baked-in, so branding still reaches the identity line
-        # instead of leaking "Vandalizer" on a white-labeled deployment.
-        effective_prompt = system_prompt
-        if effective_prompt is None:
-            effective_prompt = (
-                AGENTIC_CHAT_SYSTEM_PROMPT if deps is not None else DEFAULT_CHAT_SYSTEM_PROMPT
-            )
-        iter_kwargs["instructions"] = _brand_org_text(
-            effective_prompt, (sys_config_doc or {}).get("org_name") or ""
-        )
+            # Byte-stable per conversation (branded static base — see the
+            # instruction-base selection above). All volatile context already
+            # rides in the <system-reminder> blocks on `prompt`. Only the
+            # agentic agent takes run-level instructions: it is cached per
+            # model with nothing baked in, whereas the non-agentic agent gets
+            # the same text baked at construction (run-level instructions
+            # APPEND to baked ones — passing both would duplicate the base).
+            iter_kwargs["instructions"] = instructions_text
 
         async with agent.iter(prompt, **iter_kwargs) as agent_run:
             async for node in agent_run:
@@ -1176,12 +1277,18 @@ async def chat_stream(
                     input_toks = max(char_count // 4, 1)
                     output_toks = output_toks or max(len(assistant_message) // 4, 1)
 
+                cache_read_toks, cache_write_toks = _note_cache_usage(
+                    conversation.uuid, usage, model_name,
+                ) if usage else (0, 0)
+
                 yield json.dumps({
                     "kind": "usage",
                     "content": "",
                     "request_tokens": input_toks,
                     "response_tokens": output_toks,
                     "total_tokens": input_toks + output_toks,
+                    "cache_read_tokens": cache_read_toks,
+                    "cache_write_tokens": cache_write_toks,
                 }) + "\n"
 
     except UsageLimitExceeded:
@@ -1275,11 +1382,11 @@ _MANIFEST_MAX_CHARS = 3000
 
 
 def _build_manifest_block(manifest: list[dict]) -> str:
-    """Render the project's document list as a system-prompt section.
+    """Render the project's document list as a context section.
 
-    Appended to the system prompt (re-sent every turn) so the model always
-    knows what the project contains — the retrieved snippets alone can't tell
-    it whether an unretrieved document exists.
+    Rides in the KB <system-reminder> block on every turn's user prompt so the
+    model always knows what the project contains — the retrieved snippets
+    alone can't tell it whether an unretrieved document exists.
     """
     if not manifest:
         return ""
@@ -1677,7 +1784,10 @@ def _relative_time(dt: datetime.datetime) -> str:
 async def _build_workspace_inventory(
     user_id: str, team_id: str | None
 ) -> str:
-    """Build a compact workspace summary for injection into the system prompt.
+    """Build a compact workspace summary, injected per turn as a
+    <system-reminder> block on the user prompt (NOT the system prompt — its
+    60s-TTL contents change turn-to-turn and would break the provider prompt
+    cache there).
 
     Returns an empty string for brand-new users with zero assets.
     Results are cached in-memory for 60 seconds per (user_id, team_id).
@@ -1970,6 +2080,17 @@ async def _finalize(
                 ev.tokens_input = usage.input_tokens or 0
                 ev.tokens_output = usage.output_tokens or 0
                 ev.total_tokens = (usage.input_tokens or 0) + (usage.output_tokens or 0)
+                # Prompt-cache observability (uplift plan Phase 1.5): stash
+                # cache hit/write totals per turn so cache health is queryable
+                # from activity data without a schema change.
+                cache_read = int(getattr(usage, "cache_read_tokens", 0) or 0)
+                cache_write = int(getattr(usage, "cache_write_tokens", 0) or 0)
+                if cache_read or cache_write:
+                    ev.meta_summary = {
+                        **(ev.meta_summary or {}),
+                        "cache_read_tokens": cache_read,
+                        "cache_write_tokens": cache_write,
+                    }
             ev.documents_touched = len(documents)
             from datetime import datetime, timezone
             ev.finished_at = datetime.now(timezone.utc)
