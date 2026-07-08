@@ -259,7 +259,63 @@ class TestSummarizeResults:
 # ---------------------------------------------------------------------------
 
 
-    # Note: TestPerformDocumentValidation tests removed because
-    # langchain_text_splitters is not available in the test environment.
-    # The validate_chunk and summarize_results tests above cover the
-    # core validation logic.
+class TestPerformDocumentValidationPathResolution:
+    """When raw_text isn't ready yet, validation reads from disk. It must
+    resolve the file against upload_dir (like the extraction task) rather than
+    trusting the caller's ``document_path`` — some callers pass the bare
+    relative ``doc.path``, which fails to open from the worker CWD (the
+    "[Errno 2] No such file" OCR failures on tasks.upload.validation)."""
+
+    @patch("app.tasks.upload_validation_tasks.chord")
+    @patch("app.config.Settings")
+    @patch("app.services.document_readers.extract_text_from_file", return_value="resolved text")
+    @patch("app.tasks.upload_validation_tasks._get_compliance_settings")
+    @patch("app.tasks.upload_validation_tasks._get_db")
+    def test_relative_path_resolved_against_upload_dir(
+        self, mock_get_db, mock_settings_fn, mock_extract, MockSettings, mock_chord,
+    ):
+        from app.tasks.upload_validation_tasks import perform_document_validation
+
+        db = MagicMock()
+        mock_get_db.return_value = db
+        # No raw_text yet -> validation must read from the file.
+        db.smart_document.find_one.return_value = {
+            "uuid": "doc-1", "path": "vandalizer-qa@uidaho.edu/ABC.pdf", "raw_text": "",
+        }
+        mock_settings_fn.return_value = {
+            "enabled": True, "rules": "no PII", "chunk_size": 8000, "chunk_overlap": 200,
+        }
+        cfg = MagicMock()
+        cfg.upload_dir = "/app/static/uploads"
+        MockSettings.return_value = cfg
+
+        perform_document_validation(
+            document_uuid="doc-1",
+            document_path="vandalizer-qa@uidaho.edu/ABC.pdf",  # relative, as some callers pass
+            background=True,
+        )
+
+        called_path = mock_extract.call_args[0][0]
+        assert called_path == "/app/static/uploads/vandalizer-qa@uidaho.edu/ABC.pdf"
+
+
+class TestOcrFailureLogging:
+    def test_exhausted_attempts_log_warning_not_error(self):
+        """OCR failure is a handled degradation (caller falls back to PyMuPDF),
+        so attempt-exhaustion must log at warning, never error -> Sentry."""
+        import app.services.document_readers as dr
+
+        db = MagicMock()
+        db.system_config.find_one.return_value = {
+            "ocr_endpoint": "http://ocr.local/v1/ocrmd", "ocr_api_key": "",
+        }
+        with patch("app.tasks.get_sync_db", return_value=db), \
+             patch("app.utils.encryption.decrypt_value", return_value=""), \
+             patch("time.sleep"), \
+             patch("builtins.open", side_effect=FileNotFoundError("no such file")), \
+             patch.object(dr, "logger") as mock_logger:
+            result = dr.ocr_extract_text_from_pdf("relative/gone.pdf", retries=3)
+
+        assert result == ""
+        mock_logger.error.assert_not_called()
+        assert mock_logger.warning.called

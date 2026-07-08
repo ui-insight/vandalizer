@@ -106,3 +106,36 @@ class TestClassifyTask:
                 confidence=0.88,
                 classified_by="auto",
             )
+
+
+class TestClassifyTaskErrorHandling:
+    """The auto-classify task is best-effort: a model failure must not crash
+    the task (unhandled -> Sentry) or stamp a guessed classification."""
+
+    def test_model_http_error_is_swallowed(self):
+        """A 401 (misconfigured API key) is a ModelHTTPError — permanent, so it
+        must not retry and must not propagate; the doc stays unclassified."""
+        from pydantic_ai.exceptions import ModelHTTPError
+        from app.tasks.classification_tasks import classify_document_task
+
+        err = ModelHTTPError(status_code=401, model_name="gpt-4o-mini", body={"code": "invalid_api_key"})
+        with patch("app.tasks.classification_tasks._classify", MagicMock()), \
+             patch("app.tasks.classification_tasks.run_task_async", side_effect=err):
+            # Returns cleanly (no exception raised out of the task).
+            assert classify_document_task("doc-uuid") is None
+
+    def test_transient_model_error_retries(self):
+        """A ModelAPIError (connection blip) is transient — the task retries it
+        with the original exception."""
+        from pydantic_ai.exceptions import ModelAPIError
+        from app.tasks.classification_tasks import classify_document_task
+
+        err = ModelAPIError(model_name="gpt-4o-mini", message="Connection error.")
+        sentinel = RuntimeError("retry-called")
+        with patch("app.tasks.classification_tasks._classify", MagicMock()), \
+             patch("app.tasks.classification_tasks.run_task_async", side_effect=err), \
+             patch.object(classify_document_task, "retry", side_effect=sentinel) as mock_retry:
+            with pytest.raises(RuntimeError, match="retry-called"):
+                classify_document_task("doc-uuid")
+        mock_retry.assert_called_once()
+        assert mock_retry.call_args.kwargs.get("exc") is err

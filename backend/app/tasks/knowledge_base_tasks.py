@@ -100,6 +100,9 @@ def kb_ingest_document(self, source_uuid: str) -> None:
             return
 
         dm = get_document_manager()
+        # Idempotent: clear any chunks from a prior (partial) run so a Celery
+        # autoretry can't double-add or collide on chunk ids.
+        dm.delete_kb_source(kb_uuid, source_uuid)
         chunk_count = dm.add_to_kb(
             kb_uuid=kb_uuid,
             source_id=source_uuid,
@@ -129,6 +132,113 @@ def kb_ingest_document(self, source_uuid: str) -> None:
 
     finally:
         _recalculate_kb(db, kb_uuid)
+
+
+@celery_app.task(
+    name="tasks.documents.kb_reingest",
+    bind=True,
+    autoretry_for=TRANSIENT_EXCEPTIONS,
+    retry_backoff=True,
+    max_retries=3,
+    default_retry_delay=10,
+)
+def kb_reingest(self, kb_uuid: str) -> None:
+    """Re-chunk and re-embed every source in a KB from stored text.
+
+    Used after chunking improvements (e.g. table-aware splitting) so existing
+    KBs benefit without re-uploading files. Document sources re-chunk from
+    ``SmartDocument.raw_text`` + ``text_markers``; URL sources re-chunk from
+    their stored ``content`` snapshot (no refetch). Sources with nothing
+    stored to re-chunk are left untouched.
+    """
+    from app.services.document_manager import get_document_manager
+
+    db = _get_db()
+    kb = db.knowledge_bases.find_one({"uuid": kb_uuid})
+    if not kb:
+        logger.warning("KB %s not found, skipping re-ingest.", kb_uuid)
+        return
+    sources = list(db.knowledge_base_sources.find({"knowledge_base_uuid": kb_uuid}))
+    if not sources:
+        _recalculate_kb(db, kb_uuid)
+        return
+
+    # Project (implicit) KBs key chunks by document_uuid (_ingest_into_project_kb);
+    # explicit KBs key by the source's own uuid. Re-adding must preserve the
+    # convention or later per-source deletes would miss the chunks.
+    is_implicit = bool(kb.get("implicit"))
+
+    dm = get_document_manager()
+    for source in sources:
+        source_uuid = source["uuid"]
+        document_uuid = source.get("document_uuid")
+        try:
+            if source.get("source_type") == "url":
+                raw_text = source.get("content") or ""
+                source_name = (
+                    source.get("custom_name")
+                    or source.get("url_title")
+                    or source.get("url")
+                    or ""
+                )
+                text_markers: list = []
+                source_id = source_uuid
+            else:
+                doc = (
+                    db.smart_document.find_one({"uuid": document_uuid})
+                    if document_uuid else None
+                )
+                raw_text = (doc or {}).get("raw_text", "")
+                source_name = source.get("custom_name") or (doc or {}).get("title", "")
+                text_markers = (doc or {}).get("text_markers") or []
+                source_id = (
+                    document_uuid if is_implicit and document_uuid else source_uuid
+                )
+
+            if not raw_text.strip():
+                logger.warning(
+                    "KB %s source %s has no stored text to re-chunk; skipping.",
+                    kb_uuid, source_uuid,
+                )
+                continue
+
+            db.knowledge_base_sources.update_one(
+                {"uuid": source_uuid},
+                {"$set": {"status": "processing"}},
+            )
+            # Clear under both id conventions — harmless no-op for the unused one.
+            dm.delete_kb_source(kb_uuid, source_uuid)
+            if document_uuid and document_uuid != source_uuid:
+                dm.delete_kb_source(kb_uuid, document_uuid)
+
+            chunk_count = dm.add_to_kb(
+                kb_uuid=kb_uuid,
+                source_id=source_id,
+                source_name=source_name,
+                raw_text=raw_text,
+                text_markers=text_markers,
+            )
+            db.knowledge_base_sources.update_one(
+                {"uuid": source_uuid},
+                {
+                    "$set": {
+                        "chunk_count": chunk_count,
+                        "status": "ready",
+                        "error_message": None,
+                        "processed_at": datetime.datetime.now(datetime.timezone.utc),
+                    }
+                },
+            )
+        except Exception as e:
+            logger.error(
+                "Error re-ingesting KB %s source %s: %s", kb_uuid, source_uuid, e,
+            )
+            db.knowledge_base_sources.update_one(
+                {"uuid": source_uuid},
+                {"$set": {"status": "error", "error_message": str(e)[:2000]}},
+            )
+
+    _recalculate_kb(db, kb_uuid)
 
 
 @celery_app.task(
@@ -194,6 +304,9 @@ def kb_ingest_url(self, source_uuid: str) -> None:
         )
 
         dm = get_document_manager()
+        # Idempotent: clear any chunks from a prior (partial) run so a Celery
+        # autoretry can't double-add or collide on chunk ids.
+        dm.delete_kb_source(kb_uuid, source_uuid)
         chunk_count = dm.add_to_kb(
             kb_uuid=kb_uuid,
             source_id=source_uuid,

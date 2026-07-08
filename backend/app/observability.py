@@ -42,12 +42,38 @@ def init_sentry(settings: Settings, *, with_celery: bool = False) -> None:
         # task that silently *stops* running (not just one that throws) alerts.
         integrations.append(CeleryIntegration(monitor_beat_tasks=True))
 
+    # Turn off Sentry's auto-enabled LLM integrations. Each of these patches the
+    # provider/agent call to capture *every* exception that escapes it as an
+    # event with mechanism.handled=False — before our own code can catch it. But
+    # the app handles LLM failures deliberately (transient blips are retried,
+    # real errors are surfaced through their own channels), so these fire on
+    # gracefully-handled errors too, mislabeling them "unhandled" and doubling
+    # every genuine failure (once here, once at the real Celery/HTTP boundary).
+    # Note pydantic_ai's integration deactivates openai/anthropic when active,
+    # so all three must be disabled or the capture just moves to whichever is
+    # left. We keep our own metering (MeteredModel) and don't use their spans.
+    disabled_integrations = []
+    for _mod, _cls in (
+        ("sentry_sdk.integrations.pydantic_ai", "PydanticAIIntegration"),
+        ("sentry_sdk.integrations.openai", "OpenAIIntegration"),
+        ("sentry_sdk.integrations.anthropic", "AnthropicIntegration"),
+    ):
+        try:
+            import importlib
+
+            disabled_integrations.append(getattr(importlib.import_module(_mod), _cls))
+        except Exception:
+            # Integration/module unavailable (provider lib not installed) — it
+            # wouldn't auto-enable anyway, so nothing to disable.
+            pass
+
     sentry_sdk.init(
         dsn=settings.sentry_dsn,
         environment=settings.environment,
         traces_sample_rate=0.1 if settings.is_production else 1.0,
         send_default_pii=False,
         integrations=integrations,
+        disabled_integrations=disabled_integrations,
     )
     logger.info(
         "Sentry initialized (environment=%s, celery=%s)",

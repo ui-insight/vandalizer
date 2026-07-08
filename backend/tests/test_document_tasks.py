@@ -161,6 +161,36 @@ class TestPerformExtractionAndUpdate:
 
     @patch("app.tasks.document_tasks.get_sync_db")
     @patch("app.config.Settings")
+    @patch(
+        "app.services.document_readers.extract_text_with_markers",
+        side_effect=FileNotFoundError("no such file: 'gone.pdf'"),
+    )
+    def test_missing_source_file_warns_not_pages_sentry(self, mock_extract, MockSettings, mock_get_db):
+        """A file deleted mid-processing (E2E teardown / retention sweep) is a
+        benign race: mark the doc but log at warning, never logger.exception
+        (which would page Sentry as a fault)."""
+        from app.tasks.document_tasks import perform_extraction_and_update
+
+        db = MagicMock()
+        mock_get_db.return_value = db
+        db.smart_document.find_one.return_value = {"uuid": "doc-1", "path": "gone.pdf"}
+
+        settings = MagicMock()
+        settings.upload_dir = "/uploads"
+        MockSettings.return_value = settings
+
+        with patch("app.tasks.document_tasks.logger") as mock_logger:
+            result = perform_extraction_and_update(document_uuid="doc-1", extension="pdf")
+
+        assert result == ""
+        mock_logger.exception.assert_not_called()
+        mock_logger.warning.assert_called()
+        update_set = db.smart_document.update_one.call_args_list[-1][0][1]["$set"]
+        assert update_set["task_status"] == "error"
+        assert "no longer available" in update_set["error_message"].lower()
+
+    @patch("app.tasks.document_tasks.get_sync_db")
+    @patch("app.config.Settings")
     @patch("app.services.document_readers.extract_text_with_markers", return_value=("", []))
     def test_marks_error_when_extraction_returns_no_text(self, mock_extract, MockSettings, mock_get_db):
         """OCR returning an empty string (endpoint down, image-only PDF) is the

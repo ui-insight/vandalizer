@@ -1837,6 +1837,44 @@ async def start_workflow_optimization(
         max_candidates = int(body.get("max_candidates", 10))
     except (TypeError, ValueError):
         raise HTTPException(status_code=400, detail="max_candidates must be an integer")
+    if max_candidates < 1 or max_candidates > 50:
+        raise HTTPException(status_code=400, detail="max_candidates must be in [1, 50]")
+
+    apply_on_finish = bool(body.get("apply_on_finish", False))
+    include_judge = bool(body.get("include_judge", True))
+
+    # Fail fast on missing preconditions so the user gets an immediate,
+    # actionable 400 instead of a queued run that dies in the worker (and no
+    # governance slot / failed run doc is spent on a doomed optimization). The
+    # worker keeps the same guards as a safety net.
+    if not wf.validation_plan:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Workflow has no validation plan. Generate or add checks first "
+                "(Validate tab → Generate plan)."
+            ),
+        )
+    from app.services.workflow_optimizer import _resolve_test_inputs
+    if not await _resolve_test_inputs(wf):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "No test inputs available. Mark at least one past workflow run "
+                "as 'expected output' on the Validate tab before optimizing."
+            ),
+        )
+
+    from app.models.workflow_optimization_run import WorkflowOptimizationRun
+    active = await WorkflowOptimizationRun.find_one(
+        WorkflowOptimizationRun.workflow_id == workflow_id,
+        {"status": {"$in": ["queued", "running"]}},
+    )
+    if active:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Optimization already in progress for this workflow (run {active.uuid})",
+        )
 
     # Cross-resource cost governance: per-user concurrency cap + audit trail.
     from app.services import optimization_governance
@@ -1857,9 +1895,9 @@ async def start_workflow_optimization(
         run = await _start(
             workflow_id, user.user_id,
             token_budget=token_budget,
-            apply_on_finish=bool(body.get("apply_on_finish", False)),
+            apply_on_finish=apply_on_finish,
             max_candidates=max_candidates,
-            include_judge=bool(body.get("include_judge", True)),
+            include_judge=include_judge,
         )
     except OptimizationActionError as e:
         raise HTTPException(

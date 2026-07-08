@@ -382,6 +382,31 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
 
         return raw_text
 
+    except FileNotFoundError as e:
+        # The source file vanished between upload and extraction — a document
+        # deleted or reset mid-processing (common in E2E teardown and retention
+        # sweeps). There is nothing to extract and nothing to fix in code, so
+        # record it on the doc but log at warning rather than paging Sentry.
+        logger.warning(
+            "Source file missing for document %s — skipping extraction: %s",
+            document_uuid, e,
+        )
+        db.smart_document.update_one(
+            {"uuid": document_uuid},
+            {
+                "$set": {
+                    "raw_text": "",
+                    "processing": False,
+                    "task_status": "error",
+                    "error_message": (
+                        "The uploaded file is no longer available "
+                        "(it may have been deleted during processing)."
+                    ),
+                }
+            },
+        )
+        return ""
+
     except Exception as e:
         logger.exception("Error extracting text from document %s", document_uuid)
         db.smart_document.update_one(

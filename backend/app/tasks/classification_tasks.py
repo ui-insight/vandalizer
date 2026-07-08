@@ -3,15 +3,44 @@
 import logging
 
 from app.celery_app import celery
-from app.tasks import run_task_async
+from app.tasks import TRANSIENT_EXCEPTIONS, run_task_async
 
 logger = logging.getLogger(__name__)
 
 
-@celery.task(name="tasks.document.classify", bind=True, autoretry_for=(Exception,), max_retries=2, default_retry_delay=30)
+@celery.task(name="tasks.document.classify", bind=True, retry_backoff=True, max_retries=2, default_retry_delay=30)
 def classify_document_task(self, document_uuid: str):
-    """Auto-classify a document after text extraction."""
-    run_task_async(_classify(document_uuid))
+    """Auto-classify a document after text extraction.
+
+    Auto-classification is best-effort enrichment: a model failure must not
+    crash document processing or page Sentry as an unhandled task. Transient
+    connection blips (``ModelAPIError`` — pydantic-ai's connect/transport
+    wrapper — and the OS-level transients) get a couple retries; a permanent
+    model error (``ModelHTTPError``, e.g. a 401 from a misconfigured API key,
+    a ``ModelAPIError`` subclass so it must be caught first) or exhausted
+    retries leave the document unclassified and are logged at warning. We do
+    not stamp a guessed classification on failure — silently marking a
+    possibly-sensitive document "unrestricted" is worse than leaving it
+    unclassified for a later re-run or manual reclassification.
+    """
+    from pydantic_ai.exceptions import ModelAPIError, ModelHTTPError
+
+    try:
+        run_task_async(_classify(document_uuid))
+    except ModelHTTPError as exc:
+        logger.warning(
+            "Auto-classification skipped for %s — model returned HTTP %s "
+            "(likely misconfigured model/API key); leaving unclassified: %s",
+            document_uuid, getattr(exc, "status_code", "?"), exc,
+        )
+    except (ModelAPIError, *TRANSIENT_EXCEPTIONS) as exc:
+        if self.request.retries < self.max_retries:
+            raise self.retry(exc=exc)
+        logger.warning(
+            "Auto-classification skipped for %s after %d retries — transient "
+            "model error; leaving unclassified: %s",
+            document_uuid, self.request.retries, exc,
+        )
 
 
 async def _classify(document_uuid: str):

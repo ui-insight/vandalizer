@@ -8,6 +8,8 @@ import datetime
 import logging
 import re
 
+from pydantic_ai.exceptions import ModelAPIError
+
 from app.celery_app import celery_app
 from app.tasks import TRANSIENT_EXCEPTIONS, run_task_async
 
@@ -281,6 +283,18 @@ def generate_activity_description_task(
             "Updated activity %s with title %r (model=%s)",
             activity_id, description, model_name,
         )
+
+    except ModelAPIError as e:
+        # Title generation is best-effort cosmetic enrichment; an LLM outage —
+        # e.g. the configured endpoint is unreachable ("Connection error.") or a
+        # misconfigured model returns 4xx (ModelHTTPError is a ModelAPIError
+        # subclass) — is a handled degradation: the activity just goes untitled.
+        # Log at warning so it doesn't page Sentry as a fault.
+        logger.warning(
+            "Skipping description for activity %s — model unavailable: %s",
+            activity_id, e,
+        )
+        _mark_done()
 
     except Exception as e:
         logger.error("Error generating description for activity %s: %s", activity_id, e, exc_info=True)

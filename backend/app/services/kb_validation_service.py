@@ -240,6 +240,52 @@ def _usage_tokens(run) -> int:
     )
 
 
+CONDENSE_QUERY_SYSTEM_PROMPT = (
+    "You rewrite the final message of a conversation as a standalone search "
+    "query. Resolve pronouns and references ('it', 'that section', 'the "
+    "second one') using the conversation. Keep every distinctive term — "
+    "names, filenames, numbers, dates. Output ONLY the rewritten query: no "
+    "prose, no quotes, no explanation."
+)
+
+
+async def condense_retrieval_query(
+    message: str,
+    recent_turns: list[tuple[str, str]],
+    model_name: str,
+    timeout: float = 5.0,
+) -> tuple[str, int]:
+    """Rewrite an anaphoric follow-up ("what about year 2?") as a standalone
+    retrieval query using recent conversation turns for referents.
+
+    Returns ``(query, tokens_used)``. On any failure or timeout falls back to
+    prepending the last user turn — a zero-cost keyword carryover that still
+    beats retrieving on the bare follow-up.
+    """
+    agent = _get_or_build_agent(
+        "kb_query_condenser", model_name, CONDENSE_QUERY_SYSTEM_PROMPT,
+    )
+    convo = "\n".join(
+        f"{role}: {(text or '')[:500]}" for role, text in recent_turns[-6:]
+    )
+    prompt = (
+        f"Conversation:\n{convo}\n\n"
+        f"Final message to rewrite as a standalone search query: {message}"
+    )
+    try:
+        run = await asyncio.wait_for(agent.run(prompt), timeout=timeout)
+        condensed = (run.output or "").strip()
+        if condensed:
+            return condensed, _usage_tokens(run)
+    except Exception as e:
+        logger.warning("Query condense failed; using keyword carryover: %s", e)
+    last_user = next(
+        (text for role, text in reversed(recent_turns) if role == "user" and text),
+        "",
+    )
+    return (f"{last_user}\n{message}" if last_user else message), 0
+
+
 async def _maybe_rewrite_query(query: str, model_name: str) -> tuple[str, int]:
     """If query rewriting is enabled, ask a prompt agent to optimise the query
     for retrieval. Falls back to the original query on any failure. Returns
@@ -332,6 +378,21 @@ async def _resolve_rag_config(kb_uuid: str, explicit: Optional[RAGConfig], k: in
     return RAGConfig(k=k)
 
 
+async def resolve_kb_rag_config(kb_uuid: str) -> RAGConfig:
+    """Return the KB's applied RAGConfig (defaults when none is applied).
+
+    Public, exception-safe wrapper over ``_resolve_rag_config`` for callers
+    outside the validation harness (the live chat path). Falls back to the
+    default config on any lookup/parse failure so retrieval never silently
+    over-filters or over-fetches.
+    """
+    try:
+        return await _resolve_rag_config(kb_uuid, None, DEFAULT_K)
+    except Exception as e:
+        logger.debug("rag_config resolve failed for KB %s: %s", kb_uuid, e)
+        return RAGConfig()
+
+
 async def resolve_kb_min_similarity(kb_uuid: str) -> float:
     """Return the per-KB retrieval similarity floor (0.0 = disabled).
 
@@ -340,12 +401,103 @@ async def resolve_kb_min_similarity(kb_uuid: str) -> float:
     surface and the validation harness in lockstep. Defaults to 0.0 (no gating)
     on any lookup/parse failure so retrieval never silently over-filters.
     """
-    try:
-        cfg = await _resolve_rag_config(kb_uuid, None, DEFAULT_K)
-        return cfg.min_similarity
-    except Exception as e:
-        logger.debug("min_similarity resolve failed for KB %s: %s", kb_uuid, e)
-        return 0.0
+    cfg = await resolve_kb_rag_config(kb_uuid)
+    return cfg.min_similarity
+
+
+async def retrieve_kb_chunks(
+    kb_uuid: str,
+    query: str,
+    model_name: str,
+    *,
+    config: Optional[RAGConfig] = None,
+    overfetch_multiplier: int = 1,
+    per_step_timeout: Optional[float] = None,
+    source_filter: Optional[list[str]] = None,
+    retrieval_query: Optional[str] = None,
+) -> tuple[list[dict], RAGConfig, int]:
+    """Shared KB retrieval pipeline: config resolution → optional query
+    rewrite → vector search → optional LLM rerank.
+
+    The single retrieval seam for both the validation harness
+    (``_generate_kb_answer``) and the live chat path, so tuned knobs
+    (``k``, ``min_similarity``, ``query_rewriting``, ``rerank``) apply
+    identically on both surfaces.
+
+    ``overfetch_multiplier`` asks the vector store for extra candidates
+    beyond ``cfg.k`` so callers can post-select for per-source diversity;
+    when rerank is enabled the pool is at least ``RERANK_POOL_MULTIPLIER × k``
+    and the rerank step reduces it back to ``cfg.k``. Without rerank, callers
+    receive the full over-fetched pool and are responsible for trimming to
+    ``cfg.k``.
+
+    ``per_step_timeout`` bounds each optional LLM step (rewrite, rerank) —
+    the live chat path uses it so a slow helper degrades to the non-LLM
+    fallback instead of delaying the first streamed token indefinitely.
+
+    ``source_filter`` restricts the vector search to the given ``source_name``
+    metadata values (the exact ingestion-time names) — used by chat's
+    named-document targeting so a file the user asked about by name is
+    searched directly instead of competing with the whole corpus.
+
+    ``retrieval_query`` overrides the text used for the vector search (e.g. a
+    conversation-condensed follow-up); ``query`` remains what rerank scores
+    against. When set, the tuned ``query_rewriting`` step is skipped — one
+    rewrite per turn.
+
+    Returns ``(results, resolved_config, tokens_used)``.
+    """
+    cfg = await _resolve_rag_config(kb_uuid, config, DEFAULT_K)
+    effective_model = cfg.model or model_name
+    tokens = 0
+
+    effective_query = retrieval_query or query
+    if cfg.query_rewriting and retrieval_query is None:
+        try:
+            effective_query, rewrite_tokens = await asyncio.wait_for(
+                _maybe_rewrite_query(query, effective_model),
+                timeout=per_step_timeout,
+            )
+            tokens += rewrite_tokens
+        except asyncio.TimeoutError:
+            logger.warning("KB query rewrite timed out; using raw query")
+            effective_query = query
+
+    dm = _get_dm()
+    pool_multiplier = max(
+        overfetch_multiplier,
+        RERANK_POOL_MULTIPLIER if cfg.rerank == "llm" else 1,
+    )
+    retrieve_k = cfg.k * pool_multiplier
+    where: Optional[dict] = None
+    if source_filter:
+        names = [n for n in source_filter if n]
+        if len(names) == 1:
+            where = {"source_name": names[0]}
+        elif names:
+            where = {"source_name": {"$in": names}}
+    # Only pass ``where`` when filtering — keeps the unfiltered call shape
+    # identical to the legacy path.
+    where_kwargs = {"where": where} if where else {}
+    results = await asyncio.to_thread(
+        dm.query_kb, kb_uuid, effective_query, retrieve_k, cfg.min_similarity,
+        **where_kwargs,
+    )
+
+    # Rerank scores against the *raw* query — the rewrite optimises for vector
+    # recall, but relevance judgement should target what the user actually asked.
+    if results and cfg.rerank == "llm":
+        try:
+            results, rerank_tokens = await asyncio.wait_for(
+                _llm_rerank(query, results, cfg.k, effective_model),
+                timeout=per_step_timeout,
+            )
+            tokens += rerank_tokens
+        except asyncio.TimeoutError:
+            logger.warning("KB rerank timed out; using vector order")
+            results = results[: cfg.k]
+
+    return results, cfg, tokens
 
 
 async def _generate_kb_answer(
@@ -374,32 +526,15 @@ async def _generate_kb_answer(
     """
     cfg = await _resolve_rag_config(kb_uuid, config, k)
     effective_model = cfg.model or model_name
-    tokens = 0
 
-    # Optionally rewrite the query before retrieval.
-    if cfg.query_rewriting:
-        retrieval_query, rewrite_tokens = await _maybe_rewrite_query(query, effective_model)
-        tokens += rewrite_tokens
-    else:
-        retrieval_query = query
-
-    dm = _get_dm()
-    # Reranking pulls a larger candidate pool from the vector store, then
-    # asks an LLM to pick the top cfg.k. Skips when results returned <=cfg.k
-    # (nothing to rerank).
-    retrieve_k = cfg.k * RERANK_POOL_MULTIPLIER if cfg.rerank == "llm" else cfg.k
-    results = await asyncio.to_thread(
-        dm.query_kb, kb_uuid, retrieval_query, retrieve_k, cfg.min_similarity
+    # Shared pipeline: optional query rewrite → vector search → optional rerank.
+    results, cfg, tokens = await retrieve_kb_chunks(
+        kb_uuid, query, model_name, config=cfg,
     )
     # Empty *or* gated-empty: nothing cleared the relevance floor, so abstain
     # rather than generate. Reuses the existing empty-retrieval refusal.
     if not results:
         return ("I could not find any relevant information in the knowledge base.", [], tokens)
-    if cfg.rerank == "llm":
-        results, rerank_tokens = await _llm_rerank(
-            query, results, cfg.k, effective_model,
-        )
-        tokens += rerank_tokens
 
     context = _format_context_for_config(results, cfg)
     instruction = RAG_PROMPT_VARIANTS.get(cfg.prompt_variant, RAG_PROMPT_VARIANTS["default"])

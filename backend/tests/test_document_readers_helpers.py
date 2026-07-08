@@ -178,3 +178,59 @@ class TestExtractDocxExtras:
         source = dr.__loader__.get_source(dr.__name__) or ""
         assert "defusedxml.ElementTree" in source
         assert "import xml.etree.ElementTree as ET" not in source
+
+
+class TestExtractWithMarkersOcrFallback:
+    """When OCR returns short-but-valid text and the PyMuPDF page-boundary
+    refinement fails (corrupt PDF, or the source file removed mid-processing),
+    the OCR text must be used rather than crashing the extraction task."""
+
+    def test_pymupdf_failure_uses_ocr_text(self):
+        from unittest.mock import patch
+        import app.services.document_readers as dr
+
+        with patch.object(dr, "ocr_extract_text_from_pdf", return_value="short ocr text"), \
+             patch.object(dr, "_pymupdf_extract_with_pages",
+                          side_effect=FileNotFoundError("no such file: 'gone.pdf'")), \
+             patch.object(dr, "_pdf_page_count", return_value=1):
+            text, markers = dr.extract_text_with_markers("gone.pdf", "pdf")
+
+        assert text == "short ocr text"
+        assert isinstance(markers, list)
+
+    def test_pymupdf_failure_reraises_without_ocr_text(self):
+        from unittest.mock import patch
+        import app.services.document_readers as dr
+
+        with patch.object(dr, "ocr_extract_text_from_pdf", return_value=""), \
+             patch.object(dr, "_pymupdf_extract_with_pages",
+                          side_effect=FileNotFoundError("no such file: 'gone.pdf'")):
+            with pytest.raises(FileNotFoundError):
+                dr.extract_text_with_markers("gone.pdf", "pdf")
+
+    def test_extract_text_from_file_pymupdf_failure_uses_ocr_text(self):
+        from unittest.mock import patch
+        import app.services.document_readers as dr
+
+        with patch.object(dr, "ocr_extract_text_from_pdf", return_value="short ocr text"), \
+             patch.object(dr, "extract_text_from_pdf",
+                          side_effect=FileNotFoundError("no such file: 'gone.pdf'")):
+            assert dr.extract_text_from_file("gone.pdf", "pdf") == "short ocr text"
+
+class TestExtractTextFromFileMissingFile:
+    """A missing source file (deleted mid-processing / stale path) is benign:
+    return empty text and log at warning, never error -> Sentry, and never a
+    "[Error extracting content: ...]" placeholder that masquerades as content."""
+
+    def test_missing_txt_returns_empty_and_warns(self, tmp_path):
+        from unittest.mock import patch
+        import app.services.document_readers as dr
+
+        gone = str(tmp_path / "nope" / "8D112.txt")  # nonexistent
+        with patch.object(dr, "logger") as mock_logger:
+            result = dr.extract_text_from_file(gone, "txt")
+
+        assert result == ""
+        assert "[Error extracting content" not in result
+        mock_logger.error.assert_not_called()
+        mock_logger.warning.assert_called()

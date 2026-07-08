@@ -227,3 +227,50 @@ class TestRemoveWorkflowFromTeam:
         before auth here, so we expect 403 (not 401)."""
         resp = await client.delete("/api/workflows/wf-1/team")
         assert resp.status_code == 403
+
+
+class TestStartWorkflowOptimization:
+    """POST /api/workflows/{id}/optimize precondition guards — a doomed run
+    must be rejected synchronously (400), never queued into the worker."""
+
+    @pytest.mark.asyncio
+    async def test_rejects_when_no_validation_plan(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+
+        wf = MagicMock()
+        wf.id = "wf-1"
+        wf.validation_plan = []
+        wf.validation_inputs = []
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.workflows.get_authorized_workflow", AsyncMock(return_value=wf)):
+            MockUser.find_one = AsyncMock(return_value=user)
+            resp = await client.post(
+                "/api/workflows/wf-1/optimize", json={}, cookies=cookies, headers=headers,
+            )
+
+        assert resp.status_code == 400
+        assert "validation plan" in resp.json()["detail"].lower()
+
+    @pytest.mark.asyncio
+    async def test_rejects_when_no_test_inputs(self, client):
+        user = _make_user()
+        cookies, headers = _auth()
+
+        wf = MagicMock()
+        wf.id = "wf-1"
+        wf.validation_plan = [{"id": "c1", "category": "content"}]
+        wf.validation_inputs = []  # -> _resolve_test_inputs returns []
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.workflows.get_authorized_workflow", AsyncMock(return_value=wf)):
+            MockUser.find_one = AsyncMock(return_value=user)
+            resp = await client.post(
+                "/api/workflows/wf-1/optimize", json={}, cookies=cookies, headers=headers,
+            )
+
+        assert resp.status_code == 400
+        assert "test inputs" in resp.json()["detail"].lower()

@@ -132,6 +132,14 @@ ALL_MODELS = [
 # reclaimed, exhausting file descriptors in a long-running process.
 _client: AsyncIOMotorClient | None = None
 
+# Whether this process has already run Beanie's per-collection index management.
+# Index creation is idempotent and only needs to happen once per process (the
+# web app ensures it at startup). Re-running it on every short-lived async
+# Celery task adds ~one ``listIndexes`` round-trip per model (~18) on top of the
+# server handshake — an N+1 in the span waterfall for tasks like
+# ``tasks.document.classify``. After the first ensure we auto-skip it.
+_indexes_ensured = False
+
 
 def get_client() -> AsyncIOMotorClient:
     """Return the shared Motor client. Raises if init_db() hasn't run yet."""
@@ -144,12 +152,15 @@ async def init_db(settings: Settings, skip_indexes: bool = False) -> None:
     """Initialize the Motor client and Beanie ODM.
 
     ``skip_indexes=True`` skips Beanie's per-collection index management
-    (the ``listIndexes``/``buildInfo`` round-trips), which is redundant for
-    short-lived periodic Celery tasks — indexes are already ensured by the
-    web app startup. Leave it ``False`` for the app process so indexes are
-    created/updated on deploy.
+    (the ``listIndexes`` round-trips), which is redundant for short-lived
+    periodic Celery tasks — indexes are already ensured by the web app startup.
+
+    Index management is also skipped automatically once it has run in this
+    process (``_indexes_ensured``), so a Celery worker pays the cost on its
+    first task only rather than on every task. The web app process runs it once
+    at startup so indexes are created/updated on deploy.
     """
-    global _client
+    global _client, _indexes_ensured
     _client = AsyncIOMotorClient(
         settings.mongo_host,
         maxPoolSize=100,
@@ -159,8 +170,11 @@ async def init_db(settings: Settings, skip_indexes: bool = False) -> None:
         connectTimeoutMS=5000,
         socketTimeoutMS=30000,
     )
+    effective_skip = skip_indexes or _indexes_ensured
     await init_beanie(
         database=_client[settings.mongo_db],
         document_models=ALL_MODELS,
-        skip_indexes=skip_indexes,
+        skip_indexes=effective_skip,
     )
+    if not effective_skip:
+        _indexes_ensured = True

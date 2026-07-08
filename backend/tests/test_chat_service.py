@@ -418,3 +418,64 @@ class TestChatAgentGroundingEveryTurn:
             "grounding prompt must be present on the follow-up turn, not just "
             f"the first; saw {seen}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Citation persistence
+# ---------------------------------------------------------------------------
+
+
+class TestCitationPersistence:
+    def _citation(self, **overrides):
+        base = {
+            "document_id": "src-1",
+            "document_title": "budget.xlsx",
+            "page": None,
+            "sheet": "Year 1",
+            "chunk_id": "src-1_chunk_3",
+            "score": 0.42,
+            "similarity": 0.79,
+            "content_preview": "| Category | Amount |",
+        }
+        base.update(overrides)
+        return base
+
+    def test_chat_message_to_dict_includes_citations(self):
+        from app.models.chat import ChatMessage, ChatRole
+
+        msg = ChatMessage.model_construct(
+            role=ChatRole.ASSISTANT,
+            message="answer",
+            citations=[self._citation()],
+        )
+        d = msg.to_dict()
+        assert d["citations"] == [self._citation()]
+
+    def test_chat_message_to_dict_omits_absent_citations(self):
+        from app.models.chat import ChatMessage, ChatRole
+
+        msg = ChatMessage.model_construct(
+            role=ChatRole.ASSISTANT, message="answer", citations=None,
+        )
+        assert "citations" not in msg.to_dict()
+
+    @pytest.mark.asyncio
+    async def test_finalize_passes_citations_to_add_message(self):
+        from unittest.mock import AsyncMock
+
+        from app.models.chat import ChatRole
+        from app.services.chat_service import _finalize
+
+        conversation = MagicMock()
+        conversation.add_message = AsyncMock()
+        citations = [self._citation()]
+
+        await _finalize(
+            conversation, "answer", [], None, None, "user-1",
+            citations=citations,
+        )
+
+        conversation.add_message.assert_awaited_once()
+        args, kwargs = conversation.add_message.await_args
+        assert args[0] == ChatRole.ASSISTANT
+        assert kwargs["citations"] == citations

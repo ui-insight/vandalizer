@@ -652,6 +652,25 @@ async def mark_first_session_complete(user: User = Depends(get_current_user)):
 # ---------------------------------------------------------------------------
 
 
+def _as_aware_utc(dt: datetime.datetime | None) -> datetime.datetime | None:
+    """Coerce a datetime to timezone-aware UTC.
+
+    MongoDB/BSON stores datetimes without tzinfo, so Beanie reads them back
+    naive even though the model writes them aware. Comparing a naive DB value
+    against an aware ``datetime.now(timezone.utc)`` raises
+    ``TypeError: can't compare offset-naive and offset-aware datetimes`` — so
+    normalize both sides through here before any comparison or sort.
+    """
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=datetime.timezone.utc)
+    return dt.astimezone(datetime.timezone.utc)
+
+
+_DATETIME_MIN_UTC = datetime.datetime.min.replace(tzinfo=datetime.timezone.utc)
+
+
 @router.get("/automation-stats")
 async def get_automation_stats(user: User = Depends(get_current_user)):
     visible_workflows = await workflow_service.list_workflows(
@@ -686,7 +705,10 @@ async def get_automation_stats(user: User = Depends(get_current_user)):
     today_start = datetime.datetime.now(datetime.timezone.utc).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
-    today_results = [r for r in recent_results if r.start_time >= today_start]
+    today_results = [
+        r for r in recent_results
+        if (st := _as_aware_utc(r.start_time)) is not None and st >= today_start
+    ]
 
     return {
         "total_workflows": total,
@@ -707,6 +729,10 @@ async def get_automation_stats(user: User = Depends(get_current_user)):
                 "steps_completed": r.num_steps_completed,
                 "steps_total": r.num_steps_total,
             }
-            for r in sorted(recent_results, key=lambda x: x.start_time, reverse=True)[:20]
+            for r in sorted(
+                recent_results,
+                key=lambda x: _as_aware_utc(x.start_time) or _DATETIME_MIN_UTC,
+                reverse=True,
+            )[:20]
         ],
     }
