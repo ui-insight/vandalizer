@@ -61,7 +61,15 @@ export function RightPanel() {
 
       {/* Tab content - matches Flask .tab-content */}
       <div className="flex-1 overflow-hidden bg-white">
-        {activeRightTab === 'assistant' ? <AssistantTab /> : <LibraryTab />}
+        {/* Keep the Assistant mounted and just hide it when Library is open, so
+            the live conversation (messages, in-flight results, scroll position)
+            survives a tab switch instead of being torn down and lost. Its state
+            lives in ChatPanel/useChat, which reset on unmount. Library has no
+            ephemeral state, so it can mount on demand. */}
+        <div className={cn('h-full', activeRightTab !== 'assistant' && 'hidden')}>
+          <AssistantTab />
+        </div>
+        {activeRightTab === 'library' && <LibraryTab />}
       </div>
     </div>
   )
