@@ -1508,6 +1508,20 @@ async def chat_stream(
                                 streamed_segments.append({"kind": "tool_result", "result": result_data})
                                 yield json.dumps({"kind": "tool_result", **result_data}) + "\n"
 
+                                # Plan checklist (uplift plan Phase 8): a
+                                # successful update_plan refreshes the pinned
+                                # checklist in the UI.
+                                if (
+                                    event.result.tool_name == "update_plan"
+                                    and deps is not None
+                                    and deps.plan_state is not None
+                                ):
+                                    yield json.dumps({
+                                        "kind": "plan_update",
+                                        "content": "",
+                                        "plan": deps.plan_state,
+                                    }) + "\n"
+
                                 # Citation sidecar (search_knowledge_base): emit a
                                 # 'sources' chunk so the frontend renders citation
                                 # chips for agent-driven KB lookups, same as the
@@ -1549,6 +1563,7 @@ async def chat_stream(
                     context_anchor_tokens=_final_request_context_tokens(
                         agent_run.result
                     ),
+                    plan_state=deps.plan_state if deps is not None else None,
                 )
 
                 # Stream token usage so the frontend can display context utilization
@@ -2387,6 +2402,7 @@ async def _finalize(
     segments: Optional[list[dict]] = None,
     citations: Optional[list[dict]] = None,
     context_anchor_tokens: int = 0,
+    plan_state: Optional[list[dict]] = None,
 ) -> None:
     """Save assistant message and update activity metrics."""
     await conversation.add_message(
@@ -2414,6 +2430,10 @@ async def _finalize(
     if conversation.resume_attempts or conversation.resume_pending:
         conversation.resume_attempts = 0
         conversation.resume_pending = False
+        fields_dirty = True
+    # Persist the latest checklist so a follow-up turn resumes it (Phase 8).
+    if plan_state is not None:
+        conversation.active_plan = plan_state
         fields_dirty = True
     if fields_dirty:
         await conversation.save()

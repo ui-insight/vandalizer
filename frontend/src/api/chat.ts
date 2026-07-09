@@ -1,5 +1,5 @@
 import { apiFetch, rawFetch } from './client'
-import type { ChatMessage, UrlAttachment, FileAttachment, StreamChunk } from '../types/chat'
+import type { ChatMessage, UrlAttachment, FileAttachment, PlanTask, StreamChunk } from '../types/chat'
 
 export async function streamChat(
   message: string,
@@ -177,6 +177,7 @@ export function getHistory(conversationUuid: string) {
     context_mode?: 'full' | 'truncated' | 'compacted'
     context_cutoff_index?: number
     compact_summary?: string | null
+    active_plan?: PlanTask[] | null
   }>(`/api/chat/history/${conversationUuid}`)
 }
 

@@ -592,6 +592,7 @@ async def get_chat_history(
         ],
         "context_mode": conversation.context_mode,
         "context_cutoff_index": conversation.context_cutoff_index,
+        "active_plan": conversation.active_plan,
     }
 
 

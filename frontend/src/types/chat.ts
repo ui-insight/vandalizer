@@ -147,6 +147,13 @@ export interface Citation {
   url?: string | null
 }
 
+// Live task checklist from the update_plan tool (chat_tools Phase 8).
+export interface PlanTask {
+  content: string
+  active_form: string
+  status: 'pending' | 'in_progress' | 'completed'
+}
+
 export interface StreamChunk {
   kind:
     | 'text'
@@ -160,6 +167,7 @@ export interface StreamChunk {
     | 'context_meter'
     | 'context_notice'
     | 'compaction'
+    | 'plan_update'
     | 'sources'
   content: string
   duration?: number
@@ -176,6 +184,8 @@ export interface StreamChunk {
   tokens_dropped?: number
   // compaction kind only: auto-compaction lifecycle for this turn.
   status?: 'started' | 'done' | 'failed'
+  // plan_update kind only: the full current checklist.
+  plan?: PlanTask[]
   // Error-only: machine-readable failure code + optional suggested recovery.
   code?: string
   suggested_action?: 'convert_to_kb' | 'continue'

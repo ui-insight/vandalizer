@@ -212,6 +212,11 @@ class ChatConversation(Document):
     last_context_tokens: int = 0
     last_context_message_count: int = -1
 
+    # Latest task checklist from update_plan (uplift plan Phase 8), persisted
+    # so a follow-up turn and a page reload resume the same visible plan.
+    # Each entry: {"content", "active_form", "status"}.
+    active_plan: Optional[list[dict]] = None
+
     # Resumable usage-limit hits (uplift plan Phase 5). When a turn stops at
     # the per-turn tool budget, resume_pending arms a one-shot "resume
     # directly, no recap" reminder for the next turn (the frontend offers a

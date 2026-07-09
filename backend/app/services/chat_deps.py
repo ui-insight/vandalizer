@@ -54,3 +54,9 @@ class AgenticChatDeps:
     # confirmed=true within a single turn. See chat_tools._confirm_gate.
     conversation: Optional["ChatConversation"] = None
     turn_marker: int = 0
+
+    # Live task plan for this turn (uplift plan Phase 8). update_plan writes
+    # the full validated list here; the streaming layer emits it as a
+    # 'plan_update' chunk and _finalize persists it on the conversation so a
+    # follow-up turn resumes the same checklist. None = no plan this turn.
+    plan_state: Optional[list[dict]] = None

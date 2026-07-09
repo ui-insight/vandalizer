@@ -11,6 +11,7 @@ import { OnboardingStepper } from './WelcomeExperience'
 import { ConceptStrip } from './ConceptTip'
 import { ContextMeter } from './ContextMeter'
 import { ContextLimitDialog } from './ContextLimitDialog'
+import { PlanChecklist } from './PlanChecklist'
 import { MemoryPanel } from './MemoryPanel'
 import { ProjectChatBadge } from './ProjectChatBadge'
 import { ProjectSuggestedActions } from '../projects/ProjectSuggestedActions'
@@ -162,6 +163,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     contextNotices,
     contextMeter,
     compactionStatus,
+    planTasks,
     setContextTokens,
     setContextMode,
     setContextCutoffIndex,
@@ -1408,6 +1410,9 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
             </div>
           </div>
         )}
+
+        {/* Live task checklist for multi-step agent work (Phase 8). */}
+        {planTasks && planTasks.length > 0 && <PlanChecklist tasks={planTasks} />}
 
         {/* Auto-compaction can take a while — show progress instead of dead
             air; the context_notice that follows reports the outcome. */}

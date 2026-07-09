@@ -17,6 +17,9 @@ from app.services.chat_tools import (
 # protects it — this list exists so the assertion below catches someone
 # adding a write tool to PARALLEL_SAFE_TOOLS.
 WRITE_TOOLS = {
+    # Not a user-data write, but must serialize: it mutates shared
+    # deps.plan_state (Phase 8).
+    "update_plan",
     "create_knowledge_base", "add_documents_to_kb", "add_url_to_kb",
     "run_workflow", "approve_workflow_step", "reject_workflow_step",
     "propose_test_case", "run_validation", "create_extraction_from_document",

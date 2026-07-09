@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react'
 import { streamChat, getHistory } from '../api/chat'
-import type { ChatMessage, Citation, ContextBudgetPlan, ContextMeterInfo, OversizeDocument, StreamChunk, StreamSegment, ToolCallInfo, ToolResultInfo } from '../types/chat'
+import type { ChatMessage, Citation, ContextBudgetPlan, ContextMeterInfo, OversizeDocument, PlanTask, StreamChunk, StreamSegment, ToolCallInfo, ToolResultInfo } from '../types/chat'
 
 export interface ContextNotice {
   action: string
@@ -78,6 +78,10 @@ export function useChat() {
   // backend summarizes older messages — can take a while, so the UI shows a
   // status line instead of dead air).
   const [compactionStatus, setCompactionStatus] = useState<'started' | 'done' | 'failed' | null>(null)
+  // Live checklist from update_plan (Phase 8). Survives across turns of the
+  // same conversation (a follow-up "continue" resumes it); cleared on reset
+  // and seeded from history on load.
+  const [planTasks, setPlanTasks] = useState<PlanTask[] | null>(null)
 
   const streamingRef = useRef('')
   const thinkingRef = useRef('')
@@ -187,6 +191,9 @@ export function useChat() {
               thinkingDurationRef.current = chunk.duration ?? null
               setThinkingDuration(chunk.duration ?? null)
             } else if (chunk.kind === 'tool_call') {
+              // update_plan renders as the pinned checklist (plan_update
+              // chunk), not as a tool status line.
+              if (chunk.tool_name === 'update_plan') return
               const call: ToolCallInfo = {
                 tool_name: chunk.tool_name!,
                 tool_call_id: chunk.tool_call_id!,
@@ -197,6 +204,7 @@ export function useChat() {
               segmentsRef.current.push({ kind: 'tool_call', call })
               setSegments([...segmentsRef.current])
             } else if (chunk.kind === 'tool_result') {
+              if (chunk.tool_name === 'update_plan') return
               const res: ToolResultInfo = {
                 tool_name: chunk.tool_name!,
                 tool_call_id: chunk.tool_call_id!,
@@ -228,6 +236,10 @@ export function useChat() {
               }
             } else if (chunk.kind === 'compaction') {
               setCompactionStatus(chunk.status ?? null)
+            } else if (chunk.kind === 'plan_update') {
+              if (chunk.plan) {
+                setPlanTasks(chunk.plan)
+              }
             } else if (chunk.kind === 'sources') {
               if (chunk.sources?.length) {
                 const seen = new Set(citationsRef.current.map(citationKey))
@@ -318,6 +330,7 @@ export function useChat() {
       setConversationUuid(uuid)
       if (data.context_mode) setContextMode(data.context_mode)
       if (data.context_cutoff_index != null) setContextCutoffIndex(data.context_cutoff_index)
+      setPlanTasks(data.active_plan ?? null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load history')
     }
@@ -343,6 +356,7 @@ export function useChat() {
     setContextNotices([])
     setContextMeter(null)
     setCompactionStatus(null)
+    setPlanTasks(null)
   }, [])
 
   const clearError = useCallback(() => {
@@ -406,6 +420,7 @@ export function useChat() {
     contextNotices,
     contextMeter,
     compactionStatus,
+    planTasks,
     setContextTokens,
     setContextMode,
     setContextCutoffIndex,

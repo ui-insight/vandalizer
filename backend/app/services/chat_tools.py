@@ -3982,10 +3982,123 @@ async def create_workflow(
 
 
 # ---------------------------------------------------------------------------
+# Plan / progress tracking (uplift plan Phase 8)
+# ---------------------------------------------------------------------------
+
+_PLAN_STATUSES = ("pending", "in_progress", "completed")
+_PLAN_MAX_TASKS = 20
+
+
+async def update_plan(
+    context: RunContext[AgenticChatDeps],
+    tasks: list[dict],
+) -> dict:
+    """Update the visible task checklist for multi-step work. Call with the FULL list every time.
+
+    The user sees this as a live pinned checklist, so keeping it current is
+    how they know what you're doing and what's left. Use it proactively when
+    a request takes 3 or more distinct steps (batch extractions, build-then-
+    validate flows, multi-document comparisons, workflow setup). Skip it for
+    single, trivial actions — one search or one extraction needs no plan;
+    just do it.
+
+    Rules (strict):
+    - Send the COMPLETE list each call, not a delta.
+    - Exactly ONE task must be in_progress at a time — not less, not more —
+      until everything is completed.
+    - Mark a task completed IMMEDIATELY after finishing it; never batch
+      completions.
+    - NEVER mark a task completed if its tool call failed or was cancelled —
+      keep it in_progress and surface the blocker to the user.
+    - Every task needs both forms: content (imperative: "Run extraction on
+      FY24 proposals") and active_form (present continuous: "Running
+      extraction on FY24 proposals").
+
+    <example>
+    User: "Extract budgets from these 6 proposals, check them against the
+    F&A rules, and save a summary to my Awards folder."
+    → update_plan with three tasks, then work through them, updating after
+    each completes.
+    <reasoning>Three distinct operations the user will wait through —
+    visible progress beats a silent multi-minute spinner.</reasoning>
+    </example>
+    <example>
+    User: "What's the PI name on this proposal?"
+    → Just run the extraction/lookup. No update_plan.
+    <reasoning>Single trivial step; a checklist would be ceremony.</reasoning>
+    </example>
+
+    Args:
+        context: The call context.
+        tasks: Full task list. Each task: {"content": str (imperative),
+            "active_form": str (present continuous),
+            "status": "pending" | "in_progress" | "completed"}.
+    """
+    if not isinstance(tasks, list) or not tasks:
+        return _err(
+            "tasks must be a non-empty list.",
+            hint="Send the full checklist: [{content, active_form, status}, …].",
+        )
+    if len(tasks) > _PLAN_MAX_TASKS:
+        return _err(
+            f"Too many tasks ({len(tasks)} > {_PLAN_MAX_TASKS}).",
+            hint="Collapse related steps — the checklist is for the user, not a log.",
+        )
+
+    normalized: list[dict] = []
+    for i, task in enumerate(tasks):
+        if not isinstance(task, dict):
+            return _err(f"Task {i} is not an object.")
+        content = str(task.get("content", "")).strip()
+        active_form = str(task.get("active_form", "")).strip()
+        status = str(task.get("status", "")).strip()
+        if not content or not active_form:
+            return _err(
+                f"Task {i} is missing content or active_form.",
+                hint=(
+                    "Both forms are required: content is imperative ('Run "
+                    "extraction'), active_form is present continuous "
+                    "('Running extraction')."
+                ),
+            )
+        if status not in _PLAN_STATUSES:
+            return _err(
+                f"Task {i} has invalid status {status!r}.",
+                hint="Status must be pending, in_progress, or completed.",
+            )
+        normalized.append(
+            {"content": content, "active_form": active_form, "status": status}
+        )
+
+    in_progress = sum(1 for t in normalized if t["status"] == "in_progress")
+    completed = sum(1 for t in normalized if t["status"] == "completed")
+    all_done = completed == len(normalized)
+    if not all_done and in_progress != 1:
+        return _err(
+            f"Exactly one task must be in_progress (got {in_progress}).",
+            hint=(
+                "Mark the task you are working on RIGHT NOW as in_progress "
+                "and everything not yet started as pending. Zero in_progress "
+                "is only valid when every task is completed."
+            ),
+        )
+
+    context.deps.plan_state = normalized
+    return {
+        "ok": True,
+        "task_count": len(normalized),
+        "completed": completed,
+        "all_done": all_done,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Tool registry — imported by llm_service.create_agentic_chat_agent()
 # ---------------------------------------------------------------------------
 
 TOOLS = [
+    # Phase 0 — Plan/progress tracking (sequential: mutates deps.plan_state)
+    update_plan,
     # Phase 1 — Read-only
     search_documents,
     list_documents,

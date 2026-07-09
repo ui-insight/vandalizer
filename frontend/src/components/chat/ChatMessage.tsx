@@ -313,6 +313,9 @@ export function ChatMessage({
                   )
                 }
                 if (seg.kind === 'tool_call') {
+                  // update_plan renders as the pinned checklist card, not a
+                  // tool status line (uplift plan Phase 8).
+                  if (seg.call.tool_name === 'update_plan') return null
                   // Drop duplicate confirmation cards for the same action.
                   if (suppressedConfirmCallIds.has(seg.call.tool_call_id)) return null
                   const result = resultMap.get(seg.call.tool_call_id)
