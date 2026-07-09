@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
-import { streamChat, getHistory } from '../api/chat'
+import { streamChat, getHistory, queueChatMessage } from '../api/chat'
 import type { ChatMessage, Citation, ContextBudgetPlan, ContextMeterInfo, OversizeDocument, PlanTask, StreamChunk, StreamSegment, ToolCallInfo, ToolResultInfo } from '../types/chat'
 
 export interface ContextNotice {
@@ -82,6 +82,10 @@ export function useChat() {
   // same conversation (a follow-up "continue" resumes it); cleared on reset
   // and seeded from history on load.
   const [planTasks, setPlanTasks] = useState<PlanTask[] | null>(null)
+  // Messages typed while a turn streams (Phase 10). Shown with a "Queued"
+  // badge until the backend consumes them (queue_consumed chunk), at which
+  // point they become regular transcript messages.
+  const [queuedMessages, setQueuedMessages] = useState<string[]>([])
 
   const streamingRef = useRef('')
   const thinkingRef = useRef('')
@@ -240,6 +244,18 @@ export function useChat() {
               if (chunk.plan) {
                 setPlanTasks(chunk.plan)
               }
+            } else if (chunk.kind === 'queue_consumed') {
+              const consumed = chunk.content
+              setQueuedMessages((prev) => {
+                const idx = prev.indexOf(consumed)
+                if (idx === -1) return prev
+                const next = [...prev]
+                next.splice(idx, 1)
+                return next
+              })
+              // Promote to a regular transcript message — it now lives in
+              // the turn the model is answering.
+              setMessages((prev) => [...prev, { role: 'user', content: consumed }])
             } else if (chunk.kind === 'sources') {
               if (chunk.sources?.length) {
                 const seen = new Set(citationsRef.current.map(citationKey))
@@ -357,6 +373,7 @@ export function useChat() {
     setContextMeter(null)
     setCompactionStatus(null)
     setPlanTasks(null)
+    setQueuedMessages([])
   }, [])
 
   const clearError = useCallback(() => {
@@ -378,6 +395,28 @@ export function useChat() {
     })
     send(...args)
   }, [send])
+
+  /** Queue a message typed while a turn is streaming (Phase 10). Optimistic:
+   * the badge shows immediately; a failed POST rolls it back. If the stream
+   * ends before the drain point, the backend folds leftovers into the next
+   * turn — the badge clears when that turn's queue_consumed chunk arrives. */
+  const queueMessage = useCallback(async (text: string) => {
+    const trimmed = text.trim()
+    if (!trimmed || !conversationUuid) return
+    setQueuedMessages((prev) => [...prev, trimmed])
+    try {
+      await queueChatMessage(conversationUuid, trimmed)
+    } catch (e) {
+      setQueuedMessages((prev) => {
+        const idx = prev.indexOf(trimmed)
+        if (idx === -1) return prev
+        const next = [...prev]
+        next.splice(idx, 1)
+        return next
+      })
+      setError(e instanceof Error ? e.message : 'Could not queue the message')
+    }
+  }, [conversationUuid])
 
   /** Resume a turn that stopped at the tool budget (usage_limit_resumable).
    * Unlike retry(), this keeps the partial exchange — the backend armed a
@@ -421,6 +460,8 @@ export function useChat() {
     contextMeter,
     compactionStatus,
     planTasks,
+    queuedMessages,
+    queueMessage,
     setContextTokens,
     setContextMode,
     setContextCutoffIndex,

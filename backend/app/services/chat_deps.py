@@ -60,3 +60,10 @@ class AgenticChatDeps:
     # 'plan_update' chunk and _finalize persists it on the conversation so a
     # follow-up turn resumes the same checklist. None = no plan this turn.
     plan_state: Optional[list[dict]] = None
+
+    # Mid-run message queue hand-off (uplift plan Phase 10). chat_stream
+    # drains the conversation's queued messages before each model request
+    # and stages them here; the agent's history processor
+    # (llm_service._inject_queued_user_parts) folds them into the outgoing
+    # request as user parts and clears the list.
+    queued_user_parts: list[str] = field(default_factory=list)

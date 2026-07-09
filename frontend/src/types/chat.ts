@@ -96,6 +96,8 @@ export type StreamSegment =
   | { kind: 'text'; content: string }
   | { kind: 'tool_call'; call: ToolCallInfo }
   | { kind: 'tool_result'; result: ToolResultInfo }
+  // A message the user sent mid-turn, consumed at that point in the run.
+  | { kind: 'queued_user'; content: string }
 
 export interface ContextBudgetPlan {
   model: string
@@ -168,6 +170,7 @@ export interface StreamChunk {
     | 'context_notice'
     | 'compaction'
     | 'plan_update'
+    | 'queue_consumed'
     | 'sources'
   content: string
   duration?: number

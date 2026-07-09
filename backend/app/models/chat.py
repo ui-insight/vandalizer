@@ -32,6 +32,18 @@ class ChatRole(str, Enum):
 CLEARED_TOOL_RESULT_MARKER = "[Old tool result content cleared]"
 
 
+def wrap_queued_user_message(text: str) -> str:
+    """Frame a mid-run queued user message for the model (uplift plan
+    Phase 10). Used identically at live-injection time (llm_service history
+    processor) and at replay time (queued_user segments below), so what the
+    model sees is byte-stable across turns — which also keeps the prompt
+    cache intact."""
+    return (
+        "[The user sent this message while you were working. Address it as "
+        "part of your current reply.]\n" + text
+    )
+
+
 class ChatMessage(Document):
     role: ChatRole
     message: str
@@ -137,6 +149,16 @@ class ChatMessage(Document):
                     content=content,
                     tool_call_id=call_id,
                 ))
+            elif kind == "queued_user":
+                # A message the user sent mid-turn (Phase 10). It was
+                # injected into the request alongside that batch's tool
+                # returns, so it replays in exactly that position.
+                flush_response()
+                content = seg.get("content", "")
+                if content:
+                    request_parts.append(UserPromptPart(
+                        content=wrap_queued_user_message(content)
+                    ))
 
         flush_response()
         flush_request()
@@ -211,6 +233,12 @@ class ChatConversation(Document):
     # token counting"; truncate/compact/clear endpoints reset these.
     last_context_tokens: int = 0
     last_context_message_count: int = -1
+
+    # Mid-run message queue (uplift plan Phase 10). Messages the user typed
+    # while a turn was streaming; chat_stream drains this atomically before
+    # each model request and injects them into the running turn. Entries:
+    # {"text": str, "ts": iso timestamp}.
+    queued_messages: list[dict] = []
 
     # Latest task checklist from update_plan (uplift plan Phase 8), persisted
     # so a follow-up turn and a page reload resume the same visible plan.

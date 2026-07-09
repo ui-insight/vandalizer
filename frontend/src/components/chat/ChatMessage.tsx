@@ -312,6 +312,17 @@ export function ChatMessage({
                     />
                   )
                 }
+                if (seg.kind === 'queued_user') {
+                  // A message the user sent while this reply was running
+                  // (Phase 10) — render as a user-side chip in-position.
+                  return (
+                    <div key={i} className="my-2 flex justify-end">
+                      <div className="max-w-[80%] rounded-lg bg-gray-100 border border-gray-200 px-3 py-1.5 text-sm text-gray-800">
+                        {seg.content}
+                      </div>
+                    </div>
+                  )
+                }
                 if (seg.kind === 'tool_call') {
                   // update_plan renders as the pinned checklist card, not a
                   // tool status line (uplift plan Phase 8).

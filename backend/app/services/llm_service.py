@@ -700,6 +700,39 @@ def create_chat_agent(
     return Agent(model, instructions=prompt_to_use, model_settings=model_settings)
 
 
+async def _inject_queued_user_parts(ctx: RunContext, messages: list) -> list:
+    """History processor: fold mid-run queued user messages into the outgoing
+    request (uplift plan Phase 10).
+
+    The ``RunContext`` annotation is load-bearing: pydantic-ai inspects it to
+    decide whether to pass the context — without it the processor is called
+    as messages-only and deps are unreachable.
+
+    chat_stream drains the conversation's queue before each model request and
+    stages the texts on ``deps.queued_user_parts``; this processor appends
+    them as UserPromptParts to the final ModelRequest (alongside that batch's
+    tool returns) and clears the staging list. Runs on every request; a no-op
+    when nothing is staged. Verified against pydantic-ai 1.71: parts injected
+    here land in the run's message history in-position, so persistence via
+    the queued_user segment replays byte-identically.
+    """
+    queued = getattr(getattr(ctx, "deps", None), "queued_user_parts", None)
+    if not queued or not messages:
+        return messages
+    from pydantic_ai.messages import ModelRequest, UserPromptPart
+
+    from app.models.chat import wrap_queued_user_message
+
+    last = messages[-1]
+    if not isinstance(last, ModelRequest):
+        return messages
+    parts = list(last.parts) + [
+        UserPromptPart(content=wrap_queued_user_message(q)) for q in queued
+    ]
+    queued.clear()
+    return messages[:-1] + [ModelRequest(parts=parts)]
+
+
 def create_agentic_chat_agent(
     agent_model: str,
     thinking_override: Optional[bool] = None,
@@ -746,6 +779,7 @@ def create_agentic_chat_agent(
             model_settings=build_prompt_cache_model_settings(
                 agent_model, system_config_doc
             ) or None,
+            history_processors=[_inject_queued_user_parts],
         )
         for tool_fn in TOOLS:
             agent.tool(

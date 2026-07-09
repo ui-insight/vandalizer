@@ -47,3 +47,8 @@ class CompactContextRequest(BaseModel):
 
 class ClearContextRequest(BaseModel):
     conversation_uuid: str
+
+
+class QueueMessageRequest(BaseModel):
+    conversation_uuid: str
+    message: str

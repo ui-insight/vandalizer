@@ -399,6 +399,28 @@ async def _maybe_advance_microcompact_boundary(
     return True
 
 
+async def _drain_queued_messages(conversation_uuid: str) -> list[str]:
+    """Atomically pop all mid-run queued messages for a conversation.
+
+    Uses find_one_and_update (returns the pre-update document) so a message
+    queued between read and clear is never lost and never delivered twice —
+    the queue is written by other request handlers, potentially in other
+    worker processes, so the database is the only safe coordination point.
+    """
+    coll = ChatConversation.get_motor_collection()
+    doc = await coll.find_one_and_update(
+        {"uuid": conversation_uuid, "queued_messages.0": {"$exists": True}},
+        {"$set": {"queued_messages": []}},
+    )
+    if not doc:
+        return []
+    return [
+        str(q.get("text", "")).strip()
+        for q in doc.get("queued_messages", [])
+        if str(q.get("text", "")).strip()
+    ]
+
+
 def _final_request_context_tokens(result) -> int:
     """Context size of the run's FINAL model request, provider-reported.
 
@@ -1138,6 +1160,30 @@ async def chat_stream(
         if project_block:
             reminder_blocks.append(project_block)
 
+    # Leftover queued messages (uplift plan Phase 10): the user typed these
+    # while a previous turn was running, but that turn ended (stop/error)
+    # before its drain point. Fold them into this turn as a reminder — they
+    # arrived BEFORE the current message chronologically, and emitting
+    # queue_consumed lets the frontend clear the "queued" badges.
+    if user:
+        try:
+            leftover_queue = await _drain_queued_messages(conversation.uuid)
+        except Exception as e:
+            logger.warning("Leftover queue drain failed: %s", e)
+            leftover_queue = []
+        if leftover_queue:
+            reminder_blocks.append(
+                "Before their message below, while the previous reply was "
+                "still running, the user also sent:\n"
+                + "\n".join(f"- {q}" for q in leftover_queue)
+                + "\nAddress these as part of this turn."
+            )
+            for queued_text in leftover_queue:
+                yield json.dumps({
+                    "kind": "queue_consumed",
+                    "content": queued_text,
+                }) + "\n"
+
     # One-shot resume instruction (uplift plan Phase 5): the previous turn
     # stopped at the tool budget and the user chose to continue.
     if getattr(conversation, "resume_pending", False):
@@ -1415,6 +1461,27 @@ async def chat_stream(
         async with agent.iter(prompt, **iter_kwargs) as agent_run:
             async for node in agent_run:
                 if Agent.is_model_request_node(node):
+                    # Mid-run message queue (uplift plan Phase 10): before
+                    # this request executes, fold in anything the user typed
+                    # while tools were running. The history processor
+                    # (_inject_queued_user_parts) delivers the staged parts;
+                    # the queued_user segment persists them in-position so
+                    # replay matches what the model actually saw.
+                    if deps is not None:
+                        try:
+                            drained = await _drain_queued_messages(conversation.uuid)
+                        except Exception as e:
+                            logger.warning("Queued-message drain failed: %s", e)
+                            drained = []
+                        for queued_text in drained:
+                            deps.queued_user_parts.append(queued_text)
+                            streamed_segments.append(
+                                {"kind": "queued_user", "content": queued_text}
+                            )
+                            yield json.dumps({
+                                "kind": "queue_consumed",
+                                "content": queued_text,
+                            }) + "\n"
                     async with node.stream(agent_run.ctx) as stream:
                         async for event in stream:
                             content, is_api_thinking = _extract_event_content(event)

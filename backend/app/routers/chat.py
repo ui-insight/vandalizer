@@ -31,6 +31,7 @@ from app.schemas.chat import (
     ChatRequest,
     ClearContextRequest,
     CompactContextRequest,
+    QueueMessageRequest,
     TruncateContextRequest,
 )
 from app.services import access_control, organization_service
@@ -656,6 +657,46 @@ async def download_chat(
 # ---------------------------------------------------------------------------
 # Context management
 # ---------------------------------------------------------------------------
+
+
+@router.post("/queue")
+async def queue_message(
+    body: QueueMessageRequest,
+    user: User = Depends(get_current_user),
+):
+    """Queue a message typed while a turn is streaming (uplift plan Phase 10).
+
+    chat_stream drains the queue atomically before each model request and
+    folds queued messages into the running turn; leftovers (stopped/failed
+    turns) fold into the next turn instead. Not a replacement for sending a
+    message — the frontend only calls this while a stream is active.
+    """
+    conversation = await ChatConversation.find_one(
+        ChatConversation.uuid == body.conversation_uuid,
+        ChatConversation.user_id == user.user_id,
+    )
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
+    text = (body.message or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Message is empty")
+    if len(conversation.queued_messages or []) >= 10:
+        raise HTTPException(
+            status_code=409,
+            detail="Queue is full — wait for the current response to catch up.",
+        )
+
+    import datetime as _dt
+
+    await ChatConversation.get_motor_collection().update_one(
+        {"uuid": body.conversation_uuid, "user_id": user.user_id},
+        {"$push": {"queued_messages": {
+            "text": text[:4000],
+            "ts": _dt.datetime.now(_dt.timezone.utc).isoformat(),
+        }}},
+    )
+    return {"success": True}
 
 
 @router.post("/truncate")

@@ -187,6 +187,16 @@ export function deleteHistory(conversationUuid: string) {
   })
 }
 
+/** Queue a message typed while a turn is streaming (uplift plan Phase 10).
+ * The backend folds it into the running turn at its next drain point, or
+ * into the next turn if the stream ends first. */
+export function queueChatMessage(conversationUuid: string, message: string) {
+  return apiFetch<{ success: boolean }>('/api/chat/queue', {
+    method: 'POST',
+    body: JSON.stringify({ conversation_uuid: conversationUuid, message }),
+  })
+}
+
 export function truncateContext(conversationUuid: string, cutoffIndex?: number) {
   return apiFetch<{ success: boolean; context_mode: string; context_cutoff_index: number }>(
     '/api/chat/truncate',

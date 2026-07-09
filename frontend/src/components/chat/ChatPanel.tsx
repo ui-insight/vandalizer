@@ -164,6 +164,8 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     contextMeter,
     compactionStatus,
     planTasks,
+    queuedMessages,
+    queueMessage,
     setContextTokens,
     setContextMode,
     setContextCutoffIndex,
@@ -1411,6 +1413,23 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
           </div>
         )}
 
+        {/* Messages typed while the turn streams (Phase 10) — badge clears
+            when the backend consumes them into the run. */}
+        {queuedMessages.length > 0 && (
+          <div className="mt-2 space-y-1">
+            {queuedMessages.map((m, i) => (
+              <div key={`${i}-${m.slice(0, 24)}`} className="flex justify-end">
+                <div className="max-w-[80%] rounded-lg border border-dashed border-gray-300 bg-gray-50 px-3 py-1.5 text-sm text-gray-600">
+                  {m}
+                  <span className="ml-2 text-[10px] font-medium uppercase tracking-wide text-gray-400">
+                    Queued
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Live task checklist for multi-step agent work (Phase 8). */}
         {planTasks && planTasks.length > 0 && <PlanChecklist tasks={planTasks} />}
 
@@ -1575,13 +1594,14 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         </div>
       )}
 
-      {/* Input */}
+      {/* Input. Typing stays enabled while a turn streams (Phase 10):
+          submits mid-run queue into the current turn instead of sending. */}
       <ChatInput
-        onSend={handleSend}
+        onSend={(msg) => (isStreaming ? queueMessage(msg) : handleSend(msg))}
         onAttachFile={handleAttachFile}
         onAttachLink={handleAttachLink}
         onAddKnowledge={() => setWorkspaceMode('knowledge')}
-        disabled={isStreaming}
+        disabled={false}
         isStreaming={isStreaming}
         onStop={stop}
         selectedModel={selectedModel}
