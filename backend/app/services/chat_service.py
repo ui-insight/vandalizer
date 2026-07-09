@@ -1586,7 +1586,11 @@ async def chat_stream(
                                     yield json.dumps({
                                         "kind": "plan_update",
                                         "content": "",
-                                        "plan": deps.plan_state,
+                                        # NOT "plan" — that key belongs to the
+                                        # context_budget chunk (ContextBudgetPlan)
+                                        # and the frontend StreamChunk type can't
+                                        # carry both shapes under one name.
+                                        "plan_tasks": deps.plan_state,
                                     }) + "\n"
 
                                 # Citation sidecar (search_knowledge_base): emit a

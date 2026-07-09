@@ -187,8 +187,9 @@ export interface StreamChunk {
   tokens_dropped?: number
   // compaction kind only: auto-compaction lifecycle for this turn.
   status?: 'started' | 'done' | 'failed'
-  // plan_update kind only: the full current checklist.
-  plan?: PlanTask[]
+  // plan_update kind only: the full current checklist. Named plan_tasks
+  // because `plan` is already the context_budget chunk's ContextBudgetPlan.
+  plan_tasks?: PlanTask[]
   // Error-only: machine-readable failure code + optional suggested recovery.
   code?: string
   suggested_action?: 'convert_to_kb' | 'continue'

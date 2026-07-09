@@ -241,8 +241,8 @@ export function useChat() {
             } else if (chunk.kind === 'compaction') {
               setCompactionStatus(chunk.status ?? null)
             } else if (chunk.kind === 'plan_update') {
-              if (chunk.plan) {
-                setPlanTasks(chunk.plan)
+              if (chunk.plan_tasks) {
+                setPlanTasks(chunk.plan_tasks)
               }
             } else if (chunk.kind === 'queue_consumed') {
               const consumed = chunk.content
