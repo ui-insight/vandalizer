@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, useCallback, type DragEvent } from 'react'
-import { Loader2, BookOpen, X, ArrowDown, ChevronRight, Shield, CheckCircle2, Upload, Zap, Link2, Sparkles, FolderKanban } from 'lucide-react'
+import { Loader2, BookOpen, X, ArrowDown, ChevronRight, Upload, Zap, Link2, Sparkles, FolderKanban } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
 import { AttachmentList } from './AttachmentList'
 import { FileProcessingCell, type ProcessingCellDoc } from './FileProcessingCell'
 import { toolResultToText } from './ToolCallDisplay'
+import { FirstSessionHome, ReturningHome } from './HomeExperience'
 import { WorkspaceBriefing } from './WorkspaceBriefing'
 import { OnboardingStepper } from './WelcomeExperience'
 import { ConceptStrip } from './ConceptTip'
@@ -77,60 +78,6 @@ function StreamingLabel() {
   )
 }
 
-const VALUE_TAGLINES: Array<{
-  icon: typeof Shield
-  title: string
-  detail: string
-}> = [
-  { icon: Shield, title: 'Your documents stay private', detail: 'Files never leave your institution; you choose the model.' },
-  { icon: CheckCircle2, title: 'Workflows you can trust', detail: 'Every extraction template has documented accuracy metrics.' },
-  { icon: Upload, title: 'Built for research administration', detail: 'Purpose-built for grants, compliance, and institutional docs.' },
-]
-
-/** Single-line rotator that fades between the three value props inside the first-session banner. */
-function ValueTaglineRotator() {
-  const [index, setIndex] = useState(0)
-  const [fade, setFade] = useState(true)
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setFade(false)
-      setTimeout(() => {
-        setIndex(i => (i + 1) % VALUE_TAGLINES.length)
-        setFade(true)
-      }, 380)
-    }, 4200)
-    return () => clearInterval(interval)
-  }, [])
-
-  const { icon: Icon, title, detail } = VALUE_TAGLINES[index]
-
-  return (
-    <div
-      aria-live="polite"
-      style={{
-        marginTop: 14,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        padding: '8px 12px',
-        borderRadius: 10,
-        background: 'rgba(255,255,255,0.12)',
-        backdropFilter: 'blur(4px)',
-        opacity: fade ? 1 : 0,
-        transition: 'opacity 0.38s ease',
-        minHeight: 38,
-      }}
-    >
-      <Icon size={15} style={{ flexShrink: 0, opacity: 0.95 }} />
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: '4px 8px', lineHeight: 1.35 }}>
-        <span style={{ fontSize: 13, fontWeight: 600 }}>{title}</span>
-        <span style={{ fontSize: 12, opacity: 0.82 }}>{detail}</span>
-      </div>
-    </div>
-  )
-}
-
 interface ChatPanelProps {
   conversationToLoad?: string | null
   pendingMessage?: PendingChatMessage | null
@@ -142,7 +89,6 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const brandIcon = branding.iconUrl
   const {
     messages,
-    setMessages,
     streamingContent,
     thinkingContent,
     thinkingDuration,
@@ -175,7 +121,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     setActivity,
   } = useChat()
 
-  const { bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, activeKBUuid, activeKBTitle, activateKB, deactivateKB, activeProjectUuid, activeProjectTitle, activeProjectRole, deactivateProject, setCurrentConversationUuid, focusChatSignal, setWorkspaceMode } = useWorkspace()
+  const { bumpActivitySignal, processingDoc, selectedDocsProcessing, selectedDocUuids, setSelectedDocUuids, selectedDocNames, setSelectedDocNames, selectedFolderUuids, activeKBUuid, activeKBTitle, activateKB, deactivateKB, activeProjectUuid, activeProjectTitle, activeProjectRole, deactivateProject, setCurrentConversationUuid, focusChatSignal, focusChat, setWorkspaceMode } = useWorkspace()
 
   // When scoped to a project, surface its file/index status so the empty state
   // reflects the project (not a generic assistant) and sets honest expectations.
@@ -195,7 +141,6 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     lockedFirstSession.current = isFirstSession
   }
   const effectiveFirstSession = lockedFirstSession.current ?? isFirstSession
-  const firstSessionSeeded = useRef(false)
   const firstSessionMarked = useRef(false)
   const demoTriggered = useRef(false)
   const [fileAttachments, setFileAttachments] = useState<FileAttachment[]>([])
@@ -270,22 +215,6 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
       setShowContextNudge(false)
     }
   }, [contextTokens, contextWindow, contextMeter])
-
-  // Seed the first-session conversation with an opening assistant message
-  useEffect(() => {
-    if (effectiveFirstSession && !onboardingLoading && messages.length === 0 && !firstSessionSeeded.current && !conversationToLoad) {
-      firstSessionSeeded.current = true
-      setMessages([{
-        role: 'assistant',
-        content:
-          `Hi! I'm your ${branding.orgName} assistant.\n\n` +
-          "I specialize in document intelligence for research administration: " +
-          "extraction with **measured accuracy**, not guesses.\n\n" +
-          "Want a quick demo? Tap **Show me a live demo** above and I'll run one " +
-          "against a sample grant proposal. Or just ask me about your own documents.",
-      }])
-    }
-  }, [effectiveFirstSession, onboardingLoading, messages.length, setMessages, conversationToLoad])
 
   const handleModelChange = (model: string) => {
     setSelectedModel(model)
@@ -838,6 +767,22 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     }
   }
 
+  const homeActionsDisabled = attachLoading || !!processingDoc
+  const showFirstSessionHome = effectiveFirstSession && messages.length === 0 && !isStreaming && !onboardingLoading
+  const showReturningHome = !effectiveFirstSession
+    && messages.length === 0
+    && !isStreaming
+    && !onboardingLoading
+    && !bannerProcessingDoc
+    && !activeProjectUuid
+    && !activeKBUuid
+    && !hasDocContext
+  const showContextualEmptyState = !effectiveFirstSession
+    && messages.length === 0
+    && !isStreaming
+    && !onboardingLoading
+    && !showReturningHome
+
   return (
     <div
       className="flex h-full flex-col"
@@ -907,92 +852,42 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         style={{ padding: '20px 20px 180px 20px', position: 'relative' }}
       >
         {/* First-session: compact value-prop banner with rotating taglines */}
-        {effectiveFirstSession && !onboardingLoading && (
-          <div style={{ maxWidth: 640, margin: '0 auto 16px' }}>
-            <div
-              className="relative overflow-hidden text-white"
-              style={{
-                padding: '20px 22px',
-                borderRadius: 'var(--ui-radius, 12px)',
-                background: 'linear-gradient(135deg, var(--highlight-complement, #6a11cb), color-mix(in srgb, var(--highlight-color, #f1b300) 70%, #ffffff 30%))',
-              }}
-            >
-              <div
-                style={{
-                  position: 'absolute', top: '-50%', left: '-50%',
-                  width: '200%', height: '200%',
-                  background: 'radial-gradient(circle at center, rgba(255,255,255,0.15), transparent 70%)',
-                  animation: 'rotateBG 32s linear infinite',
-                }}
-              />
-              <div className="relative z-[1]">
-                <div className="flex items-center gap-4">
-                  {brandIcon && (
-                    <div style={{ animation: 'float 3s ease-in-out infinite' }} className="shrink-0">
-                      <img src={brandIcon} alt={branding.orgName} style={{ width: 22, height: 35, objectFit: 'contain' }} className="opacity-90" />
-                    </div>
-                  )}
-                  <div>
-                    <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.3 }}>
-                      Welcome to {branding.orgName}
-                    </div>
-                    <div style={{ fontSize: 13, opacity: 0.8, marginTop: 2, fontWeight: 400 }}>
-                      AI-powered document intelligence. Watch it in action below.
-                    </div>
-                  </div>
-                </div>
-                <ValueTaglineRotator />
-              </div>
-            </div>
-
-            {/* Primary CTA for brand-new users: one click straight to the live
-                demo, so a non-technical user never has to guess the "show me"
-                phrase. Disappears once the conversation actually starts. */}
-            {!messages.some(m => m.role === 'user') && (
-              <>
-                <div style={{ marginTop: 16, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
-                  <button
-                    disabled={!!processingDoc}
-                    onClick={handleRunDemo}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      padding: '10px 18px',
-                      fontSize: 14,
-                      fontWeight: 600,
-                      fontFamily: 'inherit',
-                      border: 'none',
-                      borderRadius: 22,
-                      backgroundColor: 'var(--highlight-color, #eab308)',
-                      color: '#1f2937',
-                      cursor: processingDoc ? 'default' : 'pointer',
-                      boxShadow: '0 2px 8px color-mix(in srgb, var(--highlight-color, #eab308) 35%, transparent)',
-                      transition: 'all 0.15s',
-                      opacity: processingDoc ? 0.5 : 1,
-                    }}
-                    onMouseEnter={e => { if (!processingDoc) e.currentTarget.style.filter = 'brightness(0.95)' }}
-                    onMouseLeave={e => { e.currentTarget.style.filter = 'none' }}
-                  >
-                    <Zap size={15} />
-                    Show me a live demo
-                  </button>
-                  <span style={{ fontSize: 12, color: '#9ca3af' }}>
-                    …or just ask a question below.
-                  </span>
-                </div>
-
-                {/* Plain-language glossary so first-timers aren't lost in jargon */}
-                <div style={{ marginTop: 18 }}>
-                  <ConceptStrip />
-                </div>
-              </>
-            )}
+        {showFirstSessionHome && (
+          <div style={{ marginBottom: 16 }}>
+            <FirstSessionHome
+              orgName={branding.orgName}
+              brandIcon={brandIcon}
+              disabled={homeActionsDisabled}
+              onRunDemo={handleRunDemo}
+              onAttachFiles={handleAttachFile}
+              onFocusComposer={focusChat}
+              onSendMessage={(msg) => handleSend(msg)}
+            />
           </div>
         )}
 
-        {/* Empty state: banner + contextual pills (non-first-session users) */}
-        {!effectiveFirstSession && messages.length === 0 && !isStreaming && !onboardingLoading && (
+        {showReturningHome && (
+          <div style={{ marginBottom: 16 }}>
+            <ReturningHome
+              orgName={branding.orgName}
+              brandIcon={brandIcon}
+              disabled={homeActionsDisabled}
+              onRunDemo={handleRunDemo}
+              onAttachFiles={handleAttachFile}
+              onFocusComposer={focusChat}
+              onSendMessage={(msg) => {
+                const hasServerPills = (onboardingStatus?.suggestion_pills?.length ?? 0) > 0
+                const needsOnboardingContext = !hasServerPills && !onboardingStatus?.has_documents
+                handleSend(msg, needsOnboardingContext)
+              }}
+              status={onboardingStatus}
+              suggestionPills={onboardingPills}
+            />
+          </div>
+        )}
+
+        {/* Empty state: banner + contextual pills for scoped/project/doc states */}
+        {showContextualEmptyState && (
           <div style={{ maxWidth: 640, margin: '0 auto' }}>
             <div
               className="relative overflow-hidden text-white"

@@ -8,26 +8,26 @@ interface PillDef {
 }
 
 const FEATURE_PILLS: PillDef[] = [
-  { id: 'add-file', label: 'How do I upload a document?', gateFlag: 'has_documents' },
-  { id: 'create-prompt', label: 'How do I save a reusable prompt?', gateFlag: 'has_library_items' },
-  { id: 'create-formatter', label: 'What are extraction templates?', gateFlag: 'has_extraction_sets' },
-  { id: 'build-from-doc', label: 'Can I auto-generate a template?', gateFlag: 'has_extraction_sets' },
-  { id: 'create-workflow', label: 'How do I set up a workflow?', gateFlag: 'has_workflows' },
-  { id: 'pin-item', label: 'What does pinning do?', gateFlag: 'has_pinned_item' },
-  { id: 'favorite-item', label: 'What does favoriting do?', gateFlag: 'has_favorited_item' },
-  { id: 'invite-team', label: 'How do I invite teammates?', gateFlag: 'has_team_members' },
-  { id: 'create-automation', label: 'What can automations do?', gateFlag: 'has_automations' },
-  { id: 'chat-kb', label: 'How do knowledge bases work?', gateFlag: 'has_ready_knowledge_base' },
+  { id: 'add-file', label: 'Upload a document and summarize it', gateFlag: 'has_documents' },
+  { id: 'create-prompt', label: 'Save a reusable prompt for this task', gateFlag: 'has_library_items' },
+  { id: 'create-formatter', label: 'Build an extraction template from my documents', gateFlag: 'has_extraction_sets' },
+  { id: 'build-from-doc', label: 'Auto-generate a template from a sample file', gateFlag: 'has_extraction_sets' },
+  { id: 'create-workflow', label: 'Turn this into a repeatable workflow', gateFlag: 'has_workflows' },
+  { id: 'pin-item', label: 'Pin the workflows I use most', gateFlag: 'has_pinned_item' },
+  { id: 'favorite-item', label: 'Favorite the templates I come back to', gateFlag: 'has_favorited_item' },
+  { id: 'invite-team', label: 'Invite teammates to review this with me', gateFlag: 'has_team_members' },
+  { id: 'create-automation', label: 'Set up an automation for incoming files', gateFlag: 'has_automations' },
+  { id: 'chat-kb', label: 'Ask my knowledge base a grounded question', gateFlag: 'has_ready_knowledge_base' },
 ]
 
 const LEARN_PILLS: PillDef[] = [
-  { id: 'learn-task-types', label: 'What workflow task types are there?', gateFlag: null },
-  { id: 'learn-inputs', label: 'How do workflow inputs work?', gateFlag: null },
-  { id: 'learn-step-inputs', label: 'How do I chain workflow steps?', gateFlag: null },
-  { id: 'learn-outputs', label: 'How do I export workflow results?', gateFlag: null },
-  { id: 'learn-folder-watch', label: 'What are folder watch triggers?', gateFlag: null },
-  { id: 'learn-m365', label: 'What are M365 intake triggers?', gateFlag: null },
-  { id: 'learn-api', label: 'Can I trigger a workflow via API?', gateFlag: null },
+  { id: 'learn-task-types', label: 'Show me which workflow should handle this document', gateFlag: null },
+  { id: 'learn-inputs', label: 'Help me choose the right inputs for this workflow', gateFlag: null },
+  { id: 'learn-step-inputs', label: 'Help me chain extraction and review steps together', gateFlag: null },
+  { id: 'learn-outputs', label: 'Show me how to export the results', gateFlag: null },
+  { id: 'learn-folder-watch', label: 'Help me watch a folder for new files', gateFlag: null },
+  { id: 'learn-m365', label: 'Show me how M365 intake would work here', gateFlag: null },
+  { id: 'learn-api', label: 'Show me how to trigger this workflow via API', gateFlag: null },
 ]
 
 /** Deterministic shuffle seeded by day+hour so pills rotate but stay stable within the hour. */
@@ -42,16 +42,10 @@ function seededShuffle<T>(arr: T[], seed: number): T[] {
   return copy
 }
 
-const CERTIFICATION_PILL = 'How do I get certified as a Vandal Workflow Architect?'
-
 function applyStatus(s: OnboardingStatus) {
   // Prefer server-generated action pills when available
   if (s.suggestion_pills?.length) {
-    // Still pin certification pill for uncertified users
-    const pinned: string[] = []
-    if (!s.is_certified) pinned.push(CERTIFICATION_PILL)
-    const serverPills = s.suggestion_pills.slice(0, 4 - pinned.length)
-    return [...pinned, ...serverPills]
+    return s.suggestion_pills.slice(0, 4)
   }
 
   // Fallback: client-side pill generation
@@ -62,15 +56,11 @@ function applyStatus(s: OnboardingStatus) {
   const shuffledFeature = seededShuffle(eligible, seed)
   const shuffledLearn = seededShuffle(LEARN_PILLS, seed + 1)
 
-  // Always include certification pill for uncertified users
-  const pinned: string[] = []
-  if (!s.is_certified) pinned.push(CERTIFICATION_PILL)
-
   const remaining = [...shuffledFeature, ...shuffledLearn]
     .map((p) => p.label)
-    .slice(0, 4 - pinned.length)
+    .slice(0, 4)
 
-  return [...pinned, ...remaining]
+  return remaining
 }
 
 export interface OnboardingResult {
@@ -103,7 +93,7 @@ export function useOnboarding(): OnboardingResult {
         const firstSession = !s.first_session_completed && !s.has_conversations && !hasActivity
         setIsFirstSession(firstSession)
 
-        // First-session users get a seeded chat message instead of pills
+        // First-session users get the dedicated home surface instead of pills.
         setPills(firstSession ? [] : applyStatus(s))
       })
       .catch(() => {
