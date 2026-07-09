@@ -2,6 +2,7 @@
 
 import pytest
 
+from app.utils import url_validation
 from app.utils.url_validation import validate_outbound_url
 
 
@@ -59,3 +60,60 @@ class TestValidateOutboundUrl:
     def test_blocks_unresolvable_hostname(self):
         with pytest.raises(ValueError, match="Cannot resolve"):
             validate_outbound_url("http://this-host-definitely-does-not-exist-xyz123.invalid/")
+
+
+class TestAllowedPrivateHosts:
+    """Hosts in ssrf_allowed_hosts may resolve to private (campus) ranges."""
+
+    @pytest.fixture
+    def allow_trusted_host(self, monkeypatch):
+        def _allow(*hosts, resolve_to="172.27.192.252"):
+            monkeypatch.setattr(
+                url_validation, "_allowed_private_hosts",
+                lambda: frozenset(h.lower() for h in hosts),
+            )
+            monkeypatch.setattr(
+                url_validation.socket, "getaddrinfo",
+                lambda host, port, proto=None: [(2, 1, 6, "", (resolve_to, port))],
+            )
+        return _allow
+
+    def test_allowed_host_may_resolve_private(self, allow_trusted_host):
+        allow_trusted_host("mindrouter.uidaho.edu")
+        url = "https://mindrouter.uidaho.edu/v1/search"
+        assert validate_outbound_url(url) == url
+
+    def test_allowed_host_match_is_case_insensitive(self, allow_trusted_host):
+        allow_trusted_host("mindrouter.uidaho.edu")
+        url = "https://MindRouter.uidaho.edu/v1/search"
+        assert validate_outbound_url(url) == url
+
+    def test_other_private_hosts_still_blocked(self, allow_trusted_host):
+        allow_trusted_host("mindrouter.uidaho.edu")
+        with pytest.raises(ValueError, match="blocked IP"):
+            validate_outbound_url("https://other.uidaho.edu/")
+
+    def test_allowed_host_still_blocked_on_loopback(self, allow_trusted_host):
+        allow_trusted_host("mindrouter.uidaho.edu", resolve_to="127.0.0.1")
+        with pytest.raises(ValueError, match="blocked IP"):
+            validate_outbound_url("https://mindrouter.uidaho.edu/")
+
+    def test_allowed_host_still_blocked_on_link_local(self, allow_trusted_host):
+        allow_trusted_host("mindrouter.uidaho.edu", resolve_to="169.254.169.254")
+        with pytest.raises(ValueError, match="blocked IP"):
+            validate_outbound_url("https://mindrouter.uidaho.edu/")
+
+    def test_allowlist_parses_settings_csv(self, monkeypatch):
+        class _FakeSettings:
+            ssrf_allowed_hosts = " MindRouter.uidaho.edu , other.host ,"
+
+        import app.config
+
+        url_validation._allowed_private_hosts.cache_clear()
+        monkeypatch.setattr(app.config, "Settings", lambda: _FakeSettings())
+        try:
+            assert url_validation._allowed_private_hosts() == frozenset(
+                {"mindrouter.uidaho.edu", "other.host"}
+            )
+        finally:
+            url_validation._allowed_private_hosts.cache_clear()

@@ -3,9 +3,11 @@
 A single service that normalizes three provider contracts into one shape so the
 admin can point the deployment at whichever search backend they have:
 
-- **tavily**  — LLM-optimized SaaS. ``POST`` JSON ``{api_key, query, ...}``.
-- **searxng** — self-hostable metasearch. ``GET .../search?q=...&format=json``.
-- **brave**   — Brave's independent index. ``GET`` with ``X-Subscription-Token``.
+- **tavily**     — LLM-optimized SaaS. ``POST`` JSON ``{api_key, query, ...}``.
+- **searxng**    — self-hostable metasearch. ``GET .../search?q=...&format=json``.
+- **brave**      — Brave's independent index. ``GET`` with ``X-Subscription-Token``.
+- **mindrouter** — campus search proxy (Brave/SearXNG behind one contract).
+  ``POST`` JSON ``{query, max_results}`` with a ``Bearer mr2_...`` key.
 
 Configuration lives on :class:`SystemConfig` (``web_search_provider``,
 ``web_search_endpoint``, ``web_search_api_key``) and is passed in as the
@@ -13,7 +15,9 @@ Configuration lives on :class:`SystemConfig` (``web_search_provider``,
 the DB. The API key is stored encrypted; we decrypt it here.
 """
 
+import html
 import logging
+import re
 from typing import Optional
 
 import httpx
@@ -28,9 +32,17 @@ _MAX_SNIPPET_CHARS = 500
 _DEFAULT_MAX_RESULTS = 5
 _HARD_MAX_RESULTS = 10
 
-# Tavily has a stable public endpoint; if the admin leaves the endpoint blank
-# but selects "tavily", fall back to it so the common case needs only a key.
+# Tavily and MindRouter have stable endpoints; if the admin leaves the
+# endpoint blank but selects one of them, fall back so the common case
+# needs only a key.
 _TAVILY_DEFAULT_ENDPOINT = "https://api.tavily.com/search"
+_MINDROUTER_DEFAULT_ENDPOINT = "https://mindrouter.uidaho.edu/v1/search"
+
+# Providers usable without an explicit endpoint.
+_DEFAULT_ENDPOINTS = {
+    "tavily": _TAVILY_DEFAULT_ENDPOINT,
+    "mindrouter": _MINDROUTER_DEFAULT_ENDPOINT,
+}
 
 _USER_AGENT = "Vandalizer-Chat/1.0 (+research-admin agent)"
 
@@ -38,14 +50,14 @@ _USER_AGENT = "Vandalizer-Chat/1.0 (+research-admin agent)"
 def is_configured(sys_config_doc: dict) -> bool:
     """Return True when web search has a provider and a usable endpoint.
 
-    Tavily is usable with just a provider (it has a default endpoint); the
-    others require an explicit endpoint.
+    Tavily and MindRouter are usable with just a provider (they have default
+    endpoints); the others require an explicit endpoint.
     """
     provider = (sys_config_doc.get("web_search_provider") or "").strip().lower()
     endpoint = (sys_config_doc.get("web_search_endpoint") or "").strip()
     if not provider:
         return False
-    if provider == "tavily":
+    if provider in _DEFAULT_ENDPOINTS:
         return True
     return bool(endpoint)
 
@@ -76,8 +88,8 @@ async def web_search(
             "results": [],
         }
 
-    if provider == "tavily" and not endpoint:
-        endpoint = _TAVILY_DEFAULT_ENDPOINT
+    if not endpoint and provider in _DEFAULT_ENDPOINTS:
+        endpoint = _DEFAULT_ENDPOINTS[provider]
     if not endpoint:
         return {
             "configured": False,
@@ -100,6 +112,8 @@ async def web_search(
             payload = await _search_searxng(endpoint, api_key, query, n)
         elif provider == "brave":
             payload = await _search_brave(endpoint, api_key, query, n)
+        elif provider == "mindrouter":
+            payload = await _search_mindrouter(endpoint, api_key, query, n)
         else:
             return {
                 "error": f"Unknown web search provider: {provider!r}.",
@@ -128,6 +142,14 @@ async def web_search(
 
 def _clip(text: Optional[str]) -> str:
     return (text or "").strip()[:_MAX_SNIPPET_CHARS]
+
+
+_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _strip_tags(text: Optional[str]) -> str:
+    """Drop inline HTML markup (Brave highlights hits with ``<strong>``)."""
+    return html.unescape(_TAG_RE.sub("", text or ""))
 
 
 async def _search_tavily(endpoint: str, api_key: str, query: str, n: int) -> dict:
@@ -206,6 +228,32 @@ async def _search_brave(endpoint: str, api_key: str, query: str, n: int) -> dict
             "snippet": _clip(r.get("description")),
         }
         for r in (web.get("results") or [])
+        if r.get("url")
+    ][:n]
+    return {"results": results, "answer": None}
+
+
+async def _search_mindrouter(endpoint: str, api_key: str, query: str, n: int) -> dict:
+    # MindRouter's BYO-search REST surface lives at <base>/v1/search. Accept a
+    # bare base URL too so the admin can paste either form.
+    url = endpoint if endpoint.rstrip("/").endswith("/search") else endpoint.rstrip("/") + "/v1/search"
+    body = {"query": query, "max_results": n}
+    headers = {"User-Agent": _USER_AGENT}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    async with httpx.AsyncClient(timeout=_TIMEOUT_S, follow_redirects=True) as client:
+        resp = await client.post(url, json=body, headers=headers)
+        resp.raise_for_status()
+        data = resp.json()
+
+    results = [
+        {
+            "title": _clip(_strip_tags(r.get("title"))) or r.get("url", ""),
+            "url": r.get("url", ""),
+            "snippet": _clip(_strip_tags(r.get("snippet"))),
+        }
+        for r in (data.get("results") or [])
         if r.get("url")
     ][:n]
     return {"results": results, "answer": None}

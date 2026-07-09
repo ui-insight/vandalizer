@@ -72,6 +72,8 @@ async def test_not_configured_returns_flag():
 @pytest.mark.asyncio
 async def test_is_configured():
     assert web_search_service.is_configured({"web_search_provider": "tavily"}) is True
+    # MindRouter has a default endpoint, so provider alone is enough.
+    assert web_search_service.is_configured({"web_search_provider": "mindrouter"}) is True
     assert web_search_service.is_configured(
         {"web_search_provider": "searxng", "web_search_endpoint": "https://s.x/search"}
     ) is True
@@ -145,6 +147,51 @@ async def test_brave_reads_web_results_and_token_header(patch_httpx):
     ]
     assert captured["headers"]["X-Subscription-Token"] == "tok"
     assert captured["params"]["count"] == 2
+
+
+@pytest.mark.asyncio
+async def test_mindrouter_posts_bearer_and_strips_html(patch_httpx):
+    captured = patch_httpx({
+        "provider": "Brave Search",
+        "total_results": 2,
+        "results": [
+            {
+                "title": "ORED | <strong>University</strong> of Idaho",
+                "url": "https://www.uidaho.edu/research",
+                "snippet": "Connects businesses with <strong>university researchers</strong> &amp; industry.",
+                "published": None,
+            },
+            {"title": "No URL", "snippet": "skip me"},  # dropped — no url
+        ],
+    })
+    cfg = {"web_search_provider": "mindrouter", "web_search_api_key": "mr2_key"}
+    result = await web_search_service.web_search("research administration", cfg, max_results=3)
+
+    assert result["provider"] == "mindrouter"
+    assert result["answer"] is None
+    assert result["results"] == [
+        {
+            "title": "ORED | University of Idaho",
+            "url": "https://www.uidaho.edu/research",
+            "snippet": "Connects businesses with university researchers & industry.",
+        }
+    ]
+    # Default endpoint, POST body, and Bearer auth.
+    assert captured["method"] == "POST"
+    assert captured["url"] == web_search_service._MINDROUTER_DEFAULT_ENDPOINT
+    assert captured["json"] == {"query": "research administration", "max_results": 3}
+    assert captured["headers"]["Authorization"] == "Bearer mr2_key"
+
+
+@pytest.mark.asyncio
+async def test_mindrouter_appends_v1_search_to_base_url(patch_httpx):
+    captured = patch_httpx({"results": []})
+    cfg = {
+        "web_search_provider": "mindrouter",
+        "web_search_endpoint": "https://mindrouter.uidaho.edu",
+    }
+    await web_search_service.web_search("q", cfg)
+    assert captured["url"] == "https://mindrouter.uidaho.edu/v1/search"
 
 
 @pytest.mark.asyncio

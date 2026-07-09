@@ -4036,16 +4036,17 @@ ${playgroundResult.request.user_prompt}`}
                 style={{ ...inputStyle, maxWidth: 500, background: '#fff', cursor: 'pointer' }}
               >
                 <option value="">Disabled</option>
+                <option value="mindrouter">MindRouter (campus search proxy)</option>
                 <option value="tavily">Tavily</option>
                 <option value="searxng">SearXNG (self-hosted)</option>
                 <option value="brave">Brave Search API</option>
               </select>
             </div>
             <div style={{ marginTop: 12 }}>
-              <label style={labelStyle}>Search Endpoint{webSearchProvider === 'tavily' ? ' (optional, defaults to api.tavily.com)' : ''}</label>
+              <label style={labelStyle}>Search Endpoint{webSearchProvider === 'tavily' ? ' (optional, defaults to api.tavily.com)' : webSearchProvider === 'mindrouter' ? ' (optional, defaults to mindrouter.uidaho.edu/v1/search)' : ''}</label>
               <input
                 type="url" value={webSearchEndpoint} onChange={e => setWebSearchEndpoint(e.target.value)}
-                placeholder={webSearchProvider === 'searxng' ? 'https://searx.your-domain.edu' : 'https://...'}
+                placeholder={webSearchProvider === 'searxng' ? 'https://searx.your-domain.edu' : webSearchProvider === 'mindrouter' ? 'https://mindrouter.uidaho.edu/v1/search' : 'https://...'}
                 style={{ ...inputStyle, maxWidth: 500 }}
               />
             </div>

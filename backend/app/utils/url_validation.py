@@ -2,6 +2,7 @@
 
 import ipaddress
 import socket
+from functools import lru_cache
 from urllib.parse import urlparse
 
 BLOCKED_HOSTS = frozenset({
@@ -11,11 +12,26 @@ BLOCKED_HOSTS = frozenset({
 })
 
 
+@lru_cache(maxsize=1)
+def _allowed_private_hosts() -> frozenset:
+    """Hostnames (from ``ssrf_allowed_hosts``) exempt from the private-IP block.
+
+    Trusted deployment infrastructure that lives on campus/RFC1918 addresses —
+    e.g. an on-prem search proxy. Exact hostname match, case-insensitive.
+    Loopback, link-local, and reserved ranges stay blocked even for these.
+    """
+    from app.config import Settings
+
+    raw = Settings().ssrf_allowed_hosts
+    return frozenset(h.strip().lower() for h in raw.split(",") if h.strip())
+
+
 def validate_outbound_url(url: str) -> str:
     """Validate that *url* is safe for server-side HTTP requests.
 
     Blocks private/loopback/link-local IPs, non-HTTP(S) schemes, and
     cloud metadata endpoints.  Raises ``ValueError`` on rejection.
+    Hosts named in ``ssrf_allowed_hosts`` may resolve to private ranges.
     """
     parsed = urlparse(url)
 
@@ -35,9 +51,12 @@ def validate_outbound_url(url: str) -> str:
     except socket.gaierror:
         raise ValueError(f"Cannot resolve hostname: {hostname}")
 
+    private_ok = hostname.lower() in _allowed_private_hosts()
     for info in infos:
         ip = ipaddress.ip_address(info[4][0])
-        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+        if ip.is_loopback or ip.is_link_local or ip.is_reserved:
+            raise ValueError(f"URL resolves to blocked IP range: {ip}")
+        if ip.is_private and not private_ok:
             raise ValueError(f"URL resolves to blocked IP range: {ip}")
 
     return url

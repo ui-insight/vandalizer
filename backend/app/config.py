@@ -33,6 +33,13 @@ class Settings(BaseSettings):
     max_context_length: int = 100000
     max_upload_size_mb: int = 500
 
+    # SSRF allowlist: comma-separated hostnames that outbound requests may hit
+    # even when they resolve to private/campus IP ranges. For trusted
+    # deployment infrastructure only (e.g. an on-campus search proxy) — the
+    # private-IP block still applies to every other host. Loopback, link-local,
+    # and cloud-metadata addresses stay blocked regardless.
+    ssrf_allowed_hosts: str = "mindrouter.uidaho.edu"
+
     # Observability
     sentry_dsn: str = ""
     log_format: str = "json"  # "json" for structured logging, "text" for human-readable
