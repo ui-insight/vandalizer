@@ -65,8 +65,10 @@ describe('FirstSessionHome', () => {
     )
 
     expect(screen.getByText('Turn complex documents into answers you can verify.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Upload a document/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Run sample demo/i })).toBeInTheDocument()
-    expect(screen.getByText('What makes the output trustworthy')).toBeInTheDocument()
+    expect(screen.getByText('Sample answer from the demo')).toBeInTheDocument()
+    expect(screen.getByText('Why the first answer feels trustworthy')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /Extract deadlines/i }))
     expect(onSendMessage).toHaveBeenCalledWith(

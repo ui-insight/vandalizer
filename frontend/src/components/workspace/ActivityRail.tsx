@@ -25,6 +25,10 @@ import { LEVEL_CONFIG } from '../certification/constants'
 import { cn } from '../../lib/cn'
 import type { ActivityEvent } from '../../types/chat'
 
+interface ActivityRailProps {
+  minimal?: boolean
+}
+
 function activityIcon(type: ActivityEvent['type']) {
   switch (type) {
     case 'conversation':
@@ -77,12 +81,13 @@ function isStale(activity: ActivityEvent, thresholdMinutes: number): boolean {
   return age > thresholdMinutes * 60 * 1000
 }
 
-export function ActivityRail() {
+export function ActivityRail({ minimal = false }: ActivityRailProps) {
   const { railDocked, toggleRailDocked, setActiveRightTab, setLoadConversationId, triggerNewChat, openWorkflow, openExtraction, closeWorkflow, closeExtraction, closeAutomation, activitySignal, currentConversationUuid } = useWorkspace()
   const { activities, refresh, freshTitleIds, markTitleShimmered, staleThresholdMinutes } = useActivities(activitySignal)
   const { toast } = useToast()
   const { togglePanel, progress } = useCertificationPanel()
   const confirm = useConfirm()
+  const visualDocked = railDocked || minimal
 
   const certLevel = progress?.level || 'novice'
   const certConfig = LEVEL_CONFIG[certLevel] || LEVEL_CONFIG.novice
@@ -161,19 +166,26 @@ export function ActivityRail() {
       {/* Header */}
       <div className="border-b border-[#ddd]" style={{ padding: '17px 12px' }}>
         <div className="flex items-center justify-between gap-2">
-          {!railDocked && (
+          {minimal && (
+            <div className="mx-auto flex items-center justify-center text-[#555]">
+              <Zap className="h-3.5 w-3.5" />
+            </div>
+          )}
+          {!visualDocked && (
             <div className="flex items-center gap-2">
               <Zap className="h-3.5 w-3.5" />
               <span className="text-sm font-bold">Activity</span>
             </div>
           )}
-          <button
-            onClick={toggleRailDocked}
-            className="flex items-center justify-center rounded p-1 text-[#333] hover:bg-[#e0e0e0] hover:text-[#111] transition-colors ml-auto"
-            title={railDocked ? 'Expand' : 'Collapse'}
-          >
-            {railDocked ? <PanelLeftOpen className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
-          </button>
+          {!minimal && (
+            <button
+              onClick={toggleRailDocked}
+              className="flex items-center justify-center rounded p-1 text-[#333] hover:bg-[#e0e0e0] hover:text-[#111] transition-colors ml-auto"
+              title={railDocked ? 'Expand' : 'Collapse'}
+            >
+              {railDocked ? <PanelLeftOpen className="h-3.5 w-3.5" /> : <PanelLeftClose className="h-3.5 w-3.5" />}
+            </button>
+          )}
         </div>
       </div>
 
@@ -187,19 +199,19 @@ export function ActivityRail() {
               'flex items-center gap-2 rounded-lg cursor-pointer p-2',
               'hover:bg-[#f0f2f5] hover:shadow-[0_1px_3px_rgb(15_23_42/0.12)]',
               'transition-[background-color,box-shadow] duration-200',
-              railDocked ? 'justify-center' : '',
+              visualDocked ? 'justify-center' : '',
             )}
           >
             <div className="shrink-0 w-4 text-center text-[#333]">
               <SquarePen className="h-4 w-4" />
             </div>
-            {!railDocked && (
+            {!visualDocked && (
               <div className="text-[11px] leading-[1.4] text-[#111]">New chat</div>
             )}
           </div>
           <div className="h-[5px]" />
 
-          {activities.map((activity) => {
+          {!minimal && activities.map((activity) => {
             const Icon = activityIcon(activity.type)
             const stale = isStale(activity, staleThresholdMinutes)
             const running = isRunning(activity.status) && !stale
@@ -230,7 +242,7 @@ export function ActivityRail() {
                 className={cn(
                   'rail-shimmer-running group relative flex items-center gap-2 rounded-lg cursor-pointer',
                   'transition-[background-color,box-shadow] duration-200',
-                  railDocked ? 'justify-center p-2' : 'p-2',
+                  visualDocked ? 'justify-center p-2' : 'p-2',
                   running
                     ? 'text-white'
                     : 'hover:bg-[#f0f2f5] hover:shadow-[0_1px_3px_rgb(15_23_42/0.12)]',
@@ -246,11 +258,11 @@ export function ActivityRail() {
                 }
               >
                 {/* Type icon */}
-                <div className={cn('shrink-0 w-4 text-center', running ? 'text-white' : railDocked ? 'text-[#999]' : 'text-[#333]')}>
+                <div className={cn('shrink-0 w-4 text-center', running ? 'text-white' : visualDocked ? 'text-[#999]' : 'text-[#333]')}>
                   <Icon className="h-4 w-4" />
                 </div>
 
-                {!railDocked && (
+                {!visualDocked && (
                   <>
                     {/* Title + status — clamp to 2 lines so AI titles can
                         breathe without blowing out the rail width. */}
@@ -312,39 +324,41 @@ export function ActivityRail() {
       </div>
 
       {/* Certification badge footer */}
-      <div className="border-t border-[#ddd] p-2 shrink-0 flex justify-center">
-        <div
-          onClick={togglePanel}
-          title={certCertified ? 'Vandal Workflow Architect' : certStarted ? `${certConfig.label} · ${certXp} XP` : 'Get Certified'}
-          className="flex items-center gap-2 cursor-pointer transition-all hover:shadow-md active:scale-95"
-          style={{
-            borderRadius: 'var(--ui-radius, 12px)',
-            padding: railDocked ? '6px 10px' : '6px 12px',
-            ...(certCertified
-              ? { background: 'linear-gradient(135deg, #191919, #2d2d2d)', border: '1px solid #444', boxShadow: '0 2px 8px rgba(234,179,8,0.2)' }
-              : { background: '#fff', border: '1px solid #e5e7eb', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }),
-          }}
-        >
-          <Award
-            className="h-3.5 w-3.5 shrink-0"
-            style={{ color: certCertified ? '#eab308' : certStarted ? certConfig.color : 'var(--highlight-on-light, #806600)' }}
-          />
-          {!railDocked && (
-            certCertified ? (
-              <span className="text-[11px] font-semibold text-yellow-400 title-shimmer">
-                Vandal Workflow Architect
-              </span>
-            ) : certStarted ? (
-              <>
-                <span className="text-[11px] font-semibold text-[#111]">{certConfig.label}</span>
-                <span className="text-[10px] text-[#999]">{certXp} XP</span>
-              </>
-            ) : (
-              <span className="text-[11px] font-semibold text-[#444]">Get Certified</span>
-            )
-          )}
+      {!minimal && (
+        <div className="border-t border-[#ddd] p-2 shrink-0 flex justify-center">
+          <div
+            onClick={togglePanel}
+            title={certCertified ? 'Vandal Workflow Architect' : certStarted ? `${certConfig.label} · ${certXp} XP` : 'Get Certified'}
+            className="flex items-center gap-2 cursor-pointer transition-all hover:shadow-md active:scale-95"
+            style={{
+              borderRadius: 'var(--ui-radius, 12px)',
+              padding: visualDocked ? '6px 10px' : '6px 12px',
+              ...(certCertified
+                ? { background: 'linear-gradient(135deg, #191919, #2d2d2d)', border: '1px solid #444', boxShadow: '0 2px 8px rgba(234,179,8,0.2)' }
+                : { background: '#fff', border: '1px solid #e5e7eb', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }),
+            }}
+          >
+            <Award
+              className="h-3.5 w-3.5 shrink-0"
+              style={{ color: certCertified ? '#eab308' : certStarted ? certConfig.color : 'var(--highlight-on-light, #806600)' }}
+            />
+            {!visualDocked && (
+              certCertified ? (
+                <span className="text-[11px] font-semibold text-yellow-400 title-shimmer">
+                  Vandal Workflow Architect
+                </span>
+              ) : certStarted ? (
+                <>
+                  <span className="text-[11px] font-semibold text-[#111]">{certConfig.label}</span>
+                  <span className="text-[10px] text-[#999]">{certXp} XP</span>
+                </>
+              ) : (
+                <span className="text-[11px] font-semibold text-[#444]">Get Certified</span>
+              )
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </aside>
   )
 }

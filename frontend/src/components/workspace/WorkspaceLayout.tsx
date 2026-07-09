@@ -13,11 +13,13 @@ import { KnowledgePanel } from './KnowledgePanel'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useToast } from '../../contexts/ToastContext'
 import { useAutomationActivity } from '../../hooks/useAutomationActivity'
+import { useOnboarding } from '../../hooks/useOnboarding'
 import type { AutomationStarted } from '../../hooks/useAutomationActivity'
 import type { CompletedAutomation } from '../../api/automations'
 
 export function WorkspaceLayout() {
   const { railDocked, panelSplit, workspaceMode, viewDocument, setWorkspaceMode, activeProjectUuid } = useWorkspace()
+  const { isFirstSession, loading: onboardingLoading } = useOnboarding()
   const { toast } = useToast()
   const containerRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
@@ -49,14 +51,15 @@ export function WorkspaceLayout() {
 
   const automationActivity = useAutomationActivity(handleAutomationStarted, handleAutomationCompleted)
 
-  const railWidth = railDocked ? 64 : 220
-
   // Once a project is scoped, the workspace shows that project (chat/files/…) —
   // the Projects drawer (the picker) must not linger underneath it.
   const isProjects = workspaceMode === 'projects' && !activeProjectUuid
   const isChat = workspaceMode === 'chat' || (workspaceMode === 'projects' && !!activeProjectUuid)
   const isAutomations = workspaceMode === 'automations'
   const isKnowledge = workspaceMode === 'knowledge'
+  const simplifyRail = isChat && !onboardingLoading && isFirstSession
+  const effectiveRailDocked = railDocked || simplifyRail
+  const railWidth = effectiveRailDocked ? 64 : 220
 
   // Layout: [UtilityBar 48px] [Content per mode] [ActivityRail(right)]
   return (
@@ -112,15 +115,14 @@ export function WorkspaceLayout() {
             top: 69,
             right: 0,
             bottom: 0,
-            width: railDocked ? 64 : 'var(--rail-w)',
+            width: effectiveRailDocked ? 64 : 'var(--rail-w)',
             zIndex: 650,
             transition: 'width 0.3s ease',
           }}
         >
-          <ActivityRail />
+          <ActivityRail minimal={simplifyRail} />
         </div>
       </div>
     </div>
   )
 }
-

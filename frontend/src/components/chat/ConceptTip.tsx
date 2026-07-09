@@ -135,12 +135,14 @@ const CONCEPTS: Array<{ term: string; explanation: ReactNode }> = [
  * A row of ConceptTips teaching the core nouns. Shown in the chat empty state
  * for users who may be new to the platform's vocabulary.
  */
-export function ConceptStrip() {
+export function ConceptStrip({ heading = 'New here? Tap a term to see what it means:' }: { heading?: string }) {
   return (
     <div>
-      <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 8, fontWeight: 500 }}>
-        New here? Tap a term to see what it means:
-      </div>
+      {heading && (
+        <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 8, fontWeight: 500 }}>
+          {heading}
+        </div>
+      )}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {CONCEPTS.map(c => (
           <ConceptTip key={c.term} term={c.term}>{c.explanation}</ConceptTip>

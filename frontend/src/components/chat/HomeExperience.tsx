@@ -162,6 +162,264 @@ function UploadActionCard({ title, description, disabled, onAttachFiles }: Uploa
   )
 }
 
+interface UploadPrimaryButtonProps {
+  disabled?: boolean
+  onAttachFiles: (files: File[]) => void
+}
+
+function UploadPrimaryButton({ disabled, onAttachFiles }: UploadPrimaryButtonProps) {
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? [])
+    if (files.length > 0) onAttachFiles(files)
+    event.target.value = ''
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => inputRef.current?.click()}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          padding: '11px 16px',
+          borderRadius: 12,
+          border: 'none',
+          background: 'var(--highlight-color, #eab308)',
+          color: '#111827',
+          fontFamily: 'inherit',
+          fontSize: 14,
+          fontWeight: 800,
+          cursor: disabled ? 'default' : 'pointer',
+          boxShadow: '0 12px 28px rgba(0,0,0,0.16)',
+          opacity: disabled ? 0.55 : 1,
+        }}
+      >
+        <FileUp size={16} />
+        Upload a document
+      </button>
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        className="hidden"
+        aria-label="Upload a document"
+        onChange={handleChange}
+      />
+    </>
+  )
+}
+
+function ActionPillButton({
+  label,
+  icon: Icon,
+  inverse,
+  disabled,
+  onClick,
+}: {
+  label: string
+  icon: LucideIcon
+  inverse?: boolean
+  disabled?: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 7,
+        padding: '10px 12px',
+        borderRadius: 12,
+        border: inverse ? '1px solid rgba(255,255,255,0.22)' : '1px solid #e5e7eb',
+        background: inverse ? 'rgba(255,255,255,0.10)' : '#ffffff',
+        color: inverse ? '#ffffff' : '#374151',
+        fontFamily: 'inherit',
+        fontSize: 13,
+        fontWeight: 700,
+        cursor: disabled ? 'default' : 'pointer',
+        opacity: disabled ? 0.55 : 1,
+      }}
+    >
+      <Icon size={14} />
+      {label}
+    </button>
+  )
+}
+
+function SampleAnswerPreview({ inverse = false }: { inverse?: boolean }) {
+  return (
+    <div
+      style={{
+        padding: inverse ? 14 : 12,
+        borderRadius: 14,
+        border: inverse ? '1px solid rgba(255,255,255,0.16)' : '1px solid #e5e7eb',
+        background: inverse ? 'rgba(255,255,255,0.10)' : '#f8fafc',
+        backdropFilter: inverse ? 'blur(6px)' : undefined,
+        boxShadow: inverse ? '0 10px 30px rgba(0,0,0,0.10)' : 'none',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 10,
+        }}
+      >
+        <div>
+          <div
+            style={{
+              fontSize: 11,
+              fontWeight: 800,
+              letterSpacing: '0.05em',
+              textTransform: 'uppercase',
+              color: inverse ? 'rgba(255,255,255,0.72)' : '#64748b',
+            }}
+          >
+            Sample answer from the demo
+          </div>
+          <div
+            style={{
+              marginTop: 5,
+              fontSize: 12,
+              lineHeight: 1.5,
+              color: inverse ? 'rgba(255,255,255,0.86)' : '#475569',
+            }}
+          >
+            Ask: <strong>When are letters of commitment due?</strong>
+          </div>
+        </div>
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '5px 8px',
+            borderRadius: 999,
+            background: inverse ? 'rgba(255,255,255,0.12)' : '#ffffff',
+            color: inverse ? '#ffffff' : '#334155',
+            fontSize: 11,
+            fontWeight: 700,
+            border: inverse ? '1px solid rgba(255,255,255,0.16)' : '1px solid #e5e7eb',
+          }}
+        >
+          <CheckCircle2 size={12} />
+          Source linked
+        </div>
+      </div>
+
+      <div
+        style={{
+          marginTop: 12,
+          display: 'grid',
+          gridTemplateColumns: '1fr auto',
+          gap: 10,
+          alignItems: 'end',
+        }}
+      >
+        <div>
+          <div style={{ fontSize: 12, color: inverse ? 'rgba(255,255,255,0.72)' : '#64748b' }}>Answer</div>
+          <div
+            style={{
+              marginTop: 3,
+              fontSize: 21,
+              lineHeight: 1.1,
+              fontWeight: 800,
+              color: inverse ? '#ffffff' : '#111827',
+            }}
+          >
+            Oct 5, 2026
+          </div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: 12, color: inverse ? 'rgba(255,255,255,0.72)' : '#64748b' }}>Source</div>
+          <div
+            style={{
+              marginTop: 3,
+              fontSize: 13,
+              fontWeight: 700,
+              color: inverse ? '#ffffff' : '#334155',
+            }}
+          >
+            Page 4, Timeline
+          </div>
+        </div>
+      </div>
+
+      <div
+        style={{
+          marginTop: 12,
+          padding: '10px 11px',
+          borderRadius: 12,
+          border: inverse ? '1px solid rgba(255,255,255,0.14)' : '1px solid #e5e7eb',
+          background: inverse ? 'rgba(0,0,0,0.08)' : '#ffffff',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 7,
+            marginBottom: 6,
+            fontSize: 12,
+            fontWeight: 800,
+            color: inverse ? '#ffffff' : '#374151',
+          }}
+        >
+          <FileSearch size={13} style={{ color: inverse ? '#ffffff' : 'var(--highlight-on-light, #806600)' }} />
+          Linked evidence
+        </div>
+        <div
+          style={{
+            fontSize: 13,
+            lineHeight: 1.55,
+            color: inverse ? 'rgba(255,255,255,0.88)' : '#4b5563',
+          }}
+        >
+          "Letters of commitment are due no later than October 5, 2026 and must name the responsible site lead."
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function GlossaryDisclosure() {
+  return (
+    <details
+      style={{
+        borderRadius: 12,
+        border: '1px solid #e5e7eb',
+        backgroundColor: '#ffffff',
+        padding: '10px 12px',
+      }}
+    >
+      <summary
+        style={{
+          cursor: 'pointer',
+          fontSize: 12,
+          fontWeight: 700,
+          color: '#64748b',
+          listStyle: 'none',
+        }}
+      >
+        New here? See key terms
+      </summary>
+      <div style={{ marginTop: 12 }}>
+        <ConceptStrip heading="" />
+      </div>
+    </details>
+  )
+}
+
 function SurfaceCard({
   title,
   subtitle,
@@ -406,11 +664,11 @@ export function FirstSessionHome({
   onSendMessage,
 }: SharedHomeProps) {
   return (
-    <div style={{ maxWidth: 760, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ maxWidth: 760, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div
         className="relative overflow-hidden text-white"
         style={{
-          padding: '24px 24px 22px',
+          padding: '20px 22px',
           borderRadius: 'var(--ui-radius, 12px)',
           background: 'linear-gradient(135deg, #7c2d12, color-mix(in srgb, var(--highlight-color, #eab308) 74%, #ffffff 26%))',
           boxShadow: '0 22px 40px rgba(124,45,18,0.16)',
@@ -430,89 +688,88 @@ export function FirstSessionHome({
         <div style={{ position: 'relative', zIndex: 1 }}>
           <div
             style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '6px 10px',
-              borderRadius: 999,
-              background: 'rgba(255,255,255,0.14)',
-              fontSize: 11,
-              fontWeight: 700,
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            padding: '5px 10px',
+            borderRadius: 999,
+            background: 'rgba(255,255,255,0.14)',
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+          }}
+        >
+          Start here
+        </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              gap: 16,
+              alignItems: 'start',
+              marginTop: 14,
             }}
           >
-            Start here
-          </div>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, marginTop: 14 }}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 44,
-                height: 44,
-                borderRadius: 14,
-                background: 'rgba(255,255,255,0.14)',
-                flexShrink: 0,
-              }}
-            >
-              {brandIcon ? (
-                <img
-                  src={brandIcon}
-                  alt={orgName}
-                  style={{ width: 24, height: 24, objectFit: 'contain' }}
-                />
-              ) : (
-                <Sparkles size={20} />
-              )}
-            </div>
             <div>
-              <div style={{ fontSize: 28, lineHeight: 1.12, fontWeight: 800, maxWidth: 620 }}>
-                Turn complex documents into answers you can verify.
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 40,
+                    height: 40,
+                    borderRadius: 13,
+                    background: 'rgba(255,255,255,0.14)',
+                    flexShrink: 0,
+                  }}
+                >
+                  {brandIcon ? (
+                    <img
+                      src={brandIcon}
+                      alt={orgName}
+                      style={{ width: 22, height: 22, objectFit: 'contain' }}
+                    />
+                  ) : (
+                    <Sparkles size={18} />
+                  )}
+                </div>
+                <div>
+                  <div style={{ fontSize: 24, lineHeight: 1.08, fontWeight: 800, maxWidth: 420 }}>
+                    Turn complex documents into answers you can verify.
+                  </div>
+                  <div style={{ marginTop: 9, fontSize: 14, lineHeight: 1.55, maxWidth: 440, opacity: 0.92 }}>
+                    Upload one of your own files or run the sample demo. {orgName} extracts deadlines,
+                    budget details, and compliance risks with source-linked evidence you can audit.
+                  </div>
+                </div>
               </div>
-              <div style={{ marginTop: 10, fontSize: 15, lineHeight: 1.6, maxWidth: 620, opacity: 0.92 }}>
-                Run the sample demo or upload one of your own files. {orgName} extracts deadlines,
-                budget details, and compliance risks with source-linked evidence you can audit.
+
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: 8,
+                  alignItems: 'center',
+                  marginTop: 16,
+                }}
+              >
+                <UploadPrimaryButton disabled={disabled} onAttachFiles={onAttachFiles} />
+                <ActionPillButton label="Run sample demo" icon={Zap} inverse disabled={disabled} onClick={onRunDemo} />
+                <ActionPillButton label="Ask a question" icon={MessageSquare} inverse disabled={disabled} onClick={onFocusComposer} />
+              </div>
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
+                <MetricChip icon={Shield} label="Trust" value="Source-linked answers" />
+                <MetricChip icon={CheckCircle2} label="Proof" value="Measured quality signals" />
+                <MetricChip icon={BookOpen} label="Fit" value="Research administration" />
               </div>
             </div>
-          </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 16 }}>
-            <MetricChip icon={Shield} label="Trust" value="Source-linked answers" />
-            <MetricChip icon={CheckCircle2} label="Proof" value="Measured quality signals" />
-            <MetricChip icon={BookOpen} label="Fit" value="Research administration" />
+
+            <SampleAnswerPreview inverse />
           </div>
         </div>
-      </div>
-
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: 12,
-        }}
-      >
-        <ActionCard
-          title="Run sample demo"
-          description="See the full flow on a real grant example before you touch your own files."
-          icon={Zap}
-          accent
-          disabled={disabled}
-          onClick={onRunDemo}
-        />
-        <UploadActionCard
-          title="Upload a document"
-          description="Add a PDF, DOCX, spreadsheet, or policy file and start with your own work."
-          disabled={disabled}
-          onAttachFiles={onAttachFiles}
-        />
-        <ActionCard
-          title="Ask a question"
-          description="Jump straight to the composer if you already know what you want to find."
-          icon={MessageSquare}
-          disabled={disabled}
-          onClick={onFocusComposer}
-        />
       </div>
 
       <div
@@ -538,10 +795,10 @@ export function FirstSessionHome({
         </SurfaceCard>
 
         <SurfaceCard
-          title="What makes the output trustworthy"
-          subtitle="The first result should show you why the answer is believable, not just what it says."
+          title="Why the first answer feels trustworthy"
+          subtitle="You should see the answer, source passage, and a reusable structure in one pass."
         >
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}>
             {FIRST_RUN_TRUST_SIGNALS.map((item) => (
               <div key={item} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                 <CheckCircle2
@@ -555,44 +812,37 @@ export function FirstSessionHome({
 
           <div
             style={{
-              marginTop: 16,
-              padding: 14,
+              marginTop: 14,
+              padding: 12,
               borderRadius: 12,
-              background: '#f8fafc',
-              border: '1px solid #e5e7eb',
+              background: 'color-mix(in srgb, var(--highlight-color, #eab308) 7%, white)',
+              border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 20%, #e5e7eb)',
             }}
           >
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              Example proof panel
+            <div style={{ fontSize: 12, fontWeight: 800, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              What you should notice
             </div>
-            <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                <div>
-                  <div style={{ fontSize: 12, color: '#6b7280' }}>Deadline</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#111827' }}>Oct 5, 2026</div>
+            <div style={{ marginTop: 9, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <div style={{ padding: '6px 9px', borderRadius: 999, background: '#ffffff', border: '1px solid #e5e7eb', fontSize: 12, fontWeight: 700, color: '#374151' }}>
+                  Exact field extracted
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 12, color: '#6b7280' }}>Source</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>Page 4, Timeline</div>
+                <div style={{ padding: '6px 9px', borderRadius: 999, background: '#ffffff', border: '1px solid #e5e7eb', fontSize: 12, fontWeight: 700, color: '#374151' }}>
+                  Source passage attached
+                </div>
+                <div style={{ padding: '6px 9px', borderRadius: 999, background: '#ffffff', border: '1px solid #e5e7eb', fontSize: 12, fontWeight: 700, color: '#374151' }}>
+                  Reusable in a template
                 </div>
               </div>
-              <div style={{ padding: 10, borderRadius: 10, backgroundColor: '#ffffff', border: '1px solid #e5e7eb' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                  <FileSearch size={14} style={{ color: 'var(--highlight-on-light, #806600)' }} />
-                  <span style={{ fontSize: 12, fontWeight: 700, color: '#374151' }}>Linked evidence</span>
-                </div>
-                <div style={{ fontSize: 13, lineHeight: 1.55, color: '#4b5563' }}>
-                  "Letters of commitment are due no later than October 5, 2026 and must name the responsible site lead."
-                </div>
+              <div style={{ fontSize: 13, lineHeight: 1.55, color: '#4b5563' }}>
+                The demo should immediately show that Vandalizer is not just answering; it is pulling a specific fact, showing where it came from, and leaving you with a pattern you can reuse on your own files.
               </div>
             </div>
           </div>
         </SurfaceCard>
       </div>
 
-      <div style={{ marginTop: 2 }}>
-        <ConceptStrip />
-      </div>
+      <GlossaryDisclosure />
     </div>
   )
 }
@@ -828,7 +1078,7 @@ export function ReturningHome({
         />
       )}
 
-      {showGlossary && <ConceptStrip />}
+      {showGlossary && <GlossaryDisclosure />}
     </div>
   )
 }
