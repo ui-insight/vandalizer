@@ -79,7 +79,18 @@ async def web_search(
 
     provider = (sys_config_doc.get("web_search_provider") or "").strip().lower()
     endpoint = (sys_config_doc.get("web_search_endpoint") or "").strip()
-    api_key = decrypt_value(sys_config_doc.get("web_search_api_key") or "")
+    # Strip — a key pasted with stray whitespace/newline breaks the auth header.
+    api_key = decrypt_value(sys_config_doc.get("web_search_api_key") or "").strip()
+    if api_key.startswith("enc:"):
+        # decrypt_value returns the ciphertext unchanged when it can't decrypt;
+        # sending that as a credential yields an opaque provider 401.
+        return {
+            "error": (
+                "Web search API key could not be decrypted — "
+                "CONFIG_ENCRYPTION_KEY is missing or changed. Re-save the key."
+            ),
+            "results": [],
+        }
 
     if not provider:
         return {

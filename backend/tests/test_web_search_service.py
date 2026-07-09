@@ -195,6 +195,26 @@ async def test_mindrouter_appends_v1_search_to_base_url(patch_httpx):
 
 
 @pytest.mark.asyncio
+async def test_undecryptable_key_errors_instead_of_sending_ciphertext(patch_httpx):
+    patch_httpx({"results": []})
+    cfg = {
+        "web_search_provider": "mindrouter",
+        "web_search_api_key": "enc:gAAAAABciphertext",
+    }
+    result = await web_search_service.web_search("q", cfg)
+    assert "could not be decrypted" in result["error"]
+    assert result["results"] == []
+
+
+@pytest.mark.asyncio
+async def test_api_key_whitespace_stripped(patch_httpx):
+    captured = patch_httpx({"results": []})
+    cfg = {"web_search_provider": "mindrouter", "web_search_api_key": " mr2_key \n"}
+    await web_search_service.web_search("q", cfg)
+    assert captured["headers"]["Authorization"] == "Bearer mr2_key"
+
+
+@pytest.mark.asyncio
 async def test_unknown_provider_errors(patch_httpx):
     patch_httpx({})  # patches the SSRF guard so we reach the provider switch
     cfg = {"web_search_provider": "duckduckgo", "web_search_endpoint": "https://x.y"}
