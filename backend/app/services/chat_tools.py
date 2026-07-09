@@ -3982,6 +3982,140 @@ async def create_workflow(
 
 
 # ---------------------------------------------------------------------------
+# Bulk document analysis via subagents (uplift plan Phase 9)
+# ---------------------------------------------------------------------------
+
+_ANALYZE_MAX_DOCS = 20
+
+
+async def analyze_documents(
+    context: RunContext[AgenticChatDeps],
+    instruction: str,
+    document_uuids: list[str],
+) -> dict:
+    """Analyze several documents in parallel WITHOUT loading their full text here. Returns one concise analysis per document.
+
+    Each document is handed to its own read-only sub-analysis with your
+    instruction; you receive back only the per-document digests (a few
+    hundred words each). Use this for 3 or more documents — summaries,
+    comparisons, per-document extractions in prose, screening a folder.
+    For 1–2 documents, use get_document_text directly instead.
+
+    Brief the sub-analysis like a colleague who just walked in: it sees ONLY
+    one document and your instruction — no conversation history, no other
+    documents. Include everything it needs: what to find, what to ignore,
+    and the exact output shape you want (e.g. "list sponsor, total budget,
+    and period of performance as three labeled lines").
+
+    <example>
+    User: "Summarize each of these 8 proposals and flag any with cost share."
+    → analyze_documents(instruction="Summarize this proposal in ~5 bullets:
+    sponsor, total request, period, aims. End with 'COST SHARE: yes/no' based
+    on whether it commits cost sharing.", document_uuids=[…8 uuids…])
+    <reasoning>8 full proposals would blow the conversation's context; the
+    fan-out returns 8 digests, and the instruction carries the output shape
+    since the sub-analysis can't see the user's ask.</reasoning>
+    </example>
+    <example>
+    User: "What's the indirect rate in this budget?"
+    → get_document_text, NOT analyze_documents.
+    <reasoning>One document, one lookup — read it directly.</reasoning>
+    </example>
+
+    Args:
+        context: The call context.
+        instruction: Complete, self-contained analysis instruction, including
+            the desired output shape.
+        document_uuids: Documents to analyze (2–20; prefer get_document_text
+            for a single document).
+    """
+    chat_cfg = (context.deps.system_config_doc or {}).get("chat_config") or {}
+    if not chat_cfg.get("subagents_enabled", True):
+        return _err(
+            "Bulk analysis is disabled on this deployment.",
+            hint="Read documents individually with get_document_text instead.",
+        )
+
+    instruction = (instruction or "").strip()
+    if not instruction:
+        return _err(
+            "instruction is required.",
+            hint=(
+                "Write a self-contained instruction including the output "
+                "shape — the sub-analysis sees only one document and this text."
+            ),
+        )
+
+    document_uuids = _resolve_doc_uuids(context, document_uuids)
+    if not document_uuids:
+        return _err(
+            "Give me at least one document to analyze.",
+            hint="Find documents with search_documents or list_documents first.",
+        )
+    if len(document_uuids) > _ANALYZE_MAX_DOCS:
+        return _err(
+            f"Too many documents ({len(document_uuids)} > {_ANALYZE_MAX_DOCS}).",
+            hint="Split the set into batches and call analyze_documents per batch.",
+        )
+
+    # Resolve + authorize up front; report unusable documents instead of
+    # silently skipping them.
+    team_id = context.deps.team_id
+    user_id = context.deps.user_id
+    ready: list[dict] = []
+    skipped: list[dict] = []
+    for doc_uuid in dict.fromkeys(document_uuids):  # de-dupe, keep order
+        doc = await SmartDocument.find_one(SmartDocument.uuid == doc_uuid)
+        if not doc:
+            skipped.append({"uuid": doc_uuid, "reason": "not found"})
+            continue
+        if team_id:
+            allowed = doc.team_id == team_id or doc.user_id == user_id
+        else:
+            allowed = doc.user_id == user_id
+        if not allowed:
+            skipped.append({"uuid": doc_uuid, "reason": "no access"})
+            continue
+        if not (doc.raw_text or "").strip():
+            skipped.append({
+                "uuid": doc_uuid,
+                "reason": "no text yet (still processing or extraction failed)",
+            })
+            continue
+        ready.append({
+            "uuid": doc.uuid,
+            "title": doc.title or doc.uuid,
+            "raw_text": doc.raw_text,
+        })
+
+    if not ready:
+        return _err(
+            "None of the requested documents are readable.",
+            hint=(
+                "Check the skipped reasons: documents may still be "
+                "processing, or belong to another team."
+            ),
+        )
+
+    from app.services.chat_subagents import fan_out_analyses
+
+    results = await fan_out_analyses(
+        documents=ready,
+        instruction=instruction,
+        model_name=context.deps.model_name,
+        sys_config_doc=context.deps.system_config_doc,
+    )
+    failed = [r for r in results if "error" in r]
+    return {
+        "instruction": instruction,
+        "analyzed": len(results) - len(failed),
+        "failed": len(failed),
+        "results": results,
+        "skipped": skipped or None,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Plan / progress tracking (uplift plan Phase 8)
 # ---------------------------------------------------------------------------
 
@@ -4114,6 +4248,7 @@ TOOLS = [
     fetch_url,
     web_search,
     get_document_text,
+    analyze_documents,
     run_extraction,
     check_compliance,
     # Phase 3 — KB write
@@ -4175,6 +4310,7 @@ COMPACTABLE_TOOLS: frozenset[str] = frozenset({
     "fetch_url",
     "web_search",
     "get_document_text",
+    "analyze_documents",
     "run_extraction",
     "check_compliance",
     "list_test_cases",

@@ -175,6 +175,8 @@ class SystemConfig(Document):
     #   "parallel_tools_enabled": bool (default True) — run read-only tool
     #       calls from one response concurrently; write tools always
     #       serialize regardless (Phase 7). Read at agent construction.
+    #   "subagents_enabled": bool (default True) — allow analyze_documents
+    #       to fan out per-document sub-analyses (Phase 9).
     # Missing keys mean "use the default" so deployments never need a
     # migration to pick up new phases.
     chat_config: dict = {}
