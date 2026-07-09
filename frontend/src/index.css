@@ -154,13 +154,16 @@ html {
   66%  { background-size: calc(100%/3) 100%, calc(100%/3) 100%, calc(100%/3) 0%   }
 }
 
-/* Thinking shimmer - subtle left-to-right highlight sweep */
+/* Thinking shimmer - highlight sweep clipped to the label text itself,
+   so the glyphs shimmer rather than the containing box */
 .thinking-shimmer {
-  background: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.04) 40%, rgba(0,0,0,0.08) 50%, rgba(0,0,0,0.04) 60%, transparent 100%);
+  display: inline-block;
+  background: linear-gradient(90deg, #6b7280 0%, #6b7280 40%, #c6cad1 50%, #6b7280 60%, #6b7280 100%);
   background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
   animation: thinking-shimmer 2s ease-in-out infinite;
-  border-radius: 6px;
-  padding: 2px 6px;
 }
 
 @keyframes thinking-shimmer {
@@ -171,6 +174,8 @@ html {
 @media (prefers-reduced-motion: reduce) {
   .thinking-shimmer {
     animation: none !important;
+    background: none;
+    -webkit-text-fill-color: currentColor;
   }
   .rail-shimmer-running {
     animation: none !important;

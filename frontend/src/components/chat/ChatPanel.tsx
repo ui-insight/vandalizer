@@ -152,7 +152,6 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const [showContextNudge, setShowContextNudge] = useState(false)
   const contextNudgeShownRef = useRef(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const stickToBottomRef = useRef(true)
   // Docs dropped this session — shown as "processing…" until the docs poll
   // confirms readiness, so a freshly dropped file's chip reflects state at once.
   const [justDroppedUuids, setJustDroppedUuids] = useState<Set<string>>(new Set())
@@ -169,7 +168,6 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const lastLoadedConvo = useRef<string | null>(null)
   const prevStreamingRef = useRef(false)
   const [showScrollDown, setShowScrollDown] = useState(false)
-  const prevScrollInfo = useRef({ scrollHeight: 0, scrollTop: 0, clientHeight: 0 })
   const [dragOver, setDragOver] = useState(false)
   const dragCounter = useRef(0)
 
@@ -276,26 +274,12 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current
     if (!el) return
-    prevScrollInfo.current = {
-      scrollHeight: el.scrollHeight,
-      scrollTop: el.scrollTop,
-      clientHeight: el.clientHeight,
-    }
     const distFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
-    // Stay "pinned" while near the bottom; if the user scrolls up, stop
-    // auto-following the stream so they can read back without being yanked down.
-    stickToBottomRef.current = distFromBottom < 80
     setShowScrollDown(distFromBottom > 80)
   }, [])
 
-  // Follow the assistant's streaming output while the user is pinned to the
-  // bottom — otherwise long answers scroll off-screen with no auto-scroll.
-  useEffect(() => {
-    if (!isStreaming || !stickToBottomRef.current) return
-    const el = scrollContainerRef.current
-    if (el) el.scrollTop = el.scrollHeight
-  }, [isStreaming, streamingContent, thinkingContent, segments])
-
+  // Incoming content never auto-scrolls the view — it accumulates below the
+  // fold and the scroll-down arrow appears, so reading isn't interrupted.
   useEffect(() => {
     const el = scrollContainerRef.current
     if (!el) return
@@ -303,13 +287,12 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     if (distFromBottom > 80) {
       setShowScrollDown(true)
     }
-  }, [messages, streamingContent])
+  }, [messages, streamingContent, thinkingContent, segments])
 
   const prevConvoRef = useRef(conversationUuid)
   useEffect(() => {
     if (conversationUuid !== prevConvoRef.current) {
       prevConvoRef.current = conversationUuid
-      prevScrollInfo.current = { scrollHeight: 0, scrollTop: 0, clientHeight: 0 }
       setShowScrollDown(false)
     }
   }, [conversationUuid])
@@ -326,9 +309,7 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
     if (messages.length > prevMsgCount.current) {
       const lastMsg = messages[messages.length - 1]
       if (lastMsg?.role === 'user') {
-        prevScrollInfo.current = { scrollHeight: 0, scrollTop: 0, clientHeight: 0 }
         setShowScrollDown(false)
-        stickToBottomRef.current = true
         const el = scrollContainerRef.current
         if (el) el.scrollTop = el.scrollHeight
       }
@@ -338,7 +319,6 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
 
   const scrollToBottom = useCallback(() => {
     setShowScrollDown(false)
-    stickToBottomRef.current = true
     const el = scrollContainerRef.current
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
   }, [])
@@ -1186,9 +1166,9 @@ export function ChatPanel({ conversationToLoad, pendingMessage, onPendingMessage
         {/* Loading indicator */}
         {isStreaming && !streamingContent && !thinkingContent && activeToolCalls.length === 0 && toolResults.length === 0 && segments.length === 0 && (
           <div role="status" aria-live="polite" style={{ padding: 15, marginBottom: 15, backgroundColor: '#00000008', borderRadius: 'var(--ui-radius, 12px)' }}>
-            <div className="thinking-shimmer" style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#6b7280' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: '#6b7280' }}>
               <ChevronRight size={14} />
-              <StreamingLabel />
+              <span className="thinking-shimmer"><StreamingLabel /></span>
             </div>
           </div>
         )}

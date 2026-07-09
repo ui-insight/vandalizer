@@ -246,7 +246,6 @@ export function ChatMessage({
                 onClick={() => setThinkingExpanded(!thinkingExpanded)}
                 aria-expanded={thinkingExpanded}
                 aria-label={thinkingExpanded ? 'Collapse thinking' : 'Expand thinking'}
-                className={duration == null ? 'thinking-shimmer' : undefined}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -272,7 +271,7 @@ export function ChatMessage({
                 />
                 {duration != null
                   ? `Thought for ${duration < 1 ? 'less than a second' : `${Math.round(duration)} second${Math.round(duration) !== 1 ? 's' : ''}`}`
-                  : <ThinkingLabel />}
+                  : <span className="thinking-shimmer"><ThinkingLabel /></span>}
               </button>
               <div className={`thinking-collapse${thinkingExpanded ? ' open' : ''}`}>
                 <div>
