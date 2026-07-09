@@ -234,17 +234,7 @@ function SampleAnswerPreview({ inverse = false }: { inverse?: boolean }) {
               color: inverse ? 'rgba(255,255,255,0.72)' : '#64748b',
             }}
           >
-            What the demo returns
-          </div>
-          <div
-            style={{
-              marginTop: 5,
-              fontSize: 12,
-              lineHeight: 1.5,
-              color: inverse ? 'rgba(255,255,255,0.86)' : '#475569',
-            }}
-          >
-            In one pass, you should get a usable answer, the source passage behind it, and a pattern you can reuse on your own files.
+            Preview of the demo result
           </div>
         </div>
         <div
@@ -262,7 +252,7 @@ function SampleAnswerPreview({ inverse = false }: { inverse?: boolean }) {
           }}
         >
           <CheckCircle2 size={12} />
-          Source linked
+          Includes source
         </div>
       </div>
 
@@ -278,7 +268,7 @@ function SampleAnswerPreview({ inverse = false }: { inverse?: boolean }) {
           color: inverse ? 'rgba(255,255,255,0.82)' : '#475569',
         }}
       >
-        Ask: <strong>When are letters of commitment due?</strong>
+        <strong>Question:</strong> When are letters of commitment due?
       </div>
 
       <div
@@ -351,17 +341,6 @@ function SampleAnswerPreview({ inverse = false }: { inverse?: boolean }) {
         >
           "Letters of commitment are due no later than October 5, 2026 and must name the responsible site lead."
         </div>
-      </div>
-
-      <div
-        style={{
-          marginTop: 10,
-          fontSize: 12,
-          lineHeight: 1.5,
-          color: inverse ? 'rgba(255,255,255,0.82)' : '#475569',
-        }}
-      >
-        Useful because you can verify the fact before you act on it, then reuse the same structure on your own proposal or policy file.
       </div>
     </div>
   )

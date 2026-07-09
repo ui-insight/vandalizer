@@ -68,8 +68,8 @@ describe('FirstSessionHome', () => {
     expect(screen.getByRole('button', { name: /Upload a document/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Run sample demo/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Ask a question/i })).not.toBeInTheDocument()
-    expect(screen.getByText('What the demo returns')).toBeInTheDocument()
-    expect(screen.getByText(/Useful because you can verify the fact before you act on it/i)).toBeInTheDocument()
+    expect(screen.getByText('Preview of the demo result')).toBeInTheDocument()
+    expect(screen.getByText(/Question:/i)).toBeInTheDocument()
     expect(screen.getByText('Why the first answer feels trustworthy')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /Extract deadlines/i }))
