@@ -234,7 +234,7 @@ function SampleAnswerPreview({ inverse = false }: { inverse?: boolean }) {
               color: inverse ? 'rgba(255,255,255,0.72)' : '#64748b',
             }}
           >
-            Sample answer from the demo
+            What the demo returns
           </div>
           <div
             style={{
@@ -244,7 +244,7 @@ function SampleAnswerPreview({ inverse = false }: { inverse?: boolean }) {
               color: inverse ? 'rgba(255,255,255,0.86)' : '#475569',
             }}
           >
-            Ask: <strong>When are letters of commitment due?</strong>
+            In one pass, you should get a usable answer, the source passage behind it, and a pattern you can reuse on your own files.
           </div>
         </div>
         <div
@@ -264,6 +264,21 @@ function SampleAnswerPreview({ inverse = false }: { inverse?: boolean }) {
           <CheckCircle2 size={12} />
           Source linked
         </div>
+      </div>
+
+      <div
+        style={{
+          marginTop: 12,
+          padding: '8px 10px',
+          borderRadius: 10,
+          background: inverse ? 'rgba(255,255,255,0.08)' : '#ffffff',
+          border: inverse ? '1px solid rgba(255,255,255,0.12)' : '1px solid #e5e7eb',
+          fontSize: 12,
+          lineHeight: 1.5,
+          color: inverse ? 'rgba(255,255,255,0.82)' : '#475569',
+        }}
+      >
+        Ask: <strong>When are letters of commitment due?</strong>
       </div>
 
       <div
@@ -336,6 +351,17 @@ function SampleAnswerPreview({ inverse = false }: { inverse?: boolean }) {
         >
           "Letters of commitment are due no later than October 5, 2026 and must name the responsible site lead."
         </div>
+      </div>
+
+      <div
+        style={{
+          marginTop: 10,
+          fontSize: 12,
+          lineHeight: 1.5,
+          color: inverse ? 'rgba(255,255,255,0.82)' : '#475569',
+        }}
+      >
+        Useful because you can verify the fact before you act on it, then reuse the same structure on your own proposal or policy file.
       </div>
     </div>
   )
@@ -1056,7 +1082,6 @@ export function FirstSessionHome({
   disabled,
   onRunDemo,
   onAttachFiles,
-  onFocusComposer,
   onSendMessage,
 }: SharedHomeProps) {
   return (
@@ -1153,13 +1178,18 @@ export function FirstSessionHome({
               >
                 <UploadPrimaryButton disabled={disabled} onAttachFiles={onAttachFiles} />
                 <ActionPillButton label="Run sample demo" icon={Zap} inverse disabled={disabled} onClick={onRunDemo} />
-                <ActionPillButton label="Ask a question" icon={MessageSquare} inverse disabled={disabled} onClick={onFocusComposer} />
               </div>
 
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
-                <MetricChip icon={Shield} label="Trust" value="Source-linked answers" />
-                <MetricChip icon={CheckCircle2} label="Proof" value="Measured quality signals" />
-                <MetricChip icon={BookOpen} label="Fit" value="Research administration" />
+              <div
+                style={{
+                  marginTop: 14,
+                  fontSize: 13,
+                  lineHeight: 1.6,
+                  color: 'rgba(255,255,255,0.84)',
+                  maxWidth: 470,
+                }}
+              >
+                Source-linked answers, measured quality signals, and workflows built for research administration.
               </div>
             </div>
 
