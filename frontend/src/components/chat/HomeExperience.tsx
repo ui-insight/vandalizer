@@ -17,7 +17,6 @@ import {
 import type { OnboardingStatus, RecentActivityItem } from '../../api/config'
 import { ConceptStrip } from './ConceptTip'
 import { OnboardingStepper } from './WelcomeExperience'
-import { WorkspaceBriefing } from './WorkspaceBriefing'
 
 const FIRST_RUN_PROMPTS = [
   {
@@ -51,123 +50,17 @@ const DEFAULT_RETURNING_PROMPTS = [
   'Compare two versions and tell me what changed.',
 ]
 
-interface ActionCardProps {
-  title: string
-  description: string
-  icon: LucideIcon
-  accent?: boolean
-  disabled?: boolean
-  onClick: () => void
-}
-
-function ActionCard({ title, description, icon: Icon, accent, disabled, onClick }: ActionCardProps) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'flex-start',
-        gap: 10,
-        width: '100%',
-        minHeight: 118,
-        padding: '16px 18px',
-        borderRadius: 'var(--ui-radius, 12px)',
-        border: accent
-          ? '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 32%, #ffffff)'
-          : '1px solid #e5e7eb',
-        background: accent
-          ? 'linear-gradient(180deg, color-mix(in srgb, var(--highlight-color, #eab308) 18%, white), white)'
-          : '#ffffff',
-        color: '#111827',
-        cursor: disabled ? 'default' : 'pointer',
-        fontFamily: 'inherit',
-        textAlign: 'left',
-        boxShadow: accent ? '0 16px 30px rgba(0,0,0,0.06)' : '0 10px 24px rgba(0,0,0,0.04)',
-        opacity: disabled ? 0.55 : 1,
-        transition: 'transform 0.16s ease, box-shadow 0.16s ease, filter 0.16s ease',
-      }}
-      onMouseEnter={e => {
-        if (disabled) return
-        e.currentTarget.style.transform = 'translateY(-1px)'
-        e.currentTarget.style.boxShadow = accent ? '0 20px 36px rgba(0,0,0,0.08)' : '0 14px 28px rgba(0,0,0,0.07)'
-      }}
-      onMouseLeave={e => {
-        e.currentTarget.style.transform = 'translateY(0)'
-        e.currentTarget.style.boxShadow = accent ? '0 16px 30px rgba(0,0,0,0.06)' : '0 10px 24px rgba(0,0,0,0.04)'
-      }}
-    >
-      <div
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          width: 34,
-          height: 34,
-          borderRadius: 10,
-          background: accent
-            ? 'var(--highlight-color, #eab308)'
-            : 'color-mix(in srgb, var(--highlight-color, #eab308) 12%, white)',
-          color: accent ? '#111827' : 'var(--highlight-on-light, #806600)',
-        }}
-      >
-        <Icon size={16} />
-      </div>
-      <div>
-        <div style={{ fontSize: 15, fontWeight: 700, lineHeight: 1.25 }}>{title}</div>
-        <div style={{ marginTop: 6, fontSize: 13, lineHeight: 1.5, color: '#4b5563' }}>
-          {description}
-        </div>
-      </div>
-    </button>
-  )
-}
-
-interface UploadActionCardProps {
-  title: string
-  description: string
-  disabled?: boolean
-  onAttachFiles: (files: File[]) => void
-}
-
-function UploadActionCard({ title, description, disabled, onAttachFiles }: UploadActionCardProps) {
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(event.target.files ?? [])
-    if (files.length > 0) onAttachFiles(files)
-    event.target.value = ''
-  }
-
-  return (
-    <>
-      <ActionCard
-        title={title}
-        description={description}
-        icon={FileUp}
-        disabled={disabled}
-        onClick={() => inputRef.current?.click()}
-      />
-      <input
-        ref={inputRef}
-        type="file"
-        multiple
-        className="hidden"
-        aria-label={title}
-        onChange={handleChange}
-      />
-    </>
-  )
-}
-
 interface UploadPrimaryButtonProps {
+  label?: string
   disabled?: boolean
   onAttachFiles: (files: File[]) => void
 }
 
-function UploadPrimaryButton({ disabled, onAttachFiles }: UploadPrimaryButtonProps) {
+function UploadPrimaryButton({
+  label = 'Upload a document',
+  disabled,
+  onAttachFiles,
+}: UploadPrimaryButtonProps) {
   const inputRef = useRef<HTMLInputElement>(null)
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -201,14 +94,70 @@ function UploadPrimaryButton({ disabled, onAttachFiles }: UploadPrimaryButtonPro
         }}
       >
         <FileUp size={16} />
-        Upload a document
+        {label}
       </button>
       <input
         ref={inputRef}
         type="file"
         multiple
         className="hidden"
-        aria-label="Upload a document"
+        aria-label={label}
+        onChange={handleChange}
+      />
+    </>
+  )
+}
+
+function UploadPillButton({
+  label,
+  inverse,
+  disabled,
+  onAttachFiles,
+}: {
+  label: string
+  inverse?: boolean
+  disabled?: boolean
+  onAttachFiles: (files: File[]) => void
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? [])
+    if (files.length > 0) onAttachFiles(files)
+    event.target.value = ''
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => inputRef.current?.click()}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 7,
+          padding: '10px 12px',
+          borderRadius: 12,
+          border: inverse ? '1px solid rgba(255,255,255,0.22)' : '1px solid #e5e7eb',
+          background: inverse ? 'rgba(255,255,255,0.10)' : '#ffffff',
+          color: inverse ? '#ffffff' : '#374151',
+          fontFamily: 'inherit',
+          fontSize: 13,
+          fontWeight: 700,
+          cursor: disabled ? 'default' : 'pointer',
+          opacity: disabled ? 0.55 : 1,
+        }}
+      >
+        <FileUp size={14} />
+        {label}
+      </button>
+      <input
+        ref={inputRef}
+        type="file"
+        multiple
+        className="hidden"
+        aria-label={label}
         onChange={handleChange}
       />
     </>
@@ -548,33 +497,399 @@ function activityResumeMessage(item: RecentActivityItem): string {
   return `Continue our conversation about "${title}"`
 }
 
+function alertReviewMessage(itemName: string): string {
+  return `Check quality of ${itemName}`
+}
+
+const ACTIVITY_ICONS: Record<string, LucideIcon> = {
+  conversation: MessageSquare,
+  search_set_run: FileSearch,
+  workflow_run: Workflow,
+}
+
+function recentActivityLabel(item: RecentActivityItem): string {
+  if (item.status === 'running') return `${item.relative_time || 'Active now'} • Running`
+  if (item.status === 'failed') return `${item.relative_time || 'Needs review'} • Failed`
+  return `${item.relative_time || 'Recent'} • Completed`
+}
+
 function returningHeroTitle(status: OnboardingStatus | null): string {
-  if (status?.has_only_onboarding_docs) return 'Turn the demo into real work'
-  if ((status?.active_alerts.length ?? 0) > 0) return 'A few items need attention'
-  if ((status?.recent_activity.length ?? 0) > 0) return 'Pick up where you left off'
-  if (status?.has_documents) return 'Your workspace is ready'
-  return 'Start with a document or question'
+  if (status?.has_only_onboarding_docs) return 'Make this workspace yours'
+  if ((status?.active_alerts.length ?? 0) > 0) return 'Review what changed since your last visit'
+  if ((status?.recent_activity.length ?? 0) > 0) return 'Resume work in one click'
+  if ((status?.unprocessed_doc_count ?? 0) > 0) return 'Your latest documents are ready'
+  if (status?.has_documents) return 'Jump back into active work'
+  return 'Start with one real document'
 }
 
 function returningHeroSubtitle(status: OnboardingStatus | null): string {
   if (status?.daily_guidance) return status.daily_guidance
   if (status?.since_last_visit) return status.since_last_visit
   if (status?.has_only_onboarding_docs) {
-    return 'You have seen the sample flow. Upload one of your own documents to personalize the results, templates, and follow-up work.'
+    return 'You have seen the sample flow. Upload one of your own documents so the home screen can reflect your real files, tasks, and follow-up work.'
   }
   if (status?.has_documents) {
-    return 'Resume prior work, review items that changed, or run the next extraction without starting from scratch.'
+    return 'Use this home to continue recent runs, review anything that drifted, or start the next grounded task without rebuilding context.'
   }
-  return 'Upload a real document, ask a question, or run the sample demo if you want a quick refresher.'
+  return 'The product becomes meaningfully better once it has one of your files, policies, or proposals to work from.'
 }
 
 function starterSuggestions(status: OnboardingStatus | null, suggestionPills: string[]): string[] {
   if (suggestionPills.length > 0) return suggestionPills.slice(0, 4)
   if (status?.suggestion_pills?.length) return status.suggestion_pills.slice(0, 4)
+  if (status?.has_only_onboarding_docs) {
+    return [
+      'Help me move from the sample demo to my own documents.',
+      'What should I upload first to get useful results fast?',
+      'Show me the exact pattern I should reuse on my own files.',
+      'Run the sample demo again and tell me what to notice.',
+    ]
+  }
+  if (status && !status.has_documents) {
+    return [
+      'Help me upload and analyze my first document.',
+      'Show me how source-linked answers work in Vandalizer.',
+      'What kind of documents can I upload here?',
+      'Run the sample demo and explain what to notice.',
+    ]
+  }
   return DEFAULT_RETURNING_PROMPTS
 }
 
-function WorkspaceSnapshot({
+type ReturningActionKind = 'upload' | 'resume' | 'alert' | 'process' | 'composer' | 'demo'
+
+interface ReturningPrimaryAction {
+  kind: ReturningActionKind
+  eyebrow: string
+  title: string
+  description: string
+  cta: string
+  icon: LucideIcon
+  prompt?: string
+}
+
+function processingPrompt(status: OnboardingStatus): string {
+  if (status.top_extraction_set_name) {
+    return `Run ${status.top_extraction_set_name} on my latest documents`
+  }
+  if (status.top_workflow_name) {
+    return `Run ${status.top_workflow_name} on my latest documents`
+  }
+  return 'Extract deadlines, owners, and deliverables from my latest documents.'
+}
+
+function deriveReturningPrimaryAction(
+  status: OnboardingStatus | null,
+  orgName: string,
+): ReturningPrimaryAction {
+  if (!status) {
+    return {
+      kind: 'upload',
+      eyebrow: 'Start here',
+      title: 'Upload a document',
+      description: `${orgName} gets useful once it has a real file to analyze.`,
+      cta: 'Upload a document',
+      icon: FileUp,
+    }
+  }
+
+  const firstAlert = status.active_alerts[0]
+  if (status.has_only_onboarding_docs) {
+    return {
+      kind: 'upload',
+      eyebrow: 'Next step',
+      title: 'Upload one of your own documents',
+      description: 'Replace the demo with a real proposal, policy, or compliance file so this home can start surfacing actual work.',
+      cta: 'Upload your document',
+      icon: FileUp,
+    }
+  }
+
+  if (firstAlert) {
+    return {
+      kind: 'alert',
+      eyebrow: 'Needs review',
+      title: firstAlert.item_name,
+      description: firstAlert.message,
+      cta: 'Review alert',
+      icon: AlertTriangle,
+      prompt: alertReviewMessage(firstAlert.item_name),
+    }
+  }
+
+  const recent = status.recent_activity[0]
+  if (recent) {
+    return {
+      kind: 'resume',
+      eyebrow: 'Resume',
+      title: recent.title,
+      description: recentActivityLabel(recent),
+      cta: recent.type === 'conversation' ? 'Continue chat' : recent.status === 'failed' ? 'Debug run' : 'Open results',
+      icon: ACTIVITY_ICONS[recent.type] ?? Clock3,
+      prompt: activityResumeMessage(recent),
+    }
+  }
+
+  if (status.unprocessed_doc_count > 0) {
+    return {
+      kind: 'process',
+      eyebrow: 'Ready to process',
+      title: status.top_extraction_set_name
+        ? `Run ${status.top_extraction_set_name}`
+        : status.top_workflow_name
+          ? `Run ${status.top_workflow_name}`
+          : 'Process the latest documents',
+      description: `${status.unprocessed_doc_count} document${status.unprocessed_doc_count === 1 ? '' : 's'} are ready for a first pass.`,
+      cta: status.top_extraction_set_name ? 'Run extraction' : status.top_workflow_name ? 'Run workflow' : 'Start with summary',
+      icon: status.top_extraction_set_name ? FileSearch : status.top_workflow_name ? Workflow : FileSearch,
+      prompt: processingPrompt(status),
+    }
+  }
+
+  if (status.has_documents && !status.has_chatted_with_docs) {
+    return {
+      kind: 'composer',
+      eyebrow: 'First grounded question',
+      title: 'Ask about the documents already in your workspace',
+      description: 'Start with a summary, a deadline check, or a compliance question tied to your actual files.',
+      cta: 'Ask about current work',
+      icon: MessageSquare,
+    }
+  }
+
+  if (status.has_documents) {
+    return {
+      kind: 'composer',
+      eyebrow: 'Fastest path',
+      title: 'Ask about current work',
+      description: 'Use the composer to summarize, compare, extract, or troubleshoot against the documents you already have loaded.',
+      cta: 'Open composer',
+      icon: MessageSquare,
+    }
+  }
+
+  return {
+    kind: 'upload',
+    eyebrow: 'Activation',
+    title: 'Upload a real document',
+    description: 'Skip the generic tour and give the workspace something real to reason over.',
+    cta: 'Upload a document',
+    icon: FileUp,
+  }
+}
+
+function returningReadyState(status: OnboardingStatus | null): string {
+  if (!status) return 'Waiting for files'
+  if (status.has_ready_knowledge_base && status.has_workflows) return 'Knowledge base + workflows ready'
+  if (status.has_ready_knowledge_base) return 'Knowledge base ready'
+  if (status.has_workflows) return 'Workflow ready'
+  if (status.has_documents) return 'Documents loaded'
+  return 'Waiting for your files'
+}
+
+function FocusNowCard({
+  action,
+  disabled,
+  onRunDemo,
+  onAttachFiles,
+  onFocusComposer,
+  onSendMessage,
+}: {
+  action: ReturningPrimaryAction
+  disabled?: boolean
+  onRunDemo: () => void
+  onAttachFiles: (files: File[]) => void
+  onFocusComposer: () => void
+  onSendMessage: (message: string) => void
+}) {
+  const Icon = action.icon
+
+  const handleAction = () => {
+    if (action.kind === 'demo') {
+      onRunDemo()
+      return
+    }
+    if (action.kind === 'composer') {
+      onFocusComposer()
+      return
+    }
+    if (action.prompt) {
+      onSendMessage(action.prompt)
+    }
+  }
+
+  return (
+    <div
+      style={{
+        padding: 16,
+        borderRadius: 16,
+        border: '1px solid rgba(255,255,255,0.18)',
+        background: 'rgba(255,255,255,0.10)',
+        backdropFilter: 'blur(8px)',
+        boxShadow: '0 18px 36px rgba(0,0,0,0.10)',
+      }}
+    >
+      <div
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 7,
+          padding: '5px 9px',
+          borderRadius: 999,
+          background: 'rgba(255,255,255,0.12)',
+          fontSize: 11,
+          fontWeight: 800,
+          letterSpacing: '0.05em',
+          textTransform: 'uppercase',
+          color: 'rgba(255,255,255,0.78)',
+        }}
+      >
+        {action.eyebrow}
+      </div>
+
+      <div style={{ marginTop: 12, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 38,
+            height: 38,
+            borderRadius: 12,
+            background: 'rgba(255,255,255,0.12)',
+            flexShrink: 0,
+          }}
+        >
+          <Icon size={18} />
+        </div>
+        <div>
+          <div style={{ fontSize: 20, lineHeight: 1.15, fontWeight: 800, color: '#ffffff' }}>
+            {action.title}
+          </div>
+          <div style={{ marginTop: 7, fontSize: 13, lineHeight: 1.55, color: 'rgba(255,255,255,0.84)' }}>
+            {action.description}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 14 }}>
+        {action.kind === 'upload' ? (
+          <UploadPrimaryButton
+            label={action.cta}
+            disabled={disabled}
+            onAttachFiles={onAttachFiles}
+          />
+        ) : (
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={handleAction}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              padding: '11px 16px',
+              borderRadius: 12,
+              border: 'none',
+              background: '#ffffff',
+              color: '#111827',
+              fontFamily: 'inherit',
+              fontSize: 14,
+              fontWeight: 800,
+              cursor: disabled ? 'default' : 'pointer',
+              opacity: disabled ? 0.55 : 1,
+            }}
+          >
+            {action.cta}
+            <ArrowRight size={15} />
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function QueueItemButton({
+  icon: Icon,
+  title,
+  subtitle,
+  tone = 'neutral',
+  onClick,
+}: {
+  icon: LucideIcon
+  title: string
+  subtitle: string
+  tone?: 'neutral' | 'warning'
+  onClick: () => void
+}) {
+  const palette = tone === 'warning'
+    ? {
+        border: 'color-mix(in srgb, var(--highlight-color, #eab308) 42%, #e5e7eb)',
+        background: 'color-mix(in srgb, var(--highlight-color, #eab308) 8%, white)',
+        icon: '#a16207',
+      }
+    : {
+        border: '#e5e7eb',
+        background: '#ffffff',
+        icon: '#6b7280',
+      }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 11,
+        width: '100%',
+        padding: '12px 12px',
+        borderRadius: 12,
+        border: `1px solid ${palette.border}`,
+        background: palette.background,
+        color: '#111827',
+        cursor: 'pointer',
+        fontFamily: 'inherit',
+        textAlign: 'left',
+        transition: 'border-color 0.15s ease, transform 0.15s ease',
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.transform = 'translateY(-1px)'
+        e.currentTarget.style.borderColor = 'color-mix(in srgb, var(--highlight-color, #eab308) 50%, #d1d5db)'
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.transform = 'translateY(0)'
+        e.currentTarget.style.borderColor = palette.border
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: 34,
+          height: 34,
+          borderRadius: 10,
+          background: tone === 'warning'
+            ? 'rgba(234,179,8,0.14)'
+            : 'color-mix(in srgb, var(--highlight-color, #eab308) 10%, white)',
+          color: palette.icon,
+          flexShrink: 0,
+        }}
+      >
+        <Icon size={16} />
+      </div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: '#111827', lineHeight: 1.35 }}>{title}</div>
+        <div style={{ marginTop: 4, fontSize: 12, lineHeight: 1.5, color: '#6b7280' }}>{subtitle}</div>
+      </div>
+      <ArrowRight size={14} style={{ marginTop: 2, flexShrink: 0, color: 'var(--highlight-on-light, #806600)' }} />
+    </button>
+  )
+}
+
+function ResumeQueue({
   status,
   onSendMessage,
 }: {
@@ -584,62 +899,143 @@ function WorkspaceSnapshot({
   if (!status) {
     return (
       <SurfaceCard
-        title="Recent work and alerts"
-        subtitle="Once you upload documents or run workflows, your active work will appear here."
-      >
-        <div style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.5 }}>
-          No workspace activity yet.
-        </div>
-      </SurfaceCard>
-    )
-  }
-
-  const hasBriefing =
-    status.recent_activity.length > 0 ||
-    status.active_alerts.length > 0 ||
-    !!status.daily_guidance ||
-    !!status.has_only_onboarding_docs ||
-    status.unprocessed_doc_count > 0 ||
-    status.maturity_stage !== 'newcomer'
-
-  if (!hasBriefing) {
-    return (
-      <SurfaceCard
-        title="Recent work and alerts"
-        subtitle="Your home screen will start surfacing work queues, recent runs, and follow-ups as soon as you begin using them."
+        title="Continue where you left off"
+        subtitle="This section turns into a work queue as soon as the workspace has files, runs, or alerts."
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <PromptButton
             label="Help me upload and analyze my first document."
             onClick={() => onSendMessage('Help me upload and analyze my first document.')}
           />
-          <PromptButton
-            label="Show me how source-linked answers work."
-            onClick={() => onSendMessage('Show me how source-linked answers work in Vandalizer.')}
-          />
         </div>
       </SurfaceCard>
     )
   }
 
+  const hasQueue =
+    status.recent_activity.length > 0 ||
+    status.active_alerts.length > 0 ||
+    status.unprocessed_doc_count > 0 ||
+    status.has_only_onboarding_docs
+
   return (
-    <div>
-      <div style={{ fontSize: 16, fontWeight: 700, color: '#111827', marginBottom: 6 }}>
-        Recent work and alerts
-      </div>
-      <div style={{ fontSize: 13, lineHeight: 1.5, color: '#6b7280', marginBottom: 14 }}>
-        Resume unfinished work, review alerts, and see what changed since your last visit.
-      </div>
-      <WorkspaceBriefing
-        recentActivity={status.recent_activity}
-        activeAlerts={status.active_alerts}
-        maturityStage={status.maturity_stage}
-        unprocessedDocCount={status.unprocessed_doc_count}
-        dailyGuidance={status.daily_guidance}
-        sinceLastVisit={status.since_last_visit}
-        hasOnlyOnboardingDocs={status.has_only_onboarding_docs}
-        onSendMessage={onSendMessage}
-      />
+    <SurfaceCard
+      title="Continue where you left off"
+      subtitle="Use actual workspace state, not a generic blank chat, to decide the fastest next move."
+    >
+      {status.since_last_visit && (
+        <div
+          style={{
+            marginBottom: 12,
+            padding: '8px 10px',
+            borderRadius: 10,
+            background: '#f8fafc',
+            border: '1px solid #e5e7eb',
+            fontSize: 12,
+            lineHeight: 1.5,
+            color: '#64748b',
+          }}
+        >
+          {status.since_last_visit}
+        </div>
+      )}
+
+      {!hasQueue ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {status.has_documents ? (
+            <>
+              <PromptButton
+                label="Ask about the documents already in my workspace."
+                onClick={() => onSendMessage('Ask about the documents already in my workspace.')}
+              />
+              <PromptButton
+                label="Suggest the next best workflow for the files I have."
+                onClick={() => onSendMessage('Suggest the next best workflow for the files I have.')}
+              />
+            </>
+          ) : (
+            <>
+              <PromptButton
+                label="Help me upload and analyze my first document."
+                onClick={() => onSendMessage('Help me upload and analyze my first document.')}
+              />
+              <PromptButton
+                label="Show me how source-linked answers work."
+                onClick={() => onSendMessage('Show me how source-linked answers work in Vandalizer.')}
+              />
+            </>
+          )}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {status.active_alerts.map((alert) => (
+            <QueueItemButton
+              key={`${alert.item_name}-${alert.message}`}
+              icon={AlertTriangle}
+              title={alert.item_name}
+              subtitle={alert.message}
+              tone="warning"
+              onClick={() => onSendMessage(alertReviewMessage(alert.item_name))}
+            />
+          ))}
+
+          {status.recent_activity.map((item) => (
+            <QueueItemButton
+              key={`${item.type}-${item.title}-${item.relative_time}`}
+              icon={ACTIVITY_ICONS[item.type] ?? Clock3}
+              title={item.title}
+              subtitle={recentActivityLabel(item)}
+              onClick={() => onSendMessage(activityResumeMessage(item))}
+            />
+          ))}
+
+          {status.unprocessed_doc_count > 0 && (
+            <QueueItemButton
+              icon={FileSearch}
+              title={
+                status.top_extraction_set_name
+                  ? `Run ${status.top_extraction_set_name}`
+                  : status.top_workflow_name
+                    ? `Run ${status.top_workflow_name}`
+                    : 'Process new documents'
+              }
+              subtitle={`${status.unprocessed_doc_count} document${status.unprocessed_doc_count === 1 ? '' : 's'} are waiting for a first pass.`}
+              onClick={() => onSendMessage(processingPrompt(status))}
+            />
+          )}
+
+          {status.has_only_onboarding_docs && (
+            <QueueItemButton
+              icon={FileUp}
+              title="Replace the sample with your own file"
+              subtitle="Upload a real document so the assistant can show live deadlines, risks, and extracted fields from your work."
+              onClick={() => onSendMessage('Help me move from the sample demo to my own documents.')}
+            />
+          )}
+        </div>
+      )}
+    </SurfaceCard>
+  )
+}
+
+function ReadyAssetBadge({ label }: { label: string }) {
+  return (
+    <div
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        padding: '6px 9px',
+        borderRadius: 999,
+        border: '1px solid #e5e7eb',
+        background: '#ffffff',
+        fontSize: 12,
+        fontWeight: 700,
+        color: '#374151',
+      }}
+    >
+      <CheckCircle2 size={12} style={{ color: 'var(--highlight-on-light, #806600)' }} />
+      {label}
     </div>
   )
 }
@@ -861,40 +1257,22 @@ export function ReturningHome({
   status: OnboardingStatus | null
   suggestionPills: string[]
 }) {
-  const recent = status?.recent_activity[0] ?? null
+  const primaryAction = deriveReturningPrimaryAction(status, orgName)
   const alerts = status?.active_alerts.length ?? 0
   const suggestions = starterSuggestions(status, suggestionPills)
-  const primaryAction = status?.has_only_onboarding_docs
-    ? {
-        title: 'Upload a real document',
-        description: 'Move from the sample experience into your own live workflow.',
-        kind: 'upload' as const,
-      }
-    : recent
-      ? {
-          title: 'Resume recent work',
-          description: recent.title,
-          kind: 'resume' as const,
-        }
-      : alerts > 0
-        ? {
-            title: 'Review active alerts',
-            description: `${alerts} quality item${alerts === 1 ? '' : 's'} need attention.`,
-            kind: 'alert' as const,
-          }
-        : {
-            title: status?.has_documents ? 'Ask about current work' : 'Run sample demo',
-            description: status?.has_documents
-              ? 'Start from a question, summary, or extraction request.'
-              : `See ${orgName} work on a sample document.`,
-            kind: status?.has_documents ? 'composer' as const : 'demo' as const,
-          }
-
-  const showBasicsStepper = !!status && ['newcomer', 'explorer'].includes(status.maturity_stage)
+  const emphasizeUpload = !status?.has_documents || !!status?.has_only_onboarding_docs
+  const showBasicsStepper = !!status
+    && ['newcomer', 'explorer'].includes(status.maturity_stage)
+    && (!status.has_documents || status.has_only_onboarding_docs)
   const showGlossary = !!status && !status.has_documents && ['newcomer', 'explorer'].includes(status.maturity_stage)
+  const readyBadges = [
+    status?.top_extraction_set_name ? `Extraction: ${status.top_extraction_set_name}` : null,
+    status?.top_workflow_name ? `Workflow: ${status.top_workflow_name}` : null,
+    status?.has_ready_knowledge_base ? 'Knowledge base ready' : null,
+  ].filter((value): value is string => !!value)
 
   return (
-    <div style={{ maxWidth: 760, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ maxWidth: 860, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div
         className="relative overflow-hidden text-white"
         style={{
@@ -911,118 +1289,137 @@ export function ReturningHome({
             background: 'radial-gradient(circle at top right, rgba(255,255,255,0.16), transparent 45%)',
           }}
         />
-        <div style={{ position: 'relative', zIndex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: 42,
-                height: 42,
-                borderRadius: 14,
-                background: 'rgba(255,255,255,0.14)',
-                flexShrink: 0,
-              }}
-            >
-              {brandIcon ? (
-                <img
-                  src={brandIcon}
-                  alt={orgName}
-                  style={{ width: 22, height: 22, objectFit: 'contain' }}
-                />
+        <div
+          style={{
+            position: 'relative',
+            zIndex: 1,
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gap: 16,
+            alignItems: 'start',
+          }}
+        >
+          <div>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 42,
+                  height: 42,
+                  borderRadius: 14,
+                  background: 'rgba(255,255,255,0.14)',
+                  flexShrink: 0,
+                }}
+              >
+                {brandIcon ? (
+                  <img
+                    src={brandIcon}
+                    alt={orgName}
+                    style={{ width: 22, height: 22, objectFit: 'contain' }}
+                  />
+                ) : (
+                  <Clock3 size={18} />
+                )}
+              </div>
+              <div>
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 7,
+                    padding: '5px 10px',
+                    borderRadius: 999,
+                    background: 'rgba(255,255,255,0.12)',
+                    fontSize: 11,
+                    fontWeight: 800,
+                    letterSpacing: '0.05em',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  Workspace home
+                </div>
+                <div style={{ marginTop: 10, fontSize: 30, lineHeight: 1.08, fontWeight: 800, maxWidth: 520 }}>
+                  {returningHeroTitle(status)}
+                </div>
+                <div style={{ marginTop: 10, fontSize: 15, lineHeight: 1.6, maxWidth: 560, opacity: 0.92 }}>
+                  {returningHeroSubtitle(status)}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 16 }}>
+              <MetricChip
+                icon={Clock3}
+                label="Recent"
+                value={
+                  status?.recent_activity[0]?.relative_time
+                    ? status.recent_activity[0].relative_time
+                    : status?.has_documents
+                      ? 'Ready for next task'
+                      : 'No runs yet'
+                }
+              />
+              <MetricChip
+                icon={AlertTriangle}
+                label="Needs review"
+                value={alerts > 0 ? `${alerts} item${alerts === 1 ? '' : 's'}` : 'Clear'}
+                tone={alerts > 0 ? 'warning' : 'neutral'}
+              />
+              <MetricChip
+                icon={status?.has_ready_knowledge_base ? BookOpen : status?.has_workflows ? Workflow : FileSearch}
+                label="Ready"
+                value={returningReadyState(status)}
+              />
+            </div>
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
+              {!emphasizeUpload ? (
+                <>
+                  <ActionPillButton
+                    label="Ask about current work"
+                    icon={MessageSquare}
+                    inverse
+                    disabled={disabled}
+                    onClick={onFocusComposer}
+                  />
+                  <UploadPillButton
+                    label="Upload another document"
+                    inverse
+                    disabled={disabled}
+                    onAttachFiles={onAttachFiles}
+                  />
+                </>
               ) : (
-                <Clock3 size={18} />
+                <>
+                  <UploadPillButton
+                    label="Upload a document"
+                    inverse
+                    disabled={disabled}
+                    onAttachFiles={onAttachFiles}
+                  />
+                  <ActionPillButton
+                    label="Run sample demo"
+                    icon={Zap}
+                    inverse
+                    disabled={disabled}
+                    onClick={onRunDemo}
+                  />
+                </>
               )}
             </div>
-            <div>
-              <div style={{ fontSize: 28, lineHeight: 1.12, fontWeight: 800 }}>
-                {returningHeroTitle(status)}
-              </div>
-              <div style={{ marginTop: 10, fontSize: 15, lineHeight: 1.6, maxWidth: 620, opacity: 0.92 }}>
-                {returningHeroSubtitle(status)}
-              </div>
-            </div>
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 16 }}>
-            <MetricChip
-              icon={Clock3}
-              label="Recent work"
-              value={`${status?.recent_activity.length ?? 0} item${(status?.recent_activity.length ?? 0) === 1 ? '' : 's'}`}
-            />
-            <MetricChip
-              icon={AlertTriangle}
-              label="Needs review"
-              value={`${alerts} alert${alerts === 1 ? '' : 's'}`}
-              tone={alerts > 0 ? 'warning' : 'neutral'}
-            />
-            <MetricChip
-              icon={FileSearch}
-              label="Docs to process"
-              value={`${status?.unprocessed_doc_count ?? 0}`}
-            />
-            <MetricChip
-              icon={Workflow}
-              label="Stage"
-              value={status?.maturity_stage ?? 'newcomer'}
-            />
-          </div>
-        </div>
-      </div>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: 12,
-        }}
-      >
-        {primaryAction.kind === 'upload' ? (
-          <UploadActionCard
-            title={primaryAction.title}
-            description={primaryAction.description}
+          <FocusNowCard
+            action={primaryAction}
             disabled={disabled}
+            onRunDemo={onRunDemo}
             onAttachFiles={onAttachFiles}
+            onFocusComposer={onFocusComposer}
+            onSendMessage={onSendMessage}
           />
-        ) : (
-          <ActionCard
-            title={primaryAction.title}
-            description={primaryAction.description}
-            icon={primaryAction.kind === 'resume' ? Clock3 : primaryAction.kind === 'alert' ? AlertTriangle : Zap}
-            accent
-            disabled={disabled}
-            onClick={() => {
-              if (primaryAction.kind === 'resume' && recent) {
-                onSendMessage(activityResumeMessage(recent))
-                return
-              }
-              if (primaryAction.kind === 'alert' && status?.active_alerts[0]) {
-                onSendMessage(`Check quality of ${status.active_alerts[0].item_name}`)
-                return
-              }
-              if (primaryAction.kind === 'composer') {
-                onFocusComposer()
-                return
-              }
-              onRunDemo()
-            }}
-          />
-        )}
-
-        <UploadActionCard
-          title={status?.has_documents ? 'Upload another document' : 'Upload a document'}
-          description="Keep new work flowing into the assistant instead of starting from an empty chat."
-          disabled={disabled}
-          onAttachFiles={onAttachFiles}
-        />
-
-        <ActionCard
-          title="Ask a question"
-          description="Jump to the composer to summarize, compare, troubleshoot, or plan next steps."
-          icon={MessageSquare}
-          disabled={disabled}
-          onClick={onFocusComposer}
-        />
+        </div>
       </div>
 
       <div
@@ -1033,11 +1430,11 @@ export function ReturningHome({
           alignItems: 'start',
         }}
       >
-        <WorkspaceSnapshot status={status} onSendMessage={onSendMessage} />
+        <ResumeQueue status={status} onSendMessage={onSendMessage} />
 
         <SurfaceCard
-          title="Suggested next actions"
-          subtitle="These are task-oriented prompts designed to get you back into useful work quickly."
+          title="Fastest next steps"
+          subtitle="These are prompt-shaped shortcuts back into real work, based on what exists in the workspace today."
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {suggestions.map((suggestion) => (
@@ -1058,14 +1455,20 @@ export function ReturningHome({
               border: '1px solid color-mix(in srgb, var(--highlight-color, #eab308) 20%, #e5e7eb)',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
               <Shield size={14} style={{ color: 'var(--highlight-on-light, #806600)' }} />
               <span style={{ fontSize: 12, fontWeight: 700, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                Trust stays visible
+                Ready in this workspace
               </span>
             </div>
-            <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.55, color: '#4b5563' }}>
-              Source-linked answers, validated extraction quality, and reusable workflows should be one click away from this screen.
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {readyBadges.length > 0 ? (
+                readyBadges.map((badge) => <ReadyAssetBadge key={badge} label={badge} />)
+              ) : (
+                <div style={{ fontSize: 13, lineHeight: 1.55, color: '#4b5563' }}>
+                  Upload a real document and the home screen will start surfacing reusable assets instead of generic prompts.
+                </div>
+              )}
             </div>
           </div>
         </SurfaceCard>

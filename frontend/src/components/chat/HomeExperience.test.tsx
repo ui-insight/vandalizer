@@ -94,12 +94,17 @@ describe('ReturningHome', () => {
       />,
     )
 
-    expect(screen.getByText('A few items need attention')).toBeInTheDocument()
-    expect(screen.getByText('Recent work and alerts')).toBeInTheDocument()
-    expect(screen.getByText('Suggested next actions')).toBeInTheDocument()
+    expect(screen.getByText('Review what changed since your last visit')).toBeInTheDocument()
+    expect(screen.getByText('Continue where you left off')).toBeInTheDocument()
+    expect(screen.getByText('Fastest next steps')).toBeInTheDocument()
+    expect(screen.getByText('Ready in this workspace')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: /Resume recent work/i }))
-    expect(onSendMessage).toHaveBeenCalledWith(
+    fireEvent.click(screen.getByRole('button', { name: /Review alert/i }))
+    expect(onSendMessage).toHaveBeenNthCalledWith(1, 'Check quality of Budget Review')
+
+    fireEvent.click(screen.getByRole('button', { name: /Budget review workflow/i }))
+    expect(onSendMessage).toHaveBeenNthCalledWith(
+      2,
       'Show me the results from my "Budget review workflow" workflow run',
     )
   })
