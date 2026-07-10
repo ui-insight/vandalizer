@@ -569,6 +569,16 @@ def _get_azure_provider(config: SystemConfig) -> dict | None:
     return None
 
 
+def _get_saml_provider(config: SystemConfig) -> dict | None:
+    """Extract the enabled, fully-configured SAML provider from config, or None."""
+    for p in config.oauth_providers:
+        if p.get("provider") == "saml" and p.get("enabled"):
+            required = ("idp_entity_id", "idp_sso_url", "idp_x509_cert")
+            if all(p.get(k) for k in required):
+                return p
+    return None
+
+
 @router.get("/config")
 async def auth_config():
     """Public endpoint  - returns which auth methods are available."""
@@ -583,6 +593,18 @@ async def auth_config():
                 if azure
                 else "Azure SSO",
                 "configured": azure is not None,
+            }
+        )
+
+    # SAML is its own SSO method (not gated on the "oauth" auth method); expose
+    # it only when a provider is enabled and has the IdP metadata it needs.
+    saml = _get_saml_provider(config)
+    if saml:
+        providers.append(
+            {
+                "provider": "saml",
+                "display_name": saml.get("display_name", "Sign in with SSO"),
+                "configured": True,
             }
         )
 

@@ -3,7 +3,7 @@
 from fastapi import Response
 
 from app.config import Settings
-from app.routers.auth import _get_azure_provider, _set_tokens
+from app.routers.auth import _get_azure_provider, _get_saml_provider, _set_tokens
 
 
 def _make_mock_user():
@@ -170,3 +170,48 @@ class TestGetAzureProvider:
         result = _get_azure_provider(cfg)
         assert result is not None
         assert result["client_id"] == "az-id"
+
+
+class TestGetSamlProvider:
+    """_get_saml_provider returns an enabled SAML provider only when the IdP
+    metadata (entity id, SSO URL, x509 cert) is present."""
+
+    def _make_config(self, providers: list[dict]):
+        class FakeConfig:
+            oauth_providers = providers
+        return FakeConfig()
+
+    _FULL = {
+        "provider": "saml",
+        "enabled": True,
+        "idp_entity_id": "https://idp.example.edu/idp/shibboleth",
+        "idp_sso_url": "https://idp.example.edu/idp/profile/SAML2/Redirect/SSO",
+        "idp_x509_cert": "MIIC...cert...",
+    }
+
+    def test_no_providers_returns_none(self):
+        assert _get_saml_provider(self._make_config([])) is None
+
+    def test_disabled_provider_returns_none(self):
+        cfg = self._make_config([{**self._FULL, "enabled": False}])
+        assert _get_saml_provider(cfg) is None
+
+    def test_missing_sso_url_returns_none(self):
+        cfg = self._make_config([{**self._FULL, "idp_sso_url": ""}])
+        assert _get_saml_provider(cfg) is None
+
+    def test_missing_cert_returns_none(self):
+        cfg = self._make_config([{**self._FULL, "idp_x509_cert": ""}])
+        assert _get_saml_provider(cfg) is None
+
+    def test_fully_configured_returns_provider(self):
+        cfg = self._make_config([dict(self._FULL)])
+        result = _get_saml_provider(cfg)
+        assert result is not None
+        assert result["idp_entity_id"] == self._FULL["idp_entity_id"]
+
+    def test_oauth_provider_ignored(self):
+        cfg = self._make_config([
+            {"provider": "azure", "enabled": True, "client_id": "id", "client_secret": "s", "tenant_id": "t"},
+        ])
+        assert _get_saml_provider(cfg) is None

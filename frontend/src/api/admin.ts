@@ -573,6 +573,17 @@ export function updateAuthMethods(methods: string[]) {
   return apiFetch<{ status: string }>('/api/admin/config/auth/methods', { method: 'PUT', body: JSON.stringify({ methods }) })
 }
 
+export interface SamlIdpFields {
+  idp_entity_id: string
+  idp_sso_url: string
+  idp_x509_cert: string
+}
+
+/** Parse an IdP's SAML metadata (from a URL or pasted XML) into the SAML fields. */
+export function parseSamlMetadata(data: { metadata_url?: string; metadata_xml?: string }) {
+  return apiFetch<SamlIdpFields>('/api/admin/config/auth/saml/parse-metadata', { method: 'POST', body: JSON.stringify(data) })
+}
+
 // Quality
 
 export interface QualitySummary {
