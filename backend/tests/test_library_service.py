@@ -669,6 +669,11 @@ class TestShareToTeamErrors:
         with patch("app.services.library_service.access_control") as ac, \
              patch("app.services.library_service._resolve_team_oid", AsyncMock(return_value=team_oid)), \
              patch(
+                 "app.services.library_service.get_or_create_team_library",
+                 AsyncMock(return_value=_make_library(scope="team")),
+             ), \
+             patch("app.services.library_service._count_team_shares_of", AsyncMock(return_value=0)), \
+             patch(
                  "app.services.library_service._clone_underlying_object",
                  AsyncMock(side_effect=CloneSourceMissingError("Workflow gone")),
              ):
@@ -690,6 +695,11 @@ class TestShareToTeamErrors:
         team_oid = PydanticObjectId()
         with patch("app.services.library_service.access_control") as ac, \
              patch("app.services.library_service._resolve_team_oid", AsyncMock(return_value=team_oid)), \
+             patch(
+                 "app.services.library_service.get_or_create_team_library",
+                 AsyncMock(return_value=_make_library(scope="team")),
+             ), \
+             patch("app.services.library_service._count_team_shares_of", AsyncMock(return_value=0)), \
              patch(
                  "app.services.library_service._clone_underlying_object",
                  AsyncMock(side_effect=RuntimeError("db blew up")),
@@ -721,6 +731,7 @@ class TestShareToTeamErrors:
                  "app.services.library_service.get_or_create_team_library",
                  AsyncMock(return_value=team_lib),
              ), \
+             patch("app.services.library_service._count_team_shares_of", AsyncMock(return_value=0)), \
              patch(
                  "app.services.library_service.add_item",
                  AsyncMock(side_effect=RuntimeError("indexing failed")),
@@ -734,6 +745,101 @@ class TestShareToTeamErrors:
             assert exc.value.code == "clone_failed"
             assert exc.value.status == 500
             assert any("adding cloned object" in r.message for r in caplog.records)
+
+
+# ---------------------------------------------------------------------------
+# share_to_team — duplicate-share detection
+# ---------------------------------------------------------------------------
+
+
+class TestShareToTeamDuplicates:
+    def _patches(self, item, team_oid, prior_shares):
+        """Common patch set for a share that passes auth and team checks."""
+        team_lib = _make_library(scope="team")
+        clone = AsyncMock(return_value=PydanticObjectId())
+        add = AsyncMock(return_value={"id": "new", "kind": "workflow", "name": "WF (Copy)"})
+        return team_lib, clone, add, [
+            patch("app.services.library_service._resolve_team_oid", AsyncMock(return_value=team_oid)),
+            patch("app.services.library_service.get_or_create_team_library", AsyncMock(return_value=team_lib)),
+            patch("app.services.library_service._count_team_shares_of", AsyncMock(return_value=prior_shares)),
+            patch("app.services.library_service._clone_underlying_object", clone),
+            patch("app.services.library_service.add_item", add),
+            patch("app.services.library_service.Team", MagicMock(get=AsyncMock(return_value=None))),
+        ]
+
+    @pytest.mark.asyncio
+    async def test_raises_already_shared_on_repeat_share(self):
+        from app.services.library_service import ShareError, share_to_team
+
+        item = _make_library_item()
+        team_oid = PydanticObjectId()
+        _, clone, _, patches = self._patches(item, team_oid, prior_shares=1)
+        with patch("app.services.library_service.access_control") as ac:
+            ac.get_authorized_library_item = AsyncMock(return_value=item)
+            ac.get_team_access_context = AsyncMock(return_value=MagicMock())
+            ac.can_view_team = MagicMock(return_value=True)
+            for p in patches:
+                p.start()
+            try:
+                with pytest.raises(ShareError) as exc:
+                    await share_to_team("item-1", _make_user(), str(team_oid))
+            finally:
+                for p in patches:
+                    p.stop()
+            assert exc.value.code == "already_shared"
+            assert exc.value.status == 409
+            clone.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_force_shares_again_with_numbered_copy(self):
+        from app.services.library_service import share_to_team
+
+        item = _make_library_item()
+        team_oid = PydanticObjectId()
+        _, clone, add, patches = self._patches(item, team_oid, prior_shares=1)
+        with patch("app.services.library_service.access_control") as ac:
+            ac.get_authorized_library_item = AsyncMock(return_value=item)
+            ac.get_team_access_context = AsyncMock(return_value=MagicMock())
+            ac.can_view_team = MagicMock(return_value=True)
+            for p in patches:
+                p.start()
+            try:
+                result = await share_to_team("item-1", _make_user(), str(team_oid), force=True)
+            finally:
+                for p in patches:
+                    p.stop()
+            assert result["id"] == "new"
+            assert clone.await_args.kwargs["copy_number"] == 2
+            assert add.await_args.kwargs["cloned_from_id"] == item.item_id
+
+    @pytest.mark.asyncio
+    async def test_first_share_records_provenance(self):
+        from app.services.library_service import share_to_team
+
+        item = _make_library_item()
+        team_oid = PydanticObjectId()
+        _, clone, add, patches = self._patches(item, team_oid, prior_shares=0)
+        with patch("app.services.library_service.access_control") as ac:
+            ac.get_authorized_library_item = AsyncMock(return_value=item)
+            ac.get_team_access_context = AsyncMock(return_value=MagicMock())
+            ac.can_view_team = MagicMock(return_value=True)
+            for p in patches:
+                p.start()
+            try:
+                result = await share_to_team("item-1", _make_user(), str(team_oid))
+            finally:
+                for p in patches:
+                    p.stop()
+            assert result["id"] == "new"
+            assert clone.await_args.kwargs["copy_number"] == 1
+            assert add.await_args.kwargs["cloned_from_id"] == item.item_id
+
+    @pytest.mark.asyncio
+    async def test_count_team_shares_short_circuits_on_empty_library(self):
+        from app.services.library_service import _count_team_shares_of
+
+        team_lib = _make_library(scope="team", items=[])
+        assert await _count_team_shares_of(team_lib, PydanticObjectId()) == 0
 
 
 # ---------------------------------------------------------------------------

@@ -73,6 +73,16 @@ describe('Library API', () => {
     expect(body.team_id).toBe('team-1')
   })
 
+  it('shareToTeam omits force by default and sends it when set', async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({ id: 'shared-1' }))
+    await shareToTeam('item-1', 'team-1')
+    expect(JSON.parse(mockFetch.mock.calls[0][1].body)).not.toHaveProperty('force')
+
+    mockFetch.mockResolvedValueOnce(jsonResponse({ id: 'shared-2' }))
+    await shareToTeam('item-1', 'team-1', undefined, true)
+    expect(JSON.parse(mockFetch.mock.calls[1][1].body).force).toBe(true)
+  })
+
   it('listCollections sends GET', async () => {
     mockFetch.mockResolvedValueOnce(
       jsonResponse({ collections: [{ id: 'c1', title: 'Pre-Award' }] }),

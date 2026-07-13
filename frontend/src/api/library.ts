@@ -57,10 +57,15 @@ export function cloneToPersonal(itemId: string) {
   return apiFetch<LibraryItem>('/api/library/clone', { method: 'POST', body: JSON.stringify({ item_id: itemId }) })
 }
 
-export function shareToTeam(itemId: string, teamId: string, comment?: string) {
+export function shareToTeam(itemId: string, teamId: string, comment?: string, force?: boolean) {
   return apiFetch<LibraryItem>('/api/library/share', {
     method: 'POST',
-    body: JSON.stringify({ item_id: itemId, team_id: teamId, comment: comment || undefined }),
+    body: JSON.stringify({
+      item_id: itemId,
+      team_id: teamId,
+      comment: comment || undefined,
+      force: force || undefined,
+    }),
   })
 }
 

@@ -39,6 +39,10 @@ class LibraryItem(Document):
     item_id: PydanticObjectId
     kind: LibraryItemKind
     added_by_user_id: str
+    # For items whose underlying object was cloned from another workflow /
+    # search set (share-to-team, add-to-my-library): the source object's id.
+    # Used to detect re-shares of the same item. None for directly-added items.
+    cloned_from_id: Optional[PydanticObjectId] = None
     verified: bool = False
     tags: list[str] = Field(default_factory=list)
     note: Optional[str] = None

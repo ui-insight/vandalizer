@@ -8,6 +8,7 @@ import uuid as uuid_mod
 from typing import TYPE_CHECKING
 
 from beanie import PydanticObjectId
+from beanie.operators import In
 from bson import ObjectId as BsonObjectId
 
 from app.models.library import (
@@ -244,6 +245,7 @@ async def add_item(
     note: str | None = None,
     tags: list[str] | None = None,
     folder: str | None = None,
+    cloned_from_id: PydanticObjectId | None = None,
 ) -> dict | None:
     lib = await access_control.get_authorized_library(library_id, user, contribute=True)
     if not lib:
@@ -274,6 +276,7 @@ async def add_item(
         note=note,
         tags=tags or [],
         folder=folder,
+        cloned_from_id=cloned_from_id,
         created_at=now,
     )
     await li.insert()
@@ -442,7 +445,18 @@ async def clone_to_personal(item_id: str, user: User) -> dict | None:
         kind=item.kind.value,
         note="Cloned from library item",
         tags=list(item.tags),
+        cloned_from_id=item.item_id,
     )
+
+
+async def _count_team_shares_of(team_lib: Library, source_object_id: PydanticObjectId) -> int:
+    """How many items in ``team_lib`` were cloned from ``source_object_id``."""
+    if not team_lib.items:
+        return 0
+    return await LibraryItem.find(
+        In(LibraryItem.id, team_lib.items),
+        LibraryItem.cloned_from_id == source_object_id,
+    ).count()
 
 
 async def share_to_team(
@@ -451,6 +465,7 @@ async def share_to_team(
     team_id: str,
     *,
     comment: str | None = None,
+    force: bool = False,
 ) -> dict:
     item = await access_control.get_authorized_library_item(item_id, user)
     if not item:
@@ -464,8 +479,18 @@ async def share_to_team(
     if not access_control.can_view_team(str(team_oid), team_access):
         raise ShareError("not_team_member", 403)
 
+    # Re-sharing the same item would silently create an identical, independent
+    # clone in the team library. Refuse unless the caller explicitly forces it,
+    # and number forced copies so they stay distinguishable.
+    team_lib = await get_or_create_team_library(user.user_id, team_id)
+    prior_shares = await _count_team_shares_of(team_lib, item.item_id)
+    if prior_shares and not force:
+        raise ShareError("already_shared", 409)
+
     try:
-        new_obj_id = await _clone_underlying_object(item, user.user_id, team_id=team_id)
+        new_obj_id = await _clone_underlying_object(
+            item, user.user_id, team_id=team_id, copy_number=prior_shares + 1
+        )
     except CloneSourceMissingError as exc:
         logger.warning("Share-to-team source missing for item %s: %s", item.id, exc)
         raise ShareError("original_missing", 404)
@@ -476,13 +501,13 @@ async def share_to_team(
         )
         raise ShareError("clone_failed", 500)
 
-    team_lib = await get_or_create_team_library(user.user_id, team_id)
     try:
         result = await add_item(
             library_id=str(team_lib.id),
             user=user,
             item_id=str(new_obj_id),
             kind=item.kind.value,
+            cloned_from_id=item.item_id,
         )
     except Exception:
         logger.exception(
@@ -794,9 +819,12 @@ async def _attach_author(item: dict | None) -> dict | None:
 
 
 async def _clone_underlying_object(
-    item: LibraryItem, user_id: str, *, team_id: str | None = None
+    item: LibraryItem, user_id: str, *, team_id: str | None = None, copy_number: int = 1
 ) -> PydanticObjectId:
     """Clone the workflow or extraction backing a LibraryItem.
+
+    ``copy_number`` numbers repeat clones of the same source ("X (Copy 2)")
+    so deliberate duplicates stay distinguishable in library listings.
 
     Returns the new object's id. Raises:
       - ``CloneSourceMissingError`` if the original or the item's kind
@@ -809,6 +837,7 @@ async def _clone_underlying_object(
     with the original — and so legacy documents stored with ``None`` in
     those fields don't blow up during the copy.
     """
+    copy_suffix = "(Copy)" if copy_number <= 1 else f"(Copy {copy_number})"
     if item.kind == LibraryItemKind.WORKFLOW:
         original = await Workflow.get(item.item_id)
         if not original:
@@ -816,7 +845,7 @@ async def _clone_underlying_object(
                 f"Workflow {item.item_id} not found for library item {item.id}"
             )
         new_wf = Workflow(
-            name=f"{original.name} (Copy)",
+            name=f"{original.name} {copy_suffix}",
             description=original.description,
             user_id=user_id,
             team_id=team_id,
@@ -868,7 +897,7 @@ async def _clone_underlying_object(
             )
         new_uuid = str(uuid_mod.uuid4())
         new_ss = SearchSet(
-            title=f"{original.title} (Copy)",
+            title=f"{original.title} {copy_suffix}",
             uuid=new_uuid,
             status=original.status,
             set_type=original.set_type,

@@ -105,6 +105,9 @@ class ShareToTeamRequest(BaseModel):
     item_id: str
     team_id: str
     comment: Optional[str] = None
+    # Share again even though the item was already shared to this team
+    # (creates a numbered copy). Set after the user confirms the 409 warning.
+    force: bool = False
 
 
 # ---------------------------------------------------------------------------

@@ -205,15 +205,39 @@ export function LibraryTab() {
   }
   const confirmShare = async (comment: string) => {
     if (!shareDialogItem || !teamId) return
+    const { id, name } = shareDialogItem
+    setShareDialogItem(null)
     try {
-      await shareToTeam(shareDialogItem.id, teamId, comment || undefined)
+      await shareToTeam(id, teamId, comment || undefined)
       toast('Shared to team library', 'success')
       refreshItems()
     } catch (err) {
+      // 409: this item was already shared to the team — re-sharing would
+      // create an independent duplicate, so ask before forcing it.
+      if (err instanceof ApiError && err.status === 409) {
+        const ok = await confirm({
+          title: 'Already shared to team',
+          message: (
+            <>
+              <strong>{name}</strong> is already in this team's library. Sharing again
+              creates a separate copy that can be edited independently of the first.
+            </>
+          ),
+          confirmLabel: 'Share a copy',
+        })
+        if (!ok) return
+        try {
+          await shareToTeam(id, teamId, comment || undefined, true)
+          toast('Shared a new copy to team library', 'success')
+          refreshItems()
+        } catch (err2) {
+          const msg = err2 instanceof ApiError ? err2.message : 'Failed to share to team'
+          toast(msg, 'error')
+        }
+        return
+      }
       const msg = err instanceof ApiError ? err.message : 'Failed to share to team'
       toast(msg, 'error')
-    } finally {
-      setShareDialogItem(null)
     }
   }
   const handleRemove = async (itemId: string) => {

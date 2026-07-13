@@ -99,13 +99,19 @@ _SHARE_ERROR_MESSAGES = {
         "Something went wrong while sharing this item. The error has been logged — "
         "please try again, and contact support if it keeps happening."
     ),
+    "already_shared": (
+        "This item has already been shared to this team's library. "
+        "Sharing again will create a separate copy that can diverge from the first."
+    ),
 }
 
 
 @router.post("/share", response_model=LibraryItemResponse)
 async def share_to_team(req: ShareToTeamRequest, user: User = Depends(get_current_user)):
     try:
-        item = await svc.share_to_team(req.item_id, user, req.team_id, comment=req.comment)
+        item = await svc.share_to_team(
+            req.item_id, user, req.team_id, comment=req.comment, force=req.force
+        )
     except svc.ShareError as exc:
         detail = _SHARE_ERROR_MESSAGES.get(exc.code, exc.code)
         raise HTTPException(status_code=exc.status, detail=detail)
