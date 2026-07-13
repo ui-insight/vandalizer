@@ -57,7 +57,7 @@ function matchesKindFilter(item: { kind: string; set_type: string | null }, filt
 type SortOption = 'recent' | 'az'
 
 export function LibraryTab() {
-  const { openWorkflow, openExtraction, sendChatMessage, selectedDocUuids, selectedFolderUuids } = useWorkspace()
+  const { openWorkflow, openExtraction, sendChatMessage, selectedDocUuids, selectedFolderUuids, openWorkflowId, openExtractionId, openAutomationId } = useWorkspace()
   const { toast } = useToast()
   const confirm = useConfirm()
   const { user } = useAuth()
@@ -182,6 +182,21 @@ export function LibraryTab() {
       folder: selectedFolder,
     },
   )
+
+  // The tab stays mounted (hidden) while a workflow/extraction/automation
+  // editor is open in the right panel, so filters and search survive the
+  // round-trip — but edits made in the editor (renames, deletes) won't be
+  // reflected here. Refetch when the editor closes.
+  const editorOpen = Boolean(openWorkflowId || openExtractionId || openAutomationId)
+  const prevEditorOpen = useRef(editorOpen)
+  useEffect(() => {
+    if (prevEditorOpen.current && !editorOpen) {
+      refreshItems()
+      refreshFolders()
+    }
+    prevEditorOpen.current = editorOpen
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editorOpen])
 
   // Actions
   const handlePin = async (itemId: string, pinned: boolean) => {
