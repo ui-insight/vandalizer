@@ -97,7 +97,13 @@ export function ChatMessage({
     const target = (e.target as HTMLElement).closest<HTMLElement>('[data-action]')
     if (!target) return
     const route = routeActionClick(target.getAttribute('data-action'), target.textContent || '')
-    if (route.kind === 'cert') certPanel.openPanel()
+    // The certification course now runs in chat (cert tools + cards) — start
+    // it in the conversation. The floating panel remains the fallback when
+    // this message has no send pathway.
+    if (route.kind === 'cert') {
+      if (onSendMessage) onSendMessage('Start the Vandalizer certification course — show me where to begin.')
+      else certPanel.openPanel()
+    }
     else if (route.kind === 'files') setWorkspaceMode('files')
     // Improvised action buttons (create-kb, build-workflow, …) have no dedicated
     // route; send their label so the assistant performs them via its tools

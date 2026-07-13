@@ -3,6 +3,13 @@ import type { ReactNode } from 'react'
 import { AlertTriangle, Check, ChevronRight, ClipboardCopy, Download, ExternalLink, FileText, Loader2 } from 'lucide-react'
 import { QualityBadge } from './QualityBadge'
 import { renderMarkdown } from './markdown'
+import {
+  CertCheckCard,
+  CertCompletionCard,
+  CertModuleCard,
+  CertProgressCard,
+  useCertificationSync,
+} from './CertificationCards'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import type { WorkspaceMode } from '../../contexts/WorkspaceContext'
 import type { ToolCallInfo, ToolResultInfo, QualityMeta } from '../../types/chat'
@@ -56,6 +63,12 @@ const TOOL_META: Record<string, { label: string; category: ToolCategory }> = {
   set_project_status:    { label: 'Updating project status',  category: 'write' },
   create_automation:     { label: 'Creating automation',      category: 'write' },
   create_workflow:       { label: 'Building workflow',         category: 'write' },
+  get_certification_progress:      { label: 'Checking certification progress', category: 'read' },
+  get_certification_module:        { label: 'Loading certification module',    category: 'read' },
+  provision_certification_lab:     { label: 'Setting up certification lab',    category: 'write' },
+  check_certification_module:      { label: 'Grading certification module',    category: 'read' },
+  complete_certification_module:   { label: 'Completing certification module', category: 'write' },
+  submit_certification_assessment: { label: 'Saving self-assessment',          category: 'write' },
 }
 
 const CATEGORY_ACCENT: Record<ToolCategory, string> = {
@@ -105,6 +118,14 @@ function getActiveHint(toolName: string, args: Record<string, unknown>): string 
       return ''
     case 'save_to_folder':
       return queryStr ? `"${queryStr}"` : ''
+    case 'get_certification_module':
+    case 'provision_certification_lab':
+    case 'check_certification_module':
+    case 'complete_certification_module':
+    case 'submit_certification_assessment': {
+      const m = args.module_id
+      return typeof m === 'string' && m ? `for "${m.replace(/_/g, ' ')}"` : ''
+    }
     default:
       return queryStr
   }
@@ -341,6 +362,41 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
       const t = obj.name ? `"${String(obj.name).slice(0, 40)}"` : 'workflow'
       return { text: `Built ${t}: ${n} step${n !== 1 ? 's' : ''}`, qualityHint: '' }
     }
+
+    case 'get_certification_progress': {
+      const done = Number(obj.modules_completed ?? 0)
+      const total = Number(obj.modules_total ?? 0)
+      const level = obj.level ? String(obj.level) : ''
+      return {
+        text: `${done}/${total} modules · ${Number(obj.total_xp ?? 0).toLocaleString()} XP${level ? ` · ${level}` : ''}`,
+        qualityHint: '',
+      }
+    }
+
+    case 'get_certification_module':
+      return { text: obj.title ? `Module: "${obj.title}"` : 'Module loaded', qualityHint: '' }
+
+    case 'check_certification_module': {
+      const checks = (obj.checks as Array<Record<string, unknown>>) || []
+      const passing = checks.filter((c) => c.passed).length
+      return {
+        text: obj.passed
+          ? `"${obj.title}" — all checks passed`
+          : `"${obj.title}" — ${passing}/${checks.length} checks passing`,
+        qualityHint: '',
+      }
+    }
+
+    case 'complete_certification_module': {
+      const xp = Number(obj.xp_earned ?? 0)
+      return {
+        text: `"${obj.title}" complete${xp > 0 ? ` · +${xp} XP` : ''}`,
+        qualityHint: '',
+      }
+    }
+
+    case 'submit_certification_assessment':
+      return { text: 'Self-assessment saved', qualityHint: '' }
   }
 
   // Generic fallback
@@ -997,6 +1053,10 @@ export function ToolStatusLine({
   const obj = result?.content as Record<string, unknown> | undefined
   const isError = Boolean(obj?.error)
 
+  // Keep the Certification panel / rail badge in sync with chat-driven
+  // certification writes (XP, lab provisioning, assessments).
+  useCertificationSync(name, Boolean(result))
+
   const needsConfirmation = !isActive && obj?.needs_confirmation === true
 
   const activeHint = isActive ? getActiveHint(name, args) : ''
@@ -1132,6 +1192,18 @@ export function ToolStatusLine({
       )}
       {result && name === 'propose_test_case' && obj?.verification_session_id != null && (
         <VerificationLauncher content={obj} actions={verificationActions} />
+      )}
+      {result && !isError && name === 'get_certification_progress' && obj?.modules != null && (
+        <CertProgressCard content={obj} />
+      )}
+      {result && !isError && name === 'get_certification_module' && obj?.module_id != null && (
+        <CertModuleCard content={obj} />
+      )}
+      {result && !isError && name === 'check_certification_module' && obj?.checks != null && (
+        <CertCheckCard content={obj} />
+      )}
+      {result && !isError && name === 'complete_certification_module' && obj?.total_xp != null && (
+        <CertCompletionCard content={obj} />
       )}
 
       {/* Confirmation buttons for write tools awaiting user approval */}

@@ -27,6 +27,10 @@ WRITE_TOOLS = {
     "save_to_folder", "create_project", "run_pin_on_project",
     "pin_to_project", "unpin_from_project", "set_project_status",
     "create_automation", "create_workflow",
+    # Certification writes: provision uploads lab documents, complete awards
+    # XP / mutates CertificationProgress, submit stores assessment answers.
+    "provision_certification_lab", "complete_certification_module",
+    "submit_certification_assessment",
 }
 
 

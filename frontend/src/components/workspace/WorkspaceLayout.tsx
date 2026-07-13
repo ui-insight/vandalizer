@@ -17,7 +17,7 @@ import type { AutomationStarted } from '../../hooks/useAutomationActivity'
 import type { CompletedAutomation } from '../../api/automations'
 
 export function WorkspaceLayout() {
-  const { railDocked, panelSplit, workspaceMode, viewDocument, setWorkspaceMode, activeProjectUuid } = useWorkspace()
+  const { railDocked, panelSplit, chatSplitOpen, workspaceMode, viewDocument, setWorkspaceMode, activeProjectUuid } = useWorkspace()
   const { toast } = useToast()
   const containerRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
@@ -53,6 +53,10 @@ export function WorkspaceLayout() {
   // the Projects drawer (the picker) must not linger underneath it.
   const isProjects = workspaceMode === 'projects' && !activeProjectUuid
   const isChat = workspaceMode === 'chat' || (workspaceMode === 'projects' && !!activeProjectUuid)
+  // Chat normally runs full-width, but the user can open the file browser
+  // beside it (split view) — e.g. to work through the certification program
+  // with their documents in sight.
+  const collapseLeft = isChat && !chatSplitOpen
   const isAutomations = workspaceMode === 'automations'
   const isKnowledge = workspaceMode === 'knowledge'
   const railWidth = railDocked ? 64 : 220
@@ -79,20 +83,21 @@ export function WorkspaceLayout() {
             transition: 'margin-right 0.3s ease',
           }}
         >
-          {/* Left panel area — hidden in chat mode, drawer in automations/knowledge */}
+          {/* Left panel area — hidden in chat mode (unless split view is open),
+              drawer in automations/knowledge */}
           <div
             className="overflow-hidden"
             style={{
-              width: isChat ? '0%' : `${panelSplit}%`,
-              minWidth: isChat ? 0 : undefined,
+              width: collapseLeft ? '0%' : `${panelSplit}%`,
+              minWidth: collapseLeft ? 0 : undefined,
               transition: isDragging ? 'none' : 'width 0.3s ease',
             }}
           >
             {isProjects ? <ProjectsPanel /> : isAutomations ? <AutomationsPanel activeIds={automationActivity.activeIds} /> : isKnowledge ? <KnowledgePanel /> : <LeftPanel />}
           </div>
 
-          {/* Resizer — hidden in chat mode */}
-          {!isChat && (
+          {/* Resizer — hidden when the left panel is collapsed */}
+          {!collapseLeft && (
             <PanelResizer
               containerRef={containerRef}
               onDragStart={() => setIsDragging(true)}

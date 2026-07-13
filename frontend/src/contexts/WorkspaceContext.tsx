@@ -116,6 +116,11 @@ interface UIStateContextValue {
   toggleRailDocked: () => void
   panelSplit: number
   setPanelSplit: (pct: number, skipPersist?: boolean) => void
+  // Chat split view — shows the file browser beside the chat (chat mode
+  // normally collapses the left panel to zero width). Persisted so a user
+  // working through e.g. the certification program keeps their layout.
+  chatSplitOpen: boolean
+  setChatSplitOpen: (open: boolean) => void
   highlightTerms: string[]
   setHighlightTerms: (terms: string[]) => void
   activitySignal: number
@@ -238,6 +243,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [selectedFolderUuids, setSelectedFolderUuids] = useState<string[]>([])
   const [railDocked, setRailDocked] = useState(() => getStoredBool('workspace:railDocked', false))
   const [panelSplit, _setPanelSplit] = useState(() => getStoredNumber('workspace:panelSplit', 60))
+  const [chatSplitOpen, _setChatSplitOpen] = useState(() => getStoredBool('workspace:chatSplit', false))
   const [loadConversationId, setLoadConversationId] = useState<string | null>(null)
   const [currentConversationUuid, setCurrentConversationUuid] = useState<string | null>(null)
   const [newChatSignal, setNewChatSignal] = useState(0)
@@ -630,6 +636,11 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const setChatSplitOpen = useCallback((open: boolean) => {
+    _setChatSplitOpen(open)
+    try { localStorage.setItem('workspace:chatSplit', String(open)) } catch {}
+  }, [])
+
   const viewDocument = useCallback((uuid: string, title: string) => {
     setViewDocumentRequest({ uuid, title })
   }, [])
@@ -685,6 +696,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     selectedFolderUuids, setSelectedFolderUuids,
     railDocked, toggleRailDocked,
     panelSplit, setPanelSplit,
+    chatSplitOpen, setChatSplitOpen,
     highlightTerms, setHighlightTerms,
     activitySignal, bumpActivitySignal,
     viewDocumentRequest, viewDocument, clearViewDocumentRequest,
@@ -694,6 +706,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     selectedDocUuids, selectedDocNames, selectedFolderUuids,
     railDocked, toggleRailDocked,
     panelSplit, setPanelSplit,
+    chatSplitOpen, setChatSplitOpen,
     highlightTerms, activitySignal, bumpActivitySignal,
     viewDocumentRequest, viewDocument, clearViewDocumentRequest,
     verificationSession, verificationCompletion,

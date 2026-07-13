@@ -4227,6 +4227,277 @@ async def update_plan(
 
 
 # ---------------------------------------------------------------------------
+# Phase 11 — Certification program (Vandal Workflow Architect)
+#
+# These wrap certification_service — the SAME service the certification panel
+# calls — so progress, XP, and module completion earned in chat show up in the
+# panel (and vice versa). Grading always runs the deterministic validators;
+# the model narrates results, it never decides pass/fail.
+# ---------------------------------------------------------------------------
+
+
+async def get_certification_progress(
+    context: RunContext[AgenticChatDeps],
+) -> dict:
+    """Get the user's Vandal Workflow Architect certification progress.
+
+    Returns overall XP, level, streak, per-module completion/stars, and the
+    next incomplete module. Call this when the user says "start certification",
+    "continue certification", asks how far along they are, or asks about XP,
+    levels, or badges. Progress is shared with the Certification panel — work
+    done in chat counts there and vice versa.
+
+    Args:
+        context: The call context.
+    """
+    from app.services import certification_service as cert_svc
+
+    prog = await cert_svc.get_progress_dict(context.deps.user_id)
+    modules = []
+    next_module_id = None
+    for mid in cert_svc.MODULE_ORDER:
+        data = prog["modules"].get(mid, {})
+        completed = bool(data.get("completed"))
+        if not completed and next_module_id is None:
+            next_module_id = mid
+        modules.append({
+            "module_id": mid,
+            "title": cert_svc.MODULE_TITLES.get(mid, mid),
+            "xp": cert_svc.MODULE_XP[mid],
+            "completed": completed,
+            "stars": data.get("stars", 0),
+        })
+    completed_count = sum(1 for m in modules if m["completed"])
+    return {
+        "total_xp": prog["total_xp"],
+        "level": prog["level"],
+        "certified": prog["certified"],
+        "streak_days": prog["streak_days"],
+        "modules_completed": completed_count,
+        "modules_total": len(modules),
+        "next_module_id": next_module_id,
+        "modules": modules,
+    }
+
+
+async def get_certification_module(
+    context: RunContext[AgenticChatDeps],
+    module_id: str,
+) -> dict:
+    """Get one certification module's exercise: overview, instructions, criteria.
+
+    Call this when presenting a module to work through in chat. The
+    instructions were written for the Certification panel UI (Learn/Challenge
+    tabs, buttons) — translate any panel-specific steps into chat-native
+    guidance, and offer to do the doable parts yourself (run extractions,
+    build workflows, propose test cases) since chat-driven work counts toward
+    the same validators.
+
+    Args:
+        context: The call context.
+        module_id: One of the certification module ids (see
+            get_certification_progress for the full ordered list).
+    """
+    from app.services import certification_service as cert_svc
+
+    if module_id not in cert_svc.MODULE_XP:
+        return _err(
+            f"Unknown module '{module_id}'.",
+            hint=f"Valid module ids: {', '.join(cert_svc.MODULE_ORDER)}",
+        )
+    exercise = cert_svc.get_exercise(module_id) or {}
+    prog = await cert_svc.get_progress_dict(context.deps.user_id)
+    data = prog["modules"].get(module_id, {})
+    return {
+        "module_id": module_id,
+        "title": cert_svc.MODULE_TITLES.get(module_id, module_id),
+        "xp": cert_svc.MODULE_XP[module_id],
+        "completed": bool(data.get("completed")),
+        "stars": data.get("stars", 0),
+        "overview": exercise.get("overview", ""),
+        "instructions": exercise.get("instructions", []),
+        "expected_fields": exercise.get("expected_fields", []),
+        "star_criteria": exercise.get("star_criteria", {}),
+        "sample_documents": exercise.get("documents", []),
+        "provisioned_docs": data.get("provisioned_docs", []),
+        # Reflective modules are completed by answering these questions via
+        # submit_certification_assessment; empty for hands-on modules.
+        "assessment_keys": list(cert_svc.ASSESSMENT_KEYS.get(module_id, ())),
+    }
+
+
+async def provision_certification_lab(
+    context: RunContext[AgenticChatDeps],
+    module_id: str,
+) -> dict:
+    """Set up a module's sample documents in the user's Certification Lab folder.
+
+    Uploads the module's practice PDFs into a "Certification Lab" folder in the
+    user's workspace (created if needed; already-uploaded documents are reused,
+    so calling again is safe). Call this before a hands-on module's challenge
+    so the user has real documents to work against. Reflective modules have no
+    documents — this returns an empty list for them.
+
+    Args:
+        context: The call context.
+        module_id: The certification module to provision documents for.
+    """
+    from app.config import Settings
+    from app.services import certification_service as cert_svc
+
+    if module_id not in cert_svc.MODULE_XP:
+        return _err(
+            f"Unknown module '{module_id}'.",
+            hint=f"Valid module ids: {', '.join(cert_svc.MODULE_ORDER)}",
+        )
+    result = await cert_svc.provision_module_documents(
+        context.deps.user, module_id, Settings(),
+    )
+    if "error" in result:
+        return _err(result["error"])
+    provisioned = result.get("provisioned_docs", [])
+    exercise = cert_svc.get_exercise(module_id) or {}
+    return {
+        "module_id": module_id,
+        "provisioned_docs": provisioned,
+        "document_names": exercise.get("documents", []),
+        "folder": cert_svc.CERT_FOLDER_TITLE,
+        "message": (
+            f"{len(provisioned)} sample document(s) are in the "
+            f'"{cert_svc.CERT_FOLDER_TITLE}" folder (Files tab).'
+            if provisioned
+            else "This module has no sample documents — nothing to provision."
+        ),
+    }
+
+
+async def check_certification_module(
+    context: RunContext[AgenticChatDeps],
+    module_id: str,
+) -> dict:
+    """Grade a certification module against the user's REAL workspace artifacts.
+
+    Runs the module's deterministic validator (the same one the Certification
+    panel uses) over what actually exists — extraction templates, workflows,
+    runs, test cases — and returns each check with pass/fail and detail. This
+    is read-only: it never marks the module complete. Relay the results
+    honestly; if a check failed, explain concretely what to do next (and offer
+    to do it in chat when a tool can). When everything passes, offer
+    complete_certification_module to bank the XP.
+
+    Args:
+        context: The call context.
+        module_id: The certification module to check.
+    """
+    from app.services import certification_service as cert_svc
+
+    if module_id not in cert_svc.MODULE_XP:
+        return _err(
+            f"Unknown module '{module_id}'.",
+            hint=f"Valid module ids: {', '.join(cert_svc.MODULE_ORDER)}",
+        )
+    result = await cert_svc.validate_module(context.deps.user_id, module_id)
+    return {
+        "module_id": module_id,
+        "title": cert_svc.MODULE_TITLES.get(module_id, module_id),
+        "passed": result.get("passed", False),
+        "stars": result.get("stars", 0),
+        "checks": result.get("checks", []),
+    }
+
+
+async def complete_certification_module(
+    context: RunContext[AgenticChatDeps],
+    module_id: str,
+) -> dict:
+    """Mark a certification module complete and award its XP.
+
+    Re-runs the module's validator first — if it doesn't pass, nothing is
+    awarded and the failing checks are returned. On success, returns XP
+    earned, stars, new total/level, and whether the user just became fully
+    certified. Only call after check_certification_module shows passed=true
+    (or the user asks to complete and you've verified). Completing an
+    already-completed module is safe: it only awards bonus XP for star
+    upgrades.
+
+    Args:
+        context: The call context.
+        module_id: The certification module to complete.
+    """
+    from app.services import certification_service as cert_svc
+
+    if module_id not in cert_svc.MODULE_XP:
+        return _err(
+            f"Unknown module '{module_id}'.",
+            hint=f"Valid module ids: {', '.join(cert_svc.MODULE_ORDER)}",
+        )
+    result = await cert_svc.complete_module(context.deps.user_id, module_id)
+    if "error" in result:
+        return {
+            "error": result["error"],
+            "module_id": module_id,
+            "validation": result.get("validation"),
+        }
+    result["title"] = cert_svc.MODULE_TITLES.get(module_id, module_id)
+    return result
+
+
+async def submit_certification_assessment(
+    context: RunContext[AgenticChatDeps],
+    module_id: str,
+    answers: dict,
+) -> dict:
+    """Store a reflective module's self-assessment answers.
+
+    The reflective modules (ai_literacy, process_mapping, workflow_design) are
+    completed by answering reflection questions, not by building artifacts.
+    Ask the user the questions conversationally — one at a time, in your own
+    words — then submit their answers here keyed by the module's
+    assessment_keys (from get_certification_module). Every key needs a
+    non-empty answer in the user's own words; never invent or pad answers the
+    user didn't give.
+
+    Args:
+        context: The call context.
+        module_id: A reflective module id (ai_literacy, process_mapping,
+            or workflow_design).
+        answers: The user's answers, keyed by the module's assessment_keys.
+    """
+    from app.services import certification_service as cert_svc
+
+    required = cert_svc.ASSESSMENT_KEYS.get(module_id)
+    if not required:
+        return _err(
+            f"Module '{module_id}' has no self-assessment.",
+            hint=(
+                "Only ai_literacy, process_mapping, and workflow_design use "
+                "assessments; hands-on modules are graded with "
+                "check_certification_module."
+            ),
+        )
+    if not isinstance(answers, dict):
+        return _err("answers must be an object keyed by the module's assessment_keys.")
+    cleaned = {k: str(v).strip() for k, v in answers.items() if str(v or "").strip()}
+    missing = [k for k in required if not cleaned.get(k)]
+    if missing:
+        return _err(
+            f"Missing answer(s) for: {', '.join(missing)}.",
+            hint="Ask the user these questions and resubmit with every key answered.",
+        )
+    await cert_svc.store_assessment(
+        context.deps.user_id, module_id, {k: cleaned[k] for k in required},
+    )
+    return {
+        "stored": True,
+        "module_id": module_id,
+        "message": (
+            "Answers saved. Run check_certification_module then "
+            "complete_certification_module to bank the XP."
+        ),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Tool registry — imported by llm_service.create_agentic_chat_agent()
 # ---------------------------------------------------------------------------
 
@@ -4284,6 +4555,13 @@ TOOLS = [
     create_automation,
     # Phase 10 — Workflow authoring
     create_workflow,
+    # Phase 11 — Certification program
+    get_certification_progress,
+    get_certification_module,
+    provision_certification_lab,
+    check_certification_module,
+    complete_certification_module,
+    submit_certification_assessment,
 ]
 
 
@@ -4316,6 +4594,9 @@ COMPACTABLE_TOOLS: frozenset[str] = frozenset({
     "list_test_cases",
     "list_optimization_recommendations",
     "list_project_documents",
+    "get_certification_progress",
+    "get_certification_module",
+    "check_certification_module",
 })
 
 

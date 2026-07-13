@@ -82,6 +82,31 @@ MODULE_ORDER = [
     "governance",
 ]
 
+# Display titles, kept in sync with the frontend MODULES catalog
+# (frontend/src/pages/Certification.tsx). Used by surfaces that only have the
+# module id (chat tools, notifications).
+MODULE_TITLES = {
+    "ai_literacy": "AI Literacy",
+    "foundations": "Foundations",
+    "process_mapping": "Thinking in Workflows",
+    "workflow_design": "Workflow Design",
+    "extraction_engine": "Extraction Engine",
+    "multi_step": "Multi-Step Workflows",
+    "advanced_nodes": "Advanced Nodes",
+    "output_delivery": "Output & Delivery",
+    "validation_qa": "Validation & QA",
+    "batch_processing": "Batch Processing",
+    "governance": "Governance",
+}
+
+# Self-assessment answer keys required by the reflective modules' validators
+# (_validate_ai_literacy / _validate_process_mapping / _validate_workflow_design).
+ASSESSMENT_KEYS = {
+    "ai_literacy": ("experience", "comfort", "concern"),
+    "process_mapping": ("process", "time_sink", "judgment", "outcome"),
+    "workflow_design": ("step_splitting", "pattern", "concern", "human_role"),
+}
+
 
 def _compute_level(xp: int) -> str:
     level = "novice"

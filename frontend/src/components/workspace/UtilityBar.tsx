@@ -1,4 +1,4 @@
-import { MessageSquare, FolderOpen, Workflow, BookOpen, FolderKanban } from 'lucide-react'
+import { MessageSquare, FolderOpen, Workflow, BookOpen, FolderKanban, Columns2 } from 'lucide-react'
 import { useWorkspace, type WorkspaceMode } from '../../contexts/WorkspaceContext'
 
 const MODES: { mode: WorkspaceMode; icon: typeof MessageSquare; label: string }[] = [
@@ -9,7 +9,7 @@ const MODES: { mode: WorkspaceMode; icon: typeof MessageSquare; label: string }[
 ]
 
 export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomation?: boolean }) {
-  const { workspaceMode, setWorkspaceMode, resetToHome, activeProjectRole, activeProjectUuid, deactivateProject } = useWorkspace()
+  const { workspaceMode, setWorkspaceMode, resetToHome, activeProjectRole, activeProjectUuid, deactivateProject, chatSplitOpen, setChatSplitOpen } = useWorkspace()
   // The Projects icon shows the picker, which is exclusive with being scoped
   // into a project — so it's "active" only when a project is NOT scoped.
   const projectsActive = workspaceMode === 'projects' && !activeProjectUuid
@@ -110,6 +110,35 @@ export function UtilityBar({ hasActiveAutomation = false }: { hasActiveAutomatio
           </button>
         )
       })}
+
+      {/* Split view — show the file browser beside the chat. Only meaningful
+          in chat mode (other modes already have a left panel). */}
+      {(workspaceMode === 'chat' || (workspaceMode === 'projects' && !!activeProjectUuid)) && activeProjectRole !== 'viewer' && (
+        <>
+          <div style={{ width: 24, height: 1, background: '#333', margin: '4px 0 2px' }} />
+          <button
+            onClick={() => setChatSplitOpen(!chatSplitOpen)}
+            title={chatSplitOpen ? 'Hide files panel' : 'Show files beside chat'}
+            aria-label={chatSplitOpen ? 'Hide files panel' : 'Show files beside chat'}
+            aria-pressed={chatSplitOpen}
+            style={{
+              width: 40,
+              height: 40,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'transparent',
+              border: 'none',
+              borderLeft: chatSplitOpen ? '3px solid var(--highlight-color, #eab308)' : '3px solid transparent',
+              borderRadius: 4,
+              cursor: 'pointer',
+              padding: 0,
+            }}
+          >
+            <Columns2 size={20} style={{ color: chatSplitOpen ? '#fff' : '#888' }} />
+          </button>
+        </>
+      )}
 
       <style>{`
         @keyframes automationGlow {

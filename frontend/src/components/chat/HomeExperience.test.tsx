@@ -1,7 +1,44 @@
 import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import type { OnboardingStatus } from '../../api/config'
+import type { CertificationProgress } from '../../types/certification'
+import { CertificationPanelProvider } from '../../contexts/CertificationPanelContext'
 import { FirstSessionHome, ReturningHome } from './HomeExperience'
+
+// The certification CTA reads the shared cert progress. Mock the API the
+// provider fetches from so tests control what "progress" the home sees.
+const certApi = vi.hoisted(() => ({
+  progress: null as CertificationProgress | null,
+}))
+vi.mock('../../api/certification', () => ({
+  getProgress: () => Promise.resolve(certApi.progress),
+  validateModule: vi.fn(),
+  completeModule: vi.fn(),
+  provisionModule: vi.fn(),
+  getExercise: vi.fn(),
+  submitAssessment: vi.fn(),
+}))
+
+function withCert(children: ReactNode) {
+  return <CertificationPanelProvider>{children}</CertificationPanelProvider>
+}
+
+function certProgress(completedModules: string[]): CertificationProgress {
+  return {
+    id: 'p1',
+    user_id: 'u1',
+    modules: Object.fromEntries(completedModules.map((m) => [m, {
+      completed: true, stars: 2, completed_at: null, attempts: 1, xp_earned: 100,
+    }])),
+    total_xp: completedModules.length * 100,
+    level: 'apprentice',
+    certified: false,
+    certified_at: null,
+    streak_days: 1,
+    last_activity_date: null,
+  }
+}
 
 const baseStatus: OnboardingStatus = {
   has_documents: true,
@@ -77,6 +114,27 @@ describe('FirstSessionHome', () => {
       'Extract every deadline, deliverable, and owner from this document.',
     )
   })
+
+  it('offers to start the certification course in chat', () => {
+    const onSendMessage = vi.fn()
+    certApi.progress = null
+
+    render(withCert(
+      <FirstSessionHome
+        orgName="Vandalizer"
+        brandIcon={null}
+        onRunDemo={vi.fn()}
+        onAttachFiles={vi.fn()}
+        onFocusComposer={vi.fn()}
+        onSendMessage={onSendMessage}
+      />,
+    ))
+
+    fireEvent.click(screen.getByRole('button', { name: /start the certification course/i }))
+    expect(onSendMessage).toHaveBeenCalledWith(
+      'Start the Vandalizer certification course — show me where to begin.',
+    )
+  })
 })
 
 describe('ReturningHome', () => {
@@ -109,5 +167,51 @@ describe('ReturningHome', () => {
       2,
       'Show me the results from my "Budget review workflow" workflow run',
     )
+  })
+
+  it('shows a continue-certification CTA with the completed count', async () => {
+    const onSendMessage = vi.fn()
+    certApi.progress = certProgress(['ai_literacy', 'foundations'])
+
+    render(withCert(
+      <ReturningHome
+        orgName="Vandalizer"
+        brandIcon={null}
+        onRunDemo={vi.fn()}
+        onAttachFiles={vi.fn()}
+        onFocusComposer={vi.fn()}
+        onSendMessage={onSendMessage}
+        status={baseStatus}
+        suggestionPills={baseStatus.suggestion_pills}
+      />,
+    ))
+
+    const btn = await screen.findByRole('button', { name: /continue certification \(2\/11\)/i })
+    fireEvent.click(btn)
+    expect(onSendMessage).toHaveBeenCalledWith(
+      'Continue my certification — show my progress and the next module.',
+    )
+  })
+
+  it('hides the certification CTA once certified', async () => {
+    certApi.progress = { ...certProgress(['ai_literacy']), certified: true }
+
+    render(withCert(
+      <ReturningHome
+        orgName="Vandalizer"
+        brandIcon={null}
+        onRunDemo={vi.fn()}
+        onAttachFiles={vi.fn()}
+        onFocusComposer={vi.fn()}
+        onSendMessage={vi.fn()}
+        status={baseStatus}
+        suggestionPills={baseStatus.suggestion_pills}
+      />,
+    ))
+
+    // Wait for the provider's progress fetch to settle, then assert absence.
+    await screen.findByText('Fastest next steps')
+    await Promise.resolve()
+    expect(screen.queryByRole('button', { name: /certification/i })).not.toBeInTheDocument()
   })
 })

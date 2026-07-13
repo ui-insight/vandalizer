@@ -68,3 +68,9 @@ export function useCertificationPanel() {
   if (!ctx) throw new Error('useCertificationPanel must be used within CertificationPanelProvider')
   return ctx
 }
+
+/** Null-safe variant for components (e.g. chat tool cards) that should work
+ *  even when rendered outside the provider, as in unit tests. */
+export function useCertificationPanelOptional() {
+  return useContext(CertificationPanelContext)
+}

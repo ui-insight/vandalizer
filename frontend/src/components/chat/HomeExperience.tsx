@@ -2,6 +2,7 @@ import { useRef, type ChangeEvent, type ReactNode } from 'react'
 import {
   AlertTriangle,
   ArrowRight,
+  Award,
   BookOpen,
   CheckCircle2,
   Clock3,
@@ -15,8 +16,34 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import type { OnboardingStatus, RecentActivityItem } from '../../api/config'
+import { useCertificationPanelOptional } from '../../contexts/CertificationPanelContext'
 import { ConceptStrip } from './ConceptTip'
 import { OnboardingStepper } from './WelcomeExperience'
+
+/**
+ * "Start certification" / "Continue certification" home CTA. The course runs
+ * right in chat (certification tools + cards), so the button just sends the
+ * kickoff message. Null when the user is already certified. Works without the
+ * CertificationPanelProvider (unit tests) — it then falls back to "start".
+ */
+function useCertificationCta(): { label: string; message: string } | null {
+  const cert = useCertificationPanelOptional()
+  const progress = cert?.progress ?? null
+  if (progress?.certified) return null
+  const completedCount = progress
+    ? Object.values(progress.modules ?? {}).filter((m) => m?.completed).length
+    : 0
+  if (completedCount > 0) {
+    return {
+      label: `Continue certification (${completedCount}/11)`,
+      message: 'Continue my certification — show my progress and the next module.',
+    }
+  }
+  return {
+    label: 'Start the certification course',
+    message: 'Start the Vandalizer certification course — show me where to begin.',
+  }
+}
 
 const FIRST_RUN_PROMPTS = [
   {
@@ -1063,6 +1090,7 @@ export function FirstSessionHome({
   onAttachFiles,
   onSendMessage,
 }: SharedHomeProps) {
+  const certCta = useCertificationCta()
   return (
     <div style={{ maxWidth: 760, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div
@@ -1157,6 +1185,15 @@ export function FirstSessionHome({
               >
                 <UploadPrimaryButton disabled={disabled} onAttachFiles={onAttachFiles} />
                 <ActionPillButton label="Run sample demo" icon={Zap} inverse disabled={disabled} onClick={onRunDemo} />
+                {certCta && (
+                  <ActionPillButton
+                    label={certCta.label}
+                    icon={Award}
+                    inverse
+                    disabled={disabled}
+                    onClick={() => onSendMessage(certCta.message)}
+                  />
+                )}
               </div>
 
               <div
@@ -1266,6 +1303,7 @@ export function ReturningHome({
   status: OnboardingStatus | null
   suggestionPills: string[]
 }) {
+  const certCta = useCertificationCta()
   const primaryAction = deriveReturningPrimaryAction(status, orgName)
   const alerts = status?.active_alerts.length ?? 0
   const suggestions = starterSuggestions(status, suggestionPills)
@@ -1416,6 +1454,15 @@ export function ReturningHome({
                     onClick={onRunDemo}
                   />
                 </>
+              )}
+              {certCta && (
+                <ActionPillButton
+                  label={certCta.label}
+                  icon={Award}
+                  inverse
+                  disabled={disabled}
+                  onClick={() => onSendMessage(certCta.message)}
+                />
               )}
             </div>
           </div>
