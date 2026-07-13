@@ -358,9 +358,10 @@ def perform_extraction_and_update(self, document_uuid: str, extension: str) -> s
                         "task_status": "error",
                         "error_message": (
                             "We couldn't extract any text from this document. "
-                            "It may be image-only, encrypted, or our OCR service "
-                            "may be temporarily unavailable. Try retrying — if "
-                            "it keeps failing, re-upload or contact support."
+                            "It may be blank, image-only, or encrypted, or our "
+                            "OCR service may be temporarily unavailable. Try "
+                            "retrying — if it keeps failing, re-upload or "
+                            "contact support."
                         ),
                     }
                 },
