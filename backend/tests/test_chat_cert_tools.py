@@ -12,6 +12,7 @@ import pytest
 from app.services.chat_tools import (
     check_certification_module,
     complete_certification_module,
+    get_certification_lesson,
     get_certification_module,
     get_certification_progress,
     provision_certification_lab,
@@ -147,6 +148,130 @@ async def test_get_module_reflective_exposes_assessment_keys():
         result = await get_certification_module(_make_context(), "ai_literacy")
 
     assert result["assessment_keys"] == ["experience", "comfort", "concern"]
+
+
+@pytest.mark.asyncio
+async def test_get_module_prefers_chat_instructions():
+    exercise = {
+        "overview": "o",
+        "instructions": ["Click the **Challenge** tab."],
+        "chat_instructions": ["Work through the lessons here in chat."],
+    }
+    with (
+        patch("app.services.certification_service.get_exercise", return_value=exercise),
+        patch(
+            "app.services.certification_service.get_progress_dict",
+            new=AsyncMock(return_value=_progress()),
+        ),
+    ):
+        result = await get_certification_module(_make_context(), "foundations")
+
+    assert result["instructions"] == ["Work through the lessons here in chat."]
+
+
+@pytest.mark.asyncio
+async def test_get_module_includes_lessons_and_assessment_questions():
+    lessons = {
+        "lessons": [{"title": "L1", "content": "c"}, {"title": "L2", "content": "c"}],
+        "assessment": {
+            "questions": [
+                {"key": "experience", "question": "Q?", "options": ["a", "b"]},
+            ],
+        },
+    }
+    with (
+        patch("app.services.certification_service.get_exercise", return_value={}),
+        patch("app.services.certification_service.get_lessons", return_value=lessons),
+        patch(
+            "app.services.certification_service.get_progress_dict",
+            new=AsyncMock(return_value=_progress()),
+        ),
+    ):
+        result = await get_certification_module(_make_context(), "ai_literacy")
+
+    assert result["lesson_titles"] == ["L1", "L2"]
+    assert result["assessment_questions"][0]["key"] == "experience"
+
+
+# ---------------------------------------------------------------------------
+# get_certification_lesson
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_get_lesson_unknown_module_errors():
+    result = await get_certification_lesson(_make_context(), "bogus", 1)
+    assert "error" in result
+
+
+@pytest.mark.asyncio
+async def test_get_lesson_module_without_lessons_errors():
+    with patch("app.services.certification_service.get_lessons", return_value={}):
+        result = await get_certification_lesson(_make_context(), "foundations", 1)
+    assert "error" in result
+
+
+@pytest.mark.asyncio
+async def test_get_lesson_out_of_range_errors():
+    lessons = {"lessons": [{"title": "L1", "content": "c"}]}
+    with patch("app.services.certification_service.get_lessons", return_value=lessons):
+        result = await get_certification_lesson(_make_context(), "foundations", 2)
+    assert "error" in result
+    assert "1..1" in result["error"]
+
+
+@pytest.mark.asyncio
+async def test_get_lesson_returns_content_and_position():
+    lessons = {
+        "lessons": [
+            {"title": "L1", "content": "first"},
+            {
+                "title": "L2",
+                "objective": "learn things",
+                "content": "second",
+                "variant": "insight",
+                "knowledge_check": {"question": "Q?", "options": []},
+            },
+        ],
+    }
+    with patch("app.services.certification_service.get_lessons", return_value=lessons):
+        result = await get_certification_lesson(_make_context(), "foundations", 2)
+
+    assert result["module_title"] == "Foundations"
+    assert result["lesson_number"] == 2
+    assert result["lesson_count"] == 2
+    assert result["title"] == "L2"
+    assert result["content"] == "second"
+    assert result["variant"] == "insight"
+    assert result["knowledge_check"]["question"] == "Q?"
+    assert result["is_last"] is True
+
+
+@pytest.mark.asyncio
+async def test_get_lesson_real_data_every_module_teachable():
+    """Every module has exported lessons and chat-native instructions, and the
+    ai_literacy reflective flow exposes its real assessment questions —
+    guards the export (frontend/scripts/export-lessons.mjs) staying in sync."""
+    from app.services import certification_service as cert_svc
+
+    for mid in cert_svc.MODULE_ORDER:
+        lessons = cert_svc.get_lessons(mid)
+        assert lessons and lessons["lessons"], f"{mid} has no exported lessons"
+        exercise = cert_svc.get_exercise(mid)
+        chat_steps = exercise.get("chat_instructions")
+        assert chat_steps, f"{mid} has no chat_instructions"
+        for step in chat_steps:
+            for phrase in ("Learn tab", "**Learn**", "Challenge tab", "**Challenge**", "Set Up Lab"):
+                assert phrase not in step, f"{mid} chat_instructions reference panel UI: {step!r}"
+
+        first = await get_certification_lesson(_make_context(), mid, 1)
+        assert first["content"], f"{mid} lesson 1 has no content"
+        assert first["lesson_count"] == len(lessons["lessons"])
+
+    # Reflective modules carry the panel's real questions.
+    for mid, keys in cert_svc.ASSESSMENT_KEYS.items():
+        questions = (cert_svc.get_lessons(mid) or {}).get("assessment", {}).get("questions", [])
+        assert [q["key"] for q in questions] == list(keys), f"{mid} assessment questions out of sync"
 
 
 # ---------------------------------------------------------------------------

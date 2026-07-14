@@ -38,6 +38,27 @@ def get_exercise(module_id: str) -> dict | None:
     return exercises.get(module_id)
 
 
+# Lesson content + self-assessment questions, exported from the panel's
+# authored source (frontend/src/pages/Certification.tsx and
+# SelfAssessment.tsx) by frontend/scripts/export-lessons.mjs. Lets the
+# in-chat certification flow teach the same lessons the panel shows.
+_LESSONS: dict = {}
+
+
+def _load_lessons() -> dict:
+    global _LESSONS
+    if _LESSONS:
+        return _LESSONS
+    lessons_path = _CERT_DATA_DIR / "lessons.json"
+    if lessons_path.exists():
+        _LESSONS = json.loads(lessons_path.read_text())
+    return _LESSONS
+
+
+def get_lessons(module_id: str) -> dict | None:
+    return _load_lessons().get(module_id)
+
+
 # ---------------------------------------------------------------------------
 # XP & Level constants
 # ---------------------------------------------------------------------------

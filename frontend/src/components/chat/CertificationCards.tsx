@@ -7,10 +7,11 @@
  * certification_service the Certification panel uses). Buttons here send
  * chat messages (so the agent stays in the loop) or open the split view.
  */
-import { useEffect, useRef } from 'react'
-import { Award, Check, Circle, CircleCheck, Columns2, Sparkles, Star, X } from 'lucide-react'
+import { useEffect, useMemo, useRef } from 'react'
+import { Award, BookOpen, Check, Circle, CircleCheck, Columns2, Sparkles, Star, X } from 'lucide-react'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
 import { useCertificationPanelOptional } from '../../contexts/CertificationPanelContext'
+import { renderMarkdown } from './markdown'
 
 const ACCENT = 'var(--highlight-color, #eab308)'
 
@@ -196,6 +197,7 @@ export function CertModuleCard({ content }: { content: Record<string, unknown> }
   const assessmentKeys = (content.assessment_keys as string[]) || []
   const isReflective = assessmentKeys.length > 0
   const hasDocs = ((content.sample_documents as string[]) || []).length > 0
+  const lessonCount = ((content.lesson_titles as string[]) || []).length
 
   return (
     <CardShell>
@@ -259,8 +261,17 @@ export function CertModuleCard({ content }: { content: Record<string, unknown> }
       )}
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+        {lessonCount > 0 && !completed && (
+          <CardButton
+            label={`Start the lessons (${lessonCount})`}
+            onClick={() => sendChatMessage(
+              `Teach me the "${title}" lessons — one at a time, starting with lesson 1.`,
+            )}
+          />
+        )}
         {isReflective ? (
           <CardButton
+            subtle={lessonCount > 0 && !completed}
             label="Answer the reflection questions"
             onClick={() => sendChatMessage(
               `I'm ready to answer the "${title}" reflection questions — ask me one at a time.`,
@@ -268,6 +279,7 @@ export function CertModuleCard({ content }: { content: Record<string, unknown> }
           />
         ) : (
           <CardButton
+            subtle={lessonCount > 0 && !completed}
             label="Check my progress"
             onClick={() => sendChatMessage(`Check my progress on the "${title}" certification module.`)}
           />
@@ -280,6 +292,59 @@ export function CertModuleCard({ content }: { content: Record<string, unknown> }
             onClick={() => setChatSplitOpen(true)}
           />
         )}
+      </div>
+    </CardShell>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Lesson card — one lesson's content from get_certification_lesson
+// ---------------------------------------------------------------------------
+
+export function CertLessonCard({ content }: { content: Record<string, unknown> }) {
+  const { sendChatMessage } = useWorkspace()
+  const moduleTitle = String(content.module_title ?? content.module_id ?? 'Module')
+  const title = String(content.title ?? 'Lesson')
+  const objective = String(content.objective ?? '')
+  const number = Number(content.lesson_number ?? 0)
+  const total = Number(content.lesson_count ?? 0)
+  const isLast = Boolean(content.is_last)
+  const body = String(content.content ?? '')
+  const html = useMemo(() => renderMarkdown(body), [body])
+
+  return (
+    <CardShell>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+        <BookOpen size={15} style={{ color: ACCENT, flexShrink: 0 }} />
+        <span style={{ fontWeight: 700, fontSize: 13 }}>{title}</span>
+        <span style={{ flex: 1 }} />
+        <span style={{ fontSize: 10, color: '#9ca3af', whiteSpace: 'nowrap' }}>
+          Lesson {number}/{total} · {moduleTitle}
+        </span>
+      </div>
+
+      {objective && (
+        <div style={{ fontStyle: 'italic', color: '#6b7280', marginBottom: 6, lineHeight: 1.5 }}>
+          {objective}
+        </div>
+      )}
+
+      <div
+        className="select-text chat-markdown"
+        style={{ lineHeight: 1.6 }}
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+
+      <div style={{ marginTop: 10 }}>
+        <CardButton
+          subtle
+          label={isLast ? 'Done reading — what’s next?' : `Continue to lesson ${number + 1}`}
+          onClick={() => sendChatMessage(
+            isLast
+              ? `I’ve finished the "${moduleTitle}" lessons — what’s next?`
+              : `Continue to lesson ${number + 1} of the "${moduleTitle}" module.`,
+          )}
+        />
       </div>
     </CardShell>
   )

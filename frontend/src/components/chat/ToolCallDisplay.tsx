@@ -6,6 +6,7 @@ import { renderMarkdown } from './markdown'
 import {
   CertCheckCard,
   CertCompletionCard,
+  CertLessonCard,
   CertModuleCard,
   CertProgressCard,
   useCertificationSync,
@@ -65,6 +66,7 @@ const TOOL_META: Record<string, { label: string; category: ToolCategory }> = {
   create_workflow:       { label: 'Building workflow',         category: 'write' },
   get_certification_progress:      { label: 'Checking certification progress', category: 'read' },
   get_certification_module:        { label: 'Loading certification module',    category: 'read' },
+  get_certification_lesson:        { label: 'Loading lesson',                  category: 'read' },
   provision_certification_lab:     { label: 'Setting up certification lab',    category: 'write' },
   check_certification_module:      { label: 'Grading certification module',    category: 'read' },
   complete_certification_module:   { label: 'Completing certification module', category: 'write' },
@@ -119,6 +121,7 @@ function getActiveHint(toolName: string, args: Record<string, unknown>): string 
     case 'save_to_folder':
       return queryStr ? `"${queryStr}"` : ''
     case 'get_certification_module':
+    case 'get_certification_lesson':
     case 'provision_certification_lab':
     case 'check_certification_module':
     case 'complete_certification_module':
@@ -375,6 +378,15 @@ function summarizeResult(toolName: string, content: unknown, quality: QualityMet
 
     case 'get_certification_module':
       return { text: obj.title ? `Module: "${obj.title}"` : 'Module loaded', qualityHint: '' }
+
+    case 'get_certification_lesson': {
+      const n = Number(obj.lesson_number ?? 0)
+      const total = Number(obj.lesson_count ?? 0)
+      return {
+        text: obj.title ? `Lesson ${n}/${total}: "${obj.title}"` : 'Lesson loaded',
+        qualityHint: '',
+      }
+    }
 
     case 'check_certification_module': {
       const checks = (obj.checks as Array<Record<string, unknown>>) || []
@@ -1198,6 +1210,9 @@ export function ToolStatusLine({
       )}
       {result && !isError && name === 'get_certification_module' && obj?.module_id != null && (
         <CertModuleCard content={obj} />
+      )}
+      {result && !isError && name === 'get_certification_lesson' && obj?.content != null && (
+        <CertLessonCard content={obj} />
       )}
       {result && !isError && name === 'check_certification_module' && obj?.checks != null && (
         <CertCheckCard content={obj} />

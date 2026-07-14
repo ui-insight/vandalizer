@@ -9,6 +9,11 @@
       "Click **Submit Self-Assessment** to save your answers.",
       "Click **Check Progress** to verify completion, then **Complete Module** to earn your 50 XP."
     ],
+    "chat_instructions": [
+      "Work through the 6 lessons right here in chat — say \"start the lessons\" and the assistant will teach them one at a time.",
+      "After the lessons, answer the 3 self-assessment reflection questions in chat. There are no wrong answers.",
+      "The assistant saves your answers, verifies completion, and completes the module to award your 50 XP."
+    ],
     "expected_fields": [],
     "expected_values": {},
     "star_criteria": {
@@ -25,6 +30,12 @@
       "Click **Submit** to save your answers.",
       "Click **Check Progress** to verify completion, then **Complete Module** to earn your 100 XP."
     ],
+    "chat_instructions": [
+      "Work through the 6 lessons here in chat to build your process thinking skills.",
+      "Think about a specific repetitive task your team does that involves processing documents.",
+      "Answer the 4 Process Reflection questions in chat — the assistant asks them one at a time.",
+      "The assistant saves your answers, verifies completion, and completes the module to award your 100 XP."
+    ],
     "expected_fields": [],
     "expected_values": {},
     "star_criteria": {
@@ -40,6 +51,12 @@
       "Switch to the **Challenge** tab and complete the **Design Reflection** by answering all 4 questions.",
       "Click **Submit** to save your answers.",
       "Click **Check Progress** to verify completion, then **Complete Module** to earn your 100 XP."
+    ],
+    "chat_instructions": [
+      "Work through the 6 lessons here in chat to understand workflow design principles.",
+      "Think about how you would translate one of your team's processes into a workflow architecture.",
+      "Answer the 4 Design Reflection questions in chat — the assistant asks them one at a time.",
+      "The assistant saves your answers, verifies completion, and completes the module to award your 100 XP."
     ],
     "expected_fields": [],
     "expected_values": {},
@@ -58,6 +75,15 @@
       "Ask the agent to run that extraction on **nsf-proposal-alpine-ecology.pdf**.",
       "Review the inline quality score and extracted table. Verify: PI Name = Sarah Chen, Total Budget = $485,000.",
       "Prefer clicks? You can also build the same workflow from the Library tab — the agent is just a faster path to the same underlying system."
+    ],
+    "chat_instructions": [
+      "Work through the lessons here in chat, then ask the assistant to set up the lab — it adds the sample NSF proposal to your Certification Lab folder.",
+      "Ask: \"What documents do I have about NSF proposals?\" — confirm the sample PDF is listed.",
+      "Ask the assistant to create an extraction for grant proposals with fields: PI Name, Institution, Total Budget, Project Period, Sponsoring Agency. Confirm when prompted.",
+      "Name the resulting extraction set \"NSF Proposal Extractor\" (or rename it later from the Library).",
+      "Ask the assistant to run that extraction on nsf-proposal-alpine-ecology.pdf.",
+      "Review the inline quality score and extracted table. Verify: PI Name = Sarah Chen, Total Budget = $485,000.",
+      "When the values check out, ask the assistant to check your progress and complete the module."
     ],
     "expected_fields": ["PI Name", "Institution", "Total Budget", "Project Period", "Sponsoring Agency"],
     "expected_values": {
@@ -82,6 +108,14 @@
       "Ask the agent to run the new extraction on **nih-r01-neuroscience.pdf**.",
       "Review the results inline. Verify PI Name = James Park, Total Budget = $1,250,000.",
       "If a field looks wrong, ask the agent to open guided verification so you can record the correct value as a test case."
+    ],
+    "chat_instructions": [
+      "Work through the lessons here in chat, then ask the assistant to set up the lab — it adds the sample NIH R01 proposal to your workspace.",
+      "Ask: \"Propose a comprehensive extraction set for NIH R01 proposals based on nih-r01-neuroscience.pdf. Include fields for PI, institution, grant number, all budget categories (personnel, equipment, travel, indirect costs), specific aims, human subjects, vertebrate animals, and key personnel.\"",
+      "Review the proposed field list, ask the assistant to add any that are missing, and confirm creation when prompted.",
+      "Ask the assistant to run the new extraction on nih-r01-neuroscience.pdf.",
+      "Review the results. Verify PI Name = James Park, Total Budget = $1,250,000.",
+      "If a field looks wrong, ask the assistant to open guided verification so you can record the correct value as a test case."
     ],
     "expected_fields": [
       "PI Name", "Institution", "Grant Number", "Project Title", "Project Period",
@@ -114,6 +148,13 @@
       "Back in chat, ask the agent to run the new workflow on **subaward-agreement.pdf**.",
       "Watch each step complete in the live status view and confirm the pipeline chains: extraction → analysis → formatted report."
     ],
+    "chat_instructions": [
+      "Work through the lessons here in chat, then ask the assistant to set up the lab — it adds the sample subaward agreement to your workspace.",
+      "Describe the process you want: \"I need a 3-step workflow for subaward review. Step 1 extracts parties, amounts, period, PI, deliverables, and compliance terms. Step 2 analyzes the extracted data to identify key obligations and deadlines. Step 3 formats the analysis into a compliance summary report.\"",
+      "Work with the assistant to refine the workflow — the Extraction task (Step 1), the Prompt task (Step 2), and the Formatter task (Step 3). You can fine-tune it in the workflow editor at any point.",
+      "Ask the assistant to run the new workflow on subaward-agreement.pdf.",
+      "Watch each step complete in the live status view and confirm the pipeline chains: extraction → analysis → formatted report."
+    ],
     "expected_fields": [
       "Prime Recipient", "Subrecipient", "Subaward Amount", "Performance Period",
       "PI Name", "Deliverables", "Reporting Schedule", "Compliance Requirements"
@@ -143,6 +184,16 @@
       "Verify the Research node produces a report and that both parallel tasks complete.",
       "Note: the **Code Execution** node (sandboxed Python) is an admin-only power node and is not in the standard palette — the Research node covers this exercise for everyone."
     ],
+    "chat_instructions": [
+      "Work through the lessons here in chat, then ask the assistant to set up the lab — it adds the sample budget justification to your workspace.",
+      "Create a workflow that processes the budget document using advanced nodes:",
+      "  Step 1 — Extraction: extract the salary table, supply costs, travel, subawards, and indirect costs.",
+      "  Step 2 — Research node: analyze the extracted figures and check whether the line items add up to the stated total. The Research node makes two LLM passes over the data — no URL or API key needed.",
+      "  Step 2 (parallel) — add a second task to the same step: a Prompt task that writes a short budget narrative summary. Two tasks in one step run concurrently.",
+      "Run the workflow against budget-justification.pdf.",
+      "Verify the Research node produces a report and that both parallel tasks complete.",
+      "Note: the Code Execution node (sandboxed Python) is an admin-only power node — the Research node covers this exercise for everyone."
+    ],
     "expected_fields": [
       "Personnel", "Fringe Benefits", "Supplies", "Travel", "Subaward Costs",
       "Indirect Costs", "Indirect Cost Rate", "Total Direct Costs", "Total Budget"
@@ -165,6 +216,13 @@
       "Describe the pipeline in chat: *\"Design a 3-step workflow for annual progress reports. Step 1 extracts accomplishments, publications, students trained, budget expenditures, and milestones. Step 2 summarizes progress and highlights key achievements. Step 3 produces a downloadable report.\"*",
       "Open the workflow in the editor and add a **Document Renderer**, **Data Export**, or **Package Builder** to Step 3 (the agent can suggest which fits your use case).",
       "From chat, ask the agent to run the workflow on **progress-report-year2.pdf**.",
+      "Open the workflow run in the editor, download the output file, and verify it contains the extracted data."
+    ],
+    "chat_instructions": [
+      "Work through the lessons here in chat, then ask the assistant to set up the lab — it adds the sample progress report to your workspace.",
+      "Describe the pipeline: \"Design a 3-step workflow for annual progress reports. Step 1 extracts accomplishments, publications, students trained, budget expenditures, and milestones. Step 2 summarizes progress and highlights key achievements. Step 3 produces a downloadable report.\"",
+      "Open the workflow in the editor (you can keep chat beside it) and add a Document Renderer, Data Export, or Package Builder to Step 3 — the assistant can suggest which fits your use case.",
+      "Ask the assistant to run the workflow on progress-report-year2.pdf.",
       "Open the workflow run in the editor, download the output file, and verify it contains the extracted data."
     ],
     "expected_fields": [
@@ -193,6 +251,14 @@
       "In the chat results, click the quality badge to see the score breakdown. Check the tier (excellent / good / fair / poor) and active alerts.",
       "Iterate: add at least one more test case, then run validation again to see the score change."
     ],
+    "chat_instructions": [
+      "Work through the lessons here in chat. This module reuses the NSF proposal from the Foundations module (already in your workspace if you completed it).",
+      "Ask: \"List the test cases for my NSF Proposal Extractor.\" If none exist yet, that's expected.",
+      "Ask the assistant to propose a test case from nsf-proposal-alpine-ecology.pdf using your NSF Proposal Extractor, then confirm each extracted value (PI Name, Total Budget, etc.) in the guided verification.",
+      "Ask the assistant to run a validation across your test cases — it reports the accuracy and consistency score.",
+      "Click the quality badge on the results to see the score breakdown. Check the tier (excellent / good / fair / poor) and active alerts.",
+      "Iterate: add at least one more test case, then run validation again to see the score change."
+    ],
     "expected_fields": [],
     "expected_values": {},
     "star_criteria": {
@@ -209,6 +275,14 @@
       "In chat, ask: *\"List my extraction sets.\"* — confirm your NSF Proposal Extractor (from Module 1) or similar is available.",
       "Ask the agent to run that extraction on **proposal-batch-1.pdf**, **proposal-batch-2.pdf**, and **proposal-batch-3.pdf** together.",
       "Watch the streaming tool call — you'll see a single run_extraction with multiple documents in the batch.",
+      "Review the combined results table in the chat response.",
+      "Verify all 3 documents completed successfully with correct PI names: Maria Lopez, Robert Kim, Amara Okafor."
+    ],
+    "chat_instructions": [
+      "Work through the lessons here in chat, then ask the assistant to set up the lab — it adds three sample NSF proposals to your workspace.",
+      "Ask: \"List my extraction sets.\" — confirm your NSF Proposal Extractor (from the Foundations module) or similar is available.",
+      "Ask the assistant to run that extraction on proposal-batch-1.pdf, proposal-batch-2.pdf, and proposal-batch-3.pdf together.",
+      "Watch the streaming tool call — a single extraction run covers all documents in the batch.",
       "Review the combined results table in the chat response.",
       "Verify all 3 documents completed successfully with correct PI names: Maria Lopez, Robert Kim, Amara Okafor."
     ],
@@ -232,6 +306,14 @@
       "In the workflow editor, mark the workflow as **verified** and publish it to your team library.",
       "If you work across multiple spaces, duplicate or export the workflow (`.vandalizer.json`) and import it into the other space.",
       "Back in chat, ask: *\"What verified workflows are available to my team?\"* — confirm your workflow is now discoverable to teammates by name."
+    ],
+    "chat_instructions": [
+      "Work through the lessons here in chat. This module uses workflows you've already built.",
+      "Ask: \"List my workflows and tell me which are verified.\" The assistant will flag anything unverified.",
+      "Pick a workflow to promote. Ensure it has a clear description and passes validation (ask the assistant to rerun validation if needed).",
+      "In the workflow editor (open it beside chat), mark the workflow as verified and publish it to your team library.",
+      "If you work across multiple spaces, duplicate or export the workflow (.vandalizer.json) and import it into the other space.",
+      "Back in chat, ask: \"What verified workflows are available to my team?\" — confirm your workflow is now discoverable to teammates by name."
     ],
     "expected_fields": [],
     "expected_values": {},

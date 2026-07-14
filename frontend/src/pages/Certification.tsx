@@ -27,6 +27,10 @@ import { useModuleLock } from '../components/certification/useModuleLock'
 
 // ---------------------------------------------------------------------------
 // Module definitions
+//
+// Lesson content here is also served to the in-chat certification flow via
+// backend/certification-data/lessons.json. After editing lessons, rerun
+// `node scripts/export-lessons.mjs` (the array must stay pure literals).
 // ---------------------------------------------------------------------------
 
 export const MODULES: ModuleDefinition[] = [

@@ -94,7 +94,8 @@ async def test_validate_batch_processing_passes_on_completed_batch_of_three():
         SimpleNamespace(batch_id="b1", status="completed", workflow="wf-1"),
     ]
     with patch.object(cs, "Workflow", _model(workflows)), \
-         patch.object(cs, "WorkflowResult", _model(batch)):
+         patch.object(cs, "WorkflowResult", _model(batch)), \
+         patch("app.models.activity.ActivityEvent", _model([])):
         result = await cs._validate_batch_processing("user-1")
     assert result["passed"] is True
     assert all(c["passed"] for c in result["checks"])
@@ -104,7 +105,8 @@ async def test_validate_batch_processing_no_workflows_does_not_raise():
     # The original bug raised AttributeError here; now it returns a clean
     # "not passed" result instead of a 500.
     with patch.object(cs, "Workflow", _model([])), \
-         patch.object(cs, "WorkflowResult", _model([])):
+         patch.object(cs, "WorkflowResult", _model([])), \
+         patch("app.models.activity.ActivityEvent", _model([])):
         result = await cs._validate_batch_processing("user-1")
     assert result["passed"] is False
     assert result["stars"] == 0
@@ -118,9 +120,21 @@ async def test_validate_batch_processing_fails_when_a_doc_did_not_complete():
         SimpleNamespace(batch_id="b1", status="queued", workflow="wf-1"),
     ]
     with patch.object(cs, "Workflow", _model(workflows)), \
-         patch.object(cs, "WorkflowResult", _model(batch)):
+         patch.object(cs, "WorkflowResult", _model(batch)), \
+         patch("app.models.activity.ActivityEvent", _model([])):
         result = await cs._validate_batch_processing("user-1")
     # Batch size of 3 passes the first check, but "All succeeded" fails.
     all_ok = next(c for c in result["checks"] if c["name"] == "All succeeded")
     assert all_ok["passed"] is False
     assert result["passed"] is False
+
+
+async def test_validate_batch_processing_counts_chat_driven_run():
+    # A single chat extraction (SEARCH_SET_RUN activity) across 3+ documents
+    # counts as a batch even with no workflow batches at all.
+    events = [SimpleNamespace(documents_touched=3)]
+    with patch.object(cs, "Workflow", _model([])), \
+         patch.object(cs, "WorkflowResult", _model([])), \
+         patch("app.models.activity.ActivityEvent", _model(events)):
+        result = await cs._validate_batch_processing("user-1")
+    assert result["passed"] is True

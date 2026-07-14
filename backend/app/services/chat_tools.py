@@ -4286,12 +4286,12 @@ async def get_certification_module(
 ) -> dict:
     """Get one certification module's exercise: overview, instructions, criteria.
 
-    Call this when presenting a module to work through in chat. The
-    instructions were written for the Certification panel UI (Learn/Challenge
-    tabs, buttons) — translate any panel-specific steps into chat-native
-    guidance, and offer to do the doable parts yourself (run extractions,
-    build workflows, propose test cases) since chat-driven work counts toward
-    the same validators.
+    Call this when presenting a module to work through in chat. Instructions
+    are chat-native. Teach the module's lessons FIRST (one at a time via
+    get_certification_lesson) before the challenge or assessment — the user
+    hasn't seen this material anywhere else. Offer to do the doable challenge
+    parts yourself (run extractions, build workflows, propose test cases)
+    since chat-driven work counts toward the same validators.
 
     Args:
         context: The call context.
@@ -4306,8 +4306,10 @@ async def get_certification_module(
             hint=f"Valid module ids: {', '.join(cert_svc.MODULE_ORDER)}",
         )
     exercise = cert_svc.get_exercise(module_id) or {}
+    lessons = cert_svc.get_lessons(module_id) or {}
     prog = await cert_svc.get_progress_dict(context.deps.user_id)
     data = prog["modules"].get(module_id, {})
+    assessment = lessons.get("assessment") or {}
     return {
         "module_id": module_id,
         "title": cert_svc.MODULE_TITLES.get(module_id, module_id),
@@ -4315,14 +4317,68 @@ async def get_certification_module(
         "completed": bool(data.get("completed")),
         "stars": data.get("stars", 0),
         "overview": exercise.get("overview", ""),
-        "instructions": exercise.get("instructions", []),
+        # Chat-native steps; the panel keeps its own tab-oriented wording.
+        "instructions": exercise.get("chat_instructions")
+        or exercise.get("instructions", []),
+        "lesson_titles": [les["title"] for les in lessons.get("lessons", [])],
         "expected_fields": exercise.get("expected_fields", []),
         "star_criteria": exercise.get("star_criteria", {}),
         "sample_documents": exercise.get("documents", []),
         "provisioned_docs": data.get("provisioned_docs", []),
         # Reflective modules are completed by answering these questions via
-        # submit_certification_assessment; empty for hands-on modules.
+        # submit_certification_assessment; empty for hands-on modules. Ask
+        # the exact questions with their options — only after the lessons.
         "assessment_keys": list(cert_svc.ASSESSMENT_KEYS.get(module_id, ())),
+        "assessment_questions": assessment.get("questions", []),
+    }
+
+
+async def get_certification_lesson(
+    context: RunContext[AgenticChatDeps],
+    module_id: str,
+    lesson_number: int,
+) -> dict:
+    """Get one lesson of a certification module — the same content the panel teaches.
+
+    Each module's challenge assumes the user has been taught its lessons, so
+    walk through them one at a time before the exercise or self-assessment.
+    The lesson content renders as a card the user reads directly — don't
+    repeat it verbatim; add a short framing sentence, then engage: when the
+    lesson has a knowledge_check, ask its question (with the options) and
+    react to the user's answer before moving to the next lesson.
+
+    Args:
+        context: The call context.
+        module_id: The certification module the lesson belongs to.
+        lesson_number: 1-based lesson number (lesson_titles in
+            get_certification_module lists them in order).
+    """
+    from app.services import certification_service as cert_svc
+
+    if module_id not in cert_svc.MODULE_XP:
+        return _err(
+            f"Unknown module '{module_id}'.",
+            hint=f"Valid module ids: {', '.join(cert_svc.MODULE_ORDER)}",
+        )
+    lessons = (cert_svc.get_lessons(module_id) or {}).get("lessons", [])
+    if not lessons:
+        return _err(f"Module '{module_id}' has no lessons.")
+    if not isinstance(lesson_number, int) or not 1 <= lesson_number <= len(lessons):
+        return _err(
+            f"lesson_number must be 1..{len(lessons)} for '{module_id}'.",
+        )
+    lesson = lessons[lesson_number - 1]
+    return {
+        "module_id": module_id,
+        "module_title": cert_svc.MODULE_TITLES.get(module_id, module_id),
+        "lesson_number": lesson_number,
+        "lesson_count": len(lessons),
+        "title": lesson["title"],
+        "objective": lesson.get("objective", ""),
+        "variant": lesson.get("variant", "concept"),
+        "content": lesson["content"],
+        "knowledge_check": lesson.get("knowledge_check"),
+        "is_last": lesson_number == len(lessons),
     }
 
 
@@ -4558,6 +4614,7 @@ TOOLS = [
     # Phase 11 — Certification program
     get_certification_progress,
     get_certification_module,
+    get_certification_lesson,
     provision_certification_lab,
     check_certification_module,
     complete_certification_module,
@@ -4596,6 +4653,7 @@ COMPACTABLE_TOOLS: frozenset[str] = frozenset({
     "list_project_documents",
     "get_certification_progress",
     "get_certification_module",
+    "get_certification_lesson",
     "check_certification_module",
 })
 
