@@ -632,23 +632,25 @@ export function ExploreTab() {
     }
   }
 
+  // Keep tab: 'library' so closing the opened item returns to this Explore
+  // view instead of falling back to the default Assistant tab.
   const handleTryIt = (item: VerifiedCatalogItem) => {
     if (!item.source_uuid) return
     setDetailItem(null)
     if (item.kind === 'workflow') {
       navigate({
         to: '/',
-        search: { mode: undefined, tab: undefined, workflow: item.source_uuid, extraction: undefined, automation: undefined, kb: undefined, project: undefined, workflow_share_token: undefined },
+        search: { mode: undefined, tab: 'library', workflow: item.source_uuid, extraction: undefined, automation: undefined, kb: undefined, project: undefined, workflow_share_token: undefined },
       })
     } else if (item.kind === 'search_set') {
       navigate({
         to: '/',
-        search: { mode: undefined, tab: undefined, workflow: undefined, extraction: item.source_uuid, automation: undefined, kb: undefined, project: undefined, workflow_share_token: undefined },
+        search: { mode: undefined, tab: 'library', workflow: undefined, extraction: item.source_uuid, automation: undefined, kb: undefined, project: undefined, workflow_share_token: undefined },
       })
     } else if (item.kind === 'knowledge_base') {
       navigate({
         to: '/',
-        search: { mode: undefined, tab: undefined, workflow: undefined, extraction: undefined, automation: undefined, kb: item.source_uuid, project: undefined, workflow_share_token: undefined },
+        search: { mode: undefined, tab: 'library', workflow: undefined, extraction: undefined, automation: undefined, kb: item.source_uuid, project: undefined, workflow_share_token: undefined },
       })
     }
   }
