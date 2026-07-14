@@ -303,3 +303,76 @@ async def test_pdf_detected_by_url_extension_when_content_type_generic():
 
     assert "Effective December 31 2025" in result.text
     assert result.raw_html is None
+
+
+# ---------------------------------------------------------------------------
+# Embedded PDF hyperlinks are surfaced for crawl-enabled KB sources
+# ---------------------------------------------------------------------------
+
+def _pdf_with_links_bytes(text: str, uris: list[str]) -> bytes:
+    """Build a one-page PDF with a URI link annotation per entry in *uris*."""
+    import pymupdf
+
+    doc = pymupdf.open()
+    page = doc.new_page()
+    page.insert_text((72, 72), text)
+    for i, uri in enumerate(uris):
+        rect = pymupdf.Rect(72, 100 + i * 20, 300, 115 + i * 20)
+        page.insert_link({"kind": pymupdf.LINK_URI, "from": rect, "uri": uri})
+    data = doc.tobytes()
+    doc.close()
+    return data
+
+
+@pytest.mark.asyncio
+async def test_pdf_embedded_links_are_extracted():
+    settings = Settings(web_fetcher_browser_enabled=False)
+    pdf = _pdf_with_links_bytes(
+        "USDA General Terms and Conditions",
+        [
+            "https://www.usda.gov/ocfo/federal-financial-assistance",
+            "https://www.usda.gov/ocfo/federal-financial-assistance",  # duplicate
+            "mailto:grants@usda.gov",  # non-HTTP scheme — excluded
+            "https://www.grants.gov/learn-grants",
+        ],
+    )
+
+    with patch("app.services.web_fetcher.httpx.AsyncClient",
+               return_value=_mock_pdf_client(pdf)), \
+         patch("app.services.web_fetcher.validate_outbound_url",
+               return_value="https://www.usda.gov/x/terms.pdf"):
+        result = await fetch_url("https://www.usda.gov/x/terms.pdf", settings=settings)
+
+    assert result.raw_html is None
+    assert result.pdf_links == [
+        "https://www.usda.gov/ocfo/federal-financial-assistance",
+        "https://www.grants.gov/learn-grants",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_pdf_without_links_yields_none():
+    settings = Settings(web_fetcher_browser_enabled=False)
+    pdf = _tiny_pdf_bytes("No links in here")
+
+    with patch("app.services.web_fetcher.httpx.AsyncClient",
+               return_value=_mock_pdf_client(pdf)), \
+         patch("app.services.web_fetcher.validate_outbound_url",
+               return_value="https://example.gov/plain.pdf"):
+        result = await fetch_url("https://example.gov/plain.pdf", settings=settings)
+
+    assert result.pdf_links is None
+
+
+@pytest.mark.asyncio
+async def test_html_pages_do_not_set_pdf_links():
+    settings = Settings(web_fetcher_browser_enabled=False)
+
+    with patch("app.services.web_fetcher.httpx.AsyncClient",
+               return_value=_mock_async_client(STATIC_PAGE_HTML)), \
+         patch("app.services.web_fetcher.validate_outbound_url",
+               return_value="https://example.com"):
+        result = await fetch_url("https://example.com", settings=settings)
+
+    assert result.pdf_links is None
+    assert result.raw_html is not None

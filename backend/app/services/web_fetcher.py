@@ -54,6 +54,10 @@ _DEFAULT_HEADERS = {
 # Cap on the raw PDF payload we'll pull from a URL before extracting text.
 _MAX_PDF_BYTES = 50 * 1024 * 1024  # 50 MB
 
+# Cap on hyperlinks harvested from a single PDF. Link annotations can number
+# in the thousands in generated documents (e.g. one per table-of-contents row).
+_MAX_PDF_LINKS = 500
+
 
 @dataclass
 class WebFetchResult:
@@ -63,6 +67,9 @@ class WebFetchResult:
     raw_html: Optional[str]
     used_browser: bool
     status_code: Optional[int]
+    # HTTP(S) hyperlinks embedded in a PDF response, in page order. None for
+    # HTML responses (crawlers extract <a href> from raw_html instead).
+    pdf_links: Optional[list[str]] = None
 
 
 def _extract_title(html: str, fallback_url: str) -> str:
@@ -108,21 +115,23 @@ def _looks_like_pdf(url: str, content_type: str) -> bool:
     return path.endswith(".pdf")
 
 
-def _extract_pdf_response(content: bytes, url: str) -> tuple[str, str]:
-    """Extract text + a title from PDF bytes fetched over HTTP.
+def _extract_pdf_response(content: bytes, url: str) -> tuple[str, str, list[str]]:
+    """Extract text, a title, and embedded hyperlinks from PDF bytes fetched over HTTP.
 
     Uses PyMuPDF (no OCR) to stay fast and dependency-light in the fetch path;
     image-only PDFs will yield little text, which the caller treats as an empty
     result. Title prefers the PDF's metadata, falling back to the URL filename.
+    Links come from the PDF's URI annotations so crawl-enabled KB sources can
+    follow them the same way <a href> links are followed on an HTML page.
     """
     if not content:
-        return "", urlparse(url).path.rsplit("/", 1)[-1] or urlparse(url).netloc
+        return "", urlparse(url).path.rsplit("/", 1)[-1] or urlparse(url).netloc, []
     if len(content) > _MAX_PDF_BYTES:
         logger.warning(
             "PDF at %s is %d bytes (> %d cap) — skipping extraction",
             url, len(content), _MAX_PDF_BYTES,
         )
-        return "", urlparse(url).path.rsplit("/", 1)[-1] or urlparse(url).netloc
+        return "", urlparse(url).path.rsplit("/", 1)[-1] or urlparse(url).netloc, []
 
     import os
     import tempfile
@@ -137,16 +146,46 @@ def _extract_pdf_response(content: bytes, url: str) -> tuple[str, str]:
             tmp_path = tmp.name
         text = extract_text_from_pdf(tmp_path)
         title = _pdf_title(tmp_path) or filename
-        return _normalize_whitespace(text or ""), title
+        links = _pdf_uri_links(tmp_path)
+        return _normalize_whitespace(text or ""), title, links
     except Exception as e:
         logger.warning("Failed to extract PDF from %s: %s", url, e)
-        return "", filename
+        return "", filename, []
     finally:
         if tmp_path:
             try:
                 os.unlink(tmp_path)
             except OSError:
                 pass
+
+
+def _pdf_uri_links(pdf_path: str) -> list[str]:
+    """HTTP(S) hyperlinks embedded in a PDF, deduplicated in page order."""
+    try:
+        import pymupdf
+
+        seen: set[str] = set()
+        links: list[str] = []
+        with pymupdf.open(pdf_path) as doc:
+            for page in doc:
+                for link in page.get_links():
+                    uri = (link.get("uri") or "").strip()
+                    if not uri or uri in seen:
+                        continue
+                    if urlparse(uri).scheme not in ("http", "https"):
+                        continue
+                    seen.add(uri)
+                    links.append(uri)
+                    if len(links) >= _MAX_PDF_LINKS:
+                        logger.warning(
+                            "PDF %s has more than %d links; truncating",
+                            pdf_path, _MAX_PDF_LINKS,
+                        )
+                        return links
+        return links
+    except Exception as e:
+        logger.warning("Failed to extract links from PDF %s: %s", pdf_path, e)
+        return []
 
 
 def _pdf_title(pdf_path: str) -> Optional[str]:
@@ -232,14 +271,15 @@ async def fetch_url(
         # on PDF bytes yields either nothing or raw binary, so without this a
         # direct .pdf URL ingests garbage or fails outright.
         if _looks_like_pdf(url, resp.headers.get("content-type", "")):
-            pdf_text, pdf_title = _extract_pdf_response(resp.content, url)
+            pdf_text, pdf_title, pdf_links = _extract_pdf_response(resp.content, url)
             return WebFetchResult(
                 url=url,
                 title=pdf_title,
                 text=pdf_text[: settings.web_fetcher_max_chars],
-                raw_html=None,  # no HTML — nothing to crawl from a PDF
+                raw_html=None,  # no HTML — crawlers use pdf_links instead
                 used_browser=False,
                 status_code=status_code,
+                pdf_links=pdf_links or None,
             )
 
         raw_html = resp.text[: settings.web_fetcher_max_chars]

@@ -93,7 +93,7 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
         {crawlEnabled && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 4 }}>
             <div style={{ fontSize: 12, color: '#888', lineHeight: 1.5 }}>
-              The crawler will follow links on each page and add discovered pages as additional sources.
+              The crawler will follow links on each page — including links embedded in PDFs — and add discovered pages as additional sources.
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <label htmlFor="add-urls-max-pages" style={{ fontSize: 13, color: '#aaa', minWidth: 80 }}>Max pages</label>

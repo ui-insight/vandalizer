@@ -13,6 +13,7 @@ from bs4 import BeautifulSoup
 
 if TYPE_CHECKING:
     from app.models.kb_suggestion import KBSuggestion
+    from app.services.web_fetcher import WebFetchResult
 
 from app.models.document import SmartDocument
 from app.models.knowledge import KnowledgeBase, KnowledgeBaseReference, KnowledgeBaseSource
@@ -538,11 +539,12 @@ async def add_urls(
         added += 1
 
         # Ingest inline
-        parent_html = await _ingest_url_source(source, kb)
+        fetched = await _ingest_url_source(source, kb)
 
-        # Crawl child pages if enabled
-        if crawl_enabled and parent_html:
-            crawled = await _crawl_from_source(source, kb, max_crawl_pages, allowed_domains, parent_html)
+        # Crawl child pages if enabled (links from HTML <a href> or, for PDF
+        # URLs, from the PDF's embedded hyperlinks)
+        if crawl_enabled and fetched:
+            crawled = await _crawl_from_source(source, kb, max_crawl_pages, allowed_domains, fetched)
             added += crawled
 
     if added:
@@ -904,12 +906,31 @@ def _extract_links(html: str, base_url: str) -> list[str]:
     return links
 
 
+def _crawlable_links(fetched: WebFetchResult, base_url: str) -> list[str]:
+    """Outbound links from a fetched source, whatever its format.
+
+    HTML pages yield their <a href> links; PDF responses (raw_html is None)
+    yield the hyperlinks embedded in the PDF, normalized the same way so
+    dedup against visited/queued URLs works across both.
+    """
+    if fetched.raw_html:
+        return _extract_links(fetched.raw_html, base_url)
+    seen: set[str] = set()
+    links: list[str] = []
+    for uri in fetched.pdf_links or []:
+        normalized = _normalize_crawl_url(uri)
+        if normalized not in seen:
+            seen.add(normalized)
+            links.append(normalized)
+    return links
+
+
 async def _crawl_from_source(
     parent: KnowledgeBaseSource,
     kb: KnowledgeBase,
     max_pages: int,
     allowed_domains: str,
-    parent_html: str,
+    parent_fetched: WebFetchResult,
 ) -> int:
     """BFS crawl from parent URL, creating child sources. Returns count added."""
     from urllib.parse import urlparse
@@ -930,8 +951,8 @@ async def _crawl_from_source(
     queue: list[str] = []
     added = 0
 
-    # Extract seed links from already-fetched parent HTML
-    seed_links = _extract_links(parent_html, parent.url)
+    # Extract seed links from the already-fetched parent (HTML page or PDF)
+    seed_links = _crawlable_links(parent_fetched, parent.url)
     logger.info(f"Crawl: found {len(seed_links)} links on parent page {parent.url}")
     for link in seed_links:
         if link not in visited:
@@ -963,15 +984,15 @@ async def _crawl_from_source(
             parent_source_uuid=parent.uuid,
         )
         await child.insert()
-        # _ingest_url_source returns the HTML on success
-        child_html = await _ingest_url_source(child, kb)
+        # _ingest_url_source returns the fetch result on success
+        child_fetched = await _ingest_url_source(child, kb)
         added += 1
         crawled_urls.append(url)
         logger.info(f"Crawl: added child {added}/{max_pages} — {url} (status={child.status})")
 
         # Extract more links from this page for BFS
-        if child_html and added < max_pages:
-            for link in _extract_links(child_html, url):
+        if child_fetched and added < max_pages:
+            for link in _crawlable_links(child_fetched, url):
                 if link not in visited:
                     parsed = urlparse(link)
                     if parsed.netloc.lower() in domain_set:
@@ -1170,15 +1191,14 @@ async def _ingest_document_source(source: KnowledgeBaseSource, kb: KnowledgeBase
 
 async def _ingest_url_source(
     source: KnowledgeBaseSource, kb: KnowledgeBase,
-) -> str | None:
-    """Ingest a URL source. Returns the raw HTML on success (for crawling), None on failure."""
+) -> WebFetchResult | None:
+    """Ingest a URL source. Returns the fetch result on success (for crawling), None on failure."""
     source.status = "processing"
     await source.save()
     try:
         from app.services.web_fetcher import fetch_url
 
         result = await fetch_url(source.url)
-        raw_html = result.raw_html or ""
         raw_text = result.text
 
         if not raw_text.strip():
@@ -1199,7 +1219,7 @@ async def _ingest_url_source(
         source.status = "ready"
         source.processed_at = datetime.datetime.now(tz=datetime.timezone.utc)
         await source.save()
-        return raw_html
+        return result
     except httpx.HTTPStatusError as e:
         if 400 <= e.response.status_code < 500:
             logger.warning("URL source %s returned %d: %s", source.uuid, e.response.status_code, e.request.url)
