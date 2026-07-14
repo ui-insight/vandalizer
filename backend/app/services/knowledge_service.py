@@ -1197,6 +1197,7 @@ async def _ingest_url_source(
     await source.save()
     try:
         from app.services.web_fetcher import fetch_url
+        from app.utils.bot_challenge import looks_like_bot_challenge
 
         result = await fetch_url(source.url)
         raw_text = result.text
@@ -1204,6 +1205,14 @@ async def _ingest_url_source(
         if not raw_text.strip():
             source.status = "error"
             source.error_message = "Failed to extract text from URL"
+            await source.save()
+            return None
+
+        if looks_like_bot_challenge(raw_text):
+            # The site served a bot-verification interstitial instead of the
+            # page. Embedding it would poison retrieval with junk text.
+            source.status = "error"
+            source.error_message = "Blocked by the site's bot protection (verification page returned instead of content)"
             await source.save()
             return None
 

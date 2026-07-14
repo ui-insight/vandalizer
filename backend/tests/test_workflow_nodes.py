@@ -562,6 +562,91 @@ class TestCrawlerNode:
         # Should only fetch 1 page despite link being present
         assert mock_client.get.call_count == 1
 
+    @staticmethod
+    def _client_serving(pages: dict):
+        """Mock httpx.Client whose GET returns per-URL canned HTML."""
+        def get(url):
+            resp = MagicMock()
+            resp.text = pages[url]
+            resp.raise_for_status = MagicMock()
+            return resp
+
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client.get.side_effect = get
+        return mock_client
+
+    CHALLENGE_HTML = (
+        "<html><body><h1>Robot or human?</h1><p>Activate and hold the button "
+        "to confirm that you're human.</p></body></html>"
+    )
+
+    @patch("app.utils.url_validation.validate_outbound_url")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_challenge_pages_excluded_and_do_not_consume_slots(self, mock_client_cls, mock_validate):
+        """Blocked pages are skipped without a Max Pages slot; crawl continues."""
+        mock_validate.return_value = "ok"
+        pages = {
+            "https://example.com": (
+                '<html><body><p>Real home page content</p>'
+                '<a href="/blocked1">a</a><a href="/blocked2">b</a>'
+                '<a href="/real2">c</a></body></html>'
+            ),
+            "https://example.com/blocked1": self.CHALLENGE_HTML,
+            "https://example.com/blocked2": self.CHALLENGE_HTML,
+            "https://example.com/real2": "<html><body><p>Second real page</p></body></html>",
+        }
+        mock_client_cls.return_value = self._client_serving(pages)
+
+        node = CrawlerNode({"start_url": "https://example.com", "max_pages": 2})
+        result = node.process({"output": "prev"})
+
+        # Both real pages made it in — the two blocked pages didn't use slots.
+        assert "Real home page content" in result["output"]
+        assert "Second real page" in result["output"]
+        # The junk verification text is excluded from the output body.
+        assert "Robot or human" not in result["output"]
+        # The user is told pages were skipped.
+        assert "2 page(s) skipped — blocked by bot protection" in result["output"]
+
+    @patch("app.utils.url_validation.validate_outbound_url")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_all_pages_blocked_reports_no_content(self, mock_client_cls, mock_validate):
+        mock_validate.return_value = "ok"
+        pages = {"https://example.com": self.CHALLENGE_HTML}
+        mock_client_cls.return_value = self._client_serving(pages)
+
+        node = CrawlerNode({"start_url": "https://example.com", "max_pages": 5})
+        result = node.process({"output": "prev"})
+
+        assert "Robot or human" not in result["output"]
+        assert "No page content retrieved" in result["output"]
+        assert "1 page(s) skipped — blocked by bot protection" in result["output"]
+
+    @patch("app.utils.url_validation.validate_outbound_url")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_http_error_challenge_counts_as_blocked(self, mock_client_cls, mock_validate):
+        """Challenges served with 403/503 are recognized from the error body."""
+        import httpx as _httpx
+
+        mock_validate.return_value = "ok"
+        resp = MagicMock()
+        resp.text = self.CHALLENGE_HTML
+        resp.raise_for_status = MagicMock(side_effect=_httpx.HTTPStatusError(
+            "403", request=MagicMock(), response=resp,
+        ))
+        mock_client = MagicMock()
+        mock_client.__enter__ = MagicMock(return_value=mock_client)
+        mock_client.__exit__ = MagicMock(return_value=False)
+        mock_client.get.return_value = resp
+        mock_client_cls.return_value = mock_client
+
+        node = CrawlerNode({"start_url": "https://example.com", "max_pages": 5})
+        result = node.process({"output": "prev"})
+
+        assert "1 page(s) skipped — blocked by bot protection" in result["output"]
+
 
 # ---------------------------------------------------------------------------
 # ResearchNode

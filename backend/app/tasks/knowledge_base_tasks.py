@@ -292,6 +292,21 @@ def kb_ingest_url(self, source_uuid: str) -> None:
             _recalculate_kb(db, kb_uuid)
             return
 
+        from app.utils.bot_challenge import looks_like_bot_challenge
+
+        if looks_like_bot_challenge(raw_text):
+            # The site served a bot-verification interstitial instead of the
+            # page. Embedding it would poison retrieval with junk text.
+            db.knowledge_base_sources.update_one(
+                {"uuid": source_uuid},
+                {"$set": {
+                    "status": "error",
+                    "error_message": "Blocked by the site's bot protection (verification page returned instead of content)",
+                }},
+            )
+            _recalculate_kb(db, kb_uuid)
+            return
+
         # Store extracted content on source
         db.knowledge_base_sources.update_one(
             {"uuid": source_uuid},

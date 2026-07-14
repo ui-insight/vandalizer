@@ -168,3 +168,34 @@ async def test_crawl_follows_links_found_on_child_pdfs():
         "https://example.gov/guide.pdf",
         "https://example.gov/appendix",
     ]
+
+
+# ---------------------------------------------------------------------------
+# Bot-challenge pages must not be ingested as KB source content
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_ingest_url_source_errors_on_bot_challenge():
+    source = SimpleNamespace(
+        uuid="src-1", url="https://www.walmart.com/help", status="pending",
+        error_message=None, content=None, url_title=None,
+        chunk_count=0, processed_at=None,
+    )
+    source.save = AsyncMock()
+    fetched = WebFetchResult(
+        url=source.url, title="Robot or human?",
+        text="Robot or human? Activate and hold the button to confirm that you're human.",
+        raw_html="<html><body>Robot or human?</body></html>",
+        used_browser=False, status_code=200,
+    )
+
+    with patch("app.services.web_fetcher.fetch_url", AsyncMock(return_value=fetched)), \
+         patch.object(knowledge_service, "_get_dm") as mock_get_dm:
+        out = await knowledge_service._ingest_url_source(source, MagicMock(uuid="kb-1"))
+
+    assert out is None
+    assert source.status == "error"
+    assert "bot protection" in source.error_message
+    # The junk text must never reach ChromaDB.
+    mock_get_dm.assert_not_called()

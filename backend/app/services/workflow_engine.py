@@ -687,6 +687,8 @@ class CrawlerNode(Node):
         except ValueError as e:
             return {"output": f"Blocked URL: {e}", "input": inputs.get("output"), "step_name": self.name}
 
+        from app.utils.bot_challenge import looks_like_bot_challenge
+
         self.report_progress(f"Crawling from {start_url}")
         parsed_start = urlparse(start_url)
         allowed = {d.strip() for d in allowed_domains.split(",") if d.strip()} if allowed_domains else {parsed_start.netloc}
@@ -694,20 +696,38 @@ class CrawlerNode(Node):
         visited = set()
         to_visit = [start_url]
         all_text = []
+        blocked = 0
+        fetches = 0
+        # Max Pages counts pages of real content; blocked/failed fetches don't
+        # consume a slot. This cap bounds total fetch attempts so a site that
+        # blocks every request can't keep the crawl running indefinitely.
+        max_fetches = max_pages * 5
 
         with httpx.Client(timeout=30, follow_redirects=True) as client:
-            while to_visit and len(visited) < max_pages:
+            while to_visit and len(all_text) < max_pages and fetches < max_fetches:
                 url = to_visit.pop(0)
                 if url in visited:
                     continue
                 visited.add(url)
-                self.report_progress(f"Crawling page {len(visited)}/{max_pages}: {url}")
+                fetches += 1
+                self.report_progress(f"Crawling page {len(all_text) + 1}/{max_pages}: {url}")
                 try:
                     resp = client.get(url)
                     resp.raise_for_status()
+                except httpx.HTTPStatusError as e:
+                    # Challenge pages are often served with a 403/503 status —
+                    # recognize them so the user learns the site blocked us.
+                    if looks_like_bot_challenge(_extract_text_from_html(e.response.text)):
+                        blocked += 1
+                    continue
                 except Exception:
                     continue
                 text = _extract_text_from_html(resp.text)
+                if looks_like_bot_challenge(text):
+                    # Bot-verification interstitial, not real content: exclude
+                    # the junk text, don't follow its links, don't use a slot.
+                    blocked += 1
+                    continue
                 all_text.append(f"--- {url} ---\n{text}")
                 soup = BeautifulSoup(resp.text, "html.parser")
                 for link in soup.find_all("a", href=True):
@@ -720,7 +740,12 @@ class CrawlerNode(Node):
                         except ValueError:
                             continue
 
-        return {"output": "\n\n".join(all_text), "input": inputs.get("output"), "step_name": self.name}
+        output = "\n\n".join(all_text)
+        if blocked:
+            note = f"{blocked} page(s) skipped — blocked by bot protection"
+            self.report_progress(note)
+            output = f"{output}\n\n[{note}]" if output else f"[No page content retrieved — {note}]"
+        return {"output": output, "input": inputs.get("output"), "step_name": self.name}
 
 
 class ResearchNode(Node):

@@ -338,6 +338,35 @@ class TestKbIngestUrl:
         assert "Failed to fetch URL content" in error_call[1]["$set"]["error_message"]
 
     @patch("app.tasks.knowledge_base_tasks._get_db")
+    def test_bot_challenge_page_sets_error(self, mock_get_db):
+        from app.services.web_fetcher import WebFetchResult
+        from app.tasks.knowledge_base_tasks import kb_ingest_url
+
+        db = MagicMock()
+        mock_get_db.return_value = db
+
+        source = _make_source(url="https://www.walmart.com/help")
+        db.knowledge_base_sources.find_one.return_value = source
+        db.knowledge_base_sources.find.return_value = [source]
+
+        fetched = WebFetchResult(
+            url="https://www.walmart.com/help",
+            title="Robot or human?",
+            text="Robot or human? Activate and hold the button to confirm that you're human.",
+            raw_html="<html><body>Robot or human?</body></html>",
+            used_browser=False,
+            status_code=200,
+        )
+
+        with patch("app.services.web_fetcher.fetch_url_sync", return_value=fetched):
+            kb_ingest_url("src-uuid")
+
+        calls = db.knowledge_base_sources.update_one.call_args_list
+        error_call = calls[1][0]
+        assert error_call[1]["$set"]["status"] == "error"
+        assert "bot protection" in error_call[1]["$set"]["error_message"]
+
+    @patch("app.tasks.knowledge_base_tasks._get_db")
     def test_url_fetch_error_sets_error_and_reraises(self, mock_get_db):
         from app.tasks.knowledge_base_tasks import kb_ingest_url
 
