@@ -101,7 +101,7 @@ const TASK_TYPES: TaskTypeDef[] = [
     description: 'Runs a small block of code against the step input for custom transforms.' },
   { name: 'CrawlerNode', label: 'Crawler Node', icon: Bug, color: '#84cc16', categories: ['all', 'web'], enabled: true,
     description: 'Recursively follows links from a starting URL and collects page contents for downstream steps.' },
-  { name: 'ResearchNode', label: 'Research Node', icon: Search, color: '#8b5cf6', categories: ['all', 'text'], enabled: true,
+  { name: 'ResearchNode', label: 'Deep Analysis', icon: Search, color: '#8b5cf6', categories: ['all', 'text'], enabled: true,
     description: 'Two-pass analysis of the step input: first finds key points, then synthesizes them into a written report. Works on your documents — no URL needed.' },
   { name: 'KnowledgeBaseQuery', label: 'Knowledge Base Query', icon: Sparkles, color: '#0ea5e9', categories: ['all', 'text'], enabled: true,
     description: 'Asks a question of a connected knowledge base via RAG and returns a cited answer, or the raw matching passages.' },
@@ -1858,7 +1858,7 @@ function EditStepOverlay({
                       : task.name === 'DescribeImage' ? 'AI image description'
                       : task.name === 'CodeNode' ? 'Run Python code'
                       : task.name === 'CrawlerNode' ? 'Web crawler'
-                      : task.name === 'ResearchNode' ? 'Deep AI research'
+                      : task.name === 'ResearchNode' ? 'Two-pass document analysis'
                       : task.name === 'KnowledgeBaseQuery' ? 'Search knowledge base'
                       : task.name === 'APINode' ? 'HTTP API request'
                       : task.name === 'DocumentRenderer' ? 'Render document'
@@ -2795,7 +2795,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                   : task.name === 'DescribeImage' ? 'Describe an image using AI'
                   : task.name === 'CodeNode' ? 'Run Python code on input data'
                   : task.name === 'CrawlerNode' ? 'Crawl multiple pages from a starting URL'
-                  : task.name === 'ResearchNode' ? 'Deep multi-pass AI analysis'
+                  : task.name === 'ResearchNode' ? 'Two-pass AI analysis of the step input'
                   : task.name === 'KnowledgeBaseQuery' ? 'Search a knowledge base and inject results as context'
                   : task.name === 'APINode' ? 'Make HTTP API requests'
                   : task.name === 'DocumentRenderer' ? 'Render output as a downloadable file'
@@ -3453,10 +3453,10 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
             {task.name === 'ResearchNode' && (
               <div>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>
-                  Research Question / Topic
+                  Analysis Question / Topic
                 </label>
                 <textarea
-                  aria-label="Research question or topic"
+                  aria-label="Analysis question or topic"
                   value={getTextValue('question')}
                   onChange={e => setTextValue('question', e.target.value)}
                   placeholder="e.g., What are the main themes and conclusions in this data?"

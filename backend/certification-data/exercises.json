@@ -133,17 +133,17 @@
     }
   },
   "advanced_nodes": {
-    "overview": "Use advanced workflow nodes (the Research node) and parallel tasks to process a sample budget justification. Click **Set Up Lab** to add the PDF, then build a workflow with an advanced node and a step that runs two tasks at once.",
+    "overview": "Use advanced workflow nodes (the Deep Analysis node) and parallel tasks to process a sample budget justification. Click **Set Up Lab** to add the PDF, then build a workflow with an advanced node and a step that runs two tasks at once.",
     "documents": ["budget-justification.pdf"],
     "instructions": [
       "Click **Set Up Lab** to add the sample budget justification to your workspace.",
       "Create a workflow that processes the budget document using advanced nodes:",
       "  **Step 1** — Extraction: Extract the salary table, supply costs, travel, subawards, and indirect costs.",
-      "  **Step 2** — Research node: Ask it to analyze the extracted figures and check whether the line items add up to the stated total. The Research node makes two LLM passes over the data — no URL or API key needed.",
+      "  **Step 2** — Deep Analysis node: Ask it to analyze the extracted figures and check whether the line items add up to the stated total. The Deep Analysis node makes two LLM passes over the data — no URL or API key needed.",
       "  **Step 2 (parallel)** — Add a second task to the same step: a Prompt task that writes a short budget narrative summary. Two tasks in one step run concurrently.",
       "Run the workflow against **budget-justification.pdf**.",
-      "Verify the Research node produces a report and that both parallel tasks complete.",
-      "Note: the **Code Execution** node (sandboxed Python) is an admin-only power node and is not in the standard palette — the Research node covers this exercise for everyone."
+      "Verify the Deep Analysis node produces a report and that both parallel tasks complete.",
+      "Note: the **Code Execution** node (sandboxed Python) is an admin-only power node and is not in the standard palette — the Deep Analysis node covers this exercise for everyone."
     ],
     "expected_fields": [
       "Personnel", "Fringe Benefits", "Supplies", "Travel", "Subaward Costs",

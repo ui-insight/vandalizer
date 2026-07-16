@@ -16,7 +16,7 @@ Why wrapping rather than rewriting:
 - Makes lift attribution clean: same prompt × different wrapper isolates the
   variant's effect.
 
-Variants are applied to ``Prompt``, ``Formatter``, ``Research``, ``FormFiller``
+Variants are applied to ``Prompt``, ``Formatter``, ``ResearchNode``, ``FormFiller``
 tasks — anything that takes a free-text instruction. ``Extraction`` tasks are
 ignored (their instruction shape is structured, not free-text).
 """

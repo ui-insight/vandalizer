@@ -435,27 +435,27 @@ export const MODULES: ModuleDefinition[] = [
     number: 6,
     title: 'Advanced Nodes',
     subtitle: 'Parallel Tasks & Power Nodes',
-    description: 'Process a sample budget justification document using an advanced node (the Research node) to analyze the figures, plus parallel tasks for concurrent processing.',
+    description: 'Process a sample budget justification document using an advanced node (the Deep Analysis node) to analyze the figures, plus parallel tasks for concurrent processing.',
     objectives: [
       'Add the sample budget justification to your workspace',
-      'Use an advanced node (Research, API, or Crawler) to analyze the budget',
+      'Use an advanced node (Deep Analysis, API, or Crawler) to analyze the budget',
       'Run 2+ tasks in parallel within a single step',
     ],
     tips: [
       'The budget has personnel costs, supplies, travel, and subaward line items that should sum to $542,800',
-      'Use the Research node to analyze the extracted figures and check whether the line items add up — it runs two LLM passes over the data, no URL or API key required',
-      'Add a parallel Prompt task alongside the Research node to generate a budget narrative',
+      'Use the Deep Analysis node to analyze the extracted figures and check whether the line items add up — it runs two LLM passes over the data, no URL or API key required',
+      'Add a parallel Prompt task alongside the Deep Analysis node to generate a budget narrative',
     ],
     lessons: [
       {
         title: 'Beyond extraction and prompts',
-        content: 'Vandalizer has 17 different node types. So far you\'ve used Extraction, Prompt, and Format \u2014 but the advanced nodes let you go much further:\n\n\u2022 **Research** \u2014 Two-pass analysis: first analyzes the data, then synthesizes findings into a report. Works on your document \u2014 no URL or API key needed.\n\u2022 **API Call** \u2014 Make HTTP requests to external services.\n\u2022 **Crawler** \u2014 Fetch and extract text from websites.\n\u2022 **Add Document / Add Website** \u2014 Inject additional context mid-workflow.\n\u2022 **Code Execution** \u2014 Run sandboxed Python for calculations or custom logic. This is an admin-only power node and is not in the standard palette, so you won\'t use it in this challenge.',
+        content: 'Vandalizer has 17 different node types. So far you\'ve used Extraction, Prompt, and Format \u2014 but the advanced nodes let you go much further:\n\n\u2022 **Deep Analysis** \u2014 Two-pass analysis: first analyzes the data, then synthesizes findings into a report. Works on your document \u2014 no URL or API key needed.\n\u2022 **API Call** \u2014 Make HTTP requests to external services.\n\u2022 **Crawler** \u2014 Fetch and extract text from websites.\n\u2022 **Add Document / Add Website** \u2014 Inject additional context mid-workflow.\n\u2022 **Code Execution** \u2014 Run sandboxed Python for calculations or custom logic. This is an admin-only power node and is not in the standard palette, so you won\'t use it in this challenge.',
         variant: 'concept',
       },
       {
         title: 'Code Execution: custom logic in your pipeline',
         objective: 'After this lesson, you\'ll know which kinds of logic belong in Code Execution rather than Prompt nodes.',
-        content: 'The Code Execution node lets you write Python that runs inside your workflow. It is an **admin-only power node** that is not in the standard palette \u2014 you won\'t add it in this module, but it\'s worth knowing when it\'s the right tool. It is powerful for:\n\n\u2022 **Data transformation** \u2014 Normalize dates, convert currencies, merge fields.\n\u2022 **Calculations** \u2014 Compute totals, percentages, or ratios from extracted numbers.\n\u2022 **Filtering** \u2014 Remove irrelevant results or flag outliers.\n\u2022 **Format conversion** \u2014 Reshape JSON into a different structure.\n\nThe code runs in a sandbox: no file system access, no network access, no imports beyond the standard library. For document analysis without code \u2014 like checking whether a budget adds up \u2014 the Research node is the everyday equivalent.',
+        content: 'The Code Execution node lets you write Python that runs inside your workflow. It is an **admin-only power node** that is not in the standard palette \u2014 you won\'t add it in this module, but it\'s worth knowing when it\'s the right tool. It is powerful for:\n\n\u2022 **Data transformation** \u2014 Normalize dates, convert currencies, merge fields.\n\u2022 **Calculations** \u2014 Compute totals, percentages, or ratios from extracted numbers.\n\u2022 **Filtering** \u2014 Remove irrelevant results or flag outliers.\n\u2022 **Format conversion** \u2014 Reshape JSON into a different structure.\n\nThe code runs in a sandbox: no file system access, no network access, no imports beyond the standard library. For document analysis without code \u2014 like checking whether a budget adds up \u2014 the Deep Analysis node is the everyday equivalent.',
         variant: 'concept',
         knowledgeCheck: {
           question: 'Which task should use Code Execution instead of a Prompt node?',
@@ -483,12 +483,12 @@ export const MODULES: ModuleDefinition[] = [
       },
       {
         title: 'Build a workflow with advanced nodes',
-        content: '1. Create a workflow with at least 3 steps.\n2. In one step, add a **Research** task. Give it a question like "Do these budget line items add up to the stated total?" and point its input at the document or the previous step\'s output.\n3. In the same step, add a second task (for example a Prompt task that writes a narrative summary) so two tasks run in parallel.\n4. Run the workflow and review how the parallel tasks\' outputs are combined.\n5. (Optional) Swap the Research node for an API Call or Crawler node to see other advanced node types.',
+        content: '1. Create a workflow with at least 3 steps.\n2. In one step, add a **Deep Analysis** task. Give it a question like "Do these budget line items add up to the stated total?" and point its input at the document or the previous step\'s output.\n3. In the same step, add a second task (for example a Prompt task that writes a narrative summary) so two tasks run in parallel.\n4. Run the workflow and review how the parallel tasks\' outputs are combined.\n5. (Optional) Swap the Deep Analysis node for an API Call or Crawler node to see other advanced node types.',
         variant: 'walkthrough',
       },
       {
         title: 'Glossary & Review',
-        content: 'Parallel Tasks \u2014 You\'ve now run multiple tasks within a single step concurrently. Their results are collected and passed to the next step together. The benefit: independent operations (two extractions, or an extraction + API call) happen simultaneously instead of sequentially.\n\nCode Execution \u2014 Python in a restricted sandbox with a 10-second timeout. The previous step\'s output is available as `input_data`. Assign your result to `output`. Use for any math, date calculations, or deterministic logic \u2014 never for work that needs language understanding.\n\nAPI Call \u2014 Connects your workflow to external services. Supports GET, POST, PUT, and PATCH. You can pass authentication headers and use the previous step\'s output in the request body \u2014 enabling real-time lookups and integrations.\n\nResearch Node \u2014 Two-stage analysis: first passes through the data to identify patterns, then synthesizes findings into a coherent report. Use when you need more depth than a single Prompt call provides.',
+        content: 'Parallel Tasks \u2014 You\'ve now run multiple tasks within a single step concurrently. Their results are collected and passed to the next step together. The benefit: independent operations (two extractions, or an extraction + API call) happen simultaneously instead of sequentially.\n\nCode Execution \u2014 Python in a restricted sandbox with a 10-second timeout. The previous step\'s output is available as `input_data`. Assign your result to `output`. Use for any math, date calculations, or deterministic logic \u2014 never for work that needs language understanding.\n\nAPI Call \u2014 Connects your workflow to external services. Supports GET, POST, PUT, and PATCH. You can pass authentication headers and use the previous step\'s output in the request body \u2014 enabling real-time lookups and integrations.\n\nDeep Analysis Node \u2014 Two-stage analysis: first passes through the data to identify patterns, then synthesizes findings into a coherent report. Use when you need more depth than a single Prompt call provides.',
         variant: 'key-terms',
       },
     ],

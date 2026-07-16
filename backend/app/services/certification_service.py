@@ -662,10 +662,11 @@ async def _validate_advanced_nodes(user_id: str) -> dict:
 
     # Task names are stored verbatim from the workflow editor palette
     # (WorkflowEditorPanel TASK_TYPES) and the engine factory in
-    # build_workflow_engine — e.g. "ResearchNode", not "Research". CodeNode is
-    # admin-only and hidden from the palette, so a non-admin trainee completes
-    # this module via the Research / API / Crawler nodes that are reachable in
-    # the UI; CodeNode and Browser still count for admins who can add them.
+    # build_workflow_engine — e.g. "ResearchNode" (shown in the UI as "Deep
+    # Analysis"), not the display label. CodeNode is admin-only and hidden from
+    # the palette, so a non-admin trainee completes this module via the Deep
+    # Analysis / API / Crawler nodes that are reachable in the UI; CodeNode and
+    # Browser still count for admins who can add them.
     advanced_task_names = {"CodeNode", "APINode", "ResearchNode", "CrawlerNode", "Browser"}
 
     for wf in workflows:
@@ -682,7 +683,7 @@ async def _validate_advanced_nodes(user_id: str) -> dict:
                     has_advanced = True
                     advanced_types.add(task.name)
 
-    checks.append({"name": "Advanced node type", "passed": has_advanced, "detail": "Use a Research, API, or Crawler node (Code Execution is admin-only)"})
+    checks.append({"name": "Advanced node type", "passed": has_advanced, "detail": "Use a Deep Analysis, API, or Crawler node (Code Execution is admin-only)"})
     checks.append({"name": "Parallel tasks", "passed": has_parallel, "detail": f"Max {max_parallel} parallel tasks in a step (need 2+)"})
 
     passed = all(c["passed"] for c in checks)

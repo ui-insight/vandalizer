@@ -58,7 +58,7 @@ Estimated time: ~3-4 hours total across all modules. Users can stop and resume a
 - Code Execution node: writing safe Python transforms
 - API Call node: integrating external data sources
 - Add Document / Add Website nodes: enriching workflows with external context
-- The Research node: two-pass analysis and synthesis
+- The Deep Analysis node: two-pass analysis and synthesis
 - **Exercise:** Build a workflow that extracts data, enriches it with a web API call, and runs a Python transform to normalize the results
 
 ### Module 5: Output and Delivery
