@@ -68,10 +68,35 @@ export function OptimizationResults({
     )
   }
 
+  // When the run did a train/holdout split, the headline optimized_score is
+  // the winner re-measured on the holdout slice. The default bar must then be
+  // the default config's holdout score too — pairing the holdout optimized
+  // number against the train-slice default reads as a lift that the CI (also
+  // holdout-based) may flatly contradict. holdout_optimized_score is non-null
+  // exactly when the headline is holdout-based; for runs that predate that
+  // field, headline ≠ train score proves the holdout re-score succeeded.
+  const holdoutHeadline =
+    run.holdout_default_score != null
+    && (
+      run.holdout_optimized_score != null
+      || (
+        run.optimized_score != null
+        && run.optimized_score_train != null
+        && run.optimized_score !== run.optimized_score_train
+      )
+    )
+  const trainCount = run.train_query_uuids?.length ?? null
+  const holdoutCount = run.holdout_query_uuids?.length ?? null
+
   const kbLabels = DOMAIN_LABELS.kb.baselineTile
   const baselines: BaselinePoint[] = [
     { id: 'no-kb', label: kbLabels.noBaseline, score: run.baseline_no_kb_score, color: '#888' },
-    { id: 'default', label: kbLabels.yourSettings, score: run.baseline_default_score, color: '#3b82f6' },
+    {
+      id: 'default',
+      label: kbLabels.yourSettings,
+      score: holdoutHeadline ? run.holdout_default_score : run.baseline_default_score,
+      color: '#3b82f6',
+    },
     { id: 'optimized', label: kbLabels.tuned, score: run.optimized_score, color: '#22c55e', emphasised: true },
   ]
 
@@ -92,6 +117,14 @@ export function OptimizationResults({
         scoreFormulaHint={
           'Quality score = 40% LLM judge + 25% retrieval precision + 20% source health + 15% chunk coverage. '
           + 'Matches the score the validation header reports.'
+        }
+        measurementNote={
+          holdoutHeadline
+            ? `${kbLabels.yourSettings} and ${kbLabels.tuned} are measured on the `
+              + `${holdoutCount ?? ''} held-out quer${holdoutCount === 1 ? 'y' : 'ies'} the optimizer `
+              + `never tuned against; ${kbLabels.noBaseline} uses the `
+              + `${trainCount ?? ''} training queries.`
+            : undefined
         }
         topSlot={
           <EvalSetCompositionStrip
@@ -149,6 +182,7 @@ export function OptimizationResults({
           optimized={winningPerQuery}
           baseline={defaultPerQuery}
           noKb={noKbPerQuery}
+          title={holdoutHeadline ? 'Per-query deltas — training queries' : 'Per-query deltas'}
         />
       )}
 
@@ -169,6 +203,14 @@ export function OptimizationResults({
           getRowKey={(t) => t.trial_id}
           onRowClick={setSelectedTrial}
           title="Trials — tap any for a plain-English breakdown"
+          caption={
+            holdoutHeadline
+              ? `Trial scores are measured on the ${trainCount ?? ''} training queries. `
+                + `The headline ${kbLabels.tuned} score re-measures the winner on `
+                + `${holdoutCount ?? ''} held-out quer${holdoutCount === 1 ? 'y' : 'ies'}, `
+                + 'so it can differ from the best trial below.'
+              : undefined
+          }
         />
       )}
 
