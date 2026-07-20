@@ -312,6 +312,22 @@ class TestTableAwareChunking:
         # First chunk should end before the table rather than slicing into it.
         assert "| Item" not in chunks[0][0]
 
+    def test_break_before_table_never_drops_rows(self):
+        from app.services.document_manager import _split_text_with_offsets
+
+        # Regression: when the break-before-table path pulled ``end`` back to
+        # the table start, the next window still jumped a full step past it,
+        # so the header and first data rows were emitted into no chunk at all.
+        # Sweep the table start across the window to cover every break path.
+        for pad in range(400, 1000, 7):
+            prose = ("Narrative context sentence about grant awards. " * 25)[:pad]
+            table = _docx_style_table(30)
+            text = f"{prose.strip()}\n{table}"
+            joined = "\n".join(c for c, _ in _split_text_with_offsets(text, 1000, 200))
+            for i in range(30):
+                row = f"| Item {i} | {100 + i} | {200 + i} |"
+                assert row in joined, f"pad={pad}: row dropped from ingestion: {row!r}"
+
     def test_non_table_text_is_undedecorated_and_offset_exact(self):
         from app.services.document_manager import _split_text_with_offsets
 
