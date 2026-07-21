@@ -688,6 +688,7 @@ class CrawlerNode(Node):
             return {"output": f"Blocked URL: {e}", "input": inputs.get("output"), "step_name": self.name}
 
         from app.utils.bot_challenge import looks_like_bot_challenge
+        from app.utils.url_validation import normalize_crawl_url
 
         self.report_progress(f"Crawling from {start_url}")
         parsed_start = urlparse(start_url)
@@ -706,9 +707,12 @@ class CrawlerNode(Node):
         with httpx.Client(timeout=30, follow_redirects=True) as client:
             while to_visit and len(all_text) < max_pages and fetches < max_fetches:
                 url = to_visit.pop(0)
-                if url in visited:
+                # Dedup on the normalized form so spelling variants of the same
+                # page (trailing slash, #fragment) don't each consume a slot.
+                page_key = normalize_crawl_url(url)
+                if page_key in visited:
                     continue
-                visited.add(url)
+                visited.add(page_key)
                 fetches += 1
                 self.report_progress(f"Crawling page {len(all_text) + 1}/{max_pages}: {url}")
                 try:
@@ -733,7 +737,7 @@ class CrawlerNode(Node):
                 for link in soup.find_all("a", href=True):
                     abs_url = urljoin(url, link["href"])
                     parsed = urlparse(abs_url)
-                    if parsed.netloc in allowed and abs_url not in visited:
+                    if parsed.netloc in allowed and normalize_crawl_url(abs_url) not in visited:
                         try:
                             validate_outbound_url(abs_url)
                             to_visit.append(abs_url)

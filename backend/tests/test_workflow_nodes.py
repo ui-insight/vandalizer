@@ -584,6 +584,33 @@ class TestCrawlerNode:
 
     @patch("app.utils.url_validation.validate_outbound_url")
     @patch("app.services.workflow_engine.httpx.Client")
+    def test_url_spelling_variants_fetched_once(self, mock_client_cls, mock_validate):
+        """example.com, example.com/ and example.com#x are one page, one slot."""
+        mock_validate.return_value = "ok"
+        pages = {
+            "https://example.com": (
+                '<html><body><p>Home page</p>'
+                '<a href="#maincontent">skip</a>'
+                '<a href="/">home</a>'
+                '<a href="https://example.com/#footer">footer</a>'
+                '<a href="/page2">next</a>'
+                '<a href="/page2#section">next anchored</a></body></html>'
+            ),
+            "https://example.com/page2": "<html><body><p>Second page</p></body></html>",
+        }
+        mock_client = self._client_serving(pages)
+        mock_client_cls.return_value = mock_client
+
+        node = CrawlerNode({"start_url": "https://example.com", "max_pages": 5})
+        result = node.process({"output": "prev"})
+
+        # Only the two distinct pages were fetched — no variant refetches.
+        assert mock_client.get.call_count == 2
+        assert result["output"].count("Home page") == 1
+        assert result["output"].count("Second page") == 1
+
+    @patch("app.utils.url_validation.validate_outbound_url")
+    @patch("app.services.workflow_engine.httpx.Client")
     def test_challenge_pages_excluded_and_do_not_consume_slots(self, mock_client_cls, mock_validate):
         """Blocked pages are skipped without a Max Pages slot; crawl continues."""
         mock_validate.return_value = "ok"

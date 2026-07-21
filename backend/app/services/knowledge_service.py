@@ -20,6 +20,7 @@ from app.models.knowledge import KnowledgeBase, KnowledgeBaseReference, Knowledg
 from app.models.user import User
 from app.services import access_control
 from app.services.document_manager import DocumentManager
+from app.utils.url_validation import normalize_crawl_url as _normalize_crawl_url
 
 logger = logging.getLogger(__name__)
 
@@ -870,18 +871,6 @@ async def resolve_reference(
 
 
 # --- Crawling ---
-
-
-def _normalize_crawl_url(url: str) -> str:
-    """Normalize a URL for deduplication: strip fragments, trailing slashes."""
-    from urllib.parse import urlparse
-
-    parsed = urlparse(url)
-    path = parsed.path.rstrip("/") or "/"
-    clean = f"{parsed.scheme}://{parsed.netloc}{path}"
-    if parsed.query:
-        clean += f"?{parsed.query}"
-    return clean
 
 
 def _extract_links(html: str, base_url: str) -> list[str]:
