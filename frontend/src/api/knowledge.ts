@@ -586,6 +586,9 @@ export type KBOptimizationRun = {
   cross_judge?: CrossJudge | null
   optimized_score_train?: number | null
   holdout_default_score?: number | null
+  // Non-null iff the winner's holdout re-score succeeded — i.e. optimized_score
+  // is the holdout number. Pair holdout_default_score only against this.
+  holdout_optimized_score?: number | null
   train_query_uuids?: string[]
   holdout_query_uuids?: string[]
   overfitting_warning?: boolean

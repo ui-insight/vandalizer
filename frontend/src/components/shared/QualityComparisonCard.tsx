@@ -66,6 +66,10 @@ interface QualityComparisonCardProps {
   /** Optional tooltip text explaining how the score is computed (e.g. the
    * blended-quality weighting). Renders as a small ⓘ next to the title. */
   scoreFormulaHint?: string
+  /** Optional one-liner under the bars saying which eval slice each bar was
+   * measured on (e.g. held-out vs training queries). Keeps the bars honest
+   * when different rows come from different slices. */
+  measurementNote?: string
 }
 
 export function QualityComparisonCard({
@@ -75,7 +79,7 @@ export function QualityComparisonCard({
   secondaryBaselineId,
   title = 'Optimization complete',
   insignificantThreshold = 5,
-  topSlot, bottomSlot, scoreFormulaHint,
+  topSlot, bottomSlot, scoreFormulaHint, measurementNote,
 }: QualityComparisonCardProps) {
   const [ciExpanded, setCiExpanded] = useState(false)
   // Legacy noise-floor band. σ × 1.96 from two judge-replay deltas: this is
@@ -193,6 +197,12 @@ export function QualityComparisonCard({
           />
         ))}
       </div>
+
+      {measurementNote && (
+        <div style={{ marginTop: 8, fontSize: 11, color: '#888', lineHeight: 1.5 }}>
+          {measurementNote}
+        </div>
+      )}
 
       {liftVsDefault != null && (
         <div style={{

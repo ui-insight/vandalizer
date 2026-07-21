@@ -281,8 +281,11 @@ class ModelAddRequest(BaseModel):
 class OAuthProviderRequest(BaseModel):
     provider: str
     display_name: str
-    client_id: str
-    client_secret: str
+    # OAuth/OIDC providers use client_id/client_secret; SAML providers use the
+    # idp_* fields below instead, so these are optional (validated per-provider
+    # in the add/update handlers).
+    client_id: str = ""
+    client_secret: str = ""
     redirect_uri: Optional[str] = None
     enabled: bool = True
     tenant_id: Optional[str] = None
@@ -291,6 +294,13 @@ class OAuthProviderRequest(BaseModel):
     authorization_endpoint: Optional[str] = None
     token_endpoint: Optional[str] = None
     userinfo_endpoint: Optional[str] = None
+    # SAML 2.0 (SP) — read from the IdP's metadata and consumed by saml_service.
+    idp_entity_id: Optional[str] = None
+    idp_sso_url: Optional[str] = None
+    idp_x509_cert: Optional[str] = None
+    # Optional SP overrides; default to /api/auth/saml/{metadata,acs} when unset.
+    sp_entity_id: Optional[str] = None
+    acs_url: Optional[str] = None
 
 
 class AuthMethodsRequest(BaseModel):
@@ -1661,12 +1671,29 @@ async def delete_model(
 # 9. POST /config/auth/providers  - Add OAuth provider
 # ---------------------------------------------------------------------------
 
+def _validate_provider_request(body: OAuthProviderRequest) -> None:
+    """Enforce the fields each provider type needs before persisting."""
+    if body.provider == "saml":
+        missing = [
+            f for f in ("idp_entity_id", "idp_sso_url", "idp_x509_cert")
+            if not (getattr(body, f) or "").strip()
+        ]
+        if missing:
+            raise HTTPException(
+                status_code=400,
+                detail=f"SAML provider requires: {', '.join(missing)}",
+            )
+    elif not body.client_id.strip():
+        raise HTTPException(status_code=400, detail="client_id is required")
+
+
 @router.post("/config/auth/providers")
 async def add_oauth_provider(
     body: OAuthProviderRequest,
     user: User = Depends(get_current_user),
 ):
     await _require_superadmin(user)
+    _validate_provider_request(body)
 
     cfg = await SystemConfig.get_config()
     provider_dict = body.model_dump(exclude_none=True)
@@ -1682,6 +1709,56 @@ async def add_oauth_provider(
     return {"status": "ok", "providers": _sanitize_providers(cfg.oauth_providers)}
 
 
+class SamlMetadataRequest(BaseModel):
+    metadata_url: Optional[str] = None
+    metadata_xml: Optional[str] = None
+
+
+@router.post("/config/auth/saml/parse-metadata")
+async def parse_saml_metadata(
+    body: SamlMetadataRequest,
+    user: User = Depends(get_current_user),
+):
+    """Extract idp_entity_id / idp_sso_url / idp_x509_cert from an IdP's SAML
+    metadata (fetched from a URL or pasted XML) so the admin can auto-fill the
+    SAML provider form instead of copying each field by hand.
+
+    Superadmin-only. The URL is fetched server-side; keep it restricted to
+    trusted admins (the same people who can already configure SSO).
+    """
+    await _require_superadmin(user)
+    from onelogin.saml2.idp_metadata_parser import OneLogin_Saml2_IdPMetadataParser
+
+    try:
+        if body.metadata_url:
+            data = OneLogin_Saml2_IdPMetadataParser.parse_remote(
+                body.metadata_url, validate_cert=False, timeout=10
+            )
+        elif body.metadata_xml:
+            data = OneLogin_Saml2_IdPMetadataParser.parse(body.metadata_xml)
+        else:
+            raise HTTPException(
+                status_code=400, detail="Provide a metadata URL or XML."
+            )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Could not read IdP metadata: {e}")
+
+    idp = data.get("idp", {}) if isinstance(data, dict) else {}
+    result = {
+        "idp_entity_id": idp.get("entityId", ""),
+        "idp_sso_url": (idp.get("singleSignOnService") or {}).get("url", ""),
+        "idp_x509_cert": idp.get("x509cert", ""),
+    }
+    if not all(result.values()):
+        raise HTTPException(
+            status_code=422,
+            detail="Metadata is missing an entityID, HTTP-Redirect SSO URL, or signing certificate.",
+        )
+    return result
+
+
 # ---------------------------------------------------------------------------
 # 10. PUT /config/auth/providers/{index}  - Update OAuth provider
 # ---------------------------------------------------------------------------
@@ -1693,6 +1770,7 @@ async def update_oauth_provider(
     user: User = Depends(get_current_user),
 ):
     await _require_superadmin(user)
+    _validate_provider_request(body)
 
     cfg = await SystemConfig.get_config()
     if index < 0 or index >= len(cfg.oauth_providers):

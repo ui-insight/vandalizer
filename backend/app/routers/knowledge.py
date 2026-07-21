@@ -1197,6 +1197,7 @@ def _serialize_optimization_run(run) -> dict:
         "cross_judge": getattr(run, "cross_judge", None),
         "optimized_score_train": getattr(run, "optimized_score_train", None),
         "holdout_default_score": getattr(run, "holdout_default_score", None),
+        "holdout_optimized_score": getattr(run, "holdout_optimized_score", None),
         "train_query_uuids": getattr(run, "train_query_uuids", []) or [],
         "holdout_query_uuids": getattr(run, "holdout_query_uuids", []) or [],
         "overfitting_warning": getattr(run, "overfitting_warning", False),

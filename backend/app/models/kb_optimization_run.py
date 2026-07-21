@@ -89,6 +89,12 @@ class KBOptimizationRun(Document):
     # ``optimized_score_train`` keeps the in-sample number for diagnostics.
     optimized_score_train: Optional[float] = None
     holdout_default_score: Optional[float] = None
+    # Winner's holdout re-score, persisted separately even though it usually
+    # equals ``optimized_score``: the holdout re-score can partially fail
+    # (optimized arm errored, default arm succeeded), and the UI must only
+    # pair ``holdout_default_score`` against a score measured on the same
+    # slice. Null ⇒ the headline fell back to the train score.
+    holdout_optimized_score: Optional[float] = None
     train_query_uuids: list[str] = Field(default_factory=list)
     holdout_query_uuids: list[str] = Field(default_factory=list)
     # True when N<6: no split was applied, so the headline score is in-sample.

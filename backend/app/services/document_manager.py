@@ -200,7 +200,11 @@ def _split_text_with_offsets(
         if end >= text_length:
             break
 
-        next_start = max(start + step, end - chunk_overlap)
+        # Never jump past ``end``: when the break above pulled ``end`` back
+        # (e.g. to a table start), ``start + step`` can overshoot it and the
+        # skipped region would never be emitted into any chunk — table rows
+        # were silently dropped from ingestion.
+        next_start = min(max(start + step, end - chunk_overlap), end)
         if next_start <= start:
             next_start = end
         # Don't let the overlap restart mid-row: snap to the start of the row

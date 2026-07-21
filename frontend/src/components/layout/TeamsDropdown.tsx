@@ -27,6 +27,10 @@ export function TeamsDropdown() {
   }
 
   useEffect(() => {
+    // Only listen while the menu is open — an always-on handler steals focus
+    // on the next frame after any mousedown on non-focusable content, which
+    // cancels the browser's drag-to-select before it can extend.
+    if (!open) return
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
         setOpen(false)
@@ -39,7 +43,7 @@ export function TeamsDropdown() {
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [])
+  }, [open])
 
   // Move focus to the first menuitem when the menu opens.
   useEffect(() => {
