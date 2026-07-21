@@ -689,6 +689,7 @@ class CrawlerNode(Node):
 
         from app.utils.bot_challenge import looks_like_bot_challenge
         from app.utils.crawl_scope import parse_crawl_scope, url_in_crawl_scope
+        from app.utils.url_validation import normalize_crawl_url
 
         self.report_progress(f"Crawling from {start_url}")
         scope = parse_crawl_scope(allowed_domains, start_url)
@@ -706,9 +707,12 @@ class CrawlerNode(Node):
         with httpx.Client(timeout=30, follow_redirects=True) as client:
             while to_visit and len(all_text) < max_pages and fetches < max_fetches:
                 url = to_visit.pop(0)
-                if url in visited:
+                # Dedup on the normalized form so spelling variants of the same
+                # page (trailing slash, #fragment) don't each consume a slot.
+                page_key = normalize_crawl_url(url)
+                if page_key in visited:
                     continue
-                visited.add(url)
+                visited.add(page_key)
                 fetches += 1
                 self.report_progress(f"Crawling page {len(all_text) + 1}/{max_pages}: {url}")
                 try:
@@ -732,7 +736,7 @@ class CrawlerNode(Node):
                 soup = BeautifulSoup(resp.text, "html.parser")
                 for link in soup.find_all("a", href=True):
                     abs_url = urljoin(url, link["href"])
-                    if url_in_crawl_scope(abs_url, scope) and abs_url not in visited:
+                    if url_in_crawl_scope(abs_url, scope) and normalize_crawl_url(abs_url) not in visited:
                         try:
                             validate_outbound_url(abs_url)
                             to_visit.append(abs_url)

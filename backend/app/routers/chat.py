@@ -98,6 +98,13 @@ async def chat(
         )
         if not kb:
             raise HTTPException(status_code=404, detail="Knowledge base not found")
+        try:
+            from app.services import knowledge_service
+
+            await knowledge_service.record_kb_usage(user_id, kb.uuid)
+        except Exception:
+            # Usage tracking is best-effort — never block chat on it.
+            logger.warning("Failed to record KB usage", exc_info=True)
 
     if body.project_uuid:
         from app.services import project_service

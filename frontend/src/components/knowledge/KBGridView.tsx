@@ -8,10 +8,11 @@ import type { KBScope, KnowledgeBase } from '../../types/knowledge'
 import type { Organization } from '../../api/organizations'
 import { AITrustChip } from './AITrustChip'
 
-type SortOption = 'newest' | 'updated' | 'name' | 'sources' | 'chunks'
+type SortOption = 'newest' | 'recent' | 'updated' | 'name' | 'sources' | 'chunks'
 
 const SORT_LABEL: Record<SortOption, string> = {
   newest: 'Newest',
+  recent: 'Recently Used',
   updated: 'Recently Updated',
   name: 'Name A–Z',
   sources: 'Most Sources',
@@ -36,11 +37,15 @@ const C = {
   textFaint: '#666',
 }
 
-function sortKBs(kbs: KnowledgeBase[], sort: SortOption): KnowledgeBase[] {
+export function sortKBs(kbs: KnowledgeBase[], sort: SortOption): KnowledgeBase[] {
   const arr = [...kbs]
   switch (sort) {
     case 'name':
       return arr.sort((a, b) => a.title.localeCompare(b.title))
+    case 'recent':
+      // Never-used KBs ('' sorts before any ISO date) fall to the end; ties
+      // among them keep the fetched (newest-first) order.
+      return arr.sort((a, b) => (b.last_used_at || '').localeCompare(a.last_used_at || ''))
     case 'updated':
       return arr.sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''))
     case 'sources':

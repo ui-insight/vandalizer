@@ -69,6 +69,28 @@ class KnowledgeBaseReference(Document):
             self.uuid = uuid4().hex
 
 
+class KnowledgeBaseUsage(Document):
+    """Per-user usage record for a knowledge base.
+
+    Keyed on the canonical KB uuid (references resolve to their source KB
+    before chat, so a referenced KB shares its usage record with the
+    original). Powers the per-user "Recently Used" sort on the KB lists.
+    """
+
+    user_id: str
+    kb_uuid: str
+    last_used_at: datetime.datetime = Field(
+        default_factory=lambda: datetime.datetime.now(tz=datetime.timezone.utc),
+    )
+    use_count: int = 1
+
+    class Settings:
+        name = "knowledge_base_usage"
+        indexes = [
+            [("user_id", 1), ("kb_uuid", 1)],
+        ]
+
+
 class KnowledgeBase(Document):
     """A curated knowledge base built from documents and URLs."""
 

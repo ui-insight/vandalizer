@@ -333,6 +333,7 @@ class TestKnowledgeListEndpoints:
             mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
             mock_svc.list_knowledge_bases = AsyncMock(return_value=([kb], 1))
             mock_svc.list_references = AsyncMock(return_value=[])
+            mock_svc.get_kb_usage_map = AsyncMock(return_value={})
             MockRun.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
             MockOpt.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
 
@@ -346,6 +347,45 @@ class TestKnowledgeListEndpoints:
         data = resp.json()
         assert data["total"] == 1
         assert data["items"][0]["uuid"] == "kb-uuid-1"
+        assert data["items"][0]["last_used_at"] is None
+
+    @pytest.mark.asyncio
+    async def test_list_v2_includes_per_user_last_used_at(self, client):
+        """A usage record for the requesting user surfaces as last_used_at."""
+        user = _make_user()
+        cookies, headers = _auth()
+        used_kb = _mock_kb(uuid="kb-used")
+        unused_kb = _mock_kb(uuid="kb-unused")
+        used_at = datetime.datetime(2026, 7, 20, 12, 0, tzinfo=datetime.timezone.utc)
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.routers.knowledge.ValidationRun") as MockRun,
+            patch("app.routers.knowledge.KBOptimizationRun") as MockOpt,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.list_knowledge_bases = AsyncMock(return_value=([used_kb, unused_kb], 2))
+            mock_svc.list_references = AsyncMock(return_value=[])
+            mock_svc.get_kb_usage_map = AsyncMock(return_value={"kb-used": used_at})
+            MockRun.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
+            MockOpt.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
+
+            resp = await client.get(
+                "/api/knowledge/list/v2?scope=mine",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        by_uuid = {item["uuid"]: item for item in resp.json()["items"]}
+        assert by_uuid["kb-used"]["last_used_at"] == used_at.isoformat()
+        assert by_uuid["kb-unused"]["last_used_at"] is None
+        # The usage lookup is scoped to the requesting user.
+        mock_svc.get_kb_usage_map.assert_awaited_once_with("user1", ["kb-used", "kb-unused"])
 
 
 class TestKnowledgeCRUD:
