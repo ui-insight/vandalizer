@@ -16,7 +16,12 @@ if TYPE_CHECKING:
     from app.services.web_fetcher import WebFetchResult
 
 from app.models.document import SmartDocument
-from app.models.knowledge import KnowledgeBase, KnowledgeBaseReference, KnowledgeBaseSource
+from app.models.knowledge import (
+    KnowledgeBase,
+    KnowledgeBaseReference,
+    KnowledgeBaseSource,
+    KnowledgeBaseUsage,
+)
 from app.models.user import User
 from app.services import access_control
 from app.services.document_manager import DocumentManager
@@ -132,6 +137,33 @@ async def list_knowledge_bases_flat(
         limit=10000,
     )
     return kbs
+
+
+async def record_kb_usage(user_id: str, kb_uuid: str) -> None:
+    """Upsert the per-user usage record for a KB (last-used time + count).
+
+    ``kb_uuid`` must be the canonical KB uuid (references are resolved before
+    chat, so callers already hold the source KB).
+    """
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    await KnowledgeBaseUsage.get_motor_collection().update_one(
+        {"user_id": user_id, "kb_uuid": kb_uuid},
+        {"$set": {"last_used_at": now}, "$inc": {"use_count": 1}},
+        upsert=True,
+    )
+
+
+async def get_kb_usage_map(
+    user_id: str, kb_uuids: list[str],
+) -> dict[str, datetime.datetime]:
+    """Map canonical KB uuid → this user's last_used_at, for the given KBs."""
+    if not kb_uuids:
+        return {}
+    records = await KnowledgeBaseUsage.find(
+        KnowledgeBaseUsage.user_id == user_id,
+        {"kb_uuid": {"$in": kb_uuids}},
+    ).to_list()
+    return {r.kb_uuid: r.last_used_at for r in records}
 
 
 async def admin_list_all_knowledge_bases(

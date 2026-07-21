@@ -31,6 +31,8 @@ export interface KnowledgeBase {
   last_validation_baseline_score?: number | null
   last_validation_lift?: number | null
   last_validated_at?: string | null
+  // Per-requesting-user: when this user last chatted with the KB (ISO string).
+  last_used_at?: string | null
 }
 
 export interface KnowledgeBaseSource {

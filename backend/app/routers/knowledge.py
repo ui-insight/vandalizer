@@ -1,6 +1,7 @@
 """Knowledge Base API routes."""
 
 import asyncio
+import datetime
 import logging
 import re
 
@@ -88,7 +89,13 @@ class _TrustSummary:
         self.at = at
 
 
-def _kb_response(kb, *, scope: str | None = None, trust: "_TrustSummary | None" = None) -> KBResponse:
+def _kb_response(
+    kb,
+    *,
+    scope: str | None = None,
+    trust: "_TrustSummary | None" = None,
+    last_used_at: datetime.datetime | None = None,
+) -> KBResponse:
     import datetime as _dt
     override = getattr(kb, "rag_config_override", None)
     # Only consider this a real applied override if the value is dict-shaped.
@@ -130,6 +137,9 @@ def _kb_response(kb, *, scope: str | None = None, trust: "_TrustSummary | None" 
         last_validation_baseline_score=last_baseline,
         last_validation_lift=last_lift,
         last_validated_at=last_validated_at_str,
+        last_used_at=(
+            last_used_at.isoformat() if isinstance(last_used_at, _dt.datetime) else None
+        ),
     )
 
 
@@ -271,17 +281,27 @@ async def list_knowledge_bases_v2(
             if source_kb:
                 ref_kbs.append((ref, source_kb))
 
-    latest_runs = await _latest_runs_by_kb(
-        [kb.uuid for kb in kbs] + [src.uuid for _, src in ref_kbs]
-    )
+    all_uuids = [kb.uuid for kb in kbs] + [src.uuid for _, src in ref_kbs]
+    latest_runs = await _latest_runs_by_kb(all_uuids)
+    usage_map = await svc.get_kb_usage_map(user.user_id, all_uuids)
 
     items: list[KBResponse] = []
     for kb in kbs:
         kb_scope = scope or _classify_scope(kb, user.user_id, team_id)
-        items.append(_kb_response(kb, scope=kb_scope, trust=latest_runs.get(kb.uuid)))
+        items.append(_kb_response(
+            kb,
+            scope=kb_scope,
+            trust=latest_runs.get(kb.uuid),
+            last_used_at=usage_map.get(kb.uuid),
+        ))
 
     for ref, source_kb in ref_kbs:
-        resp = _kb_response(source_kb, scope="reference", trust=latest_runs.get(source_kb.uuid))
+        resp = _kb_response(
+            source_kb,
+            scope="reference",
+            trust=latest_runs.get(source_kb.uuid),
+            last_used_at=usage_map.get(source_kb.uuid),
+        )
         resp.is_reference = True
         resp.source_kb_uuid = ref.source_kb_uuid
         resp.reference_uuid = ref.uuid

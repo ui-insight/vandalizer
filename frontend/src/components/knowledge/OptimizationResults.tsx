@@ -94,7 +94,7 @@ export function OptimizationResults({
     {
       id: 'default',
       label: kbLabels.yourSettings,
-      score: holdoutHeadline ? run.holdout_default_score : run.baseline_default_score,
+      score: (holdoutHeadline ? run.holdout_default_score : run.baseline_default_score) ?? null,
       color: '#3b82f6',
     },
     { id: 'optimized', label: kbLabels.tuned, score: run.optimized_score, color: '#22c55e', emphasised: true },
