@@ -16,7 +16,7 @@ import threading
 import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import NoReturn
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin
 
 import httpx
 from bs4 import BeautifulSoup
@@ -688,10 +688,10 @@ class CrawlerNode(Node):
             return {"output": f"Blocked URL: {e}", "input": inputs.get("output"), "step_name": self.name}
 
         from app.utils.bot_challenge import looks_like_bot_challenge
+        from app.utils.crawl_scope import parse_crawl_scope, url_in_crawl_scope
 
         self.report_progress(f"Crawling from {start_url}")
-        parsed_start = urlparse(start_url)
-        allowed = {d.strip() for d in allowed_domains.split(",") if d.strip()} if allowed_domains else {parsed_start.netloc}
+        scope = parse_crawl_scope(allowed_domains, start_url)
 
         visited = set()
         to_visit = [start_url]
@@ -732,8 +732,7 @@ class CrawlerNode(Node):
                 soup = BeautifulSoup(resp.text, "html.parser")
                 for link in soup.find_all("a", href=True):
                     abs_url = urljoin(url, link["href"])
-                    parsed = urlparse(abs_url)
-                    if parsed.netloc in allowed and abs_url not in visited:
+                    if url_in_crawl_scope(abs_url, scope) and abs_url not in visited:
                         try:
                             validate_outbound_url(abs_url)
                             to_visit.append(abs_url)

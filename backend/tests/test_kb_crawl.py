@@ -131,7 +131,7 @@ async def test_pdf_parent_respects_allowed_domains_and_max_pages():
                       AsyncMock(return_value=None)):
         added = await knowledge_service._crawl_from_source(
             parent, MagicMock(uuid="kb-1"), max_pages=2,
-            allowed_domains="www.grants.gov", parent_fetched=fetched,
+            allowed_domains="www.usda.gov, www.grants.gov", parent_fetched=fetched,
         )
 
     # grants.gov is allowed via allowed_domains; max_pages=2 stops before /c.
@@ -139,6 +139,58 @@ async def test_pdf_parent_respects_allowed_domains_and_max_pages():
     assert [c.url for c in children] == [
         "https://www.usda.gov/a",
         "https://www.grants.gov/b",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_explicit_allowed_domains_replace_parent_domain():
+    """An allowed-domains entry defines the whole scope — it no longer
+    silently unions with the parent's domain (the ticket's no-op case)."""
+    parent = _make_parent("https://www.usda.gov/x/terms.pdf")
+    fetched = _pdf_result(parent.url, [
+        "https://www.usda.gov/a",
+        "https://www.grants.gov/b",
+    ])
+    cls, children = _mock_source_cls()
+
+    with patch.object(knowledge_service, "KnowledgeBaseSource", cls), \
+         patch.object(knowledge_service, "_ingest_url_source",
+                      AsyncMock(return_value=None)):
+        added = await knowledge_service._crawl_from_source(
+            parent, MagicMock(uuid="kb-1"), max_pages=5,
+            allowed_domains="www.grants.gov", parent_fetched=fetched,
+        )
+
+    assert added == 1
+    assert [c.url for c in children] == ["https://www.grants.gov/b"]
+
+
+@pytest.mark.asyncio
+async def test_path_qualified_allowed_domain_scopes_crawl_to_subdirectory():
+    """A full URL with a path in Allowed domains restricts the crawl to that
+    section of the site (support ticket: suu.edu/irb pulled in all of suu.edu)."""
+    parent = _make_parent("https://www.suu.edu/irb/")
+    parent_fetched = _html_result(parent.url, """
+        <a href="/irb/apply">Apply</a>
+        <a href="/irb/forms/consent">Consent</a>
+        <a href="/irb-archive/2019">Archive</a>
+        <a href="/admissions">Admissions</a>
+        <a href="https://www.suu.edu/">Home</a>
+    """)
+    cls, children = _mock_source_cls()
+
+    with patch.object(knowledge_service, "KnowledgeBaseSource", cls), \
+         patch.object(knowledge_service, "_ingest_url_source",
+                      AsyncMock(return_value=None)):
+        added = await knowledge_service._crawl_from_source(
+            parent, MagicMock(uuid="kb-1"), max_pages=10,
+            allowed_domains="https://www.suu.edu/irb", parent_fetched=parent_fetched,
+        )
+
+    assert added == 2
+    assert [c.url for c in children] == [
+        "https://www.suu.edu/irb/apply",
+        "https://www.suu.edu/irb/forms/consent",
     ]
 
 
