@@ -14,8 +14,7 @@ from copy import deepcopy
 from typing import List, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, create_model, model_validator
-from pydantic_ai import Agent, BinaryContent
-from app.services._json_schema_utils import inline_defs
+from pydantic_ai import Agent, BinaryContent, NativeOutput
 
 from app.models.system_config import DEFAULT_EXTRACTION_CONFIG, _deep_merge
 from app.services.llm_service import (
@@ -729,12 +728,6 @@ class ExtractionEngine:
                     return {"entities": [value]}
                 return value
 
-        def _build_structured_output_schema() -> dict:
-            schema = ExtractionModel.model_json_schema(by_alias=True)
-            if "$defs" in schema:
-                schema = inline_defs(schema)
-            return schema
-
         api_protocol = get_model_api_protocol(model_name, self._sys_cfg)
         structured_retries = 3
 
@@ -749,17 +742,24 @@ class ExtractionEngine:
             model_settings = build_thinking_model_settings(
                 model_name, thinking_override, self._sys_cfg,
             )
-            if api_protocol == "vllm":
-                schema = _build_structured_output_schema()
-                extra_body = dict(model_settings.get("extra_body") or {})
-                extra_body["structured_outputs"] = {"json": schema}
-                model_settings["extra_body"] = extra_body
+            # vLLM enforces JSON schemas server-side through the standard
+            # OpenAI ``response_format`` parameter, which is exactly what
+            # pydantic-ai's NativeOutput mode emits. This works both against
+            # vLLM directly and through OpenAI-compatible gateways. The
+            # previous approach injected vLLM's proprietary
+            # ``structured_outputs`` extra-body field, which gateways drop
+            # silently, quietly losing schema enforcement.
+            output_type = (
+                NativeOutput(ExtractionModel)
+                if api_protocol == "vllm"
+                else ExtractionModel
+            )
 
             model = get_agent_model(model_name, thinking_override=thinking_override, system_config_doc=self._sys_cfg)
             agent = Agent(
                 model,
                 system_prompt=system_prompt,
-                output_type=ExtractionModel,
+                output_type=output_type,
                 retries=structured_retries,
                 output_retries=structured_retries,
             )

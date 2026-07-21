@@ -118,7 +118,7 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
                 type="text"
                 value={allowedDomains}
                 onChange={e => setAllowedDomains(e.target.value)}
-                placeholder="example.com, docs.example.com"
+                placeholder="example.com, example.com/section"
                 style={{
                   width: '100%', padding: '6px 8px', fontSize: 13, fontFamily: 'inherit',
                   backgroundColor: '#2a2a2a', color: '#e5e5e5',
@@ -126,7 +126,8 @@ export function AddUrlsModal({ onSubmit, onClose }: AddUrlsModalProps) {
                 }}
               />
               <div style={{ fontSize: 11, color: '#666' }}>
-                Comma-separated. Defaults to the same domain as the URL.
+                Comma-separated. Include a path (e.g. example.com/irb) to limit the crawl
+                to that section of the site. Defaults to the same domain as the URL.
               </div>
             </div>
           </div>
