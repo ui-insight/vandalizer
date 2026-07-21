@@ -27,7 +27,7 @@ import {
   getTeamDetail, getUserDetail, getUserHistory,
   getWorkflowEvents, getSystemConfig, updateSystemConfig, updateCompliancePolicyConfig,
   addModel, updateModel, deleteModel, setDefaultModel, testOcr, testModel, testPrompt, probeModel, getReadiness, addOAuthProvider,
-  updateOAuthProvider, deleteOAuthProvider, updateAuthMethods,
+  updateOAuthProvider, deleteOAuthProvider, updateAuthMethods, parseSamlMetadata,
   getQualitySummary, getQualityTimeline, runRegressionSuite,
   getQualityAlerts, acknowledgeAlert, getQualityItems, getQualityItemDetail,
   adminListAllTeams, adminCreateTeam, adminAddUserToTeam, adminRemoveUserFromTeam, getIsolatedUsers,
@@ -2784,9 +2784,42 @@ function ConfigTab() {
 
   // Add/edit provider form
   const [showAddProvider, setShowAddProvider] = useState(false)
-  const [newProvider, setNewProvider] = useState({ provider: 'oauth', display_name: '', client_id: '', client_secret: '', redirect_uri: '', tenant_id: '' })
+  const [newProvider, setNewProvider] = useState({ provider: 'oauth', display_name: '', client_id: '', client_secret: '', redirect_uri: '', tenant_id: '', idp_entity_id: '', idp_sso_url: '', idp_x509_cert: '' })
   const [editingProviderIndex, setEditingProviderIndex] = useState<number | null>(null)
-  const [editingProvider, setEditingProvider] = useState({ provider: 'oauth', display_name: '', client_id: '', client_secret: '', redirect_uri: '', tenant_id: '' })
+  const [editingProvider, setEditingProvider] = useState({ provider: 'oauth', display_name: '', client_id: '', client_secret: '', redirect_uri: '', tenant_id: '', idp_entity_id: '', idp_sso_url: '', idp_x509_cert: '' })
+  const [samlMeta, setSamlMeta] = useState('')
+  const [samlMetaBusy, setSamlMetaBusy] = useState(false)
+  const [samlMetaError, setSamlMetaError] = useState('')
+  const [providerError, setProviderError] = useState('')
+
+  /** Return a message if the provider form is missing a required field, else ''. */
+  const providerValidationError = (p: { provider: string; display_name: string; client_id: string; idp_entity_id: string; idp_sso_url: string; idp_x509_cert: string }): string => {
+    if (!p.display_name.trim()) return 'Display name is required.'
+    if (p.provider === 'saml') {
+      if (!p.idp_entity_id.trim() || !p.idp_sso_url.trim() || !p.idp_x509_cert.trim()) {
+        return 'SAML requires the IdP Entity ID, SSO URL, and x509 certificate (use "Fetch & fill" to import them).'
+      }
+    } else if (!p.client_id.trim()) {
+      return 'Client ID is required.'
+    }
+    return ''
+  }
+
+  const handleImportSamlMetadata = async () => {
+    const raw = samlMeta.trim()
+    if (!raw) return
+    setSamlMetaBusy(true)
+    setSamlMetaError('')
+    try {
+      const body = raw.startsWith('<') ? { metadata_xml: raw } : { metadata_url: raw }
+      const idp = await parseSamlMetadata(body)
+      setNewProvider(p => ({ ...p, idp_entity_id: idp.idp_entity_id, idp_sso_url: idp.idp_sso_url, idp_x509_cert: idp.idp_x509_cert }))
+    } catch (e) {
+      setSamlMetaError(e instanceof Error ? e.message : 'Could not read metadata')
+    } finally {
+      setSamlMetaBusy(false)
+    }
+  }
 
   useEffect(() => { void refreshReadiness() }, [refreshReadiness])
 
@@ -3167,16 +3200,19 @@ function ConfigTab() {
   }
 
   const handleAddProvider = async () => {
-    if (!newProvider.display_name || !newProvider.client_id) return
+    const validationError = providerValidationError(newProvider)
+    if (validationError) { setProviderError(validationError); return }
+    setProviderError('')
     try {
       await addOAuthProvider(newProvider as unknown as Record<string, string>)
       // Refresh config
       const c = await getSystemConfig()
       setCfg(c)
-      setNewProvider({ provider: 'oauth', display_name: '', client_id: '', client_secret: '', redirect_uri: '', tenant_id: '' })
+      setNewProvider({ provider: 'oauth', display_name: '', client_id: '', client_secret: '', redirect_uri: '', tenant_id: '', idp_entity_id: '', idp_sso_url: '', idp_x509_cert: '' })
+      setSamlMeta('')
       setShowAddProvider(false)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to add provider')
+      setProviderError(e instanceof Error ? e.message : 'Failed to add provider')
     }
   }
 
@@ -3206,6 +3242,7 @@ function ConfigTab() {
   const handleEditProvider = (index: number) => {
     const p = cfg?.oauth_providers?.[index] as Record<string, unknown> | undefined
     if (!p) return
+    setProviderError('')
     setEditingProviderIndex(index)
     setEditingProvider({
       provider: (p.provider as string) || 'oauth',
@@ -3214,20 +3251,25 @@ function ConfigTab() {
       client_secret: '***',
       redirect_uri: (p.redirect_uri as string) || '',
       tenant_id: (p.tenant_id as string) || '',
+      idp_entity_id: (p.idp_entity_id as string) || '',
+      idp_sso_url: (p.idp_sso_url as string) || '',
+      idp_x509_cert: (p.idp_x509_cert as string) || '',
     })
     setShowAddProvider(false)
   }
 
   const handleUpdateProvider = async () => {
     if (editingProviderIndex === null) return
-    if (!editingProvider.display_name || !editingProvider.client_id) return
+    const validationError = providerValidationError(editingProvider)
+    if (validationError) { setProviderError(validationError); return }
+    setProviderError('')
     try {
       await updateOAuthProvider(editingProviderIndex, editingProvider as unknown as Record<string, string>)
       const c = await getSystemConfig()
       setCfg(c)
       setEditingProviderIndex(null)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to update provider')
+      setProviderError(e instanceof Error ? e.message : 'Failed to update provider')
     }
   }
 
@@ -3841,25 +3883,50 @@ ${playgroundResult.request.user_prompt}`}
                             <label htmlFor={`admin-oauth-edit-${i}-display-name`} style={labelStyle}>Display Name</label>
                             <input id={`admin-oauth-edit-${i}-display-name`} value={editingProvider.display_name} onChange={e => setEditingProvider({ ...editingProvider, display_name: e.target.value })} style={inputStyle} />
                           </div>
-                          <div>
-                            <label htmlFor={`admin-oauth-edit-${i}-client-id`} style={labelStyle}>Client ID</label>
-                            <input id={`admin-oauth-edit-${i}-client-id`} value={editingProvider.client_id} onChange={e => setEditingProvider({ ...editingProvider, client_id: e.target.value })} style={inputStyle} />
-                          </div>
-                          <div>
-                            <label htmlFor={`admin-oauth-edit-${i}-client-secret`} style={labelStyle}>Client Secret</label>
-                            <input id={`admin-oauth-edit-${i}-client-secret`} type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore name="vandalizer-oauth-client-secret-edit" value={editingProvider.client_secret} onChange={e => setEditingProvider({ ...editingProvider, client_secret: e.target.value })} style={inputStyle} placeholder="Leave as *** to keep existing" />
-                          </div>
-                          <div style={{ gridColumn: '1 / -1' }}>
-                            <label htmlFor={`admin-oauth-edit-${i}-redirect-uri`} style={labelStyle}>Redirect URI</label>
-                            <input id={`admin-oauth-edit-${i}-redirect-uri`} value={editingProvider.redirect_uri} onChange={e => setEditingProvider({ ...editingProvider, redirect_uri: e.target.value })} style={inputStyle} />
-                          </div>
+                          {editingProvider.provider !== 'saml' && (
+                            <>
+                              <div>
+                                <label htmlFor={`admin-oauth-edit-${i}-client-id`} style={labelStyle}>Client ID</label>
+                                <input id={`admin-oauth-edit-${i}-client-id`} value={editingProvider.client_id} onChange={e => setEditingProvider({ ...editingProvider, client_id: e.target.value })} style={inputStyle} />
+                              </div>
+                              <div>
+                                <label htmlFor={`admin-oauth-edit-${i}-client-secret`} style={labelStyle}>Client Secret</label>
+                                <input id={`admin-oauth-edit-${i}-client-secret`} type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore name="vandalizer-oauth-client-secret-edit" value={editingProvider.client_secret} onChange={e => setEditingProvider({ ...editingProvider, client_secret: e.target.value })} style={inputStyle} placeholder="Leave as *** to keep existing" />
+                              </div>
+                              <div style={{ gridColumn: '1 / -1' }}>
+                                <label htmlFor={`admin-oauth-edit-${i}-redirect-uri`} style={labelStyle}>Redirect URI</label>
+                                <input id={`admin-oauth-edit-${i}-redirect-uri`} value={editingProvider.redirect_uri} onChange={e => setEditingProvider({ ...editingProvider, redirect_uri: e.target.value })} style={inputStyle} />
+                              </div>
+                            </>
+                          )}
                           {editingProvider.provider === 'azure' && (
                             <div style={{ gridColumn: '1 / -1' }}>
                               <label htmlFor={`admin-oauth-edit-${i}-tenant-id`} style={labelStyle}>Tenant ID</label>
                               <input id={`admin-oauth-edit-${i}-tenant-id`} value={editingProvider.tenant_id} onChange={e => setEditingProvider({ ...editingProvider, tenant_id: e.target.value })} style={inputStyle} />
                             </div>
                           )}
+                          {editingProvider.provider === 'saml' && (
+                            <>
+                              <div style={{ gridColumn: '1 / -1' }}>
+                                <label htmlFor={`admin-oauth-edit-${i}-idp-entity`} style={labelStyle}>IdP Entity ID</label>
+                                <input id={`admin-oauth-edit-${i}-idp-entity`} value={editingProvider.idp_entity_id} onChange={e => setEditingProvider({ ...editingProvider, idp_entity_id: e.target.value })} style={inputStyle} />
+                              </div>
+                              <div style={{ gridColumn: '1 / -1' }}>
+                                <label htmlFor={`admin-oauth-edit-${i}-idp-sso`} style={labelStyle}>IdP SSO URL</label>
+                                <input id={`admin-oauth-edit-${i}-idp-sso`} value={editingProvider.idp_sso_url} onChange={e => setEditingProvider({ ...editingProvider, idp_sso_url: e.target.value })} style={inputStyle} />
+                              </div>
+                              <div style={{ gridColumn: '1 / -1' }}>
+                                <label htmlFor={`admin-oauth-edit-${i}-idp-cert`} style={labelStyle}>IdP x509 Certificate</label>
+                                <textarea id={`admin-oauth-edit-${i}-idp-cert`} value={editingProvider.idp_x509_cert} onChange={e => setEditingProvider({ ...editingProvider, idp_x509_cert: e.target.value })} style={{ ...inputStyle, minHeight: 90, fontFamily: 'monospace', fontSize: 11 }} />
+                              </div>
+                            </>
+                          )}
                         </div>
+                        {providerError && (
+                          <div role="alert" style={{ marginTop: 10, padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--ui-radius, 12px)', color: '#b91c1c', fontSize: 13 }}>
+                            {providerError}
+                          </div>
+                        )}
                         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                           <button
                             onClick={handleUpdateProvider}
@@ -3909,25 +3976,75 @@ ${playgroundResult.request.user_prompt}`}
                     <label style={labelStyle}>Display Name</label>
                     <input value={newProvider.display_name} onChange={e => setNewProvider({ ...newProvider, display_name: e.target.value })} style={inputStyle} />
                   </div>
-                  <div>
-                    <label style={labelStyle}>Client ID</label>
-                    <input value={newProvider.client_id} onChange={e => setNewProvider({ ...newProvider, client_id: e.target.value })} style={inputStyle} />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Client Secret</label>
-                    <input type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore name="vandalizer-oauth-client-secret-new" value={newProvider.client_secret} onChange={e => setNewProvider({ ...newProvider, client_secret: e.target.value })} style={inputStyle} />
-                  </div>
-                  <div style={{ gridColumn: '1 / -1' }}>
-                    <label style={labelStyle}>Redirect URI (set automatically; register this in your identity provider)</label>
-                    <input value={`${window.location.origin}/api/auth/oauth/azure/callback`} readOnly style={{ ...inputStyle, opacity: 0.7, cursor: 'default' }} />
-                  </div>
+                  {newProvider.provider !== 'saml' && (
+                    <>
+                      <div>
+                        <label style={labelStyle}>Client ID</label>
+                        <input value={newProvider.client_id} onChange={e => setNewProvider({ ...newProvider, client_id: e.target.value })} style={inputStyle} />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>Client Secret</label>
+                        <input type="password" autoComplete="new-password" data-1p-ignore data-lpignore="true" data-bwignore name="vandalizer-oauth-client-secret-new" value={newProvider.client_secret} onChange={e => setNewProvider({ ...newProvider, client_secret: e.target.value })} style={inputStyle} />
+                      </div>
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={labelStyle}>Redirect URI (set automatically; register this in your identity provider)</label>
+                        <input value={`${window.location.origin}/api/auth/oauth/azure/callback`} readOnly style={{ ...inputStyle, opacity: 0.7, cursor: 'default' }} />
+                      </div>
+                    </>
+                  )}
                   {newProvider.provider === 'azure' && (
                     <div style={{ gridColumn: '1 / -1' }}>
                       <label style={labelStyle}>Tenant ID</label>
                       <input value={newProvider.tenant_id} onChange={e => setNewProvider({ ...newProvider, tenant_id: e.target.value })} style={inputStyle} />
                     </div>
                   )}
+                  {newProvider.provider === 'saml' && (
+                    <>
+                      <div style={{ gridColumn: '1 / -1', padding: 10, background: '#eef2ff', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #c7d2fe' }}>
+                        <label style={labelStyle}>Import from IdP metadata (URL or paste XML) — auto-fills the fields below</label>
+                        <textarea
+                          value={samlMeta}
+                          onChange={e => setSamlMeta(e.target.value)}
+                          placeholder="https://idp.example.edu/idp/shibboleth  — or paste the metadata XML"
+                          style={{ ...inputStyle, minHeight: 44 }}
+                        />
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                          <button
+                            type="button"
+                            onClick={handleImportSamlMetadata}
+                            disabled={samlMetaBusy || !samlMeta.trim()}
+                            style={{ padding: '6px 12px', borderRadius: 'var(--ui-radius, 12px)', border: '1px solid #6366f1', background: '#fff', color: '#4338ca', fontSize: 12, fontWeight: 600, cursor: samlMetaBusy || !samlMeta.trim() ? 'not-allowed' : 'pointer', opacity: samlMetaBusy || !samlMeta.trim() ? 0.6 : 1 }}
+                          >
+                            {samlMetaBusy ? 'Reading…' : 'Fetch & fill'}
+                          </button>
+                          {samlMetaError && <span role="alert" style={{ fontSize: 12, color: '#b91c1c' }}>{samlMetaError}</span>}
+                        </div>
+                      </div>
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={labelStyle}>IdP Entity ID</label>
+                        <input value={newProvider.idp_entity_id} onChange={e => setNewProvider({ ...newProvider, idp_entity_id: e.target.value })} style={inputStyle} placeholder="https://idp.example.edu/idp/shibboleth" />
+                      </div>
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={labelStyle}>IdP SSO URL</label>
+                        <input value={newProvider.idp_sso_url} onChange={e => setNewProvider({ ...newProvider, idp_sso_url: e.target.value })} style={inputStyle} placeholder="https://idp.example.edu/idp/profile/SAML2/Redirect/SSO" />
+                      </div>
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={labelStyle}>IdP x509 Certificate</label>
+                        <textarea value={newProvider.idp_x509_cert} onChange={e => setNewProvider({ ...newProvider, idp_x509_cert: e.target.value })} style={{ ...inputStyle, minHeight: 90, fontFamily: 'monospace', fontSize: 11 }} placeholder="-----BEGIN CERTIFICATE-----" />
+                      </div>
+                      <div style={{ gridColumn: '1 / -1' }}>
+                        <label style={labelStyle}>Service Provider details (give these to your IdP administrator)</label>
+                        <input value={`${window.location.origin}/api/auth/saml/metadata`} readOnly style={{ ...inputStyle, opacity: 0.7, cursor: 'default' }} />
+                        <input value={`${window.location.origin}/api/auth/saml/acs`} readOnly style={{ ...inputStyle, opacity: 0.7, cursor: 'default', marginTop: 6 }} />
+                      </div>
+                    </>
+                  )}
                 </div>
+                {providerError && (
+                  <div role="alert" style={{ marginTop: 10, padding: '8px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--ui-radius, 12px)', color: '#b91c1c', fontSize: 13 }}>
+                    {providerError}
+                  </div>
+                )}
                 <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                   <button
                     onClick={handleAddProvider}

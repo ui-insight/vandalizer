@@ -5,7 +5,7 @@ import {
   FileText, Filter, Outdent, Globe, Image, Code,
   Bug, Search, Zap, Download, Package, CheckCircle, XCircle,
   MousePointerClick, PenTool, ClipboardCheck, Flag,
-  ChevronDown, ChevronRight, ArrowUp, ArrowDown,
+  ChevronDown, ChevronRight, ArrowUp, ArrowDown, GripVertical,
   Circle, Hand, Keyboard, Sparkles, ShieldCheck, Type,
   ArrowRight, Pause, TrendingUp, RefreshCw,
   Upload, Clock, Copy, Check, FolderInput, Link2, Info, AlertTriangle,
@@ -47,6 +47,7 @@ import { listItems as listSearchSetItems, suggestFields, getSearchSet } from '..
 import { useWorkflowRunner } from '../../hooks/useWorkflowRunner'
 import { ApiError } from '../../api/client'
 import { MAX_NAME_LENGTH, normalizeName } from '../../utils/nameValidation'
+import { computeReorderedIds } from '../../utils/reorder'
 import type { Workflow, WorkflowStep, WorkflowTask, WorkflowStatus, WorkflowCitation, ModelInfo, SearchSetItem } from '../../types/workflow'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
 import DOMPurify from 'dompurify'
@@ -527,6 +528,17 @@ export function WorkflowEditorPanel() {
     refresh()
   }
 
+  // Drag-and-drop reorder: move dragId to sit before/after targetId. Operates
+  // on the full steps array (including hidden empty "Document" trigger steps)
+  // so hidden steps keep their position in the persisted order.
+  const handleDropStep = async (dragId: string, targetId: string, position: 'before' | 'after') => {
+    if (!workflow || !openWorkflowId) return
+    const ids = computeReorderedIds(workflow.steps.map(s => s.id), dragId, targetId, position)
+    if (!ids) return
+    await reorderSteps(openWorkflowId, ids)
+    refresh()
+  }
+
   const isTextInput = workflow?.input_config?.trigger_type === 'text_input'
   const isNoInput = workflow?.input_config?.trigger_type === 'no_input'
   // Whether the run is blocked for lack of required input. "No input"
@@ -856,6 +868,7 @@ export function WorkflowEditorPanel() {
               onClickStep={setEditingStepId}
               onAddStep={() => { setNewStepName(''); setShowNewStepModal(true) }}
               onMoveStep={handleMoveStep}
+              onDropStep={handleDropStep}
               canManage={canManage}
             />
             {/* Quality Pulse card */}
@@ -1280,6 +1293,7 @@ function DesignCanvas({
   onClickStep,
   onAddStep,
   onMoveStep,
+  onDropStep,
   canManage,
 }: {
   workflow: Workflow
@@ -1294,8 +1308,13 @@ function DesignCanvas({
   onClickStep: (stepId: string) => void
   onAddStep: () => void
   onMoveStep: (stepIndex: number, direction: 'up' | 'down') => void
+  onDropStep: (dragId: string, targetId: string, position: 'before' | 'after') => void
   canManage: boolean
 }) {
+  const [draggingStepId, setDraggingStepId] = useState<string | null>(null)
+  const [dropTarget, setDropTarget] = useState<{ stepId: string; position: 'before' | 'after' } | null>(null)
+  const canDrag = canManage && !runnerRunning
+
   return (
     <div style={{
       ...checkerboardBg,
@@ -1362,8 +1381,36 @@ function DesignCanvas({
           .filter(({ step }) => !(step.name === 'Document' && step.tasks.length === 0))
         const hasExplicitOutput = visibleSteps.some(({ step }) => step.is_output)
         const lastDisplayIdx = visibleSteps.length - 1
+        // Insertion point relative to the hovered card's midpoint (used by
+        // both dragover highlight and drop).
+        const dropPositionFor = (e: React.DragEvent<HTMLDivElement>): 'before' | 'after' => {
+          const rect = e.currentTarget.getBoundingClientRect()
+          return e.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
+        }
         return visibleSteps.map(({ step, originalIdx }, displayIdx) => (
-          <div key={step.id}>
+          <div
+            key={step.id}
+            onDragOver={(e) => {
+              if (!draggingStepId || draggingStepId === step.id) return
+              e.preventDefault()
+              e.dataTransfer.dropEffect = 'move'
+              const position = dropPositionFor(e)
+              setDropTarget(prev =>
+                prev?.stepId === step.id && prev.position === position ? prev : { stepId: step.id, position })
+            }}
+            onDragLeave={(e) => {
+              // Ignore transitions between this wrapper's own children
+              if (e.currentTarget.contains(e.relatedTarget as Node)) return
+              setDropTarget(prev => (prev?.stepId === step.id ? null : prev))
+            }}
+            onDrop={(e) => {
+              if (!draggingStepId || draggingStepId === step.id) return
+              e.preventDefault()
+              onDropStep(draggingStepId, step.id, dropPositionFor(e))
+              setDraggingStepId(null)
+              setDropTarget(null)
+            }}
+          >
             <ConnectionLine />
             <StepCard
               step={step}
@@ -1374,6 +1421,11 @@ function DesignCanvas({
               onClick={() => onClickStep(step.id)}
               onMoveUp={() => onMoveStep(originalIdx, 'up')}
               onMoveDown={() => onMoveStep(originalIdx, 'down')}
+              draggable={canDrag}
+              isDragging={draggingStepId === step.id}
+              dropIndicator={dropTarget?.stepId === step.id ? dropTarget.position : null}
+              onDragStart={() => setDraggingStepId(step.id)}
+              onDragEnd={() => { setDraggingStepId(null); setDropTarget(null) }}
             />
           </div>
         ))
@@ -1470,7 +1522,7 @@ function Connector({ position }: { position: 'top' | 'bottom' }) {
 // Step card
 // ---------------------------------------------------------------------------
 
-function StepCard({ step, index, totalSteps, isImplicitOutput, isActive, onClick, onMoveUp, onMoveDown }: {
+function StepCard({ step, index, totalSteps, isImplicitOutput, isActive, onClick, onMoveUp, onMoveDown, draggable, isDragging, dropIndicator, onDragStart, onDragEnd }: {
   step: WorkflowStep
   index: number
   totalSteps: number
@@ -1479,11 +1531,18 @@ function StepCard({ step, index, totalSteps, isImplicitOutput, isActive, onClick
   onClick: () => void
   onMoveUp: () => void
   onMoveDown: () => void
+  draggable: boolean
+  isDragging: boolean
+  dropIndicator: 'before' | 'after' | null
+  onDragStart: () => void
+  onDragEnd: () => void
 }) {
   const isExplicitOutput = step.is_output
   const isDeliverable = isExplicitOutput || isImplicitOutput
+  const cardRef = useRef<HTMLDivElement>(null)
   return (
     <div
+      ref={cardRef}
       onClick={onClick}
       style={{
         position: 'relative',
@@ -1499,11 +1558,49 @@ function StepCard({ step, index, totalSteps, isImplicitOutput, isActive, onClick
             : '2px solid transparent',
         transition: 'border-color 0.2s',
         marginTop: 10, marginBottom: 10,
+        opacity: isDragging ? 0.4 : 1,
       }}
     >
       <Connector position="top" />
       <Connector position="bottom" />
+      {dropIndicator && (
+        <div style={{
+          position: 'absolute', left: 8, right: 8,
+          [dropIndicator === 'before' ? 'top' : 'bottom']: -8,
+          height: 4, borderRadius: 2,
+          backgroundColor: 'var(--highlight-color, #eab308)',
+          pointerEvents: 'none',
+        }} />
+      )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        {draggable && (
+          <div
+            draggable
+            aria-label="Drag to reorder step"
+            title="Drag to reorder"
+            onClick={e => e.stopPropagation()}
+            onDragStart={(e) => {
+              e.stopPropagation()
+              e.dataTransfer.effectAllowed = 'move'
+              // Custom type: document drop zones in this file read text/plain
+              // as a doc uuid, so a step drag must not populate it.
+              e.dataTransfer.setData('application/x-vandalizer-step', step.id)
+              if (cardRef.current) {
+                const rect = cardRef.current.getBoundingClientRect()
+                e.dataTransfer.setDragImage(cardRef.current, e.clientX - rect.left, e.clientY - rect.top)
+              }
+              onDragStart()
+            }}
+            onDragEnd={onDragEnd}
+            style={{
+              display: 'flex', alignItems: 'center', cursor: 'grab',
+              color: isExplicitOutput ? 'rgba(255,255,255,0.4)' : '#d1d5db',
+              flexShrink: 0, marginLeft: -6, marginRight: -6,
+            }}
+          >
+            <GripVertical style={{ width: 16, height: 16 }} />
+          </div>
+        )}
         <div style={{
           width: 36, height: 36, borderRadius: 6,
           backgroundColor: isExplicitOutput ? 'rgba(255,255,255,0.2)' : isImplicitOutput ? '#ede9fe' : '#f3f4f6',
