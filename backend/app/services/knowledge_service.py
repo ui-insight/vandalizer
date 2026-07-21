@@ -954,18 +954,13 @@ async def _crawl_from_source(
     parent_fetched: WebFetchResult,
 ) -> int:
     """BFS crawl from parent URL, creating child sources. Returns count added."""
-    from urllib.parse import urlparse
+    from app.utils.crawl_scope import parse_crawl_scope, url_in_crawl_scope
 
     max_pages = max(1, min(max_pages, 50))
 
-    # Build allowed domain set
-    parent_domain = urlparse(parent.url).netloc.lower()
-    domain_set: set[str] = {parent_domain}
-    if allowed_domains:
-        for d in allowed_domains.split(","):
-            d = d.strip().lower()
-            if d:
-                domain_set.add(d)
+    # Explicit allowed-domains entries (which may carry path prefixes) define
+    # the scope; blank falls back to the parent URL's whole domain.
+    scope = parse_crawl_scope(allowed_domains, parent.url)
 
     parent_normalized = _normalize_crawl_url(parent.url)
     visited: set[str] = {parent_normalized}
@@ -976,13 +971,11 @@ async def _crawl_from_source(
     seed_links = _crawlable_links(parent_fetched, parent.url)
     logger.info(f"Crawl: found {len(seed_links)} links on parent page {parent.url}")
     for link in seed_links:
-        if link not in visited:
-            parsed = urlparse(link)
-            if parsed.netloc.lower() in domain_set:
-                queue.append(link)
-                visited.add(link)
+        if link not in visited and url_in_crawl_scope(link, scope):
+            queue.append(link)
+            visited.add(link)
 
-    logger.info(f"Crawl: {len(queue)} same-domain links queued (max_pages={max_pages}, domains={domain_set})")
+    logger.info(f"Crawl: {len(queue)} in-scope links queued (max_pages={max_pages}, scope={scope})")
 
     crawled_urls: list[str] = []
 
@@ -1014,11 +1007,9 @@ async def _crawl_from_source(
         # Extract more links from this page for BFS
         if child_fetched and added < max_pages:
             for link in _crawlable_links(child_fetched, url):
-                if link not in visited:
-                    parsed = urlparse(link)
-                    if parsed.netloc.lower() in domain_set:
-                        queue.append(link)
-                        visited.add(link)
+                if link not in visited and url_in_crawl_scope(link, scope):
+                    queue.append(link)
+                    visited.add(link)
 
     # Update parent with crawled URL list
     parent.crawled_urls = crawled_urls

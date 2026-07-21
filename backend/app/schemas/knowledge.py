@@ -47,7 +47,7 @@ class AddUrlsRequest(BaseModel):
     urls: list[str]
     crawl_enabled: bool = False
     max_crawl_pages: int = 5
-    allowed_domains: str = ""  # comma-separated
+    allowed_domains: str = ""  # comma-separated hosts, optionally with path prefixes (example.com/irb)
 
 
 class KBSourceResponse(BaseModel):
