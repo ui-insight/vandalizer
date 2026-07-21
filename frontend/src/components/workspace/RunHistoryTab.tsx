@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { CheckCircle, XCircle, Loader2, Clock, FileText, ChevronDown, ChevronRight, Zap } from 'lucide-react'
+import { CheckCircle, XCircle, Loader2, Clock, FileText, ChevronDown, ChevronRight, Zap, Download } from 'lucide-react'
+import DOMPurify from 'dompurify'
+import { marked } from 'marked'
 import { relativeTime } from '../../utils/time'
+import { getWorkflowStatus, downloadResults } from '../../api/workflows'
 
 export interface HistoryRun {
   id: string
@@ -67,9 +70,136 @@ function ResultPreview({ snapshot, type }: { snapshot: Record<string, unknown>; 
   )
 }
 
+// Same markdown pipeline the run panel uses for live results, so a historical
+// run reads identically to the run that produced it.
+function renderMarkdownOutput(data: unknown): string {
+  if (data === null || data === undefined) return ''
+  let md: string
+  if (typeof data === 'string') {
+    md = data
+  } else {
+    try { md = '```json\n' + JSON.stringify(data, null, 2) + '\n```' } catch { md = String(data) }
+  }
+  return DOMPurify.sanitize(marked.parse(md) as string)
+}
+
+const DOWNLOAD_FORMATS = [
+  { fmt: 'json', label: 'JSON', desc: 'Structured data', parseStructured: false },
+  { fmt: 'csv', label: 'CSV', desc: 'Spreadsheet format', parseStructured: false },
+  { fmt: 'csv', label: 'CSV (parse structured)', desc: 'Detect JSON/tables in prompt output', parseStructured: true },
+  { fmt: 'pdf', label: 'PDF', desc: 'Printable report', parseStructured: false },
+  { fmt: 'docx', label: 'Word (.docx)', desc: 'Editable document', parseStructured: false },
+  { fmt: 'text', label: 'Plain Text', desc: 'Raw text output', parseStructured: false },
+] as const
+
+// Historical workflow runs don't carry their output in the history payload
+// (it can be arbitrarily large) — fetch it from the persisted WorkflowResult
+// by session_id when the row is first expanded.
+function WorkflowRunOutput({ sessionId }: { sessionId: string }) {
+  const [loading, setLoading] = useState(true)
+  const [unavailable, setUnavailable] = useState(false)
+  const [output, setOutput] = useState<unknown>(null)
+  const [showDownload, setShowDownload] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    getWorkflowStatus(sessionId)
+      .then(status => {
+        if (cancelled) return
+        const fo = status?.final_output as Record<string, unknown> | null
+        setOutput(fo && typeof fo === 'object' && 'output' in fo ? fo.output : fo)
+        setLoading(false)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setUnavailable(true)
+        setLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [sessionId])
+
+  if (loading) {
+    return (
+      <div role="status" aria-label="Loading run output" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 12, color: '#6b7280' }}>
+        <Loader2 style={{ width: 12, height: 12, animation: 'spin 1s linear infinite' }} />
+        Loading output...
+      </div>
+    )
+  }
+
+  if (unavailable || output == null) {
+    return (
+      <div style={{ marginTop: 8, fontSize: 12, color: '#9ca3af' }}>
+        Output is no longer available for this run.
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <div
+        className="chat-markdown"
+        style={{
+          backgroundColor: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 6,
+          padding: 12, fontSize: 13, lineHeight: 1.6,
+          maxHeight: '50vh', overflowY: 'auto', overflowX: 'auto',
+          color: '#374151', wordBreak: 'break-word',
+        }}
+        dangerouslySetInnerHTML={{ __html: renderMarkdownOutput(output) }}
+      />
+      <div style={{ position: 'relative', display: 'inline-block', marginTop: 8 }}>
+        <button
+          onClick={() => setShowDownload(s => !s)}
+          aria-expanded={showDownload}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px',
+            fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+            border: '1px solid #d1d5db', borderRadius: 6,
+            backgroundColor: '#fff', cursor: 'pointer', color: '#374151',
+          }}
+        >
+          <Download style={{ width: 12, height: 12 }} />
+          Download
+        </button>
+        {showDownload && (
+          <div style={{
+            position: 'absolute', bottom: '100%', left: 0, marginBottom: 4,
+            backgroundColor: '#fff', border: '1px solid #e5e7eb', borderRadius: 8,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 10, minWidth: 200,
+            padding: '4px 0',
+          }}>
+            {DOWNLOAD_FORMATS.map(({ fmt, label, desc, parseStructured }) => (
+              <a
+                key={label}
+                href={downloadResults(sessionId, fmt, { parseStructured })}
+                onClick={() => setShowDownload(false)}
+                style={{
+                  display: 'flex', flexDirection: 'column', gap: 1,
+                  padding: '8px 14px', fontSize: 13, fontWeight: 500,
+                  color: '#374151', textDecoration: 'none',
+                  transition: 'background-color 0.1s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#f3f4f6' }}
+                onMouseLeave={e => { e.currentTarget.style.backgroundColor = '#fff' }}
+              >
+                <span>{label}</span>
+                <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 400 }}>{desc}</span>
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function RunRow({ run, type }: { run: HistoryRun; type: 'workflow' | 'extraction' }) {
   const [expanded, setExpanded] = useState(false)
-  const hasResults = run.result_snapshot && Object.keys(run.result_snapshot).length > 0
+  const hasSnapshot = run.result_snapshot && Object.keys(run.result_snapshot).length > 0
+  // Workflow runs don't snapshot their output into the history payload — the
+  // full result is fetched by session_id on expand instead.
+  const canFetchOutput = type === 'workflow' && run.status === 'completed' && !!run.session_id
+  const hasResults = hasSnapshot || canFetchOutput
 
   return (
     <div style={{
@@ -77,6 +207,7 @@ function RunRow({ run, type }: { run: HistoryRun; type: 'workflow' | 'extraction
     }}>
       <button
         onClick={() => hasResults && setExpanded(e => !e)}
+        aria-expanded={hasResults ? expanded : undefined}
         style={{
           width: '100%',
           display: 'flex',
@@ -151,7 +282,9 @@ function RunRow({ run, type }: { run: HistoryRun; type: 'workflow' | 'extraction
 
       {expanded && hasResults && (
         <div style={{ padding: '0 24px 12px 48px' }}>
-          <ResultPreview snapshot={run.result_snapshot} type={type} />
+          {canFetchOutput
+            ? <WorkflowRunOutput sessionId={run.session_id!} />
+            : <ResultPreview snapshot={run.result_snapshot} type={type} />}
         </div>
       )}
     </div>
