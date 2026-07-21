@@ -3533,7 +3533,7 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                     type="text"
                     value={getTextValue('allowed_domains')}
                     onChange={e => setTextValue('allowed_domains', e.target.value)}
-                    placeholder="example.com, docs.example.com"
+                    placeholder="example.com, example.com/section"
                     style={{
                       width: '100%', padding: '8px 12px', fontSize: 13,
                       fontFamily: 'inherit', border: '1px solid #d1d5db', borderRadius: 6,
@@ -3541,7 +3541,8 @@ function TaskEditModal({ task, selectedDocUuids, workflow, workflowId, onClose, 
                     }}
                   />
                   <div style={{ fontSize: 11, color: '#6b7280', marginTop: 4 }}>
-                    Comma-separated list. Defaults to the starting URL's domain.
+                    Comma-separated list. Include a path (e.g. example.com/docs) to limit
+                    the crawl to that section. Defaults to the starting URL's domain.
                   </div>
                 </div>
               </div>
