@@ -378,29 +378,41 @@ export function LibraryTab() {
     }
   }
 
-  // Edit modal state (prompts / formatters)
+  // Preview/Edit modal state (prompts / formatters). A row click opens the
+  // modal in 'preview' (read-only body + Use in Assistant); the row menu's
+  // Edit opens straight to 'edit'.
   const [editingItem, setEditingItem] = useState<import('../../types/library').LibraryItem | null>(null)
+  const [editMode, setEditMode] = useState<'preview' | 'edit'>('preview')
   const [editTitle, setEditTitle] = useState('')
   const [editContent, setEditContent] = useState('')
   const [editItemId, setEditItemId] = useState<string | null>(null) // SearchSetItem ID
+  const [editLoading, setEditLoading] = useState(false)
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
 
-  const openEditModal = async (item: import('../../types/library').LibraryItem) => {
+  const openPromptModal = async (item: import('../../types/library').LibraryItem, mode: 'preview' | 'edit') => {
     setEditingItem(item)
+    setEditMode(mode)
     setEditTitle(item.name)
+    // Freshly created prompts keep their body in extraction_config.content
+    // (surfaced as `description`); edited ones store it on
+    // SearchSetItem.searchphrase. Show the description while the
+    // authoritative searchphrase loads.
     setEditContent(item.description || '')
     setEditError(null)
     setEditItemId(null)
-    // Load the SearchSetItem content (the actual prompt text)
     if (item.item_uuid) {
+      setEditLoading(true)
       try {
         const items = await listSearchSetItems(item.item_uuid)
         if (items.length > 0) {
-          setEditContent(items[0].searchphrase)
           setEditItemId(items[0].id)
+          if (items[0].searchphrase?.trim() || !(item.description || '').trim()) {
+            setEditContent(items[0].searchphrase)
+          }
         }
-      } catch { /* ignore */ }
+      } catch { /* ignore — keep the description fallback */ }
+      setEditLoading(false)
     }
   }
 
@@ -410,6 +422,21 @@ export function LibraryTab() {
     setEditContent('')
     setEditItemId(null)
     setEditError(null)
+  }
+
+  const markUsed = (libraryItemId: string) => {
+    touchItem(libraryItemId).then(() => refreshItems()).catch(() => {})
+  }
+
+  const usePromptInAssistant = () => {
+    if (!editingItem) return
+    const content = editContent.trim()
+    if (!content) return
+    markUsed(editingItem.id)
+    const docs = selectedDocUuids
+    const folderUuids = selectedFolderUuids
+    closeEditModal()
+    sendChatMessage(content, { documentUuids: docs, folderUuids })
   }
 
   const handleEditSave = async () => {
@@ -1232,57 +1259,22 @@ export function LibraryTab() {
                   onClone={handleClone}
                   onShare={handleShare}
                   onRemove={handleRemove}
-                  onEdit={openEditModal}
+                  onEdit={(it) => openPromptModal(it, 'edit')}
                   onMoveToFolder={handleMoveToFolder}
                   folders={folders}
                   qualityTier={item.quality_tier}
                   qualityScore={item.quality_score}
-                  onOpen={async (it) => {
-                    touchItem(it.id).then(() => refreshItems()).catch(() => {})
+                  onOpen={(it) => {
                     if (it.kind === 'workflow') {
+                      markUsed(it.id)
                       openWorkflow(it.item_id)
                     } else if (it.set_type === 'prompt' || it.set_type === 'formatter') {
-                      // Capture selection synchronously so an awaited fetch
-                      // below can't lose it to a tab-swap remount.
-                      const docs = selectedDocUuids
-                      const folders = selectedFolderUuids
-                      // Edited prompts store their body on SearchSetItem.searchphrase;
-                      // freshly created ones store it in extraction_config.content
-                      // (surfaced as `description`). Try searchphrase first.
-                      let content = ''
-                      let source = 'none'
-                      if (it.item_uuid) {
-                        try {
-                          const items = await listSearchSetItems(it.item_uuid)
-                          if (items.length > 0 && items[0].searchphrase?.trim()) {
-                            content = items[0].searchphrase.trim()
-                            source = 'searchphrase'
-                          }
-                        } catch { /* ignore */ }
-                      }
-                      if (!content && (it.description || '').trim()) {
-                        content = (it.description || '').trim()
-                        source = 'description'
-                      }
-                      console.debug('[Library] launching prompt', {
-                        name: it.name,
-                        item_uuid: it.item_uuid,
-                        set_type: it.set_type,
-                        source,
-                        contentLength: content.length,
-                      })
-                      if (!content) {
-                        toast(
-                          `"${it.name}" has no prompt body — open it from the menu and add one.`,
-                          'error',
-                        )
-                        return
-                      }
-                      sendChatMessage(content, {
-                        documentUuids: docs,
-                        folderUuids: folders,
-                      })
+                      // Preview first — the prompt only launches into the
+                      // Assistant (an LLM call) from the modal's Use button,
+                      // which is also what bumps last-used.
+                      openPromptModal(it, 'preview')
                     } else if (it.set_type === 'extraction' && it.item_uuid) {
+                      markUsed(it.id)
                       openExtraction(it.item_uuid)
                     }
                   }}
@@ -1451,7 +1443,7 @@ export function LibraryTab() {
         </div>
       )}
 
-      {/* Edit Modal (prompts / formatters) */}
+      {/* Preview / Edit Modal (prompts / formatters) */}
       {editingItem && (
         <div
           style={{
@@ -1477,6 +1469,89 @@ export function LibraryTab() {
               boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
             }}
           >
+            {editMode === 'preview' ? (
+              <>
+                <h2 style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 600, color: '#202124', overflowWrap: 'anywhere' }}>
+                  {editingItem.name}
+                </h2>
+                <div style={{ fontSize: 12, color: '#70757a', marginBottom: 16 }}>
+                  {editingItem.set_type === 'formatter' ? 'Formatter' : 'Prompt'}
+                </div>
+                <div
+                  style={{
+                    marginBottom: 20,
+                    padding: '12px 14px',
+                    fontSize: 14,
+                    lineHeight: 1.5,
+                    color: !editLoading && editContent.trim() ? '#3c4043' : '#9aa0a6',
+                    backgroundColor: '#f8f9fa',
+                    border: '1px solid #e8eaed',
+                    borderRadius: 8,
+                    whiteSpace: 'pre-wrap',
+                    overflowWrap: 'anywhere',
+                    maxHeight: '45vh',
+                    overflowY: 'auto',
+                  }}
+                >
+                  {editLoading
+                    ? 'Loading…'
+                    : editContent.trim()
+                      ? editContent
+                      : `This ${editingItem.set_type === 'formatter' ? 'formatter' : 'prompt'} has no content yet — click Edit to add some.`}
+                </div>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button
+                    onClick={usePromptInAssistant}
+                    disabled={editLoading || !editContent.trim()}
+                    style={{
+                      padding: '10px 20px',
+                      fontSize: 14,
+                      fontWeight: 700,
+                      fontFamily: 'inherit',
+                      borderRadius: 8,
+                      border: 'none',
+                      backgroundColor: 'var(--highlight-color, #eab308)',
+                      color: 'var(--highlight-text-color, #000)',
+                      cursor: editLoading || !editContent.trim() ? 'not-allowed' : 'pointer',
+                      opacity: editLoading || !editContent.trim() ? 0.5 : 1,
+                    }}
+                  >
+                    Use in Assistant
+                  </button>
+                  <button
+                    onClick={() => setEditMode('edit')}
+                    style={{
+                      padding: '10px 20px',
+                      fontSize: 14,
+                      fontFamily: 'inherit',
+                      borderRadius: 8,
+                      border: '1px solid #dadce0',
+                      backgroundColor: '#fff',
+                      color: '#5f6368',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={closeEditModal}
+                    style={{
+                      padding: '10px 20px',
+                      fontSize: 14,
+                      fontFamily: 'inherit',
+                      borderRadius: 8,
+                      border: '1px solid #dadce0',
+                      backgroundColor: '#fff',
+                      color: '#5f6368',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Close
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
             <h2 style={{ margin: '0 0 20px', fontSize: 20, fontWeight: 600, color: '#202124' }}>
               Edit {editingItem.set_type === 'formatter' ? 'Formatter' : 'Prompt'}
             </h2>
@@ -1559,6 +1634,8 @@ export function LibraryTab() {
                 Cancel
               </button>
             </div>
+              </>
+            )}
           </div>
         </div>
       )}
