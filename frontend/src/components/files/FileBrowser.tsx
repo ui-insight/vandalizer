@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState, useRef, useEffect, type DragEvent } from 'react'
-import { Plus, Folder as FolderIcon, Upload, Trash2, Download } from 'lucide-react'
+import { Plus, Folder as FolderIcon, Upload, Trash2, Download, FolderInput } from 'lucide-react'
 import { useTeams } from '../../hooks/useTeams'
 import { useDocuments } from '../../hooks/useDocuments'
 import { useBreadcrumbs } from '../../hooks/useFolders'
@@ -12,6 +12,7 @@ import { ContextMenu } from './ContextMenu'
 import { RenameDialog } from './RenameDialog'
 import { CreateFolderDialog } from './CreateFolderDialog'
 import { MoveFolderDialog } from './MoveFolderDialog'
+import { MoveFileDialog } from './MoveFileDialog'
 import { useConfirm } from '../shared/useConfirm'
 import { useToast } from '../../contexts/ToastContext'
 import { deleteFile, renameFile, downloadFile, downloadFilesAsZip, moveFile } from '../../api/files'
@@ -300,9 +301,13 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
   }, [selectedUuids, folders, refresh, confirm])
 
   const handleDropFile = useCallback(async (fileUuid: string, folderUuid: string) => {
-    await moveFile(fileUuid, folderUuid)
+    try {
+      await moveFile(fileUuid, folderUuid)
+    } catch (err: unknown) {
+      toast(err instanceof Error ? err.message : 'Failed to move file', 'error')
+    }
     refresh()
-  }, [refresh])
+  }, [refresh, toast])
 
   const handleBulkDownload = useCallback(() => {
     const docUuids = [...selectedUuids].filter(u => documents.some(d => d.uuid === u))
@@ -346,6 +351,11 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
   const [showCreateFolder, setShowCreateFolder] = useState(false)
   const [createTeamFolder, setCreateTeamFolder] = useState(false)
   const [moveTarget, setMoveTarget] = useState<Folder | null>(null)
+  const [moveFileTarget, setMoveFileTarget] = useState<{
+    uuids: string[]
+    names: string[]
+    fromFolderId: string | null
+  } | null>(null)
 
   // Panel-wide drag & drop
   const dragCounter = useRef(0)
@@ -430,6 +440,28 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
       refresh()
     },
     [moveTarget, refresh],
+  )
+
+  const handleMoveFiles = useCallback(
+    async (folderId: string) => {
+      if (!moveFileTarget) return
+      const results = await Promise.allSettled(
+        moveFileTarget.uuids.map(uuid => moveFile(uuid, folderId)),
+      )
+      const failed = results.find(
+        (r): r is PromiseRejectedResult => r.status === 'rejected',
+      )
+      if (failed) {
+        toast(
+          failed.reason instanceof Error ? failed.reason.message : 'Failed to move file',
+          'error',
+        )
+      }
+      setMoveFileTarget(null)
+      setSelectedUuids(new Set())
+      refresh()
+    },
+    [moveFileTarget, refresh, toast],
   )
 
   const handleDelete = useCallback(
@@ -575,6 +607,7 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
         onNavigate={setCurrentFolder}
         floor={rootFolder}
         homeLabel={rootFolder ? (rootLabel ?? 'Project') : 'Home'}
+        onDropFile={handleDropFile}
       />
 
       {/* Bulk action toolbar */}
@@ -594,6 +627,22 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
             >
               <Download className="h-3.5 w-3.5" />
               Download
+            </button>
+            <button
+              onClick={() => {
+                const docs = documents.filter(d => selectedUuids.has(d.uuid))
+                if (docs.length === 0) return
+                setMoveFileTarget({
+                  uuids: docs.map(d => d.uuid),
+                  names: docs.map(d => d.title),
+                  fromFolderId: currentFolder,
+                })
+              }}
+              disabled={![...selectedUuids].some(u => documents.some(d => d.uuid === u))}
+              className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <FolderInput className="h-3.5 w-3.5" />
+              Move
             </button>
             <button
               onClick={handleBulkDelete}
@@ -666,9 +715,18 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
             })
           }}
           onMove={
-            contextMenu.type === 'folder' && !(contextMenu.item as Folder).is_shared_team_root
-              ? () => setMoveTarget(contextMenu.item as Folder)
-              : undefined
+            contextMenu.type === 'folder'
+              ? !(contextMenu.item as Folder).is_shared_team_root
+                ? () => setMoveTarget(contextMenu.item as Folder)
+                : undefined
+              : () => {
+                  const doc = contextMenu.item as Document
+                  setMoveFileTarget({
+                    uuids: [doc.uuid],
+                    names: [doc.title],
+                    fromFolderId: doc.folder,
+                  })
+                }
           }
           onExport={
             contextMenu.type === 'folder'
@@ -729,6 +787,15 @@ export function FileBrowser({ onDocClick, searchQuery = '', contentMatches, onSe
           folder={moveTarget}
           onSubmit={handleMoveFolder}
           onClose={() => setMoveTarget(null)}
+        />
+      )}
+
+      {moveFileTarget && (
+        <MoveFileDialog
+          fileNames={moveFileTarget.names}
+          currentFolderId={moveFileTarget.fromFolderId}
+          onSubmit={handleMoveFiles}
+          onClose={() => setMoveFileTarget(null)}
         />
       )}
     </div>
