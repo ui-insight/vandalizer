@@ -1443,24 +1443,27 @@ export function KnowledgePanel() {
       {/* Header */}
       <div
         style={{
-          height: 50,
+          minHeight: 50,
           backgroundColor: '#191919',
           boxShadow: '0 0px 23px -8px rgb(211, 211, 211)',
-          padding: '0 20px',
+          padding: '8px 20px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          columnGap: 12,
+          rowGap: 8,
           flexShrink: 0,
           zIndex: 300,
           position: 'relative',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', minWidth: 0 }}>
           <span style={{ fontSize: 18, fontWeight: 600, color: '#fff' }}>Knowledge Bases</span>
           <ExplainerPill label="What are knowledge bases?" onClick={() => setShowExplainer(true)} />
         </div>
         {activeTab === 'mine' && (
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0, marginLeft: 'auto' }}>
             <input
               ref={importInputRef}
               type="file"
