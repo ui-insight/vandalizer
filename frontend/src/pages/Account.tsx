@@ -12,6 +12,7 @@ export default function Account() {
   // Editable profile state
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  const [currentPassword, setCurrentPassword] = useState('')
   const [profileSaving, setProfileSaving] = useState(false)
   const [profileMessage, setProfileMessage] = useState<string | null>(null)
 
@@ -22,16 +23,29 @@ export default function Account() {
     }
   }, [user])
 
+  // Changing the email requires re-authentication, so reveal a password prompt
+  // as soon as the field diverges from the saved address.
+  const emailChanged = email.trim().toLowerCase() !== (user?.email || '').toLowerCase()
+
   const handleSaveProfile = async () => {
+    if (emailChanged && !currentPassword) {
+      setProfileMessage('Enter your current password to change your email.')
+      return
+    }
     setProfileSaving(true)
     setProfileMessage(null)
     try {
-      await updateProfile({ name, email })
+      await updateProfile({
+        name,
+        email,
+        ...(emailChanged ? { current_password: currentPassword } : {}),
+      })
       await refreshUser()
+      setCurrentPassword('')
       setProfileMessage('Profile saved')
       setTimeout(() => setProfileMessage(null), 3000)
-    } catch {
-      setProfileMessage('Failed to save')
+    } catch (err) {
+      setProfileMessage(err instanceof Error ? err.message : 'Failed to save')
     } finally {
       setProfileSaving(false)
     }
@@ -215,6 +229,25 @@ curl -X POST "$BASE_URL/api/workflows/run-integrated" \\
                   placeholder="you@example.com"
                 />
               </div>
+              {emailChanged && (
+                <div className="col-span-2">
+                  <label htmlFor="account-current-password" className="block text-xs font-medium uppercase text-gray-500 mb-1">
+                    Current Password
+                  </label>
+                  <input
+                    id="account-current-password"
+                    type="password"
+                    autoComplete="current-password"
+                    value={currentPassword}
+                    onChange={e => setCurrentPassword(e.target.value)}
+                    className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-highlight focus:outline-none focus:ring-1 focus:ring-highlight"
+                    placeholder="Confirm your password to change your email"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Changing your email requires your current password. We'll email your old address to confirm the change.
+                  </p>
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-3 mt-4">
               <button

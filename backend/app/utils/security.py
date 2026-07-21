@@ -39,23 +39,27 @@ def generate_mgmt_api_key() -> tuple[str, str, str]:
     return full, full[:MGMT_API_KEY_DISPLAY_LEN], hash_api_token(full)
 
 
-def create_access_token(user_id: str, settings: Settings) -> str:
+def create_access_token(
+    user_id: str, settings: Settings, token_version: int = 0
+) -> str:
     expire = datetime.now(timezone.utc) + timedelta(
         minutes=settings.jwt_access_expire_minutes
     )
     return jwt.encode(
-        {"sub": user_id, "exp": expire, "type": "access"},
+        {"sub": user_id, "exp": expire, "type": "access", "ver": token_version},
         settings.jwt_secret_key,
         algorithm=settings.jwt_algorithm,
     )
 
 
-def create_refresh_token(user_id: str, settings: Settings) -> str:
+def create_refresh_token(
+    user_id: str, settings: Settings, token_version: int = 0
+) -> str:
     expire = datetime.now(timezone.utc) + timedelta(
         days=settings.jwt_refresh_expire_days
     )
     return jwt.encode(
-        {"sub": user_id, "exp": expire, "type": "refresh"},
+        {"sub": user_id, "exp": expire, "type": "refresh", "ver": token_version},
         settings.jwt_secret_key,
         algorithm=settings.jwt_algorithm,
     )

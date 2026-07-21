@@ -82,7 +82,7 @@ export function getMe() {
 
 // Profile update
 
-export function updateProfile(data: { name?: string; email?: string }) {
+export function updateProfile(data: { name?: string; email?: string; current_password?: string }) {
   return apiFetch<User>('/api/auth/profile', {
     method: 'PUT',
     body: JSON.stringify(data),

@@ -26,6 +26,7 @@ def _make_user(user_id="reviewer1", is_admin=False, current_team=None):
     user.current_team = current_team
     user.organization_id = None
     user.is_demo_user = False
+    user.token_version = 0
     user.demo_status = None
     return user
 

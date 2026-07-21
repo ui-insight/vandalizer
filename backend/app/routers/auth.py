@@ -20,6 +20,7 @@ from app.utils.security import (
     create_access_token,
     create_refresh_token,
     decode_token,
+    verify_password,
 )
 
 logger = logging.getLogger(__name__)
@@ -28,8 +29,9 @@ router = APIRouter()
 
 
 def _set_tokens(response: Response, user: User, settings: Settings) -> None:
-    access = create_access_token(user.user_id, settings)
-    refresh = create_refresh_token(user.user_id, settings)
+    token_version = user.token_version or 0
+    access = create_access_token(user.user_id, settings, token_version)
+    refresh = create_refresh_token(user.user_id, settings, token_version)
     response.set_cookie(
         "access_token",
         access,
@@ -325,7 +327,18 @@ async def reset_password(
         )
 
     user.password_hash = hash_password(body.password)
+    # Invalidate every outstanding session: a reset is the recovery path after a
+    # suspected compromise, so any access/refresh token minted earlier (including
+    # a stolen one) must stop working.
+    user.token_version = (user.token_version or 0) + 1
     await user.save()
+
+    await audit_service.log_event(
+        action="user.password_reset",
+        actor_user_id=user.user_id,
+        resource_type="user",
+        resource_id=user.user_id,
+    )
 
     return {"ok": True}
 
@@ -374,14 +387,82 @@ async def me(user: User = Depends(get_current_user)):
 
 
 @router.put("/profile")
+@limiter.limit("10/minute")
 async def update_profile(
+    request: Request,
     body: UpdateProfileRequest,
+    settings: Settings = Depends(get_settings),
     user: User = Depends(get_current_user),
 ):
     if body.name is not None:
         user.name = body.name
-    if body.email is not None:
+
+    email_changed = body.email is not None and body.email != user.email
+    if email_changed:
+        # SSO-only accounts have no local password to re-auth against, and their
+        # email is owned by the identity provider — don't let it be changed here.
+        if not user.password_hash:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Your email is managed by your sign-in provider and "
+                "can't be changed here.",
+            )
+        # Re-authenticate: a valid session alone must not be enough to repoint
+        # the account's email (which would enable a password-reset takeover).
+        if not body.current_password:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Your current password is required to change your email.",
+            )
+        if not verify_password(body.current_password, user.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect password.",
+            )
+        # Reject an email already claimed by another account — a duplicate would
+        # make the forgot-password lookup ambiguous.
+        existing = await User.find_one(User.email == body.email)
+        if existing and existing.user_id != user.user_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="That email address is already in use.",
+            )
+        old_email = user.email
         user.email = body.email
+        await user.save()
+
+        await audit_service.log_event(
+            action="user.email_changed",
+            actor_user_id=user.user_id,
+            resource_type="user",
+            resource_id=user.user_id,
+            detail={"old_email": old_email, "new_email": body.email},
+            ip_address=request.client.host if request.client else None,
+        )
+        # Security heads-up to the address that was replaced, so the real owner
+        # notices an unexpected change while they may still control that inbox.
+        if old_email:
+            try:
+                from app.services.email_service import (
+                    send_email,
+                    email_changed_notice,
+                )
+
+                subject, html = email_changed_notice(
+                    user.name or user.user_id, old_email, body.email
+                )
+                await send_email(
+                    old_email, subject, html, settings,
+                    email_type="email_changed_notice",
+                )
+            except Exception:
+                logger.warning(
+                    "Failed to send email-change notice to old address for %s",
+                    user.user_id,
+                    exc_info=True,
+                )
+        return await _user_response(user)
+
     await user.save()
     return await _user_response(user)
 
@@ -549,6 +630,11 @@ async def refresh(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found"
+        )
+    # A stolen refresh cookie must not survive a password reset / email change.
+    if payload.get("ver", 0) != (user.token_version or 0):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired"
         )
     _set_tokens(response, user, settings)
     return await _user_response(user)

@@ -68,6 +68,21 @@ class ResetPasswordRequest(BaseModel):
 class UpdateProfileRequest(BaseModel):
     name: Optional[str] = None
     email: Optional[str] = None
+    # Required by the router when `email` is being changed — re-authenticates the
+    # caller so a hijacked session can't silently repoint the account's email.
+    current_password: Optional[str] = None
+
+    @field_validator("email")
+    @classmethod
+    def validate_email_format(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        v = v.strip()
+        # Deliberately permissive but enough to reject junk / non-addresses that
+        # would otherwise poison the forgot-password lookup.
+        if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", v):
+            raise ValueError("Enter a valid email address.")
+        return v.lower()
 
 
 class DeleteAccountRequest(BaseModel):

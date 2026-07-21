@@ -27,6 +27,7 @@ def _make_user(user_id="testuser", **overrides):
         "current_team": None,
         "is_demo_user": False,
         "demo_status": None,
+        "token_version": 0,
     }
     defaults.update(overrides)
     user = MagicMock()

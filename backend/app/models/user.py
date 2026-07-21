@@ -20,6 +20,11 @@ class User(Document):
     m365_enabled: bool = False
     m365_connected_at: Optional[datetime.datetime] = None
     password_hash: Optional[str] = None
+    # Incremented to invalidate all outstanding access/refresh tokens (e.g. on
+    # password reset, email change, or account recovery). Tokens embed the value
+    # they were minted with; get_current_user/refresh reject any token whose
+    # version is stale.
+    token_version: int = 0
     is_demo_user: bool = False
     demo_expires_at: Optional[datetime.datetime] = None
     demo_status: Optional[str] = None  # active | expired | locked
