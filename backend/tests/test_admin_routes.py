@@ -31,6 +31,7 @@ def _make_user(
     user.is_examiner = is_examiner
     user.current_team = current_team
     user.is_demo_user = False
+    user.token_version = 0
     user.demo_status = None
     return user
 

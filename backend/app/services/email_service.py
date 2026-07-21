@@ -349,6 +349,26 @@ def password_set_email(
     return subject, html
 
 
+def email_changed_notice(
+    name: str, old_email: str, new_email: str,
+) -> tuple[str, str]:
+    """Returns (subject, html_body) sent to the *old* address after an email change.
+
+    A security heads-up so the original owner notices an unexpected change while
+    they may still control the old inbox.
+    """
+    subject = "Your Vandalizer email address was changed"
+    html = f"""<!DOCTYPE html><html><head>{_BASE_STYLE}</head><body>
+    <div class="container"><div class="card">
+      <div class="logo">Vandalizer</div>
+      <h1>Email Address Changed</h1>
+      <p>Hi {name}, the email address on your Vandalizer account was just changed from <strong>{old_email}</strong> to <strong>{new_email}</strong>.</p>
+      <p style="font-size:13px;color:#6b7280;margin-top:16px">If you made this change, no action is needed. If you did <strong>not</strong> make this change, contact your Vandalizer administrator immediately &mdash; your account may be compromised.</p>
+      <div class="footer">Vandalizer</div>
+    </div></div></body></html>"""
+    return subject, html
+
+
 # ---------------------------------------------------------------------------
 # Team invitation emails
 # ---------------------------------------------------------------------------

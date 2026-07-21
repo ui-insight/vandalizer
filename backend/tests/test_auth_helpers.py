@@ -11,6 +11,7 @@ def _make_mock_user():
 
     class FakeUser:
         user_id = "test-user-123"
+        token_version = 0
 
     return FakeUser()
 

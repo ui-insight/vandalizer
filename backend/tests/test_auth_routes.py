@@ -39,6 +39,7 @@ def _make_user(**overrides):
         "is_examiner": False,
         "current_team": None,
         "password_hash": hash_password("correct-password"),
+        "token_version": 0,
         "is_demo_user": False,
         "demo_status": None,
         "api_token_hash": None,
@@ -423,14 +424,41 @@ class TestUpdateProfile:
         user.save.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_update_profile_email(self, client):
+    async def test_update_profile_email_with_current_password(self, client):
+        user = _make_user()
+        csrf_token = secrets.token_urlsafe(32)
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockDepUser,
+            patch("app.routers.auth.User") as MockUser,
+            patch("app.routers.auth.audit_service") as mock_audit,
+            patch("app.services.email_service.send_email", new_callable=AsyncMock, return_value=True),
+            patch("app.routers.auth._user_response", new_callable=AsyncMock, return_value=_MOCK_USER_RESPONSE_DATA),
+        ):
+            MockDepUser.find_one = AsyncMock(return_value=user)
+            # Uniqueness lookup finds no *other* account holding the new email.
+            MockUser.find_one = AsyncMock(return_value=None)
+            mock_audit.log_event = AsyncMock()
+            resp = await client.put(
+                "/api/auth/profile",
+                json={"email": "new@example.com", "current_password": "correct-password"},
+                cookies={"access_token": "valid-token", "csrf_token": csrf_token},
+                headers={"X-CSRF-Token": csrf_token},
+            )
+
+        assert resp.status_code == 200
+        assert user.email == "new@example.com"
+        mock_audit.log_event.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_update_profile_email_without_password_rejected(self, client):
         user = _make_user()
         csrf_token = secrets.token_urlsafe(32)
 
         with (
             patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
             patch("app.dependencies.User") as MockUser,
-            patch("app.routers.auth._user_response", new_callable=AsyncMock, return_value=_MOCK_USER_RESPONSE_DATA),
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             resp = await client.put(
@@ -440,8 +468,93 @@ class TestUpdateProfile:
                 headers={"X-CSRF-Token": csrf_token},
             )
 
-        assert resp.status_code == 200
-        assert user.email == "new@example.com"
+        assert resp.status_code == 400
+        assert user.email == "test@example.com"
+        user.save.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_update_profile_email_wrong_password_rejected(self, client):
+        user = _make_user()
+        csrf_token = secrets.token_urlsafe(32)
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            resp = await client.put(
+                "/api/auth/profile",
+                json={"email": "new@example.com", "current_password": "wrong-password"},
+                cookies={"access_token": "valid-token", "csrf_token": csrf_token},
+                headers={"X-CSRF-Token": csrf_token},
+            )
+
+        assert resp.status_code == 401
+        assert user.email == "test@example.com"
+        user.save.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_update_profile_email_duplicate_rejected(self, client):
+        user = _make_user()
+        other = _make_user(user_id="someoneelse", email="new@example.com")
+        csrf_token = secrets.token_urlsafe(32)
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockDepUser,
+            patch("app.routers.auth.User") as MockUser,
+        ):
+            MockDepUser.find_one = AsyncMock(return_value=user)
+            MockUser.find_one = AsyncMock(return_value=other)
+            resp = await client.put(
+                "/api/auth/profile",
+                json={"email": "new@example.com", "current_password": "correct-password"},
+                cookies={"access_token": "valid-token", "csrf_token": csrf_token},
+                headers={"X-CSRF-Token": csrf_token},
+            )
+
+        assert resp.status_code == 409
+        assert user.email == "test@example.com"
+
+    @pytest.mark.asyncio
+    async def test_update_profile_email_sso_only_rejected(self, client):
+        """SSO-only accounts (no local password) can't change email here."""
+        user = _make_user(password_hash=None)
+        csrf_token = secrets.token_urlsafe(32)
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            resp = await client.put(
+                "/api/auth/profile",
+                json={"email": "new@example.com", "current_password": "anything"},
+                cookies={"access_token": "valid-token", "csrf_token": csrf_token},
+                headers={"X-CSRF-Token": csrf_token},
+            )
+
+        assert resp.status_code == 400
+        assert user.email == "test@example.com"
+
+    @pytest.mark.asyncio
+    async def test_update_profile_invalid_email_rejected(self, client):
+        user = _make_user()
+        csrf_token = secrets.token_urlsafe(32)
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            resp = await client.put(
+                "/api/auth/profile",
+                json={"email": "not-an-email", "current_password": "correct-password"},
+                cookies={"access_token": "valid-token", "csrf_token": csrf_token},
+                headers={"X-CSRF-Token": csrf_token},
+            )
+
+        assert resp.status_code == 422
 
     @pytest.mark.asyncio
     async def test_update_profile_requires_auth(self, client):
@@ -452,6 +565,58 @@ class TestUpdateProfile:
             cookies={"csrf_token": csrf_token},
             headers={"X-CSRF-Token": csrf_token},
         )
+        assert resp.status_code == 401
+
+
+class TestResetPasswordSessionInvalidation:
+    @pytest.mark.asyncio
+    async def test_reset_password_bumps_token_version(self, client):
+        """A reset invalidates all outstanding sessions by bumping token_version."""
+        user = _make_user(token_version=2)
+        csrf_token = secrets.token_urlsafe(32)
+
+        fake_redis = MagicMock()
+        fake_redis.get = AsyncMock(return_value=b"testuser")
+        fake_redis.delete = AsyncMock()
+        fake_redis.aclose = AsyncMock()
+
+        with (
+            patch("app.routers.auth.aioredis.from_url", return_value=fake_redis),
+            patch("app.routers.auth.User") as MockUser,
+            patch("app.routers.auth.audit_service") as mock_audit,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_audit.log_event = AsyncMock()
+            resp = await client.post(
+                "/api/auth/reset-password",
+                json={"token": "reset-tok", "password": "NewPass123"},
+                cookies={"csrf_token": csrf_token},
+                headers={"X-CSRF-Token": csrf_token},
+            )
+
+        assert resp.status_code == 200
+        assert user.token_version == 3
+        user.save.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_stale_token_version_rejected(self, client):
+        """An access token minted before a session bump no longer authenticates."""
+        user = _make_user(token_version=5)
+
+        # Token carries ver=4, user is now at 5 -> rejected.
+        with (
+            patch(
+                "app.dependencies.decode_token",
+                return_value={"sub": "testuser", "type": "access", "ver": 4},
+            ),
+            patch("app.dependencies.User") as MockUser,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            resp = await client.get(
+                "/api/auth/me",
+                cookies={"access_token": "stale-token"},
+            )
+
         assert resp.status_code == 401
 
 
