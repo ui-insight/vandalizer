@@ -11,6 +11,7 @@ celery = Celery(
     backend=f"redis://{settings.redis_host}:6379/1",
 )
 
+celery.conf.timezone = settings.celery_timezone
 celery.conf.task_soft_time_limit = 3600
 celery.conf.task_time_limit = 3660
 celery.conf.result_expires = 86400
@@ -125,7 +126,7 @@ celery.conf.beat_schedule = {
     # >10pts vs the originally applied run's optimized_score.
     "kb-revalidate-applied-monthly": {
         "task": "tasks.passive.kb_revalidate_applied",
-        "schedule": crontab(day_of_month=1, hour=2, minute=0),  # 1st of month, 2am UTC
+        "schedule": crontab(day_of_month=1, hour=2, minute=0),  # 1st of month, 2am
     },
 }
 

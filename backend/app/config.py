@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     # `environment` alone can't: both prods report "production". Falls back to
     # `environment` when unset.
     deployment_label: str = ""
+    # IANA timezone for Celery beat crontab schedules (daily digests, engagement
+    # emails, retention jobs). Celery defaults to UTC when unset, which made
+    # "daily at 10am" emails land at 3am Pacific. Default matches the primary
+    # deployment (Moscow, ID).
+    celery_timezone: str = "America/Los_Angeles"
     insight_endpoint: str = ""
     chromadb_persist_dir: str = "../app/static/db"
     # If set (e.g. "chromadb:8000"), connect to a Chroma server via HttpClient.
