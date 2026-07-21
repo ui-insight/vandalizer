@@ -18,6 +18,18 @@ PERIMETERX_CHALLENGE = (
     "because we believe you are using automation tools to browse the website."
 )
 
+FEDERAL_REGISTER_CHALLENGE = (
+    "Request Access. Due to aggressive automated scraping of "
+    "FederalRegister.gov and eCFR.gov, programmatic access to these sites is "
+    "limited to access to our extensive developer APIs. If you are a human "
+    "user receiving this message, we can add your IP address to a set of IPs "
+    "that can access FederalRegister.gov & eCFR.gov; complete the CAPTCHA "
+    "(bot test) below and click \"Request Access\". This process will be "
+    "necessary for each IP address you wish to access the site from, "
+    "requests are valid for approximately one quarter (three months) after "
+    "which the process may need to be repeated."
+)
+
 
 def test_detects_walmart_challenge():
     assert looks_like_bot_challenge(WALMART_CHALLENGE) is True
@@ -29,6 +41,10 @@ def test_detects_cloudflare_challenge():
 
 def test_detects_perimeterx_challenge():
     assert looks_like_bot_challenge(PERIMETERX_CHALLENGE) is True
+
+
+def test_detects_federal_register_request_access():
+    assert looks_like_bot_challenge(FEDERAL_REGISTER_CHALLENGE) is True
 
 
 def test_normal_page_text_passes():

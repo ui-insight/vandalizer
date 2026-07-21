@@ -35,6 +35,8 @@ _CHALLENGE_MARKERS = (
     "request unsuccessful. incapsula incident",  # Imperva/Incapsula
     "unusual traffic from your computer network",  # Google sorry page
     "ddos protection by",
+    "due to aggressive automated scraping",      # FederalRegister.gov / eCFR.gov "Request Access"
+    "captcha (bot test)",
 )
 
 
