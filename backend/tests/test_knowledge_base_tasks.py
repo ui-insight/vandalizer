@@ -335,7 +335,8 @@ class TestKbIngestUrl:
         calls = db.knowledge_base_sources.update_one.call_args_list
         error_call = calls[1][0]
         assert error_call[1]["$set"]["status"] == "error"
-        assert "Failed to fetch URL content" in error_call[1]["$set"]["error_message"]
+        assert "no text could be extracted" in error_call[1]["$set"]["error_message"]
+        assert "HTTP 200" in error_call[1]["$set"]["error_message"]
 
     @patch("app.tasks.knowledge_base_tasks._get_db")
     def test_bot_challenge_page_sets_error(self, mock_get_db):

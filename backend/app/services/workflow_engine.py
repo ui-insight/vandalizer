@@ -572,10 +572,10 @@ class WebsiteNode(Node):
             text = result.text
         except ValueError as e:
             text = f"Blocked URL: {e}"
-        except httpx.HTTPStatusError as e:
-            text = f"HTTP error fetching {url}: {e.response.status_code}"
-        except httpx.RequestError as e:
-            text = f"Request error fetching {url}: {e}"
+        except (httpx.HTTPStatusError, httpx.RequestError) as e:
+            from app.utils.fetch_errors import describe_fetch_error
+
+            text = f"Could not fetch {url}: {describe_fetch_error(e)}"
         return {"output": text, "input": inputs.get("output"), "step_name": self.name}
 
 

@@ -290,6 +290,40 @@ async def test_pdf_content_type_is_extracted_as_pdf():
 
 
 @pytest.mark.asyncio
+async def test_html_challenge_page_on_pdf_url_falls_through_to_html():
+    """A WAF answering a .pdf URL with an HTML bot-challenge page (HTTP 200)
+    must be parsed as HTML so bot-challenge detection can name the failure,
+    not fed to the PDF extractor (which would yield empty text)."""
+    settings = Settings(web_fetcher_browser_enabled=False, web_fetcher_min_chars=0)
+    challenge_html = (
+        "<html><head><title>Just a moment...</title></head>"
+        "<body><p>Verify you are human. Enable JavaScript and cookies to continue.</p>"
+        "</body></html>"
+    )
+
+    resp = MagicMock()
+    resp.content = challenge_html.encode()
+    resp.text = challenge_html
+    resp.status_code = 200
+    resp.headers = {"content-type": "text/html"}
+    resp.raise_for_status = MagicMock()
+    client = MagicMock()
+    client.get = AsyncMock(return_value=resp)
+    client.__aenter__ = AsyncMock(return_value=client)
+    client.__aexit__ = AsyncMock(return_value=False)
+
+    with patch("app.services.web_fetcher.httpx.AsyncClient", return_value=client), \
+         patch("app.services.web_fetcher.validate_outbound_url",
+               return_value="https://www.usda.gov/x/terms.pdf"):
+        result = await fetch_url("https://www.usda.gov/x/terms.pdf", settings=settings)
+
+    from app.utils.bot_challenge import looks_like_bot_challenge
+
+    assert result.raw_html is not None  # took the HTML path, not the PDF path
+    assert looks_like_bot_challenge(result.text)
+
+
+@pytest.mark.asyncio
 async def test_pdf_detected_by_url_extension_when_content_type_generic():
     """A .pdf URL served as octet-stream is still parsed as a PDF."""
     settings = Settings(web_fetcher_browser_enabled=False)

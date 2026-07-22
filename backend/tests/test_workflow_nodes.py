@@ -403,14 +403,27 @@ class TestWebsiteNode:
     @patch("app.services.web_fetcher.fetch_url_sync")
     def test_http_error(self, mock_fetch):
         import httpx
-        mock_response = MagicMock()
-        mock_response.status_code = 404
+        request = httpx.Request("GET", "https://example.com/404")
+        response = httpx.Response(404, request=request)
         mock_fetch.side_effect = httpx.HTTPStatusError(
-            "Not Found", request=MagicMock(), response=mock_response
+            "Not Found", request=request, response=response
         )
         node = WebsiteNode({"url": "https://example.com/404"})
         result = node.process({"output": "prev"})
-        assert "HTTP error" in result["output"]
+        assert "Could not fetch" in result["output"]
+        assert "HTTP 404" in result["output"]
+
+    @patch("app.services.web_fetcher.fetch_url_sync")
+    def test_blocked_site_error_names_automated_access(self, mock_fetch):
+        import httpx
+        request = httpx.Request("GET", "https://www.usda.gov/terms.pdf")
+        response = httpx.Response(403, request=request)
+        mock_fetch.side_effect = httpx.HTTPStatusError(
+            "Forbidden", request=request, response=response
+        )
+        node = WebsiteNode({"url": "https://www.usda.gov/terms.pdf"})
+        result = node.process({"output": "prev"})
+        assert "refused automated access" in result["output"]
 
 
 # ---------------------------------------------------------------------------
