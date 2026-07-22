@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ShieldCheck, Loader2, Sparkles } from 'lucide-react'
+import { ShieldCheck, Loader2, Sparkles, ChevronDown, ChevronRight } from 'lucide-react'
 import {
   listKBTestQueries,
   getKBQuality,
@@ -22,6 +22,12 @@ interface Props {
   /** Called with the new KB's uuid after the user clones a KB they can't
    * manage, so the parent can navigate to their own copy. */
   onCloned?: (newUuid: string) => void
+  /** Collapse state is owned by the parent so it can trade screen space
+   * between this panel and sibling sections (e.g. the Sources list). The
+   * header stays visible when collapsed, keeping the latest score chip in
+   * view. Omit both props to render always-expanded. */
+  collapsed?: boolean
+  onToggleCollapsed?: () => void
 }
 
 // Validation runs off the request/response path (a background Celery task), so
@@ -64,7 +70,7 @@ type LatestQualitySummary = {
   createdAt: string | null
 }
 
-export function KBValidationPanel({ kbUuid, kbReady, canManage, onCloned }: Props) {
+export function KBValidationPanel({ kbUuid, kbReady, canManage, onCloned, collapsed = false, onToggleCollapsed }: Props) {
   const [tab, setTab] = useState<Tab>('autovalidate')
   const [queries, setQueries] = useState<KBTestQuery[]>([])
   const [latestRun, setLatestRun] = useState<KBValidationResult | null>(null)
@@ -253,8 +259,24 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, onCloned }: Prop
         borderRadius: 8,
       }}
     >
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+      {/* Header — doubles as the collapse toggle when the parent controls it */}
+      <button
+        type="button"
+        onClick={onToggleCollapsed}
+        aria-expanded={onToggleCollapsed ? !collapsed : undefined}
+        disabled={!onToggleCollapsed}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+          marginBottom: collapsed ? 0 : 10, padding: 0,
+          background: 'transparent', border: 'none', fontFamily: 'inherit',
+          cursor: onToggleCollapsed ? 'pointer' : 'default', textAlign: 'left',
+        }}
+      >
+        {onToggleCollapsed && (
+          collapsed
+            ? <ChevronRight size={14} style={{ color: '#888', flexShrink: 0 }} />
+            : <ChevronDown size={14} style={{ color: '#888', flexShrink: 0 }} />
+        )}
         <ShieldCheck size={16} style={{ color: '#7d8590' }} aria-hidden="true" />
         <span style={{ fontSize: 14, fontWeight: 600, color: '#e5e5e5' }}>Validation</span>
         {latestScore != null && (
@@ -286,11 +308,15 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, onCloned }: Prop
             {provenance}
           </span>
         )}
+        {collapsed && running && (
+          <Loader2 size={12} style={{ color: '#888', animation: 'spin 1s linear infinite' }} aria-label="Validation running" />
+        )}
         <span style={{ marginLeft: 'auto', fontSize: 11, color: '#888' }}>
           {queries.length} {queries.length === 1 ? 'query' : 'queries'}
         </span>
-      </div>
+      </button>
 
+      {!collapsed && (<>
       {/* Orientation hint — single sentence above the tab strip so new users
           know what each tab is for without clicking through. */}
       <div
@@ -386,6 +412,7 @@ export function KBValidationPanel({ kbUuid, kbReady, canManage, onCloned }: Prop
         />
       )}
       </div>
+      </>)}
     </div>
   )
 }
