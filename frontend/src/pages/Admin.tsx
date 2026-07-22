@@ -3133,7 +3133,9 @@ function ConfigTab() {
     setOcrTesting(true)
     setOcrTestResult(null)
     try {
-      const res = await testOcr()
+      // Send the form's current values so unsaved edits are what gets tested;
+      // an untouched key field holds the "***" sentinel, meaning the saved key.
+      const res = await testOcr({ ocr_endpoint: ocrEndpoint, ocr_api_key: ocrApiKey })
       setOcrTestResult({ ok: true, message: res.message })
     } catch (e) {
       setOcrTestResult({ ok: false, message: e instanceof Error ? e.message : 'Test failed' })

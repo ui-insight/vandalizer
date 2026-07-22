@@ -530,3 +530,111 @@ class TestUserActivityHistory:
             resp = await client.get("/api/admin/users/ghost/history", cookies=cookies, headers=headers)
 
         assert resp.status_code == 404
+
+
+class TestOcrConnectivityTest:
+    """POST /api/admin/config/test-ocr — form-value overrides vs saved config."""
+
+    def _httpx_client_mock(self, status_code=200):
+        resp = MagicMock(status_code=status_code)
+        client = MagicMock()
+        client.get = AsyncMock(return_value=resp)
+        ctx = MagicMock()
+        ctx.__aenter__ = AsyncMock(return_value=client)
+        ctx.__aexit__ = AsyncMock(return_value=False)
+        return ctx, client
+
+    @pytest.mark.asyncio
+    async def test_body_overrides_saved_endpoint_and_key(self, client):
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+        cfg = SimpleNamespace(ocr_endpoint="https://saved.example/ocr", ocr_api_key="enc-saved")
+        ctx, http_client = self._httpx_client_mock()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.SystemConfig") as MockCfg,
+            patch("httpx.AsyncClient", return_value=ctx),
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockCfg.get_config = AsyncMock(return_value=cfg)
+            resp = await client.post(
+                "/api/admin/config/test-ocr",
+                json={"ocr_endpoint": "https://form.example/ocr", "ocr_api_key": "new-key"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        url, kwargs = http_client.get.call_args[0][0], http_client.get.call_args[1]
+        assert url == "https://form.example/ocr"
+        assert kwargs["headers"]["Authorization"] == "Bearer new-key"
+
+    @pytest.mark.asyncio
+    async def test_masked_key_sentinel_uses_saved_key(self, client):
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+        cfg = SimpleNamespace(ocr_endpoint="https://saved.example/ocr", ocr_api_key="enc-saved")
+        ctx, http_client = self._httpx_client_mock()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.SystemConfig") as MockCfg,
+            patch("app.routers.admin.decrypt_value", return_value="saved-plain"),
+            patch("httpx.AsyncClient", return_value=ctx),
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockCfg.get_config = AsyncMock(return_value=cfg)
+            resp = await client.post(
+                "/api/admin/config/test-ocr",
+                json={"ocr_endpoint": "https://form.example/ocr", "ocr_api_key": "***"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        assert http_client.get.call_args[1]["headers"]["Authorization"] == "Bearer saved-plain"
+
+    @pytest.mark.asyncio
+    async def test_no_body_falls_back_to_saved_config(self, client):
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+        cfg = SimpleNamespace(ocr_endpoint="https://saved.example/ocr", ocr_api_key="")
+        ctx, http_client = self._httpx_client_mock()
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.SystemConfig") as MockCfg,
+            patch("httpx.AsyncClient", return_value=ctx),
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockCfg.get_config = AsyncMock(return_value=cfg)
+            resp = await client.post(
+                "/api/admin/config/test-ocr", cookies=cookies, headers=headers
+            )
+
+        assert resp.status_code == 200
+        assert http_client.get.call_args[0][0] == "https://saved.example/ocr"
+        assert "Authorization" not in http_client.get.call_args[1]["headers"]
+
+    @pytest.mark.asyncio
+    async def test_no_endpoint_anywhere_returns_400(self, client):
+        admin = _make_user("admin", is_admin=True)
+        cookies, headers = _auth("admin")
+        cfg = SimpleNamespace(ocr_endpoint="", ocr_api_key="")
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "admin", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.admin.SystemConfig") as MockCfg,
+        ):
+            MockUser.find_one = AsyncMock(return_value=admin)
+            MockCfg.get_config = AsyncMock(return_value=cfg)
+            resp = await client.post(
+                "/api/admin/config/test-ocr", json={}, cookies=cookies, headers=headers
+            )
+
+        assert resp.status_code == 400
