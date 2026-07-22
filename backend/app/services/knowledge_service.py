@@ -25,6 +25,7 @@ from app.models.knowledge import (
 from app.models.user import User
 from app.services import access_control
 from app.services.document_manager import DocumentManager
+from app.utils.fetch_errors import describe_fetch_error
 from app.utils.url_validation import normalize_crawl_url as _normalize_crawl_url
 
 logger = logging.getLogger(__name__)
@@ -1210,13 +1211,14 @@ async def _ingest_url_source(
     try:
         from app.services.web_fetcher import fetch_url
         from app.utils.bot_challenge import looks_like_bot_challenge
+        from app.utils.fetch_errors import describe_empty_fetch
 
         result = await fetch_url(source.url)
         raw_text = result.text
 
         if not raw_text.strip():
             source.status = "error"
-            source.error_message = "Failed to extract text from URL"
+            source.error_message = describe_empty_fetch(result.status_code)
             await source.save()
             return None
 
@@ -1247,19 +1249,19 @@ async def _ingest_url_source(
         else:
             logger.error(f"Error ingesting URL source {source.uuid}: {e}")
         source.status = "error"
-        source.error_message = str(e)[:2000]
+        source.error_message = describe_fetch_error(e)[:2000]
         await source.save()
         return None
     except (ValueError, httpx.RequestError) as e:
         logger.warning("URL source %s unreachable: %s", source.uuid, e)
         source.status = "error"
-        source.error_message = str(e)[:2000]
+        source.error_message = describe_fetch_error(e)[:2000]
         await source.save()
         return None
     except Exception as e:
         logger.error(f"Error ingesting URL source {source.uuid}: {e}")
         source.status = "error"
-        source.error_message = str(e)[:2000]
+        source.error_message = describe_fetch_error(e)[:2000]
         await source.save()
         return None
 

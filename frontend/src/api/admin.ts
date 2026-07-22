@@ -481,8 +481,11 @@ export function setDefaultModel(name: string) {
 
 // Test connectivity
 
-export function testOcr() {
-  return apiFetch<{ status: string; status_code: number; message: string }>('/api/admin/config/test-ocr', { method: 'POST' })
+export function testOcr(data: { ocr_endpoint: string; ocr_api_key: string }) {
+  return apiFetch<{ status: string; status_code: number; message: string }>('/api/admin/config/test-ocr', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
 }
 
 export type ModelCheck = { label: string; ok: boolean; detail: string }

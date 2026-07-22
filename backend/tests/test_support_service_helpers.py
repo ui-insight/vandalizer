@@ -598,3 +598,117 @@ class TestUpdateTicketSubject:
             with pytest.raises(HTTPException) as exc:
                 await support_router.update_ticket("t1", body, user)
         assert exc.value.status_code == 400
+
+
+class TestUpdateTicketPriorityClassification:
+    """Editing priority and classification (type) after filing: support-only,
+    validated at the router, applied (or cleared) by the service."""
+
+    def _ticket(self, **over):
+        base = dict(subject="Old", user_id="alice", uuid="t1", tags=[],
+                    classification=None, closed_at=None, save=AsyncMock())
+        base.update(over)
+        return SimpleNamespace(**base)
+
+    def _fake_model(self, ticket):
+        model = MagicMock()
+        model.find_one = AsyncMock(return_value=ticket)
+        return model
+
+    async def test_service_sets_classification(self):
+        from app.models.support import TicketClassification
+        from app.services import support_service
+        ticket = self._ticket()
+        with (
+            patch.object(support_service, "SupportTicket", self._fake_model(ticket)),
+            patch.object(support_service, "_ticket_to_dict",
+                         AsyncMock(return_value={"ok": True})),
+        ):
+            await support_service.update_ticket("t1", classification="bug")
+        assert ticket.classification == TicketClassification("bug")
+        ticket.save.assert_awaited_once()
+
+    async def test_service_clears_classification_on_empty_string(self):
+        from app.models.support import TicketClassification
+        from app.services import support_service
+        ticket = self._ticket(classification=TicketClassification("bug"))
+        with (
+            patch.object(support_service, "SupportTicket", self._fake_model(ticket)),
+            patch.object(support_service, "_ticket_to_dict",
+                         AsyncMock(return_value={})),
+        ):
+            await support_service.update_ticket("t1", classification="")
+        assert ticket.classification is None
+
+    async def test_service_leaves_classification_when_omitted(self):
+        from app.models.support import TicketClassification
+        from app.services import support_service
+        ticket = self._ticket(classification=TicketClassification("bug"))
+        with (
+            patch.object(support_service, "SupportTicket", self._fake_model(ticket)),
+            patch.object(support_service, "_ticket_to_dict",
+                         AsyncMock(return_value={})),
+        ):
+            await support_service.update_ticket("t1", subject="New title")
+        assert ticket.classification == TicketClassification("bug")
+
+    async def test_router_support_can_change_priority_and_classification(self):
+        from app.routers import support as support_router
+        body = support_router.UpdateTicketRequest(
+            priority="high", classification="feature_request",
+        )
+        user = SimpleNamespace(user_id="agent", is_admin=True)
+        update_mock = AsyncMock(return_value={"uuid": "t1"})
+        with (
+            patch.object(support_router.support_service, "get_ticket",
+                         AsyncMock(return_value={"user_id": "alice"})),
+            patch.object(support_router, "_is_support_user",
+                         AsyncMock(return_value=True)),
+            patch.object(support_router.support_service, "update_ticket", update_mock),
+            patch.object(support_router, "_view", lambda payload, is_support: payload),
+        ):
+            await support_router.update_ticket("t1", body, user)
+        assert update_mock.call_args.kwargs["priority"] == "high"
+        assert update_mock.call_args.kwargs["classification"] == "feature_request"
+
+    async def test_router_owner_cannot_change_classification(self):
+        from app.routers import support as support_router
+        body = support_router.UpdateTicketRequest(classification="bug")
+        user = SimpleNamespace(user_id="alice", is_admin=False)  # owner, not support
+        with (
+            patch.object(support_router.support_service, "get_ticket",
+                         AsyncMock(return_value={"user_id": "alice"})),
+            patch.object(support_router, "_is_support_user",
+                         AsyncMock(return_value=False)),
+        ):
+            with pytest.raises(HTTPException) as exc:
+                await support_router.update_ticket("t1", body, user)
+        assert exc.value.status_code == 403
+
+    async def test_router_rejects_invalid_classification(self):
+        from app.routers import support as support_router
+        body = support_router.UpdateTicketRequest(classification="nonsense")
+        user = SimpleNamespace(user_id="agent", is_admin=True)
+        with (
+            patch.object(support_router.support_service, "get_ticket",
+                         AsyncMock(return_value={"user_id": "alice"})),
+            patch.object(support_router, "_is_support_user",
+                         AsyncMock(return_value=True)),
+        ):
+            with pytest.raises(HTTPException) as exc:
+                await support_router.update_ticket("t1", body, user)
+        assert exc.value.status_code == 400
+
+    async def test_router_rejects_invalid_priority(self):
+        from app.routers import support as support_router
+        body = support_router.UpdateTicketRequest(priority="urgent")
+        user = SimpleNamespace(user_id="agent", is_admin=True)
+        with (
+            patch.object(support_router.support_service, "get_ticket",
+                         AsyncMock(return_value={"user_id": "alice"})),
+            patch.object(support_router, "_is_support_user",
+                         AsyncMock(return_value=True)),
+        ):
+            with pytest.raises(HTTPException) as exc:
+                await support_router.update_ticket("t1", body, user)
+        assert exc.value.status_code == 400

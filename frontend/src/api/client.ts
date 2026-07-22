@@ -106,7 +106,18 @@ export async function apiFetch<T>(
 ): Promise<T> {
   const { timeoutMs = 60_000, ...fetchOptions } = options
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  let timedOut = false
+  const timer = setTimeout(() => {
+    timedOut = true
+    controller.abort()
+  }, timeoutMs)
+  // A caller-provided signal must still cancel the request even though the
+  // fetch itself is wired to the internal timeout controller.
+  const callerSignal = fetchOptions.signal
+  if (callerSignal) {
+    if (callerSignal.aborted) controller.abort()
+    else callerSignal.addEventListener('abort', () => controller.abort(), { once: true })
+  }
 
   let res: Response
   try {
@@ -119,7 +130,8 @@ export async function apiFetch<T>(
   } catch (err) {
     clearTimeout(timer)
     if (err instanceof DOMException && err.name === 'AbortError') {
-      throw new ApiError(0, 'Request timed out')
+      if (timedOut) throw new ApiError(0, 'Request timed out')
+      throw err // caller-initiated abort — let the caller recognize its own cancel
     }
     throw err
   }

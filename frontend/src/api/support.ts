@@ -113,7 +113,11 @@ export function deleteAttachment(ticketUuid: string, attachmentUuid: string) {
 
 export function updateTicket(
   ticketUuid: string,
-  updates: { status?: string; priority?: string; assigned_to?: string; tags?: string[]; subject?: string },
+  // classification: '' clears the type (backend convention, same as assigned_to)
+  updates: {
+    status?: string; priority?: string; classification?: string;
+    assigned_to?: string; tags?: string[]; subject?: string;
+  },
 ) {
   return apiFetch<SupportTicket>(`/api/support/tickets/${ticketUuid}`, {
     method: 'PATCH',

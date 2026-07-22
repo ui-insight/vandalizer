@@ -316,7 +316,16 @@ function SourceContentInspector({
           </>
         )}
         <div style={{ color: '#888' }}>Status</div>
-        <div>{detail.status}{detail.error_message ? ` — ${detail.error_message}` : ''}</div>
+        <div>
+          {detail.status}
+          {detail.status === 'error' && (
+            <div style={{ color: '#f87171', marginTop: 2 }}>
+              {detail.error_message
+                || 'No failure details were recorded for this source. Re-syncing it will capture the reason (e.g. the site blocking automated access).'}
+            </div>
+          )}
+          {detail.status !== 'error' && detail.error_message ? ` — ${detail.error_message}` : ''}
+        </div>
         <div style={{ color: '#888' }}>Chunks</div>
         <div>{detail.chunk_count}</div>
         {detail.crawl_enabled && (

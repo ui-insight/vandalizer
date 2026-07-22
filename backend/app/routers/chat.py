@@ -313,10 +313,13 @@ async def add_link(
         )
         raise HTTPException(status_code=400, detail=f"Blocked URL: {e}")
     except Exception as e:
+        from app.utils.fetch_errors import describe_fetch_error
+
+        reason = describe_fetch_error(e)
         await activity_service.activity_finish(
-            activity.id, status=ActivityStatus.FAILED, error=str(e)
+            activity.id, status=ActivityStatus.FAILED, error=reason
         )
-        raise HTTPException(status_code=400, detail=f"Failed to fetch URL: {e}")
+        raise HTTPException(status_code=400, detail=f"Failed to fetch URL: {reason}")
 
     url_attachment = UrlAttachment(
         url=body.link, title=title, content=content, user_id=user_id

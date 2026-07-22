@@ -822,6 +822,24 @@ function ChatView({
     }
   }
 
+  const handlePriorityChange = async (newPriority: string) => {
+    try {
+      const updated = await supportApi.updateTicket(ticketUuid, { priority: newPriority })
+      setTicket(updated)
+    } catch {
+      toast('Failed to update priority', 'error')
+    }
+  }
+
+  const handleClassificationChange = async (newClassification: string) => {
+    try {
+      const updated = await supportApi.updateTicket(ticketUuid, { classification: newClassification })
+      setTicket(updated)
+    } catch {
+      toast('Failed to update type', 'error')
+    }
+  }
+
   const startEdit = (msg: { uuid: string; content: string }) => {
     setEditingMessageUuid(msg.uuid)
     setEditDraft(msg.content)
@@ -1041,24 +1059,38 @@ function ChatView({
             >
               <Link2 size={12} /> Copy link
             </button>
-            <span style={{
-              fontSize: 11, padding: '2px 8px', borderRadius: 9999,
-              background: `${PRIORITY_COLORS[ticket.priority]}20`,
-              color: PRIORITY_COLORS[ticket.priority],
-              fontWeight: 600, textTransform: 'uppercase',
-            }}>
-              {ticket.priority}
-            </span>
-            {ticket.classification && (
-              <span style={{
-                fontSize: 11, padding: '2px 8px', borderRadius: 9999,
-                background: `${CLASSIFICATION_COLORS[ticket.classification]}20`,
-                color: CLASSIFICATION_COLORS[ticket.classification],
-                fontWeight: 600, textTransform: 'uppercase',
-              }}>
-                {CLASSIFICATION_LABELS[ticket.classification]}
-              </span>
-            )}
+            <select
+              value={ticket.priority}
+              onChange={(e) => handlePriorityChange(e.target.value)}
+              aria-label="Change ticket priority"
+              title="Priority"
+              style={{
+                fontSize: 12, padding: '4px 8px', borderRadius: 'var(--ui-radius, 12px)',
+                border: '1px solid #d1d5db', fontFamily: 'inherit',
+                color: PRIORITY_COLORS[ticket.priority], fontWeight: 600,
+              }}
+            >
+              <option value="low">Low</option>
+              <option value="normal">Normal</option>
+              <option value="high">High</option>
+            </select>
+            <select
+              value={ticket.classification ?? ''}
+              onChange={(e) => handleClassificationChange(e.target.value)}
+              aria-label="Change ticket type"
+              title="Type"
+              style={{
+                fontSize: 12, padding: '4px 8px', borderRadius: 'var(--ui-radius, 12px)',
+                border: '1px solid #d1d5db', fontFamily: 'inherit',
+                color: ticket.classification ? CLASSIFICATION_COLORS[ticket.classification] : '#6b7280',
+                fontWeight: 600,
+              }}
+            >
+              <option value="">No type</option>
+              <option value="bug">{CLASSIFICATION_LABELS.bug}</option>
+              <option value="enhancement">{CLASSIFICATION_LABELS.enhancement}</option>
+              <option value="feature_request">{CLASSIFICATION_LABELS.feature_request}</option>
+            </select>
             <span style={{
               fontSize: 11, padding: '2px 8px', borderRadius: 9999,
               background: `${STATUS_COLORS[ticket.status]}20`,

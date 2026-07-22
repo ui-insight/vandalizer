@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload, Sparkles, HelpCircle, Pencil, Pin, PinOff, FolderKanban } from 'lucide-react'
+import { Plus, Loader2, ArrowLeft, X, FileText, Globe, MessageSquare, AlertCircle, CheckCircle2, Users, ShieldCheck, Send, Tag, Check, Download, Upload, Sparkles, HelpCircle, Pencil, Pin, PinOff, FolderKanban, ChevronDown, ChevronRight } from 'lucide-react'
 import { useKnowledgeBases, useScopedKnowledgeBases } from '../../hooks/useKnowledgeBases'
 import { useProjectPins } from '../../hooks/useProjectPins'
 import { useWorkspace } from '../../contexts/WorkspaceContext'
@@ -121,6 +121,10 @@ export function KnowledgePanel() {
   const [savingDescription, setSavingDescription] = useState(false)
   const [inspectingSource, setInspectingSource] = useState<KnowledgeBaseSource | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
+  // Collapsible detail sections. Collapsing Validation also lifts the inner
+  // scroll cap on the Sources list so long source lists become fully visible.
+  const [sourcesCollapsed, setSourcesCollapsed] = useState(false)
+  const [validationCollapsed, setValidationCollapsed] = useState(false)
   const titleInputRef = useRef<HTMLInputElement | null>(null)
   const cancelTitleEdit = useRef(false)
   // Single commit path for the inline KB title editor: every exit from edit
@@ -185,6 +189,12 @@ export function KnowledgePanel() {
       setDetailLoading(false)
     }
   }, [toast])
+
+  // A different KB starts with both detail sections expanded
+  useEffect(() => {
+    setSourcesCollapsed(false)
+    setValidationCollapsed(false)
+  }, [selectedKB?.uuid])
 
   // Poll status when building
   useEffect(() => {
@@ -1084,15 +1094,34 @@ export function KnowledgePanel() {
             />
 
             {/* Sources list */}
-            <div style={{ fontSize: 13, fontWeight: 600, color: '#ccc', marginBottom: 8 }}>Sources</div>
-            {selectedKB.sources.length === 0 ? (
+            <button
+              type="button"
+              onClick={() => setSourcesCollapsed(c => !c)}
+              aria-expanded={!sourcesCollapsed}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                padding: 0, marginBottom: sourcesCollapsed ? 0 : 8,
+                background: 'transparent', border: 'none',
+                fontFamily: 'inherit', cursor: 'pointer', color: '#ccc',
+                textAlign: 'left',
+              }}
+            >
+              {sourcesCollapsed ? <ChevronRight size={14} style={{ color: '#888' }} /> : <ChevronDown size={14} style={{ color: '#888' }} />}
+              <span style={{ fontSize: 13, fontWeight: 600 }}>Sources</span>
+              <span style={{ marginLeft: 'auto', fontSize: 11, color: '#666' }}>
+                {selectedKB.sources.length} {selectedKB.sources.length === 1 ? 'source' : 'sources'}
+              </span>
+            </button>
+            {sourcesCollapsed ? null : selectedKB.sources.length === 0 ? (
               <div style={{ fontSize: 12, color: '#888', padding: '20px 0' }}>
                 No sources added yet. Add documents or URLs above.
               </div>
             ) : (
               <div style={{
                 display: 'flex', flexDirection: 'column', gap: 6,
-                maxHeight: 320, overflowY: 'auto',
+                // With Validation collapsed the sources list gets the freed
+                // space: no inner scroll cap, the full list is visible.
+                maxHeight: validationCollapsed ? undefined : 320, overflowY: 'auto',
                 paddingRight: 4,
               }}>
                 {selectedKB.sources.map((source: KnowledgeBaseSource) => {
@@ -1276,6 +1305,8 @@ export function KnowledgePanel() {
               kbReady={selectedKB.status === 'ready'}
               canManage={!!user && (selectedKB.user_id === user.user_id || isExaminerOrAdmin)}
               onCloned={(newUuid) => { refresh(); loadDetail(newUuid) }}
+              collapsed={validationCollapsed}
+              onToggleCollapsed={() => setValidationCollapsed(c => !c)}
             />
 
             {/* "What are knowledge bases?" pill */}

@@ -33,7 +33,8 @@ import {
   getExtractionHistory,
 } from '../../api/extractions'
 import { RunHistoryTab } from './RunHistoryTab'
-import type { ValidationV2Result, QualityHistoryRun, ValidationSource } from '../../api/extractions'
+import { ApiError } from '../../api/client'
+import type { ValidationV2Result, QualityHistoryRun, ValidationSource, ExtractionRunHistoryEntry } from '../../api/extractions'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
 import { VerificationSubmitModal } from '../library/VerificationSubmitModal'
 import { ExtractionAutovalidatePanel } from '../extractions/ExtractionAutovalidatePanel'
@@ -53,6 +54,31 @@ import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 
 marked.setOptions({ breaks: true, gfm: true })
+
+const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
+
+// When the sync run request dies (client timeout, proxy cutoff) the backend
+// keeps working and records the run as an activity event. Poll run history
+// until that run leaves 'running' and hand back its final record so the panel
+// can show the results (or the error) instead of going silent. Returns null
+// if the run is still going after 30 minutes.
+async function recoverRunFromHistory(searchSetUuid: string): Promise<ExtractionRunHistoryEntry | null> {
+  const deadline = Date.now() + 30 * 60_000
+  let runId: string | null = null
+  while (Date.now() < deadline) {
+    try {
+      const { runs } = await getExtractionHistory(searchSetUuid, 5)
+      // The request that just timed out started the newest run.
+      if (!runId) runId = runs[0]?.id ?? null
+      const run = runs.find(r => r.id === runId)
+      if (run && run.status !== 'running') return run
+    } catch {
+      // transient fetch failure — keep polling
+    }
+    await sleep(5000)
+  }
+  return null
+}
 
 type Tab = 'design' | 'tools' | 'validate' | 'advanced' | 'history'
 
@@ -216,6 +242,11 @@ export function ExtractionEditorPanel() {
     // picks up the running record the backend creates — otherwise no entry
     // shows until this sync request returns.
     bumpActivitySignal()
+    // Snapshot doc names at run time so exports stay correct if the user
+    // changes selection afterward.
+    const runDocNames: string[] = combinedContext && docUuids.length > 1
+      ? [`Combined (${docUuids.length} docs)`]
+      : docUuids.map(uuid => selectedDocNames[uuid] ?? uuid)
     try {
       const resp = await runExtractionSync({
         search_set_uuid: openExtractionId,
@@ -236,14 +267,34 @@ export function ExtractionEditorPanel() {
         }
       }
       const finalSets = sets.length > 0 ? sets : [{}]
-      // Snapshot doc names at run time so exports stay correct if the user
-      // changes selection afterward.
-      const runDocNames: string[] = combinedContext && docUuids.length > 1
-        ? [`Combined (${docUuids.length} docs)`]
-        : docUuids.map(uuid => selectedDocNames[uuid] ?? uuid)
       setResultSets(finalSets)
       setResultDocNames(finalSets.map((_, i) => runDocNames[i] ?? `Result ${i + 1}`))
       setActiveResultIdx(0)
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 0) {
+        // The request timed out but the backend run is still going. Keep the
+        // progress UI up and recover the results from run history so they
+        // land here instead of only in the History tab.
+        const run = await recoverRunFromHistory(openExtractionId)
+        if (run?.status === 'completed') {
+          const snap = run.result_snapshot as { normalized?: Record<string, unknown> } | undefined
+          const map: Record<string, string> = {}
+          for (const [k, v] of Object.entries(snap?.normalized ?? {})) {
+            map[k] = v === null ? 'N/A' : String(v)
+          }
+          setResultSets([map])
+          // The history snapshot merges all documents into one value map, so
+          // a multi-doc run recovers as a single combined result set.
+          setResultDocNames([docUuids.length > 1 ? `Combined (${docUuids.length} docs)` : runDocNames[0] ?? 'Result 1'])
+          setActiveResultIdx(0)
+        } else if (run) {
+          toast(`Extraction failed: ${run.error || 'unknown error'}`, 'error')
+        } else {
+          toast('This run is taking unusually long — it is still working, and results will appear in the History tab when it finishes', 'info')
+        }
+      } else {
+        toast(err instanceof Error ? err.message : 'Extraction failed', 'error')
+      }
     } finally {
       setRunning(false)
       bumpActivitySignal()
@@ -1052,6 +1103,19 @@ function DesignTab({
   }, [exportMenuOpen])
   const [enumDraft, setEnumDraft] = useState('')
   const tip = useRotatingTip(running, config, docCount, items.length)
+  // Delays single-click expand so a double-click (rename) can cancel it
+  const nameClickTimer = useRef<number | null>(null)
+  useEffect(() => () => {
+    if (nameClickTimer.current) window.clearTimeout(nameClickTimer.current)
+  }, [])
+
+  const toggleSettings = (item: { id: string; enum_values: string[] }) => {
+    setExpandedSettingsId(prev => {
+      const opening = prev !== item.id
+      if (opening) setEnumDraft(item.enum_values.join(', '))
+      return opening ? item.id : null
+    })
+  }
 
   const handleDragStart = (idx: number) => {
     setDragIdx(idx)
@@ -1334,6 +1398,11 @@ function DesignTab({
                     {idx + 1}
                   </span>
                   {editingId === item.id ? (
+                    <>
+                    {expandedSettingsId === item.id
+                      ? <ChevronDown style={{ width: 12, height: 12, color: '#6b7280', flexShrink: 0 }} aria-hidden="true" />
+                      : <ChevronRight style={{ width: 12, height: 12, color: '#6b7280', flexShrink: 0 }} aria-hidden="true" />
+                    }
                     <input
                       autoFocus
                       aria-label="Edit field name"
@@ -1361,14 +1430,45 @@ function DesignTab({
                         outline: 'none',
                       }}
                     />
+                    </>
                   ) : (
-                    <span
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        if (e.detail > 1) return
+                        if (e.detail === 0) {
+                          toggleSettings(item)
+                          return
+                        }
+                        if (window.getSelection()?.toString()) return
+                        if (nameClickTimer.current) window.clearTimeout(nameClickTimer.current)
+                        nameClickTimer.current = window.setTimeout(() => {
+                          nameClickTimer.current = null
+                          toggleSettings(item)
+                        }, 200)
+                      }}
                       onDoubleClick={() => {
+                        if (nameClickTimer.current) {
+                          window.clearTimeout(nameClickTimer.current)
+                          nameClickTimer.current = null
+                        }
                         setEditingId(item.id)
                         setEditDraft(item.searchphrase)
                       }}
-                      style={{ fontSize: 14, color: '#202124', flex: 1, cursor: 'text', display: 'flex', alignItems: 'center', gap: 4 }}
+                      aria-expanded={expandedSettingsId === item.id}
+                      aria-controls={`field-settings-${item.id}`}
+                      title="Click for settings, double-click to rename"
+                      style={{
+                        background: 'none', border: 'none', padding: 0, margin: 0,
+                        fontFamily: 'inherit', fontSize: 14, color: '#202124', flex: 1,
+                        minWidth: 0, cursor: 'pointer', textAlign: 'left',
+                        display: 'flex', alignItems: 'center', gap: 4,
+                      }}
                     >
+                      {expandedSettingsId === item.id
+                        ? <ChevronDown style={{ width: 12, height: 12, color: '#6b7280', flexShrink: 0 }} aria-hidden="true" />
+                        : <ChevronRight style={{ width: 12, height: 12, color: '#6b7280', flexShrink: 0 }} aria-hidden="true" />
+                      }
                       {item.searchphrase}
                       {item.is_optional && (
                         <span style={{ fontSize: 10, color: '#6b7280', background: '#f3f4f6', borderRadius: 3, padding: '1px 4px', fontWeight: 500 }}>opt</span>
@@ -1376,7 +1476,7 @@ function DesignTab({
                       {item.enum_values.length > 0 && (
                         <span style={{ fontSize: 10, color: '#7c3aed', background: '#f5f3ff', borderRadius: 3, padding: '1px 4px', fontWeight: 500 }}>{item.enum_values.length}</span>
                       )}
-                    </span>
+                    </button>
                   )}
                   <button
                     type="button"
@@ -1415,32 +1515,6 @@ function DesignTab({
                     }}
                   >
                     <ChevronDown style={{ width: 14, height: 14 }} aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const opening = expandedSettingsId !== item.id
-                      setExpandedSettingsId(opening ? item.id : null)
-                      if (opening) setEnumDraft(item.enum_values.join(', '))
-                    }}
-                    aria-expanded={expandedSettingsId === item.id}
-                    aria-controls={`field-settings-${item.id}`}
-                    aria-label={`Field settings for ${item.searchphrase}`}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: 4,
-                      color: '#6b7280',
-                      display: 'flex',
-                      flexShrink: 0,
-                    }}
-                    title="Field settings"
-                  >
-                    {expandedSettingsId === item.id
-                      ? <ChevronDown style={{ width: 14, height: 14 }} aria-hidden="true" />
-                      : <ChevronRight style={{ width: 14, height: 14 }} aria-hidden="true" />
-                    }
                   </button>
                   <button
                     type="button"

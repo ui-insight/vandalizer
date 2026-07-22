@@ -2288,25 +2288,40 @@ async def classification_dashboard(user: User = Depends(get_current_user)):
 # ---------------------------------------------------------------------------
 
 
+class TestOcrRequest(BaseModel):
+    ocr_endpoint: Optional[str] = None
+    ocr_api_key: Optional[str] = None
+
+
 @router.post("/config/test-ocr")
-async def test_ocr(user: User = Depends(get_current_user)):
-    """Test OCR endpoint connectivity by sending a small health-check request."""
+async def test_ocr(body: Optional[TestOcrRequest] = None, user: User = Depends(get_current_user)):
+    """Test OCR endpoint connectivity by sending a small health-check request.
+
+    Accepts the admin form's current values so unsaved edits can be tested;
+    an ``"***"`` api key means "use the saved key", the same sentinel the
+    config update path uses. Omitted fields fall back to the saved config.
+    """
     await _require_superadmin(user)
 
     cfg = await SystemConfig.get_config()
-    if not cfg.ocr_endpoint:
+    endpoint = body.ocr_endpoint if body and body.ocr_endpoint is not None else cfg.ocr_endpoint
+    if not endpoint:
         raise HTTPException(status_code=400, detail="OCR endpoint not configured")
 
     import httpx
 
+    if body and body.ocr_api_key is not None and body.ocr_api_key != "***":
+        api_key = body.ocr_api_key
+    else:
+        api_key = decrypt_value(cfg.ocr_api_key) if cfg.ocr_api_key else ""
+
     headers: dict[str, str] = {}
-    api_key = decrypt_value(cfg.ocr_api_key) if cfg.ocr_api_key else ""
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
 
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.get(cfg.ocr_endpoint, headers=headers)
+            resp = await client.get(endpoint, headers=headers)
             return {
                 "status": "ok",
                 "status_code": resp.status_code,

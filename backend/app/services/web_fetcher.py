@@ -270,7 +270,11 @@ async def fetch_url(
         # must be parsed as PDFs, not decoded as HTML. trafilatura/BeautifulSoup
         # on PDF bytes yields either nothing or raw binary, so without this a
         # direct .pdf URL ingests garbage or fails outright.
-        if _looks_like_pdf(url, resp.headers.get("content-type", "")):
+        # WAFs (Akamai on usda.gov, Cloudflare, …) often answer a .pdf URL
+        # with an HTML bot-challenge page and a 200 — only take the PDF path
+        # when the body actually is a PDF, so challenge pages fall through to
+        # HTML extraction where bot-challenge detection can name the failure.
+        if _looks_like_pdf(url, resp.headers.get("content-type", "")) and b"%PDF" in resp.content[:1024]:
             pdf_text, pdf_title, pdf_links = _extract_pdf_response(resp.content, url)
             return WebFetchResult(
                 url=url,

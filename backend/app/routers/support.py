@@ -9,7 +9,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 
 from app.dependencies import get_current_user
-from app.models.support import TicketClassification
+from app.models.support import TicketClassification, TicketPriority
 from app.models.user import User
 from app.services import support_service
 
@@ -35,6 +35,8 @@ class EditMessageRequest(BaseModel):
 class UpdateTicketRequest(BaseModel):
     status: str | None = None
     priority: str | None = None
+    # Empty string clears the classification (same convention as assigned_to).
+    classification: str | None = None
     assigned_to: str | None = None
     tags: list[str] | None = None
     subject: str | None = None
@@ -488,9 +490,9 @@ async def update_ticket(
 ):
     """Update a ticket.
 
-    Status, priority, assignment, and tags are support-staff only. The
-    ``subject`` (title) can also be edited by the ticket's own author, so users
-    can fix a title after filing.
+    Status, priority, classification, assignment, and tags are support-staff
+    only. The ``subject`` (title) can also be edited by the ticket's own
+    author, so users can fix a title after filing.
     """
     ticket = await support_service.get_ticket(ticket_uuid)
     if not ticket:
@@ -501,13 +503,33 @@ async def update_ticket(
 
     support_only = any(
         v is not None
-        for v in (body.status, body.priority, body.assigned_to, body.tags)
+        for v in (
+            body.status, body.priority, body.classification,
+            body.assigned_to, body.tags,
+        )
     )
     if support_only and not is_support:
         raise HTTPException(
             status_code=403,
-            detail="Only support staff can change status, priority, assignment, or tags",
+            detail="Only support staff can change status, priority, type, assignment, or tags",
         )
+
+    # Validate enum-backed fields up-front so a bad value returns a clean 400
+    # rather than a 500 from the enum conversion in the service.
+    if body.priority is not None:
+        valid = {p.value for p in TicketPriority}
+        if body.priority not in valid:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid priority. Must be one of: {', '.join(sorted(valid))}",
+            )
+    if body.classification:  # empty string clears, so only non-empty is checked
+        valid = {c.value for c in TicketClassification}
+        if body.classification not in valid:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid classification. Must be one of: {', '.join(sorted(valid))}",
+            )
 
     if body.subject is not None:
         if not (is_support or is_owner):
@@ -521,6 +543,7 @@ async def update_ticket(
         ticket_uuid=ticket_uuid,
         status=body.status,
         priority=body.priority,
+        classification=body.classification,
         assigned_to=body.assigned_to,
         tags=body.tags,
         subject=body.subject,
