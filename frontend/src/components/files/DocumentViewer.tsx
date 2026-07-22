@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ZoomIn, ZoomOut, Maximize2, ChevronLeft, ChevronRight, Loader2, X, Search, AlertCircle, RefreshCw } from 'lucide-react'
+import { ZoomIn, ZoomOut, Maximize2, ChevronLeft, ChevronRight, Loader2, X, Search, AlertCircle, RefreshCw, FileText, Download } from 'lucide-react'
 import { downloadFileUrl } from '../../api/files'
 import { pollStatus, retryExtraction } from '../../api/documents'
 import { SpreadsheetViewer } from './SpreadsheetViewer'
@@ -121,6 +121,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
   const [extractionError, setExtractionError] = useState<string | null>(null)
   const [retrying, setRetrying] = useState(false)
   const [blobUrl, setBlobUrl] = useState<string | null>(null) // for non-PDF iframe fallback
+  const [previewUnavailable, setPreviewUnavailable] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null)
   const renderingRef = useRef(false)
@@ -177,6 +178,7 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
     setIsDocx(false)
     setDocxText(null)
     setBlobUrl(null)
+    setPreviewUnavailable(false)
 
     fetch(inlineUrl, { method: 'HEAD', credentials: 'include' })
       .then(async (resp) => {
@@ -208,9 +210,9 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
           }).catch(() => {
             if (!cancelled) setDocxText('')
           })
-        } else {
-          // Generic fallback: fetch into a blob URL so the iframe inherits
-          // browser-side caching and doesn't need a second auth round-trip.
+        } else if (ct.startsWith('image/')) {
+          // Fetch into a blob URL so the iframe inherits browser-side
+          // caching and doesn't need a second auth round-trip.
           const fullResp = await fetch(inlineUrl, { credentials: 'include' })
           if (cancelled) return
           const blob = await fullResp.blob()
@@ -218,10 +220,19 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
           createdBlobUrl = URL.createObjectURL(blob)
           setBlobUrl(createdBlobUrl)
           setIsPdf(false)
+        } else {
+          // Unknown type: an iframe pointed at an unrenderable blob makes
+          // the browser silently download a UUID-named file — show an
+          // explicit "no preview" panel with a real download link instead.
+          setPreviewUnavailable(true)
+          setIsPdf(false)
         }
       })
       .catch(() => {
-        if (!cancelled) setIsPdf(false)
+        if (!cancelled) {
+          setPreviewUnavailable(true)
+          setIsPdf(false)
+        }
       })
 
     return () => {
@@ -873,6 +884,41 @@ export function DocumentViewer({ docUuid, highlightTerms = [], onClearHighlights
         {processingOverlay}
         <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#525659' }}>
           <div role="status" aria-live="polite" style={{ color: '#9ca3af', fontSize: 14 }}>Loading document...</div>
+        </div>
+      </div>
+    )
+  }
+
+  // Unknown format: no in-browser preview — offer the original for download.
+  if (previewUnavailable) {
+    return (
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+        {processingOverlay}
+        <div style={{
+          flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
+          justifyContent: 'center', gap: 16, padding: 32, textAlign: 'center',
+          backgroundColor: '#f9fafb',
+        }}>
+          <FileText style={{ width: 40, height: 40, color: '#9ca3af' }} />
+          <div style={{ fontSize: 15, fontWeight: 600, color: '#111' }}>
+            No preview available
+          </div>
+          <div style={{ fontSize: 14, color: '#555', maxWidth: 420, lineHeight: 1.5 }}>
+            This file is in a format the viewer can&rsquo;t display. You can download
+            the original to open it in another application.
+          </div>
+          <a
+            href={downloadUrl}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 14px', fontSize: 14, fontWeight: 500,
+              backgroundColor: 'var(--highlight-color)', color: '#fff',
+              borderRadius: 6, textDecoration: 'none',
+            }}
+          >
+            <Download style={{ width: 14, height: 14 }} />
+            Download original
+          </a>
         </div>
       </div>
     )
