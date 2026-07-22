@@ -1,0 +1,36 @@
+PART 1104—IMPLEMENTATION OF GOVERNMENTWIDE GUIDANCE FOR GRANTS AND COOPERATIVE AGREEMENTS
+
+Authority:5 U.S.C. 301 and 10 U.S.C. 113.
+Source:85 FR 51160, Aug. 19, 2020, unless otherwise noted.
+
+§ 1104.1 Purpose of this part.
+
+This part provides an update to the DoD interim implementation of Office of Management and Budget (OMB) guidance in 2 CFR part 200. It supersedes the initial interim implementation of that guidance that DoD adopted in 2 CFR part 1103 on December 19, 2014.
+
+§ 1104.100 Award format for DoD Components' grants and cooperative agreements.
+
+DoD Components must conform the format of new grants and cooperative agreements to the standard award format specified in part 1120 of the DoD Grant and Agreement Regulations (DoDGARS) (2 CFR part 1120). The standard format provides locations within the award for:
+(a) General terms and conditions, including the administrative and national policy requirements discussed in § 1104.105(a) and (b), respectively.
+(b) Any award-specific terms and conditions discussed in § 1104.110.
+
+§ 1104.105 Regulations governing DoD Components' general terms and conditions.
+
+(a) Administrative requirements. On an interim basis pending completion of the update of the DoDGARs to implement OMB guidance published in 2 CFR part 200, the following regulatory provisions govern the administrative requirements to be included in general terms and conditions of DoD Components' new grants and cooperative agreements:
+(1) The provisions of parts 1126 through 1138 of the DoDGARs (2 CFR parts 1126 through 1138, which comprise subchapter D of this chapter) govern the administrative requirements to be included in the general terms and conditions of DoD Components' new grants and cooperative agreements awarded to institutions of higher education, nonprofit organizations, States, local governments, and Indian tribes.
+(2) Part 34 of the DoDGARs (32 CFR part 34) governs the administrative requirements to be included in general terms and conditions of DoD Components' grants and cooperative agreements awarded to for-profit entities.
+(b) National policy requirements. Part 1122 of the DoDGARs (2 CFR part 1122) governs the national policy requirements to be included in DoD Components' new grants and cooperative agreements awarded to all types of entities.
+
+§ 1104.110 Regulations governing DoD Components' award-specific terms and conditions.
+
+On an interim basis pending completion of the update of the DoDGARs to implement OMB guidance published in 2 CFR part 200:
+(a) The guidance in 2 CFR part 200 governs administrative requirements to be included in any award-specific terms and conditions used to supplement the general terms and conditions of a new grant or cooperative agreement awarded to an institution of higher education, nonprofit organization, State, local government, or Indian tribe.
+(b) Part 34 of the DoDGARs (32 CFR part 34) governs the administrative requirements to be included in any award-specific terms and conditions of DoD Components' grants and cooperative agreements awarded to for-profit entities.
+
+§ 1104.115 Regulations governing DoD Components' internal procedures.
+
+On an interim basis pending completion of the update of the DoDGARs to implement OMB guidance published in 2 CFR part 200, DoD Components' internal pre-award, time-of-award, and post-award procedures will continue to comply with requirements in parts 21 and 22 of the DoDGARs (32 CFR parts 21 and 22) and other applicable Defense Grant and Agreement Regulatory System (DGARS) policies.
+
+§ 1104.120 Definitions.
+
+(a) DoD Grant and Agreement Regulations or DoDGARs means the regulations in chapter I, subchapter C of title 32, Code of Federal Regulations, and chapter XI of title 2, Code of Federal Regulations.
+(b) Other terms. See part 1108 of the DoDGARs for definitions of other terms used in this part.

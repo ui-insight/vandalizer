@@ -1,0 +1,202 @@
+Subpart C—Pre-Federal Award Requirements and Contents of Federal Awards
+
+§ 200.200 Purpose.
+
+Sections 200.201 through 200.217 prescribe instructions and other pre-award matters to be used by Federal agencies in the program planning, announcement, application, and award processes.
+
+§ 200.201 Use of grants, cooperative agreements, fixed amount awards, and contracts.
+
+(a) Federal awards. The Federal agency or pass-through entity must decide on the appropriate type of agreement for a Federal award (for example, a grant, cooperative agreement, subaward, or contract) in accordance with this guidance. See the Federal Grant and Cooperative Agreement Act (31 U.S.C. 6301-6309).
+(b) Fixed amount awards. The Federal agency or pass-through entity (see § 200.333) may use fixed amount awards (see the definition of fixed amount awards in § 200.1) for which the following conditions apply:
+(1) The Federal award amount is negotiated using the cost principles (or other pricing information) as a guide. See § 200.101(b)(4)(ii) for further information on which provisions in subpart E (cost principles) apply to fixed amount awards. The Federal agency or pass-through entity may use fixed amount awards if the project scope has measurable goals and objectives and if accurate cost, historical, or unit pricing data is available to establish a fixed budget based on a reasonable estimate of actual costs. Budgets for fixed amount awards are negotiated with the recipient or subrecipient and the total amount of Federal funding is determined in accordance with the recipient's or subrecipient's proposal, available pricing data, and subpart E. Accountability must be based on performance and results, which can be communicated in performance reports or through routine monitoring. There is no expected routine monitoring of the actual costs incurred by the recipient or subrecipient under the Federal award. Therefore, no financial reporting is required. This does not absolve the recipient or subrecipient from the record retention requirements contained in §§ 200.334 through 200.338; nor does it absolve the recipient or subrecipient of the responsibilities of making records available for review during an audit. See § 200.101(b)(5)(i). Payments must be based on meeting specific requirements of the Federal award. Some of the ways in which the Federal award may be paid include, but are not limited to:
+(i) In several partial payments. The amount of each payment as well as the “milestone” or event triggering the payment, should be agreed to in advance and included in the Federal award;
+(ii) On a unit price basis. The defined unit(s) or price(s) should be agreed to in advance and included in the Federal award; or
+(iii) In one payment at the completion of the Federal award.
+(2) A fixed amount award must not be used in programs that require cost sharing.
+(3) A fixed amount award may generate and use program income in accordance with the terms and conditions of the Federal award; however, the requirements of § 200.307 do not apply.
+(4) At the end of a fixed amount award, the recipient or subrecipient must certify in writing to the Federal agency or pass-through entity that the project was completed as agreed to in the Federal award, or identify those activities that were not completed, and that all expenditures were incurred in accordance with § 200.403. When the required activities were not carried out, including fixed amount awards paid on a unit price basis under 200.201(b)(1)(ii), the amount of the Federal award must be reduced by the amount that reflects the activities that were not completed in accordance with the Federal award. When the required activities were completed in accordance with the terms and conditions of the Federal award, the recipient or subrecipient is entitled to any unexpended funds.
+(5) Periodic reports may be established for fixed amount awards.
+(6) Prior approval requirements that apply to fixed amount awards are § 200.308(f) (paragraphs 1 through 3, 6 through 8, and 10) and § 200.333.
+
+§ 200.202 Program planning and design.
+
+(a) The Federal agency must design a program and create an Assistance Listing before announcing the Notice of Funding Opportunity. A program must be designed:
+(1) With clear goals and objectives that provide meaningful results and be consistent with the Federal authorizing legislation of the program;
+(2) To measure performance based on the goals and objectives developed during program planning and design. Performance measures may differ depending on the type of program. See § 200.301 for more information on performance measurement;
+(3) To align with the strategic goals and objectives within the Federal agency's performance plan and support the Federal agency's performance measurement, management, customer service initiatives, and reporting as required by Part 6 of OMB Circular A-11 (Preparation, Submission, and Execution of the Budget);
+(4) To align with the Program Management Improvement Accountability Act (Pub. L. 114-264) as well as the Foundations for Evidence-Based Policymaking Act (Pub. L. 115-435), as applicable; and
+(5) To encourage applicants to engage, when practicable, during the design phase, members of the community that will benefit from or be impacted by a program.
+(b) Federal agencies should develop programs in consultation with communities benefiting from or impacted by the program. In addition, Federal agencies should consider available data, evidence, and evaluation results from past programs and make every effort to extend eligibility requirements to all potential applicants. Federal agencies are encouraged to coordinate with other agencies during program planning and design, particularly when the goals and objectives of a program or project align with those of other agencies.
+
+§ 200.203 Requirement to provide public notice of Federal financial assistance programs.
+
+(a) The Federal agency must maintain an accurate list of Federal programs in the Assistance Listings maintained by the General Services Administration (GSA) at SAM.gov.
+(1) The Assistance Listings is the comprehensive government-wide source of Federal financial assistance program information produced by the executive branch of the Federal Government.
+(2) The information that the Federal agency must submit to GSA for approval by OMB is listed in paragraph (b). GSA must prescribe the format for the submission in coordination with OMB.
+(3) The Federal agency must assign the appropriate Assistance Listing before making the Federal award unless exigent circumstances require otherwise (for example, timing requirements imposed by a Federal statute).
+(b) To the extent practicable, the Federal agency must create, update, and manage Assistance Listing entries based on the authorizing statute for the program and comply with additional guidance provided by GSA (in consultation with OMB) to ensure consistent and accurate information is available to prospective applicants. Assistance Listings should be communicated to the public in plain language. Accordingly, Federal agencies must submit the following information to GSA when creating an Assistance Listing:
+(1) Program Description, Purpose, Goals, and Measurement. A brief summary of the statutory or regulatory requirements of the program and its intended outcome. Where appropriate, the program description, purpose, goals, and performance measurement should align with the strategic goals and objectives within the Federal agency's performance plan and should support the Federal agency's performance measurement, management, customer experience initiatives, and reporting as required by Part 6 of OMB Circular A-11;
+(2) Identification. Identification of whether the program will issue Federal awards on a discretionary or non-discretionary basis;
+(3) Projected total amount of funds available for the program. Estimates based on previous year funding are acceptable if current appropriations are not available at the time of the submission;
+(4) Anticipated source of available funds. The statutory authority for funding the program and the agency, sub-agency, or specific program unit that will issue the Federal awards (to the extent possible) and associated funding identifier (for example, Treasury Account Symbol(s));
+(5) General eligibility requirements. The statutory, regulatory, or other eligibility factors or considerations that determine the applicant's qualification for Federal awards under the program (for example, type of recipient); and
+(6) Applicability of Single Audit Requirements. Applicability of Single Audit Requirements as required by subpart F.
+
+§ 200.204 Notices of funding opportunities.
+
+The Federal agency must announce specific funding opportunities for Federal financial assistance that will be openly competed. The term openly competed means opportunities that are not directed to one or more specifically identified applicants. To the extent possible, the Federal agency should communicate opportunities to the public in plain language to ensure the announcement is accessible to diverse communities of eligible applicants, including underserved communities. The Federal agency should also make efforts to limit the length and complexity of the announcement and only include the information that is necessary for the effective communication of the program objectives. Federal agencies may offer pre-application technical assistance or provide clarifying information for funding opportunities. However, Federal agencies must ensure these resources are made accessible and widely available to all potential applicants (for example, by posting answers to questions and requests on Grants.gov). The Federal agency should make every effort to identify in the NOFO all eligible applicants (for example, different types of nonprofit organizations such as labor unions and tribal organizations). The following information must be provided in a public notice:
+(a) Summary information in notices of funding opportunities. The Federal agency must display the following information on Grants.gov, in a location preceding the full text of the announcement:
+(1) Federal Agency Name;
+(2) Funding Opportunity Title;
+(3) Announcement Type (whether the funding opportunity is the initial announcement or a modification of a previously announced opportunity);
+(4) Funding Opportunity Number (required, if the Federal agency has assigned a number to the funding opportunity announcement);
+(5) Assistance Listing Number(s);
+(6) Funding Details. To the extent appropriate, the total amount of funding that the Federal agency expects to award, the anticipated number of awards, and the expected dollar values of individual awards, which may be a range or average;
+(7) Key Dates. Key dates include due dates for submitting applications or Executive Order 12372 submissions, as well as for any letters of intent or preapplications. For any announcement issued before a program's application materials are available, key dates also include the date on which those materials will be released; and any other additional information, as deemed applicable by the Federal agency. If possible, the Federal agency should provide an anticipated award date. If the NOFO states that applications will be evaluated on a “rolling” basis (that is, at different points during a specified period of time), the Federal agency should provide an estimate of the time needed to process an application and notify the applicant of the Federal agency's decision;
+(8) Executive Summary. A brief description that is written in plain language and summarizes the goals and objectives of the program, the target audience, and eligible applicants. The text of the executive summary should not exceed 500 words; and
+(9) Agency contact information.
+(b) Availability period. The Federal agency should make all funding opportunities available for application for at least 60 calendar days. However, the Federal agency may modify the availability period of an opportunity as needed. For example, extending the period may be necessary to provide technical assistance to an applicant pool that was not anticipated when the announcement was made or has less experience with applying for Federal financial assistance. The Federal agency may also determine that an availability period of less than 60 days is sufficient for a particular funding opportunity. However, no funding opportunity should be available for less than 30 calendar days unless the Federal agency determines that exigent circumstances justify this.
+(c) Full text of funding opportunities. (1) The Federal agency must include the information in Appendix I for every funding opportunity.
+(2) Federal agencies should ensure that funding opportunities are written using plain language. To the extent possible Federal agencies must streamline opportunities to make them accessible, particularly for funding opportunities that are new, targeted to underserved communities, or intended to reach inexperienced applicants.
+(3) To reduce application burden, Federal agencies should consider whether programmatic or administrative requirements specific to the agency, program, or funding opportunity must be met at the time of application or as a requirement of receiving a Federal award.
+
+§ 200.205 Federal agency review of merit of proposals.
+
+Unless prohibited by Federal statute, the Federal agency must design and execute a merit review process of applications for discretionary Federal awards. The objective of a merit review process is to select recipients most likely to be successful in delivering results based on the program objectives as outlined in section § 200.202. A merit review is an objective process of evaluating Federal award applications in accordance with the written standards of the Federal agency. These standards should identify the number of people the agency requires to participate in the merit review process and provide opportunities for a diverse group of participants, including those representing underserved communities. The merit review process explained in this section must be described or incorporated by reference in the applicable funding opportunity. See appendix I to this part. See also § 200.204. The Federal agency must also periodically review its merit review process.
+
+§ 200.206 Federal agency review of risk posed by applicants.
+
+(a) Review of OMB-designated repositories of government-wide data. (1) Prior to making a Federal award, the Federal agency is required to review eligibility information for applicants and financial integrity information for applicants available in OMB-designated databases per the Payment Integrity Information Act of 2019 (Pub. L. 116-117), the “Do Not Pay Initiative” (31 U.S.C. 3354), and 41 U.S.C. 2313.
+(2) The Federal agency is required to review the responsibility and qualification records available in the non-public segment of the System for Award Management (SAM.gov) prior to making a Federal award where the Federal share is expected to exceed the simplified acquisition threshold, defined at 41 U.S.C. 134, over the period of performance. See 41 U.S.C. 2313. The Federal agency must consider all of the information available in SAM.gov with regard to the applicant and any immediate highest-level owner, predecessor (meaning, an organization that is replaced by a successor), or subsidiary, identified for that applicant in SAM.gov. See Public Law 112-239, National Defense Authorization Act for Fiscal Year 2013; 41 U.S.C. 2313(d). The information in the system for a prior recipient of a Federal award must demonstrate a satisfactory record of administering programs or activities under Federal financial assistance or procurement awards, and integrity and business ethics. The Federal agency may make a Federal award to a recipient that does not fully meet these standards if it is determined that the information is not relevant to the Federal award under consideration or there are specific conditions that can appropriately mitigate the risk associated with the recipient in accordance with § 200.208.
+(b) Risk Assessment. (1) The Federal agency must establish and maintain policies and procedures for conducting a risk assessment to evaluate the risks posed by applicants before issuing Federal awards. This assessment helps identify risks that may affect the advancement toward or the achievement of a project's goals and objectives. Risk assessments assist Federal managers in determining appropriate resources and time to devote to project oversight and monitor recipient progress. This assessment may incorporate elements such as the quality of the application, award amount, risk associated with the program, cybersecurity risks, fraud risks, and impacts on local jobs and the community. If the Federal agency determines that the Federal award will be made, specific conditions that address the assessed risk may be implemented in the Federal award. The risk criteria to be evaluated must be described in the announcement of the funding opportunity described in § 200.204.
+(2) In evaluating risks posed by applicants, the Federal agency should consider the following items:
+(i) Financial stability. The applicant's record of effectively managing financial risks, assets, and resources;
+(ii) Management systems and standards. Quality of management systems and ability to meet the management standards prescribed in this part;
+(iii) History of performance. The applicant's record of managing previous and current Federal awards, including compliance with reporting requirements and conformance to the terms and conditions of Federal awards, if applicable;
+(iv) Audit reports and findings. Reports and findings from audits performed under subpart F or the reports and findings of any other available audits, if applicable; and
+(v) Ability to effectively implement requirements. The applicant's ability to effectively implement statutory, regulatory, or other requirements imposed on recipients of Federal awards.
+(c) Adjustments to the Risk Assessment. The Federal agency may modify the risk assessment at any time during the period of performance, which may justify changes to the terms and conditions of the Federal award. See § 200.208.
+(d) Suspension and debarment compliance. The Federal agency must comply with the government-wide suspension and debarment guidance in 2 CFR part 180 and individual Federal agency suspension and debarment requirements in title 2 of the Code of Federal Regulations. Federal agencies must also require recipients to comply with these requirements. These requirements restrict making Federal awards, subawards, and contracts with certain parties that are debarred, suspended, or otherwise excluded from receiving Federal awards or participating in Federal awards.
+
+§ 200.207 Standard application requirements.
+
+(a) Paperwork clearances. The Federal agency may only use application information collections approved by OMB under the Paperwork Reduction Act of 1995 and OMB's implementing regulations in 5 CFR part 1320 and in alignment with OMB-approved, government-wide data elements available from the OMB-designated standards lead. Examples of application information collections approved by OMB include the Standard Forms 424 (SF-424), which is available on Grants.gov, and the Biographical Sketch Common Form (OMB Control Number 3145-0279), which Federal agencies should use to collect biographical sketches and other disclosure information from award applicants. OMB will authorize additional information collections only on a limited basis and consistent with these requirements.
+(b) Information collection. The Federal agency may inform applicants that they do not need to provide certain information already being collected through other means.
+
+§ 200.208 Specific conditions.
+
+(a) Federal agencies are responsible for ensuring that specific Federal award conditions and performance expectations are consistent with the program design (See § 200.202 and § 200.301).
+(b) The Federal agency or pass-through entity may adjust specific conditions in the Federal award based on an analysis of the following factors:
+(1) Review of OMB-designated repositories of government-wide data (for example, SAM.gov) or review of its risk assessment (See § 200.206);
+(2) The recipient's or subrecipient's history of compliance with the terms and conditions of Federal awards;
+(3) The recipient's or subrecipient's ability to meet expected performance goals as described in § 200.211; or
+(4) A determination of whether a recipient or subrecipient has inadequate financial capability to perform the Federal award.
+(c) Specific conditions may include the following:
+(1) Requiring payments as reimbursements rather than advance payments;
+(2) Withholding authority to proceed to the next phase until receipt of evidence of acceptable performance;
+(3) Requiring additional or more detailed financial reports;
+(4) Requiring additional project monitoring;
+(5) Requiring the recipient or subrecipient to obtain technical or management assistance; or
+(6) Establishing additional prior approvals.
+(d) Prior to imposing specific conditions, the Federal agency or pass-through entity must notify the recipient or subrecipient as to:
+(1) The nature of the specific condition(s);
+(2) The reason why the specific condition(s) is being imposed;
+(3) The nature of the action needed to remove the specific condition(s);
+(4) The time allowed for completing the actions; and
+(5) The method for requesting the Federal agency or pass-through entity to reconsider imposing a specific condition.
+(e) Any specific conditions must be promptly removed once the conditions that prompted them have been satisfied.
+
+§ 200.209 Certifications and representations.
+
+Unless prohibited by the U.S. Constitution, Federal statutes, or regulations, a Federal agency or pass-through entity is authorized to require a recipient to submit annual certifications and representations. Submission may be required more frequently if a recipient or subrecipient fails to meet a requirement of a Federal award. When a recipient is provided an exception to the requirements of 2 CFR 25.110, the recipient must submit the appropriate assurance form (for example, SF-424B).
+
+§ 200.210 Pre-award costs.
+
+For requirements on costs incurred by the applicant prior to the start date of the period of performance of the Federal award, see § 200.458.
+
+§ 200.211 Information contained in a Federal award.
+
+The Federal award must include the following information:
+(a) Federal award performance goals. Where applicable, performance goals, indicators, targets, and baseline data must be included in the Federal award. The Federal agency must also specify in the terms and conditions of the Federal award how performance will be assessed, including the timing and scope of expected performance. See §§ 200.202 and 200.301 for more information on Federal award performance goals.
+(b) General Federal award information. The Federal agency must include the following information in each Federal award:
+(1) Recipient Name (which must match the name associated with its unique entity identifier as defined at 2 CFR 25.400);
+(2) Recipient's Unique Entity Identifier;
+(3) Unique Federal Award Identification Number (FAIN);
+(4) Federal Award Date (see Federal award date in § 200.1);
+(5) Period of Performance Start and End Date;
+(6) Budget Period Start and End Date;
+(7) Amount of Federal Funds Obligated by this Action;
+(8) Total Amount of Federal Funds Obligated;
+(9) Total Approved Cost Sharing, where applicable;
+(10) Total Amount of the Federal Award including approved Cost Sharing;
+(11) Budget Approved by the Federal Agency;
+(12) Federal Award Description (to comply with statutory requirements (for example, FFATA));
+(13) Name of the Federal agency (including contact information for the awarding official);
+(14) Assistance Listings Number and Title;
+(15) Identification of whether the Award is R&D; and
+(16) Indirect Cost Rate for the Federal award (including if the de minimis rate is charged per § 200.414).
+(c) General terms and conditions. (1) Federal agencies must incorporate the following general terms and conditions either in the Federal award or by reference, as applicable:
+(i) Administrative requirements. Administrative requirements implemented by the Federal agency as specified in this part.
+(ii) National policy requirements. These include statutory, executive order, other Presidential directive, or regulatory requirements that apply by specific reference and are not program-specific. See § 200.300 Statutory and national policy requirements.
+(iii) Recipient integrity and performance matters. When the total Federal share of the Federal award may include more than $500,000 over the period of performance, the Federal agency must include the terms and conditions available in Appendix XII. See also § 200.113.
+(iv) Future budget periods. When it is anticipated that the period of performance will include multiple budget periods, the Federal agency must indicate that subsequent budget periods are subject to the availability of funds, program authority, satisfactory performance, and compliance with the terms and conditions of the Federal award.
+(v) Termination provisions. Federal agencies must inform recipients of the termination provisions in § 200.340, including the applicable termination provisions in the Federal agency's regulations or terms and conditions of the Federal award.
+(2) The Federal award must incorporate, by reference, all general terms and conditions of the Federal award, which must be maintained on the Federal agency's website.
+(3) The Federal agency must provide a copy of the full text of the general terms and conditions if a recipient requests it.
+(4) The Federal agency must maintain an archive of previous versions of the general terms and conditions, with effective dates, for use by a recipient, auditors, or others. The archive should be located on the Federal agency's website in the same place where current terms and conditions are available.
+(d) Federal award specific terms and conditions. The Federal agency must include in each Federal award any specific terms and conditions that are in addition to the general terms and conditions. See also § 200.208. For loan and loan guarantee programs, the Federal agency must specify whether or not the Federal award has continuing compliance requirements. Whenever practicable, these specific terms and conditions should also be available on the Federal agency's website and in notices of funding opportunities (as outlined in § 200.204).
+(e) Federal agency requirements. Any other information required by the Federal agency.
+
+§ 200.212 Public access to Federal award information.
+
+(a) Except as noted in paragraph (c) of this section, the Federal agency must publish the required Federal award information on USAspending.gov in accordance with the guidance provided by OMB and the U.S. Department of the Treasury's Government-wide Spending Data Model (GSDM).
+(b) All responsibility and qualification records posted in SAM.gov will be publicly available after a waiting period of 14 calendar days, except for:
+(1) Past performance reviews required by Federal Government contractors (See Federal Acquisition Regulation (FAR) 48 CFR part 42, subpart 42.15);
+(2) Information that was entered prior to April 15, 2011; or
+(3) Information that is withdrawn during the 14-calendar day waiting period by a Federal agency.
+(c) Nothing in this section may be construed as requiring the publication of information otherwise exempt under the Freedom of Information Act (5 U.S.C. 552), or controlled unclassified information pursuant to Executive Order 13556.
+
+§ 200.213 Reporting a determination that an applicant is not qualified for a Federal award.
+
+(a) The Federal agency must report in SAM.gov if it does not make a Federal award to an applicant because it determines that the applicant does not meet the minimum qualification standards as described in § 200.206(a)(2). The Federal agency must report that determination only if all of the following apply:
+(1) The only basis for the determination is the applicant's prior record of performance on administering Federal awards or its record of integrity and business ethics, as described in § 200.206(a)(2) (meaning, the applicant was determined to be qualified based on all factors other than those two standards); and
+(2) The total Federal share of the Federal award was expected to exceed the simplified acquisition threshold over the period of performance.
+(b) The Federal agency is not required to report a determination that an applicant is not qualified for a Federal award if they issue the Federal award in accordance with the requirements of § 200.208.
+(c) If the Federal agency reports a determination that an applicant is not qualified for a Federal award, the Federal agency also must notify the applicant that:
+(1) The determination was made and reported in SAM.gov. The notification from the Federal agency to the applicant should also provide a brief explanation for the determination;
+(2) The information will be kept in the system for a period of five years from the date of the determination and then archived (See section 872 of Public Law 110-417, as amended, codified at 41 U.S.C. 2313);
+(3) Each Federal agency that considers making a Federal award to the applicant during that five-year period will consider that information in determining the applicant's qualification to receive a Federal award when the total Federal share of a Federal award is expected to exceed the simplified acquisition threshold over the period of performance;
+(4) The applicant may review the responsibility and qualification records accessible in SAM.gov and comment on any information the system contains about the applicant; and
+(5) Federal agencies must consider the applicant's comments in determining whether the applicant is qualified for a future Federal award.
+(d) If the Federal agency enters information into SAM.gov about a determination that an applicant is not qualified for a Federal award and subsequently:
+(1) Learns that any of that information is erroneous, the Federal agency must correct the information in the system within three business days; and
+(2) Obtains an update to that information that could be helpful to other Federal agencies, the Federal agency should amend the information in the system within 30 days.
+(e) Federal agencies must not post any information that will be made publicly available in the non-public segment of the responsibility and qualification records that is covered by a disclosure exemption under the Freedom of Information Act. If a recipient asserts within seven calendar days to a Federal agency that some or all of the publicly available information is covered by a disclosure exemption under the Freedom of Information Act, the Federal agency that posted the information must remove the posting within seven calendar days of receiving the assertion. Prior to reposting the releasable information, the Federal agency must resolve the issue in accordance with the agency's Freedom of Information Act procedures.
+
+§ 200.214 Suspension and debarment.
+
+Recipients and subrecipients are subject to the nonprocurement debarment and suspension regulations implementing Executive Orders 12549 and 12689, as well as 2 CFR part 180. The regulations in 2 CFR part 180 restrict making Federal awards, subawards, and contracts with certain parties that are debarred, suspended, or otherwise excluded from receiving or participating in Federal awards.
+
+§ 200.215 Never contract with the enemy.
+
+Federal agencies, recipients, and subrecipients are subject to the guidance implementing Never Contract with the Enemy in 2 CFR part 183. The guidance in 2 CFR part 183 affects covered contracts, grants, and cooperative agreements that are expected to exceed $50,000 during the period of performance, are performed outside the United States and its territories, and are in support of a contingency operation in which members of the Armed Forces are actively engaged in hostilities.
+
+§ 200.216 Prohibition on certain telecommunications and video surveillance equipment or services.
+
+(a) Recipients and subrecipients are prohibited from obligating or expending loan or grant funds to:
+(1) Procure or obtain covered telecommunications equipment or services;
+(2) Extend or renew a contract to procure or obtain covered telecommunications equipment or services; or
+(3) Enter into a contract (or extend or renew a contract) to procure or obtain covered telecommunications equipment or services.
+(b) As described in section 889 of Public Law 115-232, “covered telecommunications equipment or services” means any of the following:
+(1) Telecommunications equipment produced by Huawei Technologies Company or ZTE Corporation (or any subsidiary or affiliate of such entities);
+(2) For the purpose of public safety, security of government facilities, physical security surveillance of critical infrastructure, and other national security purposes, video surveillance and telecommunications equipment produced by Hytera Communications Corporation, Hangzhou Hikvision Digital Technology Company, or Dahua Technology Company (or any subsidiary or affiliate of such entities);
+(3) Telecommunications or video surveillance services provided by such entities or using such equipment;
+(4) Telecommunications or video surveillance equipment or services produced or provided by an entity that the Secretary of Defense, in consultation with the Director of the National Intelligence or the Director of the Federal Bureau of Investigation, reasonably believes to be an entity owned or controlled by, or otherwise connected to, the government of a covered foreign country;
+(c) For the purposes of this section, “covered telecommunications equipment or services” also include systems that use covered telecommunications equipment or services as a substantial or essential component of any system, or as critical technology as part of any system.
+(d) In implementing the prohibition under section 889 of Public Law 115-232, heads of executive agencies administering loan, grant, or subsidy programs must prioritize available funding and technical support to assist affected businesses, institutions, and organizations as is reasonably necessary for those affected entities to transition from covered telecommunications equipment or services, to procure replacement equipment or services, and to ensure that communications service to users and customers is sustained.
+(e) When the recipient or subrecipient accepts a loan or grant, it is certifying that it will comply with the prohibition on covered telecommunications equipment and services in this section. The recipient or subrecipient is not required to certify that funds will not be expended on covered telecommunications equipment or services beyond the certification provided upon accepting the loan or grant and those provided upon submitting payment requests and financial reports.
+(f) For additional information, see section 889 of Public Law 115-232 and § 200.471.
+
+§ 200.217 Whistleblower protections.
+
+An employee of a recipient or subrecipient must not be discharged, demoted, or otherwise discriminated against as a reprisal for disclosing to a person or body described in paragraph (a)(2) of 41 U.S.C. 4712 information that the employee reasonably believes is evidence of gross mismanagement of a Federal contract or grant, a gross waste of Federal funds, an abuse of authority relating to a Federal contract or grant, a substantial and specific danger to public health or safety, or a violation of law, rule, or regulation related to a Federal contract (including the competition for or negotiation of a contract) or grant. The recipient and subrecipient must inform their employees in writing of employee whistleblower rights and protections under 41 U.S.C. 4712. See statutory requirements for whistleblower protections at 10 U.S.C. 4701, 41 U.S.C. 4712, 41 U.S.C. 4304, and 10 U.S.C. 4310.
