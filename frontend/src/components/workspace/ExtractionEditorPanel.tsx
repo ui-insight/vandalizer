@@ -206,7 +206,11 @@ export function ExtractionEditorPanel() {
     const cleanTitle = normalizeName(titleDraft)
     if (!openExtractionId || cleanTitle === searchSet?.title) return
     if (blockedByVerified()) return
-    await updateSearchSet(openExtractionId, { title: cleanTitle || searchSet?.title })
+    try {
+      await updateSearchSet(openExtractionId, { title: cleanTitle || searchSet?.title })
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to rename', 'error')
+    }
     refresh()
   }
 

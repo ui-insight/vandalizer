@@ -133,6 +133,31 @@ class TestCreateWorkflow:
             "New Workflow", "testuser", "A test workflow", team_id=None,
         )
 
+    @pytest.mark.asyncio
+    async def test_create_workflow_duplicate_name_returns_409(self, client):
+        from app.services.name_conflicts import DuplicateNameError
+
+        user = _make_user()
+        cookies, headers = _auth()
+
+        with patch("app.dependencies.decode_token", return_value={"sub": "testuser", "type": "access"}), \
+             patch("app.dependencies.User") as MockUser, \
+             patch("app.routers.workflows.svc") as mock_svc:
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_svc.create_workflow = AsyncMock(
+                side_effect=DuplicateNameError('A workflow named "New Workflow" already exists in your library. Choose a different name.'),
+            )
+
+            resp = await client.post(
+                "/api/workflows",
+                json={"name": "New Workflow"},
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 409
+        assert "already exists" in resp.json()["detail"]
+
 
 class TestRemoveWorkflowFromTeam:
     """DELETE /api/workflows/{id}/team — unset team_id without deleting the workflow."""

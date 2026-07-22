@@ -28,6 +28,7 @@ from app.services.access_control import (
     get_authorized_workflow,
     get_team_access_context,
 )
+from app.services import name_conflicts
 from app.services.config_service import get_user_model_name
 
 if TYPE_CHECKING:
@@ -55,6 +56,7 @@ def _sanitize_for_json(value):
 
 
 async def create_workflow(name: str, user_id: str, description: str | None = None, team_id: str | None = None) -> Workflow:
+    await name_conflicts.ensure_workflow_name_available(name, user_id, team_id)
     wf = Workflow(
         name=name,
         description=description,
@@ -187,6 +189,10 @@ async def update_workflow(
     if not wf:
         return None
     if name is not None:
+        if name != wf.name:
+            await name_conflicts.ensure_workflow_name_available(
+                name, wf.user_id, wf.team_id, exclude_id=str(wf.id),
+            )
         wf.name = name
     if description is not None:
         wf.description = description
@@ -299,8 +305,12 @@ async def duplicate_workflow(
         validation_plan = original_wf.validation_plan or []
         validation_inputs = original_wf.validation_inputs or []
 
+    copy_name = await name_conflicts.next_available_name(
+        f"{original['name']} (Copy)",
+        lambda n: name_conflicts.workflow_name_taken(n, user_id, team_id),
+    )
     new_wf = Workflow(
-        name=f"{original['name']} (Copy)",
+        name=copy_name,
         description=original.get("description"),
         user_id=user_id,
         team_id=team_id,

@@ -1330,6 +1330,7 @@ class TestConvertDocumentsToKB:
             patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
             patch("app.dependencies.User") as MockUser,
             patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.services.name_conflicts.kb_title_taken", new_callable=AsyncMock, return_value=False),
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_svc.create_knowledge_base = AsyncMock(return_value=fake_kb)
@@ -1401,6 +1402,7 @@ class TestConvertDocumentsToKB:
             patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
             patch("app.dependencies.User") as MockUser,
             patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.services.name_conflicts.kb_title_taken", new_callable=AsyncMock, return_value=False),
         ):
             MockUser.find_one = AsyncMock(return_value=user)
             mock_svc.create_knowledge_base = AsyncMock(return_value=fake_kb)

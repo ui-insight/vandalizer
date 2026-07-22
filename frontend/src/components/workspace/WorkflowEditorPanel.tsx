@@ -410,7 +410,11 @@ export function WorkflowEditorPanel() {
       setEditingTitle(false)
       return
     }
-    await updateWorkflow(openWorkflowId, { name: cleanName })
+    try {
+      await updateWorkflow(openWorkflowId, { name: cleanName })
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to rename workflow', 'error')
+    }
     setEditingTitle(false)
     refresh()
   }

@@ -16,7 +16,7 @@ const KIND_LABEL: Record<string, string> = {
 }
 import { cloneToPersonal, shareToTeam, addItem as addItemToLibrary, touchItem, listCollections } from '../../api/library'
 import { ApiError } from '../../api/client'
-import { MAX_NAME_LENGTH, getNameError, normalizeName } from '../../utils/nameValidation'
+import { MAX_NAME_LENGTH, getNameError, isDuplicateName, normalizeName } from '../../utils/nameValidation'
 import { createWorkflow, importWorkflow } from '../../api/workflows'
 import { createSearchSet, importSearchSet, listItems as listSearchSetItems, updateSearchSet, updateItem as updateSearchSetItem, addItem as addSearchSetItem } from '../../api/extractions'
 import {
@@ -447,6 +447,14 @@ export function LibraryTab() {
       return
     }
     const cleanTitle = normalizeName(editTitle)
+    const editKind = (editingItem.set_type || 'extraction') as 'extraction' | 'prompt' | 'formatter'
+    const siblingNames = items
+      .filter((i) => i.id !== editingItem.id && matchesKindFilter(i, editKind))
+      .map((i) => i.name)
+    if (isDuplicateName(cleanTitle, siblingNames)) {
+      setEditError(`You already have a ${editKind} named "${cleanTitle}". Choose a different name.`)
+      return
+    }
     setEditSaving(true)
     setEditError(null)
     try {
@@ -478,6 +486,10 @@ export function LibraryTab() {
       return
     }
     const cleanName = normalizeName(createName)
+    if (createModalType && isDuplicateName(cleanName, items.filter((i) => matchesKindFilter(i, createModalType)).map((i) => i.name))) {
+      setCreateError(`You already have a ${createModalType} named "${cleanName}". Choose a different name.`)
+      return
+    }
     setCreating(true)
     setCreateError(null)
     const personalLib = libraries.find((l) => l.scope === 'personal')
