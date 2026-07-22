@@ -682,8 +682,13 @@ class ExtractionEngine:
             safe_key = "".join(c if c.isalnum() else "_" for c in key)
             if not safe_key:
                 safe_key = "field"
-            if safe_key[0].isdigit():
-                safe_key = f"_{safe_key}"
+            # pydantic forbids field names with a leading underscore (private
+            # attrs) and Python forbids a leading digit, so names like
+            # "2 CFR Part 200" or "$ Amount" must get a letter prefix. The
+            # internal name never leaks: the LLM-facing schema and the output
+            # dict both use the original key via the alias.
+            if not safe_key[0].isalpha():
+                safe_key = f"f_{safe_key}"
             original_safe_key = safe_key
             counter = 1
             while safe_key in field_definitions:
