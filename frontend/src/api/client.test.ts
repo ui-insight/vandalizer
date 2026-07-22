@@ -169,6 +169,58 @@ describe('apiFetch', () => {
       expect((err as ApiError).status).toBe(404)
     }
   })
+
+  it('throws ApiError(0, "Request timed out") when the timeout fires', async () => {
+    vi.useFakeTimers()
+    try {
+      // Hang until the passed signal aborts, like a stalled network request.
+      mockFetch.mockImplementationOnce((_url, init: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () =>
+            reject(new DOMException('Aborted', 'AbortError')))
+        }),
+      )
+
+      const pending = apiFetch('/api/slow', { timeoutMs: 1000 })
+      const assertion = expect(pending).rejects.toMatchObject({ status: 0, message: 'Request timed out' })
+      await vi.advanceTimersByTimeAsync(1001)
+      await assertion
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('honors a caller-provided abort signal and rethrows the AbortError', async () => {
+    mockFetch.mockImplementationOnce((_url, init: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        init.signal?.addEventListener('abort', () =>
+          reject(new DOMException('Aborted', 'AbortError')))
+      }),
+    )
+
+    const controller = new AbortController()
+    const pending = apiFetch('/api/slow', { signal: controller.signal })
+    const assertion = expect(pending).rejects.toSatisfy(
+      (err) => err instanceof DOMException && err.name === 'AbortError',
+    )
+    controller.abort()
+    await assertion
+  })
+
+  it('rejects immediately when the caller signal is already aborted', async () => {
+    mockFetch.mockImplementationOnce((_url, init: RequestInit) => {
+      if (init.signal?.aborted) {
+        return Promise.reject(new DOMException('Aborted', 'AbortError'))
+      }
+      return Promise.resolve(jsonResponse({ ok: true }))
+    })
+
+    const controller = new AbortController()
+    controller.abort()
+    await expect(apiFetch('/api/slow', { signal: controller.signal })).rejects.toSatisfy(
+      (err) => err instanceof DOMException && err.name === 'AbortError',
+    )
+  })
 })
 
 describe('ApiError', () => {

@@ -33,7 +33,8 @@ import {
   getExtractionHistory,
 } from '../../api/extractions'
 import { RunHistoryTab } from './RunHistoryTab'
-import type { ValidationV2Result, QualityHistoryRun, ValidationSource } from '../../api/extractions'
+import { ApiError } from '../../api/client'
+import type { ValidationV2Result, QualityHistoryRun, ValidationSource, ExtractionRunHistoryEntry } from '../../api/extractions'
 import { DocumentPickerDialog } from '../shared/DocumentPickerDialog'
 import { VerificationSubmitModal } from '../library/VerificationSubmitModal'
 import { ExtractionAutovalidatePanel } from '../extractions/ExtractionAutovalidatePanel'
@@ -53,6 +54,31 @@ import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 
 marked.setOptions({ breaks: true, gfm: true })
+
+const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
+
+// When the sync run request dies (client timeout, proxy cutoff) the backend
+// keeps working and records the run as an activity event. Poll run history
+// until that run leaves 'running' and hand back its final record so the panel
+// can show the results (or the error) instead of going silent. Returns null
+// if the run is still going after 30 minutes.
+async function recoverRunFromHistory(searchSetUuid: string): Promise<ExtractionRunHistoryEntry | null> {
+  const deadline = Date.now() + 30 * 60_000
+  let runId: string | null = null
+  while (Date.now() < deadline) {
+    try {
+      const { runs } = await getExtractionHistory(searchSetUuid, 5)
+      // The request that just timed out started the newest run.
+      if (!runId) runId = runs[0]?.id ?? null
+      const run = runs.find(r => r.id === runId)
+      if (run && run.status !== 'running') return run
+    } catch {
+      // transient fetch failure — keep polling
+    }
+    await sleep(5000)
+  }
+  return null
+}
 
 type Tab = 'design' | 'tools' | 'validate' | 'advanced' | 'history'
 
@@ -216,6 +242,11 @@ export function ExtractionEditorPanel() {
     // picks up the running record the backend creates — otherwise no entry
     // shows until this sync request returns.
     bumpActivitySignal()
+    // Snapshot doc names at run time so exports stay correct if the user
+    // changes selection afterward.
+    const runDocNames: string[] = combinedContext && docUuids.length > 1
+      ? [`Combined (${docUuids.length} docs)`]
+      : docUuids.map(uuid => selectedDocNames[uuid] ?? uuid)
     try {
       const resp = await runExtractionSync({
         search_set_uuid: openExtractionId,
@@ -236,14 +267,34 @@ export function ExtractionEditorPanel() {
         }
       }
       const finalSets = sets.length > 0 ? sets : [{}]
-      // Snapshot doc names at run time so exports stay correct if the user
-      // changes selection afterward.
-      const runDocNames: string[] = combinedContext && docUuids.length > 1
-        ? [`Combined (${docUuids.length} docs)`]
-        : docUuids.map(uuid => selectedDocNames[uuid] ?? uuid)
       setResultSets(finalSets)
       setResultDocNames(finalSets.map((_, i) => runDocNames[i] ?? `Result ${i + 1}`))
       setActiveResultIdx(0)
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 0) {
+        // The request timed out but the backend run is still going. Keep the
+        // progress UI up and recover the results from run history so they
+        // land here instead of only in the History tab.
+        const run = await recoverRunFromHistory(openExtractionId)
+        if (run?.status === 'completed') {
+          const snap = run.result_snapshot as { normalized?: Record<string, unknown> } | undefined
+          const map: Record<string, string> = {}
+          for (const [k, v] of Object.entries(snap?.normalized ?? {})) {
+            map[k] = v === null ? 'N/A' : String(v)
+          }
+          setResultSets([map])
+          // The history snapshot merges all documents into one value map, so
+          // a multi-doc run recovers as a single combined result set.
+          setResultDocNames([docUuids.length > 1 ? `Combined (${docUuids.length} docs)` : runDocNames[0] ?? 'Result 1'])
+          setActiveResultIdx(0)
+        } else if (run) {
+          toast(`Extraction failed: ${run.error || 'unknown error'}`, 'error')
+        } else {
+          toast('This run is taking unusually long — it is still working, and results will appear in the History tab when it finishes', 'info')
+        }
+      } else {
+        toast(err instanceof Error ? err.message : 'Extraction failed', 'error')
+      }
     } finally {
       setRunning(false)
       bumpActivitySignal()

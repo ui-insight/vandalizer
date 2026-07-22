@@ -102,6 +102,11 @@ export function runExtractionSync(data: {
     method: 'POST',
     body: JSON.stringify(data),
     signal,
+    // The sync endpoint holds the request open for the whole extraction, so
+    // the 60s client default is far too short for larger documents. Match
+    // nginx's proxy_read_timeout (300s); callers recover via run history if
+    // even that is exceeded.
+    timeoutMs: 300_000,
   })
 }
 
