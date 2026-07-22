@@ -23,7 +23,7 @@ from app.models.knowledge import (
     KnowledgeBaseUsage,
 )
 from app.models.user import User
-from app.services import access_control
+from app.services import access_control, name_conflicts
 from app.services.document_manager import DocumentManager
 from app.utils.fetch_errors import describe_fetch_error
 from app.utils.url_validation import normalize_crawl_url as _normalize_crawl_url
@@ -192,6 +192,10 @@ async def create_knowledge_base(
     title: str, user_id: str, team_id: str | None = None,
     description: str | None = None, implicit: bool = False,
 ) -> KnowledgeBase:
+    # Implicit (project-owned) KBs never surface in KB lists, so their
+    # auto-generated titles are exempt from the uniqueness rule.
+    if not implicit:
+        await name_conflicts.ensure_kb_title_available(title[:300], user_id, team_id)
     kb = KnowledgeBase(
         title=title[:300],
         description=(description or "")[:5000] or None,
@@ -299,6 +303,10 @@ async def update_knowledge_base(
     if title is not None:
         t = title.strip()
         if t:
+            if t[:300] != kb.title:
+                await name_conflicts.ensure_kb_title_available(
+                    t[:300], kb.user_id, kb.team_id, exclude_uuid=kb.uuid,
+                )
             kb.title = t[:300]
     if description is not None:
         kb.description = description[:5000] or None
@@ -690,8 +698,19 @@ async def clone_knowledge_base(
     """
     team_id = str(user.current_team) if user.current_team else None
 
+    if new_title:
+        # User-chosen clone title: reject collisions like any typed name.
+        await name_conflicts.ensure_kb_title_available(new_title[:300], user.user_id, team_id)
+        clone_title = new_title[:300]
+    else:
+        clone_title = await name_conflicts.next_available_name(
+            f"{source_kb.title} (Clone)",
+            lambda t: name_conflicts.kb_title_taken(t, user.user_id, team_id),
+            max_length=300,
+        )
+
     clone = KnowledgeBase(
-        title=(new_title or f"{source_kb.title} (Clone)")[:300],
+        title=clone_title,
         description=source_kb.description,
         tags=list(source_kb.tags or []),
         user_id=user.user_id,
@@ -964,7 +983,16 @@ async def _crawl_from_source(
     scope = parse_crawl_scope(allowed_domains, parent.url)
 
     parent_normalized = _normalize_crawl_url(parent.url)
+    # visited dedups the queue; landed tracks pages whose content was actually
+    # ingested — including the URL a redirect landed on (uidaho.edu →
+    # www.uidaho.edu), which only becomes known after the fetch, when the
+    # other spelling may already sit in the queue.
     visited: set[str] = {parent_normalized}
+    landed: set[str] = {parent_normalized}
+    if parent_fetched.final_url:
+        parent_final = _normalize_crawl_url(parent_fetched.final_url)
+        visited.add(parent_final)
+        landed.add(parent_final)
     queue: list[str] = []
     added = 0
 
@@ -982,6 +1010,12 @@ async def _crawl_from_source(
 
     while queue and added < max_pages:
         url = queue.pop(0)
+
+        # A redirect on an earlier fetch may have landed on this URL under
+        # another spelling — its content is already ingested.
+        if _normalize_crawl_url(url) in landed:
+            logger.debug(f"Crawl: skipping {url} — already ingested via redirect")
+            continue
 
         # Skip if already in this KB
         existing = await KnowledgeBaseSource.find_one(
@@ -1003,6 +1037,11 @@ async def _crawl_from_source(
         child_fetched = await _ingest_url_source(child, kb)
         added += 1
         crawled_urls.append(url)
+        landed.add(_normalize_crawl_url(url))
+        if child_fetched and child_fetched.final_url:
+            child_final = _normalize_crawl_url(child_fetched.final_url)
+            visited.add(child_final)
+            landed.add(child_final)
         logger.info(f"Crawl: added child {added}/{max_pages} — {url} (status={child.status})")
 
         # Extract more links from this page for BFS
@@ -1080,9 +1119,14 @@ async def import_knowledge_base(
         raw_title = "Imported Knowledge Base"
 
     team_id = str(user.current_team) if user.current_team else None
+    import_title = await name_conflicts.next_available_name(
+        raw_title[:300],
+        lambda t: name_conflicts.kb_title_taken(t, user.user_id, team_id),
+        max_length=300,
+    )
     raw_tags = payload.get("tags") or []
     kb = KnowledgeBase(
-        title=raw_title[:300],
+        title=import_title,
         description=(payload.get("description") or "")[:5000] or None,
         tags=_normalize_tags(raw_tags) if isinstance(raw_tags, list) else [],
         user_id=user.user_id,

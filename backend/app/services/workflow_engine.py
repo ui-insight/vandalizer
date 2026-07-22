@@ -726,6 +726,10 @@ class CrawlerNode(Node):
                     continue
                 except Exception:
                     continue
+                # A redirect lands on a different spelling of the same page
+                # (uidaho.edu → www.uidaho.edu) — stamp the landing URL so the
+                # page can't be fetched again under it.
+                visited.add(normalize_crawl_url(str(resp.url)))
                 text = _extract_text_from_html(resp.text)
                 if looks_like_bot_challenge(text):
                     # Bot-verification interstitial, not real content: exclude

@@ -15,10 +15,10 @@ from app.services import knowledge_service
 from app.services.web_fetcher import WebFetchResult
 
 
-def _html_result(url: str, html: str) -> WebFetchResult:
+def _html_result(url: str, html: str, final_url: str | None = None) -> WebFetchResult:
     return WebFetchResult(
         url=url, title="t", text="body text", raw_html=html,
-        used_browser=False, status_code=200,
+        used_browser=False, status_code=200, final_url=final_url,
     )
 
 
@@ -220,6 +220,64 @@ async def test_crawl_follows_links_found_on_child_pdfs():
         "https://example.gov/guide.pdf",
         "https://example.gov/appendix",
     ]
+
+
+@pytest.mark.asyncio
+async def test_redirect_landing_url_not_crawled_again():
+    """A child fetched via redirect isn't crawled again under the URL it
+    landed on — both spellings of the page sit in the queue before the first
+    fetch reveals where it redirects to."""
+    parent = _make_parent("https://example.gov/index")
+    parent_fetched = _html_result(parent.url, """
+        <a href="https://example.gov/guide">Guide</a>
+        <a href="https://www.example.gov/guide#top">Guide (www)</a>
+    """)
+    # Fetching the bare-host spelling redirects to the www spelling.
+    child = _html_result(
+        "https://example.gov/guide", "<p>no links</p>",
+        final_url="https://www.example.gov/guide",
+    )
+    cls, children = _mock_source_cls()
+
+    with patch.object(knowledge_service, "KnowledgeBaseSource", cls), \
+         patch.object(knowledge_service, "_ingest_url_source",
+                      AsyncMock(return_value=child)) as mock_ingest:
+        added = await knowledge_service._crawl_from_source(
+            parent, MagicMock(uuid="kb-1"), max_pages=5,
+            allowed_domains="example.gov, www.example.gov",
+            parent_fetched=parent_fetched,
+        )
+
+    assert added == 1
+    assert [c.url for c in children] == ["https://example.gov/guide"]
+    assert mock_ingest.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_redirected_parent_stamps_landing_url():
+    """Links back to the parent's landing URL (uidaho.edu → www.uidaho.edu)
+    aren't crawled as new pages."""
+    parent = _make_parent("https://example.gov")
+    parent_fetched = _html_result(
+        parent.url, """
+        <a href="https://www.example.gov/#content">Skip to content</a>
+        <a href="https://www.example.gov/a">A</a>
+        """,
+        final_url="https://www.example.gov/",
+    )
+    cls, children = _mock_source_cls()
+
+    with patch.object(knowledge_service, "KnowledgeBaseSource", cls), \
+         patch.object(knowledge_service, "_ingest_url_source",
+                      AsyncMock(return_value=None)):
+        added = await knowledge_service._crawl_from_source(
+            parent, MagicMock(uuid="kb-1"), max_pages=5,
+            allowed_domains="example.gov, www.example.gov",
+            parent_fetched=parent_fetched,
+        )
+
+    assert added == 1
+    assert [c.url for c in children] == ["https://www.example.gov/a"]
 
 
 # ---------------------------------------------------------------------------

@@ -70,6 +70,10 @@ class WebFetchResult:
     # HTTP(S) hyperlinks embedded in a PDF response, in page order. None for
     # HTML responses (crawlers extract <a href> from raw_html instead).
     pdf_links: Optional[list[str]] = None
+    # URL the request actually landed on after redirects (uidaho.edu →
+    # www.uidaho.edu). Crawlers dedup on this too, so the same page can't be
+    # fetched once per spelling.
+    final_url: Optional[str] = None
 
 
 def _extract_title(html: str, fallback_url: str) -> str:
@@ -284,6 +288,7 @@ async def fetch_url(
                 used_browser=False,
                 status_code=status_code,
                 pdf_links=pdf_links or None,
+                final_url=str(resp.url),
             )
 
         raw_html = resp.text[: settings.web_fetcher_max_chars]
@@ -315,6 +320,7 @@ async def fetch_url(
         raw_html=raw_html,
         used_browser=used_browser,
         status_code=status_code,
+        final_url=str(resp.url),
     )
 
 
