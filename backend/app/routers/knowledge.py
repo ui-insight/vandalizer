@@ -13,6 +13,8 @@ from app.rate_limit import limiter
 from app.models.user import User
 from app.models.validation_run import ValidationRun
 from app.models.kb_optimization_run import KBOptimizationRun
+from app.models.library import LibraryItemKind
+from app.models.verification import VerifiedItemMetadata
 from app.services import organization_service
 from app.schemas.knowledge import (
     AddDocumentsRequest,
@@ -281,6 +283,18 @@ async def list_knowledge_bases_v2(
             if source_kb:
                 ref_kbs.append((ref, source_kb))
 
+    # The Explore tab renders the catalog's curated display name
+    # (VerifiedItemMetadata.display_name) over the KB's own title, so adopted
+    # references must show the same name or a KB appears to rename itself
+    # between Explore and My KBs.
+    catalog_names: dict[str, str] = {}
+    if ref_kbs:
+        metas = await VerifiedItemMetadata.find({
+            "item_kind": LibraryItemKind.KNOWLEDGE_BASE.value,
+            "item_id": {"$in": [str(src.id) for _, src in ref_kbs]},
+        }).to_list()
+        catalog_names = {m.item_id: m.display_name for m in metas if m.display_name}
+
     all_uuids = [kb.uuid for kb in kbs] + [src.uuid for _, src in ref_kbs]
     latest_runs = await _latest_runs_by_kb(all_uuids)
     usage_map = await svc.get_kb_usage_map(user.user_id, all_uuids)
@@ -302,6 +316,7 @@ async def list_knowledge_bases_v2(
             trust=latest_runs.get(source_kb.uuid),
             last_used_at=usage_map.get(source_kb.uuid),
         )
+        resp.title = catalog_names.get(str(source_kb.id), resp.title)
         resp.is_reference = True
         resp.source_kb_uuid = ref.source_kb_uuid
         resp.reference_uuid = ref.uuid

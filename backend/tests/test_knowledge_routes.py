@@ -387,6 +387,105 @@ class TestKnowledgeListEndpoints:
         # The usage lookup is scoped to the requesting user.
         mock_svc.get_kb_usage_map.assert_awaited_once_with("user1", ["kb-used", "kb-unused"])
 
+    @pytest.mark.asyncio
+    async def test_list_v2_reference_uses_catalog_display_name(self, client):
+        """Adopted references show the catalog's display-name override.
+
+        The Explore tab renders VerifiedItemMetadata.display_name over the
+        KB's own title, so My KBs must do the same for adopted references or
+        the KB appears under two different names.
+        """
+        user = _make_user()
+        cookies, headers = _auth()
+        source_kb = _mock_kb(uuid="kb-src", title="Raw KB Title")
+        source_kb.id = "oid-123"
+        ref = MagicMock()
+        ref.uuid = "ref-1"
+        ref.source_kb_uuid = "kb-src"
+        meta = MagicMock()
+        meta.item_id = "oid-123"
+        meta.display_name = "Curated Catalog Name"
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.routers.knowledge.ValidationRun") as MockRun,
+            patch("app.routers.knowledge.KBOptimizationRun") as MockOpt,
+            patch("app.routers.knowledge.VerifiedItemMetadata") as MockMeta,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.list_knowledge_bases = AsyncMock(return_value=([], 0))
+            mock_svc.list_references = AsyncMock(return_value=[ref])
+            mock_svc.resolve_reference = AsyncMock(return_value=source_kb)
+            mock_svc.get_kb_usage_map = AsyncMock(return_value={})
+            MockRun.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
+            MockOpt.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
+            MockMeta.find.return_value.to_list = AsyncMock(return_value=[meta])
+
+            resp = await client.get(
+                "/api/knowledge/list/v2?scope=mine",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        items = resp.json()["items"]
+        assert len(items) == 1
+        assert items[0]["is_reference"] is True
+        assert items[0]["title"] == "Curated Catalog Name"
+        # The catalog lookup is scoped to KB items for the adopted source KBs.
+        MockMeta.find.assert_called_once_with({
+            "item_kind": "knowledge_base",
+            "item_id": {"$in": ["oid-123"]},
+        })
+
+    @pytest.mark.asyncio
+    async def test_list_v2_reference_without_override_keeps_kb_title(self, client):
+        """A reference to a catalog KB with no display_name keeps the KB title."""
+        user = _make_user()
+        cookies, headers = _auth()
+        source_kb = _mock_kb(uuid="kb-src", title="Raw KB Title")
+        source_kb.id = "oid-123"
+        ref = MagicMock()
+        ref.uuid = "ref-1"
+        ref.source_kb_uuid = "kb-src"
+        meta = MagicMock()
+        meta.item_id = "oid-123"
+        meta.display_name = None
+
+        with (
+            patch("app.dependencies.decode_token", return_value={"sub": "user1", "type": "access"}),
+            patch("app.dependencies.User") as MockUser,
+            patch("app.routers.knowledge.svc") as mock_svc,
+            patch("app.routers.knowledge.organization_service") as mock_org,
+            patch("app.routers.knowledge.ValidationRun") as MockRun,
+            patch("app.routers.knowledge.KBOptimizationRun") as MockOpt,
+            patch("app.routers.knowledge.VerifiedItemMetadata") as MockMeta,
+        ):
+            MockUser.find_one = AsyncMock(return_value=user)
+            mock_org.get_user_org_ancestry = AsyncMock(return_value=[])
+            mock_svc.list_knowledge_bases = AsyncMock(return_value=([], 0))
+            mock_svc.list_references = AsyncMock(return_value=[ref])
+            mock_svc.resolve_reference = AsyncMock(return_value=source_kb)
+            mock_svc.get_kb_usage_map = AsyncMock(return_value={})
+            MockRun.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
+            MockOpt.find.return_value.sort.return_value.to_list = AsyncMock(return_value=[])
+            MockMeta.find.return_value.to_list = AsyncMock(return_value=[meta])
+
+            resp = await client.get(
+                "/api/knowledge/list/v2?scope=mine",
+                cookies=cookies,
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        items = resp.json()["items"]
+        assert len(items) == 1
+        assert items[0]["title"] == "Raw KB Title"
+
 
 class TestKnowledgeCRUD:
     """Cover create, get-detail, update, delete, share endpoints."""
