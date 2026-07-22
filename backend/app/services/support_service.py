@@ -713,6 +713,7 @@ async def update_ticket(
     ticket_uuid: str,
     status: str | None = None,
     priority: str | None = None,
+    classification: str | None = None,
     assigned_to: str | None = None,
     tags: list[str] | None = None,
     subject: str | None = None,
@@ -737,6 +738,11 @@ async def update_ticket(
             ticket.closed_at = None
     if priority:
         ticket.priority = TicketPriority(priority)
+    if classification is not None:
+        # Empty string clears the type (same convention as assigned_to).
+        ticket.classification = (
+            TicketClassification(classification) if classification else None
+        )
     if assigned_to is not None:
         ticket.assigned_to = assigned_to or None
     added_tags: list[str] = []
