@@ -1262,3 +1262,52 @@ async def _ingest_url_source(
         source.error_message = str(e)[:2000]
         await source.save()
         return None
+
+
+async def ingest_text_into_source(
+    source: KnowledgeBaseSource,
+    kb: KnowledgeBase,
+    text: str,
+    label: str | None = None,
+) -> int | None:
+    """(Re)ingest a source from caller-supplied text — no network fetch.
+
+    Replaces any existing chunks for the source, so it both ingests fresh
+    sources and repairs poisoned ones (e.g. a cached bot-challenge page).
+    Used by the catalog seeder for bundled regulation text and by
+    scripts.repair_gov_kb_sources. Returns the chunk count, or None on error
+    (the source is marked ``error`` rather than raising, matching
+    ``_ingest_url_source``).
+    """
+    if not text.strip():
+        source.status = "error"
+        source.error_message = "No text provided for ingestion"
+        await source.save()
+        return None
+    source.status = "processing"
+    await source.save()
+    try:
+        name = (
+            label or source.custom_name or source.url_title or source.url
+            or "Text Source"
+        )
+        dm = _get_dm()
+        await asyncio.to_thread(dm.delete_kb_source, kb.uuid, source.uuid)
+        chunk_count = await asyncio.to_thread(
+            dm.add_to_kb, kb.uuid, source.uuid, name, text,
+        )
+        source.content = text[:500000]
+        if label:
+            source.url_title = label[:500]
+        source.chunk_count = chunk_count
+        source.status = "ready"
+        source.error_message = None
+        source.processed_at = datetime.datetime.now(tz=datetime.timezone.utc)
+        await source.save()
+        return chunk_count
+    except Exception as e:
+        logger.error(f"Error ingesting text into source {source.uuid}: {e}")
+        source.status = "error"
+        source.error_message = str(e)[:2000]
+        await source.save()
+        return None

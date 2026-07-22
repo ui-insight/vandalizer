@@ -1,0 +1,923 @@
+PART 200—UNIFORM ADMINISTRATIVE REQUIREMENTS, COST PRINCIPLES, AND AUDIT REQUIREMENTS FOR FEDERAL AWARDS
+
+
+Appendix I to Part 200—Full Text of Notice of Funding Opportunity
+
+(a) General Requirements.
+(1) Requirements for developing NOFOs. In developing a notice of funding opportunity (NOFO), Federal agencies must:
+(i) Be concise and use plain language per the guidance at PlainLanguage.gov wherever possible.
+(ii) For electronic NOFOs and other information about them, comply with Section 508 of the Rehabilitation Act of 1973 (29 U.S.C. 794d).
+(2) Considerations for developing NOFOs. Federal agencies may:
+(i) Link to standard content to include required information rather than including the full language in the NOFO. The NOFO should make clear if linked information is critical—for example, standard terms and conditions, administrative and national policy requirements, and standard templates.
+(ii) Include links to relevant regulations and other sources.
+(iii) Use cross-references between the sections, including hyperlinks in electronic versions.
+(3) Required Consistency. Potential applicants must be able to find similar information across all Federal NOFOs. To that end, Federal agencies must include the same or similar section headings and a table of contents with at least these sections:
+(i) Basic Information
+(ii) Eligibility
+(iii) Program Description
+(iv) Application Contents and Format
+(v) Submission Requirements and Deadlines
+(vi) Application Review Information
+(vii) Award Notices
+(viii) Post-Award Requirements and Administration
+(b) Required Sections and Information.
+As required below, the Federal agency must include the following sections and information in the text of a NOFO and a table of contents.
+(1) Basic Information.
+This section provides sufficient information to help an applicant make an informed decision about whether to submit a proposal.
+(i) This section must include the following:
+(A) Federal Agency Name.
+(B) Funding Opportunity Title.
+(C)I Announcement Type (whether the funding opportunity is the initial announcement or a modification of a previously announced opportunity).
+(D) Funding Opportunity Number (required, if the Federal agency has assigned a number to the funding opportunity announcement).
+(E) Assistance Listing Number(s).
+(F) Funding Details. The total amount of funding that the Federal agency expects to award, the anticipated number of awards, and the expected dollar values of individual awards, which may be a range.
+(G) Key Dates. Key dates include due dates for submitting applications or Executive Order 12372 submissions, as well as for any letters of intent or preapplications. For any announcement issued before a program's application materials are available, key dates also include the date on which those materials will be released; and any other additional information, as deemed applicable by the Federal agency. If possible, the Federal agency should provide an anticipated award date. If the NOFO is evaluated on a “rolling” basis, the Federal agency should provide an estimate of the time needed to process an application and notify the applicant of the Federal agency's decision.
+(H) Executive Summary. A brief description that is written in plain language and summarizes the goals and objectives of the program, the target audience, and eligible recipients. The text of the executive summary should not exceed 500 words
+(I) Agency contact information.
+(ii) This section could include the following:
+(A) The amount of funding per Federal award, on average, experienced in previous years.
+(B) Whether this is a new program or a one-time initiative.
+(2) Eligibility.
+This section addresses the factors that determine applicant or application eligibility.
+(i) Eligible Applicants. This subsection must identify the following:
+(A) A complete and specific list of entity types eligible to apply.
+(B) Any additional restrictions on eligibility beyond the type of entity.
+(C) Eligibility factors for the principal investigator or project director, if any.
+(D) Criteria that would make any particular projects ineligible.
+(E) A reference to any funding restriction elsewhere in the NOFO that could affect an applicant's or project's eligibility.
+(F) A reference or link to any other factors that would disqualify an applicant or application, such as the responsiveness criteria in 6a.
+(G) Any limit on the number of applications an applicant may submit under the announcement. Make clear whether the limitation is on the submitting organization, individual investigator or program director, or both.
+(ii) Cost Sharing. This subsection must state:
+(A) Whether there is required cost sharing. This statement must be clear that not committing to the required cost sharing will make the application ineligible. If cost sharing is not required, the announcement must say so.
+(B) An explanation of the calculation for the required cost sharing. Required cost sharing may be a certain percentage or amount or in the form of contributions of specified items or activities (for example, provision of equipment).
+(C) Any restrictions on the types of cost, such as in-kind contributions, acceptable as cost sharing.
+(D) Any requirement to commit to cost sharing. This section should refer to the appropriate portions of section (b)(4) stating any pre-award requirements for the submission of letters or other documentation to verify commitments to meet cost-sharing requirements if a Federal award is made.
+(3) Program Description. This section contains the full program description of the funding opportunity.
+(i) This section must include the following:
+(A) The general purpose of the funding and what it is expected to achieve for the public good.
+(B) The Federal agency's funding priorities or focus areas, if any.
+(C) Program goals and objectives.
+(D) A description of how the award will contribute to achieving the program's goals and objectives.
+(E) The expected performance goals, indicators, targets, baseline data, data collection, and other outcomes the Federal agency expects recipients to achieve.
+(F) For cooperative agreements, the “substantial involvement” that the Federal agency expects to have or should reference where the potential applicant can find that information.
+(G) Information on program specific unallowable costs so that the applicant can develop an application and budget consistent with program requirements and any limits on indirect costs.
+(H) Any eligibility criteria for beneficiaries or program participants other than Federal award recipients.
+(I) Citations for authorizing statutes and regulations for the funding opportunity.
+(ii) This section could also include the following:
+(A) Any program history, such as whether it is a new program or a new or changed area of program emphasis.
+(B) Examples of successful projects funded in the past.
+(C) For infrastructure projects subject to Build America, Buy America requirements, information on key items anticipated to be purchased under the program, and any related domestic sourcing concerns based on market research.
+(D) Other information the Federal agency finds necessary.
+(4) Application Contents and Format. This section must identify the required content of an application and the forms or formats an applicant must use. If any requirements are stated elsewhere, this section should refer to where those requirements may be found. This section also should include required forms or formats as part of the announcement or state where the applicant may obtain them.
+(i) This section must specifically address content and form or format requirements for:
+(A) Whether pre-applications, letters of intent, or white papers are required or encouraged.
+(B) The application as a whole.
+(C) Component pieces of the application.
+(D) Information that successful applicants must submit after notification of intent to make a Federal award but prior to a Federal award. For example, this could include evidence of compliance with requirements relating to human subjects or information needed to comply with the National Environmental Policy Act (NEPA) (42 U.S.C. 4321 et seq.).
+(ii) Within each of the categories above, this subsection must include, where relevant:
+(A) Limitations on page numbers.
+(B) Formatting requirements, including font and font size, margins, paper size, and color limitations.
+(C) Any requirements for file naming, file size limitations, or file format such as PDF.
+(D) The number of copies required if paper submissions are allowed.
+(E) The sequence required for application sections or components.
+(F) Signature requirements, including those for electronic submissions.
+(G) Any requirements for third-party information such as references, letters of support, or letters of commitment to the project or to contribute to cost sharing.
+(H) A reference to any requirements to provide documentation to support an eligibility determination, such as proof of 501(c)(3) status or an authorizing tribal resolution.
+(I) Instructions needed to develop the narrative portions of the application. Include any requirements for its order, format, or required headings.
+(J) If applicable, the need to identify proprietary information. Include how to do so and how the Federal agency will handle it.
+(5) Submission Requirements and Deadlines.
+(i) Address to Request Application Package. This section must include the following:
+(A) How to get application forms, kits, or other materials needed to apply. If the announcement contains everything needed, this section needs only say so. If not, the guidance must include:
+(1) An internet address where the materials can be accessed.
+(2) An email address.
+(3) A U.S. Postal Service mailing address.
+(4) Telephone number.
+(5) Telephone Device for the Deaf (TDD), Text Telephone (TTY) number, or other appropriate telecommunication relay service.
+(ii) Unique entity identifier and System for Award Management (SAM.gov). This section must state the requirements for unique entity identifiers and registration in SAM.gov. It must include the following:
+(A) Each applicant must:
+(1) Be registered in SAM.gov before submitting its application;
+(2) Provide a valid unique entity identifier in its application; and
+(3) Continue to maintain an active registration in SAM.gov with current information at all times during which it has an active Federal award or an application or plan under consideration by a Federal agency.
+(B) If individuals are eligible to apply, they are exempt from this requirement under 2 CFR 25.110(b).
+(C) If the Federal agency exempts any applicants from this requirement under 2 CFR 25.110(c) or (d), a statement to that effect.
+(iii) Submission Instructions. This section addresses how the applicant will submit the application. It must include the following:
+(A) Actions needed prior to applying:
+(1) Instructions on any registrations required to access electronic submission systems or links to them. Where possible, provide the expected time frames needed to complete the registration process.
+(B) The methods for submitting the application:
+(1) Whether the applicant must submit in electronic or paper form or whether the applicant has an option. Applicants should not be required to submit in more than one format.
+(2) Instructions on how to submit electronically or links to them. Must include the URL to the electronic submission system and information on or links to information about the system or software requirements needed by the system.
+(3) If the Federal agency allows paper submissions, the process used to approve this option if it is not automatically allowed.
+(4) If the Federal agency allows paper submissions, the method for submitting the application. This information must include a postal address and “care of” information needed to route the application to the appropriate person, office, or email address, if the Federal agency allows such submissions.
+(C) If applicable, this section also must say how applicants must submit pre-applications, letters of intent, third-party information, or other information required before the award. It must include the following:
+(1) Instructions on how to submit electronically or links to them.
+(2) Whether the applicant must submit in electronic or paper form or whether the applicant has an option.
+(3) If the Federal agency allows paper submissions, the method for submitting the required information. This information must include a postal address and “care of” information needed to route the application to the appropriate person, office, or email address.
+(D) This section must also include what to do in the event of system problems and a point of contact who will be available if the applicant experiences technical difficulties.
+(iv) Submission Dates and Times. This section must include due dates and times for all submissions. If they are different for electronic and paper submissions, be clear about the differences. This includes the following:
+(A) Full applications.
+(B) Any preliminary submissions, such as letters of intent, white papers, or pre-applications.
+(C) Any other submissions required before Federal award separate from the full application.
+(D) If the funding opportunity is a general announcement that is open for a period of time with no specific due dates for applications, this section should say so.
+(v) Intergovernmental Review. This section must include the following:
+(A) Whether or not the funding opportunity is subject to Executive Order 12372, “Intergovernmental Review of Federal Programs”.
+(B) If it is applicable, include the following:
+(1) A short description of this requirement.
+(2) Where applicants can find their State's Single Point of Contact, learn whether their State has an intergovernmental review process, and if so, get information on their State's process. The list of SPOCs is on the Office of Management and Budget's website.
+(6) Application Review Information.
+(i) Responsiveness Review. This section includes information on the criteria that make an application or project ineligible. These are sometimes referred to as “responsiveness” criteria, “go-no-go” criteria, or “threshold” criteria. Federal agencies may change the title of this section as appropriate. This section must include the following:
+(A) A brief understanding of the Federal agency responsiveness review process.
+(B) A list and enough detail to understand the criteria or disqualifying factors to be reviewed.
+(C) A reference to the regulation or requirement that describes the restriction, if applicable. For example, if entities that have been found to be in violation of a particular Federal statute are ineligible, say so.
+(ii) Review Criteria. This section must address the review criteria that the Federal agency will use to evaluate applications for merit. This information includes the merit and other review criteria evaluators will use to judge applications, including any statutory, regulatory, or other preferences that will be applied in the review process. These criteria are distinct from eligibility criteria that are addressed before an application is accepted for review and any program policy or other factors that are applied during the selection process, after the review process is completed.
+The intent is to make the application process transparent so applicants can make informed decisions when preparing their applications to maximize the fairness of the process.
+(A) This section must include the following:
+(1) A clear description of each criterion and sub-criterion used.
+(2) If criteria vary in importance, the relative percentages, weights, or other means used to distinguish between them.
+(3) For statutory, regulatory, or other preferences, an explanation of those preferences with an explicit indication of their effect, for example, if they result in additional points being assigned.
+(4) How an applicant's proposed cost sharing will be considered in the review process if it is not an eligibility criterion in Section 2b. For example, to assign a certain number of additional points to applicants who offer cost sharing or to break ties among applications with equivalent scores after evaluation against all other factors. If cost sharing will not be considered in the evaluation, the announcement should say so. Do not include statements that cost sharing is encouraged without providing clarity about what that means.
+(5) The relevant information if the Federal agency permits applicants to nominate reviewers of their applications or suggest those they feel may be inappropriate due to a conflict of interest.
+(B) This section could include the following:
+(1) The types of people responsible for evaluation against the merit criteria. For example, peers external to the Federal agency or Federal agency personnel.
+(2) The number of people on an evaluation panel and how it operates, how reviewers are selected, reviewer qualifications, and how conflicts of interest are avoided.
+(iii) Review and Selection Process. This section may vary in the level of detail provided.
+(A) It must include the following:
+(1) Any program policy, factors, or elements that the selecting official may use in selecting applications for the award. For example, geographical dispersion, program balance, or diversity.
+(2) A brief description of the merit review process, including how the Federal agency uses merit review outcomes in final decision-making. For example, whether they are advisory only.
+(B) It could also include the following:
+(1) Who makes the final selections for awards.
+(2) Any multi-phase review methods. For example, an external panel that advises on, makes, or approves final recommendations to the deciding official.
+(iv) Risk Review.
+(A) This section must include the following:
+(1) A brief description of the factors used for the Federal agency's risk review as required by § 200.206.
+(2) If the Federal agency expects that any award under the NOFO will be more than the simplified acquisition threshold during its period of performance, include the following information:
+(i) That before making a Federal award with a total amount of Federal share greater than the simplified acquisition threshold, the Federal agency must review and consider any information about the applicant that is in the responsibility/qualification records available in SAM.gov (see 41 U.S.C. 2313).
+(ii) That an applicant can review and comment on any information in the responsibility/qualification records available in SAM.gov.
+(iii) That before making decisions in the risk review required by § 200.206 the Federal agency will consider any comments by the applicant, along with information available in the responsibility/qualification records in SAM.gov.
+(7) Award Notices. This section must address what a successful applicant can expect to receive following selection.
+(i) It must include the following:
+(A) If the Federal agency's practice is to provide a separate notice stating that an application has been selected before it makes the Federal award, indicate that the letter is not an authorization to begin performance and that the Federal award is the authorizing document.
+(B) If pre-award costs are allowed, beginning performance is at the applicant's own risk.
+(C) This section should indicate that the notice of Federal award signed by the grants officer, or equivalent, is the official document that obligates funds, and whether it is provided through postal mail or by electronic means and to whom.
+(D) The timing, form, and content of notifications to unsuccessful applicants. See also § 200.211.
+(8) Post-Award Requirements and Administration.
+(i) Administrative and National Policy Requirements. Providing information on administrative and policy requirements lets a potential applicant identify any requirements with which it would have difficulty complying. This section must include the following:
+(A) A statement related to the “general” terms and conditions of the award, including requirements that the Federal agency normally includes.
+(B) Any relevant specific terms and conditions.
+(C) Any special requirements that could apply to specific awards after the review of applications and other information based on the particular circumstances of the effort to be supported. For example, if human subjects were to be involved or if some situations may justify specific terms on intellectual property, data sharing, or security requirements.
+(D) As in other sections, the announcement need not include all terms and conditions of the award but may refer to documents with details on terms and conditions.
+(ii) Reporting. This section includes information needed to understand the post-award reporting requirements. Highlight any special reporting requirements for Federal awards under this funding opportunity that differ from what the Federal agency's Federal awards usually require. For example, differences in report type, frequency, form, format, or circumstances for use. This section must include the following:
+(A) The type of reporting required, such as financial or performance.
+(B) The reporting frequency.
+(C) The means of submission, such as paper or electronic.
+(D) References to all relevant requirements, such as those at 2 CFR 180.335 and 180.350.
+(E) If the Federal share of any Federal award may include more than $500,000 over the period of performance, this section must inform potential applicants about the post-award reporting requirements reflected in appendix XII to this part.
+(9) Other Information—Optional. This section may include any additional information to help potential applicants. For example, the section could include the following:
+(i) Related programs or other upcoming or ongoing Federal agency funding opportunities for similar activities.
+(ii) Current internet addresses for Federal agency websites that may be useful to an applicant in understanding the program.
+(iii) Routine notices to applicants. For example, the Federal Government is not obligated to make any Federal award as a result of the announcement, or only grants officers can bind the Federal Government to the expenditure of funds.
+[89 FR 30204, Apr. 22, 2024]
+
+
+Appendix II to Part 200—Contract Provisions for Non-Federal Entity Contracts Under Federal Awards
+
+In addition to other provisions required by the Federal agency or non-Federal entity, all contracts made by the non-Federal entity under the Federal award must contain provisions covering the following, as applicable.
+(A) Contracts for more than the simplified acquisition threshold, which is the inflation adjusted amount determined by the Civilian Agency Acquisition Council and the Defense Acquisition Regulations Council (Councils) as authorized by 41 U.S.C. 1908, must address administrative, contractual, or legal remedies in instances where contractors violate or breach contract terms, and provide for such sanctions and penalties as appropriate.
+(B) All contracts in excess of $10,000 must address termination for cause and for convenience by the non-Federal entity including the manner by which it will be effected and the basis for settlement.
+(C) Equal Employment Opportunity. Except as otherwise provided under 41 CFR Part 60, all contracts that meet the definition of “federally assisted construction contract” in 41 CFR Part 60-1.3 must include the equal opportunity clause provided under 41 CFR 60-1.4(b), in accordance with Executive Order 11246, “Equal Employment Opportunity” (30 FR 12319, 12935, 3 CFR Part, 1964-1965 Comp., p. 339), as amended by Executive Order 11375, “Amending Executive Order 11246 Relating to Equal Employment Opportunity,” and implementing regulations at 41 CFR part 60, “Office of Federal Contract Compliance Programs, Equal Employment Opportunity, Department of Labor.”
+(D) Davis-Bacon Act, as amended (40 U.S.C. 3141-3148). When required by Federal program legislation, all prime construction contracts in excess of $2,000 awarded by non-Federal entities must include a provision for compliance with the Davis-Bacon Act (40 U.S.C. 3141-3144, and 3146-3148) as supplemented by Department of Labor regulations (29 CFR Part 5, “Labor Standards Provisions Applicable to Contracts Covering Federally Financed and Assisted Construction”). In accordance with the statute, contractors must be required to pay wages to laborers and mechanics at a rate not less than the prevailing wages specified in a wage determination made by the Secretary of Labor. In addition, contractors must be required to pay wages not less than once a week. The non-Federal entity must place a copy of the current prevailing wage determination issued by the Department of Labor in each solicitation. The decision to award a contract or subcontract must be conditioned upon the acceptance of the wage determination. The non-Federal entity must report all suspected or reported violations to the Federal awarding agency. The contracts must also include a provision for compliance with the Copeland “Anti-Kickback” Act (40 U.S.C. 3145), as supplemented by Department of Labor regulations (29 CFR Part 3, “Contractors and Subcontractors on Public Building or Public Work Financed in Whole or in Part by Loans or Grants from the United States”). The Act provides that each contractor or subrecipient must be prohibited from inducing, by any means, any person employed in the construction, completion, or repair of public work, to give up any part of the compensation to which he or she is otherwise entitled. The non-Federal entity must report all suspected or reported violations to the Federal awarding agency.
+(E) Contract Work Hours and Safety Standards Act (40 U.S.C. 3701-3708). Where applicable, all contracts awarded by the non-Federal entity in excess of $100,000 that involve the employment of mechanics or laborers must include a provision for compliance with 40 U.S.C. 3702 and 3704, as supplemented by Department of Labor regulations (29 CFR Part 5). Under 40 U.S.C. 3702 of the Act, each contractor must be required to compute the wages of every mechanic and laborer on the basis of a standard work week of 40 hours. Work in excess of the standard work week is permissible provided that the worker is compensated at a rate of not less than one and a half times the basic rate of pay for all hours worked in excess of 40 hours in the work week. The requirements of 40 U.S.C. 3704 are applicable to construction work and provide that no laborer or mechanic must be required to work in surroundings or under working conditions which are unsanitary, hazardous or dangerous. These requirements do not apply to the purchases of supplies or materials or articles ordinarily available on the open market, or contracts for transportation or transmission of intelligence.
+(F) Rights to Inventions Made Under a Contract or Agreement. If the Federal award meets the definition of “funding agreement” under 37 CFR § 401.2 (a) and the recipient or subrecipient wishes to enter into a contract with a small business firm or nonprofit organization regarding the substitution of parties, assignment or performance of experimental, developmental, or research work under that “funding agreement,” the recipient or subrecipient must comply with the requirements of 37 CFR Part 401, “Rights to Inventions Made by Nonprofit Organizations and Small Business Firms Under Government Grants, Contracts and Cooperative Agreements,” and any implementing regulations issued by the awarding agency.
+(G) Clean Air Act (42 U.S.C. 7401-7671q.) and the Federal Water Pollution Control Act (33 U.S.C. 1251-1387), as amended—Contracts and subgrants of amounts in excess of $150,000 must contain a provision that requires the non-Federal award to agree to comply with all applicable standards, orders or regulations issued pursuant to the Clean Air Act (42 U.S.C. 7401-7671q) and the Federal Water Pollution Control Act as amended (33 U.S.C. 1251-1387). Violations must be reported to the Federal awarding agency and the Regional Office of the Environmental Protection Agency (EPA).
+(H) Debarment and Suspension (Executive Orders 12549 and 12689)—A contract award (see 2 CFR 180.220) must not be made to parties listed on the governmentwide exclusions in the System for Award Management (SAM), in accordance with the OMB guidelines at 2 CFR 180 that implement Executive Orders 12549 (3 CFR part 1986 Comp., p. 189) and 12689 (3 CFR part 1989 Comp., p. 235), “Debarment and Suspension.” SAM Exclusions contains the names of parties debarred, suspended, or otherwise excluded by agencies, as well as parties declared ineligible under statutory or regulatory authority other than Executive Order 12549.
+(I) Byrd Anti-Lobbying Amendment (31 U.S.C. 1352)—Contractors that apply or bid for an award exceeding $100,000 must file the required certification. Each tier certifies to the tier above that it will not and has not used Federal appropriated funds to pay any person or organization for influencing or attempting to influence an officer or employee of any agency, a member of Congress, officer or employee of Congress, or an employee of a member of Congress in connection with obtaining any Federal contract, grant or any other award covered by 31 U.S.C. 1352. Each tier must also disclose any lobbying with non-Federal funds that takes place in connection with obtaining any Federal award. Such disclosures are forwarded from tier to tier up to the non-Federal award.
+(J) See § 200.323.
+(K) See § 200.216.
+(L) See § 200.322.
+[78 FR 78608, Dec. 26, 2013, as amended at 79 FR 75888, Dec. 19, 2014; 85 FR 49577, Aug. 13, 2020]
+
+
+Appendix III to Part 200—Indirect (F&A) Costs Identification and Assignment, and Rate Determination for Institutions of Higher Education (IHEs)
+
+A. General
+
+This appendix provides criteria for identifying and computing indirect (or indirect (F&A)) rates at IHEs (institutions). Indirect (F&A) costs are those that are incurred for common or joint objectives and therefore cannot be identified readily and specifically with a particular sponsored project, an instructional activity, or any other institutional activity. See subsection B.1 for a discussion of the components of indirect (F&A) costs.
+
+1. Major Functions/Activities of an IHE
+
+Refers to instruction, organized research, other sponsored activities and other institutional activities as defined in this section:
+a. Instruction means the teaching and training activities of an institution. Except for research training as provided in subsection b, this term includes all teaching and training activities, whether they are offered for credits toward a degree or certificate or on a non-credit basis, and whether they are offered through regular academic departments or separate divisions, such as a summer school division or an extension division. Also considered part of this major function are departmental research, and, where agreed to, university research.
+(1) Sponsored instruction and training means specific instructional or training activity established by grant, contract, or cooperative agreement. For purposes of the cost principles, this activity may be considered a major function even though an institution's accounting treatment may include it in the instruction function.
+(2) Departmental research means research, development and scholarly activities that are not organized research and, consequently, are not separately budgeted and accounted for. Departmental research, for purposes of this document, is not considered as a major function, but as a part of the instruction function of the institution.
+(3) Only mandatory cost sharing or cost sharing specifically committed in the project budget must be included in the organized research base for computing the indirect (F&A) cost rate or reflected in any allocation of indirect costs. Salary costs above statutory limits are not considered cost sharing.
+b. Organized research means all research and development activities of an institution that are separately budgeted and accounted for. It includes:
+(1) Sponsored research means all research and development activities that are sponsored by Federal and non-Federal agencies and organizations. This term includes activities involving the training of individuals in research techniques (commonly called research training) where such activities utilize the same facilities as other research and development activities and where such activities are not included in the instruction function.
+(2) University research means all research and development activities that are separately budgeted and accounted for by the institution under an internal application of institutional funds. University research, for purposes of this document, must be combined with sponsored research under the function of organized research.
+c. Other sponsored activities means programs and projects financed by Federal and non-Federal agencies and organizations which involve the performance of work other than instruction and organized research. Examples of such programs and projects are health service projects and community service programs. However, when any of these activities are undertaken by the institution without outside support, they may be classified as other institutional activities.
+d. Other institutional activities means all activities of an institution except for instruction, departmental research, organized research, and other sponsored activities, as defined in this section; indirect (F&A) cost activities identified in this Appendix paragraph B, Identification and assignment of indirect (F&A) costs; and specialized services facilities described in § 200.468 of this part.
+
+2. Criteria for Distribution
+
+a. Base period. A base period for distribution of indirect (F&A) costs is the period during which the costs are incurred. The base period normally should coincide with the fiscal year established by the institution, but in any event the base period should be so selected as to avoid inequities in the distribution of costs.
+b. Need for cost groupings. The overall objective of the indirect (F&A) cost allocation process is to distribute the indirect (F&A) costs described in Section B, Identification and assignment of indirect (F&A) costs, to the major functions of the institution in proportions reasonably consistent with the nature and extent of their use of the institution's resources. In order to achieve this objective, it may be necessary to provide for selective distribution by establishing separate groupings of cost within one or more of the indirect (F&A) cost categories referred to in subsection B.1. In general, the cost groupings established within a category should constitute, in each case, a pool of those items of expense that are considered to be of like nature in terms of their relative contribution to (or degree of remoteness from) the particular cost objectives to which distribution is appropriate. Cost groupings should be established considering the general guides provided in subsection c of this section. Each such pool or cost grouping should then be distributed individually to the related cost objectives, using the distribution base or method most appropriate in light of the guidelines set forth in subsection d of this section.
+c. General considerations on cost groupings. The extent to which separate cost groupings and selective distribution would be appropriate at an institution is a matter of judgment to be determined on a case-by-case basis. Typical situations which may warrant the establishment of two or more separate cost groupings (based on account classification or analysis) within an indirect (F&A) cost category include but are not limited to the following:
+(1) If certain items or categories of expense relate solely to one of the major functions of the institution or to less than all functions, such expenses should be set aside as a separate cost grouping for direct assignment or selective allocation in accordance with the guides provided in subsections b and d.
+(2) If any types of expense ordinarily treated as general administration or departmental administration are charged to Federal awards as direct costs, expenses applicable to other activities of the institution when incurred for the same purposes in like circumstances must, through separate cost groupings, be excluded from the indirect (F&A) costs allocable to those Federal awards and included in the direct cost of other activities for cost allocation purposes.
+(3) If it is determined that certain expenses are for the support of a service unit or facility whose output is susceptible of measurement on a workload or other quantitative basis, such expenses should be set aside as a separate cost grouping for distribution on such basis to organized research, instructional, and other activities at the institution or within the department.
+(4) If activities provide their own purchasing, personnel administration, building maintenance or similar service, the distribution of general administration and general expenses, or operation and maintenance expenses to such activities should be accomplished through cost groupings which include only that portion of central indirect (F&A) costs (such as for overall management) which are properly allocable to such activities.
+(5) If the institution elects to treat fringe benefits as indirect (F&A) charges, such costs should be set aside as a separate cost grouping for selective distribution to related cost objectives.
+(6) The number of separate cost groupings within a category should be held within practical limits, after taking into consideration the materiality of the amounts involved and the degree of precision attainable through less selective methods of distribution.
+d. Selection of distribution method.
+(1) Actual conditions must be taken into account in selecting the method or base to be used in distributing individual cost groupings. The essential consideration in selecting a base is that it be the one best suited for assigning the pool of costs to cost objectives in accordance with benefits derived; with a traceable cause-and-effect relationship; or with logic and reason, where neither benefit nor a cause-and-effect relationship is determinable.
+(2) If a cost grouping can be identified directly with the cost objective benefitted, it should be assigned to that cost objective.
+(3) If the expenses in a cost grouping are more general in nature, the distribution may be based on a cost analysis study which results in an equitable distribution of the costs. Such cost analysis studies may take into consideration weighting factors, population, or space occupied if appropriate. Cost analysis studies, however, must (a) be appropriately documented in sufficient detail for subsequent review by the cognizant agency for indirect costs, (b) distribute the costs to the related cost objectives in accordance with the relative benefits derived, (c) be statistically sound, (d) be performed specifically at the institution at which the results are to be used, and (e) be reviewed periodically, but not less frequently than rate negotiations, updated if necessary, and used consistently. Any assumptions made in the study must be stated and explained. The use of cost analysis studies and periodic changes in the method of cost distribution must be fully justified.
+(4) If a cost analysis study is not performed, or if the study does not result in an equitable distribution of the costs, the distribution must be made in accordance with the appropriate base cited in Section B, unless one of the following conditions is met:
+(a) It can be demonstrated that the use of a different base would result in a more equitable allocation of the costs, or that a more readily available base would not increase the costs charged to Federal awards, or
+(b) The institution qualifies for, and elects to use, the simplified method for computing indirect (F&A) cost rates described in Section D.
+(5) Notwithstanding subsection (3), effective July 1, 1998, a cost analysis or base other than that in Section B must not be used to distribute utility or student services costs. Instead, subsection B.4.c, may be used in the recovery of utility costs.
+e. Order of distribution.
+(1) Indirect (F&A) costs are the broad categories of costs discussed in Section B.1.
+(2) Depreciation, interest expenses, operation and maintenance expenses, and general administrative and general expenses should be allocated in that order to the remaining indirect (F&A) cost categories as well as to the major functions and specialized service facilities of the institution. Other cost categories may be allocated in the order determined to be most appropriate by the institutions. When cross allocation of costs is made as provided in subsection (3), this order of allocation does not apply.
+(3) Normally an indirect (F&A) cost category will be considered closed once it has been allocated to other cost objectives, and costs may not be subsequently allocated to it. However, a cross allocation of costs between two or more indirect (F&A) cost categories may be used if such allocation will result in a more equitable allocation of costs. If a cross allocation is used, an appropriate modification to the composition of the indirect (F&A) cost categories described in Section B is required.
+
+B. Identification and Assignment of Indirect (F&A) Costs
+
+1. Definition of Facilities and Administration
+
+See § 200.414 which provides the basis for these indirect cost requirements.
+
+2. Depreciation
+
+a. The expenses under this heading are the portion of the costs of the institution's buildings, capital improvements to land and buildings, and equipment which are computed in accordance with § 200.436.
+b. In the absence of the alternatives provided for in Section A.2.d, the expenses included in this category must be allocated in the following manner:
+(1) Depreciation on buildings used exclusively in the conduct of a single function, and on capital improvements and equipment used in such buildings, must be assigned to that function.
+(2) Depreciation on buildings used for more than one function, and on capital improvements and equipment used in such buildings, must be allocated to the individual functions performed in each building on the basis of usable square feet of space, excluding common areas such as hallways, stairwells, and rest rooms.
+(3) Depreciation on buildings, capital improvements and equipment related to space (e.g., individual rooms, laboratories) used jointly by more than one function (as determined by the users of the space) must be treated as follows. The cost of each jointly used unit of space must be allocated to benefitting functions on the basis of:
+(a) The employee full-time equivalents (FTEs) or salaries and wages of those individual functions benefitting from the use of that space; or
+(b) Institution-wide employee FTEs or salaries and wages applicable to the benefitting major functions (see Section A.1) of the institution.
+(4) Depreciation on certain capital improvements to land, such as paved parking areas, fences, sidewalks, and the like, not included in the cost of buildings, must be allocated to user categories of students and employees on a full-time equivalent basis. The amount allocated to the student category must be assigned to the instruction function of the institution. The amount allocated to the employee category must be further allocated to the major functions of the institution in proportion to the salaries and wages of all employees applicable to those functions.
+
+3. Interest
+
+Interest on debt associated with certain buildings, equipment and capital improvements, as defined in § 200.449, must be classified as an expenditure under the category Facilities. These costs must be allocated in the same manner as the depreciation on the buildings, equipment and capital improvements to which the interest relates.
+
+4. Operation and Maintenance Expenses
+
+a. The expenses under this heading are those that have been incurred for the administration, supervision, operation, maintenance, preservation, and protection of the institution's physical plant. They include expenses normally incurred for such items as janitorial and utility services; repairs and ordinary or normal alterations of buildings, furniture and equipment; care of grounds; maintenance and operation of buildings and other plant facilities; security; earthquake and disaster preparedness; environmental safety; hazardous waste disposal; property, liability and all other insurance relating to property; space and capital leasing; facility planning and management; and central receiving. The operation and maintenance expense category should also include its allocable share of fringe benefit costs, depreciation, and interest costs.
+b. In the absence of the alternatives provided for in Section A.2.d, the expenses included in this category must be allocated in the same manner as described in subsection 2.b for depreciation.
+c. A utility cost adjustment of up to 1.3 percentage points may be included in the negotiated indirect cost rate of the IHE for organized research, per the computation alternatives in paragraphs (c)(1) and (2) of this section:
+(1) Where space is devoted to a single function and metering allows unambiguous measurement of usage related to that space, costs must be assigned to the function located in that space.
+(2) Where space is allocated to different functions and metering does not allow unambiguous measurement of usage by function, costs must be allocated as follows:
+(i) Utilities costs should be apportioned to functions in the same manner as depreciation, based on the calculated difference between the site or building actual square footage for monitored research laboratory space (site, building, floor, or room), and a separate calculation prepared by the IHE using the “effective square footage” described in subsection (c)(2)(ii) of this section.
+(ii) “Effective square footage” allocated to research laboratory space must be calculated as the actual square footage times the relative energy utilization index (REUI) posted on the OMB Web site at the time of a rate determination.
+A. This index is the ratio of a laboratory energy use index (lab EUI) to the corresponding index for overall average college or university space (college EUI).
+B. In July 2012, values for these two indices (taken respectively from the Lawrence Berkeley Laboratory “Labs for the 21st Century” benchmarking tool and the US Department of Energy “Buildings Energy Databook” and were 310 kBtu/sq ft-yr. and 155 kBtu/sq ft-yr., so that the adjustment ratio is 2.0 by this methodology. To retain currency, OMB will adjust the EUI numbers from time to time (no more often than annually nor less often than every 5 years), using reliable and publicly disclosed data. Current values of both the EUIs and the REUI will be posted on the OMB website.
+
+5. General Administration and General Expenses
+
+a. The expenses under this heading are those that have been incurred for the general executive and administrative offices of educational institutions and other expenses of a general character which do not relate solely to any major function of the institution; i.e., solely to (1) instruction, (2) organized research, (3) other sponsored activities, or (4) other institutional activities. The general administration and general expense category should also include its allocable share of fringe benefit costs, operation and maintenance expense, depreciation, and interest costs. Examples of general administration and general expenses include: Those expenses incurred by administrative offices that serve the entire university system of which the institution is a part; central offices of the institution such as the President's or Chancellor's office, the offices for institution-wide financial management, business services, budget and planning, personnel management, and safety and risk management; the office of the General Counsel; and the operations of the central administrative management information systems. General administration and general expenses must not include expenses incurred within non-university-wide deans' offices, academic departments, organized research units, or similar organizational units. (See subsection 6.)
+b. In the absence of the alternatives provided for in Section A.2.d, the expenses included in this category must be grouped first according to common major functions of the institution to which they render services or provide benefits. The aggregate expenses of each group must then be allocated to serviced or benefitted functions on the modified total cost basis. Modified total costs consist of the same elements as those in Section C.2. When an activity included in this indirect (F&A) cost category provides a service or product to another institution or organization, an appropriate adjustment must be made to either the expenses or the basis of allocation or both, to assure a proper allocation of costs.
+
+6. Departmental Administration Expenses
+
+a. The expenses under this heading are those that have been incurred for administrative and supporting services that benefit common or joint departmental activities or objectives in academic deans' offices, academic departments and divisions, and organized research units. Organized research units include such units as institutes, study centers, and research centers. Departmental administration expenses are subject to the following limitations.
+(1) Academic deans' offices. Salaries and operating expenses are limited to those attributable to administrative functions.
+(2) Academic departments:
+(a) Salaries and fringe benefits attributable to the administrative work (including bid and proposal preparation) of faculty (including department heads) and other professional personnel conducting research and/or instruction, must be allowed at a rate of 3.6 percent of modified total direct costs. This category does not include professional business or professional administrative officers. This allowance must be added to the computation of the indirect (F&A) cost rate for major functions in Section C; the expenses covered by the allowance must be excluded from the departmental administration cost pool. No documentation is required to support this allowance.
+(b) Other administrative and supporting expenses incurred within academic departments are allowable provided they are treated consistently in like circumstances. This would include expenses such as the salaries of secretarial and clerical staffs, the salaries of administrative officers and assistants, travel, office supplies, stockrooms, and the like.
+(3) Other fringe benefit costs applicable to the salaries and wages included in subsections (1) and (2) are allowable, as well as an appropriate share of general administration and general expenses, operation and maintenance expenses, and depreciation.
+(4) Federal agencies may authorize reimbursement of additional costs for department heads and faculty only in exceptional cases where an institution can demonstrate undue hardship or detriment to project performance.
+b. The following guidelines apply to the determination of departmental administrative costs as direct or indirect (F&A) costs.
+(1) In developing the departmental administration cost pool, special care should be exercised to ensure that costs incurred for the same purpose in like circumstances are treated consistently as either direct or indirect (F&A) costs. For example, salaries of technical staff, laboratory supplies (e.g., chemicals), telephone toll charges, animals, animal care costs, computer costs, travel costs, and specialized shop costs must be treated as direct costs wherever identifiable to a particular cost objective. Direct charging of these costs may be accomplished through specific identification of individual costs to benefitting cost objectives, or through recharge centers or specialized service facilities, as appropriate under the circumstances. See §§ 200.413(c) and 200.468.
+(2) Items such as office supplies, postage, local telephone costs, and memberships must normally be treated as indirect (F&A) costs.
+c. In the absence of the alternatives provided for in Section A.2.d, the expenses included in this category must be allocated as follows:
+(1) The administrative expenses of the dean's office of each college and school must be allocated to the academic departments within that college or school on the modified total cost basis.
+(2) The administrative expenses of each academic department, and the department's share of the expenses allocated in subsection (1) must be allocated to the appropriate functions of the department on the modified total cost basis.
+
+7. Sponsored Projects Administration
+
+a. The expenses under this heading are limited to those incurred by a separate organization(s) established primarily to administer sponsored projects, including such functions as grant and contract administration (Federal and non-Federal), special security, purchasing, personnel, administration, and editing and publishing of research and other reports. They include the salaries and expenses of the head of such organization, assistants, and immediate staff, together with the salaries and expenses of personnel engaged in supporting activities maintained by the organization, such as stock rooms, print shops, and the like. This category also includes an allocable share of fringe benefit costs, general administration and general expenses, operation and maintenance expenses, and depreciation. Appropriate adjustments will be made for services provided to other functions or organizations.
+b. In the absence of the alternatives provided for in Section A.2.d, the expenses included in this category must be allocated to the major functions of the institution under which the sponsored projects are conducted on the basis of the modified total cost of sponsored projects.
+c. An appropriate adjustment must be made to eliminate any duplicate charges to Federal awards when this category includes similar or identical activities as those included in the general administration and general expense category or other indirect (F&A) cost items, such as accounting, procurement, or personnel administration.
+
+8. Library Expenses
+
+a. The expenses under this heading are those that have been incurred for the operation of the library, including the cost of books and library materials purchased for the library, less any items of library income that qualify as applicable credits under § 200.406. The library expense category should also include the fringe benefits applicable to the salaries and wages included therein, an appropriate share of general administration and general expense, operation and maintenance expense, and depreciation. Costs incurred in the purchases of rare books (museum-type books) with no value to Federal awards should not be allocated to them.
+b. In the absence of the alternatives provided for in Section A.2.d, the expenses included in this category must be allocated first on the basis of primary categories of users, including students, professional employees, and other users.
+(1) The student category must consist of full-time equivalent students enrolled at the institution, regardless of whether they earn credits toward a degree or certificate.
+(2) The professional employee category must consist of all faculty members and other professional employees of the institution, on a full-time equivalent basis. This category may also include post-doctorate fellows and graduate students.
+(3) The other users category must consist of a reasonable factor as determined by institutional records to account for all other users of library facilities.
+c. Amount allocated in paragraph b of this section must be assigned further as follows:
+(1) The amount in the student category must be assigned to the instruction function of the institution.
+(2) The amount in the professional employee category must be assigned to the major functions of the institution in proportion to the salaries and wages of all faculty members and other professional employees applicable to those functions.
+(3) The amount in the other users category must be assigned to the other institutional activities function of the institution.
+
+9. Student Administration and Services
+
+a. The expenses under this heading are those that have been incurred for the administration of student affairs and for services to students, including expenses of such activities as deans of students, admissions, registrar, counseling and placement services, student advisers, student health and infirmary services, catalogs, and commencements and convocations. The salaries of members of the academic staff whose responsibilities to the institution require administrative work that benefits sponsored projects may also be included to the extent that the portion charged to student administration is determined in accordance with subpart E of this Part. This expense category also includes the fringe benefit costs applicable to the salaries and wages included therein, an appropriate share of general administration and general expenses, operation and maintenance, interest expense, and depreciation.
+b. In the absence of the alternatives provided for in Section A.2.d, the expenses in this category must be allocated to the instruction function, and subsequently to Federal awards in that function.
+
+10. Offset for Indirect (F&A) Expenses Otherwise Provided for by the Federal Government
+
+a. The items to be accumulated under this heading are the reimbursements and other payments from the Federal Government which are made to the institution to support solely, specifically, and directly, in whole or in part, any of the administrative or service activities described in subsections 2 through 9.
+b. The items in this group must be treated as a credit to the affected individual indirect (F&A) cost category before that category is allocated to benefitting functions.
+
+C. Determination and Application of Indirect (F&A) Cost Rate or Rates
+
+1. Indirect (F&A) Cost Pools
+
+a. (1) Subject to subsection b, the separate categories of indirect (F&A) costs allocated to each major function of the institution as prescribed in Section B, must be aggregated and treated as a common pool for that function. The amount in each pool must be divided by the distribution base described in subsection 2 to arrive at a single indirect (F&A) cost rate for each function.
+(2) The rate for each function is used to distribute indirect (F&A) costs to individual Federal awards of that function. Since a common pool is established for each major function of the institution, a separate indirect (F&A) cost rate would be established for each of the major functions described in Section A.1 under which Federal awards are carried out.
+(3) Each institution's indirect (F&A) cost rate process must be appropriately designed to ensure that Federal sponsors do not in any way subsidize the indirect (F&A) costs of other sponsors, specifically activities sponsored by industry and foreign governments. Accordingly, each allocation method used to identify and allocate the indirect (F&A) cost pools, as described in Sections A.2 and B.2 through B.9, must contain the full amount of the institution's modified total costs or other appropriate units of measurement used to make the computations. In addition, the final rate distribution base (as defined in subsection 2) for each major function (organized research, instruction, etc., as described in Section A.1 functions of an institution) must contain all the programs or activities which utilize the indirect (F&A) costs allocated to that major function. At the time an indirect (F&A) cost proposal is submitted to a cognizant agency for indirect costs, each institution must describe the process it uses to ensure that Federal funds are not used to subsidize industry and foreign government funded programs.
+
+2. The Distribution Basis
+
+Indirect (F&A) costs must be distributed to applicable Federal awards and other benefitting activities within each major function (see section A.1) on the basis of modified total direct costs (MTDC), consisting of all salaries and wages, fringe benefits, materials and supplies, services, travel, and up to the first $50,000 of each subaward (regardless of the period covered by the subaward). MTDC is defined in § 200.1. For this purpose, an indirect (F&A) cost rate should be determined for each of the separate indirect (F&A) cost pools developed pursuant to subsection 1. The rate in each case should be stated as the percentage which the amount of the particular indirect (F&A) cost pool is of the modified total direct costs identified with such pool.
+
+3. Negotiated Lump Sum for Indirect (F&A) Costs
+
+A negotiated fixed amount in lieu of indirect (F&A) costs may be appropriate for self-contained, off-campus, or primarily subcontracted activities where the benefits derived from an institution's indirect (F&A) services cannot be readily determined. Such negotiated indirect (F&A) costs will be treated as an offset before allocation to instruction, organized research, other sponsored activities, and other institutional activities. The base on which such remaining expenses are allocated should be appropriately adjusted.
+
+4. Predetermined Rates for Indirect (F&A) Costs
+
+Public Law 87-638 (76 Stat. 437) as amended (41 U.S.C. 4708) authorizes the use of predetermined rates in determining the “indirect costs” (indirect (F&A) costs) applicable under research agreements with educational institutions. The stated objectives of the law are to simplify the administration of cost-type research and development contracts (including grants) with educational institutions, to facilitate the preparation of their budgets, and to permit more expeditious closeout of such contracts when the work is completed. In view of the potential advantages offered by this procedure, negotiation of predetermined rates for indirect (F&A) costs for a period of two to four years should be the norm in those situations where the cost experience and other pertinent facts available are deemed sufficient to enable the parties involved to reach an informed judgment as to the probable level of indirect (F&A) costs during the ensuing accounting periods.
+
+5. Negotiated Fixed Rates and Carry-Forward Provisions
+
+When a fixed rate is negotiated in advance for a fiscal year (or other time period), the over- or under-recovery for that year may be included as an adjustment to the indirect (F&A) cost for the next rate negotiation. When the rate is negotiated before the carry-forward adjustment is determined, the carry-forward amount may be applied to the next subsequent rate negotiation. When such adjustments are to be made, each fixed rate negotiated in advance for a given period will be computed by applying the expected indirect (F&A) costs allocable to Federal awards for the forecast period plus or minus the carry-forward adjustment (over- or under-recovery) from the prior period, to the forecast distribution base. Unrecovered amounts under lump-sum agreements or cost-sharing provisions of prior years must not be carried forward for consideration in the new rate negotiation. There must, however, be an advance understanding in each case between the institution and the cognizant agency for indirect costs as to whether these differences will be considered in the rate negotiation rather than making the determination after the differences are known. Further, institutions electing to use this carry-forward provision may not subsequently change without prior approval of the cognizant agency for indirect costs. In the event that an institution returns to a post-determined rate, any over- or under-recovery during the period in which negotiated fixed rates and carry-forward provisions were followed will be included in the subsequent post-determined rates. Where multiple rates are used, the same procedure will be applicable for determining each rate.
+
+6. Provisional and Final Rates for Indirect (F&A) Costs
+
+Where the cognizant agency for indirect costs determines that cost experience and other pertinent facts do not justify the use of predetermined rates, or a fixed rate with a carry-forward, or if the parties cannot agree on an equitable rate, a provisional rate must be established. To prevent substantial overpayment or underpayment, the provisional rate may be adjusted by the cognizant agency for indirect costs during the institution's fiscal year. Predetermined or fixed rates may replace provisional rates at any time prior to the close of the institution's fiscal year. If a provisional rate is not replaced by a predetermined or fixed rate prior to the end of the institution's fiscal year, a final rate will be established and upward or downward adjustments will be made based on the actual allowable costs incurred for the period involved.
+
+7. Fixed Rates for the Life of the Sponsored Agreement
+
+a. Except as provided in paragraph (c)(1) of § 200.414, Federal agencies must use the negotiated rates in effect at the time of the initial award throughout the life of the Federal award. Award levels for Federal awards may not be adjusted in future years as a result of changes in negotiated rates. “Negotiated rates” per the rate agreement include final, fixed, and predetermined rates and exclude provisional rates. “Life” for the purpose of this subsection means each competitive segment of a project. A competitive segment is a period of years approved by the Federal awarding agency at the time of the Federal award. If negotiated rate agreements do not extend through the life of the Federal award at the time of the initial award, then the negotiated rate for the last year of the Federal award must be extended through the end of the life of the Federal award.
+b. Except as provided in § 200.414, when an educational institution does not have a negotiated rate with the Federal Government at the time of an award (because the educational institution is a new recipient or the parties cannot reach agreement on a rate), the provisional rate used at the time of the award must be adjusted once a rate is negotiated and approved by the cognizant agency for indirect costs.
+
+8. Limitation on Reimbursement of Administrative Costs
+
+a. Notwithstanding the provisions of subsection C.1.a, the administrative costs charged to Federal awards awarded or amended (including continuation and renewal awards) with effective dates beginning on or after the start of the institution's first fiscal year which begins on or after October 1, 1991, must be limited to 26% of modified total direct costs (as defined in subsection 2) for the total of General Administration and General Expenses, Departmental Administration, Sponsored Projects Administration, and Student Administration and Services (including their allocable share of depreciation, interest costs, operation and maintenance expenses, and fringe benefits costs, as provided by Section B, and all other types of expenditures not listed specifically under one of the subcategories of facilities in Section B.
+b. Institutions should not change their accounting or cost allocation methods if the effect is to change the charging of a particular type of cost from F&A to direct, or to reclassify costs, or increase allocations from the administrative pools identified in paragraph B.1 of this Appendix to the other F&A cost pools or fringe benefits. Cognizant agencies for indirect cost are authorized to allow changes where an institution's charging practices are at variance with acceptable practices followed by a substantial majority of other institutions.
+
+9. Alternative Method for Administrative Costs
+
+a. Notwithstanding the provisions of subsection C.1.a, an institution may elect to claim a fixed allowance for the “Administration” portion of indirect (F&A) costs. The allowance could be either 24% of modified total direct costs or a percentage equal to 95% of the most recently negotiated fixed or predetermined rate for the cost pools included under “Administration” as defined in Section B.1, whichever is less. Under this alternative, no cost proposal need be prepared for the “Administration” portion of the indirect (F&A) cost rate nor is further identification or documentation of these costs required (see subsection c). Where a negotiated indirect (F&A) cost agreement includes this alternative, an institution must make no further charges for the expenditure categories described in Section B.5, Section B.6, Section B.7, and Section B.9.
+b. In negotiations of rates for subsequent periods, an institution that has elected the option of subsection a may continue to exercise it at the same rate without further identification or documentation of costs.
+c. If an institution elects to accept a threshold rate as defined in subsection a of this section, it is not required to perform a detailed analysis of its administrative costs. However, in order to compute the facilities components of its indirect (F&A) cost rate, the institution must reconcile its indirect (F&A) cost proposal to its financial statements and make appropriate adjustments and reclassifications to identify the costs of each major function as defined in Section A.1, as well as to identify and allocate the facilities components. Administrative costs that are not identified as such by the institution's accounting system (such as those incurred in academic departments) will be classified as instructional costs for purposes of reconciling indirect (F&A) cost proposals to financial statements and allocating facilities costs.
+
+10. Individual Rate Components
+
+In order to provide mutually agreed-upon information for management purposes, each indirect (F&A) cost rate negotiation or determination must include development of a rate for each indirect (F&A) cost pool as well as the overall indirect (F&A) cost rate.
+
+11. Negotiation and Approval of Indirect (F&A) Rate
+
+a. Cognizant agency for indirect costs is defined in Subpart A.
+(1) Cost negotiation cognizance is assigned to the Department of Health and Human Services (HHS) or the Department of Defense's Office of Naval Research (DOD), normally depending on which of the two agencies (HHS or DOD) provides more funds directly to the educational institution for the most recent three years. Information on funding must be derived from relevant data gathered by the National Science Foundation. In cases where neither HHS nor DOD provides Federal funding directly to an educational institution, the cognizant agency for indirect costs assignment must default to HHS. Notwithstanding the method for cognizance determination described in this section, other arrangements for cognizance of a particular educational institution may also be based in part on the types of research performed at the educational institution and must be decided based on mutual agreement between HHS and DOD. Where a non-Federal entity only receives funds as a subrecipient, see § 200.332.
+(2) After cognizance is established, it must continue for a five-year period.
+b. Acceptance of rates. See § 200.414.
+c. Correcting deficiencies. The cognizant agency for indirect costs must negotiate changes needed to correct systems deficiencies relating to accountability for Federal awards. Cognizant agencies for indirect costs must address the concerns of other affected agencies, as appropriate, and must negotiate special rates for Federal agencies that are required to limit recovery of indirect costs by statute.
+d. Resolving questioned costs. The cognizant agency for indirect costs must conduct any necessary negotiations with an educational institution regarding amounts questioned by audit that are due the Federal Government related to costs covered by a negotiated agreement.
+e. Reimbursement. Reimbursement to cognizant agencies for indirect costs for work performed under this Part may be made by reimbursement billing under the Economy Act, 31 U.S.C. 1535.
+f. Procedure for establishing facilities and administrative rates must be established by one of the following methods:
+(1) Formal negotiation. The cognizant agency for indirect costs is responsible for negotiating and approving rates for an educational institution on behalf of all Federal agencies. Federal awarding agencies that do not have cognizance for indirect costs must notify the cognizant agency for indirect costs of specific concerns (i.e., a need to establish special cost rates) which could affect the negotiation process. The cognizant agency for indirect costs must address the concerns of all interested agencies, as appropriate. A pre-negotiation conference may be scheduled among all interested agencies, if necessary. The cognizant agency for indirect costs must then arrange a negotiation conference with the educational institution.
+(2) Other than formal negotiation. The cognizant agency for indirect costs and educational institution may reach an agreement on rates without a formal negotiation conference; for example, through correspondence or use of the simplified method described in this section D of this Appendix.
+g. Formalizing determinations and agreements. The cognizant agency for indirect costs must formalize all determinations or agreements reached with an educational institution and provide copies to other agencies having an interest. Determinations should include a description of any adjustments, the actual amount, both dollar and percentage adjusted, and the reason for making adjustments.
+h. Disputes and disagreements. Where the cognizant agency for indirect costs is unable to reach agreement with an educational institution with regard to rates or audit resolution, the appeal system of the cognizant agency for indirect costs must be followed for resolution of the disagreement.
+
+12. Standard Format for Submission
+
+For facilities and administrative (indirect (F&A)) rate proposals, educational institutions must use the standard format, shown in section E of this appendix, to submit their indirect (F&A) rate proposal to the cognizant agency for indirect costs. The cognizant agency for indirect costs may, on an institution-by-institution basis, grant exceptions from all or portions of Part II of the standard format requirement. This requirement does not apply to educational institutions that use the simplified method for calculating indirect (F&A) rates, as described in Section D of this Appendix.
+As provided in section C.10 of this appendix, each F&A cost rate negotiation or determination must include development of a rate for each F&A cost pool as well as the overall F&A rate.
+
+D. Simplified Method for Small Institutions
+
+1. General
+
+a. Where the total direct cost of work covered by this Part at an institution does not exceed $10 million in a fiscal year, the simplified procedure described in subsections 2 or 3 may be used in determining allowable indirect (F&A) costs. Under this simplified procedure, the institution's most recent annual financial report and immediately available supporting information must be utilized as a basis for determining the indirect (F&A) cost rate applicable to all Federal awards. The institution may use either the salaries and wages (see subsection 2) or modified total direct costs (see subsection 3) as the distribution basis.
+b. The simplified procedure should not be used where it produces results which appear inequitable to the Federal Government or the institution. In any such case, indirect (F&A) costs should be determined through use of the regular procedure.
+
+2. Simplified Procedure—Salaries and Wages Base
+
+a. Establish the total amount of salaries and wages paid to all employees of the institution.
+b. Establish an indirect (F&A) cost pool consisting of the expenditures (exclusive of capital items and other costs specifically identified as unallowable) which customarily are classified under the following titles or their equivalents:
+(1) General administration and general expenses (exclusive of costs of student administration and services, student activities, student aid, and scholarships).
+(2) Operation and maintenance of physical plant and depreciation (after appropriate adjustment for costs applicable to other institutional activities).
+(3) Library.
+(4) Department administration expenses, which will be computed as 20 percent of the salaries and expenses of deans and heads of departments.
+In those cases where expenditures classified under subsection (1) have previously been allocated to other institutional activities, they may be included in the indirect (F&A) cost pool. The total amount of salaries and wages included in the indirect (F&A) cost pool must be separately identified.
+c. Establish a salary and wage distribution base, determined by deducting from the total of salaries and wages as established in subsection a from the amount of salaries and wages included under subsection b.
+d. Establish the indirect (F&A) cost rate, determined by dividing the amount in the indirect (F&A) cost pool, subsection b, by the amount of the distribution base, subsection c.
+e. Apply the indirect (F&A) cost rate to direct salaries and wages for individual agreements to determine the amount of indirect (F&A) costs allocable to such agreements.
+
+3. Simplified Procedure—Modified Total Direct Cost Base
+
+a. Establish the total costs incurred by the institution for the base period.
+b. Establish an indirect (F&A) cost pool consisting of the expenditures (exclusive of capital items and other costs specifically identified as unallowable) which customarily are classified under the following titles or their equivalents:
+(1) General administration and general expenses (exclusive of costs of student administration and services, student activities, student aid, and scholarships).
+(2) Operation and maintenance of physical plant and depreciation (after appropriate adjustment for costs applicable to other institutional activities).
+(3) Library.
+(4) Department administration expenses, which will be computed as 20 percent of the salaries and expenses of deans and heads of departments. In those cases where expenditures classified under subsection (1) have previously been allocated to other institutional activities, they may be included in the indirect (F&A) cost pool. The modified total direct costs amount included in the indirect (F&A) cost pool must be separately identified.
+c. Establish a modified total direct cost distribution base, as defined in Section C.2, The distribution basis, that consists of all institution's direct functions.
+d. Establish the indirect (F&A) cost rate, determined by dividing the amount in the indirect (F&A) cost pool, subsection b, by the amount of the distribution base, subsection c.
+e. Apply the indirect (F&A) cost rate to the modified total direct costs for individual agreements to determine the amount of indirect (F&A) costs allocable to such agreements.
+
+E. Documentation Requirements
+
+The standard format for documentation requirements for indirect (indirect (F&A)) rate proposals for claiming costs under the regular method is available on the OMB website.
+
+F. Certification
+
+1. Certification of Charges
+
+To assure that expenditures for Federal awards are proper and in accordance with the agreement documents and approved project budgets, the annual and/or final fiscal reports or vouchers requesting payment under the agreements will include a certification, signed by an authorized official of the university, which reads “By signing this report, I certify to the best of my knowledge and belief that the report is true, complete, and accurate, and the expenditures, disbursements and cash receipts are for the purposes and intent set forth in the award documents. I am aware that any false, fictitious, or fraudulent information, or the omission of any material fact, may subject me to criminal, civil or administrative penalties for fraud, false statements, false claims or otherwise. (U.S. Code, Title 18, Section 1001 and Title 31, Sections 3729-3733 and 3801-3812)”.
+
+2. Certification of Indirect (F&A) Costs
+
+a. Policy. Cognizant agencies must not accept a proposed indirect cost rate unless such costs have been certified by the educational institution using the Certificate of indirect (F&A) Costs set forth in subsection F.2.c
+b. The certificate must be signed on behalf of the institution by the chief financial officer or an individual designated by an individual at a level no lower than vice president or chief financial officer.
+An indirect (F&A) cost rate is not binding upon the Federal Government if the most recent required proposal from the institution has not been certified. Where it is necessary to establish indirect (F&A) cost rates, and the institution has not submitted a certified proposal for establishing such rates in accordance with the requirements of this section, the Federal Government must unilaterally establish such rates. Such rates may be based upon audited historical data or such other data that have been furnished to the cognizant agency for indirect costs and for which it can be demonstrated that all unallowable costs have been excluded. When indirect (F&A) cost rates are unilaterally established by the Federal Government because of failure of the institution to submit a certified proposal for establishing such rates in accordance with this section, the rates established will be set at a level low enough to ensure that potentially unallowable costs will not be reimbursed.
+c. Certificate. The certificate required by this section must be in the following form:
+
+Certificate of Indirect (F&A) Costs
+
+This is to certify that to the best of my knowledge and belief:
+(1) I have reviewed the indirect (F&A) cost proposal submitted herewith;
+(2) All costs included in this proposal [identify date] to establish billing or final indirect (F&A) costs rate for [identify period covered by rate] are allowable in accordance with the requirements of the Federal agreement(s) to which they apply and with the cost principles applicable to those agreements.
+(3) This proposal does not include any costs which are unallowable under subpart E of this part such as (without limitation): Public relations costs, contributions and donations, entertainment costs, fines and penalties, lobbying costs, and defense of fraud proceedings; and
+(4) All costs included in this proposal are properly allocable to Federal agreements on the basis of a beneficial or causal relationship between the expenses incurred and the agreements to which they are allocated in accordance with applicable requirements.
+I declare that the foregoing is true and correct.
+Institution of Higher Education:
+Signature:
+Name of Official:
+Title:
+Date of Execution:
+[78 FR 78608, Dec. 26, 2013, as amended at 79 FR 75888, Dec. 19, 2014; 80 FR 54409, Sept. 10, 2015; 85 FR 49577, Aug. 13, 2020; 89 FR 30206, Apr. 22, 2024]
+
+
+Appendix IV to Part 200—Indirect (F&A) Costs Identification and Assignment, and Rate Determination for Nonprofit Organizations
+
+A. General
+
+1. Indirect costs are those that have been incurred for common or joint objectives and cannot be readily identified with a particular final cost objective. Direct cost of minor amounts may be treated as indirect costs under the conditions described in § 200.413(d). After direct costs have been determined and assigned directly to awards or other work as appropriate, indirect costs are those remaining to be allocated to benefitting cost objectives. A cost may not be allocated to a Federal award as an indirect cost if any other cost incurred for the same purpose, in like circumstances, has been assigned to a Federal award as a direct cost.
+2. “Major nonprofit organizations” are defined in paragraph (a) of § 200.414. See indirect cost rate reporting requirements in sections B.2.e and B.3.g of this Appendix.
+
+B. Allocation of Indirect Costs and Determination of Indirect Cost Rates
+
+1. General
+
+a. If a nonprofit organization has only one major function, or where all its major functions benefit from its indirect costs to approximately the same degree, the allocation of indirect costs and the computation of an indirect cost rate may be accomplished through simplified allocation procedures, as described in section B.2 of this Appendix.
+b. If an organization has several major functions which benefit from its indirect costs in varying degrees, allocation of indirect costs may require the accumulation of such costs into separate cost groupings which then are allocated individually to benefitting functions by means of a base which best measures the relative degree of benefit. The indirect costs allocated to each function are then distributed to individual Federal awards and other activities included in that function by means of an indirect cost rate(s).
+c. The determination of what constitutes an organization's major functions will depend on its purpose in being; the types of services it renders to the public, its clients, and its members; and the amount of effort it devotes to such activities as fundraising, public information and membership activities.
+d. Specific methods for allocating indirect costs and computing indirect cost rates along with the conditions under which each method should be used are described in section B.2 through B.5 of this Appendix.
+e. The base period for the allocation of indirect costs is the period in which such costs are incurred and accumulated for allocation to work performed in that period. The base period normally should coincide with the organization's fiscal year but, in any event, must be so selected as to avoid inequities in the allocation of the costs.
+
+2. Simplified Allocation Method
+
+a. Where an organization's major functions benefit from its indirect costs to approximately the same degree, the allocation of indirect costs may be accomplished by (i) separating the organization's total costs for the base period as either direct or indirect, and (ii) dividing the total allowable indirect costs (net of applicable credits) by an equitable distribution base. The result of this process is an indirect cost rate which is used to distribute indirect costs to individual Federal awards. The rate should be expressed as the percentage which the total amount of allowable indirect costs bears to the base selected. This method should also be used where an organization has only one major function encompassing a number of individual projects or activities, and may be used where the level of Federal awards to an organization is relatively small.
+b. Both the direct costs and the indirect costs must exclude capital expenditures and unallowable costs. However, unallowable costs which represent activities must be included in the direct costs under the conditions described in § 200.413(e).
+c. The distribution base may be total direct costs (excluding capital expenditures and other distorting items, such as subawards for $50,000 or more), direct salaries and wages, or other base which results in an equitable distribution. The distribution base must exclude participant support costs as defined in § 200.1.
+d. Except where a special rate(s) is required in accordance with section B.5 of this Appendix, the indirect cost rate developed under the above principles is applicable to all Federal awards of the organization. If a special rate(s) is required, appropriate modifications must be made in order to develop the special rate(s).
+e. For an organization that receives more than $10 million in direct Federal funding in a fiscal year, a breakout of the indirect cost component into two broad categories, Facilities and Administration as defined in paragraph (a) of § 200.414, is required. The rate in each case must be stated as the percentage which the amount of the particular indirect cost category (i.e., Facilities or Administration) is of the distribution base identified with that category.
+
+3. Multiple Allocation Base Method
+
+a. General. Where an organization's indirect costs benefit its major functions in varying degrees, indirect costs must be accumulated into separate cost groupings, as described in subparagraph b. Each grouping must then be allocated individually to benefitting functions by means of a base which best measures the relative benefits. The default allocation bases by cost pool are described in section B.3.c of this Appendix.
+b. Identification of indirect costs. Cost groupings must be established so as to permit the allocation of each grouping on the basis of benefits provided to the major functions. Each grouping must constitute a pool of expenses that are of like character in terms of functions they benefit and in terms of the allocation base which best measures the relative benefits provided to each function. The groupings are classified within the two broad categories: “Facilities” and “Administration,” as described in section A.3 of this Appendix. The indirect cost pools are defined as follows:
+(1) Depreciation. The expenses under this heading are the portion of the costs of the organization's buildings, capital improvements to land and buildings, and equipment which are computed in accordance with § 200.436.
+(2) Interest. Interest on debt associated with certain buildings, equipment and capital improvements are computed in accordance with § 200.449.
+(3) Operation and maintenance expenses. The expenses under this heading are those that have been incurred for the administration, operation, maintenance, preservation, and protection of the organization's physical plant. They include expenses normally incurred for such items as: janitorial and utility services; repairs and ordinary or normal alterations of buildings, furniture and equipment; care of grounds; maintenance and operation of buildings and other plant facilities; security; earthquake and disaster preparedness; environmental safety; hazardous waste disposal; property, liability and other insurance relating to property; space and capital leasing; facility planning and management; and central receiving. The operation and maintenance expenses category must also include its allocable share of fringe benefit costs, depreciation, and interest costs.
+(4) General administration and general expenses. The expenses under this heading are those that have been incurred for the overall general executive and administrative offices of the organization and other expenses of a general nature which do not relate solely to any major function of the organization. This category must also include its allocable share of fringe benefit costs, operation and maintenance expense, depreciation, and interest costs. Examples of this category include central offices, such as the director's office, the office of finance, business services, budget and planning, personnel, safety and risk management, general counsel, management information systems, and library costs.
+In developing this cost pool, special care should be exercised to ensure that costs incurred for the same purpose in like circumstances are treated consistently as either direct or indirect costs. For example, salaries of technical staff, project supplies, project publication, telephone toll charges, computer costs, travel costs, and specialized services costs must be treated as direct costs wherever identifiable to a particular program. The salaries and wages of administrative and pooled clerical staff should normally be treated as indirect costs. Direct charging of these costs may be appropriate as described in § 200.413. Items such as office supplies, postage, local telephone costs, periodicals and memberships should normally be treated as indirect costs.
+c. Allocation bases. Actual conditions must be taken into account in selecting the base to be used in allocating the expenses in each grouping to benefitting functions. The essential consideration in selecting a method or a base is that it is the one best suited for assigning the pool of costs to cost objectives in accordance with benefits derived; a traceable cause and effect relationship; or logic and reason, where neither the cause nor the effect of the relationship is determinable. When an allocation can be made by assignment of a cost grouping directly to the function benefitted, the allocation must be made in that manner. When the expenses in a cost grouping are more general in nature, the allocation must be made through the use of a selected base which produces results that are equitable to both the Federal Government and the organization. The distribution must be made in accordance with the bases described herein unless it can be demonstrated that the use of a different base would result in a more equitable allocation of the costs, or that a more readily available base would not increase the costs charged to Federal awards. The results of special cost studies (such as an engineering utility study) must not be used to determine and allocate the indirect costs to Federal awards.
+(1) Depreciation. Depreciation expenses must be allocated in the following manner:
+(a) Depreciation on buildings used exclusively in the conduct of a single function, and on capital improvements and equipment used in such buildings, must be assigned to that function.
+(b) Depreciation on buildings used for more than one function, and on capital improvements and equipment used in such buildings, must be allocated to the individual functions performed in each building on the basis of usable square feet of space, excluding common areas, such as hallways, stairwells, and restrooms.
+(c) Depreciation on buildings, capital improvements and equipment related space (e.g., individual rooms, and laboratories) used jointly by more than one function (as determined by the users of the space) must be treated as follows. The cost of each jointly used unit of space must be allocated to the benefitting functions on the basis of:
+(i) the employees and other users on a full-time equivalent (FTE) basis or salaries and wages of those individual functions benefitting from the use of that space; or
+(ii) organization-wide employee FTEs or salaries and wages applicable to the benefitting functions of the organization.
+(d) Depreciation on certain capital improvements to land, such as paved parking areas, fences, sidewalks, and the like, not included in the cost of buildings, must be allocated to user categories on a FTE basis and distributed to major functions in proportion to the salaries and wages of all employees applicable to the functions.
+(2) Interest. Interest costs must be allocated in the same manner as the depreciation on the buildings, equipment and capital equipment to which the interest relates.
+(3) Operation and maintenance expenses. Operation and maintenance expenses must be allocated in the same manner as the depreciation.
+(4) General administration and general expenses. General administration and general expenses must be allocated to benefitting functions based on modified total costs (MTC). The MTC is the modified total direct costs (MTDC), as described in § 200.1, plus the allocated indirect cost proportion. The expenses included in this category could be grouped first according to major functions of the organization to which they render services or provide benefits. The aggregate expenses of each group must then be allocated to benefitting functions based on MTC.
+d. Order of distribution.
+(1) Indirect cost categories consisting of depreciation, interest, operation and maintenance, and general administration and general expenses must be allocated in that order to the remaining indirect cost categories as well as to the major functions of the organization. Other cost categories should be allocated in the order determined to be most appropriate by the organization. This order of allocation does not apply if cross allocation of costs is made as provided in section B.3.d.2 of this Appendix.
+(2) Normally, an indirect cost category will be considered closed once it has been allocated to other cost objectives, and costs must not be subsequently allocated to it. However, a cross allocation of costs between two or more indirect costs categories could be used if such allocation will result in a more equitable allocation of costs. If a cross allocation is used, an appropriate modification to the composition of the indirect cost categories is required.
+e. Application of indirect cost rate or rates. Except where a special indirect cost rate(s) is required in accordance with section B.5 of this Appendix, the separate groupings of indirect costs allocated to each major function must be aggregated and treated as a common pool for that function. The costs in the common pool must then be distributed to individual Federal awards included in that function by use of a single indirect cost rate.
+f. Distribution basis. Indirect costs must be distributed to applicable Federal awards and other benefitting activities within each major function on the basis of MTDC (see definition in § 200.1).
+g. Individual Rate Components. An indirect cost rate must be determined for each separate indirect cost pool developed. The rate in each case must be stated as the percentage which the amount of the particular indirect cost pool is of the distribution base identified with that pool. Each indirect cost rate negotiation or determination agreement must include development of the rate for each indirect cost pool as well as the overall indirect cost rate. The indirect cost pools must be classified within two broad categories: “Facilities” and “Administration,” as described in § 200.414(a).
+
+4. Direct Allocation Method
+
+a. Some nonprofit organizations treat all costs as direct costs except general administration and general expenses. These organizations generally separate their costs into three basic categories: (i) General administration and general expenses, (ii) fundraising, and (iii) other direct functions (including projects performed under Federal awards). Joint costs, such as depreciation, rental costs, operation and maintenance of facilities, telephone expenses, information technology, and the like are prorated individually as direct costs to each category and to each Federal award or other activity using a base most appropriate to the particular cost being prorated.
+b. This method is acceptable, provided each joint cost is prorated using a base which accurately measures the benefits provided to each Federal award or other activity. The bases must be established in accordance with reasonable criteria and be supported by current data. This method is compatible with the Standards of Accounting and Financial Reporting for Voluntary Health and Welfare Organizations issued jointly by the National Health Council, Inc., the National Assembly of Voluntary Health and Social Welfare Organizations, and the United Way of America.
+c. Under this method, indirect costs consist exclusively of general administration and general expenses. In all other respects, the organization's indirect cost rates must be computed in the same manner as that described in section B.2 of this Appendix.
+
+5. Special Indirect Cost Rates
+
+In some instances, a single indirect cost rate for all activities of an organization or for each major function of the organization may not be appropriate, since it would not take into account those different factors which may substantially affect the indirect costs applicable to a particular segment of work. For this purpose, a particular segment of work may be that performed under a single Federal award or it may consist of work under a group of Federal awards performed in a common environment. These factors may include the physical location of the work, the level of administrative support required, the nature of the facilities or other resources employed, the scientific disciplines or technical skills involved, the organizational arrangements used, or any combination thereof. When a particular segment of work is performed in an environment which appears to generate a significantly different level of indirect costs, provisions should be made for a separate indirect cost pool applicable to such work. The separate indirect cost pool should be developed during the course of the regular allocation process, and the separate indirect cost rate resulting therefrom should be used, provided it is determined that (i) the rate differs significantly from that which would have been obtained under sections B.2, B.3, and B.4 of this Appendix, and (ii) the volume of work to which the rate would apply is material.
+
+C. Negotiation and Approval of Indirect Cost Rates
+
+1. Definitions
+
+As used in this section, the following terms have the meanings set forth in this section:
+a. Cognizant agency for indirect costs means the Federal agency responsible for negotiating and approving indirect cost rates for a nonprofit organization on behalf of all Federal agencies.
+b. Predetermined rate means an indirect cost rate, applicable to a specified current or future period, usually the organization's fiscal year. The rate is based on an estimate of the costs to be incurred during the period. A predetermined rate is not subject to adjustment.
+c. Fixed rate means an indirect cost rate which has the same characteristics as a predetermined rate, except that the difference between the estimated costs and the actual costs of the period covered by the rate is carried forward as an adjustment to the rate computation of a subsequent period.
+d. Final rate means an indirect cost rate applicable to a specified past period which is based on the actual costs of the period. A final rate is not subject to adjustment.
+e. Provisional rate or billing rate means a temporary indirect cost rate applicable to a specified period which is used for funding, interim reimbursement, and reporting indirect costs on Federal awards pending the establishment of a final rate for the period.
+f. Indirect cost proposal means the documentation prepared by an organization to substantiate its claim for the reimbursement of indirect costs. This proposal provides the basis for the review and negotiation leading to the establishment of an organization's indirect cost rate.
+g. Cost objective means a function, organizational subdivision, contract, Federal award, or other work unit for which cost data are desired and for which provision is made to accumulate and measure the cost of processes, projects, jobs and capitalized projects.
+
+2. Negotiation and Approval of Rates
+
+a. Unless different arrangements are agreed to by the Federal agencies concerned, the Federal agency with the largest dollar value of Federal awards directly funded to an organization will be designated as the cognizant agency for indirect costs for the negotiation and approval of the indirect cost rates and, where necessary, other rates such as fringe benefit and computer charge-out rates. Once an agency is assigned cognizance for a particular nonprofit organization, the assignment will not be changed unless there is a shift in the dollar volume of the Federal awards directly funded to the organization for at least three years. All concerned Federal agencies must be given the opportunity to participate in the negotiation process but, after a rate has been agreed upon, it will be accepted by all Federal agencies. When a Federal agency has reason to believe that special operating factors affecting its Federal awards necessitate special indirect cost rates in accordance with section B.5 of this Appendix, it will, prior to the time the rates are negotiated, notify the cognizant agency for indirect costs. (See also § 200.414.) If the nonprofit does not receive any funding from any Federal agency, the pass-through entity is responsible for the negotiation of the indirect cost rates in accordance with § 200.332(a)(4).
+b. Except as otherwise provided in § 200.414(f), a nonprofit organization which has not previously established an indirect cost rate with a Federal agency must submit its initial indirect cost proposal immediately after the organization is advised that a Federal award will be made and, in no event, later than three months after the effective date of the Federal award.
+c. Unless approved by the cognizant agency for indirect costs in accordance with § 200.414(g), organizations that have previously established indirect cost rates must submit a new indirect cost proposal to the cognizant agency for indirect costs within six months after the close of each fiscal year.
+d. A predetermined rate may be negotiated for use on Federal awards where there is reasonable assurance, based on past experience and reliable projection of the organization's costs, that the rate is not likely to exceed a rate based on the organization's actual costs.
+e. Fixed rates may be negotiated where predetermined rates are not considered appropriate. A fixed rate, however, must not be negotiated if (i) all or a substantial portion of the organization's Federal awards are expected to expire before the carry-forward adjustment can be made; (ii) the mix of Federal and non-Federal work at the organization is too erratic to permit an equitable carry-forward adjustment; or (iii) the organization's operations fluctuate significantly from year to year.
+f. Provisional and final rates must be negotiated where neither predetermined nor fixed rates are appropriate. Predetermined or fixed rates may replace provisional rates at any time prior to the close of the organization's fiscal year. If that event does not occur, a final rate will be established and upward or downward adjustments will be made based on the actual allowable costs incurred for the period involved.
+g. The results of each negotiation must be formalized in a written agreement between the cognizant agency for indirect costs and the nonprofit organization. The cognizant agency for indirect costs must make available copies of the agreement to all concerned Federal agencies.
+h. If a dispute arises in a negotiation of an indirect cost rate between the cognizant agency for indirect costs and the nonprofit organization, the dispute must be resolved in accordance with the appeals procedures of the cognizant agency for indirect costs.
+i. To the extent that problems are encountered among the Federal agencies in connection with the negotiation and approval process, OMB will lend assistance as required to resolve such problems in a timely manner.
+
+D. Certification of Indirect (F&A) Costs
+
+(1) Required Certification. No proposal to establish indirect (F&A) cost rates must be acceptable unless such costs have been certified by the nonprofit organization using the Certificate of Indirect (F&A) Costs set forth in section j. of this appendix. The certificate must be signed on behalf of the organization by an individual at a level no lower than vice president or chief financial officer for the organization.
+(2) Each indirect cost rate proposal must be accompanied by a certification in the following form:
+
+Certificate of Indirect (F&A) Costs
+
+This is to certify that to the best of my knowledge and belief:
+(1) I have reviewed the indirect (F&A) cost proposal submitted herewith;
+(2) All costs included in this proposal [identify date] to establish billing or final indirect (F&A) costs rate for [identify period covered by rate] are allowable in accordance with the requirements of the Federal awards to which they apply and with subpart E of this part.
+(3) This proposal does not include any costs which are unallowable under subpart E of this part such as (without limitation): Public relations costs, contributions and donations, entertainment costs, fines and penalties, lobbying costs, and defense of fraud proceedings; and
+(4) All costs included in this proposal are properly allocable to Federal awards on the basis of a beneficial or causal relationship between the expenses incurred and the Federal awards to which they are allocated in accordance with applicable requirements.
+I declare that the foregoing is true and correct.
+Nonprofit Organization:
+Signature:
+Name of Official:
+Title:
+Date of Execution:
+[78 FR 78608, Dec. 26, 2013, as amended at 80 FR 54410, Sept. 10, 2015; 85 FR 49579, Aug. 13, 2020; 89 FR 30206, Apr. 22, 2024]
+
+
+Appendix V to Part 200—State/Local Governmentwide Central Service Cost Allocation Plans
+
+A. General
+
+1. Most governmental units provide certain services, such as motor pools, computer centers, purchasing, accounting, etc., to operating agencies on a centralized basis. Since federally-supported awards are performed within the individual operating agencies, there needs to be a process whereby these central service costs can be identified and assigned to benefitted activities on a reasonable and consistent basis. The central service cost allocation plan provides that process. All costs and other data used to distribute the costs included in the plan should be supported by formal accounting and other records that will support the propriety of the costs assigned to Federal awards.
+2. Guidelines and illustrations of central service cost allocation plans are provided in a brochure published by the Department of Health and Human Services entitled “A Guide for State, Local and Indian Tribal Governments: Cost Principles and Procedures for Developing Cost Allocation Plans and Indirect Cost Rates for Agreements with the Federal Government.” A copy of this brochure may be obtained from the HHS Cost Allocation Services or at their website.
+
+B. Definitions
+
+1. Agency or operating agency means an organizational unit or sub-division within a governmental unit that is responsible for the performance or administration of Federal awards or activities of the governmental unit.
+2. Allocated central services means central services that benefit operating agencies but are not billed to the agencies on a fee-for-service or similar basis. These costs are allocated to benefitted agencies on some reasonable basis. Examples of such services might include general accounting, personnel administration, purchasing, etc.
+3. Billed central services means central services that are billed to benefitted agencies or programs on an individual fee-for-service or similar basis. Typical examples of billed central services include computer services, transportation services, insurance, and fringe benefits.
+4. Cognizant agency for indirect costs is defined in § 200.1. The determination of cognizant agency for indirect costs for states and local governments is described in section F.1.
+5. Major local government means local government that receives more than $100 million in direct Federal awards subject to this Part.
+
+C. Scope of the Central Service Cost Allocation Plans
+
+The central service cost allocation plan will include all central service costs that will be claimed (either as a billed or an allocated cost) under Federal awards and will be documented as described in section E. omitted from the plan will not be reimbursed.
+
+D. Submission Requirements
+
+1. Each state will submit a plan to the Department of Health and Human Services for each year in which it claims central service costs under Federal awards. The plan should include (a) a projection of the next year's allocated central service cost (based either on actual costs for the most recently completed year or the budget projection for the coming year), and (b) a reconciliation of actual allocated central service costs to the estimated costs used for either the most recently completed year or the year immediately preceding the most recently completed year.
+2. Each major local government is also required to submit a plan to its cognizant agency for indirect costs annually.
+3. All other local governments claiming central service costs must develop a plan in accordance with the requirements described in this Part and maintain the plan and related supporting documentation for audit. These local governments are not required to submit their plans for Federal approval unless they are specifically requested to do so by the cognizant agency for indirect costs. Where a local government only receives funds as a subrecipient, the pass-through entity will be responsible for monitoring the subrecipient's plan.
+4. All central service cost allocation plans will be prepared and, when required, submitted within six months prior to the beginning of each of the governmental unit's fiscal years in which it proposes to claim central service costs. Extensions may be granted by the cognizant agency for indirect costs on a case-by-case basis.
+
+E. Documentation Requirements for Submitted Plans
+
+The documentation requirements described in this section may be modified, expanded, or reduced by the cognizant agency for indirect costs on a case-by-case basis. For example, the requirements may be reduced for those central services which have little or no impact on Federal awards. Conversely, if a review of a plan indicates that certain additional information is needed, and will likely be needed in future years, it may be routinely requested in future plan submissions. Items marked with an asterisk (*) should be submitted only once; subsequent plans should merely indicate any changes since the last plan.
+
+1. General
+
+All proposed plans must be accompanied by the following: an organization chart sufficiently detailed to show operations including the central service activities of the state/local government whether or not they are shown as benefitting from central service functions; a copy of the Comprehensive Annual Financial Report (or a copy of the Executive Budget if budgeted costs are being proposed) to support the allowable costs of each central service activity included in the plan; and, a certification (see subsection 4.) that the plan was prepared in accordance with this Part, contains only allowable costs, and was prepared in a manner that treated similar costs consistently among the various Federal awards and between Federal and non-Federal awards/activities.
+
+2. Allocated Central Services
+
+For each allocated central service*, the plan must also include the following: a brief description of the service, an identification of the unit rendering the service and the operating agencies receiving the service, the items of expense included in the cost of the service, the method used to distribute the cost of the service to benefitted agencies, and a summary schedule showing the allocation of each service to the specific benefitted agencies. If any self-insurance funds or fringe benefits costs are treated as allocated (rather than billed) central services, documentation discussed in subsections 3.b. and c. must also be included.
+
+3. Billed Services
+
+a. General. The information described in this section must be provided for all billed central services, including internal service funds, self-insurance funds, and fringe benefit funds.
+b. Internal service funds.
+(1) For each internal service fund or similar activity with an operating budget of $5 million or more, the plan must include: A brief description of each service; a balance sheet for each fund based on individual accounts contained in the governmental unit's accounting system; a revenue/expenses statement, with revenues broken out by source, e.g., regular billings, interest earned, etc.; a listing of all non-operating transfers (as defined by GAAP) into and out of the fund; a description of the procedures (methodology) used to charge the costs of each service to users, including how billing rates are determined; a schedule of current rates; and, a schedule comparing total revenues (including imputed revenues) generated by the service to the allowable costs of the service, as determined under this part, with an explanation of how variances will be handled.
+(2) Revenues must consist of all revenues generated by the service, including unbilled and uncollected revenues. If some users were not billed for the services (or were not billed at the full rate for that class of users), a schedule showing the full imputed revenues associated with these users must be provided. Expenses must be broken out by object cost categories (e.g., salaries, supplies, etc.).
+c. Self-insurance funds. For each self-insurance fund, the plan must include: the fund balance sheet; a statement of revenue and expenses including a summary of billings and claims paid by agency; a listing of all non-operating transfers into and out of the fund; the type(s) of risk(s) covered by the fund (e.g., automobile liability, workers' compensation, etc.); an explanation of how the level of fund contributions are determined, including a copy of the current actuarial report (with the actuarial assumptions used) if the contributions are determined on an actuarial basis; and, a description of the procedures used to charge or allocate fund contributions to benefitted activities. Reserve levels in excess of claims (1) submitted and adjudicated but not paid, (2) submitted but not adjudicated, and (3) incurred but not submitted must be identified and explained.
+d. Fringe benefits. For fringe benefit costs, the plan must include: a listing of fringe benefits provided to covered employees, and the overall annual cost of each type of benefit; current fringe benefit policies; and procedures used to charge or allocate the costs of the benefits to benefitted activities. In addition, for pension and post-retirement health insurance plans, the following information must be provided: the governmental unit's funding policies, e.g., legislative bills, trust agreements, or state-mandated contribution rules, if different from actuarially determined rates; the pension plan's costs accrued for the year; the amount funded, and date(s) of funding; a copy of the current actuarial report (including the actuarial assumptions); the plan trustee's report; and, a schedule from the activity showing the value of the interest cost associated with late funding.
+
+4. Required Certification
+
+Each central service cost allocation plan will be accompanied by a certification in the following form:
+
+CERTIFICATE OF COST ALLOCATION PLAN
+
+This is to certify that I have reviewed the cost allocation plan submitted herewith and to the best of my knowledge and belief:
+(1) All costs included in this proposal [identify date] to establish cost allocations or billings for [identify period covered by plan] are allowable in accordance with the requirements of this Part and the Federal award(s) to which they apply. Unallowable costs have been adjusted for in allocating costs as indicated in the cost allocation plan.
+(2) All costs included in this proposal are properly allocable to Federal awards on the basis of a beneficial or causal relationship between the expenses incurred and the Federal awards to which they are allocated in accordance with applicable requirements. Further, the same costs that have been treated as indirect costs have not been claimed as direct costs. Similar types of costs have been accounted for consistently.
+I declare that the foregoing is true and correct.
+Governmental Unit:
+Signature:
+Name of Official:
+Title:
+Date of Execution:
+
+F. Negotiation and Approval of Central Service Plans
+
+1. Federal Cognizant Agency for Indirect Costs Assignments for Cost Negotiation
+
+In general, unless different arrangements are agreed to by the concerned Federal agencies, for central service cost allocation plans, the cognizant agency responsible for review and approval is the Federal agency with the largest dollar value of total Federal awards with a governmental unit. For indirect cost rates and departmental indirect cost allocation plans, the cognizant agency is the Federal agency with the largest dollar value of direct Federal awards with a governmental unit or component, as appropriate. Once designated as the cognizant agency for indirect costs, the Federal agency must remain so for a period of five years. In addition, the following Federal agencies continue to be responsible for the indicated governmental entities:
+Department of Health and Human Services—Public assistance and state-wide cost allocation plans for all states (including the District of Columbia and Puerto Rico), state and local hospitals, libraries and health districts.
+Department of the Interior—Indian tribal governments, territorial governments, and state and local park and recreational districts.
+Department of Labor—State and local labor departments.
+Department of Education—School districts and state and local education agencies.
+Department of Agriculture—State and local agriculture departments.
+Department of Transportation—State and local airport and port authorities and transit districts.
+Department of Commerce—State and local economic development districts.
+Department of Housing and Urban Development—State and local housing and development districts.
+Environmental Protection Agency—State and local water and sewer districts.
+
+2. Review
+
+All proposed central service cost allocation plans that are required to be submitted will be reviewed, negotiated, and approved by the cognizant agency for indirect costs on a timely basis. The cognizant agency for indirect costs will review the proposal within six months of receipt of the proposal and either negotiate/approve the proposal or advise the governmental unit of the additional documentation needed to support/evaluate the proposed plan or the changes required to make the proposal acceptable. Once an agreement with the governmental unit has been reached, the agreement will be accepted and used by all Federal agencies, unless prohibited or limited by statute. Where a Federal awarding agency has reason to believe that special operating factors affecting its Federal awards necessitate special consideration, the funding agency will, prior to the time the plans are negotiated, notify the cognizant agency for indirect costs.
+
+3. Agreement
+
+The results of each negotiation must be formalized in a written agreement between the cognizant agency for indirect costs and the governmental unit. This agreement will be subject to re-opening if the agreement is subsequently found to violate a statute or the information upon which the plan was negotiated is later found to be materially incomplete or inaccurate. The results of the negotiation must be made available to all Federal agencies for their use.
+
+4. Adjustments
+
+Negotiated cost allocation plans based on a proposal later found to have included costs that: (a) are unallowable (i) as specified by law or regulation, (ii) as identified in subpart F, General Provisions for selected Items of Cost of this Part, or (iii) by the terms and conditions of Federal awards, or (b) are unallowable because they are clearly not allocable to Federal awards, must be adjusted, or a refund must be made at the option of the cognizant agency for indirect costs, including earned or imputed interest from the date of transfer and debt interest, if applicable, chargeable in accordance with applicable Federal cognizant agency for indirect costs regulations. Adjustments or cash refunds may include, at the option of the cognizant agency for indirect costs, earned or imputed interest from the date of expenditure and delinquent debt interest, if applicable, chargeable in accordance with applicable cognizant agency claims collection regulations. These adjustments or refunds are designed to correct the plans and do not constitute a reopening of the negotiation.
+
+G. Other Policies
+
+1. Billed Central Service Activities
+
+Each billed central service activity must separately account for all revenues (including imputed revenues) generated by the service, expenses incurred to furnish the service, and profit/loss.
+
+2. Working Capital Reserves
+
+Internal service funds are dependent upon a reasonable level of working capital reserve to operate from one billing cycle to the next. Charges by an internal service activity to provide for the establishment and maintenance of a reasonable level of working capital reserve, in addition to the full recovery of costs, are allowable. A working capital reserve as part of retained earnings of up to 60 calendar days cash expenses for normal operating purposes is considered reasonable. A working capital reserve exceeding 60 calendar days may be approved by the cognizant agency for indirect costs in exceptional cases.
+
+3. Carry-Forward Adjustments of Allocated Central Service Costs
+
+Allocated central service costs are usually negotiated and approved for a future fiscal year on a “fixed with carry-forward” basis. Under this procedure, the fixed amounts for the future year covered by agreement are not subject to adjustment for that year. However, when the actual costs of the year involved become known, the differences between the fixed amounts previously approved and the actual costs will be carried forward and used as an adjustment to the fixed amounts established for a later year. This “carry-forward” procedure applies to all central services whose costs were fixed in the approved plan. However, a carry-forward adjustment is not permitted, for a central service activity that was not included in the approved plan, or for unallowable costs that must be reimbursed immediately.
+
+4. Adjustments of Billed Central Services
+
+Billing rates used to charge Federal awards must be based on the estimated costs of providing the services, including an estimate of the allocable central service costs. A comparison of the revenue generated by each billed service (including total revenues whether or not billed or collected) to the actual allowable costs of the service will be made at least annually, and an adjustment will be made for the difference between the revenue and the allowable costs. These adjustments will be made through one of the following adjustment methods: (a) a cash refund including earned or imputed interest from the date of transfer and debt interest, if applicable, chargeable in accordance with applicable Federal cognizant agency for indirect costs regulations to the Federal Government for the Federal share of the adjustment, (b) credits to the amounts charged to the individual programs, (c) adjustments to future billing rates, or (d) adjustments to allocated central service costs. Adjustments to allocated central services will not be permitted where the total amount of the adjustment for a particular service (Federal share and non-Federal) share exceeds $500,000. Adjustment methods may include, at the option of the cognizant agency, earned or imputed interest from the date of expenditure and delinquent debt interest, if applicable, chargeable in accordance with applicable cognizant agency claims collection regulations.
+
+5. Records Retention
+
+All central service cost allocation plans and related documentation used as a basis for claiming costs under Federal awards must be retained for audit in accordance with the records retention requirements contained in subpart D of this part.
+
+6. Appeals
+
+If a dispute arises in the negotiation of a plan between the cognizant agency for indirect costs and the governmental unit, the dispute must be resolved in accordance with the appeals procedures of the cognizant agency for indirect costs.
+
+7. OMB Assistance
+
+To the extent that problems are encountered among the Federal agencies or governmental units in connection with the negotiation and approval process, OMB will lend assistance, as required, to resolve such problems in a timely manner.
+[78 FR 78608, Dec. 26, 2013, as amended at 80 FR 54410, Sept. 10, 2015; 85 FR 49581, Aug. 13, 2020]
+
+
+Appendix VI to Part 200—Public Assistance Cost Allocation Plans
+
+A. General
+
+Federally-financed programs administered by state public assistance agencies are funded predominately by the Department of Health and Human Services (HHS). In support of its stewardship requirements, HHS has published requirements for the development, documentation, submission, negotiation, and approval of public assistance cost allocation plans in Subpart E of 45 CFR Part 95. All administrative costs (direct and indirect) are normally charged to Federal awards by implementing the public assistance cost allocation plan. This Appendix extends these requirements to all Federal awarding agencies whose programs are administered by a state public assistance agency. Major federally-financed programs typically administered by state public assistance agencies include: Temporary Aid to Needy Families (TANF), Medicaid, Food Stamps, Child Support Enforcement, Adoption Assistance and Foster Care, and Social Services Block Grant.
+
+B. Definitions
+
+1. State public assistance agency means a state agency administering or supervising the administration of one or more public assistance programs operated by the state as identified in Subpart E of 45 CFR Part 95. For the purpose of this Appendix, these programs include all programs administered by the state public assistance agency.
+2. State public assistance agency costs means all costs incurred by, or allocable to, the state public assistance agency, except expenditures for financial assistance, medical contractor payments, food stamps, and payments for services and goods provided directly to program recipients.
+
+C. Policy
+
+State public assistance agencies will develop, document and implement, and the Federal Government will review, negotiate, and approve, public assistance cost allocation plans in accordance with Subpart E of 45 CFR Part 95. The plan will include all programs administered by the state public assistance agency. Where a letter of approval or disapproval is transmitted to a state public assistance agency in accordance with Subpart E, the letter will apply to all Federal agencies and programs. The remaining sections of this Appendix (except for the requirement for certification) summarize the provisions of Subpart E of 45 CFR Part 95.
+
+D. Submission, Documentation, and Approval of Public Assistance Cost Allocation Plans
+
+1. State public assistance agencies are required to promptly submit amendments to the cost allocation plan to HHS for review and approval.
+2. Under the coordination process outlined in section E, affected Federal agencies will review all new plans and plan amendments and provide comments, as appropriate, to HHS. The effective date of the plan or plan amendment will be the first day of the calendar quarter following the event that required the amendment, unless another date is specifically approved by HHS. HHS, as the cognizant agency for indirect costs acting on behalf of all affected Federal agencies, will, as necessary, conduct negotiations with the state public assistance agency and will inform the state agency of the action taken on the plan or plan amendment.
+
+E. Review of Implementation of Approved Plans
+
+1. Since public assistance cost allocation plans are of a narrative nature, the review during the plan approval process consists of evaluating the appropriateness of the proposed groupings of costs (cost centers) and the related allocation bases. As such, the Federal Government needs some assurance that the cost allocation plan has been implemented as approved. This is accomplished by reviews by the Federal awarding agencies, single audits, or audits conducted by the cognizant agency for indirect costs.
+2. Where inappropriate charges affecting more than one Federal awarding agency are identified, the cognizant HHS cost negotiation office will be advised and will take the lead in resolving the issue(s) as provided for in Subpart E of 45 CFR Part 95.
+3. If a dispute arises in the negotiation of a plan or from a disallowance involving two or more Federal awarding agencies, the dispute must be resolved in accordance with the appeals procedures set out in 45 CFR Part 16. Disputes involving only one Federal awarding agency will be resolved in accordance with the Federal awarding agency's appeal process.
+4. To the extent that problems are encountered among the Federal awarding agencies or governmental units in connection with the negotiation and approval process, the Office of Management and Budget will lend assistance, as required, to resolve such problems in a timely manner.
+
+F. Unallowable Costs
+
+Claims developed under approved cost allocation plans will be based on allowable costs as identified in this Part. Where unallowable costs have been claimed and reimbursed, they will be refunded to the program that reimbursed the unallowable cost using one of the following methods: (a) a cash refund, (b) offset to a subsequent claim, or (c) credits to the amounts charged to individual Federal awards. Cash refunds, offsets, and credits may include at the option of the cognizant agency for indirect cost, earned or imputed interest from the date of expenditure and delinquent debt interest, if applicable, chargeable in accordance with applicable cognizant agency for indirect cost claims collection regulations.
+[78 FR 78608, Dec. 26, 2013, as amended at 85 FR 49581, Aug. 13, 2020]
+
+
+Appendix VII to Part 200—States and Local Government and Indian Tribe Indirect Cost Proposals
+
+A. General
+
+1. Indirect costs are those that have been incurred for common or joint purposes. These costs benefit more than one cost objective and cannot be readily identified with a particular final cost objective without effort disproportionate to the results achieved. After direct costs have been determined and assigned directly to Federal awards and other activities as appropriate, indirect costs are those remaining to be allocated to benefitted cost objectives. A cost may not be allocated to a Federal award as an indirect cost if any other cost incurred for the same purpose, in like circumstances, has been assigned to a Federal award as a direct cost.
+2. Indirect costs include (a) the indirect costs originating in each department or agency of the governmental unit carrying out Federal awards and (b) the costs of central governmental services distributed through the central service cost allocation plan (as described in Appendix V to this part) and not otherwise treated as direct costs.
+3. Indirect costs are normally charged to Federal awards by the use of an indirect cost rate. A separate indirect cost rate(s) is usually necessary for each department or agency of the governmental unit claiming indirect costs under Federal awards. Guidelines and illustrations of indirect cost proposals are provided in a brochure published by the Department of Health and Human Services entitled “A Guide for States and Local Government Agencies: Cost Principles and Procedures for Establishing Cost Allocation Plans and Indirect Cost Rates for Grants and Contracts with the Federal Government.” A copy of this brochure may be obtained from HHS Cost Allocation Services or at their website.
+4. Because of the diverse characteristics and accounting practices of governmental units, the types of costs which may be classified as indirect costs cannot be specified in all situations. However, typical examples of indirect costs may include certain state/local-wide central service costs, general administration of the non-Federal entity accounting and personnel services performed within the non-Federal entity, depreciation on buildings and equipment, the costs of operating and maintaining facilities.
+5. This Appendix does not apply to state public assistance agencies. These agencies should refer instead to Appendix VI to this part.
+
+B. Definitions
+
+1. Base means the accumulated direct costs (normally either total direct salaries and wages or total direct costs exclusive of any extraordinary or distorting expenditures) used to distribute indirect costs to individual Federal awards. The direct cost base selected should result in each Federal award bearing a fair share of the indirect costs in reasonable relation to the benefits received from the costs.
+2. Base period for the allocation of indirect costs is the period in which such costs are incurred and accumulated for allocation to activities performed in that period. The base period normally should coincide with the governmental unit's fiscal year, but in any event, must be so selected as to avoid inequities in the allocation of costs.
+3. Cognizant agency for indirect costs means the Federal agency responsible for reviewing and approving the governmental unit's indirect cost rate(s) on the behalf of the Federal Government. The cognizant agency for indirect costs assignment is described in Appendix V, section F.
+4. Final rate means an indirect cost rate applicable to a specified past period which is based on the actual allowable costs of the period. A final audited rate is not subject to adjustment.
+5. Fixed rate means an indirect cost rate which has the same characteristics as a predetermined rate, except that the difference between the estimated costs and the actual, allowable costs of the period covered by the rate is carried forward as an adjustment to the rate computation of a subsequent period.
+6. Indirect cost pool is the accumulated costs that jointly benefit two or more programs or other cost objectives.
+7. Indirect cost rate is a device for determining in a reasonable manner the proportion of indirect costs each program should bear. It is the ratio (expressed as a percentage) of the indirect costs to a direct cost base.
+8. Indirect cost rate proposal means the documentation prepared by a governmental unit or subdivision thereof to substantiate its request for the establishment of an indirect cost rate.
+9. Predetermined rate means an indirect cost rate, applicable to a specified current or future period, usually the governmental unit's fiscal year. This rate is based on an estimate of the costs to be incurred during the period. Except under very unusual circumstances, a predetermined rate is not subject to adjustment. (Because of legal constraints, predetermined rates are not permitted for Federal contracts; they may, however, be used for grants or cooperative agreements.) Predetermined rates may not be used by governmental units that have not submitted and negotiated the rate with the cognizant agency for indirect costs. In view of the potential advantages offered by this procedure, negotiation of predetermined rates for indirect costs for a period of two to four years should be the norm in those situations where the cost experience and other pertinent facts available are deemed sufficient to enable the parties involved to reach an informed judgment as to the probable level of indirect costs during the ensuing accounting periods.
+10. Provisional rate means a temporary indirect cost rate applicable to a specified period which is used for funding, interim reimbursement, and reporting indirect costs on Federal awards pending the establishment of a “final” rate for that period.
+
+C. Allocation of Indirect Costs and Determination of Indirect Cost Rates
+
+1. General
+
+a. Where a governmental unit's department or agency has only one major function, or where all its major functions benefit from the indirect costs to approximately the same degree, the allocation of indirect costs and the computation of an indirect cost rate may be accomplished through simplified allocation procedures as described in subsection 2.
+b. Where a governmental unit's department or agency has several major functions which benefit from its indirect costs in varying degrees, the allocation of indirect costs may require the accumulation of such costs into separate cost groupings which then are allocated individually to benefitted functions by means of a base which best measures the relative degree of benefit. The indirect costs allocated to each function are then distributed to individual Federal awards and other activities included in that function by means of an indirect cost rate(s).
+c. Specific methods for allocating indirect costs and computing indirect cost rates along with the conditions under which each method should be used are described in subsections 2, 3 and 4.
+
+2. Simplified Method
+
+a. Where a non-Federal entity's major functions benefit from its indirect costs to approximately the same degree, the allocation of indirect costs may be accomplished by (1) classifying the non-Federal entity's total costs for the base period as either direct or indirect, and (2) dividing the total allowable indirect costs (net of applicable credits) by an equitable distribution base. The result of this process is an indirect cost rate which is used to distribute indirect costs to individual Federal awards. The rate should be expressed as the percentage which the total amount of allowable indirect costs bears to the base selected. This method should also be used where a governmental unit's department or agency has only one major function encompassing a number of individual projects or activities, and may be used where the level of Federal awards to that department or agency is relatively small.
+b. Both the direct costs and the indirect costs must exclude capital expenditures and unallowable costs. However, unallowable costs must be included in the direct costs if they represent activities to which indirect costs are properly allocable.
+c. The distribution base may be (1) total direct costs (excluding capital expenditures and other distorting items, such as pass-through funds, subcontracts in excess of $50,000, and participant support costs), (2) direct salaries and wages, or (3) another base which results in an equitable distribution.
+
+3. Multiple Allocation Base Method
+
+a. Where a non-Federal entity's indirect costs benefit its major functions in varying degrees, such costs must be accumulated into separate cost groupings. Each grouping must then be allocated individually to benefitted functions by means of a base which best measures the relative benefits.
+b. The cost groupings should be established so as to permit the allocation of each grouping on the basis of benefits provided to the major functions. Each grouping should constitute a pool of expenses that are of like character in terms of the functions they benefit and in terms of the allocation base which best measures the relative benefits provided to each function. The number of separate groupings should be held within practical limits, taking into consideration the materiality of the amounts involved and the degree of precision needed.
+c. Actual conditions must be taken into account in selecting the base to be used in allocating the expenses in each grouping to benefitted functions. When an allocation can be made by assignment of a cost grouping directly to the function benefitted, the allocation must be made in that manner. When the expenses in a grouping are more general in nature, the allocation should be made through the use of a selected base which produces results that are equitable to both the Federal Government and the governmental unit. In general, any cost element or related factor associated with the governmental unit's activities is potentially adaptable for use as an allocation base provided that: (1) it can readily be expressed in terms of dollars or other quantitative measures (total direct costs, direct salaries and wages, staff hours applied, square feet used, hours of usage, number of documents processed, population served, and the like), and (2) it is common to the benefitted functions during the base period.
+d. Except where a special indirect cost rate(s) is required in accordance with paragraph (C)(4) of this Appendix, the separate groupings of indirect costs allocated to each major function must be aggregated and treated as a common pool for that function. The costs in the common pool must then be distributed to individual Federal awards included in that function by use of a single indirect cost rate.
+e. The distribution base used in computing the indirect cost rate for each function may be (1) total direct costs (excluding capital expenditures and other distorting items such as pass-through funds, subawards in excess of $50,000, and participant support costs), (2) direct salaries and wages, or (3) another base which results in an equitable distribution. An indirect cost rate should be developed for each separate indirect cost pool developed. The rate in each case should be stated as the percentage relationship between the particular indirect cost pool and the distribution base identified with that pool.
+
+4. Special Indirect Cost Rates
+
+a. In some instances, a single indirect cost rate for all activities of a non-Federal entity or for each major function of the agency may not be appropriate. It may not take into account those different factors which may substantially affect the indirect costs applicable to a particular program or group of programs. The factors may include the physical location of the work, the level of administrative support required, the nature of the facilities or other resources employed, the organizational arrangements used, or any combination thereof. When a particular Federal award is carried out in an environment which appears to generate a significantly different level of indirect costs, provisions should be made for a separate indirect cost pool applicable to that Federal award. The separate indirect cost pool should be developed during the course of the regular allocation process, and the separate indirect cost rate resulting therefrom should be used, provided that: (1) The rate differs significantly from the rate which would have been developed under paragraphs (C)(2) and (C)(3) of this Appendix, and (2) the Federal award to which the rate would apply is material in amount.
+b. Where Federal statutes restrict the reimbursement of certain indirect costs, it may be necessary to develop a special rate for the affected Federal award. Where a “restricted rate” is required, the same procedure for developing a non-restricted rate will be used except for the additional step of the elimination from the indirect cost pool those costs for which the law prohibits reimbursement.
+
+D. Submission and Documentation of Proposals
+
+1. Submission of Indirect Cost Rate Proposals
+
+a. All departments or agencies of the governmental unit desiring to claim indirect costs under Federal awards must prepare an indirect cost rate proposal and related documentation to support those costs. The proposal and related documentation must be retained for audit in accordance with the records retention requirements contained in § 200.334.
+b. A governmental department or agency (such as a state or local Department of Health, Department of Transportation, or Department of Housing) that receives more than $35 million in direct Federal funding during its fiscal year must submit its indirect cost rate proposal to its cognizant agency for indirect costs.
+c. If a governmental department or agency (such as a state or local Department of Health, Department of Transportation, or Department of Housing) receives $35 million or less in direct Federal funding during its fiscal year, it must develop an indirect cost proposal in accordance with the requirements of this part and maintain the proposal and related supporting documentation for audit. This established rate must be accepted by any Federal agency to which the governmental department or agency applies for funding. Federal agencies must not compel the governmental department or agency to accept the de minimis rate or some other rate established by the Federal agency. These governmental departments or agencies are not required to submit their proposals unless they are specifically requested to do so by an awarding Federal agency. The Federal agency's review should be limited to ensuring the proposal is consistent with the principles of this part. Where a non-Federal entity only receives funds as a subrecipient, the pass-through entity will be responsible for negotiating and/or monitoring the subrecipient's indirect costs.
+c. Each Indian tribal government desiring reimbursement of indirect costs must submit its indirect cost proposal to the Department of the Interior (its cognizant agency for indirect costs).
+d. Indirect cost proposals must be developed (and, when required, submitted) within six months after the close of the governmental unit's fiscal year, unless an exception is approved by the cognizant agency for indirect costs. If the proposed central service cost allocation plan for the same period has not been approved by that time, the indirect cost proposal may be prepared including an amount for central services that is based on the latest federally approved central service cost allocation plan. The difference between these central service amounts and the amounts ultimately approved will be compensated for by an adjustment in a subsequent period.
+
+2. Documentation of Proposals
+
+The following must be included with each indirect cost proposal:
+a. The rates proposed, including subsidiary work sheets and other relevant data, cross referenced and reconciled to the financial data noted in subsection b. Allocated central service costs will be supported by the summary table included in the approved central service cost allocation plan. This summary table is not required to be submitted with the indirect cost proposal if the central service cost allocation plan for the same fiscal year has been approved by the cognizant agency for indirect costs and is available to the funding agency.
+b. A copy of the financial data (financial statements, comprehensive annual financial report, executive budgets, accounting reports, etc.) upon which the rate is based. Adjustments resulting from the use of unaudited data will be recognized, where appropriate, by the Federal cognizant agency for indirect costs in a subsequent proposal.
+c. The approximate amount of direct base costs incurred under Federal awards. These costs should be broken out between salaries and wages and other direct costs.
+d. A chart showing the organizational structure of the agency during the period for which the proposal applies, along with a functional statement(s) noting the duties and/or responsibilities of all units that comprise the agency. (Once this is submitted, only revisions need be submitted with subsequent proposals.)
+
+3. Required certification.
+
+Each indirect cost rate proposal must be accompanied by a certification in the following form:
+
+Certificate of Indirect Costs
+
+This is to certify that I have reviewed the indirect cost rate proposal submitted herewith and to the best of my knowledge and belief:
+(1) All costs included in this proposal [identify date] to establish billing or final indirect costs rates for [identify period covered by rate] are allowable in accordance with the requirements of the Federal award(s) to which they apply and the provisions of this Part. Unallowable costs have been adjusted for in allocating costs as indicated in the indirect cost proposal
+(2) All costs included in this proposal are properly allocable to Federal awards on the basis of a beneficial or causal relationship between the expenses incurred and the agreements to which they are allocated in accordance with applicable requirements. Further, the same costs that have been treated as indirect costs have not been claimed as direct costs. Similar types of costs have been accounted for consistently and the Federal Government will be notified of any accounting changes that would affect the predetermined rate.
+I declare that the foregoing is true and correct.
+Governmental Unit:
+Signature:
+Name of Official:
+Title:
+Date of Execution:
+
+E. Negotiation and Approval of Rates
+
+1. Indirect cost rates will be reviewed, negotiated, and approved by the cognizant agency on a timely basis. Once a rate has been agreed upon, it will be accepted and used by all Federal agencies unless prohibited or limited by statute. Where a Federal awarding agency has reason to believe that special operating factors affecting its Federal awards necessitate special indirect cost rates, the funding agency will, prior to the time the rates are negotiated, notify the cognizant agency for indirect costs.
+2. The use of predetermined rates, if allowed, is encouraged where the cognizant agency for indirect costs has reasonable assurance based on past experience and reliable projection of the non-Federal entity's costs, that the rate is not likely to exceed a rate based on actual costs. Long-term agreements utilizing predetermined rates extending over two or more years are encouraged, where appropriate.
+3. The results of each negotiation must be formalized in a written agreement between the cognizant agency for indirect costs and the governmental unit. This agreement will be subject to re-opening if the agreement is subsequently found to violate a statute, or the information upon which the plan was negotiated is later found to be materially incomplete or inaccurate. The agreed upon rates must be made available to all Federal agencies for their use.
+4. Refunds must be made if proposals are later found to have included costs that (a) are unallowable (i) as specified by law or regulation, (ii) as identified in § 200.420, or (iii) by the terms and conditions of Federal awards, or (b) are unallowable because they are clearly not allocable to Federal awards. These adjustments or refunds will be made regardless of the type of rate negotiated (predetermined, final, fixed, or provisional).
+
+F. Other Policies
+
+1. Fringe Benefit Rates
+
+If overall fringe benefit rates are not approved for the governmental unit as part of the central service cost allocation plan, these rates will be reviewed, negotiated and approved for individual recipient agencies during the indirect cost negotiation process. In these cases, a proposed fringe benefit rate computation should accompany the indirect cost proposal. If fringe benefit rates are not used at the recipient agency level (i.e., the agency specifically identifies fringe benefit costs to individual employees), the governmental unit should so advise the cognizant agency for indirect costs.
+
+2. Billed Services Provided by the Recipient Agency
+
+In some cases, governmental departments or agencies (components of the governmental unit) provide and bill for services similar to those covered by central service cost allocation plans (e.g., computer centers). Where this occurs, the governmental departments or agencies (components of the governmental unit)should be guided by the requirements in Appendix V relating to the development of billing rates and documentation requirements, and should advise the cognizant agency for indirect costs of any billed services. Reviews of these types of services (including reviews of costing/billing methodology, profits or losses, etc.) will be made on a case-by-case basis as warranted by the circumstances involved.
+
+3. Indirect Cost Allocations Not Using Rates
+
+In certain situations, governmental departments or agencies (components of the governmental unit), because of the nature of their Federal awards, may be required to develop a cost allocation plan that distributes indirect (and, in some cases, direct) costs to the specific funding sources. In these cases, a narrative cost allocation methodology should be developed, documented, maintained for audit, or submitted, as appropriate, to the cognizant agency for indirect costs for review, negotiation, and approval.
+
+4. Appeals
+
+If a dispute arises in a negotiation of an indirect cost rate (or other rate) between the cognizant agency for indirect costs and the governmental unit, the dispute must be resolved in accordance with the appeals procedures of the cognizant agency for indirect costs.
+
+5. Collection of Unallowable Costs and Erroneous Payments
+
+Costs specifically identified as unallowable and charged to Federal awards either directly or indirectly will be refunded (including interest chargeable in accordance with applicable Federal cognizant agency for indirect costs regulations).
+
+6. OMB Assistance
+
+To the extent that problems are encountered among the Federal agencies or governmental units in connection with the negotiation and approval process, OMB will lend assistance, as required, to resolve such problems in a timely manner.
+[78 FR 78608, Dec. 26, 2013, as amended at 79 FR 75889, Dec. 19, 2014; 85 FR 49581, Aug. 13, 2020; 89 FR 30207, Apr. 22, 2024]
+
+
+Appendix VIII to Part 200—Nonprofit Organizations Exempted From Subpart E of Part 200
+
+1. Advance Technology Institute (ATI), Charleston, South Carolina
+2. Aerospace Corporation, El Segundo, California
+3. American Institutes of Research (AIR), Washington, DC
+4. Argonne National Laboratory, Chicago, Illinois
+5. Atomic Casualty Commission, Washington, DC
+6. Battelle Memorial Institute, Headquartered in Columbus, Ohio
+7. Brookhaven National Laboratory, Upton, New York
+8. Charles Stark Draper Laboratory, Incorporated, Cambridge, Massachusetts
+9. CNA Corporation (CNAC), Alexandria, Virginia
+10. Environmental Institute of Michigan, Ann Arbor, Michigan
+11. Georgia Institute of Technology/Georgia Tech Applied Research Corporation/Georgia Tech Research Institute, Atlanta, Georgia
+12. Hanford Environmental Health Foundation, Richland, Washington
+13. IIT Research Institute, Chicago, Illinois
+14. Institute of Gas Technology, Chicago, Illinois
+15. Institute for Defense Analysis, Alexandria, Virginia
+16. LMI, McLean, Virginia
+17. Mitre Corporation, Bedford, Massachusetts
+18. Noblis, Inc., Falls Church, Virginia
+19. National Radiological Astronomy Observatory, Green Bank, West Virginia
+20. National Renewable Energy Laboratory, Golden, Colorado
+21. Oak Ridge Associated Universities, Oak Ridge, Tennessee
+22. Rand Corporation, Santa Monica, California
+23. Research Triangle Institute, Research Triangle Park, North Carolina
+24. Riverside Research Institute, New York, New York
+25. South Carolina Research Authority (SCRA), Charleston, South Carolina
+26. Southern Research Institute, Birmingham, Alabama
+27. Southwest Research Institute, San Antonio, Texas
+28. SRI International, Menlo Park, California
+29. Syracuse Research Corporation, Syracuse, New York
+30. Universities Research Association, Incorporated (National Acceleration Lab), Argonne, Illinois
+31. Urban Institute, Washington DC
+32. Nonprofit insurance companies, such as Blue Cross and Blue Shield Organizations
+33. Other nonprofit organizations as negotiated with Federal awarding agencies
+[78 FR 78608, Dec. 26, 2013, as amended at 85 FR 49582, Aug. 13, 2020]
+
+
+Appendix IX to Part 200—Hospital Cost Principles
+
+Until such time as revised guidance is proposed and implemented for hospitals, the existing principles located at 45 CFR part 75 Appendix IX, entitled “Principles for Determining Cost Applicable to Research and Development Under Grants and Contracts with Hospitals,” remain in effect.
+[86 FR 10440, Feb. 22, 2021]
+
+
+Appendix X to Part 200—Data Collection Form
+
+The data collection form is available as a series of workbooks on the Federal Audit Clearinghouse (FAC.gov). The form and submission instructions can be found at https://www.fac.gov/.
+[89 FR 30207, Apr. 22, 2024]
+
+
+Appendix XI to Part 200—Compliance Supplement
+
+The compliance supplement is available on the OMB website.
+[85 FR 49582, Aug. 13, 2020]
+
+
+Appendix XII to Part 200—Award Term and Condition for Recipient Integrity and Performance Matters
+
+I. Reporting of Matters Related to Recipient Integrity and Performance
+
+(a) General Reporting Requirement.
+
+(1) If the total value of your active grants, cooperative agreements, and procurement contracts from all Federal agencies exceeds $10,000,000 for any period of time during the period of performance of this Federal award, then you as the recipient must ensure the information available in the responsibility/qualification records through the System for Award Management (SAM.gov), about civil, criminal, or administrative proceedings described in paragraph (b) of this award term is current and complete. This is a statutory requirement under section 872 of Public Law 110-417, as amended (41 U.S.C. 2313). As required by section 3010 of Public Law 111-212, all information posted in responsibility/qualification records in SAM.gov on or after April 15, 2011 (except past performance reviews required for Federal procurement contracts) will be publicly available.
+(b) Proceedings About Which You Must Report.
+(1) You must submit the required information about each proceeding that—
+(i) Is in connection with the award or performance of a grant, cooperative agreement, or procurement contract from the Federal Government;
+(ii) Reached its final disposition during the most recent five-year period; and
+(iii) Is one of the following—
+(A) A criminal proceeding that resulted in a conviction;
+(B) A civil proceeding that resulted in a finding of fault and liability and payment of a monetary fine, penalty, reimbursement, restitution, or damages of $5,000 or more;
+(C) An administrative proceeding that resulted in a finding of fault and liability and your payment of either a monetary fine or penalty of $5,000 or more or reimbursement, restitution, or damages in excess of $100,000; or
+(D) Any other criminal, civil, or administrative proceeding if—
+(1) It could have led to an outcome described in paragraph (b)(1)(iii)(A) through (C);
+(2) It had a different disposition arrived at by consent or compromise with an acknowledgment of fault on your part; and
+(3) The requirement in this award term to disclose information about the proceeding does not conflict with applicable laws and regulations.
+(c) Reporting Procedures. Enter the required information in SAM.gov for each proceeding described in paragraph (b) of this award term. You do not need to submit the information a second time under grants and cooperative agreements that you received if you already provided the information in SAM.gov because you were required to do so under Federal procurement contracts that you were awarded.
+(d) Reporting Frequency. During any period of time when you are subject to the requirement in paragraph (a) of this award term, you must report proceedings information in SAM.gov for the most recent five-year period, either to report new information about a proceeding that you have not reported previously or affirm that there is no new information to report. If you have Federal contract, grant, and cooperative agreement awards with a cumulative total value greater than $10,000,000, you must disclose semiannually any information about the criminal, civil, and administrative proceedings.
+(e) Definitions. For purposes of this award term—
+Administrative proceeding means a non-judicial process that is adjudicatory in nature to make a determination of fault or liability (for example, Securities and Exchange Commission Administrative proceedings, Civilian Board of Contract Appeals proceedings, and Armed Services Board of Contract Appeals proceedings). This includes proceedings at the Federal and State level but only in connection with the performance of a Federal contract or grant. It does not include audits, site visits, corrective plans, or inspection of deliverables.
+Conviction means a judgment or conviction of a criminal offense by any court of competent jurisdiction, whether entered upon a verdict or a plea, and includes a conviction entered upon a plea of nolo contendere.
+Total value of currently active grants, cooperative agreements, and procurement contracts includes the value of the Federal share already received plus any anticipated Federal share under those awards (such as continuation funding).
+
+II. [Reserved]
+
+[89 FR 30207, Apr. 22, 2024]

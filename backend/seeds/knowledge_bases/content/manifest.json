@@ -1,0 +1,42 @@
+{
+  "https://www.ecfr.gov/current/title-2/subtitle-A/chapter-II/part-200": {
+    "file": "ecfr-title2-part200-appendices.txt",
+    "title": "2 CFR Part 200 \u2014 Appendices I\u2013XII"
+  },
+  "https://www.ecfr.gov/current/title-2/subtitle-A/chapter-II/part-200/subpart-A": {
+    "file": "ecfr-title2-part200-subpart-a.txt",
+    "title": "Subpart A\u2014Acronyms and Definitions"
+  },
+  "https://www.ecfr.gov/current/title-2/subtitle-A/chapter-II/part-200/subpart-B": {
+    "file": "ecfr-title2-part200-subpart-b.txt",
+    "title": "Subpart B\u2014General Provisions"
+  },
+  "https://www.ecfr.gov/current/title-2/subtitle-A/chapter-II/part-200/subpart-C": {
+    "file": "ecfr-title2-part200-subpart-c.txt",
+    "title": "Subpart C\u2014Pre-Federal Award Requirements and Contents of Federal Awards"
+  },
+  "https://www.ecfr.gov/current/title-2/subtitle-A/chapter-II/part-200/subpart-D": {
+    "file": "ecfr-title2-part200-subpart-d.txt",
+    "title": "Subpart D\u2014Post Federal Award Requirements"
+  },
+  "https://www.ecfr.gov/current/title-2/subtitle-A/chapter-II/part-200/subpart-E": {
+    "file": "ecfr-title2-part200-subpart-e.txt",
+    "title": "Subpart E\u2014Cost Principles"
+  },
+  "https://www.ecfr.gov/current/title-2/subtitle-A/chapter-II/part-200/subpart-F": {
+    "file": "ecfr-title2-part200-subpart-f.txt",
+    "title": "Subpart F\u2014Audit Requirements"
+  },
+  "https://www.ecfr.gov/current/title-2/subtitle-B/chapter-XI/subchapter-D/part-1104": {
+    "file": "ecfr-title2-part1104.txt",
+    "title": "PART 1104\u2014IMPLEMENTATION OF GOVERNMENTWIDE GUIDANCE FOR GRANTS AND COOPERATIVE AGREEMENTS"
+  },
+  "https://www.ecfr.gov/current/title-2/subtitle-B/chapter-IX/part-910": {
+    "file": "ecfr-title2-part910.txt",
+    "title": "PART 910\u2014UNIFORM ADMINISTRATIVE REQUIREMENTS, COST PRINCIPLES, AND AUDIT REQUIREMENTS FOR FEDERAL AWARDS"
+  },
+  "https://www.ecfr.gov/current/title-42/chapter-I/subchapter-D/part-93": {
+    "file": "ecfr-title42-part93.txt",
+    "title": "PART 93\u2014PUBLIC HEALTH SERVICE POLICIES ON RESEARCH MISCONDUCT"
+  }
+}

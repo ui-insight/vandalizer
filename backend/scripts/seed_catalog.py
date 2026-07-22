@@ -646,6 +646,24 @@ async def _recalc_kb_stats(kb: KnowledgeBase) -> None:
     await kb.save()
 
 
+def _load_seed_source_text(src_data: dict) -> str | None:
+    """Read a seed source's bundled text (``content_file``), if it has one.
+
+    Sources with bundled text (e.g. eCFR regulation text fetched via the
+    official API) are ingested from the file and never fetched from the live
+    site — ecfr.gov blocks scraping.
+    """
+    rel = src_data.get("content_file")
+    if not rel:
+        return None
+    path = SEEDS_DIR / "knowledge_bases" / rel
+    if not path.exists():
+        logger.warning("Seed content file missing: %s", path)
+        return None
+    text = path.read_text()
+    return text if text.strip() else None
+
+
 async def seed_knowledge_base(
     data: dict, meta: dict, verified_lib: Library, slug_to_collection: dict[str, VerifiedCollection],
 ) -> SeedResult:
@@ -663,7 +681,11 @@ async def seed_knowledge_base(
             KnowledgeBase.verified == True,  # noqa: E712
         )
     if existing:
-        from app.services.knowledge_service import _ingest_url_source
+        from app.services.knowledge_service import (
+            _ingest_url_source,
+            ingest_text_into_source,
+        )
+        from app.utils.bot_challenge import looks_like_bot_challenge
 
         changed = False
         if existing.resource_config.get("seed_id") != seed_id:
@@ -696,14 +718,45 @@ async def seed_knowledge_base(
                 status="pending",
             )
             await src.insert()
-            if src.source_type == "url":
+            bundled_text = _load_seed_source_text(src_data)
+            if bundled_text:
+                if await ingest_text_into_source(
+                    src, existing, bundled_text, label=src_data.get("url_title"),
+                ):
+                    new_sources_ingested += 1
+            elif src.source_type == "url":
                 try:
                     await _ingest_url_source(src, existing)
                     new_sources_ingested += 1
                 except Exception as e:
                     logger.warning("Failed to ingest seed URL %s: %s", src.url, e)
-        if new_sources_ingested:
-            print(f"    + {new_sources_ingested} new source(s)")
+
+        # Repair pass: existing sources whose cached content is a bot-challenge
+        # interstitial (ecfr.gov "Request Access" lockout) or that errored, and
+        # for which the seed now bundles clean text, get rebuilt from the
+        # bundle. This lets a normal catalog upgrade heal poisoned KBs.
+        repaired = 0
+        bundled_by_url = {
+            s["url"]: s for s in item.get("sources", [])
+            if s.get("url") and s.get("content_file")
+        }
+        for src in current_sources:
+            src_data = bundled_by_url.get(src.url or "")
+            if not src_data:
+                continue
+            poisoned = src.status == "error" or looks_like_bot_challenge(src.content)
+            if not poisoned:
+                continue
+            bundled_text = _load_seed_source_text(src_data)
+            if not bundled_text:
+                continue
+            if await ingest_text_into_source(
+                src, existing, bundled_text, label=src_data.get("url_title"),
+            ):
+                repaired += 1
+        if repaired:
+            print(f"    ~ repaired {repaired} poisoned source(s) from bundled text")
+        if new_sources_ingested or repaired:
             await _recalc_kb_stats(existing)
 
         await ensure_library_item(verified_lib, existing.id, LibraryItemKind.KNOWLEDGE_BASE)
@@ -738,7 +791,7 @@ async def seed_knowledge_base(
     await kb.insert()
 
     # Create source records and ingest URL sources
-    from app.services.knowledge_service import _ingest_url_source
+    from app.services.knowledge_service import _ingest_url_source, ingest_text_into_source
 
     for src_data in item.get("sources", []):
         src = KnowledgeBaseSource(
@@ -750,8 +803,14 @@ async def seed_knowledge_base(
         )
         await src.insert()
 
-        # Ingest URL sources inline so KBs have chunks on first run
-        if src.source_type == "url" and src.url:
+        # Bundled text (content_file) ingests without touching the live site;
+        # other URL sources ingest inline so KBs have chunks on first run.
+        bundled_text = _load_seed_source_text(src_data)
+        if bundled_text:
+            await ingest_text_into_source(
+                src, kb, bundled_text, label=src_data.get("url_title"),
+            )
+        elif src.source_type == "url" and src.url:
             try:
                 await _ingest_url_source(src, kb)
             except Exception as e:
