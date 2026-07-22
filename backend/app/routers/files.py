@@ -1,6 +1,7 @@
 import io
 import re
 import zipfile
+from pathlib import PurePosixPath
 
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Response
 from fastapi.responses import StreamingResponse
@@ -93,6 +94,19 @@ MEDIA_TYPES = {
 }
 
 
+def _resolve_media_type(extension: str, title: str) -> str:
+    """Map a document to its Content-Type, falling back to the title's suffix.
+
+    Some legacy records carry a stale `extension` (the old Flask app rewrote
+    Excel uploads to extension="html") while the title still names the real
+    format — the title suffix is the better signal in that case.
+    """
+    media_type = MEDIA_TYPES.get(f".{extension.lower().lstrip('.')}")
+    if media_type is None:
+        media_type = MEDIA_TYPES.get(PurePosixPath(title).suffix.lower())
+    return media_type or "application/octet-stream"
+
+
 @router.head("/download")
 async def download_head(
     docid: str,
@@ -102,7 +116,7 @@ async def download_head(
     result = await file_service.download_document(docid, settings, user=user)
     if not result:
         raise HTTPException(status_code=404, detail="File not found")
-    media_type = MEDIA_TYPES.get(f".{result.extension.lower()}", "application/octet-stream")
+    media_type = _resolve_media_type(result.extension, result.title)
     return Response(
         headers={
             "Content-Type": media_type,
@@ -125,7 +139,7 @@ async def download(
     result = await file_service.download_document(docid, settings, user=user)
     if not result:
         raise HTTPException(status_code=404, detail="File not found")
-    media_type = MEDIA_TYPES.get(f".{result.extension.lower()}", "application/octet-stream")
+    media_type = _resolve_media_type(result.extension, result.title)
     disposition = "inline" if inline else "attachment"
     data = result.data
     total = len(data)
