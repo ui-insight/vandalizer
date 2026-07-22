@@ -1052,6 +1052,19 @@ function DesignTab({
   }, [exportMenuOpen])
   const [enumDraft, setEnumDraft] = useState('')
   const tip = useRotatingTip(running, config, docCount, items.length)
+  // Delays single-click expand so a double-click (rename) can cancel it
+  const nameClickTimer = useRef<number | null>(null)
+  useEffect(() => () => {
+    if (nameClickTimer.current) window.clearTimeout(nameClickTimer.current)
+  }, [])
+
+  const toggleSettings = (item: { id: string; enum_values: string[] }) => {
+    setExpandedSettingsId(prev => {
+      const opening = prev !== item.id
+      if (opening) setEnumDraft(item.enum_values.join(', '))
+      return opening ? item.id : null
+    })
+  }
 
   const handleDragStart = (idx: number) => {
     setDragIdx(idx)
@@ -1334,6 +1347,11 @@ function DesignTab({
                     {idx + 1}
                   </span>
                   {editingId === item.id ? (
+                    <>
+                    {expandedSettingsId === item.id
+                      ? <ChevronDown style={{ width: 12, height: 12, color: '#6b7280', flexShrink: 0 }} aria-hidden="true" />
+                      : <ChevronRight style={{ width: 12, height: 12, color: '#6b7280', flexShrink: 0 }} aria-hidden="true" />
+                    }
                     <input
                       autoFocus
                       aria-label="Edit field name"
@@ -1361,14 +1379,45 @@ function DesignTab({
                         outline: 'none',
                       }}
                     />
+                    </>
                   ) : (
-                    <span
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        if (e.detail > 1) return
+                        if (e.detail === 0) {
+                          toggleSettings(item)
+                          return
+                        }
+                        if (window.getSelection()?.toString()) return
+                        if (nameClickTimer.current) window.clearTimeout(nameClickTimer.current)
+                        nameClickTimer.current = window.setTimeout(() => {
+                          nameClickTimer.current = null
+                          toggleSettings(item)
+                        }, 200)
+                      }}
                       onDoubleClick={() => {
+                        if (nameClickTimer.current) {
+                          window.clearTimeout(nameClickTimer.current)
+                          nameClickTimer.current = null
+                        }
                         setEditingId(item.id)
                         setEditDraft(item.searchphrase)
                       }}
-                      style={{ fontSize: 14, color: '#202124', flex: 1, cursor: 'text', display: 'flex', alignItems: 'center', gap: 4 }}
+                      aria-expanded={expandedSettingsId === item.id}
+                      aria-controls={`field-settings-${item.id}`}
+                      title="Click for settings, double-click to rename"
+                      style={{
+                        background: 'none', border: 'none', padding: 0, margin: 0,
+                        fontFamily: 'inherit', fontSize: 14, color: '#202124', flex: 1,
+                        minWidth: 0, cursor: 'pointer', textAlign: 'left',
+                        display: 'flex', alignItems: 'center', gap: 4,
+                      }}
                     >
+                      {expandedSettingsId === item.id
+                        ? <ChevronDown style={{ width: 12, height: 12, color: '#6b7280', flexShrink: 0 }} aria-hidden="true" />
+                        : <ChevronRight style={{ width: 12, height: 12, color: '#6b7280', flexShrink: 0 }} aria-hidden="true" />
+                      }
                       {item.searchphrase}
                       {item.is_optional && (
                         <span style={{ fontSize: 10, color: '#6b7280', background: '#f3f4f6', borderRadius: 3, padding: '1px 4px', fontWeight: 500 }}>opt</span>
@@ -1376,7 +1425,7 @@ function DesignTab({
                       {item.enum_values.length > 0 && (
                         <span style={{ fontSize: 10, color: '#7c3aed', background: '#f5f3ff', borderRadius: 3, padding: '1px 4px', fontWeight: 500 }}>{item.enum_values.length}</span>
                       )}
-                    </span>
+                    </button>
                   )}
                   <button
                     type="button"
@@ -1415,32 +1464,6 @@ function DesignTab({
                     }}
                   >
                     <ChevronDown style={{ width: 14, height: 14 }} aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const opening = expandedSettingsId !== item.id
-                      setExpandedSettingsId(opening ? item.id : null)
-                      if (opening) setEnumDraft(item.enum_values.join(', '))
-                    }}
-                    aria-expanded={expandedSettingsId === item.id}
-                    aria-controls={`field-settings-${item.id}`}
-                    aria-label={`Field settings for ${item.searchphrase}`}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      padding: 4,
-                      color: '#6b7280',
-                      display: 'flex',
-                      flexShrink: 0,
-                    }}
-                    title="Field settings"
-                  >
-                    {expandedSettingsId === item.id
-                      ? <ChevronDown style={{ width: 14, height: 14 }} aria-hidden="true" />
-                      : <ChevronRight style={{ width: 14, height: 14 }} aria-hidden="true" />
-                    }
                   </button>
                   <button
                     type="button"
