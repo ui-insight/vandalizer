@@ -100,6 +100,24 @@ def parse_ecfr_url(url: str) -> dict | None:
     return out
 
 
+def parse_ecfr_chapter_url(url: str) -> dict | None:
+    """Extract {title, chapter} from a chapter-level ecfr.gov URL (no part).
+
+    A whole chapter can't be fetched in one API call — the full-XML endpoint
+    silently ignores its ``chapter`` param and returns the entire title — so
+    callers expand these URLs part-by-part via ``fetch_parts_for_chapter_url``.
+    """
+    if "ecfr.gov" not in url:
+        return None
+    if re.search(r"/part-(\d+)(?:/|$)", url):
+        return None
+    title_m = re.search(r"/title-(\d+)(?:/|$)", url)
+    chapter_m = re.search(r"/chapter-([0-9A-Za-z]+)(?:/|$)", url)
+    if not title_m or not chapter_m:
+        return None
+    return {"title": int(title_m.group(1)), "chapter": chapter_m.group(1).upper()}
+
+
 def _el_text(el: ET.Element) -> str:
     return " ".join("".join(el.itertext()).split())
 
@@ -217,6 +235,82 @@ def fetch_text_for_url(url: str, client: httpx.Client | None = None) -> tuple[st
                     label = division_heading(div) or label
                     break
         return (label or url, text)
+    finally:
+        if own_client:
+            client.close()
+
+
+def list_chapter_parts(
+    client: httpx.Client, title: int, chapter: str, issue_date: str,
+) -> tuple[str, list[dict]]:
+    """Enumerate a chapter's non-reserved parts via the structure API.
+
+    Returns (chapter_label, parts) where each part is {"part", "label", "url"}
+    and ``url`` is the part's canonical ecfr.gov URL, rebuilt from its ancestor
+    path (e.g. /current/title-48/chapter-99/subchapter-B/part-9904).
+    """
+    resp = client.get(f"{API_BASE}/structure/{issue_date}/title-{title}.json")
+    resp.raise_for_status()
+
+    chapter_label = f"{title} CFR Chapter {chapter}"
+    parts: list[dict] = []
+
+    def walk(node: dict, path: list[str], in_chapter: bool) -> None:
+        nonlocal chapter_label
+        ntype = node.get("type")
+        ident = str(node.get("identifier", ""))
+        if ntype == "chapter" and ident.upper() == chapter:
+            in_chapter = True
+            chapter_label = (node.get("label") or chapter_label).strip()
+        if ntype == "part" and in_chapter:
+            if not node.get("reserved") and ident.isdigit():
+                parts.append({
+                    "part": int(ident),
+                    "label": (node.get("label") or "").strip() or f"{title} CFR Part {ident}",
+                    "url": "https://www.ecfr.gov/current/" + "/".join([*path, f"part-{ident}"]),
+                })
+            return
+        seg = f"{ntype}-{ident}" if ntype in ("title", "subtitle", "chapter", "subchapter") else None
+        for child in node.get("children") or []:
+            walk(child, [*path, seg] if seg else path, in_chapter)
+
+    walk(resp.json(), [], False)
+    if not parts:
+        raise ValueError(f"no non-reserved parts found for title {title} chapter {chapter}")
+    return chapter_label, parts
+
+
+def fetch_parts_for_chapter_url(
+    url: str, client: httpx.Client | None = None, delay_seconds: float = 2.0,
+) -> tuple[str, list[dict]] | None:
+    """Fetch every part of a chapter-level ecfr.gov URL via the API.
+
+    Returns (chapter_label, parts) with each part as {"part", "label", "url",
+    "text"}, or None when the URL isn't chapter-shaped. One API call per part,
+    spaced ``delay_seconds`` apart to stay polite.
+    """
+    parsed = parse_ecfr_chapter_url(url)
+    if not parsed:
+        return None
+    own_client = client is None
+    client = client or httpx.Client(timeout=60)
+    try:
+        dates = latest_issue_dates(client)
+        issue_date = dates.get(parsed["title"])
+        if not issue_date:
+            raise ValueError(f"no issue date for title {parsed['title']}")
+        chapter_label, listed = list_chapter_parts(
+            client, parsed["title"], parsed["chapter"], issue_date,
+        )
+        out: list[dict] = []
+        for entry in listed:
+            time.sleep(delay_seconds)
+            root = fetch_part_xml(client, parsed["title"], entry["part"], issue_date)
+            text = xml_to_text(root)
+            if not text.strip():
+                continue
+            out.append({**entry, "label": division_heading(root) or entry["label"], "text": text})
+        return chapter_label, out
     finally:
         if own_client:
             client.close()

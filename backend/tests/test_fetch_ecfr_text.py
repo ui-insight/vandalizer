@@ -11,6 +11,8 @@ from scripts.fetch_ecfr_text import (
     MANIFEST_NAME,
     SEED_ECFR_SOURCES,
     extract_text,
+    list_chapter_parts,
+    parse_ecfr_chapter_url,
     parse_ecfr_url,
     xml_to_text,
 )
@@ -71,6 +73,88 @@ def test_parse_rejects_non_part_url():
 
 def test_parse_rejects_non_ecfr_url():
     assert parse_ecfr_url("https://www.acquisition.gov/far/part-31") is None
+
+
+# --- parse_ecfr_chapter_url ---
+
+def test_parse_chapter_url():
+    assert parse_ecfr_chapter_url(
+        "https://www.ecfr.gov/current/title-48/chapter-99"
+    ) == {"title": 48, "chapter": "99"}
+
+
+def test_parse_chapter_url_roman_numeral():
+    assert parse_ecfr_chapter_url(
+        "https://www.ecfr.gov/current/title-42/chapter-i"
+    ) == {"title": 42, "chapter": "I"}
+
+
+def test_parse_chapter_url_rejects_part_urls():
+    """URLs that name a part belong to parse_ecfr_url, not the chapter path."""
+    assert parse_ecfr_chapter_url(
+        "https://www.ecfr.gov/current/title-42/chapter-I/subchapter-D/part-93"
+    ) is None
+
+
+def test_parse_chapter_url_rejects_non_ecfr():
+    assert parse_ecfr_chapter_url("https://example.gov/title-48/chapter-99") is None
+
+
+# --- list_chapter_parts ---
+
+CHAPTER_STRUCTURE = {
+    "type": "title", "identifier": "48", "reserved": False,
+    "children": [
+        {"type": "chapter", "identifier": "1", "reserved": False, "children": [
+            {"type": "part", "identifier": "31", "reserved": False},
+        ]},
+        {"type": "chapter", "identifier": "99",
+         "label": " Chapter 99—Cost Accounting Standards Board", "reserved": False,
+         "children": [
+            {"type": "part", "identifier": "9900",
+             "label": "Part 9900—Scope of Chapter", "reserved": False},
+            {"type": "subchapter", "identifier": "A", "reserved": False, "children": [
+                {"type": "part", "identifier": "9901",
+                 "label": "Part 9901—Rules and Procedures", "reserved": False},
+                {"type": "part", "identifier": "9902",
+                 "label": "Part 9902 [Reserved]", "reserved": True},
+            ]},
+         ]},
+    ],
+}
+
+
+def _structure_client():
+    class _Resp:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return CHAPTER_STRUCTURE
+
+    class _Client:
+        def get(self, url):
+            assert "structure" in url
+            return _Resp()
+
+    return _Client()
+
+
+def test_list_chapter_parts_walks_structure():
+    label, parts = list_chapter_parts(_structure_client(), 48, "99", "2026-07-16")
+    assert label == "Chapter 99—Cost Accounting Standards Board"
+    # Only chapter-99 parts, reserved 9902 excluded, chapter-1's part 31 excluded
+    assert [p["part"] for p in parts] == [9900, 9901]
+    assert parts[0]["url"] == "https://www.ecfr.gov/current/title-48/chapter-99/part-9900"
+    assert parts[1]["url"] == (
+        "https://www.ecfr.gov/current/title-48/chapter-99/subchapter-A/part-9901"
+    )
+    assert parts[1]["label"] == "Part 9901—Rules and Procedures"
+
+
+def test_list_chapter_parts_unknown_chapter_raises():
+    with pytest.raises(ValueError):
+        list_chapter_parts(_structure_client(), 48, "77", "2026-07-16")
 
 
 # --- xml_to_text / extract_text ---
