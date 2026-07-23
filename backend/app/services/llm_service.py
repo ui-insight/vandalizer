@@ -259,7 +259,7 @@ def _get_model_endpoint_sync(model_name: str, system_config_doc: dict | None = N
     return ""
 
 
-SUPPORTED_PROTOCOLS = ("openai", "ollama", "vllm", "anthropic", "openrouter")
+SUPPORTED_PROTOCOLS = ("openai", "ollama", "vllm", "anthropic", "openrouter", "google")
 
 
 def detect_api_protocol(model_name: str, model_config: Optional[dict] = None) -> str:
@@ -274,6 +274,11 @@ def detect_api_protocol(model_name: str, model_config: Optional[dict] = None) ->
         return "openrouter"
     if "openai/" in model_name or model_name.startswith("gpt-") or "claude" in model_lower:
         return "openai"
+    # Gemini routes to the native Google (google-genai) integration. Without
+    # this guard a bare name like "gemini-2.5-flash" would fall through to the
+    # bare-name branch below and be treated as a local Ollama model.
+    if model_lower.startswith("gemini") or "gemini" in model_lower:
+        return "google"
     if "/" not in model_name and not model_name.startswith("http"):
         return "ollama"
     if "vllm" in model_lower or model_name.startswith("vllm/"):
@@ -299,6 +304,15 @@ def resolve_thinking_enabled(
     return bool(model_config.get("thinking", False)) if model_config else False
 
 
+def _positive_int(value) -> Optional[int]:
+    """Coerce a config value to a positive int, or None if unset/invalid."""
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        return None
+    return n if n > 0 else None
+
+
 def build_thinking_model_settings(
     agent_model: str,
     thinking_override: Optional[bool] = None,
@@ -315,9 +329,13 @@ def build_thinking_model_settings(
         what Qwen3, DeepSeek-R1, etc. read when served via vLLM — safe
         unknown-field passthrough on most OpenAI-compatible gateways)
       - Ollama: `think`
-    We skip `chat_template_kwargs` only for truly external OpenAI-protocol
-    models (external=true + api_protocol=openai), since the canonical OpenAI
-    API can reject unknown fields and has its own reasoning controls.
+    We skip `chat_template_kwargs` for any external (third-party hosted)
+    OpenAI-compatible API — the canonical OpenAI API, Google's Gemini
+    compatibility endpoint, Azure, etc. all validate strictly and reject
+    unknown fields (Gemini returns a 400 "Unknown name chat_template_kwargs").
+    These providers expose reasoning via the unified `thinking` setting instead.
+    The skip keys off the `external` flag, not the literal api_protocol string,
+    so it holds even when the admin leaves the protocol on Auto-detect.
     """
     thinking_enabled = resolve_thinking_enabled(agent_model, thinking_override, system_config_doc)
     model_config = _get_model_config_sync(agent_model, system_config_doc)
@@ -326,28 +344,77 @@ def build_thinking_model_settings(
     # the chat_template_kwargs signal for Qwen3 on vLLM-backed endpoints.
     raw_protocol = (model_config.get("api_protocol", "") if model_config else "").strip().lower()
     is_external = bool(model_config and model_config.get("external", False))
+    # Native Gemini (google-genai) uses GoogleModelSettings and honors the
+    # unified `thinking` setting; a stray chat_template_kwargs would be forwarded
+    # as extra_body and rejected. Treat a gemini model as google even when the
+    # admin left the protocol on auto-detect. Scoped to gemini names only, so the
+    # bare-name → vLLM path below still gets its chat_template_kwargs signal.
+    is_google = raw_protocol == "google" or (
+        not raw_protocol and detect_api_protocol(agent_model, model_config) == "google"
+    )
 
     settings: dict = {"thinking": thinking_enabled}
     extra_body: dict = {}
     if raw_protocol == "ollama":
         extra_body["think"] = thinking_enabled
-    elif raw_protocol in ("anthropic", "openrouter"):
-        # Anthropic exposes thinking natively via pydantic-ai's unified setting
-        # (the AnthropicModel profile honors it). OpenRouter routes to whatever
-        # backend the model lives on, which has its own thinking mechanism;
-        # passing vLLM-style chat_template_kwargs through OpenRouter is unsafe
-        # because OpenRouter validates extra fields more strictly.
+    elif raw_protocol in ("anthropic", "openrouter") or is_google:
+        # Native providers (Anthropic, Google Gemini) expose thinking via
+        # pydantic-ai's unified `thinking` setting, which their model profiles
+        # honor. OpenRouter routes to whatever backend the model lives on, which
+        # has its own thinking mechanism; passing vLLM-style chat_template_kwargs
+        # through any of these is unsafe (strict extra-field validation).
         pass
-    elif not (raw_protocol == "openai" and is_external):
+    elif is_external:
+        # Third-party hosted OpenAI-compatible APIs (OpenAI, Google/Gemini,
+        # Azure, ...) validate strictly and reject unknown fields like
+        # chat_template_kwargs; they expose reasoning via the unified `thinking`
+        # setting instead. Keying off `external` (not the literal protocol
+        # string) catches the auto-detect case where the admin left the
+        # protocol blank — which is exactly how Gemini gets misconfigured.
+        pass
+    else:
         # vllm, openai-internal (e.g. InsightAI), or auto-detect internal:
-        # all are OpenAI-compatible servers that may be serving Qwen/DeepSeek/
-        # other thinking models via vLLM. chat_template_kwargs is the
-        # Qwen3-style control and passes through unknown-field-tolerant
-        # gateways. Skip only for truly external OpenAI (strict validation,
-        # has native reasoning_effort via unified `thinking`).
+        # all are self-hosted OpenAI-compatible servers that may be serving
+        # Qwen/DeepSeek/other thinking models via vLLM. chat_template_kwargs is
+        # the Qwen3-style control and passes through unknown-field-tolerant
+        # gateways.
         extra_body["chat_template_kwargs"] = {"enable_thinking": thinking_enabled}
     if extra_body:
         settings["extra_body"] = extra_body
+
+    # --- Output cap -----------------------------------------------------------
+    # Without an explicit cap, a model on a large context window can spend the
+    # entire remaining budget "reasoning" and never emit a final answer. Cap
+    # generation at the response reserve the budgeter already carves out of the
+    # window, so input-trimming and output length stay consistent (they share one
+    # window). A per-model `response_reserve_tokens` raises it for long-output or
+    # long-thinking models, at the cost of input room.
+    from app.config import Settings
+    from app.services.context_budget import _default_response_reserve, resolve_context_window
+    window = resolve_context_window(agent_model, model_config)
+    reserve = (
+        (_positive_int(model_config.get("response_reserve_tokens")) if model_config else None)
+        or _default_response_reserve(window)
+    )
+    # Thinking models need headroom so reasoning can't consume the whole cap.
+    max_out = max(reserve, 2048) if thinking_enabled else reserve
+    settings["max_tokens"] = max_out
+
+    # For Anthropic thinking, the API requires max_tokens > thinking.budget_tokens.
+    # Bound reasoning to ~half the cap so an answer always has room. (Gemini bills
+    # thinking separately; vLLM/Qwen has no separate budget, so max_tokens alone
+    # bounds them.)
+    if thinking_enabled and raw_protocol == "anthropic":
+        settings["anthropic_thinking"] = {"type": "enabled", "budget_tokens": max(1024, max_out // 2)}
+
+    # --- Request timeout ------------------------------------------------------
+    # Per-model override, else the system default. Setting it in model_settings
+    # applies per-request across every provider — including the external
+    # OpenAI/OpenRouter branches whose AsyncOpenAI client would otherwise be
+    # pinned to a fixed timeout the admin can't change.
+    timeout_override = _positive_int(model_config.get("request_timeout_seconds")) if model_config else None
+    settings["timeout"] = float(timeout_override or Settings().workflow_llm_timeout_seconds)
+
     return settings
 
 
@@ -437,6 +504,7 @@ def _build_agent_model(
     system_config_doc: dict | None = None,
 ):
     """Build the raw (unmetered) provider-specific model instance."""
+    from app.config import Settings
     model_config = _get_model_config_sync(agent_model, system_config_doc)
 
     # Resolve per-model API key from system config (decrypt if encrypted)
@@ -464,6 +532,26 @@ def _build_agent_model(
             provider_kwargs["base_url"] = endpoint
         return AnthropicModel(model_name=model_name, provider=AnthropicProvider(**provider_kwargs))
 
+    # Google Gemini — native pydantic-ai integration via the google-genai SDK
+    # (AI Studio / Generative Language API). Uses Google's own API rather than
+    # the OpenAI-compatibility shim, so structured output, native thinking, and
+    # safety settings work as first-class features. Strips a leading "google/"
+    # prefix so admins can disambiguate identical labels across providers.
+    #
+    # This path is api_key only. Vertex AI (service-account / ADC auth) is
+    # intentionally not wired here. The configured endpoint is ignored on
+    # purpose: native Gemini uses Google's own base URL, and a stale
+    # OpenAI-compatibility endpoint (…/v1beta/openai/) would point at the wrong
+    # path — a model migrated from the compat setup keeps working without edits.
+    if api_protocol == "google":
+        from pydantic_ai.models.google import GoogleModel
+        from pydantic_ai.providers.google import GoogleProvider
+        model_name = agent_model.split("/", 1)[1] if agent_model.startswith("google/") else agent_model
+        # Per-loop httpx client for the same event-loop-safety reason as the
+        # Anthropic branch above — see _get_loop_http_client.
+        provider = GoogleProvider(api_key=api_key, http_client=_get_loop_http_client())
+        return GoogleModel(model_name=model_name, provider=provider)
+
     # OpenRouter — pydantic-ai ships a first-class provider with a fixed
     # https://openrouter.ai/api/v1 base URL. If an admin configures a custom
     # endpoint (self-hosted OpenRouter-compatible gateway), we wrap an
@@ -478,7 +566,8 @@ def _build_agent_model(
             # Reuse the per-loop httpx client so we don't leak an SDK client (and
             # its connection pool) per call — see _get_loop_http_client above.
             client = AsyncOpenAI(
-                api_key=api_key, base_url=endpoint, timeout=120.0,
+                api_key=api_key, base_url=endpoint,
+                timeout=float(Settings().workflow_llm_timeout_seconds),
                 http_client=_get_loop_http_client(),
             )
             provider = OpenRouterProvider(openai_client=client, app_title="Vandalizer")
@@ -499,7 +588,7 @@ def _build_agent_model(
         # connection pool) per call — see _get_loop_http_client above.
         client_kwargs: dict = {
             "api_key": api_key,
-            "timeout": 120.0,
+            "timeout": float(Settings().workflow_llm_timeout_seconds),
             "http_client": _get_loop_http_client(),
         }
         if endpoint:

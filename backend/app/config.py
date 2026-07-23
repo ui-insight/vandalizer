@@ -35,7 +35,6 @@ class Settings(BaseSettings):
     # Required when multiple processes (FastAPI workers + Celery) share Chroma —
     # PersistentClient is not process-safe for concurrent writers.
     chromadb_host: str = ""
-    max_context_length: int = 100000
     max_upload_size_mb: int = 500
 
     # Observability
