@@ -769,3 +769,43 @@ class TestNodeBase:
         node = Node("test")
         with pytest.raises(NotImplementedError):
             node.process({})
+
+
+# ---------------------------------------------------------------------------
+# llm_chat_model prompt construction
+# ---------------------------------------------------------------------------
+
+class TestLlmChatModelPrompt:
+    """A Prompt step must ground itself in upstream CONTEXT when there is any,
+    but answer directly when the workflow runs with No Input (empty context).
+
+    Regression: a "No Input" workflow used to emit the grounding constraint
+    against "(No data provided.)", so the model would refuse with
+    "The provided context does not contain the information needed...".
+    """
+
+    def _run(self, data):
+        from app.services.workflow_engine import llm_chat_model
+
+        agent = MagicMock()
+        agent.run_sync.return_value = MagicMock(output="ok")
+        with patch(
+            "app.services.workflow_engine.create_chat_agent", return_value=agent
+        ):
+            llm_chat_model("gpt-4o", "Write three tips for a strong NSF proposal", data=data)
+        # The single positional arg to run_sync is the assembled prompt.
+        return agent.run_sync.call_args[0][0]
+
+    def test_no_input_prompt_omits_grounding_constraint(self):
+        for empty in (None, ""):
+            prompt = self._run(empty)
+            assert "ONLY the CONTEXT" not in prompt
+            assert "CONTEXT:" not in prompt
+            assert "(No data provided.)" not in prompt
+            assert "drawing on your own knowledge" in prompt
+            assert "Write three tips for a strong NSF proposal" in prompt
+
+    def test_with_context_keeps_grounding_constraint(self):
+        prompt = self._run("Prior step said the deadline is March 3.")
+        assert "ONLY the CONTEXT" in prompt
+        assert "Prior step said the deadline is March 3." in prompt

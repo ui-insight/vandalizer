@@ -246,27 +246,47 @@ def llm_chat_model(model: str, prompt: str, data=None, progress_callback=None,
                    usage_acc: UsageAccumulator | None = None):
     """Run a chat prompt via LLM. Sync context."""
     if data is None or data == "":
-        data_block = "(No data provided.)"
+        has_context = False
+        data_block = ""
     elif isinstance(data, str):
+        has_context = True
         data_block = data
     else:
+        has_context = True
         try:
             data_block = json.dumps(data, indent=2, default=str)
         except (TypeError, ValueError):
             data_block = str(data)
 
-    output_prompt = (
-        "You are completing one step of a multi-step workflow. Answer the "
-        "INSTRUCTION below using ONLY the CONTEXT block, which is the output "
-        "of the previous step. Do not draw on outside knowledge or invent "
-        "details that are not present in the CONTEXT. If the CONTEXT does not "
-        "contain what the instruction needs, say so explicitly rather than "
-        "guessing.\n\n"
-        "Format your answer as clean markdown for a web chat UI. Output only "
-        "the markdown — no preamble, no code fences around the whole reply.\n\n"
-        f"INSTRUCTION:\n{prompt}\n\n"
-        f"CONTEXT:\n{data_block}"
-    )
+    if has_context:
+        # Grounded mode: an upstream step (or document) supplied context, so
+        # constrain the answer to it — this is what keeps multi-step chains
+        # faithful and prevents hallucination.
+        output_prompt = (
+            "You are completing one step of a multi-step workflow. Answer the "
+            "INSTRUCTION below using ONLY the CONTEXT block, which is the output "
+            "of the previous step. Do not draw on outside knowledge or invent "
+            "details that are not present in the CONTEXT. If the CONTEXT does not "
+            "contain what the instruction needs, say so explicitly rather than "
+            "guessing.\n\n"
+            "Format your answer as clean markdown for a web chat UI. Output only "
+            "the markdown — no preamble, no code fences around the whole reply.\n\n"
+            f"INSTRUCTION:\n{prompt}\n\n"
+            f"CONTEXT:\n{data_block}"
+        )
+    else:
+        # Standalone mode: no upstream context exists (e.g. a "No Input"
+        # workflow, or the first step running directly). There is nothing to
+        # ground against, so answer the instruction on its own merits instead
+        # of reporting that "the context does not contain the information."
+        output_prompt = (
+            "You are completing one step of a workflow that runs without any "
+            "input document or prior-step context. Complete the INSTRUCTION "
+            "below directly, drawing on your own knowledge.\n\n"
+            "Format your answer as clean markdown for a web chat UI. Output only "
+            "the markdown — no preamble, no code fences around the whole reply.\n\n"
+            f"INSTRUCTION:\n{prompt}"
+        )
     chat_agent = create_chat_agent(model, system_config_doc=system_config_doc)
     result = chat_agent.run_sync(output_prompt)
     if usage_acc:
