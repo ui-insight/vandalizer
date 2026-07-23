@@ -529,3 +529,148 @@ async def test_build_kb_segment_condenses_anaphoric_followups():
     assert retrieve.await_args.kwargs["retrieval_query"] == "IRB expiration date year 2"
     # The raw message stays the primary query (answer prompt + rerank target).
     assert retrieve.await_args.args[1] == "what about year 2?"
+
+
+# ---------------------------------------------------------------------------
+# Section-number (identifier) lexical lookup — bare "§ 200.1" style queries
+# ---------------------------------------------------------------------------
+
+
+def test_extract_section_refs_variants():
+    assert chat_service._extract_section_refs("What does § 200.1 say?") == ["200.1"]
+    assert chat_service._extract_section_refs("explain section 200.512") == ["200.512"]
+    assert chat_service._extract_section_refs("compare 200.1 and 200.400") == ["200.1", "200.400"]
+    # Dedup, order-preserving.
+    assert chat_service._extract_section_refs("§ 200.1 vs 200.1") == ["200.1"]
+    # Bare integers / years must not trip it (no dotted part.section token).
+    assert chat_service._extract_section_refs("what happened in 2024?") == []
+    assert chat_service._extract_section_refs("the $200 cap") == []
+
+
+def test_get_kb_chunks_containing_uses_where_document():
+    from app.services.document_manager import DocumentManager
+
+    dm = object.__new__(DocumentManager)
+    fake_collection = MagicMock()
+    fake_collection.get = MagicMock(return_value={
+        "documents": ["§ 200.1 Definitions ..."],
+        "metadatas": [{"source_name": "2 CFR 200"}],
+        "ids": ["src_chunk_3"],
+    })
+    dm.get_kb_collection_readonly = MagicMock(return_value=fake_collection)
+
+    results = dm.get_kb_chunks_containing("kb-1", "200.1", limit=5)
+
+    fake_collection.get.assert_called_once_with(
+        where_document={"$contains": "200.1"}, limit=5,
+    )
+    assert len(results) == 1
+    assert results[0]["chunk_id"] == "src_chunk_3"
+    assert results[0]["similarity"] is None
+
+
+@pytest.mark.asyncio
+async def test_retrieve_section_chunks_filters_substring_false_positives():
+    """A "$contains: 200.1" candidate pool would also match "200.10"; the
+    word-boundary post-filter must keep only exact section hits."""
+    candidates = [
+        {"content": "§ 200.1 Definitions apply here.", "chunk_id": "c1",
+         "metadata": {"source_name": "2 CFR 200"}, "score": None, "similarity": None},
+        {"content": "§ 200.10 U.S. Federal awarding agency.", "chunk_id": "c2",
+         "metadata": {"source_name": "2 CFR 200"}, "score": None, "similarity": None},
+    ]
+    fake_dm = MagicMock()
+    fake_dm.get_kb_chunks_containing = MagicMock(return_value=candidates)
+
+    with patch("app.services.document_manager.get_document_manager",
+               return_value=fake_dm):
+        out = await chat_service._retrieve_section_chunks("kb-1", ["200.1"])
+
+    ids = [r["chunk_id"] for r in out]
+    assert ids == ["c1"], "200.10 must not be returned for a 200.1 lookup"
+
+
+@pytest.mark.asyncio
+async def test_build_kb_segment_answers_section_only_query_when_semantic_empty():
+    """A bare "§ 200.1" retrieves nothing semantically (gated by the floor),
+    but the lexical section lookup must still surface the chunk so chat can
+    answer instead of abstaining."""
+    cfg = RAGConfig(k=4)
+    section_hit = _chunk(0, source="2 CFR 200")
+
+    with patch.object(kb_validation_service, "_ensure_system_config_loaded",
+                      new=AsyncMock()), \
+         patch.object(kb_validation_service, "retrieve_kb_chunks",
+                      new=AsyncMock(return_value=([], cfg, 0))), \
+         patch.object(chat_service, "_retrieve_section_chunks",
+                      new=AsyncMock(return_value=[section_hit])):
+        segment, sources = await chat_service._build_kb_segment(
+            "kb-1", "What does § 200.1 say?", "test-model",
+        )
+
+    assert segment is not None
+    assert len(sources) == 1
+    assert sources[0]["document_title"] == "2 CFR 200"
+
+
+# ---------------------------------------------------------------------------
+# Multi-question fan-out — several questions in one message must not starve
+# ---------------------------------------------------------------------------
+
+
+def test_split_questions_only_fans_out_on_multiple():
+    assert chat_service._split_questions("Just one question?") == []
+    assert chat_service._split_questions("No question mark here") == []
+    two = chat_service._split_questions(
+        "What is a non-Federal entity? And what does § 200.1 cover?"
+    )
+    assert two == [
+        "What is a non-Federal entity?",
+        "And what does § 200.1 cover?",
+    ]
+
+
+def test_round_robin_merge_interleaves_and_dedupes():
+    a = [_chunk(0, source="A"), _chunk(1, source="A")]
+    b = [_chunk(0, source="B"), _chunk(1, source="B")]
+    shared = _chunk(0, source="A")
+    c = [shared, shared]  # duplicate chunk_id within a pool
+
+    merged = chat_service._round_robin_merge([a, b, c])
+    ids = [r["chunk_id"] for r in merged]
+    # First tier is one chunk from each pool before any pool's second chunk.
+    assert ids[0] == "src-A_chunk_0"
+    assert ids[1] == "src-B_chunk_0"
+    assert len(ids) == len(set(ids)), "duplicates must be dropped"
+
+
+@pytest.mark.asyncio
+async def test_build_kb_segment_fans_out_per_question():
+    """Two questions in one turn each get their own retrieval and fair
+    representation in the composed top-k."""
+    cfg = RAGConfig(k=4)
+    q1_pool = [_chunk(i, source="entity.txt") for i in range(4)]
+    q2_pool = [_chunk(i, source="section.txt") for i in range(4)]
+    calls = []
+
+    async def fake_retrieve(kb_uuid, message, model_name, **kwargs):
+        calls.append(message)
+        return (q1_pool if "non-Federal" in message else q2_pool), cfg, 0
+
+    msg = "What does 'non-Federal entity' mean? What does § 200.400 cover?"
+    with patch.object(kb_validation_service, "_ensure_system_config_loaded",
+                      new=AsyncMock()), \
+         patch.object(kb_validation_service, "retrieve_kb_chunks",
+                      new=AsyncMock(side_effect=fake_retrieve)), \
+         patch.object(chat_service, "_retrieve_section_chunks",
+                      new=AsyncMock(return_value=[])):
+        segment, sources = await chat_service._build_kb_segment(
+            "kb-1", msg, "test-model",
+        )
+
+    # One retrieval per sub-question (no whole-message blend).
+    assert len(calls) == 2
+    titles = {s["document_title"] for s in sources}
+    assert titles == {"entity.txt", "section.txt"}, (
+        "both questions must contribute chunks"
+    )
