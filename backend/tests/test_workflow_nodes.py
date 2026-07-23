@@ -577,10 +577,17 @@ class TestCrawlerNode:
 
     @staticmethod
     def _client_serving(pages: dict):
-        """Mock httpx.Client whose GET returns per-URL canned HTML."""
+        """Mock httpx.Client whose GET returns per-URL canned HTML.
+
+        A value may be plain HTML, or a ``(final_url, html)`` tuple to model
+        a redirect: the response reports ``final_url`` as its landing URL.
+        """
         def get(url):
             resp = MagicMock()
-            resp.text = pages[url]
+            page = pages[url]
+            final_url, html = page if isinstance(page, tuple) else (url, page)
+            resp.url = final_url
+            resp.text = html
             resp.raise_for_status = MagicMock()
             return resp
 
@@ -618,6 +625,38 @@ class TestCrawlerNode:
         result = node.process({"output": "prev"})
 
         # Only the two distinct pages were fetched — no variant refetches.
+        assert mock_client.get.call_count == 2
+        assert result["output"].count("Home page") == 1
+        assert result["output"].count("Second page") == 1
+
+    @patch("app.utils.url_validation.validate_outbound_url")
+    @patch("app.services.workflow_engine.httpx.Client")
+    def test_redirect_landing_url_not_refetched(self, mock_client_cls, mock_validate):
+        """A page reached via redirect isn't fetched again under the URL it
+        landed on (uidaho.edu → www.uidaho.edu, then a www.…/#fragment link)."""
+        mock_validate.return_value = "ok"
+        home_html = (
+            '<html><body><p>Home page</p>'
+            '<a href="https://www.example.com/#content">skip</a>'
+            '<a href="https://www.example.com/page2">next</a></body></html>'
+        )
+        pages = {
+            # Start URL redirects to the www spelling.
+            "https://example.com": ("https://www.example.com/", home_html),
+            # If dedup fails, the fragment link refetches the homepage here.
+            "https://www.example.com/#content": ("https://www.example.com/", home_html),
+            "https://www.example.com/page2": "<html><body><p>Second page</p></body></html>",
+        }
+        mock_client = self._client_serving(pages)
+        mock_client_cls.return_value = mock_client
+
+        node = CrawlerNode({
+            "start_url": "https://example.com",
+            "max_pages": 5,
+            "allowed_domains": "example.com, www.example.com",
+        })
+        result = node.process({"output": "prev"})
+
         assert mock_client.get.call_count == 2
         assert result["output"].count("Home page") == 1
         assert result["output"].count("Second page") == 1

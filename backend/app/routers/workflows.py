@@ -40,6 +40,7 @@ from app.schemas.workflows import (
 )
 from app.rate_limit import limiter
 from app.services import workflow_service as svc
+from app.services.name_conflicts import DuplicateNameError
 from app.services.user_lookup import resolve_author, resolve_authors
 
 logger = logging.getLogger(__name__)
@@ -460,7 +461,10 @@ async def _authorize_documents(document_uuids: list[str], user: User) -> list[st
 @router.post("", response_model=WorkflowResponse)
 async def create_workflow(req: CreateWorkflowRequest, user: User = Depends(get_current_user)):
     team_id = str(user.current_team) if user.current_team else None
-    wf = await svc.create_workflow(req.name, user.user_id, req.description, team_id=team_id)
+    try:
+        wf = await svc.create_workflow(req.name, user.user_id, req.description, team_id=team_id)
+    except DuplicateNameError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     created_by = await resolve_author(wf.created_by_user_id or wf.user_id)
     return WorkflowResponse(
         id=str(wf.id), name=wf.name, description=wf.description,
@@ -935,10 +939,13 @@ async def mint_workflow_share_token(workflow_id: str, user: User = Depends(get_c
 
 @router.patch("/{workflow_id}", response_model=WorkflowResponse)
 async def update_workflow(workflow_id: str, req: UpdateWorkflowRequest, user: User = Depends(get_current_user)):
-    wf = await svc.update_workflow(
-        workflow_id, user=user, name=req.name, description=req.description,
-        input_config=req.input_config, output_config=req.output_config,
-    )
+    try:
+        wf = await svc.update_workflow(
+            workflow_id, user=user, name=req.name, description=req.description,
+            input_config=req.input_config, output_config=req.output_config,
+        )
+    except DuplicateNameError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     if not wf:
         raise HTTPException(status_code=404, detail="Workflow not found")
     # Flag stale verification if this workflow was verified

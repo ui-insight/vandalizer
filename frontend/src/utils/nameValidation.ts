@@ -33,3 +33,17 @@ export function getNameError(value: string, label = 'Name'): string | null {
   }
   return null
 }
+
+/**
+ * Case-insensitive duplicate check against the names already visible to the
+ * user (same-kind library items, KB titles, ...). The backend enforces the
+ * same rule with an HTTP 409; this lets forms warn before submitting.
+ */
+export function isDuplicateName(value: string, existingNames: Iterable<string>): boolean {
+  const target = normalizeName(value).toLowerCase()
+  if (!target) return false
+  for (const name of existingNames) {
+    if (normalizeName(name).toLowerCase() === target) return true
+  }
+  return false
+}

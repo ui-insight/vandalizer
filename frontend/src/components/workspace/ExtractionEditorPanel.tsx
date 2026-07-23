@@ -206,7 +206,11 @@ export function ExtractionEditorPanel() {
     const cleanTitle = normalizeName(titleDraft)
     if (!openExtractionId || cleanTitle === searchSet?.title) return
     if (blockedByVerified()) return
-    await updateSearchSet(openExtractionId, { title: cleanTitle || searchSet?.title })
+    try {
+      await updateSearchSet(openExtractionId, { title: cleanTitle || searchSet?.title })
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to rename', 'error')
+    }
     refresh()
   }
 
@@ -267,6 +271,11 @@ export function ExtractionEditorPanel() {
         }
       }
       const finalSets = sets.length > 0 ? sets : [{}]
+      if (sets.length === 0) {
+        // A run that "succeeds" with zero values otherwise looks identical to
+        // never having run — tell the user where to find out why.
+        toast('Extraction finished but returned no values — see the History tab for details', 'info')
+      }
       setResultSets(finalSets)
       setResultDocNames(finalSets.map((_, i) => runDocNames[i] ?? `Result ${i + 1}`))
       setActiveResultIdx(0)

@@ -12,6 +12,7 @@ from beanie import PydanticObjectId
 from app.models.document import SmartDocument
 from app.models.search_set import SearchSet, SearchSetItem
 from app.models.system_config import SystemConfig
+from app.services import name_conflicts
 from app.services.config_service import get_user_model_name
 from app.services.extraction_engine import ExtractionEngine
 
@@ -32,6 +33,7 @@ async def create_search_set(
     extraction_config: dict | None = None,
     team_id: str | None = None,
 ) -> SearchSet:
+    await name_conflicts.ensure_search_set_title_available(title, set_type, user_id, team_id)
     ss = SearchSet(
         title=title,
         uuid=str(uuid_mod.uuid4()),
@@ -129,6 +131,10 @@ async def update_search_set(search_set_uuid: str, title: str | None = None, extr
     if not ss:
         return None
     if title is not None:
+        if title != ss.title:
+            await name_conflicts.ensure_search_set_title_available(
+                title, ss.set_type, ss.user_id, ss.team_id, exclude_uuid=ss.uuid,
+            )
         ss.title = title
     if extraction_config is not None:
         ss.extraction_config = extraction_config
@@ -151,8 +157,14 @@ async def clone_search_set(search_set_uuid: str, user_id: str) -> SearchSet | No
     if not original:
         return None
     new_uuid = str(uuid_mod.uuid4())
+    copy_title = await name_conflicts.next_available_name(
+        f"{original.title} (Copy)",
+        lambda t: name_conflicts.search_set_title_taken(
+            t, original.set_type, user_id, original.team_id,
+        ),
+    )
     clone = SearchSet(
-        title=f"{original.title} (Copy)",
+        title=copy_title,
         uuid=new_uuid,
         status="active",
         set_type=original.set_type,

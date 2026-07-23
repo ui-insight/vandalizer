@@ -50,7 +50,7 @@ export function KnowledgePanel() {
   const { activateKB, activeProjectUuid, activeProjectTitle, activeProjectRole } = useWorkspace()
   const { user } = useAuth()
   const { toast } = useToast()
-  const { create, remove, transferToTeam, refresh } = useKnowledgeBases()
+  const { knowledgeBases, create, remove, transferToTeam, refresh } = useKnowledgeBases()
   const projectPins = useProjectPins(activeProjectUuid)
   // Inside a project, default to showing only the KBs pinned to it; "Show all"
   // escapes the scope. Reset to scoped when the project changes.
@@ -1717,6 +1717,7 @@ export function KnowledgePanel() {
       <CreateKBModal
         onClose={() => setShowCreateModal(false)}
         onCreate={handleCreate}
+        existingTitles={knowledgeBases.filter((kb) => !kb.verified).map((kb) => kb.title)}
       />
     )}
     {showExplainer && <KnowledgeExplainer onClose={() => setShowExplainer(false)} />}

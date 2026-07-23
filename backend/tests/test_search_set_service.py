@@ -55,7 +55,10 @@ def _make_item(searchphrase="PI Name", searchset="ss-uuid", searchtype="extracti
 class TestCreateSearchSet:
     @pytest.mark.asyncio
     async def test_creates_and_inserts(self):
-        with patch("app.services.search_set_service.SearchSet") as MockSS:
+        with (
+            patch("app.services.search_set_service.SearchSet") as MockSS,
+            patch("app.services.name_conflicts.ensure_search_set_title_available", new_callable=AsyncMock),
+        ):
             mock_ss = _make_search_set()
             MockSS.return_value = mock_ss
 
@@ -149,7 +152,10 @@ class TestSearchSetCRUD:
     @pytest.mark.asyncio
     async def test_update_search_set_title(self):
         ss = _make_search_set(title="Old Title")
-        with patch("app.services.search_set_service.get_search_set", new_callable=AsyncMock, return_value=ss):
+        with (
+            patch("app.services.search_set_service.get_search_set", new_callable=AsyncMock, return_value=ss),
+            patch("app.services.name_conflicts.ensure_search_set_title_available", new_callable=AsyncMock),
+        ):
             from app.services.search_set_service import update_search_set
 
             result = await update_search_set("ss-uuid", title="New Title")
@@ -211,6 +217,7 @@ class TestCloneSearchSet:
             patch("app.services.search_set_service.SearchSet") as MockSS,
             patch("app.services.search_set_service.SearchSetItem") as MockItem,
             patch("app.models.user.User") as MockUser,
+            patch("app.services.name_conflicts.search_set_title_taken", new_callable=AsyncMock, return_value=False),
         ):
             MockSS.return_value = clone_ss
             mock_item = _make_item()

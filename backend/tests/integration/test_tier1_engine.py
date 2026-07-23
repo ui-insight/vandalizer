@@ -5,7 +5,6 @@ ExtractionModel validation, Celery eager dispatch, and ThreadPoolExecutor
 parallel execution. Only the LLM call (Agent.run_sync) is mocked.
 """
 
-import json
 import threading
 from unittest.mock import MagicMock, patch
 
@@ -80,17 +79,25 @@ class TestExtractStructuredSpecialChars:
         assert result[0]["Cost ($)"] == "$50k"
         assert result[0]["Field"] == "val"
 
-    def test_digit_prefixed_key_raises(self):
-        """Digit-prefixed keys cause NameError in create_model. This
-        propagates because create_model is outside the try/except."""
-        from app.services.extraction_engine import ExtractionEngine
+    def test_digit_prefixed_key_extracts(self):
+        """Digit-prefixed keys (e.g. AI-suggested "2 CFR Part 200") must not
+        crash create_model — the sanitizer letter-prefixes the internal name
+        and the alias maps the value back to the original key."""
+        result = _run_extract(
+            keys=["2 CFR Part 200", "123 Field"],
+            raw_response=[{"2 CFR Part 200": "applies", "123 Field": "val"}],
+        )
+        assert result[0]["2 CFR Part 200"] == "applies"
+        assert result[0]["123 Field"] == "val"
 
-        with pytest.raises(NameError, match="leading underscores"):
-            ExtractionEngine(system_config_doc={})._extract_structured(
-                content="text",
-                keys=["123 Field"],
-                model_name="test-model",
-            )
+    def test_punctuation_prefixed_key_extracts(self):
+        """Keys starting with punctuation sanitize to a leading underscore,
+        which pydantic also forbids — same letter-prefix rescue applies."""
+        result = _run_extract(
+            keys=["$ Amount"],
+            raw_response=[{"$ Amount": "$50k"}],
+        )
+        assert result[0]["$ Amount"] == "$50k"
 
 
 # ---------------------------------------------------------------------------

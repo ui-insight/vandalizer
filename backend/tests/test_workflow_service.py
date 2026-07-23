@@ -97,8 +97,9 @@ def _make_result(session_id="abc123", status="completed", final_output=None, wor
 # ---------------------------------------------------------------------------
 
 class TestCreateWorkflow:
+    @patch("app.services.name_conflicts.ensure_workflow_name_available", new_callable=AsyncMock)
     @patch("app.services.workflow_service.Workflow")
-    async def test_creates_workflow(self, mock_wf_cls):
+    async def test_creates_workflow(self, mock_wf_cls, mock_ensure):
         from app.services.workflow_service import create_workflow
 
         mock_wf = MagicMock()

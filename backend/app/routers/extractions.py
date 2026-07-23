@@ -41,6 +41,7 @@ from app.schemas.extractions import (
 )
 from app.services import extraction_validation_service as val_svc
 from app.services import search_set_service as svc
+from app.services.name_conflicts import DuplicateNameError
 
 logger = logging.getLogger(__name__)
 
@@ -146,13 +147,16 @@ async def _authorize_documents(document_uuids: list[str], user: User) -> list[st
 @router.post("/search-sets", response_model=SearchSetResponse)
 async def create_search_set(req: CreateSearchSetRequest, user: User = Depends(get_current_user)):
     team_id = str(user.current_team) if user.current_team else None
-    ss = await svc.create_search_set(
-        req.title,
-        user.user_id,
-        req.set_type,
-        extraction_config=req.extraction_config,
-        team_id=team_id,
-    )
+    try:
+        ss = await svc.create_search_set(
+            req.title,
+            user.user_id,
+            req.set_type,
+            extraction_config=req.extraction_config,
+            team_id=team_id,
+        )
+    except DuplicateNameError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     return await _ss_response(ss)
 
 
@@ -190,7 +194,10 @@ async def get_search_set(uuid: str, user: User = Depends(get_current_user)):
 @router.patch("/search-sets/{uuid}", response_model=SearchSetResponse)
 async def update_search_set(uuid: str, req: UpdateSearchSetRequest, user: User = Depends(get_current_user)):
     await _get_search_set_or_404(uuid, user, manage=True)
-    ss = await svc.update_search_set(uuid, title=req.title, extraction_config=req.extraction_config)
+    try:
+        ss = await svc.update_search_set(uuid, title=req.title, extraction_config=req.extraction_config)
+    except DuplicateNameError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     if not ss:
         raise HTTPException(status_code=404, detail="SearchSet not found")
     # Flag stale verification if this search set was verified

@@ -37,6 +37,7 @@ from app.schemas.knowledge import (
     UpdateSourceRequest,
 )
 from app.services import knowledge_service as svc
+from app.services.name_conflicts import DuplicateNameError
 
 logger = logging.getLogger(__name__)
 
@@ -338,10 +339,13 @@ async def remove_reference(ref_uuid: str, user: User = Depends(get_current_user)
 async def create_knowledge_base(req: CreateKBRequest, user: User = Depends(get_current_user)):
     # Title is validated (required, length, normalized) by CreateKBRequest's EntityName field.
     team_id = str(user.current_team) if user.current_team else None
-    kb = await svc.create_knowledge_base(
-        title=req.title, user_id=user.user_id,
-        team_id=team_id, description=req.description,
-    )
+    try:
+        kb = await svc.create_knowledge_base(
+            title=req.title, user_id=user.user_id,
+            team_id=team_id, description=req.description,
+        )
+    except DuplicateNameError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     return _kb_response(kb)
 
 
@@ -371,6 +375,14 @@ async def convert_documents_to_kb(
             title = "Reference documents"
 
     team_id = str(user.current_team) if user.current_team else None
+    # This is a one-click recovery flow with an auto-picked title — suffix on
+    # collision instead of failing like the explicit create path does.
+    from app.services import name_conflicts
+    title = await name_conflicts.next_available_name(
+        title,
+        lambda t: name_conflicts.kb_title_taken(t, user.user_id, team_id),
+        max_length=300,
+    )
     kb = await svc.create_knowledge_base(
         title=title, user_id=user.user_id, team_id=team_id, description=None,
     )
@@ -451,16 +463,19 @@ async def update_knowledge_base(uuid: str, req: UpdateKBRequest, user: User = De
     # KB) returns a logged 403, not the bare 404 the service emits for both
     # "not found" and "not authorized".
     await _require_manageable_kb(uuid, user, user_org_ancestry)
-    kb = await svc.update_knowledge_base(
-        uuid,
-        user,
-        title=req.title,
-        description=req.description,
-        shared_with_team=req.shared_with_team,
-        organization_ids=req.organization_ids,
-        tags=req.tags,
-        user_org_ancestry=user_org_ancestry,
-    )
+    try:
+        kb = await svc.update_knowledge_base(
+            uuid,
+            user,
+            title=req.title,
+            description=req.description,
+            shared_with_team=req.shared_with_team,
+            organization_ids=req.organization_ids,
+            tags=req.tags,
+            user_org_ancestry=user_org_ancestry,
+        )
+    except DuplicateNameError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     if not kb:
         raise HTTPException(status_code=404, detail="Knowledge base not found")
     return {"ok": True}
@@ -1672,6 +1687,8 @@ async def clone_knowledge_base(uuid: str, request: Request, user: User = Depends
     new_title = body.get("title")
     try:
         clone = await svc.clone_knowledge_base(kb, user, new_title=new_title)
+    except DuplicateNameError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     return _kb_response(clone)
