@@ -340,7 +340,7 @@ export interface SystemConfigData {
   quality_config: Record<string, unknown>
   auth_methods: string[]
   oauth_providers: Record<string, unknown>[]
-  available_models: { name: string; tag: string; external: boolean; thinking: boolean; endpoint?: string; api_protocol?: string; api_key?: string; speed?: string; tier?: string; privacy?: string; supports_structured?: boolean; multimodal?: boolean; supports_pdf?: boolean; context_window?: number }[]
+  available_models: { name: string; tag: string; external: boolean; thinking: boolean; endpoint?: string; api_protocol?: string; api_key?: string; speed?: string; tier?: string; privacy?: string; supports_structured?: boolean; multimodal?: boolean; supports_pdf?: boolean; context_window?: number; request_timeout_seconds?: number | null; response_reserve_tokens?: number | null }[]
   default_model: string
   ocr_endpoint: string
   ocr_api_key: string
@@ -432,10 +432,12 @@ export type ModelFormData = {
   multimodal?: boolean
   supports_pdf?: boolean
   context_window?: number
+  request_timeout_seconds?: number | null
+  response_reserve_tokens?: number | null
 }
 
 export function addModel(data: ModelFormData) {
-  return apiFetch<{ status: string; models: SystemConfigData['available_models'] }>('/api/admin/config/models', {
+  return apiFetch<{ status: string; models: SystemConfigData['available_models']; default_model?: string }>('/api/admin/config/models', {
     method: 'POST',
     body: JSON.stringify(data),
   })

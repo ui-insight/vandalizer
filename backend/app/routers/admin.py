@@ -271,6 +271,11 @@ class ModelAddRequest(BaseModel):
     multimodal: bool = False
     supports_pdf: bool = False
     context_window: int = 128000
+    # Optional per-model overrides (None = use system default / computed value).
+    # request_timeout_seconds replaces the shared LLM read timeout for this model;
+    # response_reserve_tokens sets the output cap (tokens reserved for the answer).
+    request_timeout_seconds: Optional[int] = None
+    response_reserve_tokens: Optional[int] = None
     # Cost rates in USD per 1M tokens. Populated for external paid providers
     # so KB Autovalidate can show dollar cost estimates in its budget modal.
     # None = not declared; UI falls back to tokens-only display.
@@ -1519,6 +1524,7 @@ async def add_model(
     await _require_superadmin(user)
 
     cfg = await SystemConfig.get_config()
+    was_empty = len(cfg.available_models) == 0
     cfg.available_models.append(
         {
             "name": body.name,
@@ -1535,17 +1541,24 @@ async def add_model(
             "multimodal": body.multimodal,
             "supports_pdf": body.supports_pdf,
             "context_window": body.context_window,
+            "request_timeout_seconds": body.request_timeout_seconds,
+            "response_reserve_tokens": body.response_reserve_tokens,
             "cost_per_1m_input": body.cost_per_1m_input,
             "cost_per_1m_output": body.cost_per_1m_output,
         }
     )
+    # First-run convenience: the very first model an admin connects becomes the
+    # system default, so a fresh install goes straight to "ready" instead of
+    # immediately raising a second "no default model is set" setup blocker.
+    if was_empty and not cfg.default_model:
+        cfg.default_model = body.name
     cfg.updated_at = datetime.datetime.now(datetime.timezone.utc)
     cfg.updated_by = user.user_id
     await cfg.save()
     clear_agent_caches()
     await _audit(user, "add_model", f"Added model: {body.name} ({body.tag})")
 
-    return {"status": "ok", "models": _sanitize_models(cfg.available_models)}
+    return {"status": "ok", "models": _sanitize_models(cfg.available_models), "default_model": cfg.default_model or ""}
 
 
 # ---------------------------------------------------------------------------
@@ -1624,6 +1637,8 @@ async def update_model(
         "multimodal": body.multimodal,
         "supports_pdf": body.supports_pdf,
         "context_window": body.context_window,
+        "request_timeout_seconds": body.request_timeout_seconds,
+        "response_reserve_tokens": body.response_reserve_tokens,
         "cost_per_1m_input": body.cost_per_1m_input,
         "cost_per_1m_output": body.cost_per_1m_output,
     }
