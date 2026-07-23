@@ -778,26 +778,162 @@ def _match_named_sources(message: str, manifest: list[dict]) -> list[str]:
 
 
 def _compose_kb_results(
-    general: list[dict], named: list[dict], k: int,
+    general: list[dict],
+    named: list[dict],
+    k: int,
+    pinned: Optional[list[dict]] = None,
 ) -> list[dict]:
-    """Merge named-document hits with the general pool into the final top-k.
+    """Merge pinned + named-document hits with the general pool into the top-k.
 
-    Named-document chunks are guaranteed up to ceil(k/2) slots (the document
-    the user asked about by name must not be crowded out), the rest are filled
-    from the general pool with a per-source diversity cap.
+    ``pinned`` chunks (an explicit section/identifier lookup the user typed,
+    e.g. "§ 200.1") get first claim on slots — the user named exactly what they
+    want. Named-document chunks are guaranteed the next share so a file asked
+    about by name isn't crowded out. The rest is filled from the general
+    semantic pool with a per-source diversity cap. Any slots the general pool
+    can't fill are backfilled from leftover pinned/named hits, so a query that
+    *only* names a section (nothing clears the semantic floor) still returns
+    the section's chunks instead of abstaining.
     """
-    max_per_source = max(2, -(-k // 2))  # ceil(k/2)
-    if not named:
-        return _select_diverse_chunks(general, k, max_per_source)
+    half = max(1, -(-k // 2))  # ceil(k/2)
+    max_per_source = max(2, half)
+    pinned = pinned or []
+    final: list[dict] = []
+    seen: set = set()
 
-    quota = -(-k // 2)
-    final = named[:quota]
-    seen = {r.get("chunk_id") for r in final}
+    def take(items: list[dict], limit: int) -> None:
+        for r in items:
+            if limit <= 0 or len(final) >= k:
+                break
+            cid = r.get("chunk_id")
+            if cid is not None and cid in seen:
+                continue
+            if cid is not None:
+                seen.add(cid)
+            final.append(r)
+            limit -= 1
+
+    # 1. Section/identifier hits the user asked for by name — highest priority,
+    #    but capped at half so they can't starve co-asked questions.
+    take(pinned, half)
+    # 2. Named-source hits — half of whatever slots remain.
+    take(named, max(1, -(-(k - len(final)) // 2)))
+    # 3. General semantic pool with per-source diversity.
     remaining = [r for r in general if r.get("chunk_id") not in seen]
-    final.extend(
-        _select_diverse_chunks(remaining, k - len(final), max_per_source)
-    )
+    for r in _select_diverse_chunks(remaining, k - len(final), max_per_source):
+        cid = r.get("chunk_id")
+        if cid is not None and cid in seen:
+            continue
+        if cid is not None:
+            seen.add(cid)
+        final.append(r)
+    # 4. Backfill unused slots from leftover pinned/named (section-only query).
+    if len(final) < k:
+        take([r for r in pinned + named if r.get("chunk_id") not in seen],
+             k - len(final))
     return final[:k]
+
+
+# A CFR-style section citation: an optional § / "section" / "sec." lead-in
+# followed by a "part.section" number (e.g. "200.1", "200.512"). The lead-in is
+# optional so a bare "200.1" is still caught, but we require the dotted form so
+# plain years or dollar amounts ("2024", "200") don't trip it.
+_SECTION_REF_RE = re.compile(
+    r"(?:§+\s*|\bsections?\s+|\bsec\.?\s+)?(\d{1,4}\.\d+[a-z]?)",
+    re.IGNORECASE,
+)
+
+
+def _extract_section_refs(message: str) -> list[str]:
+    """Pull CFR-style section numbers (e.g. "200.1") out of the message.
+
+    Only matches a dotted ``part.section`` token, optionally preceded by a
+    §/"section"/"sec." lead-in — enough to catch "§ 200.1", "section 200.1",
+    and a bare "200.1" while ignoring plain integers. Deduped, order-preserving.
+    """
+    seen: set = set()
+    refs: list[str] = []
+    for m in _SECTION_REF_RE.finditer(message or ""):
+        ref = m.group(1)
+        if ref not in seen:
+            seen.add(ref)
+            refs.append(ref)
+    return refs
+
+
+async def _retrieve_section_chunks(
+    kb_uuid: str, refs: list[str], limit_per_ref: int = 6,
+) -> list[dict]:
+    """Lexically fetch chunks that literally contain each section number.
+
+    A candidate pool comes from ChromaDB's substring filter (which would also
+    match "200.10" for "200.1"), then a word-boundary regex keeps only exact
+    section matches so "§ 200.1" doesn't drag in "§ 200.10". Runs off the
+    embedding index entirely — the point is to rescue identifier lookups that
+    vector search can't see.
+    """
+    from app.services.document_manager import get_document_manager
+
+    dm = get_document_manager()
+    out: list[dict] = []
+    seen: set = set()
+    for ref in refs:
+        exact = re.compile(rf"(?<!\d){re.escape(ref)}(?!\d)")
+        candidates = await asyncio.to_thread(
+            dm.get_kb_chunks_containing, kb_uuid, ref, limit_per_ref * 4,
+        )
+        kept = 0
+        for r in candidates:
+            if kept >= limit_per_ref:
+                break
+            if not exact.search(r.get("content") or ""):
+                continue
+            cid = r.get("chunk_id")
+            if cid is not None and cid in seen:
+                continue
+            if cid is not None:
+                seen.add(cid)
+            out.append(r)
+            kept += 1
+    return out
+
+
+def _split_questions(message: str) -> list[str]:
+    """Split a message into standalone questions when it asks several at once.
+
+    Returns the individual ``?``-terminated questions only when there are at
+    least two — otherwise an empty list, so the single-question path is
+    untouched. Multiple questions in one turn otherwise share a single blended
+    embedding and one top-k budget, so a secondary question can retrieve zero
+    supporting chunks and go unanswered even though its answer is in the KB.
+    """
+    segments = re.split(r"(?<=\?)\s+", (message or "").strip())
+    questions = [s.strip() for s in segments if s.strip().endswith("?")]
+    return questions if len(questions) >= 2 else []
+
+
+def _round_robin_merge(pools: list[list[dict]]) -> list[dict]:
+    """Interleave per-question result pools so each question is fairly ranked.
+
+    Taking each pool's #1 before any pool's #2 means the downstream top-k trim
+    can't spend the whole budget on the first (or loudest) question — every
+    question contributes before any question gets a second chunk. Deduped by
+    chunk_id.
+    """
+    import itertools
+
+    merged: list[dict] = []
+    seen: set = set()
+    for tier in itertools.zip_longest(*pools):
+        for r in tier:
+            if r is None:
+                continue
+            cid = r.get("chunk_id")
+            if cid is not None and cid in seen:
+                continue
+            if cid is not None:
+                seen.add(cid)
+            merged.append(r)
+    return merged
 
 
 async def _build_kb_segment(
@@ -841,11 +977,37 @@ async def _build_kb_segment(
     # deliberately do NOT apply here — they tune the headless RAG answer
     # generator, while chat keeps its own agent, prompt, and settings.
     # Over-fetch 3× so the diversity pass below has a pool to select from.
-    kb_results, rag_cfg, _ = await retrieve_kb_chunks(
-        kb_uuid, message, model_name, per_step_timeout=6.0,
-        overfetch_multiplier=3,
-        retrieval_query=retrieval_query,
-    )
+    #
+    # Multi-question turns: when the user asks several questions at once, one
+    # blended embedding and one top-k budget let a secondary question retrieve
+    # nothing. Retrieve per sub-question and round-robin the pools so each is
+    # fairly represented before the top-k trim. Skipped for anaphoric turns
+    # (single condensed intent) and single-question turns (unchanged path).
+    sub_questions = _split_questions(message) if retrieval_query is None else []
+    if sub_questions:
+        pools = await asyncio.gather(*[
+            retrieve_kb_chunks(
+                kb_uuid, q, model_name, per_step_timeout=6.0,
+                overfetch_multiplier=3,
+            )
+            for q in sub_questions
+        ])
+        kb_results = _round_robin_merge([p[0] for p in pools])
+        rag_cfg = pools[0][1]
+    else:
+        kb_results, rag_cfg, _ = await retrieve_kb_chunks(
+            kb_uuid, message, model_name, per_step_timeout=6.0,
+            overfetch_multiplier=3,
+            retrieval_query=retrieval_query,
+        )
+
+    # Section-number targeting: a bare identifier like "§ 200.1" carries almost
+    # no semantic signal, so vector search misses the very chunk that contains
+    # it. Fetch those chunks lexically and pin them into the final slots.
+    section_results: list[dict] = []
+    section_refs = _extract_section_refs(message)
+    if section_refs:
+        section_results = await _retrieve_section_chunks(kb_uuid, section_refs)
 
     # Named-document targeting: when the message mentions a project file by
     # name, run a second search restricted to that source and guarantee it a
@@ -862,7 +1024,9 @@ async def _build_kb_segment(
             retrieval_query=retrieval_query,
         )
 
-    kb_results = _compose_kb_results(kb_results, named_results, rag_cfg.k)
+    kb_results = _compose_kb_results(
+        kb_results, named_results, rag_cfg.k, pinned=section_results,
+    )
     if not kb_results:
         logger.warning("KB query returned no results for kb_uuid=%s", kb_uuid)
         return None, []

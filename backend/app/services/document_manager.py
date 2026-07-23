@@ -530,6 +530,52 @@ class DocumentManager:
                 })
         return output
 
+    def get_kb_chunks_containing(
+        self,
+        kb_uuid: str,
+        substring: str,
+        limit: int = 20,
+    ) -> list[dict[str, Any]]:
+        """Lexical (exact substring) lookup over a KB collection's chunk text.
+
+        Uses ChromaDB's ``where_document`` full-text filter rather than the
+        embedding index, so it finds chunks that literally contain
+        ``substring`` even when the query embeds poorly. This is the fallback
+        for identifier-style lookups — a bare regulation section like
+        "§ 200.1" carries almost no semantic signal, so vector search misses
+        it even though the exact string is sitting in a chunk.
+
+        Returns chunk dicts in the same shape as :meth:`query_kb`, with
+        ``score``/``similarity`` left ``None`` (there is no distance for a
+        lexical hit). Order is ChromaDB's storage order, not relevance.
+        """
+        collection = self.get_kb_collection_readonly(kb_uuid)
+        if collection is None:
+            return []
+        try:
+            results = collection.get(
+                where_document={"$contains": substring}, limit=limit,
+            )
+        except Exception as e:
+            logger.debug(
+                "Lexical KB lookup failed for kb=%s substring=%r: %s",
+                kb_uuid, substring, e,
+            )
+            return []
+        output = []
+        docs = results.get("documents") or []
+        ids = results.get("ids") or []
+        metas = results.get("metadatas") or []
+        for i, doc in enumerate(docs):
+            output.append({
+                "content": doc,
+                "metadata": metas[i] if i < len(metas) else {},
+                "chunk_id": ids[i] if i < len(ids) else None,
+                "score": None,
+                "similarity": None,
+            })
+        return output
+
     def delete_kb_collection(self, kb_uuid: str) -> None:
         """Drop an entire KB collection. No-op if the collection never existed."""
         collection_name = f"kb_{kb_uuid}"
