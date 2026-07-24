@@ -1,0 +1,292 @@
+PART 738—COMMERCE CONTROL LIST OVERVIEW AND THE COUNTRY CHART
+
+Authority:50 U.S.C. 4801-4852; 50 U.S.C. 4601 et seq.; 50 U.S.C. 1701 et seq.; 10 U.S.C. 8720; 10 U.S.C. 8730(e); 22 U.S.C. 287c; 22 U.S.C. 2151 note; 22 U.S.C. 3201 et seq.; 22 U.S.C. 6004; 42 U.S.C. 2139a; 15 U.S.C. 1824; 50 U.S.C. 4305; 22 U.S.C. 7201 et seq.; 22 U.S.C. 7210; E.O. 13026, 61 FR 58767, 3 CFR, 1996 Comp., p. 228.
+
+§ 738.1 Introduction.
+
+(a) Commerce Control List scope. (1) In this part, references to the EAR are references to 15 CFR chapter VII, subchapter C. The Bureau of Industry and Security (BIS) maintains the Commerce Control List (CCL) within the Export Administration Regulations (EAR), which includes items (i.e., commodities, software, and technology) subject to the export licensing authority of BIS. The CCL does not include those items exclusively controlled for export or reexport by another department or agency of the U.S. Government. In instances where agencies other than the Department of Commerce administer controls over related items, entries in the CCL contain a reference to these controls.
+(2) The CCL is contained in supplement no. 1 to part 774 of the EAR. Supplement no. 2 to part 774 of the EAR contains the General Technology and Software Notes relevant to entries contained in the CCL.
+(3) Items that warrant control for export or reexport but currently are not permanently classified on the CCL. Items subject to temporary CCL controls are classified under the ECCN 0Y521 series (i.e., 0A521, 0B521, 0C521, 0D521, and 0E521) pursuant to § 742.6(a)(8) of the EAR while a determination is made as to whether classification under a revised or new ECCN, or an EAR99 designation, is appropriate.
+(b) Commerce Country Chart scope. BIS also maintains the Commerce Country Chart. The Commerce Country Chart, located in supplement no. 1 to part 738, contains licensing requirements based on destination and Reason for Control. In combination with the CCL, the Commerce Country Chart allows you to determine whether a license is required for items on the CCL to any country in the world.
+[61 FR 12756, Mar. 25, 1996, as amended at 77 FR 22198, Apr. 13, 2012; 85 FR 23462, Apr. 28, 2020]
+
+§ 738.2 Commerce Control List (CCL) structure.
+
+(a) Categories. The CCL is divided into 10 categories, numbered as follows:
+0—Nuclear Materials, Facilities and Equipment and Miscellaneous 1—Materials, Chemicals, “Microorganisms,” and Toxins 2—Materials Processing 3—Electronics 4—Computers 5—Telecommunications and Information Security 6—Lasers and Sensors 7—Navigation and Avionics 8—Marine 9—Aerospace and Propulsion
+(b) Groups. Within each category, items are arranged by group. Each category contains the same five groups. Each Group is identified by the letters A through E, as follows:
+A—Equipment, Assemblies and Components B—Test, Inspection and Production Equipment C—Materials D—Software E—Technology
+(c) Order of review. The CCL includes a supplement no. 4 to part 774—Commerce Control List Order of Review. This supplement establishes the steps (i.e., the order of review) that should be followed in classifying items that are “subject to the EAR.”
+(d) Entries—(1) Composition of an entry. Within each group, individual items are identified by an Export Control Classification Number (ECCN). Each number consists of a set of digits and a letter. The first digit identifies the general category within which the entry falls (e.g., 3A001). The letter immediately following this first digit identifies under which of the five groups the item is listed (e.g., 3A001). The second and third digits differentiate individual entries by identifying the type of controls associated with the items contained in the entry (e.g., 3A001). Table 1 lists the Reasons for Control associated with this second and third digits.
+Table 1 to Paragraph (d)(1) Introductory Text
+Last 3 digits of an ECCN | Reason for control
+000-099 | National Security (NS).
+100-199 | Missile Technology (MT).
+200-299 | Nuclear Nonproliferation (NP).
+300-399 | Chemical and Biological (CB).
+500-599 | Firearms, “Spacecraft,” and related commodities controlled for NS and other reasons.
+600-699 | Wassenaar Arrangement Munitions List (WAML) or former U.S. Munitions List (USML) controlled for NS and other reasons.
+900-979 | Plurilateral NS and Regional Stability (RS) and other reasons.
+980-989 | Crime Control (CC), Short Supply (SS).
+990-999 | Anti-terrorism (AT), RS, United Nations Sanctions (UN).
+(i) Reasons for Control are not mutually exclusive and numbers are assigned in order of precedence. As an example, if an item is controlled for both National Security and Missile Technology reasons, the entry's third alphanumeric character will be a “0”. If the item is controlled only for Missile Technology the third alphanumeric character will be “1”.
+(ii) The numbers in either the second or third digit (e.g., 3A001) serve to differentiate between multilateral, plurilateral, and unilateral entries. For example, an entry with the number “99” as the second and third digit, identifies the entire entry as controlled for a unilateral concern (e.g., 2B991 for anti-terrorism reasons). If the second digit is a “2” and the third digit is a “9”, the item is controlled for unilateral purposes based on a nuclear proliferation concern (e.g., 2A290 is controlled for unilateral purposes based on nuclear nonproliferation concerns).
+(iii) The last digit within each entry (e.g., 3A001) is used for the sequential numbering of ECCNs to differentiate between entries on the CCL.
+(iv) Last two characters in a “600 series” ECCN. The last two characters of each “600 series” ECCN generally track the Wassenaar Arrangement Munitions List (WAML) categories for the types of items at issue. The WAML ML21 (“software”) and ML22 (“technology”) are, however, included in D (“software”) and E (“technology”) CCL product groups to remain consistent with the structure of the CCL.
+(2) Reading an ECCN. An ECCN is made up of four sections, the “Heading,” “License Requirements,” “License Exceptions,” and “List of Items Controlled” sections. A brief description of each section and its use follows:
+(i) Heading. A description of the items controlled is provided next to each ECCN. In certain ECCNs, the description is a summary and will direct you to “see List of Items Controlled” for a complete list of items classified under those respective ECCNs. The “Items” paragraph in the List of Items Controlled section will describe all of the items that the ECCN controls for the portions of the heading that precede the “see List of Items Controlled” phrase. Portions of the heading that follow the phrase are complete descriptions of the items controlled by that portion of the heading. If “see List of Items Controlled” appears at the end of the heading, the “Items” paragraph in the List of Items Controlled section is the exclusive, complete list of the items the ECCN controls.
+(ii) License Requirements. This section contains a separate line identifying all possible Reasons for Control in order of precedence, and two columns entitled “Control(s)” and “Country Chart”.
+(A) The “Controls” header identifies all applicable Reasons for Control, in order of restrictiveness, and to what extent each applies (e.g., to the entire entry or only to certain subparagraphs). Those requiring licenses for a larger number of countries and/or items are listed first. As you read down the list the number of countries and/or items requiring a license declines. Since Reasons for Control are not mutually exclusive, items controlled within a particular ECCN may be controlled for more than one reason. The following is a list of all possible Reasons for Control:
+AT Anti-Terrorism CB Chemical & Biological Weapons CC Crime Control CW Chemical Weapons Convention EI Encryption Items FC Firearms Convention MT Missile Technology NS National Security NP Nuclear Nonproliferation RS Regional Stability SS Short Supply UN United Nations Embargo SI Significant Items SL Surreptitious Listening
+(B) The “Country Chart” header identifies, for each applicable Reason for Control, a column name and number (e.g., CB Column 1). These column identifiers are used to direct you from the CCL to the appropriate column identifying the countries requiring a license. Consult part 742 of the EAR for an indepth discussion of the licensing requirements and policies applicable to each Country Chart column.
+(iii) License Exceptions. This section provides a brief eligibility statement for each ECCN-driven License Exception that may be applicable to your transaction, and should be consulted only AFTER you have determined a license is required based on an analysis of the entry and the Country Chart. The brief eligibility statement in this section is provided to assist you in deciding which ECCN-driven License Exception related to your particular item and destination you should explore prior to submitting an application. The term “Yes” (followed in some instances by the scope of Yes) appears next to each available ECCN-driven License Exception. Some ECCNs have License Exception STA exclusion paragraphs. These paragraphs identify items for which the License Exception STA provisions in § 740.20(c)(2) of the EAR may not be used, but do not otherwise affect License Exception STA availability. The term “N/A” will be noted for License Exceptions that are not available within a particular entry. In some “600 series” ECCNs, the STA license exception paragraph or a note to the License Exceptions section contains additional information on the availability of License Exception STA for that ECCN. If one or more License Exceptions appear to apply to your transaction, you must consult part 740 of the EAR to review the conditions and restrictions applicable to each available License Exception. The list of License Exceptions contained within each ECCN is not an all-exclusive list. Other License Exceptions, not based on particular ECCNs, may be available. Consult part 740 of the EAR to determine eligibility for non-ECCN-driven License Exceptions.
+(iv) List of Items Controlled—(A) Related definitions. This header identifies, where appropriate, definitions or parameters that apply to all items controlled by the entry. The information provided in this section is unique to the entry, and hence not listed in the definitions contained in part 772 of the EAR.
+(B) Related controls. If another U.S. government agency or department has export licensing authority over items related to those controlled by an entry, a statement is included identifying the agency or department along with the applicable regulatory cite. An additional cross-reference may be included in instances where the scope of controls differs between a CCL entry and its corresponding entry on list maintained by the European Union. This information is provided to assist readers who use both lists.
+(C) Items. This paragraph describes the relationship between the “items” paragraph and ECCN headings and will assist your understanding as you classify items on the CCL. When the heading contains the phrase “see List of Items Controlled,” the portion of the heading preceding that phrase is only a summary of the items controlled by the ECCN and the “items” paragraph contains an exclusive list of items described in the heading. Paragraphs (d)(2)(iv)(C)(1), (2) and (3) of this section provide examples of the three different uses of the phrase “(see List of Items Controlled)” in ECCN headings. Each heading on the CCL uses one of these three structures. Understanding the relationship between the heading and the “items” paragraph is important when classifying items that are “subject to the EAR” on the CCL.
+(1) “(See List of Items Controlled)” is at the end of the ECCN heading. An example of an ECCN where all of the heading text precedes the phrase “(see List of Items Controlled)” is ECCN 8A002 Marine systems, equipment, “parts” and “components,” as follows (see List of Items Controlled). ECCNs 1A001, 3A001, 6A001, 7A004 and 9A012 are other examples where all of the heading text precedes the phrase “(see List of Items Controlled).” In these types of headings, the items paragraphs must be reviewed to determine whether your item is contained within the heading and classified under that ECCN.
+(2) “(See List of Items Controlled)” is in the middle of the ECCN heading. If the phrase “(see List of Items Controlled)” appears in the middle of the ECCN heading, then all portions of the heading that follow the phrase “(see List of Items Controlled)” will list items controlled in addition to the list in the “items” paragraph. An example of such a heading is ECCN 2B992 Non-“numerically controlled” machine tools for generating optical quality surfaces, (see List of Items Controlled) and “specially designed” “parts” and “components” therefor. Under the ECCN 2B992 example, the “items” paragraph must be reviewed to determine whether your item is contained within the first part of the heading (“non-'numerically controlled' machine tools for generating optical quality surfaces”) and classified under 2B992. The second part of the ECCN 2B992 heading (“and 'specially designed' 'parts' and 'components' therefor”) contains the exclusive list described in the heading. ECCNs 1A006, 3B992, 4A001, 6A006 and 7A001 are other examples where the phrase “(see List of Items Controlled)” appears in the middle of the ECCN heading.
+(3) ECCNs that do not use the phrase “(see List of Items controlled).” When all items classified in the ECCN are listed in the heading, a sentence is generally included in the “items” paragraph to direct you to the heading. An example of such a heading is ECCN 4E980 “Technology” for the “development,” “production” or “use” of commodities controlled by 4A980. ECCNs 0A982, 5D101, 8D001 and 9A002 are other examples where the heading is the exclusive description of the items classified under those respective ECCNs.
+[61 FR 112756, Mar. 25, 1996, as amended at 61 FR 68579, Dec. 30, 1996; 62 FR 25456, May 9, 1997; 64 FR 17970, Apr. 13, 1999; 27141, May 18, 1999; 70 FR 54628, Sept. 16, 2005; 71 FR 20883, Apr. 24, 2006; 71 FR 67035, Nov. 20, 2006; 72 FR 43531, Aug. 6, 2007; 76 FR 35286, June 16, 2011; 78 FR 22708, Apr. 16, 2013; 78 FR 61900, Oct. 4, 2013; 79 FR 77866, Dec. 29, 2014; 81 FR 85144, Nov. 25, 2016; 82 FR 61156, Dec. 27, 2017; 89 FR 72936, Sept. 6, 2024]
+
+§ 738.3 Commerce Country Chart structure.
+
+(a) Scope. The Commerce Country Chart allows you to determine the Commerce Control List (CCL) export and reexport license requirements for most items listed on the CCL. Such license requirements are based on the Reasons for Control listed in the Export Control Classification Number (ECCN) that applies to the item. Some ECCNs, however, impose license requirements either without reference to a reason for control code that is listed on the Commerce Country Chart, or in addition to such a reference. Those ECCNs may state their license requirements in full in their “Reasons for Control” sections or they may refer the reader to another provision of the EAR for license requirement information. In addition, some ECCNs do not impose license requirements, but refer the reader to the regulations of another government agency that may impose license requirements on the items described in that ECCN.
+(1) ECCNs 0A983, 5A001.f.1, 5A980, 5D001 (for 5A001.f.1, or for 5E001.a (for 5A001.f.1 or for 5D001.a (for 5A001.f.1))), 5D980, 5E001.a (for 5A001.f.1, or for 5D001.a (for 5A001.f.1)) and 5E980. A license is required for all destinations for items controlled under these entries. For items controlled by 0A983, 5E001.a (for 5A001.f.1, or for 5D001.a (for 5A001.f.1)) and 5E980, no license exceptions apply. For items controlled by 5A001.f.1, 5A980, 5D001 (for 5A001.f.1 or for 5E001.a (for 5A001.f.1, or for 5D001.a (for 5A001.f.1))) and 5D980, License Exception GOV may apply if your item is consigned to and for the official use of an agency of the U.S. Government (see § 740.2(a)(3)). If your item is controlled by 0A983, 5A001.f.1, 5A980, 5D001 (for 5A001.f.1 or for 5E001.a (for 5A001.f.1, or for 5D001.a (for 5A001.f.1))), 5D980, 5E001.a (for 5A001.f.1, or for 5D001.a (for 5A001.f.1)) or 5E980 you should proceed directly to part 748 of the EAR for license application instructions and § 742.11 or § 742.13 of the EAR for information on the licensing policy relevant to these types of applications.
+(2) [Reserved]
+(b) Countries. The first column of the Country Chart lists countries in alphabetical order. There are a number of destinations that are not listed in the Country Chart contained in supplement no. 1 to part 738. If your destination is not listed on the Country Chart and such destination is a territory, possession, dependency or department of a country included on the Country Chart, the EAR accords your destination the same licensing treatment as the country of which it is a territory, possession, dependency or department. For example, if your destination is the Cayman Islands, a dependent territory of the United Kingdom, refer to the United Kingdom on the Country Chart for licensing requirements. In addition, if your destination is Liechtenstein, which serves as one territory with Switzerland for purposes of the EAR, refer to Switzerland on the Country Chart for licensing requirements.
+(c) Columns. Stretching out to the right are horizontal headers identifying the various Reasons for Control. Under each Reason for Control header are diagonal column identifiers capping individual columns. Each column identifier consists of the two letter Reason for Control and a column number. (e.g., CB Column 1). The column identifiers correspond to those listed in the “Country Chart” header within the “License Requirements” section of each ECCN.
+(d) Cells. The symbol “X” is used to denote licensing requirements on the Country Chart. If an “X” appears in a particular cell, transactions subject to that particular Reason for Control/Destination combination require a license. There is a direct correlation between the number of “X”s applicable to your transaction and the number of licensing reviews your application will undergo.
+[61 FR 12756, Mar. 25, 1996, as amended at 63 FR 42228, Aug. 7, 1998; 65 FR 55178, Sept. 13, 2000; 70 FR 8249, Feb. 18, 2005; 71 FR 67035, Nov. 20, 2006; 76 FR 54930, Sept. 6, 2011; 76 FR 70339, Nov. 14, 2011; 77 FR 39367, July 2, 2012; 78 FR 37382, June 20, 2013]
+
+§ 738.4 Determining whether a license is required.
+
+(a) Using the CCL and the Country Chart—(1) Overview. Once you have determined that your item is classified under a specific ECCN, you must use information contained in the “License Requirements” section of that ECCN in combination with the Country Chart to decide whether a license is required. Note that not all license requirements set forth under the “License Requirements” section of an ECCN refer you to the Commerce Country Chart, but in some cases this section will contain references to a specific section in the EAR for license requirements. In such cases, this section would not apply.
+(2) License decision making process. The following decision making process must be followed in order to determine whether a license is required to export or reexport a particular item to a specific destination:
+(i) Examine the appropriate ECCN in the CCL. Is the item you intend to export or reexport controlled for a single Reason for Control?
+(A) If yes, identify the single Reason for Control and the relevant Country Chart column identifier (e.g., CB Column 1).
+(B) If no, identify the Country Chart column identifier for each applicable Reason for Control (e.g., NS Column 1, NP Column 1, etc.).
+(ii) Review the Country Chart. With each of the applicable Country Chart Column identifiers noted, turn to the Country Chart (supplement no. 1 to part 738). Locate the correct Country Chart column identifier on the diagonal headings, and determine whether an “X” is marked in the cell next to the country in question for each Country Chart column identified in the applicable ECCN. If your item is subject to more than one reason for control, repeat this step using each unique Country Chart column identifier.
+(A) If yes, a license application must be submitted based on the particular reason for control and destination, unless a License Exception applies. If “Yes” is noted next to any of the listed License Exceptions, you should consult part 740 of the EAR to determine whether you can use any of the available ECCN-driven License Exceptions to effect your shipment, rather than applying for a license. Each affirmative license requirement must be overcome by a License Exception. If you are unable to qualify for a License Exception based on each license requirement noted on the Country Chart, you must apply for a license. Note that other License Exceptions, not related to the CCL, may also apply to your transaction (See part 740 of the EAR).
+(B) If no, a license is not required based on the particular Reason for Control and destination. Provided that General Prohibitions Four through Ten do not apply to your proposed transaction and the License Requirement section does not refer you to any other part of the EAR to determine license requirements. For example, any applicable encryption classification requirements described in § 740.17(b) of the EAR must be met for certain mass market encryption items to affect your shipment using the symbol “NLR.” Proceed to parts 758 and 762 of the EAR for information on export clearance procedures and recordkeeping requirements. Note that although you may stop after determining a license is required based on the first Reason for Control, it is best to work through each applicable Reason for Control. A full analysis of every possible licensing requirement based on each applicable Reason for Control is required to determine the most advantageous License Exception available for your particular transaction and, if a license is required, ascertain the scope of review conducted by BIS on your license application.
+(b) Sample analysis using the CCL and Country Chart—(1) Scope. The following sample entry and related analysis is provided to illustrate the type of thought process you must complete in order to determine whether a license is required to export or reexport a particular item to a specific destination using the CCL in combination with the Country Chart.
+(2) Sample CCL entry.
+2A000: Entry heading. License Requirements Reason for Control: NS, NP, AT Control(s) Country chart(see Supp. No. 1 to part 738) NS applies to entire entry NS Column 2. NP applies to 2A000.b entire entry NP Column 1. AT applies to entire entry AT Column 1. List Based License Exceptions (See Part 740 for a Description of all License Exceptions) LVS: $5,000 GBS: Yes List of Items Controlled Related Definition: N/A Related Controls: N/A Items: a. Having x. b. Having z.
+(3) Sample analysis. After consulting the CCL, I determine my item, valued at $10,000, is classified under ECCN 2A000.a. I read that the entire entry is controlled for national security, and anti-terrorism reasons. Because my item is classified under paragraph .a, and not .b, I understand that though nuclear nonproliferation controls apply to a portion of the entry, they do not apply to my item. I note that the appropriate Country Chart column identifiers are NS Column 2 and AT Column 1. Turning to the Country Chart, I locate my specific destination, Chad, and see that an “X” appears in the NS Column 2 cell for Chad, but not in the AT Column 1 cell. I understand that a license is required, unless my transaction qualifies for a License Exception. From the License Exception LVS value listed in the entry, I know immediately that my proposed transaction exceeds the value limitation associated with LVS. Noting that License Exception GBS is “Yes” for this entry, I turn to part 740 of the EAR to review the provisions related to use of GBS.
+[61 FR 12756, Mar. 25, 1996, as amended at 67 FR 38861, June 6, 2002; 70 FR 54628, Sept. 16, 2005; 73 FR 57503, Oct. 3, 2008; 74 FR 52883, Oct. 15, 2009; 75 FR 36490, June 25, 2010; 78 FR 61901, Oct. 4, 2013; 79 FR 32623, June 5, 2014; 81 FR 64668, Sept. 20, 2016; 83 FR 38020, Aug. 3, 2018; 86 FR 54811, Oct. 5, 2021]
+
+Supplement No. 1 to Part 738—Commerce Country Chart
+
+[Reason for control]
+Countries | Chemical and biological weapons | Nuclearnonproliferation | Nationalsecurity | Missile tech | Regionalstability | Firearmsconvention | Crimecontrol | Anti-terrorism
+CB 1 | CB 2 | CB 3 | NP 1 | NP 2 | NS 1 | NS 2 | MT 1 | RS 1 | RS 2 | FC 1 | CC 1 | CC 2 | CC 3 | AT 1 | AT 2
+Afghanistan | X | X | X | X | X | X | X | X | X | X | X
+Albania 2 3 | X | X | X | X | X | X | X | X
+Algeria | X | X | X | X | X | X | X | X | X | X
+Andorra | X | X | X | X | X | X | X | X | X | X
+Angola | X | X | X | X | X | X | X | X | X | X
+Antigua and Barbuda | X | X | X | X | X | X | X | X | X | X | X
+Argentina | X | X | X | X | X | X | X
+Armenia | X | X | X | X | X | X | X | X | X | X | X
+Aruba | X | X | X | X | X | X | X | X | X | X
+Australia 10 | X
+Austria 3 4 | X | X | X | X
+Azerbaijan | X | X | X | X | X | X | X | X | X | X | X
+Bahamas, The | X | X | X | X | X | X | X | X | X | X | X
+Bahrain | X | X | X | X | X | X | X | X | X | X | X
+Bangladesh | X | X | X | X | X | X | X | X | X | X
+Barbados | X | X | X | X | X | X | X | X | X | X | X
+Belarus 6 | X | X | X | X | X | X | X | X | X | X | X | X
+Belgium 3 | X | X | X | X
+Belize | X | X | X | X | X | X | X | X | X | X | X
+Benin | X | X | X | X | X | X | X | X | X | X
+Bhutan | X | X | X | X | X | X | X | X | X | X
+Bolivia | X | X | X | X | X | X | X | X | X | X | X
+Bosnia and Herzegovina | X | X | X | X | X | X | X | X | X | X
+Botswana | X | X | X | X | X | X | X | X | X | X
+Brazil | X | X | X | X | X | X | X | X | X | X
+Brunei | X | X | X | X | X | X | X | X | X | X
+Bulgaria 3 | X | X | X | X
+Burkina Faso | X | X | X | X | X | X | X | X | X | X
+Burma | X | X | X | X | X | X | X | X | X | X | X
+Burundi | X | X | X | X | X | X | X | X | X | X
+Cambodia | X | X | X | X | X | X | X | X | X | X
+Cameroon | X | X | X | X | X | X | X | X | X | X
+Canada | X | X
+Cape Verde | X | X | X | X | X | X | X | X | X | X
+Central African Republic | X | X | X | X | X | X | X | X | X | X
+Chad | X | X | X | X | X | X | X | X | X | X
+Chile | X | X | X | X | X | X | X | X | X | X | X
+China | X | X | X | X | X | X | X | X | X | X | X | X
+Colombia | X | X | X | X | X | X | X | X | X | X | X
+Comoros | X | X | X | X | X | X | X | X | X | X
+Congo (Democratic Republic of the) 1 | X | X | X | X | X | X | X | X | X | X
+Congo (Republic of the) | X | X | X | X | X | X | X | X | X | X
+Costa Rica | X | X | X | X | X | X | X | X | X | X | X
+Cote d'Ivoire | X | X | X | X | X | X | X | X | X | X
+Croatia 3 | X | X | X | X
+Cuba | See part 746 of the EAR to determine whether a license is required in order to export or reexport to this destination.
+Curaçao | X | X | X | X | X | X | X | X | X | X
+Cyprus 2 3 4 | X | X | X | X | X | X | X | X
+Czech Republic 3 | X | X | X | X
+Denmark 3 | X | X | X | X
+Djibouti | X | X | X | X | X | X | X | X | X | X
+Dominica | X | X | X | X | X | X | X | X | X | X | X
+Dominican Republic | X | X | X | X | X | X | X | X | X | X | X
+Ecuador | X | X | X | X | X | X | X | X | X | X | X
+Egypt | X | X | X | X | X | X | X | X | X | X | X
+El Salvador | X | X | X | X | X | X | X | X | X | X | X
+Equatorial Guinea | X | X | X | X | X | X | X | X | X | X
+Eritrea 1 | X | X | X | X | X | X | X | X | X | X
+Estonia 3 | X | X | X | X
+Eswatini | X | X | X | X | X | X | X | X | X | X
+Ethiopia | X | X | X | X | X | X | X | X | X | X
+Fiji | X | X | X | X | X | X | X | X | X | X | X
+Finland 3 4 | X | X | X | X
+France 3 | X | X | X | X
+Gabon | X | X | X | X | X | X | X | X | X | X
+Gambia, The | X | X | X | X | X | X | X | X | X | X
+Georgia | X | X | X | X | X | X | X | X | X | X | X
+Germany 3 | X | X | X | X
+Ghana | X | X | X | X | X | X | X | X | X | X
+Greece 3 | X | X | X | X
+Grenada | X | X | X | X | X | X | X | X | X | X | X
+Guatemala | X | X | X | X | X | X | X | X | X | X | X
+Guinea | X | X | X | X | X | X | X | X | X | X
+Guinea-Bissau | X | X | X | X | X | X | X | X | X | X
+Guyana | X | X | X | X | X | X | X | X | X | X | X
+Haiti | X | X | X | X | X | X | X | X | X | X | X
+Honduras | X | X | X | X | X | X | X | X | X | X | X
+Hungary 3 | X | X | X | X
+Iceland 3 | X | X | X | X
+India 7 | X | X | X | X | X
+Indonesia | X | X | X | X | X | X | X | X | X | X
+Iran 1 | See part 746 of the EAR to determine whether a license is required in order to export or reexport to this destination.
+Iraq 1 | X | X | X | X | X | X | X | X | X | X | X | X
+Ireland 3 4 | X | X | X | X
+Israel | X | X | X | X | X | X | X | X | X | X | X | X
+Italy 3 | X | X | X | X
+Jamaica | X | X | X | X | X | X | X | X | X | X | X
+Japan 3 | X | X | X | X
+Jordan | X | X | X | X | X | X | X | X | X | X | X
+Kazakhstan | X | X | X | X | X | X | X | X | X | X
+Kenya | X | X | X | X | X | X | X | X | X | X
+Kiribati | X | X | X | X | X | X | X | X | X | X
+Korea, North 1 | See Sections 742.19 and 746.4 of the EAR to determine whether a license is required in order to export or reexport to this destination.
+Korea, South 3 4 | X | X | X | X
+Kosovo | X | X | X | X | X | X | X | X | X | X | X
+Kuwait | X | X | X | X | X | X | X | X | X | X | X
+Kyrgyzstan | X | X | X | X | X | X | X | X | X | X | X
+Laos | X | X | X | X | X | X | X | X | X | X
+Latvia 3 | X | X | X | X
+Lebanon 1 | X | X | X | X | X | X | X | X | X | X | X
+Lesotho | X | X | X | X | X | X | X | X | X | X
+Liberia | X | X | X | X | X | X | X | X | X | X
+Libya 1 | X | X | X | X | X | X | X | X | X | X | X | X
+Liechtenstein 5 | X | X | X | X
+Lithuania 3 | X | X | X | X
+Luxembourg 3 | X | X | X | X
+Macau | X | X | X | X | X | X | X | X | X | X | X | X
+Madagascar | X | X | X | X | X | X | X | X | X | X
+Malawi | X | X | X | X | X | X | X | X | X | X
+Malaysia | X | X | X | X | X | X | X | X | X | X
+Maldives | X | X | X | X | X | X | X | X | X | X
+Mali | X | X | X | X | X | X | X | X | X | X
+Malta 2 3 4 | X | X | X | X | X | X | X | X
+Marshall Islands | X | X | X | X | X | X | X | X | X | X
+Mauritania | X | X | X | X | X | X | X | X | X | X
+Mauritius | X | X | X | X | X | X | X | X | X | X
+Mexico | X | X | X | X | X | X | X
+Micronesia (Federated State of) | X | X | X | X | X | X | X | X | X | X
+Moldova | X | X | X | X | X | X | X | X | X | X | X
+Monaco | X | X | X | X | X | X | X | X | X | X
+Mongolia | X | X | X | X | X | X | X | X | X | X | X
+Montenegro | X | X | X | X | X | X | X | X | X | X | X
+Morocco | X | X | X | X | X | X | X | X | X | X
+Mozambique | X | X | X | X | X | X | X | X | X | X
+Namibia | X | X | X | X | X | X | X | X | X | X
+Nauru | X | X | X | X | X | X | X | X | X | X
+Nepal | X | X | X | X | X | X | X | X | X | X
+Netherlands 3 | X | X | X | X
+New Zealand 3 | X | X | X | X
+Nicaragua | X | X | X | X | X | X | X | X | X | X | X
+Niger | X | X | X | X | X | X | X | X | X | X
+Nigeria | X | X | X | X | X | X | X | X | X | X
+North Macedonia | X | X | X | X | X | X | X | X | X | X
+Norway 3 | X | X | X | X
+Oman | X | X | X | X | X | X | X | X | X | X | X
+Pakistan 8 | X | X | X | X | X | X | X | X | X | X | X | X
+Palau | X | X | X | X | X | X | X | X | X | X
+Panama | X | X | X | X | X | X | X | X | X | X | X
+Papua New Guinea | X | X | X | X | X | X | X | X | X | X
+Paraguay | X | X | X | X | X | X | X | X | X | X | X
+Peru | X | X | X | X | X | X | X | X | X | X | X
+Philippines | X | X | X | X | X | X | X | X | X | X
+Poland 3 | X | X | X | X
+Portugal 3 | X | X | X | X
+Qatar | X | X | X | X | X | X | X | X | X | X | X
+Romania 3 | X | X | X | X
+Russia 6 | X | X | X | X | X | X | X | X | X | X | X | X
+Rwanda | X | X | X | X | X | X | X | X | X | X | X
+St. Kitts and Nevis | X | X | X | X | X | X | X | X | X | X | X
+St. Lucia | X | X | X | X | X | X | X | X | X | X | X
+St. Vincent and the Grenadines | X | X | X | X | X | X | X | X | X | X | X
+Samoa | X | X | X | X | X | X | X | X | X | X
+San Marino | X | X | X | X | X | X | X | X | X | X
+Sao Tome and Principe | X | X | X | X | X | X | X | X | X | X
+Saudi Arabia | X | X | X | X | X | X | X | X | X | X | X
+Senegal | X | X | X | X | X | X | X | X | X | X
+Serbia | X | X | X | X | X | X | X | X | X | X
+Seycheles | X | X | X | X | X | X | X | X | X | X
+Sierra Leone | X | X | X | X | X | X | X | X | X | X
+Singapore | X | X | X | X | X | X | X | X | X | X
+Sint Maarten (the Dutch two-fifths of the island of Saint Martin) | X | X | X | X | X | X | X | X | X | X
+Slovakia 3 | X | X | X | X
+Slovenia 3 | X | X | X | X
+Solomon Islands | X | X | X | X | X | X | X | X | X | X
+Somalia 1 | X | X | X | X | X | X | X | X | X | X
+South Africa 2 3 4 | X | X | X | X | X | X | X
+South Sudan, Republic of | X | X | X | X | X | X | X | X | X | X
+Spain 3 | X | X | X | X
+Sri Lanka | X | X | X | X | X | X | X | X | X | X
+Sudan 1 | X | X | X | X | X | X | X | X | X | X
+Suriname | X | X | X | X | X | X | X | X | X | X | X
+Sweden 3 4 | X | X | X | X
+Switzerland 3 4 | X | X | X | X
+Syria | See § 746.9 of the EAR to determine whether a license is required in order to export or reexport to this destination.
+Taiwan | X | X | X | X | X | X | X | X | X | X | X
+Tajikistan | X | X | X | X | X | X | X | X | X | X | X
+Tanzania | X | X | X | X | X | X | X | X | X | X
+Thailand | X | X | X | X | X | X | X | X | X | X
+Timor-Leste | X | X | X | X | X | X | X | X | X | X
+Togo | X | X | X | X | X | X | X | X | X | X
+Tonga | X | X | X | X | X | X | X | X | X | X
+Trinidad and Tobago | X | X | X | X | X | X | X | X | X | X | X
+Tunisia | X | X | X | X | X | X | X | X | X | X
+Türkiye | X | X | X | X
+Turkmenistan | X | X | X | X | X | X | X | X | X | X | X
+Tuvalu | X | X | X | X | X | X | X | X | X | X
+Uganda | X | X | X | X | X | X | X | X | X | X
+Ukraine 9 | X | X | X | X | X | X | X | X
+United Arab Emirates | X | X | X | X | X | X | X | X | X | X | X
+United Kingdom 10 | X
+Uruguay | X | X | X | X | X | X | X | X | X | X | X
+Uzbekistan | X | X | X | X | X | X | X | X | X | X | X
+Vanuatu | X | X | X | X | X | X | X | X | X | X
+Vatican City | X | X | X | X | X | X | X | X | X | X
+Venezuela | X | X | X | X | X | X | X | X | X | X | X | X | X
+Vietnam | X | X | X | X | X | X | X | X | X | X | X
+Western Sahara | X | X | X | X | X | X | X | X | X | X
+Yemen | X | X | X | X | X | X | X | X | X | X | X
+Zambia | X | X | X | X | X | X | X | X | X | X
+Zimbabwe | X | X | X | X | X | X | X | X | X | X
+1 See § 746.1(b) for United Nations Security Council Sanctions under the EAR. See § 746.3 for United Nations Security Council-related license requirements for exports and reexports to Iraq or transfer within Iraq under the EAR, as well as regional stability licensing requirements not included in the Country Chart.
+2 See § 742.4(a) for special provisions that apply to exports and reexports to these countries of certain thermal imaging cameras.
+3 See § 742.6(a)(3) for special provisions that apply to military commodities that are subject to ECCN 0A919.
+4 See § 742.6(a)(2) and (4)(ii) regarding special provisions for exports and reexports of certain thermal imaging cameras to these countries.
+5 Refer to Switzerland for licensing requirements for Liechtenstein under the EAR.
+6 See § 746.5 of the EAR for additional license requirements under the Russian Industry Sector Sanctions for ECCNs 0A998, 1C992, 3A229, 3A231, 3A232, 6A991, 8A992, and 8D999 and items identified in supplement no. 2 to part 746 of the EAR. See § 746.8 of the EAR for Sanctions against Russia and Belarus, including additional license requirements for items listed in any ECCN on the CCL.
+7 Note that a license is still required for items controlled under ECCNs 6A003.b.4.b and 9A515.e for RS column 2 reasons when destined to India.
+8 See § 746.6 of the EAR for additional license requirements for exports and reexports to the Crimea region of Ukraine and the so-called Donetsk People's Republic (DNR) and Luhansk People's Republic (LNR) regions of Ukraine and transfers (in-country) within the Crimea, DNR, and LNR regions of Ukraine for all items subject to the EAR, other than food and medicine designated as EAR99 and certain EAR99 or ECCN 5D992.c software for internet-based communications.
+9 See § 746.6 of the EAR for additional license requirements for exports and reexports to the Crimea region of Ukraine and the so-called Donetsk People's Republic (DNR) and Luhansk People's Republic (LNR) regions of Ukraine and transfers (in-country) within the Crimea, DNR, and LNR regions of Ukraine for all items subject to the EAR, other than food and medicine designated as EAR99 and certain EAR99 or ECCN 5D992.c software for internet-based communications.
+10 A license is required to these destinations for items in the following ECCNs: 0A501 (except for 0A501.y), 0A502 for shotguns with a barrel length less than 18 inches (45.72 cm), 0A504.i, 0A505.a and .x, 0A506, 0A507, 0A508 for semi-automatic shotguns with a barrel length less than 18 inches (45.72 cm), 0A509, 0D501 (except for “software” for commodities in ECCN 0A501.y or “equipment” in ECCN 0B501 for commodities in ECCN 0A501.y), 0D505 for “software” for commodities in ECCN 0A505.a and .x and “equipment” in ECCN 0B505.a and .x, 0E501, 0E504, 0E505 for “technology” for “development,” “production,” operation, installation, maintenance, repair, overhaul, or refurbishing commodities in 0A505.a and .x; for “equipment” for those commodities in 0B505; and for “software” for that “equipment” and those commodities in 0D505.
+[90 FR 47189, Sept. 30, 2025]

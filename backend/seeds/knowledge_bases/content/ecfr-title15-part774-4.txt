@@ -1,0 +1,700 @@
+Note 1: “Development” or “production” “technology” controlled by 9E001 to 9E003 for gas turbine engines remains controlled when used for repair or overhaul. Excluded from 9E001 to 9E003 control are: technical data, drawings or documentation for maintenance activities directly associated with calibration, removal or replacement of damaged or unserviceable line replaceable units, including replacement of whole engines or engine modules.
+Note 2: USML Category XV(f) and ECCNs 9E001, 9E002 and 9E515 do not control the data transmitted to or from a satellite or “spacecraft,” whether real or simulated, when limited to information about the health, operational status, or measurements or function of, or raw sensor output from, the “spacecraft,” “spacecraft” payload(s), or its associated subsystems or components. Such information is not within the scope of information captured within the definition of “technology” in the EAR for purposes of Category 9 Product Group E. Examples of such information, which are commonly referred to as “housekeeping data,” include (i) system, hardware, component configuration, and operation status information pertaining to temperatures, pressures, power, currents, voltages, and battery charges; (ii) “spacecraft” or payload orientation or position information, such as state vector or ephemeris information; (iii) payload raw mission or science output, such as images, spectra, particle measurements, or field measurements; (iv) command responses; (v) accurate timing information; and (vi) link budget data. The act of processing such telemetry data—i.e., converting raw data into engineering units or readable products—or encrypting it does not, in and of itself, cause the telemetry data to become subject to the ITAR or to ECCN 9E515 for purposes of 9A515, or to ECCNs 9E001 or 9E002 for purposes of 9A004. All classified technical data directly related to items controlled in USML Category XV or ECCNs 9A515, and defense services using the classified technical data remains subject to the ITAR. This note does not affect controls in USML XV(f), ECCN 9D515, or ECCN 9E515 on software source code or commands that control a “spacecraft,” payload, or associated subsystems for purposes of 9A515. This note also does not affect controls in ECCNs 9D001, 9D002, 9E001, or 9E002 on software source code or commands that control a “spacecraft,” payload, or associated subsystems for purposes of 9A004.
+9E001 “Technology” according to the General Technology Note for the “development” of equipment or “software”, controlled by 9A004, 9A012, 9B (except for ECCNs 9B604, 9B610, 9B619, 9B990 and 9B991), or ECCN 9D001 to 9D004, 9D101, or 9D104.
+License Requirements
+Reason for Control: NS, MT, AT
+Control(s) | Country chart (see supp. No. 1 to part 738)
+NS applies to “technology” for items controlled by 9A004, 9A012, 9B001 to 9B010, 9D001 to 9D004 for NS reasons | NS Column 1
+MT applies to “technology” for items controlled by 9A012, 9B001, 9B002, 9B003, 9B004, 9B005, 9B007, 9B104, 9B105, 9B106, 9B115, 9B116, 9B117, 9D001, 9D002, 9D003, or 9D004 for MT reasons | MT Column 1
+AT applies to entire entry | AT Column 1
+Reporting Requirements
+See § 743.1 of the EAR for reporting requirements for exports under License Exceptions, and Validated End-User authorizations.
+List Based License Exceptions (See Part 740 for a Description of All License Exceptions)
+TSR: N/A
+Special Conditions for STA
+STA: License Exception STA may not be used to ship or transmit any technology in this entry to any of the destinations listed in Country Group A:6 (See Supplement No. 1 to part 740 of the EAR)
+List of Items Controlled
+Related Controls: (1) See also 9E101 and 1E002.f (for controls on “technology” for the repair of controlled structures, laminates or materials). (2) “Technology” required for the “development” of equipment described in ECCNs 9A005 to 9A011 or “software” described in ECCNs 9D103 and 9D105 is “subject to the ITAR.”
+Related Definitions: N/A
+Items:
+The list of items controlled is contained in the ECCN heading.
+9E002 “Technology” according to the General Technology Note for the “production” of “equipment” controlled by ECCN 9A004 or 9B (except for ECCNs 9B117, 9B604, 9B610, 9B619, 9B990, and 9B991).
+License Requirements
+Reason for Control: NS, MT, AT
+Control(s) | Country chart (see supp. No. 1 to part 738)
+NS applies to entire entry | NS Column 1
+MT applies to “technology” for equipment controlled by 9B001, 9B002, 9B003, 9B004, 9B005, 9B007, 9B104, 9B105, 9B106, 9B115 or 9B116 for MT reasons | MT Column 1
+AT applies to entire entry | AT Column 1
+Reporting Requirements
+See § 743.1 of the EAR for reporting requirements for exports under License Exceptions, and Validated End-User authorizations.
+List Based License Exceptions (See Part 740 for a Description of All License Exceptions)
+TSR: N/A
+Special Conditions for STA
+STA: License Exception STA may not be used to ship or transmit any technology in this entry to any of the destinations listed in Country Group A:6 (See Supplement No.1 to part 740 of the EAR).
+List of Items Controlled
+Related Controls: (1) See also 9E102. (2) See also 1E002.f for 'technology” for the repair of controlled structures, laminates, or materials. (3) “Technology” that is required for the “production” of equipment described in ECCNs 9A005 to 9A011 is “subject to the ITAR.”
+Related Definitions: N/A
+Items:
+The list of items controlled is contained in the ECCN heading.
+9E003 Other “technology” as follows (see List of Items Controlled).
+License Requirements
+Reason for Control: NS, SI, AT
+Control(s) | Country chart (see supp. No. 1 to part 738)
+NS applies to entire entry | NS Column 1
+SI applies to 9E003.a.1 through a.8, .h, .i, and .l | See § 742.14 of the EAR for additional information.
+AT applies to entire entry | AT Column 1
+Reporting Requirements
+See § 743.1 of the EAR for reporting requirements for exports under License Exceptions, and Validated End-User authorizations.
+List Based License Exceptions (See Part 740 for a Description of All License Exceptions)
+TSR: N/A
+Special Conditions for STA
+STA: License Exception STA may not be used to ship or transmit any technology in 9E003.a.1 to a.5, 9E003.c., 9E003.h, or 9E003.i (other than technology for fan or power turbines) to any of the destinations listed in Country Group A:5 or A:6 (See Supplement No.1 to part 740 of the EAR).
+License Exception STA may not be used to ship or transmit any technology in 9E003.k to any of the destinations listed in Country Group A:6 (See Supplement No.1 to part 740 of the EAR).
+List of Items Controlled
+Related Controls: (1) Hot section “technology” specifically designed, modified, or equipped for military uses or purposes, or developed principally with U.S. Department of Defense funding, is “subject to the ITAR” (see 22 CFR parts 120 through 130). (2) “Technology” is subject to the EAR when actually applied to a commercial “aircraft” engine program. Exporters may seek to establish commercial application either on a case-by-case basis through submission of documentation demonstrating application to a commercial program in requesting an export license from the Department of Commerce in respect to a specific export, or in the case of use for broad categories of “aircraft,” engines, “parts” or “components,” a commodity jurisdiction determination from the Department of State.
+Related Definitions: N/A
+Items:
+a. “Technology” “required” for the “development” or “production” of any of the following gas turbine engine “parts,” “components” or systems:
+a.1. Gas turbine blades, vanes or “tip shrouds”, made from Directionally Solidified (DS) or Single Crystal (SC) alloys and having (in the 001 Miller Index Direction) a stress-rupture life exceeding 400 hours at 1,273 K (1,000 °C) at a stress of 200 MPa, based on the average property values;
+Technical Note: For the purposes of 9E003.a.1, stress-rupture life testing is typically conducted on a test specimen.
+a.2. Combustors having any of the following:
+a.2.a. 'Thermally decoupled liners' designed to operate at 'combustor exit temperature' exceeding 1,883 K (1,610 °C);
+a.2.b. Non-metallic liners;
+a.2.c. Non-metallic shells; or
+a.2.d. Liners designed to operate at 'combustor exit temperature' exceeding 1,883 K (1,610 °C) and having holes that meet the parameters specified by 9E003.c;
+a.2.e. Utilizing 'pressure gain combustion';
+Technical Note: For the purposes of 9E003.a.2.e, in 'pressure gain combustion' the bulk average stagnation pressure at the combustor outlet is greater than the bulk average stagnation pressure at the combustor inlet due primarily to the combustion process, when the engine is running in a “steady state mode” of operation.
+Note: The “required” “technology” for holes in 9E003.a.2 is limited to the derivation of the geometry and location of the holes.
+Technical Notes: 1. For the purposes of 9E003.a.2.a, 'thermally decoupled liners' are liners that feature at least a support structure designed to carry mechanical loads and a combustion facing structure designed to protect the support structure from the heat of combustion. The combustion facing structure and support structure have independent thermal displacement (mechanical displacement due to thermal load) with respect to one another, i.e., they are thermally decoupled. 2. For the purposes of 9E003.a.2.d, 'combustor exit temperature' is the bulk average gas path total (stagnation) temperature between the combustor exit plane and the leading edge of the turbine inlet guide vane (i.e., measured at engine station T40 as defined in SAE ARP 755A) when the engine is running in a “steady state mode” of operation at the certificated maximum continuous operating temperature.
+N.B.: See 9E003.c for “technology” “required” for manufacturing cooling holes.
+a.3. “Parts” or “components,” that are any of the following:
+a.3.a. Manufactured from organic “composite” materials designed to operate above 588 K (315 °C);
+a.3.b. Manufactured from any of the following:
+a.3.b.1. Metal “matrix” “composites” reinforced by any of the following:
+a.3.b.1.a. Materials controlled by 1C007;
+a.3.b.1.b. “Fibrous or filamentary materials” specified by 1C010; or
+a.3.b.1.c. Aluminides specified by 1C002.a; or
+a.3.b.2. Ceramic “matrix” “composites” specified by 1C007; or
+a.3.c. Stators, vanes, blades, tip seals (shrouds), rotating blings, rotating blisks or 'splitter ducts', that are all of the following:
+a.3.c.1. Not specified in 9E003.a.3.a;
+a.3.c.2. Designed for compressors or fans; and
+a.3.c.3. Manufactured from material controlled by 1C010.e with resins controlled by 1C008;
+Technical Note: For the purposes of 9E003.a.3.c, a 'splitter duct' performs the initial separation of the air-mass flow between the bypass and core sections of the engine.
+a.4. Uncooled turbine blades, vanes or “tip shrouds” designed to operate at a 'gas path temperature' of 1,373 K (1,100 °C) or more;
+a.5. Cooled turbine blades, vanes or “tip shrouds”, other than those described in 9E003.a.1, designed to operate at a 'gas path temperature' of 1,693 K (1,420 °C) or more;
+Technical Note: For the purposes of 9E003.a.5, 'gas path temperature' is the bulk average gas path total (stagnation) temperature at the leading-edge plane of the turbine component when the engine is running in a “steady state mode” of operation at the certificated or specified maximum continuous operating temperature.
+a.6. Airfoil-to-disk blade combinations using solid state joining;
+a.7. [Reserved]
+a.8. 'Damage tolerant' gas turbine engine rotor “parts” or “components” using powder metallurgy materials controlled by 1C002.b; or
+Technical Note: For the purposes of 9E003.a.8, 'damage tolerant' “parts” and “components” are designed using methodology and substantiation to predict and limit crack growth.
+a.9. [Reserved]
+N.B.: For “FADEC systems”, see 9E003.h.
+a.10. [Reserved]
+N.B.: For adjustable flow path geometry, see 9E003.i.
+a.11. 'Fan blades' having all of the following:
+a.11.a. 20% or more of the total volume being one or more closed cavities containing vacuum or gas only; and
+a.11.b. One or more closed cavities having a volume of 5 cm 3 or larger;
+Technical Note: For the purposes of 9E003.a.11, a 'fan blade' is the aerofoil portion of the rotating stage or stages, which provide both compressor and bypass flow in a gas turbine engine.
+b. “Technology” “required” for the “development” or “production” of any of the following:
+b.1. Wind tunnel aero-models equipped with non-intrusive sensors capable of transmitting data from the sensors to the data acquisition system; or
+b.2. “Composite” propeller blades or prop-fans, capable of absorbing more than 2,000 kW at flight speeds exceeding Mach 0.55;
+c. “Technology” “required” for manufacturing cooling holes in gas turbine engine “parts” or “components” incorporating any of the “technologies” specified by 9E003.a.1, 9E003.a.2, or 9E003.a.5, and having any of the following:
+c.1. Having all of the following:
+c.1.a. Minimum 'cross-sectional area' less than 0.45 mm 2;
+c.1.b. 'Hole shape ratio' greater than 4.52; and
+c.1.c. 'Incidence angle' equal to or less than 25°; or
+c.2. Having all of the following:
+c.2.a. Minimum 'cross-sectional area' less than 0.12 mm 2;
+c.2.b. 'Hole shape ratio' greater than 5.65; and
+c.2.c. 'Incidence angle' more than 25°;
+Note: 9E003.c does not apply to “technology” for manufacturing constant radius cylindrical holes that are straight through and enter and exit on the external surfaces of the component.
+Technical Notes: 1. For the purposes of 9E003.c, the 'cross-sectional area' is the area of the hole in the plane perpendicular to the hole axis. 2. For the purposes of 9E003.c, 'hole shape ratio' is the nominal length of the axis of the hole divided by the square root of its minimum 'cross-sectional area'. 3. For the purposes of 9E003.c, 'incidence angle' is the acute angle measured between the plane tangential to the airfoil surface and the hole axis at the point where the hole axis enters the airfoil surface. 4. For the purposes of 9E003.c, methods for manufacturing holes include “laser” beam machining, water jet machining, Electro-Chemical Machining (ECM) or Electrical Discharge Machining (EDM).
+d. “Technology” “required” for the “development” or “production” of helicopter power transfer systems or tilt rotor or tilt wing “aircraft” power transfer systems;
+e. “Technology” for the “development” or “production” of reciprocating diesel engine ground vehicle propulsion systems having all of the following:
+e.1. 'Box volume' of 1.2 m 3 or less;
+e.2. An overall power output of more than 750 kW based on 80/1269/EEC, ISO 2534 or national equivalents; and
+e.3. Power density of more than 700 kW/m 3 of 'box volume';
+Technical Note: For the purposes of 9E003.e.1., 'box volume' is the product of three perpendicular dimensions measured in the following way: Length: The length of the crankshaft from front flange to flywheel face; Width: The widest of any of the following: a. The outside dimension from valve cover to valve cover; b. The dimensions of the outside edges of the cylinder heads; or c. The diameter of the flywheel housing; Height: The largest of any of the following: a. The dimension of the crankshaft center-line to the top plane of the valve cover (or cylinder head) plus twice the stroke; or b. The diameter of the flywheel housing.
+f. “Technology” “required” for the “production” of “specially designed” “parts” or “components” for high output diesel engines, as follows:
+f.1. “Technology” “required” for the “production” of engine systems having all of the following “parts” and “components” employing ceramics materials controlled by 1C007:
+f.1.a Cylinder liners;
+f.1.b. Pistons;
+f.1.c. Cylinder heads; and
+f.1.d. One or more other “part” or “component” (including exhaust ports, turbochargers, valve guides, valve assemblies or insulated fuel injectors);
+f.2. “Technology” “required” for the “production” of turbocharger systems with single-stage compressors and having all of the following:
+f.2.a. Operating at pressure ratios of 4:1 or higher;
+f.2.b. Mass flow in the range from 30 to 130 kg per minute; and
+f.2.c. Variable flow area capability within the compressor or turbine sections;
+f.3. “Technology” “required” for the “production” of fuel injection systems with a “specially designed” multifuel (e.g., diesel or jet fuel) capability covering a viscosity range from diesel fuel (2.5 cSt at 310.8 K (37.8 °C)) down to gasoline fuel (0.5 cSt at 310.8 K (37.8 °C)) and having all of the following:
+f.3.a. Injection amount in excess of 230 mm 3 per injection per cylinder; and
+f.3.b. Electronic control features “specially designed” for switching governor characteristics automatically depending on fuel property to provide the same torque characteristics by using the appropriate sensors;
+g. “Technology” “required” for the “development” or “production” of 'high output diesel engines' for solid, gas phase or liquid film (or combinations thereof) cylinder wall lubrication and permitting operation to temperatures exceeding 723 K (450 °C), measured on the cylinder wall at the top limit of travel of the top ring of the piston;
+Technical Note: For the purposes of 9E003.g, 'high output diesel engines' are diesel engines with a specified brake mean effective pressure of 1.8 MPa or more at a speed of 2,300 r.p.m., provided the rated speed is 2,300 r.p.m. or more.
+h. “Technology” for gas turbine engine “FADEC systems” as follows:
+h.1. “Development” “technology” for deriving the functional requirements for the “parts” or “components” necessary for the “FADEC system” to regulate engine thrust or shaft power (e.g., feedback sensor time constants and accuracies, fuel valve slew rate);
+h.2. “Development” or “production” “technology” for control and diagnostic “parts” or “components” unique to the “FADEC system” and used to regulate engine thrust or shaft power;
+h.3. “Development” “technology” for the control law algorithms, including “source code”, unique to the “FADEC system” and used to regulate engine thrust or shaft power;
+Note: 9E003.h does not apply to technology related to engine-“aircraft” integration required by civil aviation authorities of one or more Wassenaar Arrangement Participating States (See Supplement No. 1 to part 743 of the EAR) to be published for general airline use (e.g., installation manuals, operating instructions, instructions for continued airworthiness) or interface functions (e.g., input/output processing, airframe thrust or shaft power demand).
+i. “Technology” for adjustable flow path systems designed to maintain engine stability for gas generator turbines, fan or power turbines, or propelling nozzles, as follows:
+i.1. “Development” “technology” for deriving the functional requirements for the “parts” or “components” that maintain engine stability;
+i.2. “Development” or “production” “technology” for “parts” or “components” unique to the adjustable flow path system and that maintain engine stability;
+i.3. “Development” “technology” for the control law algorithms, including “source code”, unique to the adjustable flow path system and that maintain engine stability;
+Note: 9E003.i does not apply to “technology” for any of the following: a. Inlet guide vanes; b. Variable pitch fans or prop-fans; c. Variable compressor vanes; d. Compressor bleed valves; or e. Adjustable flow path geometry for reverse thrust.
+j. “Technology” “required” for the “development” of wing-folding systems designed for fixed-wing “aircraft” powered by gas turbine engines.
+N.B.: For “technology” “required” for the “development” of wing-folding systems designed for fixed-wing “aircraft” specified in USML Category VIII (a), see USML Category VIII (i).
+k. “Technology”, not specified in 9E003.a, 9E003.h, or 9E003.i, “required” for the “development” of any of the following components or systems, “specially designed” for aero gas turbine engines to enable “aircraft” to cruise at Mach 1 or greater for more than 30 minutes:
+k.1. Propulsion inlet systems;
+k.2. Propulsion exhaust systems;
+k.3. 'Reheat systems';
+k.4. 'Active thermal management systems' to condition fluids used to lubricate or cool 'engine rotor supports';
+k.5. Oil-free 'engine rotor supports'; or
+k.6. Systems to remove heat from 'compression system' core gas path flow.
+Technical Notes: For the purposes of 9E003.k: 1. Propulsion inlet systems include core flow pre-coolers. 2. 'Reheat systems' provide additional thrust by combusting fuel in exhaust and/or bypass flow downstream of the last turbomachinery stage. 'Reheat systems' are also referred to as afterburners. 3. 'Active thermal management systems' employ methods other than passive oil-to-air cooling or oil-to-fuel cooling, such as vapor cycle systems. 4. 'Compression system' is any stage or combination of stages between the engine inlet face and the combustor that increases gas path pressure through mechanical work. 5. An 'engine rotor support' is the bearing supporting the main engine shaft that drives the compression system or turbine rotors.
+N.B. 1 See 9E003.h, for engine control technology.
+N.B. 2 See 9E003.i, for adjustable flow path systems technology.
+l. “Technology” not otherwise controlled in 9E003.a.1 through a.8, a.10, and .h and used in the “development”, “production”, or overhaul of hot section “parts” or “components” of civil derivatives of military engines controlled on the U.S. Munitions List.
+9E018 “Technology” for the “development,” “production,” or “use” of equipment controlled by 9A018.
+(a) See ECCN 9E610 for “technology” related to aircraft, refuelers, ground equipment, parachutes, harnesses, instrument flight trainers and “parts”, “accessories” and “attachments” for the forgoing that, immediately prior to October 15, 2013, were classified under 9A018.a.1, .a.3, .c, .d, .e, or .f.
+(b) See ECCN 9E619 for “technology” related to military trainer aircraft turbo prop engines and “parts” and “components” therefor that, immediately prior to October 15, 2013, were classified under ECCN 9A018.a.2 or .a.3.
+(c) Technology related to certain armored ground transport vehicles that prior to January 6, 2014 were classified under ECCN 9A018.b is EAR99 (See 0E606).
+9E101 “Technology” according to the General Technology Note for the “development” or “production” of commodities or “software” controlled by ECCN 9A012 (applies only to “production” “technology” for MT-controlled items in 9A012), 9A101 (except for items in 9A101.b that are “subject to the ITAR,” see 22 CFR part 121), 9A106.d or .e, 9A110 (for items that are “specially designed” for non-military unmanned aerial vehicles controlled by 9A012), 9C110, 9D101, or 9D104.
+License Requirements
+Reason for Control: MT, AT
+Control(s) | Country Chart (See Supp. No. 1 to part 738)
+MT applies to entire entry | MT Column 1
+AT applies to entire entry | AT Column 1
+List Based License Exceptions (See Part 740 for a description of all license exceptions)
+TSR: N/A
+List of Items Controlled
+Related Controls: “Technology” that is required for items specified in ECCNs 9A101.b (except for items that are subject to the EAR), 9A104, 9A105, 9A106.a, .b, and .c, 9A107 to 9A109, 9A110 (for items that are “specially designed” for use in missile systems and subsystems), 9A111, 9A115 to 9A119, 9D103, and 9D105 is “subject to the ITAR” (see 22 CFR parts 120 through 130).
+Related Definitions: N/A
+Items: The list of items controlled is contained in the ECCN heading.
+9E102 “Technology” according to the General Technology Note for the “use” of commodities or “software” controlled by ECCN 9A004 (except for items in 9A004 that are “subject to the ITAR,” see 22 CFR part 121), 9A012, 9A101 (except for items in 9A101.b that are “subject to the ITAR,” see 22 CFR part 121), 9A106.d or .e, 9A110 (for items that are “specially designed” for non-military unmanned aerial vehicles controlled by 9A012), 9B105, 9B106, 9B115, 9B116, 9D101, or 9D104.
+License Requirements
+Reason for Control: MT, AT
+Control(s) | Country Chart (See Supp. No. 1 to part 738)
+MT applies to entire entry | MT Column 1
+AT applies to entire entry | AT Column 1
+List Based License Exceptions (See Part 740 for a description of all license exceptions)
+TSR: N/A
+List of Items Controlled
+Related Controls: (1) For the purpose of this entry, “use” “technology” is limited to items controlled for MT and their subsystems. (2) “Technology” for items specified in ECCNs 9A004 (except for items that are subject to the EAR), 9A005 to 9A011, 9A101.b (except for items that are subject to the EAR), 9A104, 9A105, 9A106.a, .b and .c, 9A107 to 9A109, 9A110 (for items that are “specially designed” for use in missile systems and subsystems), 9A111, 9A115 to 9A119, 9D103, and 9D105 is “subject to the ITAR” (see 22 CFR part 121).
+Related Definitions: N/A
+Items: The list of items controlled is contained in the ECCN heading.
+9E515 “Technology” “required” for the “development,” “production,” operation, installation, repair, overhaul, or refurbishing of “spacecraft” and related commodities, as follows (see List of Items Controlled).
+License Requirements
+Reason for Control: NS, MT, RS, AT
+Control(s) | Country chart (see Supp. No. 1 to part 738)
+NS applies to entire entry except 9E515.x and .y | NS Column 1.
+RS applies to entire entry except 9E515.x and .y | RS Column 1.
+MT applies to technology for items in 9A515.d, .e.2, .h, and 9B515.a controlled for MT reasons | MT Column 1.
+NS applies to 9E515.x | NS Column 2.
+RS applies to 9E515.x | RS Column 2.
+RS applies to 9E515.y, except to Russia for use in, with, or for the International Space Station (ISS), including launch to the ISS | China, Russia, or Venezuela (see § 742.6(a)(7)).
+AT applies to entire entry | AT Column 1.
+License Requirement Note: The Commerce Country Chart is not used for determining license requirements for “technology” classified ECCN 9E515.f. See § 742.6(a)(9), which specifies that such “technology” is subject to a worldwide license requirement, except to Australia, Canada, and the United Kingdom.
+List Based License Exceptions (See Part 740 for a Description of All License Exceptions)
+TSR: N/A
+Special Conditions for STA
+STA: (1) Paragraph (c)(1) of License Exception STA (§ 740.20(c)(1) of the EAR) may not be used for ECCN 9E515.b, .d, .e, or .f unless determined by BIS to be eligible for License Exception STA in accordance with § 740.20(g) (License Exception STA eligibility requests for certain 9x515 and “600 series” items). (2) Paragraph (c)(2) of License Exception STA (§ 740.20(c)(2) of the EAR) may not be used for any “technology” in 9E515.
+List of Items Controlled
+Related Controls: Technical data directly related to articles described in USML Category XV are subject to the ITAR. See also ECCNs 3E001, 3E003, 6E001, and 6E002 for specific “space-qualified” items. See ECCNs 9E001 and 9E002 for technology for the International Space Station, the James Webb Space Telescope (JWST) and “parts,” “components,” “accessories,” and “attachments” “specially designed” therefor. See USML Category XV for controls on technical data and defense services related to launch vehicle integration.
+Related Definitions: N/A
+Items:
+a. “Technology” “required” for the “development,” “production,” installation, repair (including on-orbit anomaly resolution and analysis beyond established procedures), overhaul, or refurbishing of commodities controlled by ECCN 9A515 (except 9A515.a.1, a.2, a.3, a.4, .b, .d, .e, or .g), ECCN 9B515, or “software” controlled by ECCN 9D515.a.
+b. “Technology” “required” for the “development,” “production,” failure analysis or anomaly resolution of software controlled by ECCN 9D515.b.
+c. [Reserved]
+d. “Technology” “required” for the “development,” “production,” operation, failure analysis or anomaly resolution of commodities controlled by ECCN 9A515.d.
+e. “Technology” “required” for the “development,” “production,” failure analysis or anomaly resolution of commodities controlled by ECCN 9A515.e.
+f. “Technology” “required” for the “development,” “production,” installation, repair (including on-orbit anomaly resolution and analysis beyond established procedures), overhaul, or refurbishing of commodities controlled by ECCN 9A515.a.1, a.2, a.3, a.4, or .g.
+g. through w. [Reserved]
+x. “Technology” “required” for the “development,” “production,” operation, failure analysis or anomaly resolution of commodities controlled by ECCN 9A515.x.
+y. Specific “technology” “required” for the “production,” “development,” operation, installation, maintenance, repair, overhaul, or refurbishing of commodities or software enumerated in ECCN 9A515.y or 9D515.y.
+Note 1: [Reserved]
+Note 2: Activities and technology/technical data directly related to or required for the spaceflight (e.g., sub-orbital, orbital, lunar, interplanetary, or otherwise beyond Earth orbit) passenger or participant experience, regardless of whether the passenger or participant experience is for space tourism, scientific or commercial research, commercial manufacturing/production activities, educational, media, or commercial transportation purposes, are not subject to the ITAR or the EAR. Such activities and technology/technical data include those directly related to or required for: (i) “Spacecraft” access, ingress, and egress, including the operation of all “spacecraft” doors, hatches, and airlocks; (ii) Physiological training (e.g., human-rated centrifuge training or parabolic flights, pressure suit or spacesuit training/operation); (iii) Medical evaluation or assessment of the spaceflight passenger or participant; (iv) Training for and operation by the passenger or participant of health and safety related hardware (e.g., seating, environmental control and life support, hygiene facilities, food preparation, exercise equipment, fire suppression, communications equipment, safety-related clothing or headgear) or emergency procedures; (v) Viewing of the interior and exterior of the spacecraft or terrestrial mock-ups; (vi) Observing “spacecraft” operations (e.g., pre-flight checks, landing, in-flight status); (vii) Training in “spacecraft” or terrestrial mock-ups for connecting to or operating passenger or participant equipment used for purposes other than operating the “spacecraft”; or (viii) Donning, wearing or utilizing the passenger's or participant's flight suit, pressure suit or spacesuit, and personal equipment.
+9E604 “Technology” “required” for the “development,” “production,” operation, installation, maintenance, repair, overhaul, or refurbishing of commodities controlled by ECCN 9A604 or 9B604, or “software” controlled by ECCN 9D604 (see List of Items Controlled).
+License Requirements
+Reason for Control: NS, RS, MT, AT, UN
+Control(s) | Country chart(See Supp. No. 1to part 738)
+NS applies to entire entry | NS Column 1
+RS applies to entire entry | RS Column 1
+MT applies to “technology,” as described in paragraph .a of this entry, for commodities and “software” controlled for MT reasons in ECCN 9A604, 9B604 or 9D604 | MT Column 1
+AT applies to entire entry | AT Column 1
+UN applies to entire entry | See § 746.1(b) for UN controls
+List Based License Exceptions (See Part 740 for a Description of All License Exceptions)
+TSR: N/A
+Special Conditions for STA
+STA: Paragraph (c)(2) of License Exception STA (§ 740.20(c)(2) of the EAR) may not be used for any item in this ECCN 9E604.
+List of Items Controlled
+Related Controls: (1) Technical data directly related to articles enumerated or otherwise described in USML Category IV is controlled under USML Category IV(i). (2) See also ECCNs 9E002, 9E101, and 9E102 for controls on “technology” for the “development,” “production,” and “use” of missiles and related items controlled on the CCL.
+Related Definitions: N/A
+Items: a. “Technology” “required” for the “development,” “production,” operation, installation, maintenance, repair, overhaul, or refurbishing of commodities controlled by ECCN 9A604 or 9B604, or “software” controlled by ECCN 9D604.
+b. [Reserved]
+9E610 Technology “required” for the “development,” “production,” operation, installation, maintenance, repair, overhaul, or refurbishing of military aircraft and related commodities controlled by 9A610, equipment controlled by 9B610, materials controlled by 9C610, or software controlled by 9D610 (see List of Items Controlled).
+License Requirements
+Reason for Control: NS, RS, MT, AT, UN
+Control(s) | Country chart(see Supp. No. 1 to part 738)
+NS applies to entire entry except 9E610.y | NS Column 1.
+RS applies to entire entry except 9E610.y | RS Column 1.
+RS applies to 9E610.y | China, Russia, or Venezuela (see § 742.6(a)(7)).
+MT applies to “technology” “required” for the “development,” “production,” operation, installation, maintenance, repair, overhaul, or refurbishing of commodities or software controlled for MT reasons in 9A610, 9B610, or 9D610 for MT reasons | MT Column 1.
+AT applies to entire entry | AT Column 1.
+UN applies to entire entry except 9E610.y | See § 746.1(b) for UN controls.
+List Based License Exceptions (See Part 740 for a Description of All License Exceptions)
+TSR: N/A
+Special Conditions for STA
+STA: (1) Paragraph (c)(1) of License Exception STA (§ 740.20(c)(1) of the EAR) may not be used for 9E610.b. (2) Paragraph (c)(2) of License Exception STA (§ 740.20(c)(2) of the EAR) may not be used for any technology in 9E610.
+List of Items Controlled
+Related Controls: Technical data directly related to articles enumerated or otherwise described in USML Category VIII are subject to the control of USML paragraph VIII(i).
+Related Definitions: N/A
+Items:
+a. “Technology” (other than technology controlled by paragraphs .b or .y of this entry) “required” for the “development,” “production,” operation, installation, maintenance, repair, overhaul, or refurbishing of commodities or software controlled by ECCN 9A610, 9B610, 9C610, or 9D610.
+Note: “Build-to-print technology” “required” for the “production” of items described in paragraphs b.1 through b.15 of this entry is classified under 9E610.a.
+b. “Technology” (other than “build-to-print technology”) “required” for the “development” or “production” of any of the following:
+b.1. Static structural members;
+b.2. Exterior skins, removable fairings, non-removable fairings, radomes, access doors and panels, and in-flight opening doors;
+b.3. Control surfaces, leading edges, trailing edges, and leading edge flap seals;
+b.4. Leading edge flap actuation system commodities (i.e., power drive units, rotary geared actuators, torque tubes, asymmetry brakes, position sensors, and angle gearboxes) “specially designed” for fighter, attack, or bomber aircraft controlled in USML Category VIII;
+b.5. Engine inlets and ducting;
+b.6. Fatigue life monitoring systems “specially designed” to relate actual usage to the analytical or design spectrum and to compute amount of fatigue life “specially designed” for aircraft controlled by either USML subcategory VIII(a) or ECCN 9A610.a, except for Military Commercial Derivative Aircraft;
+b.7. Landing gear, and “parts” and “components” “specially designed” therefor, “specially designed” for use in aircraft weighing more than 21,000 pounds controlled by either USML subcategory VIII(a) or ECCN 9A610.a, except for Military Commercial Derivative Aircraft;
+b.8. Conformal fuel tanks and “parts” and “components” “specially designed” therefor;
+b.9. Electrical “equipment,” “parts,” and “components” “specially designed” for electro-magnetic interference (EMI)—i.e., conducted emissions, radiated emissions, conducted susceptibility and radiated susceptibility—protection of aircraft that conform to the requirements of MIL-STD-461;
+b.10. HOTAS (Hand-on Throttle and Stick) controls, HOCAS (Hands on Collective and Stick), Active Inceptor Systems (i.e., a combination of Active Side Stick Control Assembly, Active Throttle Quadrant Assembly, and Inceptor Control Unit), rudder pedal assemblies for digital flight control systems, and parts and components “specially designed” therefor;
+b.11. Integrated Vehicle Health Management Systems (IVHMS), Condition Based Maintenance (CBM) Systems, and Flight Data Monitoring (FDM) systems;
+b.12. Equipment “specially designed” for system prognostic and health management of aircraft;
+b.13. Active Vibration Control Systems;
+b.14. Self-sealing fuel bladders “specially designed” to pass a .50 caliber or larger gunfire test (MIL-DTL-5578, MIL-DTL-27422); or
+b.15. Technology “required” for the “development” or “production” of “parts” or “components” controlled in 9A610.x and “specially designed” for damage or failure-adaptive flight control systems controlled in Category VIII(h)(7) of the USML.
+c. through x. [Reserved]
+y. Specific “technology” “required” for the “production,” “development,” operation, installation, maintenance, repair, overhaul, or refurbishing of commodities or software enumerated in ECCN 9A610.y or 9D610.y.
+9E619 “Technology” “required” for the “development,” “production,” operation, installation, maintenance, repair, overhaul, or refurbishing of military gas turbine engines and related commodities controlled by 9A619, equipment controlled by 9B619, materials controlled by 9C619, or software controlled by 9D619 (see List of Items Controlled).
+License Requirements
+Reason for Control: NS, RS, AT, UN
+Control(s) | Country chart(see Supp. No. 1 to part 738)
+NS applies to entire entry except 9E619.y | NS Column 1.
+RS applies to entire entry except 9E619.y | RS Column 1.
+RS applies to 9E619.y | China, Russia, or Venezuela (see § 742.6(a)(7)).
+AT applies to entire entry | AT Column 1.
+UN applies to entire entry except 9E619.y | See § 746.1(b)for UN controls.
+List Based License Exceptions (See Part 740 for a Description of All License Exceptions)
+TSR: N/A
+Special Conditions for STA
+STA: (1) Paragraph (c)(1) of License Exception STA (§ 740.20(c)(1) of the EAR) may not be used for 9E619.b. or .c. (2) Paragraph (c)(2) of License Exception STA (§ 740.20(c)(2) of the EAR) may not be used for any technology in ECCN 9E619.
+List of Items Controlled
+Related Controls: Technical data directly related to articles enumerated or otherwise described in USML Category XIX are subject to the control of USML Category XIX(g).
+Related Definitions: N/A
+Items:
+a. “Technology” (other than “technology” controlled by paragraphs .b and .c of this entry) “required” for the “development,” “production,” operation, installation, maintenance, repair, overhaul, or refurbishment of items controlled by ECCN 9A619 (except 9A619.y), ECCN 9B619 (except 9B619.y), ECCN 9C619, or ECCN 9D619 (except 9D619.y).
+Note: “Build-to-print technology” “required” for the “production” of items described in paragraphs b.1 through b.10 of this entry is classified under 9E619.a.
+b. “Technology” (other than “build-to-print technology”) “required” for the “development” or “production” of any of the following:
+b.1. Front, turbine center, and exhaust frames;
+b.2. Low pressure compressor (i.e., fan) “components” and “parts” as follows: Nose cones and casings;
+b.3. High pressure compressor “components” and “parts” as follows: Casings;
+b.4. Combustor “components” and “parts” as follows: Casings, fuel nozzles, swirlers, swirler cups, deswirlers, valve injectors, and igniters;
+b.5. High pressure turbine “components” and “parts” as follows: Casings
+b.6. Low pressure turbine “components” and “parts” as follows: Casings;
+b.7. Augmentor “components” and “parts” as follows: Casings, flame holders, spray bars, pilot burners, augmentor fuel controls, flaps (external, convergent, and divergent), guide and syncronization rings, and flame detectors and sensors;
+b.8. Mechanical “components” and “parts” as follows: Fuel metering units and fuel pump metering units, valves (fuel throttle, main metering, oil flow management), heat exchangers (air/air, fuel/air, fuel/oil), debris monitoring (inlet and exhaust), seals (carbon, labyrinth, brush, balance piston, and “knife-edge”), permanent magnetic alternator and generator, eddy current sensors;
+b.9. Torquemeter assembly (i.e., housing, shaft, reference shaft, and sleeve); or
+b.10. Materials controlled by ECCN 9C619.b.
+c. “Technology” “required” for the “development” or “production” of any of the following:
+c.1. Low pressure compressor (i.e., fan) “components” and “parts” as follows: blades, vanes, spools, shrouds, blisks, shafts and disks;
+c.2. High pressure compressor “components” and “parts” as follows: blades, vanes, spools, shrouds, blisks, shafts, disks, and impellers;
+c.3. Combustor “components” and “parts” as follows: diffusers, liners, chambers, cowlings, domes and shells;
+c.4. High pressure turbine “components” and “parts” as follows: shafts and disks, blades, vanes, nozzles, tip shrouds;
+c.5. Low pressure turbine “components” and “parts” as follows: shafts and disks, blades, vanes, nozzles, tip shrouds;
+c.6. Digital engine control systems (e.g., Full Authority Digital Engine Controls (FADEC) and Digital Electronic Engine Controls (DEEC)) “specially designed” for gas turbine engines controlled in this ECCN; or
+c.7. Engine monitoring systems (i.e., prognostics, diagnostics, and health) “specially designed” for gas turbine engines and components controlled in this ECCN.
+d. through x. [Reserved]
+y. Specific “technology” “required” for the “development,” “production,” operation, installation, maintenance, repair, overhaul, or refurbishment of commodities controlled by 9A619.y or 9B619.y, or “software” controlled by ECCN 9D619.y.
+9E620 Technology “required” for cryogenic and “superconductive” equipment, as follows (see List of Items Controlled).
+License Requirements
+Reason for Control: NS, RS, AT, UN
+Control(s) | Country chart(see Supp. No. 1 to part 738)
+NS applies to entire entry | NS Column 1
+RS applies to entire entry | RS Column 1
+AT applies to entire entry | AT Column 1
+UN applies to entire entry | See § 746.1(b) for UN controls
+List Based License Exceptions (see Part 740 for a description of all license exceptions)
+TSR: N/A
+Special Conditions for STA
+STA: Paragraph (c)(2) of License Exception STA (§ 740.20(c)(2) of the EAR) may not be used for any technology in 9E620.
+List of Items Controlled
+Related Controls: Technical data directly related to articles enumerated on USML are subject to the control of that USML category.
+Related Definitions: N/A
+Items: “Technology” “required” for the “development,” “production,” operation, installation, maintenance, repair, overhaul, or refurbishing of commodities or software controlled by ECCN 9A620, 9B620 or 9D620.
+9E990 “Technology”, n.e.s., for the “development” or “production” or “use” of equipment controlled by 9A990 or 9B990.
+License Requirements
+Reason for Control: AT
+Control(s) | Country Chart (See Supp. No. 1 to part 738)
+AT applies to “technology” for equipment under 9A990 and 9B990 except 9A990.a | AT Column 1
+AT applies to “technology” for equipment under 9A990.a only | AT Column 2
+List Based License Exceptions (See Part 740 for a description of all license exceptions)
+TSR: N/A
+List of Items Controlled
+Related Controls: N/A
+Related Definitions: N/A
+Items: The list of items controlled is contained in the ECCN heading.
+9E991 “Technology”, for the “development”, “production” or “use” of equipment controlled by 9A991 or 9B991.
+License Requirements
+Reason for Control: AT
+Control(s) | Country Chart (See Supp. No. 1 to part 738)
+AT applies to entire entry | AT Column 1
+List Based License Exceptions (See Part 740 for a description of all license exceptions)
+TSR: N/A
+List of Items Controlled
+Related Controls: N/A
+Related Definitions: N/A
+Items: The list of items controlled is contained in the ECCN heading.
+9E993 Other “technology”, not described by 9E003, as follows (see List of Items Controlled).
+License Requirements
+Reason for Control: AT
+Control(s) | Country Chart (See Supp. No. 1 to part 738)
+AT applies to entire entry | AT Column 1.
+List Based License Exceptions (See Part 740 for a description of all license exceptions)
+TSR: N/A
+List of Items Controlled
+Related Controls: N/A
+Related Definitions: N/A
+Items: a. Rotor blade tip clearance control systems employing active compensating casing “technology” limited to a design and development data base; or
+b. Gas bearing for turbine engine rotor assemblies.
+EAR99 Items subject to the EAR that are not elsewhere specified in this CCL Category or in any other category in the CCL are designated by the number EAR99.
+[63 FR 2459, Jan. 15, 1998]
+
+Editorial Notes:
+
+1. For Federal Register citations affecting supplement no. 1 to part 774, see the List of CFR Sections Affected, which appears in the Finding Aids section of the printed volume and at www.govinfo.gov.
+
+Editorial Notes:
+
+2. At 88 FR 71936, Oct. 18, 2023, § supplement no. 1 to part 774 was amended by revising 9A005; however, the amendment could not be incorporated due to missing text.
+
+Supplement No. 2 to Part 774—General Technology and Software Notes
+
+1. General Technology Note. The export of “technology” that is “required” for the “development”, “production”, or “use” of items on the Commerce Control List is controlled according to the provisions in each Category.
+“Technology” “required” for the “development”, “production”, or “use” of a controlled product remains controlled even when applicable to a product controlled at a lower level.
+License Exception TSU is available for “technology” that is the minimum necessary for the installation, operation, maintenance (checking), or repair of those products that are eligible for License Exceptions or that are exported under a license.
+N.B.: This does not allow release under a License Exception of the repair “technology” controlled by 1E002.e, 1E002.f, 8E002.a, or 8E002.b.
+N.B.: The “minimum necessary” excludes “development” or “production” technology and permits “use” technology only to the extent “required” to ensure safe and efficient use of the product. Individual ECCNs may further restrict export of “minimum necessary” information.
+2. General Software Note. License Exception TSU (mass market software) (see § 740.13 of the EAR) is available to all destinations, except countries in Country Group E:1 of Supplement No. 1 to part 740 of the EAR, for release of “software” which is any of the following:
+1. Generally available to the public by being:
+a. Sold from stock at retail selling points, without restriction, by means of:
+1. Over the counter transactions;
+2. Mail order transactions;
+3. Electronic transactions; or
+4. Telephone call transactions; and
+b. Designed for installation by the user without further substantial support by the supplier.
+2. [Reserved] See § 734.3(b)(3) for “publicly available technology and software.”
+3. The minimum necessary “object code” for the installation, operation, maintenance (checking) or repair of those items whose export has been authorized.
+3. General “Information Security” Note. “Information security” items or functions should be considered against the provisions in Category 5-Part 2, even if they are components, “software” or functions of other items.
+Note: Minimum necessary “object code” does not enhance or improve the performance of an item or provide new features or functionality.
+Note: The General Software Note does not apply to “software” controlled by Category 5, part 2 “Information Security”). For “software” controlled by Category 5, part 2, see Supplement No. 1 to part 774, Category 5, part 2, Note 3—Cryptography Note.
+[69 FR 46087, July 30, 2004, as amended at 78 FR 37394, June 20, 2013; 79 FR 45307, Aug. 4, 2014; 81 FR 64691, Sept. 20, 2016]
+
+Supplement No. 3 to Part 774—Statements of Understanding
+
+(a) Statement of Understanding—medical equipment. Commodities that are ““specially designed” for medical end-use” that “incorporate” commodities or software on the Commerce Control List (Supplement No. 1 to part 774 of the EAR) that do not have a reason for control of Nuclear Nonproliferation (NP), Missile Technology (MT), or Chemical & Biological Weapons (CB) are designated by the number EAR99 (i.e., are not elsewhere specified on the Commerce Control List).
+Notes to paragraph (a): (1) “Specially designed for medical end-use” means designed for medical treatment or the practice of medicine (does not include medical research). (2) Commodities or software are considered “incorporated” if the commodity or software is: Essential to the functioning of the medical equipment; customarily included in the sale of the medical equipment; and exported or reexported with the medical equipment. (3) Except for such software that is made publicly available consistent with § 734.3(b)(3) of the EAR, commodities and software “specially designed for medical end-use” remain subject to the EAR. (4) See also § 770.2(b) interpretation 2, for other types of equipment that incorporate items on the Commerce Control List that are subject to the EAR. (5) For computers used with medical equipment, see also ECCN 4A003 note 2 regarding the “principal element” rule. (6) For commodities and software “specially designed” for medical end-use that incorporate an encryption or other “information security” item subject to the EAR, see also section 3 (General “Information Security” Note (GISN)) to Supplement No. 2 to this part.
+(b) Statement of Understanding—Source Code. For the purpose of national security controlled items, “source code” items are controlled either by “software” or by “software” and “technology” controls, except when such “source code” items are explicitly decontrolled.
+(c) Category 5—Part 2—Note 4 Statement of Understanding. All items previously described by Notes (b), (c) and (h) to 5A002 are now described by Note 4 to Category 5—Part 2. Note (h) to 5A002 prior to June 25, 2010 stated that the following was not controlled by 5A002:
+Equipment “specially designed” for the servicing of portable or mobile radiotelephones and similar client wireless devices that meet all the provisions of the Cryptography Note (Note 3 in Category 5, Part 2), where the servicing equipment meets all of the following:
+(1) The cryptographic functionality of the servicing equipment cannot easily be changed by the user of the equipment;
+(2) The servicing equipment is designed for installation without further substantial support by the supplier; and
+(3) The servicing equipment cannot change the cryptographic functionality of the device being serviced.
+(d) Statement of Understanding—Used Goods. The specifications in the Commerce Control List apply equally to new or used goods. In the case of used goods, an evaluation by the Bureau of Industry and Security may be carried out in order to assess whether the goods are capable of meeting the relevant specifications.
+[75 FR 36502, June 25, 2010, as amended at 76 FR 29632, May 20, 2011; 82 FR 27110, June 14, 2017]
+
+Supplement No. 4 to Part 774—Commerce Control List Order of Review
+
+(a) As described in EAR § 734.3, the EAR govern only items “subject to the EAR,” e.g., items not subject to the exclusive jurisdiction of another agency. Thus, for example, if an item is described in the U.S. Munitions List (USML) (22 CFR Part 121) of the International Traffic in Arms Regulations (ITAR) (22 CFR Parts 120-130), including one of its catch-all paragraphs, then the item is a “defense article” subject to the ITAR and there is no need to review the CCL with respect to whether it describes the item. See 22 CFR § 120.6 (“Defense article means any item or technical data designated in § 121.1 of the ITAR. The policy described in § 120.3 is applicable to designations of additional items”). If an item is not described on the USML and is otherwise “subject to the EAR,” then work through each of the following steps to determine where the item is covered by the CCL or, if it is not covered by the CCL, and is therefore designated as EAR99.
+(1) Step 1. To classify an item “subject to the EAR” against the CCL, review the general characteristics of the item. This will usually guide you to the appropriate category (0 through 9) on the CCL.
+(2) Step 2. Once the potentially applicable CCL categories are identified, determine which product group within the CCL category or categories—i.e., A, B, C, D, or E—is applicable to the item.
+(3) Step 3. The “600 series” describes military items that were once subject to the ITAR. The 9x515 ECCNs describe “spacecraft,” related items, and some radiation-hardened microelectronic circuits that were once subject to the ITAR under USML Category XV. Just as the ITAR effectively trumps the EAR, items described in a 9x515 ECCN or “600 series” ECCN trump other ECCNs on the CCL. Thus, the next step in conducting a classification analysis of an item “subject to the EAR” is to determine whether it is described in a 9x515 ECCN or “600 series” ECCN paragraph other than a “catch-all” paragraph such as a “.x” paragraph that controls unspecified “parts” and “components” “specially designed” for items in that ECCN or the corresponding USML paragraph. If so, the item is classified under that 9x515 ECCN or “600 series” ECCN paragraph even if it would also be described in another ECCN.
+(4) Step 4. If the item is not described in a 9x515 ECCN or “600 series” ECCN, then determine whether the item is classified under a 9x515 ECCN or “600 series” catch-all paragraph, i.e., one that controls non-specific “parts,” “components,” “accessories,” and “attachments” “specially designed” for items in that ECCN or the corresponding USML paragraph. Such items are generally in the “.x” paragraph of ECCN 9A515 or a “600 series” ECCN.
+(i) Step 4.a. Determine whether the item would meet the criteria of either paragraphs (a)(1) or (a)(2) of the “specially designed” definition in § 772.1 of the EAR. (These are informally known as the “catch” paragraphs.) If not applicable, then the item is not within the scope of the ECCN paragraph that contains a “specially designed” control parameter. Skip to Step 5.
+(ii) Step 4.b. If the item meets the criteria of either paragraph (a)(1) or (a)(2) of the “specially designed” definition, then determine whether any of the provisions of paragraph (b) of the “specially designed” definition would apply. (These are informally known as the “release” provisions.) If so, then the item is not within the scope of the ECCN paragraph that contains a “specially designed” control parameter.
+Note to paragraph (a)(4): The emphasis on the word “control” in Steps 4.a and 4.b is deliberate. Some ECCNs use “specially designed” as a de-control parameter. If an item would not be classified under a particular ECCN because it falls within the scope of either subparagraph (a)(1) or (a)(2) of the “specially designed” definition, then there is no need to analyze whether any element of paragraph (b) of the definition would apply to the item. One needs only review the “release” provisions in paragraph (b) of the “specially designed” definition if paragraph (a) of the “specially designed” definition applies to the item in a “control” paragraph of an ECCN that uses the term “specially designed.”
+(5) Step 5. If an item is not classified by a “600 series” or in a 9x515 ECCN, then starting from the beginning of the product group analyze each ECCN to determine whether any other ECCN in that product group describes the item. If any ECCN uses the term “specially designed,” see Steps 4.a and 4.b above in paragraphs (a)(4)(i) and (a)(4)(ii) respectively. If the item is described in one of these ECCNs, then the item is classified under that ECCN.
+(6) Step 6. If the item is not described under any ECCN of any category of the CCL, then the item is designated as EAR99. EAR99 items may require a license if destined for a prohibited or restricted end user, end use or destination. See paragraphs (g) through (n) of § 732.3 “Steps Regarding the Ten General Prohibitions,” or General Prohibitions Four through Ten of part 736 of the EAR for license requirements other than those imposed by the CCL.
+(b) [Reserved]
+[78 FR 22735, Apr. 16, 2013, as amended at 79 FR 27443, May 13, 2014; 79 FR 32632, June 5, 2014]
+
+Supplement No. 5 to Part 774—Items Classified Under ECCNS 0A521, 0B521, 0C521, 0D521 and 0E521
+
+The following table lists items subject to the EAR that are not listed elsewhere in the CCL, but which the Department of Commerce, with the concurrence of the Departments of Defense and State, has identified warrant control for export or reexport because the items provide at least a significant military or intelligence advantage to the United States or for foreign policy reasons.
+Item descriptor.Note: The description must match by model number or a broader descriptor that does not necessarily need to be company specific | Date of initial orsubsequentBIS classification(ID = initial date;SD = subsequent date) | Date when the item will be designated EAR99, unless reclassified in another ECCN or the 0Y521 classification is reissued | Item-specific licenseexception eligibility
+0A521. Systems, Equipment and Components
+No. 1 [Reserved] | [Reserved] | [Reserved] | [Reserved]
+0B521. Test, Inspection and Production Equipment
+[Reserved]
+0C521. Materials
+No. 1 XBS Epoxy system designed to obfuscate critical technology components against x-ray and terahertz microscopy imaging attempts | November 16, 2015 (ID) | November 16, 2016 | License Exception GOV under § 740.11(b)(2)(ii) only
+No. 2 [Reserved] | [Reserved] | [Reserved] | [Reserved]
+0D521. Software
+No. 1 Geospatial imagery “software” “specially designed” for training a Deep Convolutional Neural Network to automate the analysis of geospatial imagery and point clouds, and having all of the following:1. Provides a graphical user interface that enables the user to identify objects (e.g., vehicles, houses, etc.) from within geospatial imagery and point clouds in order to extract positive and negative samples of an object of interest;2. Reduces pixel variation by performing scale, color, and rotational normalization on the positive samples;3. Trains a Deep Convolutional Neural Network to detect the object of interest from the positive and negative samples; and4. Identifies objects in geospatial imagery using the trained Deep Convolutional Neural Network by matching the rotational pattern from the positive samples with the rotational pattern of objects in the geospatial imagery.Technical Note: A point cloud is a collection of data points defined by a given coordinate system. A point cloud is also known as a digital surface model. | January 6, 2020 (ID) | January 6, 2023 | License Exception GOV under § 740.11(b)(2)(ii) only.
+0E521. Technology
+No. 1 [Reserved] | [Reserved] | [Reserved] | [Reserved]
+[80 FR 70678, Nov. 16, 2015, as amended at 81 FR 52328, Aug. 8, 2016; 83 FR 14583, Apr. 5, 2018; 85 FR 461, Jan. 6, 2020; 86 FR 462, Jan. 6, 2021; 87 FR 730, Jan. 6, 2022]
+
+Supplement No. 6 to Part 774—Sensitive List
+
+Note to Supplement No. 6: While the items on this list are identified by ECCN rather than by Wassenaar Arrangement numbering, the item descriptions are drawn directly from the Wassenaar Arrangement's Sensitive List. If text accompanies an ECCN below, then the Sensitive List is limited to a subset of items classified under the specific ECCN or has differing parameters.
+
+(1) Category 1
+
+(i) 1A002.a.1—“Composite” structures or laminates made from an organic “matrix” and “fibrous or filamentary materials” specified by 1C010.c or 1C010.d.
+(ii) 1C001.
+(iii) 1C007.c.
+(iv) 1C010.c and .d.
+(v) 1C012.
+(vi) 1D002—“Software” for the “development” of organic “matrix”, metal “matrix”, or carbon “matrix” laminates or composites controlled under 1A002.a.1, 1C001, 1C007.c, 1C010.c, 1C010.d, or 1C012.
+(vii) 1E001—“Technology” according to the General Technology Note for the “development” or “production” of equipment and materials controlled under 1A002, 1C001, 1C007.c, 1C010.c, 1C010.d, or 1C012.
+(viii) 1E002.e and .f.
+
+(2) Category 2
+
+(i) 2D001—“Software”, other than that controlled by 2D002, “specially designed” for the “development” or “production” of equipment as follows:
+(A) Specified by 2B001.a, 2B001.b.1, or 2B001.b.2, and having a “unidirectional positioning repeatability” equal to or less (better) than 0.9 µm along one or more linear axis;
+(B) Specified by 2B001.b.3, 2B001.d, 2B001.f or 2B003.
+(ii) 2E001—“Technology” according to the General Technology Note for the “development” of equipment or “software”, as follows:
+(A) Equipment specified by 2B001.a, 2B001.b.1 or 2B001.b.2, and having a “unidirectional positioning repeatability” equal to or less (better) than 0.9 µm along one or more linear axis;
+(B) Equipment specified by 2B001.b.3, 2B001.d, 2B001.f or 2B003.
+(C) “Software” specified by 2D001 of this Supplement;
+(iii) 2E002—“Technology” according to the General Technology Note for the “production” of equipment as follows:
+(A) Specified by 2B001.a, 2B001.b.1, or 2B001.b.2, and having a “unidirectional positioning repeatability” equal to or less (better) than 0.9 µm along one or more linear axis;
+(B) Specified by 2B001.b.3, 2B001.d, 2B001.f or 2B003.
+
+(3) Category 3
+
+(i) 3A001.b.2 (including those described under 3A001.b.2 that are controlled by 3A001.z)—“Monolithic Microwave Integrated Circuit” (“MMIC”) amplifiers that are any of the following:
+(A) Rated for operation at frequencies exceeding 2.7 GHz up to and including 6.8 GHz with a “fractional bandwidth” greater than 15%, and having any of the following:
+(A.1.) A peak saturated power output greater than 300 W (54.8 dBm) at any frequency exceeding 2.7 GHz up to and including 2.9 GHz;
+(A.2.) A peak saturated power output greater than 300 W (54.8 dBm) at any frequency exceeding 2.9 GHz up to and including 3.2 GHz;
+(A.3.) A peak saturated power output greater than 300 W (54.8 dBm) at any frequency exceeding 3.2 GHz up to and including 3.7 GHz; or
+(A.4.) A peak saturated power output greater than 120 W (50.8 dBm) at any frequency exceeding 3.7 GHz up to and including 6.8 GHz;
+(B) Rated for operation at frequencies exceeding 6.8 GHz up to and including 12 GHz with a “fractional bandwidth” greater than 10%, and having any of the following:
+(B.1) A peak saturated power output greater than 25 W (44 dBm) at any frequency exceeding 6.8 GHz up to and including 8.5 GHz; or
+(B.2.) A peak saturated power output greater than 25 W (44 dBm) at any frequency exceeding 8.5 GHz up to and including 12 GHz.
+(ii) 3A001.b.3 (including those described under 3A001.b.3 that are controlled by 3A001.z)—Discrete microwave transistors that are any of the following:
+(A) Rated for operation at frequencies exceeding 2.7 GHz up to and including 6.8 GHz and having any of the following:
+(A.1.) A peak saturated power output greater than 600 W (57.8 dBm) at any frequency exceeding 2.7 GHz up to and including 2.9 GHz;
+(A.2.) A peak saturated power output greater than 600 W (57.8 dBm) at any frequency exceeding 2.9 GHz up to and including 3.2 GHz;
+(A.3.) A peak saturated power output greater than 600 W (57.8 dBm) at any frequency exceeding 3.2 GHz up to and including 3.7 GHz; or
+(A.4.) A peak saturated power output greater than 130 W (51.2 dBm) at any frequency exceeding 3.7 GHz up to and including 6.8 GHz;
+(B) Rated for operation at frequencies exceeding 6.8 GHz up to and including 12 GHz and having any of the following:
+(B.1.) A peak saturated power output greater than 130 W (51.2 dBm) at any frequency exceeding 6.8 GHz up to and including 8.5 GHz;
+(B.2.) A peak saturated power output greater than 60 W (47.8 dBm) at any frequency exceeding 8.5 GHz up to and including 12 GHz.
+(iii) 3A002.g.1.
+(iv) 3D001—“Software” “specially designed” for the “development” or “production” of equipment controlled under 3A001.b.2, 3A001.b.3, equipment described under 3A001.b.2 or 3A001.b.3 that are controlled under 3A001.z, and 3A002.g.1.
+(v) 3E001—“Technology” according to the General Technology Note for the “development” or “production” of equipment controlled under 3A001.b.2, 3A001.b.3, equipment described under 3A001.b.2 or 3A001.b.3 that are controlled under 3A001.z, and 3A002.g.1.
+
+(4) Category 4
+
+(i) 4A001.a.2.
+(ii) [Reserved]
+
+(5) Category 5—Part 1
+
+(i) 5A001.b.3, .b.5, and .h.
+(ii) 5B001.a—Equipment and “specially designed” components or “accessories” therefor, “specially designed” for the “development” or “production” of equipment, functions or features controlled under 5A001.b.3, b.5, or .h.
+(iii) 5D001.a—“Software” “specially designed” for the “development” or “production” of equipment, functions or features controlled under 5A001.b.3, b.5, or .h.
+(iv) [Reserved]
+(v) 5E001.a—“Technology” according to the General Technology Note for the “development” or “production” of equipment, functions or features controlled under 5A001.b.3, b.5, or .h or “software” described in this Supplement's description of 5D001.a.
+
+(6) Category 6
+
+(i) 6A001.a.1.b—Systems or transmitting and receiving arrays, designed for object detection or location, having any of the following:
+(A) A transmitting frequency below 5 kHz or a sound pressure level exceeding 224 dB (reference 1 µPa at 1 m) for equipment with an operating frequency in the band from 5 kHz to 10 kHz inclusive;
+(B) Sound pressure level exceeding 224 dB (reference 1 µPa at 1 m) for equipment with an operating frequency in the band from 10 kHz to 24 kHz inclusive;
+(C) Sound pressure level exceeding 235 dB (reference 1 µPa at 1 m) for equipment with an operating frequency in the band between 24 kHz and 30 kHz;
+(D) Forming beams of less than 1° on any axis and having an operating frequency of less than 100 kHz;
+(E) Designed to operate with an unambiguous display range exceeding 5,120 m; or
+(F) Designed to withstand pressure during normal operation at depths exceeding 1,000 m and having transducers with any of the following:
+(1) Dynamic compensation for pressure; or
+(2) Incorporating other than lead zirconate titanate as the transduction element;
+(ii) 6A001.a.1.e.
+(iii) 6A001.a.2.a.1, a.2.a.2, a.2.a.3, a.2.a.5, and a.2.a.6.
+(iv) 6A001.a.2.b.
+(v) 6A001.a.2.c—Processing equipment, “specially designed” for real time application with towed acoustic hydrophone arrays, having “user-accessible programmability” and time or frequency domain processing and correlation, including spectral analysis, digital filtering and beamforming using Fast Fourier or other transforms or processes.
+(vi) 6A001.a.2.d.
+(vii) 6A001.a.2.e.
+(viii) 6A001.a.2.f—Processing equipment, “specially designed” for real time application with bottom or bay cable systems, having “user-accessible programmability” and time or frequency domain processing and correlation, including spectral analysis, digital filtering and beamforming using Fast Fourier or other transforms or processes.
+(ix) 6A002.a.1.a, a.1.b, and a.1.c.
+(x) 6A002.a.1.d.
+(xi) 6A002.a.2.a—Image intensifier tubes having all of the following:
+(A) A peak response in the wavelength range exceeding 400 nm but not exceeding 1,050 nm;
+(B) Electron image amplification using any of the following:
+(1) A microchannel plate for electron image amplification with a hole pitch (center-to-center spacing) of 12 µm or less; or
+(2) An electron sensing device with a non-binned pixel pitch of 500 µm or less, “specially designed” or modified to achieve ‘ charge multiplication’ other than by a microchannel plate; and
+(C) Any of the following photocathodes:
+(1) Multialkali photocathodes (e.g., S-20 and S-25) having a luminous sensitivity exceeding 700 µA/lm;
+(2) GaAs or GaInAs photocathodes; or
+(3) Other “III-V compound” semiconductor photocathodes having a maximum “radiant sensitivity” exceeding 10 mA/W.
+(xii) 6A002.a.2.b.
+(xiii) 6A002.a.3—Subject to the following additional notes:
+Note 1: 6A002.a.3 does not apply to the following “focal plane arrays” in this Supplement: a. Platinum Silicide (PtSi) “focal plane arrays” having less than 10,000 elements; b. Iridium Silicide (IrSi) “focal plane arrays”.
+Note 2: 6A002.a.3 does not apply to the following “focal plane arrays” in this Supplement: a. Indium Antimonide (InSb) or Lead Selenide (PbSe) “focal plane arrays” having less than 256 elements; b. Indium Arsenide (InAs) “focal plane arrays”; c. Lead Sulphide (PbS) “focal plane arrays”; d. Indium Gallium Arsenide (InGaAs) “focal plane arrays”.
+Note 3: 6A002.a.3 does not apply to Mercury Cadmium Telluride (HgCdTe) “focal plane arrays” as follows in this Supplement: a. 'Scanning Arrays' having any of the following: 1. 30 elements or less; or 2. Incorporating time delay-and-integration within the element and having 2 elements or less; b. 'Staring Arrays' having less than 256 elements.
+Technical Notes: a. 'Scanning Arrays' are defined as “focal plane arrays” designed for use with a scanning optical system that images a scene in a sequential manner to produce an image; b. 'Staring Arrays' are defined as “focal plane arrays” designed for use with a nonscanning optical system that images a scene.
+Note 6: 6A002.a.3 does not apply to the following “focal plane arrays” in this List:
+a. Gallium Arsenide (GaAs) or Gallium Aluminum Arsenide (GaAlAs) quantum well “focal plane arrays” having less than 256 elements;
+b. Microbolometer “focal plane arrays” having less than 8,000 elements.
+Note 7: 6A002.a.3.g does not apply to “focal plane arrays”, “specially designed” or modified to achieve 'charge multiplication', as follows: a. Linear (1-dimensional) arrays having 4,096 elements or less. b. Non-linear (2-dimensional) arrays having all of the following; b.1. A total of 250,000 elements or less; and b.2. A maximum of 4,096 elements in each dimension.
+(xiv) 6A002.b.
+(xv) 6A002.c—‘ Direct view’ imaging equipment incorporating any of the following:
+(A) Image intensifier tubes having the characteristics listed in this Supplement's description of 6A002.a.2.a or 6A002.a.2.b;
+(B) “Focal plane arrays” having the characteristics listed in this Supplement's description of 6A002.a.3; or
+(C) Solid-state detectors having the characteristics listed in 6A002.a.1.
+(xvi) 6A003.b.3—Imaging cameras incorporating image intensifier tubes having the characteristics listed in this Supplement's description of 6A002.a.2.a or 6A002.a.2.b
+Note: 6A003.b.3 does not apply to imaging cameras “specially designed” or modified for underwater use.
+(xvii) 6A003.b.4—Imaging cameras incorporating “focal plane arrays” having any of the following:
+(A) Incorporating “focal plane arrays” specified by this Supplement's description of 6A002.a.3.a to 6A002.a.3.e;
+(B) Incorporating “focal plane arrays” specified by this Supplement's description of 6A002.a.3.f; or
+(C) Incorporating “focal plane arrays” specified by this Supplement's description of 6A002.a.3.g.
+Note 1: ‘ Imaging cameras’ described in 6A003.b.4 include “focal plane arrays” combined with sufficient “signal processing” electronics, beyond the read out integrated circuit, to enable as a minimum the output of an analog or digital signal once power is supplied.
+Note 2: 6A003.b.4.a does not control imaging cameras incorporating linear “focal plane arrays” with twelve 12 elements or fewer, not employing time-delay-and-integration within the element, and designed for any of the following: a. Industrial or civilian intrusion alarm, traffic or industrial movement control or counting systems; b. Industrial equipment used for inspection or monitoring of heat flows in buildings, equipment or industrial processes; c. Industrial equipment used for inspection, sorting or analysis of the properties of materials; d. Equipment “specially designed” for laboratory use; or e. Medical equipment.
+Note 3: 6A003.b.4.b does not control imaging cameras having any of the following characteristics: a. A maximum frame rate equal to or less than 9 Hz; b. Having all of the following: 1. Having a minimum horizontal or vertical ‘ Instantaneous-Field-of-View (IFOV)’ of at least 10 mrad/pixel (milliradians/pixel); 2. Incorporating a fixed focal-length lens that is not designed to be removed; 3. Not incorporating a ‘ direct view’ display; and
+Technical Note: ‘ Direct view’ refers to an imaging camera operating in the infrared spectrum that presents a visual image to a human observer using a near-to-eye micro display incorporating any light-security mechanism. 4. Having any of the following: a. No facility to obtain a viewable image of the detected field-of-view; or b. The camera is designed for a single kind of application and designed not to be user modified; or
+Technical Note: ‘ Instantaneous Field of View (IFOV)’ specified in Note 3.b is the lesser figure of the ‘ Horizontal FOV’ or the ‘ Vertical FOV’. ‘ Horizontal IFOV’ = horizontal Field of View (FOV)/number of horizontal detector elements ‘ Vertical IFOV’= vertical Field of View (FOV)/number of vertical detector elements. c. Where the camera is “specially designed” for installation into a civilian passenger land vehicle of less than 3 tonnes three tons (gross vehicle weight) and having all of the following: 1. Is operable only when installed in any of the following: a. The civilian passenger land vehicle for which it was intended; or b. A “specially designed”, authorized maintenance test facility; and 2. Incorporates an active mechanism that forces the camera not to function when it is removed from the vehicle for which it was intended.
+Note: When necessary, details of the items will be provided, upon request, to the Bureau of Industry and Security in order to ascertain compliance with the conditions described in Note 3.b.4 and Note 3.c in this Note to 6A003.b.4.b.
+Note 4: 6A003.b.4.c does not apply to ‘ imaging cameras’ having any of the following characteristics:
+a. Having all of the following:
+1. Where the camera is “specially designed” for installation as an integrated component into indoor and wall-plug-operated systems or equipment, limited by design for a single kind of application, as follows:
+a. Industrial process monitoring, quality control, or analysis of the properties of materials;
+b. Laboratory equipment “specially designed” for scientific research;
+c. Medical equipment;
+d. Financial fraud detection equipment; and
+2. Is only operable when installed in any of the following:
+a. The system(s) or equipment for which it was intended; or
+b. A “specially designed”, authorized maintenance facility; and
+3. Incorporates an active mechanism that forces the camera not to function when it is removed from the system(s) or equipment for which it was intended;
+b. Where the camera is “specially designed” for installation into a civilian passenger land vehicle of less than 3 tonnes (gross vehicle weight), or passenger and vehicle ferries having a length overall (LOA) 65 m or greater, and having all of the following:
+1. Is only operable when installed in any of the following:
+a. The civilian passenger land vehicle or passenger and vehicle ferry for which it was intended; or
+b. A “specially designed”, authorized maintenance test facility; and
+2. Incorporates an active mechanism that forces the camera not to function when it is removed from the vehicle for which it was intended;
+c. Limited by design to have a maximum “radiant sensitivity” of 10 mA/W or less for wavelengths exceeding 760 nm, having all of the following:
+1. Incorporating a response limiting mechanism designed not to be removed or modified; and
+2. Incorporates an active mechanism that forces the camera not to function when the response limiting mechanism is removed; and
+3. Not “specially designed” or modified for underwater use; or
+d. Having all of the following:
+1. Not incorporating a ‘ direct view’ or electronic image display;
+2. Has no facility to output a viewable image of the detected field of view;
+3. The “focal plane array” is only operable when installed in the camera for which it was intended; and
+4. The “focal plane array” incorporates an active mechanism that forces it to be permanently inoperable when removed from the camera for which it was intended.
+Note: When necessary, details of the item will be provided, upon request, to the Bureau of Industry and Security in order to ascertain compliance with the conditions described in Note 4 above.
+Note 5: 6A003.b.4.c does not apply to imaging cameras “specially designed” or modified for underwater use.
+(xviii) 6A003.b.5.
+(xix) 6A004.c.
+(xx) 6A004.d.
+(xxi) 6A006.a.1.
+(xxii) 6A006.a.2—“Magnetometers” using optically pumped or nuclear precession (proton/Overhauser) “technology” having a ‘ sensitivity’ lower (better) than 2 pT (rms) per square root Hz.
+(xxiii) 6A006.c.1—“Magnetic gradiometers” using multiple “magnetometers” specified by 6A006.a.1 or this Supplement's description of 6A006.a.2.
+(xxiv) 6A006.d—“Compensation systems” for the following:
+(A) Magnetic sensors specified by 6A006.a.2 and using optically pumped or nuclear precession (proton/Overhauser) “technology” that will permit these sensors to realize a ‘ sensitivity’ lower (better) than 2 pT rms per square root Hz.
+(B) Underwater electric field sensors specified by 6A006.b.
+(C) “Magnetic gradiometers” specified by 6A006.c. that will permit these sensors to realize a ‘ sensitivity’ lower (better) than 3 pT/m rms per square root Hz.
+(xxv) 6A006.e—Underwater electromagnetic receivers incorporating “magnetometers” specified by 6A006.a.1 or this Supplement's description of 6A006.a.2.
+(xxvi) 6A008.d, .h, and .k.
+(xxvii) 6B008.
+(xxviii) 6D001—“Software” “specially designed” for the “development” or “production” of equipment specified by 6A004.c, 6A004.d, 6A008.d, 6A008.h, 6A008.k, or 6B008.
+(xxix) 6D003.a.
+(xxx) 6E001.
+(xxxi) 6E002—“Technology” according to the General Technology Note for the “production” of equipment specified by the 6A or 6B provisions described in this Supplement.
+
+(7) Category 7
+
+(i) 7D002.
+(ii) 7D003.a.
+(iii) 7D003.b.
+(iv) [Reserved]
+(v) 7D004.a to .d and .g.
+(vi) 7E001.
+(vii) 7E002.
+
+(8) Category 8
+
+(i) 8A001.b to .c.
+(ii) 8A002.b—Systems specially designed or modified for the automated control of the motion of submersible vehicles specified by 8A001.b through .c using navigation data having closed loop servo-controls and having any of the following:
+(A) Enabling a vehicle to move within 10 m of a predetermined point in the water column;
+(B) Maintaining the position of the vehicle within 10 m of a predetermined point in the water column; or
+(C) Maintaining the position of the vehicle within 10 m while following a cable on or under the seabed.
+(iii) 8A002.h and .j.
+(iv) 8A002.o.3.
+(v) 8A002.p.
+(vi) 8D001—“Software” specially designed for the “development” or “production” of equipment in 8A001.b to .c, 8A002.b (as described in this Supplement), 8A002.h, 8A002.j, 8A002.o.3, or 8A002.p.
+(vii) 8D002.
+(viii) 8E001—“Technology” according to the General Technology Note for the “development” or “production” of equipment specified by 8A001.b to .c, 8A002.b (as described in this Supplement), 8A002.h, 8A002.j, 8A002.o.3, or 8A002.p.
+(ix) 8E002.a.
+
+(9) Category 9
+
+(i) 9A011.
+(ii) 9B001.
+(iii) 9D001—“Software” “specially designed” or modified for the “development” of equipment or “technology,” specified by 9A011, 9B001.b. 9E003.a.1, 9E003.a.2 to a.5 or 9E003.a.8 or 9E003.h.
+(iv) 9D002—“Software” “specially designed” or modified for the “production” of equipment specified by 9A011 or 9B001.b.
+(v) 9D004.a and .c.
+(vi) 9E001.
+(vii) 9E002.
+(viii) [Reserved]
+(ix) 9E003.a.1 to a.5, a.8.
+(x) 9E003.h.
+[78 FR 22736, Apr. 16, 2013, as amended at 79 FR 45307, Aug. 4, 2014; 80 FR 29455, May 21, 2015; 81 FR 64691, Sept. 20, 2016; 82 FR 38819, Aug. 15, 2017; 83 FR 53793, Oct. 24, 2018; 85 FR 56334, Sept. 11, 2020; 86 FR 16506, Mar. 29, 2021; 88 FR 71985, Oct. 18, 2023; 88 FR 73517, Oct. 25, 2023; 89 FR 23905, Apr. 4, 2024]
+
+Supplement No. 7 to Part 774—Very Sensitive List
+
+Note to Supplement No. 7: While the items on this list are identified by ECCN rather than by Wassenaar Arrangement numbering, the item descriptions are drawn directly from the Wassenaar Arrangement's Very Sensitive List, which is a subset of the Wassenaar Arrangement's Sensitive List. If text accompanies an ECCN below, then the Very Sensitive List is limited to a subset of items classified under the specific ECCN or has differing parameters.
+
+(1) Category 1
+
+(i) 1A002.a.1.
+(ii) 1C001.
+(iii) 1C012.
+(iv) 1E001—“Technology” according to the General Technology Note for the “development” or “production” of equipment and materials specified by 1A002.a, 1C001, or 1C012.
+
+(2) Category 5—Part 1
+
+(i) 5A001.b.5.
+(ii) 5A001.h.
+(iii) 5D001.a—“Software” “specially designed” for the “development” or “production” of equipment, functions or features specified by 5A001.b.5 or 5A001.h.
+(iv) 5E001.a—“Technology” according to the General Technology Note for the “development” or “production” of equipment, functions, features or “software” specified by 5A001.b.5, 5A001.h, or 5D001.a.
+
+(3) Category 6
+
+(i) 6A001.a.1.b.1—Systems or transmitting and receiving arrays, designed for object detection or location, having a sound pressure level exceeding 210 dB (reference 1 µPa at 1 m) and an operating frequency in the band from 30 Hz to 2 kHz.
+(ii) 6A001.a.2.a.1 to a.2.a.3, a.2.a.5, or a.2.a.6.
+(iii) 6A001.a.2.b.
+(iv) 6A001.a.2.c—Processing equipment, “specially designed” for real time application with towed acoustic hydrophone arrays, having “user-accessible programmability” and time or frequency domain processing and correlation, including spectral analysis, digital filtering and beamforming using Fast Fourier or other transforms or processes.
+(v) 6A001.a.2.e.
+(vi) 6A001.a.2.f—Processing equipment, “specially designed” for real time application with bottom or bay cable systems, having “user-accessible programmability” and time or frequency domain processing and correlation, including spectral analysis, digital filtering and beamforming using Fast Fourier or other transforms or processes.
+(vii) 6A002.a.1.c.
+(viii) 6B008.
+(ix) 6D001—“Software” “specially designed” for the “development” or “production” of equipment specified by 6B008.
+(x) 6D003.a.
+(xi) 6E001—“Technology” according to the General Technology Note for the “development” of equipment or “software” specified by the 6A, 6B, or 6D provisions described in this Supplement.
+(xii) 6E002—“Technology” according to the General Technology Note for the “production” of equipment specified by the 6A or 6B provisions described in this Supplement.
+
+(4) Category 7
+
+(i) 7D003.a.
+(ii) 7D003.b.
+
+(5) Category 8
+
+(i) 8A001.b.
+(ii) 8A001.c.1.
+(iii) 8A002.o.3.b.
+(iv) 8D001—“Software” specially designed for the “development” or “production” of equipment specified by 8A001.b, 8A001.c.1, or 8A002.o.3.b.
+(v) 8E001—“Technology” according to the General Technology Note for the “development” or “production” of equipment specified by 8A001.b, 8A001.c.1, or 8A002.o.3.b.
+
+(6) Category 9
+
+(i) 9A011.
+(ii) 9D001—“Software” “specially designed” or modified for the “development” of equipment or “technology” specified by 9A011, 9E003.a.1, or 9E003.a.3.a.
+(iii) 9D002—“Software” “specially designed” or modified for the “production” of equipment specified by 9A011.
+(iv) 9E001—“Technology” according to the General Technology note for the “development” of equipment or “software” specified by 9A011 or this Supplement's description of 9D001 or 9D002.
+(v) 9E002—“Technology” according to the General Technology Note for the “production” of equipment specified by 9A011.
+(vi) 9E003.a.1.
+(vii) 9E003.a.3.a.
+[78 FR 22736, Apr. 16, 2013, as amended at 83 FR 53793, Oct. 24, 2018; 85 FR 56334, Sept. 11, 2020]

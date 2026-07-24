@@ -1,0 +1,29 @@
+{
+  "vandalizer_export": true,
+  "schema_version": 1,
+  "export_type": "knowledge_base",
+  "_seed_meta": {
+    "seed_id": "kb-common-rule",
+    "display_name": "Human Subjects Protection (Common Rule)",
+    "description": "The Common Rule (45 CFR 46) governing protection of human research subjects: IRB review, informed consent, and vulnerable populations.",
+    "quality_tier": "gold",
+    "collections": [
+      "compliance",
+      "reference-knowledge"
+    ]
+  },
+  "items": [
+    {
+      "title": "Human Subjects Protection (Common Rule)",
+      "description": "The Common Rule (45 CFR 46) governing protection of human research subjects: IRB review, informed consent, and vulnerable populations.",
+      "sources": [
+        {
+          "source_type": "url",
+          "url": "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-A/part-46",
+          "content_file": "content/ecfr-title45-part46.txt",
+          "url_title": "PART 46\u2014PROTECTION OF HUMAN SUBJECTS"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,183 @@
+PART 754—SHORT SUPPLY CONTROLS
+
+Authority:50 U.S.C. 4801-4852; 50 U.S.C. 4601 et seq.; 50 U.S.C. 1701 et seq.; 10 U.S.C. 8720; 10 U.S.C. 8730(e); 15 U.S.C. 1824; E.O. 11912, 41 FR 15825, 3 CFR, 1976 Comp., p. 114; E.O. 13222, 66 FR 44025, 3 CFR, 2001 Comp., p. 783.
+Source:61 FR 12844, Mar. 25, 1996, unless otherwise noted.
+
+§ 754.1 Introduction.
+
+(a) Scope. In this part, references to the Export Administration Regulations (EAR) are references to 15 CFR chapter VII, subchapter C. This part implements the provisions of section 7, “Short Supply Controls,” of the Export Administration Act (EAA) and similar provisions in other laws that are not based on national security and foreign policy grounds.
+(b) Contents. Specifically, this part deals with the following:
+(1) It sets forth the license requirements and licensing policies for commodities that contain the symbol “SS” in the “Reason for Control” part of “License Requirements” section of the applicable Export Control Classification Number (ECCN) identified on the Commerce Control List (supplement no. 1 to part 774 of the EAR). In appropriate cases, it also provides for License Exceptions from the short supply licensing requirements described in this part. The license requirements and policies that are described in this part cover the following:
+(i) [Reserved]
+(ii) Petroleum products other than crude oil listed in supplement no. 1 to this part, that were produced or derived from the Naval Petroleum Reserves (NPR) or became available for export as a result of an exchange of any NPR-produced or -derived commodities described by the following ECCNs. For specific licensing requirements for these items, see § 754.3 of this part.
+(A) ECCN 1C980 (Inorganic chemicals);
+(B) ECCN 1C982 (Other petroleum products);
+(C) ECCN 1C983 (Natural gas liquids and other natural gas derivatives); and
+(D) ECCN 1C984 (Manufactured gas and synthetic natural gas (except when commingled with natural gas and thus subject to export authorization from the Department of Energy).
+(iii) Unprocessed western red cedar described by ECCN 1C988 (Western red cedar (thuja plicata) logs and timber, and rough, dressed and worked lumber containing wane). For specific licensing requirements for these items, see § 754.4 of this part.
+(iv) Horses exported by sea for slaughter covered by ECCN 0A980 (Horses for export by sea). For specific licensing requirements, see § 754.5 of this part.
+(2) It incorporates statutory provisions for the registration of U.S. agricultural commodities for exemption from short supply limitations on export (see § 754.6 of this part); and
+(3) It incorporates statutory provisions for the filing and review of petitions seeking the imposition of monitoring or controls on recyclable metallic materials and procedures for related public hearings (see § 754.7 of this part).
+(c) Reexports. Reexports of items controlled by this part require a license only if such a requirement is specifically set forth in this part or is set forth on the license authorizing the export from the United States.
+(d) Additional requirements for embargoed destinations. For exports involving embargoed destinations, you must satisfy the requirements of this part and also of part 746 of the EAR (Embargoes and Other Special Controls).
+[61 FR 12844, Mar. 25, 1996, as amended at 79 FR 34410, June 17, 2014; 81 FR 29486, May 12, 2016]
+
+§ 754.2 [Reserved]
+
+§ 754.3 Petroleum products not including crude oil.
+
+(a) License requirement. As indicated by the letters “SS” in the “Reason for Control” paragraph in the “License Requirements” section of ECCNs 1C980, 1C982, 1C983, and 1C984 on the CCL (supplement no. 1 to part 774 of the EAR), a license is required to all destinations, including Australia, Canada, and the United Kingdom, for the export of petroleum products, excluding crude oil, listed in supplement no. 1 to this part, that were produced or derived from the Naval Petroleum Reserves (NPR) or became available for export as a result of an exchange of any NPR produced or derived commodities.
+(b) License policy. (1) Applications for the export of petroleum products listed in supplement no. 1 to this part that were produced or derived from the Naval Petroleum Reserves, or that became available for export as a result of an exchange for a Naval Petroleum Reserves produced or derived commodity, other than crude oil, will be denied, unless the President makes a finding required by the Naval Petroleum Reserves Production Act (10 U.S.C. 7430).
+(2) Applications that involve temporary exports or exchanges excepted from that Act will be approved.
+[61 FR 12844, Mar. 25, 1996, as amended at 89 FR 28601, Apr. 19, 2024]
+
+§ 754.4 Unprocessed western red cedar.
+
+(a) License requirement. As indicated by the letters “SS” in the “Reason for Control” paragraph in the “License Requirements” section of ECCN 1C988 on the CCL (supplement no. 1 to part 774 of the EAR), a license is required to all destinations, including Australia, Canada, and the United Kingdom, for the export of unprocessed western red cedar covered by ECCN 1C988 (Western red cedar (thuja plicata) logs and timber, and rough, dressed and worked lumber containing wane). For a non-exhaustive list of 10-digit Harmonized System-based Schedule B commodity numbers that may apply to unprocessed western red cedar products subject to the license requirements of this section, see supplement no. 2 to part 754 of the EAR. See paragraph (c) of this section for license exceptions for timber harvested from public lands in the State of Alaska, private lands, or Indian lands, and see paragraph (d) of this section for relevant definitions.
+(b) Licensing policy. (1) BIS will generally deny applications for licenses to export unprocessed western red cedar harvested from Federal or State lands under harvest contracts entered into after September 30, 1979.
+(2) BIS will consider, on a case-by-case basis, applications for licenses to export unprocessed western red cedar harvested from Federal or State lands under harvest contracts entered into prior to October 1, 1979.
+(3) BIS will approve license applications for unprocessed western red cedar timber harvested from public lands in Alaska, private lands, and Indian lands. Applications must be submitted in accordance with the procedures set forth in paragraph (a) of this section. See paragraph (c) of this section for the availability of a License Exception.
+(c) License Exception for western red cedar (WRC). (1) Subject to the requirements described in paragraph (c) of this section, License Exception WRC may be used to export without a license unprocessed western red cedar timber harvested from Federal, State and other public lands in Alaska, all private lands, and, lands held in trust for recognized Indian tribes by Federal or State agencies.
+(2) Exporters who use License Exception WRC must obtain and retain on file the following documents:
+(i) A statement by the exporter (or other appropriate documentation) indicating that the unprocessed western red cedar timber exported under this License Exception was not harvested from State or Federal lands outside the State of Alaska, and did not become available for export through substitution of commodities so harvested or produced. If the exporter did not harvest or produce the timber, the records or statement must identify the harvester or producer and must be accompanied by an identical statement from the harvester or producer. If any intermediate party or parties held title to the timber between harvesting and purchase, the exporter must also obtain such a statement, or equivalent documentation, from the intermediate party or parties and retain it on file.
+(ii) A certificate of inspection issued by a third party log scaling and grading organization, approved by the United States Forest Service, that:
+(A) Specifies the quantity in cubic meters or board feet, scribner rule, of unprocessed western red cedar timber to be exported; and
+(B) Lists each type of brand, tag, and/or paint marking that appears on any log or unprocessed lumber in the export shipment or, alternatively, on the logs from which the unprocessed timber was produced.
+(3) The requirements and restrictions described in §§ 740.1 and 740.2 of the EAR that apply to all License Exceptions also apply to the use of License Exception WRC.
+(4) A person exporting any item pursuant to this license exception must enter on any required Electronic Export Information (EEI) filing to the Automated Export System (AES) the correct license code that corresponds to “SS-WRC.”
+(d) License applications. (1) Applicants requesting to export unprocessed western red cedar must apply for a license in accordance with § 748.1, 748.4 and 748.6 of the EAR, submit any other documents as may be required by BIS, and submit a statement from an authorized representative of the exporter, reading as follows:
+I, (Name) (Title) of (Exporter) HEREBY CERTIFY that to the best of my knowledge and belief the (Quantity) (cubic meters or board feed scribner) of unprocessed western red cedar timber that (Exporter) proposes to export was not harvested from State or Federal lands under contracts entered into after October 1, 1979. Signature Date
+(2) In Blocks 16 and 18 of the application, “Various” may be entered when there is more than one purchaser or ultimate consignee.
+(3) For each application submitted, and for each export shipment made under a license, the exporter must assemble and retain for the period described in part 762 of the EAR, and produce or make available for inspection, the following:
+(i) A signed statement(s) by the harvester or producer, and each subsequent party having held title to the commodities, that the commodities in question were harvested under a contract to harvest unprocessed western red cedar from State or Federal lands, entered into before October 1, 1979; and
+(ii) The Automated Export System record.
+(4) A shipping tolerance of 5 percent in cubic feet or board feet scribner is allowed on the un-shipped balance of a commodity listed on a license. This tolerance applies only to the final quantity remaining un-shipped on a license against which more than one shipment is made and not to the original quantity authorized by such license. See § 750.11 of the EAR for an explanation of shipping tolerances.
+(e) Definitions. When used in this section, the following terms have the meaning indicated:
+(1) Unprocessed western red cedar means western red cedar (thuja plicata) timber, logs, cants, flitches, and processed lumber containing wane on one or more sides, as defined in ECCN 1C988, that has not been processed into:
+(i) Lumber of American Lumber Standards Grades of Number 3 dimension or better, or Pacific Lumber Inspection Bureau Export R-List Grades of Number 3 common or better grades, with a maximum cross section of 2,000 square centimeters (310 square inches) for any individual piece of processed western red cedar (WRC) being exported, regardless of grade;
+(ii) Chips, pulp, and pulp products;
+(iii) Veneer and plywood;
+(iv) Poles, posts, or pilings cut or treated with preservative for use as such and not intended to be further processed; and
+(v) Shakes and shingles.
+(2) Federal and State lands means Federal and State lands, excluding lands in the State of Alaska and lands held in trust by any Federal or State official or agency for a recognized Indian tribe or for any member of such tribe.
+(3) Contract harvester means any person who, on October 1, 1979, had an outstanding contractual commitment to harvest western red cedar timber from State and Federal lands and who can show by previous business practice or other means that the contractual commitment was made with the intent of exporting or selling for export in unprocessed form all or part of the commodities to be harvested.
+(4) Producer means any person engaged in a process that transforms an unprocessed western red cedar commodity (e.g., western red cedar timber) into another unprocessed western red cedar commodity (e.g., cants) primarily through a saw mill.
+[61 FR 12844, Mar. 25, 1996, as amended at 68 FR 50473, Aug. 21, 2003; 73 FR 49331, Aug. 21, 2008; 78 FR 13470, Feb. 28, 2013; 79 FR 4617, Jan. 29, 2014; 79 FR 34411, June 17, 2014; 89 FR 28601, Apr. 19, 2024]
+
+§ 754.5 Horses for export by sea.
+
+(a) License requirement. As indicated by the letters “SS” in the “Reason for Control” paragraph of the “License Requirements” section of ECCN 0A980 on the CCL (supplement no. 1 to part 774 of the EAR) a license is required for the export of horses exported by sea to all destinations, including Australia, Canada, and the United Kingdom.
+(b) License policy. (1) License applications for the export of horses by sea for the purposes of slaughter will be denied.
+(2) Other license applications will be approved if BIS, in consultation with the Department of Agriculture, determines that the horses are not intended for slaughter. You must provide a statement in the additional information section of the application certifying that no horse under consignment is being exported for the purpose of slaughter.
+(3) Each application for export may cover only one consignment of horses.
+[61 FR 12844, Mar. 25, 1996, as amended at 73 FR 49331, Aug. 21, 2008; 89 FR 28601, Apr. 19, 2024]
+
+§ 754.6 Registration of U.S. agricultural commodities for exemption from short supply limitations on export.
+
+(a) Scope. Under the provisions of section 7(g) of the Export Administration Act of 1979 (EAA), agricultural commodities of U.S. origin purchased by or for use in a foreign country and stored in the United States for export at a later date may be registered with BIS for exemption from any quantitative limitations on export that may subsequently be imposed under section 7 of the EAA for reasons of short supply.
+(b) Applications for registration. Applications to register agricultural commodities must be submitted by a person or firm subject to the jurisdiction of the United States who is acting as a duly authorized agent for the foreign purchaser.
+(c) Address. Submit applications pursuant to the provisions of section 7(g) of the EAA, via courier, to: Bureau of Industry and Security, U.S. Department of Commerce, 14th and Pennsylvania Ave., NW., Room 2099B, Washington, DC 20230.
+[61 FR 12844, Mar. 25, 1996, as amended at 62 FR 25467, May 9, 1997; 73 FR 37, Jan. 2, 2008; 78 FR 13470, Feb. 28, 2013]
+
+§ 754.7 Petitions for the imposition of monitoring or controls on recyclable metallic materials; Public hearings.
+
+(a) Scope. Section 7(c) of the Export Administration Act of 1979 (EAA) provides for the filing and review of petitions seeking the imposition of monitoring or controls on recyclable metallic materials.
+(b) Eligibility for filing petitions. Any entity, including a trade association, firm or certified or recognized union or group of workers, which is representative of an industry or a substantial segment of an industry which processes metallic materials capable of being recycled with respect to which an increase in domestic prices or a domestic shortage, either of which results from increased exports, has or may have a significant adverse effect on the national economy or any sector thereof, may submit a written petition to BIS requesting the monitoring of exports, or the imposition of export controls, or both, with respect to such materials.
+(c) Public hearings. The petitioner may also request a public hearing. Public hearings may also be requested by an entity, including a trade association, firm, or certified or recognized union or group of workers, which is representative of an industry or a substantial segment of an industry which processes, produces or exports the metallic materials which are the subject of a petition.
+(d) Address. Submit petitions pursuant to section 7(c) of the EAA, via courier, to: Bureau of Industry and Security, U.S. Department of Commerce, 14th and Pennsylvania Ave., NW., Room 2099B, Washington, DC 20230.
+[61 FR 12844, Mar. 25, 1996, as amended at 62 FR 25467, May 9, 1997; 73 FR 38, Jan. 2, 2008; 78 FR 13470, Feb. 28, 2013]
+
+Supplement No. 1 to Part 754—Crude Petroleum and Petroleum Products
+
+This Supplement provides relevant Schedule B numbers and commodity descriptions for crude oil (EAR99) and for petroleum products other than crude oil that are controlled by ECCN 1C980, 1C982, 1C983, or 1C984. The 10-digit Harmonized System-based Schedule B commodity numbers and descriptions below are drawn from Chapter 27 of the Schedule B 2014 found at and the AES 2014 Export Concordance (December 30, 2013) http://www.census.gov/foreign-trade/aes/documentlibrary/expaes.txt. If there are any discrepancies between the information in this supplement and the information in the most current Schedule B, use the most current Schedule B commodity number on your Electronic Export Information filing on the Automated Export System.
+Schedule B No. | Commodity description
+CRUDE OIL
+2709001000 | Petroleum oils and oils obtained from bituminous minerals, crude.
+2709002010 | Petroleum oils and oils obtained from bituminous minerals, testing 25 degrees API or more, condensate derived wholly from natural gas, crude.
+2709002090 | Petroleum oils and oils obtained from bituminous minerals, testing 25 degrees API or more, crude, NESOI.
+2714100000 | Bituminous or oil shale and tar sands.
+PETROLEUM PRODUCTS
+2707999010 | Carbon black feedstock.
+2710121510 | Leaded gasoline.
+2710121514 | Unleaded gasoline, reformulated.
+2710121519 | Unleaded gasoline, NESOI.
+2710121520 | Jet fuel, naphtha-type.
+2710121550 | Motor fuels, NESOI.
+2710121805 | Motor fuel blending stock, Reformulated Blendstock for Oxygenate Blending (RBOB).
+2710121890 | Motor fuel blending stock, except Reformulated Blendstock for Oxygenate Blending (RBOB).
+2710122500 | Naphthas, except motor fuel or motor fuel blending stock.
+2710124500 | Light oil and preparation, mixtures of hydrocarbons containing by weight not over 50 percent of any single hydrocarbon compound, NESOI.
+2710129000 | Light oils and preparations obtained from bituminous minerals containing by weight 70 percent or more of petroleum oils, NESOI.
+2710190605 | No. 4-type fuel oils, API lt 25 degrees, having a saybolt universal viscosity at 37.8 degrees C of 45-125 seconds, with not over 500 ppm of sulfur.
+2710190615 | No. 4-type fuel oils under 25 degrees API having a saybolt universal viscosity at 37.8 degrees C of 45-125 seconds, having over 500 ppm sulfur.
+2710190620 | Heavy fuel oils under 25 degrees API having saybolt universal viscosity at 37.8 degrees C of more than 125 seconds.
+2710190650 | Distillate and residual fuel oils (including blended fuel oils), testing under 25 degrees API, NESOI.
+2710191106 | Light fuel oils testing 25 degrees API or more, containing not more than 15 ppm of sulfur.
+2710191109 | Light fuel oils testing 25 degrees API or more, containing more than 15 ppm but not more than 500 ppm of sulfur.
+2710191112 | Light fuel oils 25 degrees API or more having a saybolt universal viscosity at 37.8 degrees C of less than 45 seconds, containing over 500 ppm sulfur.
+2710191115 | No. 4-type fuel oils containing not more than 500 ppm of sulfur.
+2710191125 | No. 4-type fuel oils containing more than 500 ppm of sulfur.
+2710191150 | Heavy fuel oils 25 degrees API or more with a saybolt universal viscosity at 37.8 degrees C of more than 125 seconds.
+2710191600 | Kerosene-type jet fuel, NESOI.
+2710192400 | Kerosene motor fuel.
+2710192500 | Kerosene motor fuel blending stock.
+2710192600 | Kerosene, except motor fuel or motor fuel blending stock, NESOI.
+2710193010 | Aviation engine lubricating oils (except jet engine lubricating oils).
+2710193020 | Automotive, diesel or marine engine (except turbine) lubricating oils.
+2710193030 | Turbine lubricating oil, including marine.
+2710193040 | Automotive gear oils.
+2710193050 | Steam cylinder oils.
+2710193070 | Quenching or cutting oils.
+2710193080 | Lubricating oils with or without additives, NESOI.
+2710193750 | Lubricating greases with or w/out additives.
+2710194530 | White mineral oils, medicinal grade.
+2710194540 | White mineral oils, except medicinal grade.
+2710194545 | Insulating or transformer oils, NESOI.
+2710194590 | Mixtures of hydrocarbons NESOI, containing by weight not over 50 percent of any single hydrocarbon compound.
+2710199000 | Petroleum oils or oils obtained from bituminous minerals, other than crude, containing by weight 70% or more of petroleum oils, NESOI.
+2710200000 | Petroleum oils or oils obtained from bituminous minerals, other than crude, containing by weight 70% or more of petroleum oils, containing biodiesel.
+2710910000 | Waste oils containing Polychlorinated Biphenyls (PCBs), Polychlorinated Terphenyls (PCTs), or Polybrominated Biphenyls (PBBs).
+2710990000 | Waste oils, not elsewhere specified or included.
+2711110000 | Natural gas, liquefied.
+2711120000 | Propane, liquefied.
+2711130000 | Butanes, liquefied.
+2711140000 | Ethylene, propylene, butylene and butadiene liquefied.
+2711190000 | Petroleum gases and other gaseous hydrocarbons, liquefied, NESOI.
+2712200000 | Paraffin wax containing less than 0.75 percent oil.
+2712900000 | Microcrystalline petroleum wax, slack wax, ozokerite, lignite wax, peat wax, other mineral waxes, and similar products, NESOI.
+2713110000 | Petroleum coke, not calcined.
+2713120000 | Petroleum coke, calcined.
+2713200000 | Petroleum bitumen.
+2713900000 | Residues of petroleum oils or of oils obtained from bituminous materials, NESOI.
+2714900000 | Bitumen and asphalt, natural; asphaltites and asphaltic rocks.
+2715000000 | Bituminous mixtures based on natural asphalt, natural bitumen, petroleum bitumen, mineral tar or mineral tar pitch.
+2804100000 | Hydrogen.
+2804290010 | Helium.
+2811210000 | Carbon dioxide.
+2811299000 | Carbon monoxide.
+2814100000 | Anhydrous ammonia.
+2814200000 | Ammonia in aqueous solution.
+3819000000 | Hydraulic brake fluids and other prepared liquids for hydraulictransmission, not containing or containing less than 70 percent byweight of petroleum oils or oils obtained from bituminous minerals.
+[79 FR 34411, June 17, 2014, as amended at 81 FR 29486, May 12, 2016]
+
+Supplement No. 2 to Part 754—Unprocessed Western Red Cedar
+
+This table is a non-exhaustive list of 10-digit Harmonized System-based Schedule B commodity numbers that may apply to unprocessed western red cedar products subject to license requirements of § 754.4 of this part. The 10-digit Harmonized System-based Schedule B commodity numbers and descriptions below are drawn from Chapter 44 of the Schedule B 2014 found at http://www.census.gov/foreign-trade/schedules/b/2014/c44.html and the AES 2014 Export Concordance (December 30, 2013) http://www.census.gov/foreign-trade/aes/documentlibrary/expaes.txt. If there are any discrepancies between the information in this supplement and the information in the most current Schedule B, use the most current Schedule B commodity number on your Electronic Export Information filing in the Automated Export System.
+Schedule B commodity No. | Description
+Wood in the rough
+4403100030 | Poles, piles and posts; 'treated'.
+4403100060 | Wood in the rough; 'treated'.
+4403200010 | Not 'treated'; coniferous; poles, piles and posts.
+4403200055 | Not 'treated'; coniferous; logs and timber; Western Red Cedar (Thuja Plicata).
+'Lumber'
+4407100101 | Coniferous; finger-jointed.
+4407100102 | Coniferous; except finger-jointed; 'treated'.
+4407100168 | Coniferous; except finger-jointed; not 'treated'; Western Red Cedar (Thuja Plicata); 'rough'.
+4407100169 | Coniferous; except finger-jointed; not 'treated'; Western Red Cedar (Thuja Plicata); not 'rough'.
+Note 1: 4403 heading in the Schedule B 2014 pertains to “wood in the rough, whether or not stripped of bark or sapwood, or roughly squared (not including lumber of heading 4407).”
+Note 2: The 6-digit Harmonized System subheading 4403.10 and the 10-digit Harmonized System code 4407.10.0102 in Schedule B 2014 state that 'treated' means “treated with paint, stain, creosote or other preservatives.”
+Note 3: The 4407 heading in the Schedule B 2014 refers to 'lumber' as “wood sawn or chipped lengthwise, sliced or peeled, whether or not planed, sanded or end-jointed, of a thickness exceeding 6mm (.236 inch).”
+Note 4: Section IX—Chapter 44 of Schedule B 2014, Statistical Note 3 states, “for the purpose of heading 4407, the term “rough” includes wood that has been edged, resawn, crosscut or trimmed to smaller sizes but it does not include wood that has been dressed or surfaced by planing on one or more edges or faces or has been edge-glued or end-glued.”
+[79 FR 34412, June 17, 2014]
+
+Supplement No. 3 to Part 754 [Reserved]

@@ -1,42 +1,174 @@
 {
-  "https://www.ecfr.gov/current/title-2/subtitle-A/chapter-II/part-200": {
-    "file": "ecfr-title2-part200-appendices.txt",
-    "title": "2 CFR Part 200 \u2014 Appendices I\u2013XII"
-  },
-  "https://www.ecfr.gov/current/title-2/subtitle-A/chapter-II/part-200/subpart-A": {
-    "file": "ecfr-title2-part200-subpart-a.txt",
-    "title": "Subpart A\u2014Acronyms and Definitions"
-  },
-  "https://www.ecfr.gov/current/title-2/subtitle-A/chapter-II/part-200/subpart-B": {
-    "file": "ecfr-title2-part200-subpart-b.txt",
-    "title": "Subpart B\u2014General Provisions"
-  },
-  "https://www.ecfr.gov/current/title-2/subtitle-A/chapter-II/part-200/subpart-C": {
-    "file": "ecfr-title2-part200-subpart-c.txt",
-    "title": "Subpart C\u2014Pre-Federal Award Requirements and Contents of Federal Awards"
-  },
-  "https://www.ecfr.gov/current/title-2/subtitle-A/chapter-II/part-200/subpart-D": {
-    "file": "ecfr-title2-part200-subpart-d.txt",
-    "title": "Subpart D\u2014Post Federal Award Requirements"
-  },
-  "https://www.ecfr.gov/current/title-2/subtitle-A/chapter-II/part-200/subpart-E": {
-    "file": "ecfr-title2-part200-subpart-e.txt",
-    "title": "Subpart E\u2014Cost Principles"
-  },
-  "https://www.ecfr.gov/current/title-2/subtitle-A/chapter-II/part-200/subpart-F": {
-    "file": "ecfr-title2-part200-subpart-f.txt",
-    "title": "Subpart F\u2014Audit Requirements"
-  },
-  "https://www.ecfr.gov/current/title-2/subtitle-B/chapter-XI/subchapter-D/part-1104": {
-    "file": "ecfr-title2-part1104.txt",
-    "title": "PART 1104\u2014IMPLEMENTATION OF GOVERNMENTWIDE GUIDANCE FOR GRANTS AND COOPERATIVE AGREEMENTS"
-  },
-  "https://www.ecfr.gov/current/title-2/subtitle-B/chapter-IX/part-910": {
-    "file": "ecfr-title2-part910.txt",
-    "title": "PART 910\u2014UNIFORM ADMINISTRATIVE REQUIREMENTS, COST PRINCIPLES, AND AUDIT REQUIREMENTS FOR FEDERAL AWARDS"
-  },
-  "https://www.ecfr.gov/current/title-42/chapter-I/subchapter-D/part-93": {
-    "file": "ecfr-title42-part93.txt",
-    "title": "PART 93\u2014PUBLIC HEALTH SERVICE POLICIES ON RESEARCH MISCONDUCT"
-  }
+ "https://www.ecfr.gov/current/title-2/subtitle-A/chapter-II/part-200": {
+  "file": "ecfr-title2-part200-appendices.txt",
+  "title": "2 CFR Part 200 \u2014 Appendices I\u2013XII"
+ },
+ "https://www.ecfr.gov/current/title-2/subtitle-A/chapter-II/part-200/subpart-A": {
+  "file": "ecfr-title2-part200-subpart-a.txt",
+  "title": "Subpart A\u2014Acronyms and Definitions"
+ },
+ "https://www.ecfr.gov/current/title-2/subtitle-A/chapter-II/part-200/subpart-B": {
+  "file": "ecfr-title2-part200-subpart-b.txt",
+  "title": "Subpart B\u2014General Provisions"
+ },
+ "https://www.ecfr.gov/current/title-2/subtitle-A/chapter-II/part-200/subpart-C": {
+  "file": "ecfr-title2-part200-subpart-c.txt",
+  "title": "Subpart C\u2014Pre-Federal Award Requirements and Contents of Federal Awards"
+ },
+ "https://www.ecfr.gov/current/title-2/subtitle-A/chapter-II/part-200/subpart-D": {
+  "file": "ecfr-title2-part200-subpart-d.txt",
+  "title": "Subpart D\u2014Post Federal Award Requirements"
+ },
+ "https://www.ecfr.gov/current/title-2/subtitle-A/chapter-II/part-200/subpart-E": {
+  "file": "ecfr-title2-part200-subpart-e.txt",
+  "title": "Subpart E\u2014Cost Principles"
+ },
+ "https://www.ecfr.gov/current/title-2/subtitle-A/chapter-II/part-200/subpart-F": {
+  "file": "ecfr-title2-part200-subpart-f.txt",
+  "title": "Subpart F\u2014Audit Requirements"
+ },
+ "https://www.ecfr.gov/current/title-2/subtitle-B/chapter-XI/subchapter-D/part-1104": {
+  "file": "ecfr-title2-part1104.txt",
+  "title": "PART 1104\u2014IMPLEMENTATION OF GOVERNMENTWIDE GUIDANCE FOR GRANTS AND COOPERATIVE AGREEMENTS"
+ },
+ "https://www.ecfr.gov/current/title-2/subtitle-B/chapter-IX/part-910": {
+  "file": "ecfr-title2-part910.txt",
+  "title": "PART 910\u2014UNIFORM ADMINISTRATIVE REQUIREMENTS, COST PRINCIPLES, AND AUDIT REQUIREMENTS FOR FEDERAL AWARDS"
+ },
+ "https://www.ecfr.gov/current/title-42/chapter-I/subchapter-D/part-93": {
+  "file": "ecfr-title42-part93.txt",
+  "title": "PART 93\u2014PUBLIC HEALTH SERVICE POLICIES ON RESEARCH MISCONDUCT"
+ },
+ "https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-A/part-46": {
+  "file": "ecfr-title45-part46.txt",
+  "title": "PART 46\u2014PROTECTION OF HUMAN SUBJECTS"
+ },
+ "https://www.ecfr.gov/current/title-42/chapter-I/subchapter-D/part-50/subpart-F": {
+  "file": "ecfr-title42-part50-subpart-f.txt",
+  "title": "Subpart F\u2014Promoting Objectivity in Research"
+ },
+ "https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-730": {
+  "file": "ecfr-title15-part730.txt",
+  "title": "PART 730\u2014GENERAL INFORMATION"
+ },
+ "https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-732": {
+  "file": "ecfr-title15-part732.txt",
+  "title": "PART 732\u2014STEPS FOR USING THE EAR"
+ },
+ "https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-734": {
+  "file": "ecfr-title15-part734.txt",
+  "title": "PART 734\u2014SCOPE OF THE EXPORT ADMINISTRATION REGULATIONS"
+ },
+ "https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-736": {
+  "file": "ecfr-title15-part736.txt",
+  "title": "PART 736\u2014GENERAL PROHIBITIONS"
+ },
+ "https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-738": {
+  "file": "ecfr-title15-part738.txt",
+  "title": "PART 738\u2014COMMERCE CONTROL LIST OVERVIEW AND THE COUNTRY CHART"
+ },
+ "https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-740": {
+  "file": "ecfr-title15-part740.txt",
+  "title": "PART 740\u2014LICENSE EXCEPTIONS"
+ },
+ "https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-742": {
+  "file": "ecfr-title15-part742.txt",
+  "title": "PART 742\u2014CONTROL POLICY\u2014CCL BASED CONTROLS"
+ },
+ "https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-743": {
+  "file": "ecfr-title15-part743.txt",
+  "title": "PART 743\u2014SPECIAL REPORTING AND NOTIFICATION"
+ },
+ "https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-745": {
+  "file": "ecfr-title15-part745.txt",
+  "title": "PART 745\u2014CHEMICAL WEAPONS CONVENTION REQUIREMENTS"
+ },
+ "https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-746": {
+  "file": "ecfr-title15-part746.txt",
+  "title": "PART 746\u2014EMBARGOES AND OTHER SPECIAL CONTROLS"
+ },
+ "https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-748": {
+  "file": "ecfr-title15-part748.txt",
+  "title": "PART 748\u2014APPLICATIONS (CLASSIFICATION, ADVISORY, AND LICENSE) AND DOCUMENTATION"
+ },
+ "https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-750": {
+  "file": "ecfr-title15-part750.txt",
+  "title": "PART 750\u2014APPLICATION PROCESSING, ISSUANCE, AND DENIAL"
+ },
+ "https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-754": {
+  "file": "ecfr-title15-part754.txt",
+  "title": "PART 754\u2014SHORT SUPPLY CONTROLS"
+ },
+ "https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-756": {
+  "file": "ecfr-title15-part756.txt",
+  "title": "PART 756\u2014APPEALS AND JUDICIAL REVIEW"
+ },
+ "https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-758": {
+  "file": "ecfr-title15-part758.txt",
+  "title": "PART 758\u2014EXPORT CLEARANCE REQUIREMENTS AND AUTHORITIES"
+ },
+ "https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-760": {
+  "file": "ecfr-title15-part760.txt",
+  "title": "PART 760\u2014RESTRICTIVE TRADE PRACTICES OR BOYCOTTS"
+ },
+ "https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-762": {
+  "file": "ecfr-title15-part762.txt",
+  "title": "PART 762\u2014RECORDKEEPING"
+ },
+ "https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-764": {
+  "file": "ecfr-title15-part764.txt",
+  "title": "PART 764\u2014ENFORCEMENT AND PROTECTIVE MEASURES"
+ },
+ "https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-766": {
+  "file": "ecfr-title15-part766.txt",
+  "title": "PART 766\u2014ADMINISTRATIVE ENFORCEMENT PROCEEDINGS"
+ },
+ "https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-768": {
+  "file": "ecfr-title15-part768.txt",
+  "title": "PART 768\u2014FOREIGN AVAILABILITY DETERMINATION PROCEDURES AND CRITERIA"
+ },
+ "https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-770": {
+  "file": "ecfr-title15-part770.txt",
+  "title": "PART 770\u2014INTERPRETATIONS"
+ },
+ "https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-772": {
+  "file": "ecfr-title15-part772.txt",
+  "title": "PART 772\u2014DEFINITIONS OF TERMS"
+ },
+ "https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-744": {
+  "file": "ecfr-title15-part744-1.txt",
+  "title": "PART 744\u2014CONTROL POLICY: END-USER AND END-USE BASED (1 of 5)"
+ },
+ "https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-744/#2": {
+  "file": "ecfr-title15-part744-2.txt",
+  "title": "PART 744\u2014CONTROL POLICY: END-USER AND END-USE BASED (2 of 5)"
+ },
+ "https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-744/#3": {
+  "file": "ecfr-title15-part744-3.txt",
+  "title": "PART 744\u2014CONTROL POLICY: END-USER AND END-USE BASED (3 of 5)"
+ },
+ "https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-744/#4": {
+  "file": "ecfr-title15-part744-4.txt",
+  "title": "PART 744\u2014CONTROL POLICY: END-USER AND END-USE BASED (4 of 5)"
+ },
+ "https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-744/#5": {
+  "file": "ecfr-title15-part744-5.txt",
+  "title": "PART 744\u2014CONTROL POLICY: END-USER AND END-USE BASED (5 of 5)"
+ },
+ "https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-774": {
+  "file": "ecfr-title15-part774-1.txt",
+  "title": "PART 774\u2014THE COMMERCE CONTROL LIST (1 of 4)"
+ },
+ "https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-774/#2": {
+  "file": "ecfr-title15-part774-2.txt",
+  "title": "PART 774\u2014THE COMMERCE CONTROL LIST (2 of 4)"
+ },
+ "https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-774/#3": {
+  "file": "ecfr-title15-part774-3.txt",
+  "title": "PART 774\u2014THE COMMERCE CONTROL LIST (3 of 4)"
+ },
+ "https://www.ecfr.gov/current/title-15/subtitle-B/chapter-VII/subchapter-C/part-774/#4": {
+  "file": "ecfr-title15-part774-4.txt",
+  "title": "PART 774\u2014THE COMMERCE CONTROL LIST (4 of 4)"
+ }
 }

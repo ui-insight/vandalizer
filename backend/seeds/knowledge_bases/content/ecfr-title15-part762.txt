@@ -1,0 +1,182 @@
+PART 762—RECORDKEEPING
+
+Authority:50 U.S.C. 4801-4852; 50 U.S.C. 4601 et seq.; 50 U.S.C. 1701 et seq.; E.O. 13222, 66 FR 44025, 3 CFR, 2001 Comp., p. 783.
+Source:61 FR 12900, Mar. 25, 1996, unless otherwise noted.
+
+§ 762.1 Scope.
+
+In this part, references to the EAR are references to 15 CFR chapter VII, subchapter C.
+(a) Transactions subject to this part. The recordkeeping provisions of this part apply to the following transactions:
+(1) Transactions involving restrictive trade practices or boycotts described in part 760 of the EAR;
+(2) Exports of commodities, software, or technology from the United States and any known reexports, transfers (in-country), transshipment, or diversions of items exported from the United States;
+(3) Exports to Canada, if, at any stage in the transaction, it appears that a person in a country other than the United States or Canada has an interest therein, or that the item involved is to be reexported, transshipped, or diverted from Canada to another foreign country; or
+(4) Any other transactions subject to the EAR, including, but not limited to, the prohibitions against servicing, forwarding and other actions for or on behalf of end-users of proliferation concern contained in §§ 736.2(b)(7) and 744.6 of the EAR. This part also applies to all negotiations connected with those transactions, except that for export control matters a mere preliminary inquiry or offer to do business and negative response thereto shall not constitute negotiations, unless the inquiry or offer to do business proposes a transaction that a reasonably prudent exporter would believe likely to lead to a violation of the EAA, the EAR or any order, license or authorization issued thereunder.
+(b) Persons subject to this part. Any person subject to the jurisdiction of the United States who, as principal or agent (including a forwarding agent), participates in any transaction described in paragraph (a) of this section, and any person in the United States or abroad who is required to make and maintain records under any provision of the EAR, shall keep and maintain all records described in § 762.2 of this part that are made or obtained by that person and shall produce them in a manner provided by § 762.7 of this part.
+[61 FR 12900, Mar. 25, 1996, as amended at 70 FR 22249, Apr. 29, 2005; 78 FR 13471, Feb. 28, 2013; 87 FR 57106, Sept. 16, 2022]
+
+§ 762.2 Records to be retained.
+
+(a) Records required to be retained. The records required to be retained under this part 762 include the following:
+(1) Export control documents as defined in part 772 of the EAR, except parties submitting documents electronically to BIS via the SNAP-R system are not required to retain copies of documents so submitted;
+(2) Memoranda;
+(3) Notes;
+(4) Correspondence;
+(5) Contracts;
+(6) Invitations to bid;
+(7) Books of account;
+(8) Financial records;
+(9) Restrictive trade practice or boycott documents and reports;
+(10) Notification from BIS of an application being returned without action; notification by BIS of an application being denied; notification by BIS of the results of a commodity classification or encryption review request conducted by BIS;
+(11) The serial number, make, model, and caliber for any firearm controlled in ECCNs 0A501.a, 0A506, or 0A507 and for shotguns with barrel length less than 18 inches controlled in 0A502 and 0A508 that have been exported. The “exporter” or any other party to the transaction (see § 758.3 of the EAR), that creates or receives such records is a person responsible for retaining this record; and
+(12) Other records pertaining to the types of transactions described in § 762.1(a) of this part, which are made or obtained by a person described in § 762.1(b) of this part.
+(b) Records retention references. Paragraph (a) of this section describes records that are required to be retained. Other parts, sections, or supplements of the EAR which require the retention of records or contain recordkeeping provisions, include, but are not limited to the following:
+(1) § 732.6, Steps for other requirements;
+(2) § 734.4(g), de minimis calculation (method);
+(3) Section 734.9(h), Foreign Direct Product (FDP) supply chain certification;
+(4) Part 736, General Prohibitions;
+(5) § 740.1, Introduction (to License Exceptions);
+(6) § 740.9(a)(3)(i)(B), Tools of trade: Temporary exports, reexports, and transfers (in country) of technology by U.S. persons (TMP);
+(7) § 740.10(c), Servicing and replacement of parts and equipment (RPL);
+(8) § 740.11(b)(2)(iii) and (iv), Exports, reexports and transfers (in-country) made for or on behalf of a department or agency of the U.S. Government and Items exported at the direction of the U.S. Department of Defense (GOV);
+(9) § 740.12, Humanitarian donations (GFT);
+(10) § 740.13(h), Technology and software—unrestricted (TSU);
+(11) § 740.20(g), Responses to License Exception STA eligibility requests for “600 series” end items (STA);
+(12) § 743.1, Wassenaar reports;
+(13) § 743.2, High Performance Computers;
+(14) § 743.4(c)(1) and (c)(2), Conventional arms reporting;
+(15) § 745.1, Annual reports;
+(16) § 745.2, End-use certificates;
+(17) § 746.3 Iraq;
+(18) [Reserved]
+(19) § 748.1(d)(2), Procedure for requesting authorization to file paper applications, notifications, or requests;
+(20) § 748.4(b), Disclosure of parties on license applications and the power of attorney;
+(21) § 748.6, General instructions for license applications;
+(22) § 748.9, Support documents for license applications;
+(23) § 748.10, PRC End-User Statement;
+(24) § 748.11, Statement by Ultimate Consignee and Purchaser;
+(25) § 748.12, Firearms Convention (FC) Import Certificate;
+(26) [Reserved]
+(27) Supplement No. 2 to Part 748 paragraph (c)(2), Security Safeguard Plan requirement;
+(28) § 750.7, Issuance of license and acknowledgment of conditions;
+(29) § 750.8, Revocation or suspension of license;
+(30) § 750.9, Duplicate licenses;
+(31) § 750.10, Transfer of licenses for export;
+(32)-(39) [Reserved]
+(40) § 754.4, Unprocessed western red cedar;
+(41) § 758.1 and § 758.2, Automated Export System record;
+(42) § 758.1(h), Record and proof of agent's authority;
+(43) § 758.3(b), Routed Export Transactions;
+(44) § 758.6, Destination control statements;
+(45) § 760.5, Reporting requirements;
+(46) § 762.2, Records to be retained;
+(47) § 764.2, Violations;
+(48) § 764.5, Voluntary self-disclosure;
+(49) § 766.10, Subpoenas;
+(50) § 772.2, “Specially designed” definition, note to paragraphs (b)(4), (b)(5), and (b)(6);
+(51) § 740.20, note to paragraph (c)(1), License Exception STA prior approval on a BIS or DDTC license (STA);
+(52) § 744.15(b), UVL statement as well as any logs or records created for multiple exports, reexports, and transfers (in-country);
+(53) § 750.7(c)(2), Notification of name change by advisory opinion request;
+(54) § 748.13, Certain Hong Kong import and export licenses; and
+(55) § 740.23, License Exception MED.
+(56) § 740.25, License Exception HBM.
+(57) § 740.26, License Exception RFF.
+(58) § 740.27, License Exception AIA.
+(59) § 740.28, License Exception ACM.
+(60) § 740.29, License Exception LPP.
+(61) § 748.16(b), all records relating to requests for addition or modifications to or deletion from supplement no. 6 or supplement no. 7 to part 740.
+(62) Supplement No. 2 to Part 743 Authorized Integrated Circuit Designer Vetting Form.
+(c) Special recordkeeping requirement—(1) Libya. Persons in receipt of a specific license granted by the Department of the Treasury's Office of Foreign Assets Control (OFAC) for the export to Libya of any item subject to the EAR must maintain a record of those items transferred to Libya pursuant to such specific license and record when the items are consumed or destroyed in the normal course of their use in Libya, reexported to a third country not requiring further authorization from BIS, or returned to the United States. This requirement applies only to items subject to a license requirement under the EAR for export to Libya as of April 29, 2004. These records must include the following information:
+(i) Date of export or reexport and related details (including means of transport);
+(ii) Description of items (including ECCN) and value of items in U.S. Dollars;
+(iii) Description of proposed end-use and locations in Libya where items are intended to be used;
+(iv) Parties other than specific OFAC licensee who may be given temporary access to the items; and
+(v) Date of consumption or destruction, if the items are consumed or destroyed in the normal course of their use in Libya, or the date of reexport to a third country not requiring further authorization from BIS, or return to the United States.
+(2) [Reserved]
+[61 FR 12900, Mar. 25, 1996]
+
+Editorial Note:
+
+For Federal Register citations affecting § 762.2, see the List of CFR Sections Affected, which appears in the Finding Aids section of the printed volume and at www.govinfo.gov.
+
+§ 762.3 Records exempt from recordkeeping requirements.
+
+(a) The following types of records have been determined to be exempt from the recordkeeping requirement procedures:
+(1) Export information page;
+(2) Special export file list;
+(3) Vessel log from freight forwarder;
+(4) Inspection certificate;
+(5) Warranty certificate, except for a warranty certificate issued for an address located outside the United States for any firearm controlled in ECCNs 0A501.a or .b, 0A506 or 0A507 and for shotguns with barrel length less than 18 inches controlled in 0A502 or 0A508;
+(6) Guarantee certificate;
+(7) Packing material certificate;
+(8) Goods quality certificate;
+(9) Notification to customer of advance meeting;
+(10) Letter of indemnity;
+(11) Financial release form;
+(12) Financial hold form;
+(13) Export parts shipping problem form;
+(14) Draft number log;
+(15) Expense invoice mailing log;
+(16) Financial status report;
+(17) Bank release of guarantees;
+(18) Cash sheet;
+(19) Commission payment back-up;
+(20) Commissions payable worksheet;
+(21) Commissions payable control;
+(22) Check request forms;
+(23) Accounts receivable correction form;
+(24) Check request register;
+(25) Commission payment printout;
+(26) Engineering fees invoice;
+(27) Foreign tax receipt;
+(28) Individual customer credit status;
+(29) Request for export customers code forms;
+(30) Acknowledgement for receipt of funds;
+(31) Escalation development form;
+(32) Summary quote;
+(33) Purchase order review form;
+(34) Proposal extensions;
+(35) Financial proposal to export customers;
+and
+(36) Sales summaries.
+(b) [Reserved]
+[61 FR 12900, Mar. 25, 1996, as amended at 62 FR 25469, May 9, 1997; 85 FR 4180, Jan. 23, 2020; 89 FR 34710, Apr. 30, 2024]
+
+§ 762.4 Original records required.
+
+The regulated person must maintain the original records in the form in which that person receives or creates them unless that person meets all of the conditions of § 762.5 of this part relating to reproduction of records. If the original record does not meet the standards of legibility and readability described in § 762.5 of this part and the regulated person intends to rely on that record to meet the recordkeeping requirements of the EAR, that person must retain the original record. With respect to documents that BIS issues to a party in SNAP-R, either an electronically stored copy in a format that makes the document readable with software possessed by that party or a paper print out of the complete document is deemed to be an original record for purposes of this section.
+[61 FR 12900, Mar. 25, 1996, as amended at 75 FR 17055, Apr. 5, 2010]
+
+§ 762.5 Reproduction of original records.
+
+(a) The regulated person may maintain reproductions instead of the original records provided all of the requirements of paragraph (b) of this section are met.
+(b) In order to maintain the records required by § 762.2 of this part, the regulated persons defined in § 762.1 of this part may use any photographic, photostatic, miniature photographic, micrographic, automated archival storage, or other process that completely, accurately, legibly and durably reproduces the original records (whether on paper, microfilm, or through electronic digital storage techniques). The process must meet all of the following requirements, which are applicable to all systems:
+(1) The system must be capable of reproducing all records on paper.
+(2) The system must record and be able to reproduce all marks, information, and other characteristics of the original record, including both obverse and reverse sides of paper documents in legible form.
+(3) When displayed on a viewer, monitor, or reproduced on paper, the records must exhibit a high degree of legibility and readability. (For purposes of this section, legible and legibility mean the quality of a letter or numeral that enable the observer to identify it positively and quickly to the exclusion of all other letters or numerals. Readable and readability mean the quality of a group of letters or numerals being recognized as complete words or numbers.)
+(4) The system must preserve the initial image (including both obverse and reverse sides of paper documents) and record all changes, who made them and when they were made. This information must be stored in such a manner that none of it may be altered once it is initially recorded.
+(5) The regulated person must establish written procedures to identify the individuals who are responsible for the operation, use and maintenance of the system.
+(6) The regulated person must establish written procedures for inspection and quality assurance of records in the system and document the implementation of those procedures.
+(7) The system must be complete and contain all records required to be kept by this part or the regulated person must provide a method for correlating, identifying and locating records relating to the same transaction(s) that are kept in other record keeping systems.
+(8) The regulated person must keep a record of where, when, by whom, and on what equipment the records and other information were entered into the system.
+(9) Upon request by the Office of Export Enforcement, the Office of Antiboycott Compliance, or any other agency of competent jurisdiction, the regulated person must furnish, at the examination site, the records, the equipment and, if necessary, knowledgeable personnel for locating, reading, and reproducing any record in the system.
+(c) Requirements applicable to systems based on the storage of digital images. For systems based on the storage of digital images, the system must provide accessibility to any digital image in the system. With respect to records of transactions, including those involving restrictive trade practices or boycott requirements or requests. The system must be able to locate and reproduce all records relating to a particular transaction based on any one of the following criteria:
+(1) The name(s) of the parties to the transaction;
+(2) Any country(ies) connected with the transaction; or
+(3) A document reference number that was on any original document.
+(d) Requirements applicable to a system based on photographic processes. For systems based on photographic, photostatic, or miniature photographic processes, the regulated person must maintain a detailed index of all records in the system that is arranged in such a manner as to allow immediate location of any particular record in the system.
+
+§ 762.6 Period of retention.
+
+(a) Five year retention period. All records required to be kept by the EAR must be retained for five years from the latest of the following times:
+(1) The export from the United States of the item involved in the transaction to which the records pertain or the provision of financing, transporting or other service for or on behalf of end-users of proliferation concern as described in §§ 736.2(b)(7) and 744.6 of the EAR;
+(2) Any known reexport, transfer (in-country), transshipment, or diversion of such item;
+(3) Any other termination of the transaction, whether formally in writing or by any other means; or
+(4) In the case of records of pertaining to transactions involving restrictive trade practices or boycotts described in part 760 of the EAR, the date the regulated person receives the boycott-related request or requirement.
+(b) Destruction or disposal of records. If the Bureau of Industry and Security or any other government agency makes a formal or informal request for a certain record or records, such record or records may not be destroyed or disposed of without the written authorization of the agency concerned. This prohibition applies to records pertaining to voluntary disclosures made to BIS in accordance with § 764.5(c)(4)(ii) and other records even if such records have been retained for a period of time exceeding that required by paragraph (a) of this section.
+[61 FR 12900, Mar. 25, 1996, as amended at 72 FR 3946, Jan. 29, 2007; 87 FR 57106, Sept. 16, 2022]
+
+§ 762.7 Producing and inspecting records.
+
+(a) Persons located in the United States. Persons located in the United States may be asked to produce books, records, and other information that are required to be kept by any provision of the EAR, or any license, order, or authorization issued thereunder and to make them available for inspection and copying by any authorized official of the BIS, or any other official of the United States designated by BIS, without any charge or expense to such official. OEE and the Office of Antiboycott Compliance encourage voluntary cooperation with such requests. When voluntary cooperation is not forthcoming, OEE and the Office of Antiboycott Compliance are authorized to issue subpoenas requiring persons to appear and testify, or to produce books, records, and other writings. In instances where a person does not comply with a subpoena, the Department of Commerce may petition a district court to have the subpoena enforced.
+(b) Persons located outside of the United States. Persons located outside of the United States that are required to keep books, records, and other information by any provision of the EAR or by any license, order, or authorization issued thereunder shall produce all books, records, and other information required to be kept, or reproductions thereof, and make them available for inspection and copying upon request by an authorized official of BIS without any charge or expense to such official. BIS may designate any other official of the United States to exercise the authority of BIS under this subsection.
+[85 FR 73416, Nov. 18, 2020]

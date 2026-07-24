@@ -1,0 +1,240 @@
+PART 730—GENERAL INFORMATION
+
+Authority:50 U.S.C. 4801-4852; 50 U.S.C. 4601 et seq.; 50 U.S.C. 1701 et seq.; 10 U.S.C. 8720; 10 U.S.C. 8730(e); 22 U.S.C. 287c; 22 U.S.C. 2151 note; 22 U.S.C. 3201 et seq.; 22 U.S.C. 6004; 42 U.S.C. 2139a; 15 U.S.C. 1824; 50 U.S.C. 4305; 22 U.S.C. 7201 et seq.; 22 U.S.C. 7210; E.O. 11912, 41 FR 15825, 3 CFR, 1976 Comp., p. 114; E.O. 12002, 42 FR 35623, 3 CFR, 1977 Comp., p. 133; E.O. 12058, 43 FR 20947, 3 CFR, 1978 Comp., p. 179; E.O. 12214, 45 FR 29783, 3 CFR, 1980 Comp., p. 256; E.O. 12851, 58 FR 33181, 3 CFR, 1993 Comp., p. 608; E.O. 12854, 58 FR 36587, 3 CFR, 1993 Comp., p. 179; E.O. 12918, 59 FR 28205, 3 CFR, 1994 Comp., p. 899; E.O. 12938, 59 FR 59099, 3 CFR, 1994 Comp., p. 950; E.O. 12981, 60 FR 62981, 3 CFR, 1995 Comp., p. 419; E.O. 13020, 61 FR 54079, 3 CFR, 1996 Comp., p. 219; E.O. 13026, 61 FR 58767, 3 CFR, 1996 Comp., p. 228; E.O. 13222, 66 FR 44025, 3 CFR, 2001 Comp., p. 783; E.O. 13224, 66 FR 49079, 3 CFR, 2001 Comp., p. 786; E.O. 13338, 69 FR 26751, 3 CFR, 2004 Comp., p 168; E.O. 13637, 78 FR 16129, 3 CFR, 2014 Comp., p. 223; Notice of September 18, 2020, 85 FR 59641 (September 22, 2020); Notice of November 12, 2020, 85 FR 72897 (November 13, 2020); Notice of May 7, 2020, 85 FR 27639.
+Source:61 FR 12734, Mar. 25, 1996, unless otherwise noted.
+
+§ 730.1 What these regulations cover.
+
+In this part, references to the Export Administration Regulations (EAR) are references to 15 CFR chapter VII, subchapter C. The EAR are issued by the United States Department of Commerce, Bureau of Industry and Security (BIS) under laws relating to the control of certain exports, reexports, and activities. In addition, the EAR implement antiboycott law provisions requiring regulations to prohibit specified conduct by United States persons that has the effect of furthering or supporting boycotts fostered or imposed by a country against a country friendly to United States. Supplement no. 1 to part 730 lists the control numbers assigned to information collection requirements under the EAR by the Office of Management and Budget pursuant to the Paperwork Reduction Act of 1995.
+
+§ 730.2 Statutory authority.
+
+The EAR have been designed primarily to implement the Export Administration Act of 1979, as amended, 50 U.S.C. app. 2401-2420 (EAA). There are numerous other legal authorities underlying the EAR. These are listed in the Federal Register documents promulgating the EAR and at the beginning of each part of the EAR in the Code of Federal Regulations (CFR). From time to time, the President has exercised authority under the International Emergency Economic Powers Act with respect to the EAR (50 U.S.C. 1701-1706 (IEEPA)). The EAA is not permanent legislation, and when it has lapsed, Presidential executive orders under IEEPA have directed and authorized the continuation in force of the EAR.
+
+§ 730.3 “Dual use” and other types of items subject to the EAR.
+
+The term “dual use” is often used to describe the types of items subject to the EAR. A “dual-use” item is one that has civil applications as well as terrorism and military or weapons of mass destruction (WMD)-related applications. The precise description of what is “subject to the EAR” is in § 734.3, which does not limit the EAR to controlling only dual-use items. In essence, the EAR control any item warranting control that is not exclusively controlled for export, reexport, or transfer (in-country) by another agency of the U.S. Government or otherwise excluded from being subject to the EAR pursuant to § 734.3(b) of the EAR. Thus, items subject to the EAR include purely civilian items, items with both civil and military, terrorism or potential WMD-related applications, and items that are exclusively used for military applications but that do not warrant control under the International Traffic in Arms Regulations (ITAR) (22 CFR parts 120 et seq.).
+[78 FR 22705, Apr. 16, 2013]
+
+§ 730.4 Other control agencies and departments.
+
+In addition to the departments and agencies mentioned in § 730.3 of this part, other departments and agencies have jurisdiction over certain narrower classes of exports and reexports. These include the Department of Treasury's Office of Foreign Assets Control (OFAC), which administers controls against certain countries that are the object of sanctions affecting not only exports and reexports, but also imports and financial dealings. For your convenience, supplement no. 3 to part 730 identifies other departments and agencies with regulatory jurisdiction over certain types of exports and reexports. This is not a comprehensive list, and the brief descriptions are only generally indicative of the types of controls administered and/or enforced by each agency.
+
+§ 730.5 Coverage of more than exports.
+
+The core of the export control provisions of the EAR concerns exports from the United States. You will find, however, that some provisions give broad meaning to the term “export”, apply to transactions outside of the United States, or apply to activities other than exports.
+(a) Reexports. Commodities, software, and technology that have been exported from the United States are generally subject to the EAR with respect to reexport. Many such reexports, however, may go to many destinations without a license or will qualify for an exception from licensing requirements.
+(b) Foreign products. In some cases, exports from abroad, reexports or transfers (in-country) of items produced outside of the United States are subject to the EAR when they contain more than the de minimis amount of controlled U.S.-origin content as specified in § 734.4 of the EAR or when they are the direct product of specified “technology,” “software,” or a “plant or major component of a plant” as specified in § 736.2(b)(3) of the EAR.
+(c) Scope of “exports”. Certain actions that you might not regard as an “export” in other contexts do constitute an export subject to the EAR. The release of technology to a foreign national in the United States through such means as demonstration or oral briefing is deemed an export. Other examples of exports under the EAR include the return of foreign equipment to its country of origin after repair in the United States, shipments from a U.S. foreign trade zone, and the electronic transmission of non-public data that will be received abroad.
+(d) “U.S. person” activities. The EAR restrict specific activities of “U.S. persons,” wherever located, related to the proliferation of nuclear explosive devices, “missiles,” chemical or biological weapons, whole plants for chemical weapons precursors, and certain military-intelligence end uses and end users, as described in § 744.6 of the EAR.
+[61 FR 12734, Mar. 25, 1996, as amended at 61 FR 68577, Dec. 30, 1996; 74 FR 52882, Oct. 15, 2009; 85 FR 29852, May 19, 2020; 86 FR 4869, Jan. 15, 2021]
+
+§ 730.6 Control purposes.
+
+The export control provisions of the EAR are intended to serve the national security, foreign policy, nonproliferation of weapons of mass destruction, and other interests of the United States, which in many cases are reflected in international obligations or arrangements. Some controls are designed to restrict access to items subject to the EAR by countries or persons that might apply such items to uses inimical to U.S. interests. These include controls designed to stem the proliferation of weapons of mass destruction and controls designed to limit the military and terrorism support capability of certain countries. The effectiveness of many of the controls under the EAR is enhanced by their being maintained as part of multilateral control arrangements. Multilateral export control cooperation is sought through arrangements such as the Nuclear Suppliers Group, the Australia Group, and the Missile Technology Control Regime. The EAR also include some export controls to protect the United States from the adverse impact of the unrestricted export of commodities in short supply.
+[61 FR 12734, Mar. 25, 1996, as amended at 78 FR 22705, Apr. 16, 2013]
+
+§ 730.7 License requirements and exceptions.
+
+A relatively small percentage of exports and reexports subject to the EAR require an application to BIS for a license. Many items are not on the Commerce Control List (CCL) (supplement no. 1 to § 774.1 of the EAR), or, if on the CCL, require a license to only a limited number of countries. Other transactions may be covered by one or more of the License Exceptions in the EAR. In such cases no application need be made to BIS.
+
+§ 730.8 How to proceed and where to get help.
+
+(a) How the EAR are organized. The Export Administration Regulations (EAR) are structured in a logical manner. In dealing with the EAR you may find it helpful to be aware of the overall organization of these regulations. In order to determine what the rules are and what you need to do, review the titles and the introductory sections of the parts of the EAR.
+(1) How do you go about determining your obligations under the EAR? Part 732 of the EAR provides steps you may follow to determine your obligations under the EAR. You will find guidance to enable you to tell whether or not your transaction is subject to the EAR and, if it is, whether it qualifies for a License Exception or must be authorized through issuance of a license.
+(2) Are your items or activities subject to the EAR at all? Part 734 of the EAR defines the items and activities that are subject to the EAR. Note that the definition of “items subject to the EAR” includes, but is not limited to, items listed on the Commerce Control List in part 774 of the EAR.
+(3) If subject to the EAR, what do the EAR require? Part 736 of the EAR lists all the prohibitions that are contained in the EAR. Note that certain prohibitions (General Prohibitions One through Three) apply to items as indicated on the CCL, and others (General Prohibitions Four through Ten) prohibit certain activities and apply to all items subject to the EAR unless otherwise indicated.
+(4) Do you need a license for your item or activity? What policies will BIS apply if you do need to submit license application? The EAR have four principal ways of describing license requirements:
+(i) The EAR may require a license to a country if your item is listed on the CCL and the Country Chart in part 738 of the EAR tells that a license is required to that country. Virtually all Export Control Classification Numbers (ECCN) on the CCL are covered by the Country Chart in part 738 of the EAR. That part identifies the limited number of entries that are not included on the Chart. These ECCNs will state the specific countries that require a license or refer you to a self-contained section, i.e., Short Supply in part 754 of the EAR, or Embargoes in part 746 of the EAR. If a license is required, you should consult part 740 of the EAR which describes the License Exception that may be available for items on the CCL. Part 742 of the EAR describes the licensing policies that BIS will apply in reviewing an application you file. Note that part 754 of the EAR on short supply controls and part 746 on embargoes are self-contained parts that include the available exceptions and licensing policy.
+(ii) A license requirement may be based on the end-use or end-user in a transaction, primarily for proliferation reasons. Part 744 of the EAR describes such requirements and relevant licensing policies and includes both restrictions on items and restrictions on the activities of U.S. persons.
+(iii) A license is required for virtually all exports to embargoed destinations, such as Cuba. Part 746 of the EAR describes all the licensing requirements, license review policies and License Exceptions that apply to such destinations. If your transaction involves one of these countries, you should first look at this part. This part also describes controls that may be maintained under the EAR to implement UN sanctions.
+(iv) In addition, under §§ 736.2(b)(9) and (10) of the EAR, you may not engage in a transaction knowing a violation is about to occur or violate any orders, terms, and conditions under the EAR. Part 764 of the EAR describes prohibited transactions with a person denied export privileges or activity that violates the terms or conditions of a denial order.
+(5) How do you file a license application and what will happen to the application once you do file it? What if you need authorization for multiple transactions? Parts 748 and 750 of the EAR provide information on license submission and processing. If your application is denied, part 756 of the EAR provides rules for filing appeals.
+(6) How do you clear shipments with the U.S. Customs Service? Part 758 of the EAR describes the requirements for clearance of exports.
+(7) Where do you find the rules on restrictive trade practices and boycotts? Part 760 of the EAR deals with restrictive trade practices and boycotts.
+(8) Where are the rules on recordkeeping and enforcement? Part 762 of the EAR sets out your recordkeeping requirements, and parts 764 and 766 of the EAR deal with violations and enforcement proceedings.
+(9) What is the effect of foreign availability? Part 768 of the EAR provides rules for determining foreign availability of items subject to controls.
+(10) Do the EAR provide definitions and interpretations? Part 770 of the EAR contains interpretations and part 772 of the EAR lists definitions used.
+(b) Why the EAR are so detailed. Some people will find the great length of the EAR and their extensive use of technical terms intimidating. BIS believes, however, that such detail and precision can and does serve the interests of the public. The detailed listing of technical parameters in the CCL establishes precise, objective criteria. This should, in most cases, enable you to ascertain the appropriate control status. Broader, more subjective criteria would leave exporters and reexporters more dependent upon interpretations and rulings by BIS officials. Moreover, much of the detail in the CCL is derived from multilaterally adopted lists, and the specificity serves to enhance the uniformity and effectiveness of international control practices and to promote a “level playing field”. The detailed presentation of such elements as licensing and export clearance procedures enables you to find in one place what you need to know to comply with pertinent requirements. Of special importance is the detailed listing of License Exception criteria, as these will enable you to determine quickly, and with confidence, that you may proceed with a transaction without delay. Finally, some of the detail results from the need to draft the EAR with care in order to avoid loop-holes and to permit effective enforcement.
+(c) Where to get help. Throughout the EAR you will find information on offices you can contact for various purposes and types of information. General information including assistance in understanding the EAR, information on how to obtain forms, electronic services, publications, and information on training programs offered by BIS, is available from the Office of Export Services at the following locations: Outreach and Educational Services Division, U.S. Department of Commerce, 14th and Pennsylvania Avenue, NW., Room H1099D, Washington, DC 20230, Tel: (202) 482-4811, Fax: (202) 482-2927, and Bureau of Industry and Security, Western Regional Office, U.S. Department of Commerce, 2302 Martin St., Suite 330, Irvine, CA 92612, Tel: (949) 660-0144, Fax: (949) 660-9347, and Bureau of Industry and Security, Western Regional Office, Northern California Branch, U.S. Department of Commerce, 160 W. Santa Clara Street, Suite 725, San Jose, CA 95113, Tel: (408) 998-8806, Fax: (408) 998-8677.
+[61 FR 12734, Mar. 25, 1996, as amended at 69 FR 5687, Feb. 6, 2004; 70 FR 14386, Mar. 22, 2005; 70 FR 22249, Apr. 29, 2005; 72 FR 3945, Jan. 29, 2007; 73 FR 35, Jan. 2, 2008; 73 FR 75944, Dec. 15, 2008; 76 FR 40604, July 11, 2011; 80 FR 51729, Aug. 26, 2015]
+
+§ 730.9 Organization of the Bureau of Industry and Security.
+
+The head of the Bureau of Industry and Security is the Under Secretary for Industry and Security. The Under Secretary is assisted by a Deputy Under Secretary for Industry and Security, the Assistant Secretary for Export Administration, the Assistant Secretary for Export Enforcement, the Director of Administration, the Director of the Office of Congressional and Public Affairs, and the Chief Information Officer. The functions and authorities of the Under Secretary are described in the Department's Organizational Order 10-16. The Department's organizational and administrative orders are available via Office of Management and Organization's Web page on the Department's Web site at http://www.osec.doc.gov/omo/DMPHome.htm. The principal functions of the Bureau that directly affect the public are carried out by two units: Export Administration and Export Enforcement.
+(a) Export Administration is headed by the Assistant Secretary for Export Administration, who is assisted by a Deputy Assistant Secretary. Its substantive work is carried out by six sub-units: the Office of Nonproliferation and Treaty Compliance, the Office of National Security and Technology Transfer Controls, the Office of Exporter Services, the Operating Committee, the Office of Strategic Industries and Economic Security, and the Office of Technology Evaluation. The functions of the Operating Committee are described in § 750.4(f)(1) of the EAR. The roles of the other units are described on BIS's Web site at http://www.bis.doc.gov/about/programoffices.htm.
+(b) Export Enforcement is headed by the Assistant Secretary for Export Enforcement who is assisted by a Deputy Assistant Secretary. Its substantive work is carried out by three sub-units: the Office of Export Enforcement, the Office of Enforcement Analysis and the Office of Antiboycott Compliance. The roles of these units are described on BIS's Web site at http://www.bis.doc.gov/about/programoffices.htm.
+(c) BIS is also assisted in its work by six technical advisory committees. The procedures and criteria for establishing and operating the technical advisory committees is at supplement No. 2 to this part. Information about the specific roles of each committee, meeting schedules, and membership selection is available on BIS's Web site at http://tac.bis.doc.gov/.
+[70 FR 8248, Feb. 18, 2005, as amended at 72 FR 25196, May 4, 2007]
+
+§ 730.10 Advisory information.
+
+The general information in this part is just that—general. To achieve brevity, so as to give you a quick overview, the information in this part is selective, incomplete, and not expressed with regulatory precision. The controlling language is the language of succeeding parts of the EAR and of any other laws or regulations referred to or applicable. The content of this part is not to be construed as modifying or interpreting any other language or as in any way, limiting the authority of BIS, any of its components or any other government department or agency. You should not take any action based solely on what you read in this part.
+
+Supplement No. 1 to Part 730—Information Collection Requirements Under the Paperwork Reduction Act: OMB Control Numbers
+
+This supplement lists the control numbers assigned to the information collection requirements for the Bureau of Industry and Security by the Office of Management and Budget (OMB), pursuant to the Paperwork Reduction Act of 1995. This supplement complies with the requirements of section 3506(c)(1)(B)(i) of the Paperwork Reduction Act requiring agencies to display current control numbers assigned by the Director of OMB for each agency information collection requirement.
+Collection number | Title | Reference in the EAR
+0694-0004 | Foreign Availability Procedures and Criteria | part 768.
+0694-0009 | Approval of Triangular Transactions Involving Commodities Covered by a U.S. Import Certificate | § 748.10(e).
+0694-0012 | Report of Requests for Restrictive Trade Practice or Boycott—Single or Multiple Transactions | part 760 and § 762.2(b).
+0694-0013 | Computers and Related Equipment EAR Supplement 2 to Part 748 | part 774.
+0694-0016 | Delivery Verification Certificate | §§ 748.13 and 762.2(b).
+0694-0017 | International Import Certificate | § 748.10.
+0694-0021 | Statement by Ultimate Consignee and Purchaser | §§ 748.11 and 762.2(b).
+0694-0026 | Short Supply Regulations—Petroleum Products | § 754.3.
+0694-0047 | Technology Letter of Explanation | Supplement No. 2 to part 748, paragraph (o)(2).
+0694-0058 | Procedure for Voluntary Self-Disclosure of Violations | §§ 762.2(b) and 764.5.
+0694-0073 | Export Controls of High Performance Computers | Supplement No. 2 to part 748, paragraph (c)(2), and § 762.2(b).
+0694-0088 | Simplified Network Application Processing+ System (SNAP+) and the Multipurpose Export License Application | parts 746 and 748, and § 762.2(b).
+0694-0093 | Import Certificates And End-User Certificates | §§ 748.9, 748.10, 762.5(d), 762.6 764.2(g)(2).
+0694-0096 | Five Year Records Retention Period | part 760, § 762.6(a).
+0694-0100 | Requests for Appointment of Technical Advisory Committee | Supplement No. 1 to part 730.
+0694-0102 | Registration of U.S. Agricultural Commodities For Exemption From Short Supply Limitations on Export, and Petitions For The Imposition of Monitoring Or Controls On Recyclable Metallic Materials; Public Hearings | §§ 754.6 and 754.7.
+0694-0107 | National Defense Authorization Act (NDAA) | §§ 740.7, 742.12.
+0694-0117 | Chemical Weapons Convention Provisions of the Export Administration Regulations (Schedule 1 Advance Notifications and Reports and Schedule 3 End-use Certificates) | part 745.
+0694-0122 | Licensing Responsibilities and Enforcement | §§ 744.15(b) and 748.4 and part 758.
+0694-0125 | BIS Seminar Evaluation | N/A
+0694-0126 | Export License Services—Transfer of License Ownership, Requests for a Duplicate License | § 750.9.
+0694-0129 | Export and Reexport Controls For Iraq | §§ 732.3, 738, 744.18, 746.3(b)(1), 750, 758, 762, 772, 774.
+0694-0132 | Voluntary Self-Disclosure of Antiboycott Violations | § 764.8.
+0694-0134 | Procedure for parties on the Entity List or the Unverified List to Request Removal or Modification of their Listing | §§ 744.15 and 744.16
+0694-0137 | License Exceptions and Exclusions | § 734.4, Supplement No. 2 to part 734, §§ 740.3(d), 740.4(c), 740.9(a)(2)(viii)(B), 740.9(c), 740.12(b)(7), 740.17, 740.18, Supp. No. 2 to part 740, §§ 742.15, 743.1, 743.3, 754.4, 762.2(b) and Supplement No. 1 to part 774.
+0607-0152 | Automated Export System (AES) Program | §§ 740.1(d), 740.3(a)(3), 754.4(c), 758.1, 758.2, and 758.3 of the EAR.
+[61 FR 12734, Mar. 25, 1996]
+
+Editorial Note:
+
+For Federal Register citations affecting supplement no. 1 to part 730, see the List of CFR Sections Affected, which appears in the Finding Aids section of the printed volume and at www.govinfo.gov.
+
+Supplement No. 2 to Part 730—Technical Advisory Committees
+
+(a) Purpose. The purpose of this supplement is to describe the procedures and criteria for the establishment and operation of Technical Advisory Committees.
+(b) Technical advisory committees. Any producer of articles, materials, or supplies, including technology, software, and other information, that are subject to export controls, or are being considered for such controls because of their significance to the national security of the United States, may request the Secretary of Commerce to establish a technical advisory committee, under the provisions of section 5(h) of the Export Administration Act of 1979, as amended (EAA) to advise and assist the Department of Commerce and other appropriate U.S. Government agencies or officials with respect to questions involving technical matters; worldwide availability and actual utilization of production technology; licensing procedures that affect the level of export controls applicable to a clearly defined grouping of articles, materials, or supplies, including technology, software, or other information; and exports and reexports subject to all controls that the United States maintains including proposed revisions of any such controls. If producers of articles, materials, or supplies, including technology, software, and other information, that are subject to export controls because of their significance to the national security of the United States, wish a trade association or other representative to submit a written request on their behalf for the appointment to a TAC, such request shall be submitted in accordance with paragraph (b)(4) of this supplement.
+(1) Form and substance of requests. Each request for the appointment of a TAC shall be submitted in writing to: Assistant Secretary for Export Administration, 14th Street and Pennsylvania Ave., NW., Room 2099B, Washington, DC 20230.
+The request shall include:
+(i) A description of the articles, materials, or supplies including technology and software, in terms of a clear, cohesive grouping (citing the applicable Export Control Classification Numbers where practical);
+(ii) A statement of the reasons for requesting the appointment of a TAC; and
+(iii) Any information in support of any contention that may be made that the request meets the criteria described in paragraph (b)(2) of this supplement.
+(2) Consideration of request for establishment of a TAC. The Department of Commerce will review all requests for the establishment of a TAC to determine if the following criteria are met:
+(i) That a substantial segment of the industry producing the specified articles, materials, or supplies including technology desires such a committee; and
+(ii) That the evaluation of such articles, materials, or supplies including technology and software for export control purposes is difficult because of questions involving technical matters, worldwide availability and actual utilization of production and software technology, or licensing procedures.
+(3) Requests by a substantial segment of an industry. In determining whether or not a substantial segment of any industry has requested the appointment of a TAC, the Department of Commerce will consider:
+(i) The number of persons or firms requesting the establishment of a TAC for a particular grouping of commodities, software and technology in relation to the total number of U.S. producers of such items; and
+(ii) The volume of annual production by such persons or firms of each item in the grouping in relation to the total U.S. production. Generally, a substantial segment of an industry (for purposes of this supplement) shall consist of:
+(A) Not less than 30 percent of the total number of U.S. producers of the items concerned; or
+(B) Three or more U.S. producers who produce a combined total of not less than 30 percent of the total U.S. annual production, by dollar value of the items concerned; or
+(C) Not less than 20 percent of the total number of U.S. producers of the items concerned, provided that the total of their annual production thereof is not less than 20 percent of the total U.S. annual production, by dollar value.
+(iii) If it is determined that a substantial segment of the industry concerned has requested the establishment of a TAC concerning a specific grouping of items that the Department of Commerce determines difficult to evaluate for export control purposes, BIS will establish and use the TAC requested.
+(4) Requests from trade associations or other representatives. Requests from trade associations or other representatives of U.S. producers for the establishment of a TAC must comply with the provisions of paragraphs (b) (1) through (3) of this supplement. In addition, in order to assist BIS in determining whether the criteria described in paragraph (b)(3) of this supplement have been met, a trade association or other representative submitting a request for the establishment of a TAC should include the following information:
+(i) The total number of firms in the particular industry;
+(ii) The total number of firms in the industry that have authorized the trade association or other representative to act in their behalf in this matter;
+(iii) The approximate amount of total U.S. annual production by dollar value of the items concerned produced by those firms that have authorized the trade association or other representative to act in their behalf; and
+(iv) A description of the method by which authorization to act on behalf of these producers was obtained.
+(5) Nominations for membership on TACs. When the Department of Commerce determines that the establishment of a TAC is warranted, it will request nominations for membership on the committee among the producers of the items and from any other sources that may be able to suggest well-qualified nominees.
+(6) Selection of industry members of committee. Industry members of a TAC will be selected by the Department of Commerce from a list of the nominees who have indicated their availability for service on the committee. To the extent feasible, the Department of Commerce will select a committee balanced to represent all significant facets of the industry involved, taking into consideration such factors as the size of the firms, their geographical distribution, and their product lines. No industry representative shall serve on a TAC for more than four consecutive years. The membership of a member who is absent from four consecutive meetings shall be terminated.
+(7) Government members. Government members of a TAC will be selected by the Department of Commerce from the agencies having an interest in the subject matter concerned.
+(8) Invitation to serve on committee. Invitations to serve on a TAC will be sent by letter to the selected nominees.
+(9) Election of Chair. The Chair of each TAC shall be elected by a vote of the majority of the members of the committee present and voting.
+(c) Charter. (1) No TAC established pursuant to this supplement shall meet or take any action until an advisory committee charter has been filed with the Assistant Secretary for Export Administration of the Department of Commerce and with the standing committees of the Senate and of the House of Representatives having legislative jurisdiction over the Department. Such charter shall contain the following information:
+(i) The committee's official designation;
+(ii) The committee's objectives and the scope of its activities;
+(iii) The period of time necessary for the committee to carry out its purposes;
+(iv) The agency or official to whom the committee reports;
+(v) The agency responsible for providing the necessary support for the committee;
+(vi) A description of the duties for which the committee is responsible, and, if such duties are not solely advisory, a specification of the authority for such functions;
+(vii) The estimated annual operating costs in dollars and years for such committee;
+(viii) The estimated number and frequency of committee meetings;
+(ix) The committee's termination date, if less than two years from the date of the committee's establishment; and
+(x) The date the charter is filed.
+(d) Meetings. (1) Each TAC established under the provisions of the EAA and paragraph (b) of this supplement shall meet at least once every three months at the call of its Chair unless it is specifically determined by the Chair, in consultation with other members of the committee, that a particular meeting is not necessary.
+(2) No TAC may meet except at the call of its Chair.
+(3) Each meeting of a TAC shall be conducted in accordance with an agenda approved by a designated Federal government employee.
+(4) No TAC shall conduct a meeting in the absence of a designated Federal government employee who shall be authorized to adjourn any advisory committee meeting, whenever the Federal government employee determines adjournment to be in the public interest.
+(e) Public notice. Notice to the public of each meeting of a TAC will be issued at least 20 days in advance and will be published in the Federal Register. The notice will include the time and place of the meeting and the agenda.
+(f) Public attendance and participation. (1) Any member of the public who wishes to do so may file a written statement with any TAC before or after any meeting of a committee.
+(2) A request for an opportunity to deliver an oral statement relevant to matters on the agenda of a meeting of a TAC will be granted to the extent that the time available for the meeting permits. A committee may establish procedures requiring such persons to obtain advance approval for such participation.
+(3) Attendance at meetings of TACs will be open to the public unless it is determined pursuant to section 10(d) of the Federal Advisory Committee Act to be necessary to close all, or some portion, of the meeting to the public. A determination that a meeting or portion thereof be closed to the public may be made if all or a specific portion of a meeting of a TAC is concerned with matters described in section 552(b) of Title 5, U.S.C.
+(4) Participation by members of the public in open TAC meetings or questioning of committee members or other participants shall not be permitted except in accordance with procedures established by the committee.
+(5) Every effort will be made to accommodate all members of the public who wish to attend.
+(g) Minutes. (1) Detailed minutes of each meeting of each TAC will be kept and will contain a record of the persons present, a complete and accurate description of the matters discussed and conclusions reached, and copies of all reports received, issued, or approved by the TAC.
+(2) The accuracy of all the minutes will be certified to by the TAC Chair.
+(h) Records. (1) Subject to section 552 of Title 5, U.S.C. and Department of Commerce Administrative Order 205-12, “Public Information,” and “Public Information” regulations issued by the Department of Commerce that are contained in 15 CFR part 4, Subtitle A, the records, reports, transcripts, minutes, appendices, working papers, draft, studies, agenda, or other documents that were made available to or prepared for or by each TAC will be available for public inspection and copying.
+(2) Each TAC will prepare once each year a report describing its membership, functions, activities, and such related matters as would be informative to the public consistent with the policy of section 552(b) of Title 5, U.S.C.
+(3)(i) Requests for records should be addressed to: Bureau of Industry and Security, Freedom of Information, Records Inspection Facility, U.S. Department of Commerce, Room 4513, Washington, DC 20230, Telephone (202) 482-2593.
+(ii) Rules concerning the use of the Records Inspection Facility are contained in 15 CFR part 4, Subtitle A, or may be obtained from this facility.
+(i) Compensation. If the Department of Commerce deems it appropriate, a member of a TAC may be reimbursed for travel, subsistence, and other necessary expenses incurred in connection with the member's duties.
+(j) Scope of advisory committee functions. All TACs are limited to the functions described in their charters.
+(k) Duration of committees. Each TAC will terminate at the end of two years from the date the committee was established or two years from the effective date of its most recent extension, whichever is later. Committees may be continued only for successive two-year periods by appropriate action taken by the authorized officer of the Department of Commerce prior to the date on which such advisory committee would otherwise terminate. TACs may be extended or terminated only after consultation with the committee.
+(l) Miscellaneous. (1) TACs established in accordance with paragraph (b) of this supplement must conform to the provisions of the Federal Advisory Committee Act (Pub. L. 92-463), Office of Management and Budget Circular A-63 (Revision of March 1974), “Advisory Committee Management,” Department of Commerce Administrative Order 205-12, “Public Information,” the applicable provisions of the EAA, and any other applicable Department of Commerce regulations or procedures affecting the establishment or operation of advisory committees.
+(2) Whenever the Department of Commerce desires the advice or assistance of a particular segment of an industry with respect to any export control problem for which the service of a TAC, as described in paragraph (b) of this supplement is either unavailable or impracticable, an advisory committee may be established pursuant to the provisions of section 9 of the Federal Advisory Committee Act. Such committees will be subject to the requirements of the Federal Advisory Committee Act, OMB Circular A-63 (Revision of March 1974), “Advisory Committee Management,” Department of Commerce Administrative Order 205-12, “Public Information,” and any other applicable Department of Commerce regulations or procedures affecting the establishment or operation of advisory committees.
+(3) Nothing in the provisions of this supplement shall be construed to restrict in any manner the right of any person or firm to discuss any export control matter with the Department of Commerce or to offer advice or information on export control matters. Similarly, nothing in these provisions shall be construed to restrict the Department of Commerce in consulting any person or firm relative to any export control matter.
+[61 FR 12734, Mar. 25, 1996, as amended at 73 FR 35, Jan. 2, 2008; 73 FR 75945, Dec. 15, 2008; 78 FR 13468, Feb. 28, 2013]
+
+Supplement No. 3 to Part 730—Other U.S. Government Departments and Agencies With Export Control Responsibilities
+
+Note: The departments and agencies identified with an asterisk control exports for foreign policy or national security reasons and, in certain cases, such controls may overlap with the controls described in the EAR (see part 734 of the EAR).
+
+Defense Services and Defense Articles
+
+*Department of State, Directorate of Defense Trade Controls, Tel. (202) 663-2700, Fax: (202) 261-8695, Internet: http://www.pmddtc.state.gov/index.html.
+22 CFR parts 120 through 130.
+
+Drugs, Chemicals and Precursors
+
+Chemicals: Drug Enforcement Administration, Office of Diversion Control, Import-Export Unit, Tel. (202) 307-4916, Fax: 202-307-4702, Internet: http://www.deadiversion.usdoj.gov/imp_exp/index.html.
+
+21 CFR Parts 1311 Through 1313
+
+Controlled Substances: Drug Enforcement Administration, Office of Diversion Control, Import-Export Unit, Tel. (202) 307-7182 or (202) 307-7181, Fax: (202) 307-7503, Internet: http://www.deadiversion.usdoj.gov/imp_exp/index.html.
+21 CFR Parts 1311 Through 1313
+Drugs and Biologics: Food and Drug Administration, Import/Export, Tel. (301) 594-3150, Fax: (301) 594-0165.
+21 U.S.C. 301 et seq .
+Investigational drugs permitted: Food and Drug Administration, International Affairs, Tel. (301) 443-4480, Fax: (301) 443-0235.
+21 CFR 312.1106
+
+Fish and Wildlife Controls; Endangered Species
+
+Department of the Interior, Chief Office of Management Authority, Tel. (703) 358-2093, Fax: (703) 358-2280.
+50 CFR 17.21, 17.22, 17.31, 17.32.
+
+Foreign Assets and Transactions Controls
+
+* Department of Treasury, Office of Foreign Assets Control, Licensing, Tel. (202) 622-2480, Fax: (202) 622-1657.
+31 CFR parts 500 through 590.
+
+Medical Devices
+
+Food and Drug Administration, Office of Compliance, Tel. (301) 594-4699, Fax: (301) 594-4715.
+21 U.S.C. 301 et seq.
+
+Natural Gas and Electric Power
+
+Department of Energy, Office of Fuels Programs, Tel. (202) 586-9482, Fax: (202) 586-6050.
+10 CFR 205.300 through 205.379 and part 590.
+
+Nuclear Materials and Equipment
+
+* Nuclear Regulatory Commission, Office of International Programs, Tel. (301) 415-2344, Fax: (301) 415-2395.
+10 CFR part 110.
+
+Nuclear Technologies and Services Which Contribute to the Production of Special Nuclear Material (Snm). Technologies Covered Include Nuclear Reactors, Enrichment, Reprocessing, Fuel Fabrication, and Heavy Water Production.
+
+Department of Energy Office of Export Control Policy & Cooperation (NA-24) Tel. (202) 586-2331, Fax (202) 586-1348.
+10 CFR part 810.
+
+Ocean Freight Forwarders
+
+Federal Maritime Commission, Office of Freight Forwarders, Tel. (202) 523-5843, Fax: (202) 523-5830.
+46 CFR part 510.
+
+Patent Filing Data Sent Abroad
+
+* Department of Commerce, Patent and Trademark Office, Licensing and Review; Tel. (703) 308-1722, Fax: (703) 305-3603, 3604.
+37 CFR part 5.
+
+U.S. Flagged or U.S. Manufactured Vessels Over 1,000 Gross Tons
+
+U.S. Maritime Administration, Division of Vessel Transfer and Disposal, Tel. (202) 366-5821, Fax: (202) 366-3889.
+46 CFR part 221.
+[61 FR 12734, Mar. 25, 1996, as amended at 65 FR 38149, June 19, 2000; 69 FR 5687, Feb. 6, 2004; 72 FR 20222, Apr. 24, 2007; 78 FR 13468, Feb. 28, 2013]
