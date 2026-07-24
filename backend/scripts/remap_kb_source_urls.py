@@ -71,7 +71,7 @@ async def main(dry_run: bool) -> None:
     # Cache KB names for readable reporting.
     kb_names: dict[str, str] = {}
     async for kb in KnowledgeBase.find_all():
-        kb_names[kb.uuid] = kb.name
+        kb_names[kb.uuid] = kb.title
 
     remapped = 0
     for old_url, new_url in REMAP.items():
