@@ -216,6 +216,127 @@ class TestPerformExtractionAndUpdate:
 
     @patch("app.tasks.document_tasks.get_sync_db")
     @patch("app.config.Settings")
+    @patch("app.services.document_readers.pdf_page_count", return_value=3)
+    @patch(
+        "app.services.document_readers.extract_text_with_markers",
+        return_value=(
+            "page one\npage two\npage three",
+            [
+                {"char_offset": 0, "kind": "page", "value": 1},
+                {"char_offset": 9, "kind": "page", "value": 2},
+                {"char_offset": 18, "kind": "page", "value": 3},
+            ],
+        ),
+    )
+    def test_persists_num_pages_for_pdf(
+        self, mock_extract, mock_page_count, MockSettings, mock_get_db,
+    ):
+        from app.tasks.document_tasks import perform_extraction_and_update
+
+        db = MagicMock()
+        mock_get_db.return_value = db
+        db.smart_document.find_one.return_value = {"uuid": "doc-1", "path": "three.pdf"}
+
+        settings = MagicMock()
+        settings.upload_dir = "/uploads"
+        MockSettings.return_value = settings
+
+        perform_extraction_and_update(document_uuid="doc-1", extension="pdf")
+
+        update_set = db.smart_document.update_one.call_args_list[-1][0][1]["$set"]
+        assert update_set["num_pages"] == 3
+
+    @patch("app.tasks.document_tasks.get_sync_db")
+    @patch("app.config.Settings")
+    @patch("app.services.document_readers.pdf_page_count", return_value=10)
+    @patch(
+        "app.services.document_readers.extract_text_with_markers",
+        return_value=(
+            "text from the eight pages that had a text layer",
+            [{"char_offset": i, "kind": "page", "value": i + 1} for i in range(8)],
+        ),
+    )
+    def test_num_pages_counts_pages_not_markers(
+        self, mock_extract, mock_page_count, MockSettings, mock_get_db,
+    ):
+        """PyMuPDF emits no marker for a page with no text and no form fields
+        (see document_readers._pymupdf_extract_with_pages), so a scanned or
+        mixed PDF has fewer page markers than pages. num_pages must come from
+        the PDF itself, not from len(markers)."""
+        from app.tasks.document_tasks import perform_extraction_and_update
+
+        db = MagicMock()
+        mock_get_db.return_value = db
+        db.smart_document.find_one.return_value = {"uuid": "doc-1", "path": "mixed.pdf"}
+
+        settings = MagicMock()
+        settings.upload_dir = "/uploads"
+        MockSettings.return_value = settings
+
+        perform_extraction_and_update(document_uuid="doc-1", extension="pdf")
+
+        update_set = db.smart_document.update_one.call_args_list[-1][0][1]["$set"]
+        assert update_set["num_pages"] == 10
+
+    @patch("app.tasks.document_tasks.get_sync_db")
+    @patch("app.config.Settings")
+    @patch(
+        "app.services.document_readers.extract_text_with_markers",
+        return_value=(
+            "## Sheet1\nrow\n## Sheet2\nrow\n## Sheet3\nrow",
+            [
+                {"char_offset": 0, "kind": "sheet", "value": "Sheet1"},
+                {"char_offset": 14, "kind": "sheet", "value": "Sheet2"},
+                {"char_offset": 28, "kind": "sheet", "value": "Sheet3"},
+            ],
+        ),
+    )
+    def test_xlsx_sheet_markers_do_not_set_num_pages(
+        self, mock_extract, MockSettings, mock_get_db,
+    ):
+        """Sheets are not pages — an XLSX must not get a fabricated page count."""
+        from app.tasks.document_tasks import perform_extraction_and_update
+
+        db = MagicMock()
+        mock_get_db.return_value = db
+        db.smart_document.find_one.return_value = {"uuid": "doc-1", "path": "book.xlsx"}
+
+        settings = MagicMock()
+        settings.upload_dir = "/uploads"
+        MockSettings.return_value = settings
+
+        perform_extraction_and_update(document_uuid="doc-1", extension="xlsx")
+
+        update_set = db.smart_document.update_one.call_args_list[-1][0][1]["$set"]
+        assert "num_pages" not in update_set
+
+    @patch("app.tasks.document_tasks.get_sync_db")
+    @patch("app.config.Settings")
+    @patch("app.services.document_readers.pdf_page_count", return_value=5)
+    @patch("app.services.document_readers.extract_text_with_markers", return_value=("", []))
+    def test_failed_extraction_clears_num_pages(
+        self, mock_extract, mock_page_count, MockSettings, mock_get_db,
+    ):
+        """A reprocess that now yields no text must not leave a stale page count
+        next to an empty raw_text."""
+        from app.tasks.document_tasks import perform_extraction_and_update
+
+        db = MagicMock()
+        mock_get_db.return_value = db
+        db.smart_document.find_one.return_value = {"uuid": "doc-1", "path": "scan.pdf"}
+
+        settings = MagicMock()
+        settings.upload_dir = "/uploads"
+        MockSettings.return_value = settings
+
+        perform_extraction_and_update(document_uuid="doc-1", extension="pdf")
+
+        update_set = db.smart_document.update_one.call_args_list[-1][0][1]["$set"]
+        assert update_set["task_status"] == "error"
+        assert update_set["num_pages"] == 0
+
+    @patch("app.tasks.document_tasks.get_sync_db")
+    @patch("app.config.Settings")
     @patch("app.services.document_readers.extract_text_from_file", return_value="text")
     def test_sets_processing_status_to_extracting(self, mock_extract, MockSettings, mock_get_db):
         from app.tasks.document_tasks import perform_extraction_and_update

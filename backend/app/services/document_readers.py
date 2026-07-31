@@ -562,7 +562,7 @@ def _interpolate_page_markers(text: str, num_pages: int) -> list[dict]:
     ]
 
 
-def _pdf_page_count(pdf_path: str) -> int:
+def pdf_page_count(pdf_path: str) -> int:
     """Cheap page-count read via PyMuPDF. Returns 0 if it can't open the file."""
     try:
         import pymupdf
@@ -647,7 +647,7 @@ def extract_text_with_markers(file_path: str, file_extension: str) -> tuple[str,
             logger.warning("OCR raised, falling back to PyMuPDF: %s", e)
             ocr_text = ""
         if ocr_text and len(ocr_text.strip()) >= MIN_PDF_TEXT_LENGTH:
-            num_pages = _pdf_page_count(file_path)
+            num_pages = pdf_page_count(file_path)
             return ocr_text, _interpolate_page_markers(ocr_text, num_pages)
         # OCR unavailable / too little text — PyMuPDF gives us exact boundaries.
         # The PyMuPDF pass is a page-boundary refinement over the OCR text, not a
@@ -664,7 +664,7 @@ def extract_text_with_markers(file_path: str, file_extension: str) -> tuple[str,
                     file_path, e,
                 )
                 return ocr_text, _interpolate_page_markers(
-                    ocr_text, _pdf_page_count(file_path)
+                    ocr_text, pdf_page_count(file_path)
                 )
             raise
 
